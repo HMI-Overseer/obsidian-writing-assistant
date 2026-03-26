@@ -1,0 +1,29 @@
+{
+  "name": "lm-studio-writing-assistant",
+  "version": "1.0.0",
+  "description": "Obsidian plugin: LM Studio Writing Assistant",
+  "main": "main.js",
+  "scripts": {
+    "dev": "node esbuild.config.mjs",
+    "build": "node esbuild.config.mjs production",
+    "lint": "eslint src --ext .ts",
+    "lint:fix": "eslint src --ext .ts --fix",
+    "format": "prettier --write \"src/**/*.ts\"",
+    "format:check": "prettier --check \"src/**/*.ts\""
+  },
+  "keywords": [],
+  "author": "Harbingers",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@typescript-eslint/eslint-plugin": "^7.18.0",
+    "@typescript-eslint/parser": "^7.18.0",
+    "builtin-modules": "^3.3.0",
+    "esbuild": "^0.21.0",
+    "eslint": "^8.57.0",
+    "obsidian": "latest",
+    "prettier": "^3.3.0",
+    "tslib": "2.6.0",
+    "typescript": "5.3.3"
+  }
+}

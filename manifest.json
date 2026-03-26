@@ -1,0 +1,10 @@
+{
+  "id": "lm-studio-writing-assistant",
+  "name": "LM Studio Writing Assistant",
+  "version": "1.0.0",
+  "minAppVersion": "1.0.0",
+  "description": "A chat interface that connects to a local LM Studio instance to assist with writing.",
+  "author": "Harbingers",
+  "authorUrl": "",
+  "isDesktopOnly": true
+}

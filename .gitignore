@@ -1,0 +1,29 @@
+# Build output
+main.js
+main.js.map
+
+# Dependencies
+node_modules/
+
+# TypeScript cache
+*.tsbuildinfo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Environment / secrets
+.env
+.env.*
+
+# Obsidian vault config (if the repo is inside a vault)
+.obsidian/
+
+# Claude Code local memory
+.claude/

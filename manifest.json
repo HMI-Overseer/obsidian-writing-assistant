@@ -4,7 +4,7 @@
   "version": "1.0.0",
   "minAppVersion": "1.0.0",
   "description": "A chat interface that connects to a local LM Studio instance to assist with writing.",
-  "author": "Harbingers",
-  "authorUrl": "",
+  "author": "HMI-Overseer",
+  "authorUrl": "https://github.com/HMI-Overseer",
   "isDesktopOnly": true
 }

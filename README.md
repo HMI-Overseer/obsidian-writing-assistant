@@ -59,64 +59,9 @@ All settings are in **Settings → LM Studio Writing Assistant**.
 
 ---
 
-## Development
+## Contributing
 
-### Prerequisites
-
-- Node.js 18+
-- npm
-
-### Scripts
-
-```bash
-npm install          # install dependencies
-npm run dev          # watch mode — rebuilds on file changes
-npm run build        # production build
-npm run lint         # ESLint
-npm run lint:fix     # ESLint with auto-fix
-npm run format       # Prettier (writes files)
-npm run format:check # Prettier (check only, no writes)
-```
-
-### Project Structure
-
-```
-src/
-├── main.ts                        # Plugin entry point — registers views, commands, settings tab
-├── constants.ts                   # Plugin-wide defaults and the VIEW_TYPE_CHAT constant
-├── utils.ts                       # Shared utility functions (ID generation, model resolution)
-├── shared/
-│   └── types.ts                   # TypeScript interfaces (Message, PluginSettings, etc.)
-├── api/
-│   ├── LMStudioClient.ts          # HTTP client — supports Node.js and fetch transports, streaming
-│   └── index.ts
-├── chat/
-│   ├── ChatView.ts                # Main chat UI (Obsidian ItemView)
-│   ├── chatState.ts               # State normalisation and hydration helpers
-│   └── index.ts
-├── context/
-│   └── noteContext.ts             # Reads active note text from the vault
-└── settings/
-    ├── SettingsTab.ts             # Tab router (Obsidian PluginSettingTab)
-    ├── GeneralTab.ts
-    ├── CompletionModelsTab.ts
-    ├── EmbeddingModelsTab.ts
-    ├── CommandsTab.ts
-    ├── AdvancedTab.ts
-    └── modals/
-        ├── CompletionModelModal.ts
-        ├── EmbeddingModelModal.ts
-        ├── CommandModal.ts
-        └── index.ts
-```
-
-### Coding Standards
-
-- **TypeScript** with `strict: true`
-- **ESLint** (`npm run lint`) — enforces `consistent-type-imports`, no unused vars, `eqeqeq`
-- **Prettier** (`npm run format`) — 100-char line width, double quotes, trailing commas
-- CSS class prefix: `lmsa-*`
-- One class per file; barrel `index.ts` exports per folder
+See [CONTRIBUTING.md](CONTRIBUTING.md) for setup instructions, project structure, coding standards, and the development workflow.
 
 ---
 

@@ -1,4 +1,4 @@
-﻿export interface Message {
+export interface Message {
   role: "system" | "user" | "assistant";
   content: string;
 }
@@ -30,6 +30,47 @@ export interface CustomCommand {
   autoInsert: boolean;
 }
 
+/**
+ * A single message in a conversation transcript.
+ * The `id` field is intentionally included now so that future branching and
+ * in-place bubble editing can reference a stable message identity without
+ * requiring a schema migration.
+ */
+export interface ConversationMessage {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+}
+
+/**
+ * A full conversation record stored in history.
+ *
+ * `parentConversationId` and `branchFromMessageId` are reserved for future
+ * branch-off support (create a new conversation forked from a specific bubble).
+ * They are undefined on normal conversations.
+ */
+export interface Conversation {
+  id: string;
+  title: string;
+  createdAt: number;
+  updatedAt: number;
+  /** CompletionModel.id at creation time — used to resolve the live model. */
+  modelId: string;
+  /** Display snapshot — survives model rename or deletion. */
+  modelName: string;
+  messages: ConversationMessage[];
+  draft: string;
+  /** Reserved for future branching support. */
+  parentConversationId?: string;
+  /** Reserved for future branching support. */
+  branchFromMessageId?: string;
+}
+
+export interface ChatHistory {
+  conversations: Conversation[];
+  activeConversationId: string | null;
+}
+
 export interface PluginSettings {
   lmStudioUrl: string;
   bypassCors: boolean;
@@ -39,5 +80,7 @@ export interface PluginSettings {
   completionModels: CompletionModel[];
   embeddingModels: EmbeddingModel[];
   commands: CustomCommand[];
-  chatState: ChatState;
+  chatHistory: ChatHistory;
+  /** @deprecated Kept only for one-time migration from the pre-history schema. */
+  chatState?: ChatState;
 }

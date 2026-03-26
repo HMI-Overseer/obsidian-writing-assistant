@@ -1,4 +1,4 @@
-import type { CompletionModel, PluginSettings } from "./shared/types";
+import type { ChatHistory, CompletionModel, PluginSettings } from "./shared/types";
 
 export const VIEW_TYPE_CHAT = "lm-studio-chat";
 
@@ -14,6 +14,13 @@ export const DEFAULT_COMPLETION_MODEL: CompletionModel = {
   maxTokens: 2000,
 };
 
+export const MAX_CONVERSATIONS = 50;
+
+export const DEFAULT_CHAT_HISTORY: ChatHistory = {
+  conversations: [],
+  activeConversationId: null,
+};
+
 export const DEFAULT_SETTINGS: PluginSettings = {
   lmStudioUrl: "http://localhost:1234/v1",
   bypassCors: true,
@@ -23,8 +30,5 @@ export const DEFAULT_SETTINGS: PluginSettings = {
   completionModels: [{ ...DEFAULT_COMPLETION_MODEL }],
   embeddingModels: [],
   commands: [],
-  chatState: {
-    messages: [],
-    draft: "",
-  },
+  chatHistory: { ...DEFAULT_CHAT_HISTORY },
 };

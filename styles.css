@@ -108,6 +108,7 @@
   position: relative;
   flex: 1;
   min-height: 0;
+  overflow: hidden;
 }
 
 .lmsa-messages {
@@ -321,6 +322,7 @@
 }
 
 .lmsa-composer-panel {
+  position: relative;
   border: 1px solid var(--background-modifier-border);
   background: color-mix(in srgb, var(--background-primary) 92%, transparent);
   border-radius: 20px;
@@ -563,6 +565,211 @@
   line-height: 1.5;
 }
 
+/* =========================================================
+   Context chips (inside composer panel)
+   ========================================================= */
+
+.lmsa-composer-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 0 4px 8px;
+}
+
+.lmsa-composer-chips:empty {
+  display: none;
+}
+
+.lmsa-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 6px 4px 8px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--interactive-accent) 40%, var(--background-modifier-border));
+  background: color-mix(in srgb, var(--interactive-accent) 10%, var(--background-secondary));
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+  max-width: 220px;
+}
+
+.lmsa-chip-icon {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  color: var(--interactive-accent);
+}
+
+.lmsa-chip-icon svg {
+  width: 11px;
+  height: 11px;
+}
+
+.lmsa-chip-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  min-width: 0;
+}
+
+.lmsa-chip-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-faint);
+  cursor: pointer;
+  flex: 0 0 auto;
+}
+
+.lmsa-chip-remove:hover {
+  background: color-mix(in srgb, var(--background-modifier-border) 60%, transparent);
+  color: var(--text-muted);
+}
+
+.lmsa-chip-remove svg {
+  width: 10px;
+  height: 10px;
+}
+
+/* =========================================================
+   Model selector button & dropdown
+   ========================================================= */
+
+.lmsa-model-selector-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 8px;
+  border-radius: 8px;
+  border: 1px solid var(--background-modifier-border);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: var(--font-ui-smaller);
+  max-width: 180px;
+  min-width: 0;
+  flex-shrink: 0;
+}
+
+.lmsa-model-selector-btn:hover,
+.lmsa-model-selector-btn.is-active {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+  border-color: var(--background-modifier-border-hover, var(--background-modifier-border));
+}
+
+.lmsa-model-selector-icon {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+}
+
+.lmsa-model-selector-icon svg {
+  width: 13px;
+  height: 13px;
+}
+
+.lmsa-model-selector-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  min-width: 0;
+}
+
+.lmsa-model-selector-chevron {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+}
+
+.lmsa-model-selector-chevron svg {
+  width: 12px;
+  height: 12px;
+}
+
+.lmsa-model-dropdown {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  background: var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 14px;
+  padding: 6px;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.14);
+  z-index: 100;
+  max-height: 280px;
+  overflow-y: auto;
+}
+
+.lmsa-model-dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 10px;
+  border: none;
+  background: transparent;
+  color: var(--text-normal);
+  cursor: pointer;
+  text-align: left;
+  border-radius: 10px;
+  font-size: var(--font-ui-small);
+}
+
+.lmsa-model-dropdown-item:hover {
+  background: var(--background-modifier-hover);
+}
+
+.lmsa-model-dropdown-item.is-active {
+  color: var(--interactive-accent);
+}
+
+.lmsa-model-dropdown-check {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 16px;
+  width: 16px;
+}
+
+.lmsa-model-dropdown-check svg {
+  width: 14px;
+  height: 14px;
+}
+
+.lmsa-model-dropdown-name {
+  flex: 1;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lmsa-model-dropdown-id {
+  font-size: var(--font-ui-smaller);
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 130px;
+}
+
+.lmsa-model-dropdown-empty {
+  padding: 12px 10px;
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+  text-align: center;
+}
+
 @keyframes lmsa-pulse {
   0%,
   100% {
@@ -574,6 +781,179 @@
     opacity: 1;
     transform: scale(1);
   }
+}
+
+/* =========================================================
+   Chat History Drawer
+   ========================================================= */
+
+.lmsa-history-drawer {
+  display: none;
+  position: absolute;
+  inset: 0;
+  flex-direction: column;
+  background: var(--background-primary);
+  z-index: 10;
+  overflow: hidden;
+}
+
+.lmsa-history-drawer.is-open {
+  display: flex;
+  animation: lmsa-drawer-fade 180ms ease forwards;
+}
+
+@keyframes lmsa-drawer-fade {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.lmsa-history-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 14px 16px 12px;
+  border-bottom: 1px solid var(--background-modifier-border);
+  flex-shrink: 0;
+}
+
+.lmsa-history-title-group {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+
+.lmsa-history-title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text-normal);
+}
+
+.lmsa-history-count {
+  font-size: var(--font-ui-smaller);
+  color: var(--text-faint);
+}
+
+.lmsa-history-header-actions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.lmsa-history-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.lmsa-history-empty {
+  padding: 32px 16px;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: var(--font-ui-small);
+}
+
+.lmsa-history-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 10px 10px 12px;
+  border-radius: 12px;
+  border: 1px solid transparent;
+  cursor: default;
+  transition: background 100ms;
+}
+
+.lmsa-history-item:hover {
+  background: var(--background-modifier-hover);
+  border-color: var(--background-modifier-border);
+}
+
+.lmsa-history-item.is-active {
+  background: color-mix(in srgb, var(--interactive-accent) 10%, var(--background-secondary));
+  border-color: color-mix(in srgb, var(--interactive-accent) 30%, var(--background-modifier-border));
+}
+
+.lmsa-history-item-body {
+  flex: 1;
+  min-width: 0;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.lmsa-history-item-title {
+  font-size: var(--font-ui-small);
+  font-weight: 500;
+  color: var(--text-normal);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lmsa-history-item.is-active .lmsa-history-item-title {
+  color: var(--interactive-accent);
+}
+
+.lmsa-history-item-meta {
+  font-size: var(--font-ui-smaller);
+  color: var(--text-faint);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lmsa-history-item-delete-area {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+/* Trash button — only visible on hover */
+.lmsa-history-trash-btn {
+  opacity: 0;
+  transition: opacity 120ms;
+}
+
+.lmsa-history-item:hover .lmsa-history-trash-btn {
+  opacity: 1;
+}
+
+/* Confirm / Cancel delete buttons */
+.lmsa-history-delete-confirm,
+.lmsa-history-delete-cancel {
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: var(--font-ui-smaller);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.lmsa-history-delete-confirm {
+  border: 1px solid var(--background-modifier-error);
+  background: var(--background-primary);
+  color: var(--text-error);
+}
+
+.lmsa-history-delete-confirm:hover {
+  background: color-mix(in srgb, var(--background-modifier-error) 15%, var(--background-primary));
+}
+
+.lmsa-history-delete-cancel {
+  border: 1px solid var(--background-modifier-border);
+  background: var(--background-secondary);
+  color: var(--text-muted);
+}
+
+.lmsa-history-delete-cancel:hover {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
 }
 
 @media (max-width: 700px) {

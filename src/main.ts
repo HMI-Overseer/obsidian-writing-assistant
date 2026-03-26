@@ -1,13 +1,22 @@
-﻿import type { WorkspaceLeaf } from "obsidian";
+import type { WorkspaceLeaf } from "obsidian";
 import { Notice, Plugin } from "obsidian";
 import type {
+  ChatHistory,
   CompletionModel,
+  Conversation,
   CustomCommand,
   EmbeddingModel,
   PluginSettings,
 } from "./shared/types";
-import { DEFAULT_COMPLETION_MODEL, DEFAULT_SETTINGS, VIEW_TYPE_CHAT } from "./constants";
-import { ChatView, normalizeChatState } from "./chat";
+import { DEFAULT_CHAT_HISTORY, DEFAULT_COMPLETION_MODEL, DEFAULT_SETTINGS, VIEW_TYPE_CHAT } from "./constants";
+import { ChatView } from "./chat";
+import { normalizeChatState } from "./chat/chatState";
+import {
+  createConversation,
+  generateConversationTitle,
+  normalizeChatHistory,
+} from "./chat/conversationHistory";
+import { generateId } from "./utils";
 import { LMStudioSettingTab } from "./settings";
 
 export default class LMStudioWritingAssistant extends Plugin {
@@ -73,6 +82,9 @@ export default class LMStudioWritingAssistant extends Plugin {
       }
     > | null;
 
+    // -----------------------------------------------------------------------
+    // Normalise completion models (unchanged from before)
+    // -----------------------------------------------------------------------
     const legacyModel: CompletionModel = {
       ...DEFAULT_COMPLETION_MODEL,
       modelId: data?.modelId ?? DEFAULT_COMPLETION_MODEL.modelId,
@@ -113,19 +125,74 @@ export default class LMStudioWritingAssistant extends Plugin {
         ? data.activeCompletionModelId
         : completionModels[0].id;
 
+    // -----------------------------------------------------------------------
+    // Chat history — with one-time migration from legacy chatState
+    // -----------------------------------------------------------------------
+    let chatHistory: ChatHistory;
+
+    if (data?.chatHistory && typeof data.chatHistory === "object") {
+      // Already on new schema — normalise and use.
+      chatHistory = normalizeChatHistory(data.chatHistory);
+    } else if (data?.chatState) {
+      // Legacy single-conversation schema — promote to history.
+      const legacy = normalizeChatState(data.chatState);
+      const legacyMessages = legacy.messages.filter(
+        (m) => m.role === "user" || m.role === "assistant"
+      );
+
+      if (legacyMessages.length > 0 || legacy.draft) {
+        const firstUserMessage =
+          legacyMessages.find((m) => m.role === "user")?.content ?? "";
+        const activeModel =
+          completionModels.find((m) => m.id === activeCompletionModelId) ??
+          completionModels[0];
+
+        const migratedConversation: Conversation = {
+          id: generateId(),
+          title: firstUserMessage
+            ? generateConversationTitle(firstUserMessage)
+            : "Previous conversation",
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+          modelId: activeModel.id,
+          modelName: activeModel.name,
+          messages: legacyMessages.map((m) => ({
+            id: generateId(),
+            role: m.role as "user" | "assistant",
+            content: m.content,
+          })),
+          draft: legacy.draft,
+        };
+
+        chatHistory = {
+          conversations: [migratedConversation],
+          activeConversationId: migratedConversation.id,
+        };
+      } else {
+        chatHistory = { ...DEFAULT_CHAT_HISTORY };
+      }
+    } else {
+      chatHistory = { ...DEFAULT_CHAT_HISTORY };
+    }
+
     this.settings = {
       ...DEFAULT_SETTINGS,
       ...data,
       completionModels,
       embeddingModels,
       commands,
-      chatState: normalizeChatState(data?.chatState),
       activeCompletionModelId,
+      chatHistory,
+      // Intentionally omit chatState — it will vanish from data.json on next save.
+      chatState: undefined,
     };
   }
 
   async saveSettings(): Promise<void> {
-    await this.saveData(this.settings);
+    // Strip the deprecated chatState field before writing so it disappears from
+    // data.json after the first save following migration.
+    const { chatState: _dropped, ...toSave } = this.settings;
+    await this.saveData(toSave);
   }
 
   private initLeafIfNeeded(): void {

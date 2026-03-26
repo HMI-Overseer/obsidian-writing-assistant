@@ -1,7 +1,12 @@
-﻿import type { ChatState, Message } from "../shared/types";
+import type { ChatState, ConversationMessage, Message } from "../shared/types";
 
 export const CHAT_DRAFT_SAVE_DELAY_MS = 300;
-export type ChatTranscriptMessage = { role: "user" | "assistant"; content: string };
+
+/**
+ * @deprecated Use ConversationMessage from types.ts for new code.
+ * Kept as an alias so existing call-sites that haven't been updated yet still compile.
+ */
+export type ChatTranscriptMessage = ConversationMessage;
 
 export function normalizeChatState(raw?: Partial<ChatState> | null): ChatState {
   const messages: Message[] = Array.isArray(raw?.messages)
@@ -23,32 +28,5 @@ export function normalizeChatState(raw?: Partial<ChatState> | null): ChatState {
   return {
     messages,
     draft: typeof raw?.draft === "string" ? raw.draft : "",
-  };
-}
-
-export function hydrateTranscript(chatState: ChatState): {
-  draft: string;
-  messages: ChatTranscriptMessage[];
-  lastAssistantResponse: string;
-} {
-  const messages = chatState.messages.filter(
-    (message): message is ChatTranscriptMessage =>
-      message.role === "user" || message.role === "assistant"
-  );
-
-  const lastAssistantResponse =
-    [...messages].reverse().find((message) => message.role === "assistant")?.content ?? "";
-
-  return {
-    draft: chatState.draft,
-    messages,
-    lastAssistantResponse,
-  };
-}
-
-export function createChatState(messages: ChatTranscriptMessage[], draft: string): ChatState {
-  return {
-    messages: [...messages],
-    draft,
   };
 }

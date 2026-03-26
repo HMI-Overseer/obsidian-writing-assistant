@@ -27,3 +27,6 @@ Thumbs.db
 
 # Claude Code local memory
 .claude/
+
+# Obsidian
+data.json

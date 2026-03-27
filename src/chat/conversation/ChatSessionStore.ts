@@ -1,0 +1,220 @@
+import type {
+  CompletionModel,
+  Conversation,
+  ConversationMessage,
+} from "../../shared/types";
+import type LMStudioWritingAssistant from "../../main";
+import { resolveCompletionModel } from "../../utils";
+import {
+  createConversation,
+  generateConversationTitle,
+  pruneHistory,
+} from "./conversationUtils";
+import type { ChatSessionSnapshot } from "../types";
+
+const CHAT_DRAFT_SAVE_DELAY_MS = 300;
+
+export class ChatSessionStore {
+  private activeConversationId: string | null = null;
+  private messageHistory: ConversationMessage[] = [];
+  private lastAssistantResponse = "";
+  private draft = "";
+  private draftSaveTimer: number | null = null;
+
+  constructor(private readonly plugin: LMStudioWritingAssistant) {}
+
+  getSnapshot(): ChatSessionSnapshot {
+    return {
+      activeConversationId: this.activeConversationId,
+      draft: this.draft,
+      messageHistory: [...this.messageHistory],
+      lastAssistantResponse: this.lastAssistantResponse,
+    };
+  }
+
+  getConversations(): Conversation[] {
+    return this.plugin.settings.chatHistory.conversations;
+  }
+
+  getActiveConversationId(): string | null {
+    return this.activeConversationId;
+  }
+
+  getActiveConversation(): Conversation | null {
+    const id = this.activeConversationId;
+    if (!id) return null;
+
+    return (
+      this.plugin.settings.chatHistory.conversations.find(
+        (conversation) => conversation.id === id
+      ) ?? null
+    );
+  }
+
+  getResolvedConversationModel(
+    conversation: Conversation | null = this.getActiveConversation()
+  ): CompletionModel | null {
+    return conversation
+      ? resolveCompletionModel(this.plugin.settings, conversation.modelId)
+      : null;
+  }
+
+  setDraft(draft: string): void {
+    this.draft = draft;
+  }
+
+  appendMessage(message: ConversationMessage): void {
+    this.messageHistory.push(message);
+  }
+
+  setLastAssistantResponse(text: string): void {
+    this.lastAssistantResponse = text;
+  }
+
+  ensureConversationTitleFromFirstUserMessage(text: string): boolean {
+    if (this.messageHistory.length > 0) return false;
+
+    const conversation = this.getActiveConversation();
+    if (!conversation || conversation.title) return false;
+
+    conversation.title = generateConversationTitle(text);
+    return true;
+  }
+
+  async restorePersistedState(): Promise<void> {
+    const history = this.plugin.settings.chatHistory;
+    const currentId = history.activeConversationId;
+    const currentConversation = currentId
+      ? history.conversations.find((conversation) => conversation.id === currentId)
+      : null;
+
+    if (currentConversation) {
+      this.hydrateFromConversation(currentConversation);
+      return;
+    }
+
+    if (history.conversations.length > 0) {
+      this.hydrateFromConversation(history.conversations[0]);
+      return;
+    }
+
+    const freshConversation = createConversation("", "");
+    history.conversations.unshift(freshConversation);
+    history.activeConversationId = freshConversation.id;
+    this.hydrateFromConversation(freshConversation);
+  }
+
+  async setActiveConversationModel(model: CompletionModel): Promise<void> {
+    const conversation = this.getActiveConversation();
+    if (!conversation) return;
+
+    conversation.modelId = model.id;
+    conversation.modelName = model.name;
+    await this.plugin.saveSettings();
+  }
+
+  async newConversation(): Promise<void> {
+    const history = this.plugin.settings.chatHistory;
+    const conversation = createConversation("", "");
+
+    history.conversations.unshift(conversation);
+    pruneHistory(history);
+    this.hydrateFromConversation(conversation);
+
+    await this.plugin.saveSettings();
+  }
+
+  async switchToConversation(id: string): Promise<boolean> {
+    if (id === this.activeConversationId) return false;
+
+    const target = this.plugin.settings.chatHistory.conversations.find(
+      (conversation) => conversation.id === id
+    );
+    if (!target) return false;
+
+    this.hydrateFromConversation(target);
+    await this.plugin.saveSettings();
+    return true;
+  }
+
+  async deleteConversation(id: string): Promise<void> {
+    const history = this.plugin.settings.chatHistory;
+    const isActiveConversation = id === this.activeConversationId;
+
+    history.conversations = history.conversations.filter(
+      (conversation) => conversation.id !== id
+    );
+
+    if (isActiveConversation) {
+      if (history.conversations.length > 0) {
+        this.hydrateFromConversation(history.conversations[0]);
+      } else {
+        const freshConversation = createConversation("", "");
+        history.conversations.unshift(freshConversation);
+        this.hydrateFromConversation(freshConversation);
+      }
+    }
+
+    await this.plugin.saveSettings();
+  }
+
+  async persistActiveConversation(): Promise<void> {
+    const id = this.activeConversationId;
+    if (!id) return;
+
+    const history = this.plugin.settings.chatHistory;
+    const conversationIndex = history.conversations.findIndex(
+      (conversation) => conversation.id === id
+    );
+    if (conversationIndex === -1) return;
+
+    const conversation = history.conversations[conversationIndex];
+    const isEmptyConversation =
+      this.messageHistory.length === 0 && !this.draft.trim();
+
+    if (isEmptyConversation && !conversation.title) {
+      history.conversations.splice(conversationIndex, 1);
+      if (history.activeConversationId === id) {
+        history.activeConversationId = history.conversations[0]?.id ?? null;
+      }
+
+      await this.plugin.saveSettings();
+      return;
+    }
+
+    history.conversations[conversationIndex] = {
+      ...conversation,
+      messages: [...this.messageHistory],
+      draft: this.draft,
+      updatedAt: Date.now(),
+    };
+
+    await this.plugin.saveSettings();
+  }
+
+  scheduleDraftSave(): void {
+    this.clearDraftSaveTimer();
+    this.draftSaveTimer = window.setTimeout(() => {
+      this.draftSaveTimer = null;
+      void this.persistActiveConversation();
+    }, CHAT_DRAFT_SAVE_DELAY_MS);
+  }
+
+  clearDraftSaveTimer(): void {
+    if (this.draftSaveTimer === null) return;
+
+    window.clearTimeout(this.draftSaveTimer);
+    this.draftSaveTimer = null;
+  }
+
+  private hydrateFromConversation(conversation: Conversation): void {
+    this.activeConversationId = conversation.id;
+    this.messageHistory = [...conversation.messages];
+    this.lastAssistantResponse =
+      [...conversation.messages]
+        .reverse()
+        .find((message) => message.role === "assistant")?.content ?? "";
+    this.draft = conversation.draft;
+    this.plugin.settings.chatHistory.activeConversationId = conversation.id;
+  }
+}

@@ -1,0 +1,109 @@
+@layer components {
+  .lmsa-settings-root {
+    @apply lmsa-pb-8;
+  }
+
+  .lmsa-settings-shell {
+    @apply lmsa-flex lmsa-flex-col lmsa-gap-5;
+  }
+
+  .lmsa-settings-topbar {
+    @apply lmsa-relative lmsa-flex lmsa-flex-col lmsa-items-stretch lmsa-justify-start lmsa-gap-5 lmsa-overflow-hidden lmsa-px-5 lmsa-py-[18px];
+    background:
+      radial-gradient(circle at top left, color-mix(in srgb, var(--interactive-accent) 14%, transparent), transparent 44%),
+      linear-gradient(180deg, color-mix(in srgb, var(--background-primary) 94%, transparent), color-mix(in srgb, var(--background-secondary) 88%, transparent));
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+    box-shadow:
+      0 20px 48px rgba(0, 0, 0, 0.08),
+      inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  }
+
+  .lmsa-settings-topbar::before {
+    content: "";
+    @apply lmsa-pointer-events-none lmsa-absolute lmsa-inset-x-5 lmsa-top-0 lmsa-h-px;
+    background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--interactive-accent) 55%, white), transparent);
+    opacity: 0.85;
+  }
+
+  .lmsa-settings-brand {
+    @apply lmsa-flex lmsa-min-w-0 lmsa-flex-col lmsa-gap-1;
+  }
+
+  .lmsa-settings-eyebrow {
+    @apply lmsa-font-semibold lmsa-uppercase lmsa-tracking-[0.18em];
+    color: color-mix(in srgb, var(--interactive-accent) 72%, var(--text-muted));
+    font-size: 0.68rem;
+  }
+
+  .lmsa-settings-title,
+  .lmsa-settings-panel-title {
+    @apply lmsa-m-0 lmsa-font-bold lmsa-text-obsidian-text;
+    font-size: 1.35rem;
+    line-height: 1.15;
+  }
+
+  .lmsa-settings-nav {
+    @apply lmsa-flex lmsa-w-full lmsa-min-w-0 lmsa-flex-nowrap lmsa-items-stretch lmsa-gap-2 lmsa-overflow-x-auto lmsa-py-0.5;
+    scrollbar-width: thin;
+  }
+
+  .lmsa-settings-tab-btn {
+    @apply lmsa-inline-flex lmsa-min-w-max lmsa-flex-none lmsa-items-center lmsa-justify-center lmsa-rounded-[16px] lmsa-border lmsa-border-transparent lmsa-px-4 lmsa-py-3 lmsa-text-center;
+    background: color-mix(in srgb, var(--background-secondary) 34%, transparent);
+    color: var(--text-muted);
+    transition:
+      background-color 140ms ease,
+      border-color 140ms ease,
+      color 140ms ease,
+      transform 140ms ease,
+      box-shadow 140ms ease;
+  }
+
+  .lmsa-settings-tab-btn:hover {
+    color: var(--text-normal);
+    border-color: color-mix(in srgb, var(--interactive-accent) 18%, var(--background-modifier-border));
+    background: color-mix(in srgb, var(--background-modifier-hover) 78%, transparent);
+    transform: translateY(-1px);
+  }
+
+  .lmsa-settings-tab-btn.is-active {
+    color: var(--text-normal);
+    border-color: color-mix(in srgb, var(--interactive-accent) 34%, var(--background-modifier-border));
+    background:
+      linear-gradient(135deg, color-mix(in srgb, var(--interactive-accent) 16%, var(--background-secondary)), color-mix(in srgb, var(--interactive-accent) 7%, var(--background-primary)));
+    box-shadow:
+      0 16px 32px rgba(0, 0, 0, 0.08),
+      0 0 0 1px color-mix(in srgb, var(--interactive-accent) 14%, transparent);
+  }
+
+  .lmsa-settings-tab-label {
+    @apply lmsa-font-semibold lmsa-whitespace-nowrap;
+    font-size: 0.95rem;
+  }
+
+  .lmsa-settings-stage {
+    @apply lmsa-min-w-0;
+  }
+
+  .lmsa-tab-desc,
+  .lmsa-divider {
+    display: none;
+  }
+
+  @media (max-width: 980px) {
+    .lmsa-settings-nav {
+      @apply lmsa-pb-1;
+    }
+  }
+
+  @media (max-width: 700px) {
+    .lmsa-settings-topbar {
+      @apply lmsa-px-4 lmsa-py-4;
+    }
+
+    .lmsa-settings-tab-btn {
+      @apply lmsa-min-w-max;
+    }
+  }
+}

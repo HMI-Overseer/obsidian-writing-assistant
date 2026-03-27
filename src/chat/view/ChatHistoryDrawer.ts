@@ -1,7 +1,7 @@
 import { setIcon } from "obsidian";
-import type { Conversation } from "../shared/types";
-import { MAX_CONVERSATIONS } from "../constants";
-import { formatRelativeDate } from "./conversationHistory";
+import { MAX_CONVERSATIONS } from "../../constants";
+import type { Conversation } from "../../shared/types";
+import { formatRelativeDate } from "../conversation/conversationUtils";
 
 export type DrawerCallbacks = {
   onSelect: (conversationId: string) => void;
@@ -13,11 +13,11 @@ export type DrawerCallbacks = {
 export class ChatHistoryDrawer {
   private hostEl: HTMLElement;
   private backdropEl: HTMLElement;
-  private drawerEl: HTMLElement;  private listEl!: HTMLElement;
+  private drawerEl: HTMLElement;
+  private listEl!: HTMLElement;
   private countEl!: HTMLElement;
   private callbacks: DrawerCallbacks;
 
-  /** id of a conversation currently showing the confirm/cancel delete UI */
   private pendingDeleteId: string | null = null;
 
   constructor(containerEl: HTMLElement, callbacks: DrawerCallbacks) {
@@ -28,10 +28,6 @@ export class ChatHistoryDrawer {
     this.drawerEl = containerEl.createDiv({ cls: "lmsa-history-drawer" });
     this.buildShell();
   }
-
-  // ---------------------------------------------------------------------------
-  // Public API
-  // ---------------------------------------------------------------------------
 
   open(conversations: Conversation[], activeId: string | null): void {
     this.pendingDeleteId = null;
@@ -52,22 +48,20 @@ export class ChatHistoryDrawer {
     return this.drawerEl.hasClass("is-open");
   }
 
-  /** Re-render list in-place (e.g. after a conversation title updates mid-session). */
   refresh(conversations: Conversation[], activeId: string | null): void {
     if (!this.isOpen()) return;
     this.render(conversations, activeId);
   }
-
-  // ---------------------------------------------------------------------------
-  // Private DOM construction
-  // ---------------------------------------------------------------------------
 
   private buildShell(): void {
     const header = this.drawerEl.createDiv({ cls: "lmsa-history-header" });
 
     const titleGroup = header.createDiv({ cls: "lmsa-history-title-group" });
     titleGroup.createEl("span", { cls: "lmsa-history-title", text: "Chat History" });
-    this.countEl = titleGroup.createEl("span", { cls: "lmsa-history-count", text: "" });
+    this.countEl = titleGroup.createEl("span", {
+      cls: "lmsa-history-count",
+      text: "",
+    });
 
     const actions = header.createDiv({ cls: "lmsa-history-header-actions" });
 
@@ -83,8 +77,6 @@ export class ChatHistoryDrawer {
 
   private render(conversations: Conversation[], activeId: string | null): void {
     this.listEl.empty();
-
-    // Update counter
     this.countEl.setText(`${conversations.length} / ${MAX_CONVERSATIONS}`);
 
     if (conversations.length === 0) {
@@ -95,91 +87,83 @@ export class ChatHistoryDrawer {
       return;
     }
 
-    for (const conv of conversations) {
-      this.renderItem(conv, conv.id === activeId);
+    for (const conversation of conversations) {
+      this.renderItem(conversation, conversation.id === activeId);
     }
   }
 
-  private renderItem(conv: Conversation, isActive: boolean): void {
+  private renderItem(conversation: Conversation, isActive: boolean): void {
     const item = this.listEl.createDiv({
       cls: "lmsa-history-item lmsa-ui-list-item" + (isActive ? " is-active" : ""),
-      attr: { "data-conv-id": conv.id },
+      attr: { "data-conv-id": conversation.id },
     });
 
-    // Clickable body
     const body = item.createDiv({ cls: "lmsa-history-item-body" });
     const displayTitle =
-      conv.title || (conv.messages.length === 0 ? "New conversation" : "Untitled");
+      conversation.title ||
+      (conversation.messages.length === 0 ? "New conversation" : "Untitled");
     body.createDiv({ cls: "lmsa-history-item-title", text: displayTitle });
 
-    const msgCount = conv.messages.length;
-    const msgLabel = msgCount === 1 ? "1 msg" : `${msgCount} msgs`;
-    const dateLabel = formatRelativeDate(conv.updatedAt);
-    const meta = [dateLabel, msgLabel, conv.modelName].filter(Boolean).join(" · ");
+    const messageCount = conversation.messages.length;
+    const messageLabel = messageCount === 1 ? "1 msg" : `${messageCount} msgs`;
+    const dateLabel = formatRelativeDate(conversation.updatedAt);
+    const meta = [dateLabel, messageLabel, conversation.modelName]
+      .filter(Boolean)
+      .join(" - ");
     body.createDiv({ cls: "lmsa-history-item-meta", text: meta });
 
     body.addEventListener("click", () => {
-      if (this.pendingDeleteId === conv.id) return; // ignore while confirm is shown
-      this.callbacks.onSelect(conv.id);
+      if (this.pendingDeleteId === conversation.id) return;
+      this.callbacks.onSelect(conversation.id);
     });
 
-    // Delete / confirm area
     const deleteArea = item.createDiv({ cls: "lmsa-history-item-delete-area" });
-    this.renderDeleteControl(deleteArea, conv.id);
+    this.renderDeleteControl(deleteArea, conversation.id);
   }
 
-  private renderDeleteControl(container: HTMLElement, convId: string): void {
+  private renderDeleteControl(container: HTMLElement, conversationId: string): void {
     container.empty();
 
-    if (this.pendingDeleteId === convId) {
-      // Show confirm / cancel
+    if (this.pendingDeleteId === conversationId) {
       const confirmBtn = container.createEl("button", {
         cls: "lmsa-history-delete-confirm lmsa-ui-compact-btn lmsa-ui-compact-btn-danger",
         text: "Delete",
       });
-      confirmBtn.addEventListener("click", (e) => {
-        e.stopPropagation();
+      confirmBtn.addEventListener("click", (event) => {
+        event.stopPropagation();
         this.pendingDeleteId = null;
-        this.callbacks.onDelete(convId);
+        this.callbacks.onDelete(conversationId);
       });
 
       const cancelBtn = container.createEl("button", {
         cls: "lmsa-history-delete-cancel lmsa-ui-compact-btn lmsa-ui-compact-btn-secondary",
         text: "Cancel",
       });
-      cancelBtn.addEventListener("click", (e) => {
-        e.stopPropagation();
+      cancelBtn.addEventListener("click", (event) => {
+        event.stopPropagation();
         this.pendingDeleteId = null;
-        // Re-render the delete control back to the trash icon
-        this.renderDeleteControl(container, convId);
+        this.renderDeleteControl(container, conversationId);
       });
-    } else {
-      const trashBtn = container.createEl("button", {
-        cls: "lmsa-header-btn lmsa-history-trash-btn lmsa-ui-icon-btn",
-        attr: { "aria-label": "Delete conversation" },
-      });
-      setIcon(trashBtn, "trash-2");
-      trashBtn.addEventListener("click", (e) => {
-        e.stopPropagation();
-        // Cancel any other pending delete first
-        if (this.pendingDeleteId && this.pendingDeleteId !== convId) {
-          // Find the old pending item's delete area and reset it
-          const oldArea = this.listEl.querySelector(
-            `.lmsa-history-item[data-conv-id="${this.pendingDeleteId}"] .lmsa-history-item-delete-area`
-          );
-          if (oldArea instanceof HTMLElement) {
-            this.renderDeleteControl(oldArea, this.pendingDeleteId);
-          }
-        }
-        this.pendingDeleteId = convId;
-        this.renderDeleteControl(container, convId);
-      });
+      return;
     }
+
+    const trashBtn = container.createEl("button", {
+      cls: "lmsa-header-btn lmsa-history-trash-btn lmsa-ui-icon-btn",
+      attr: { "aria-label": "Delete conversation" },
+    });
+    setIcon(trashBtn, "trash-2");
+    trashBtn.addEventListener("click", (event) => {
+      event.stopPropagation();
+      if (this.pendingDeleteId && this.pendingDeleteId !== conversationId) {
+        const oldArea = this.listEl.querySelector(
+          `.lmsa-history-item[data-conv-id="${this.pendingDeleteId}"] .lmsa-history-item-delete-area`
+        );
+        if (oldArea instanceof HTMLElement) {
+          this.renderDeleteControl(oldArea, this.pendingDeleteId);
+        }
+      }
+      this.pendingDeleteId = conversationId;
+      this.renderDeleteControl(container, conversationId);
+    });
   }
 }
-
-
-
-
-
-

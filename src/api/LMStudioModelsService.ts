@@ -82,7 +82,7 @@ function buildSummary(model: LMStudioModel, kind: LMStudioModelKind): string | u
 }
 
 function toDigest(model: LMStudioModel, kind: LMStudioModelKind): LMStudioModelDigest {
-  const targetModelId = model.selectedVariant ?? model.id;
+  const targetModelId = model.key;
 
   return {
     id: `${kind}:${targetModelId}`,

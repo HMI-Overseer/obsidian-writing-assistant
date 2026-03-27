@@ -1,0 +1,48 @@
+@keyframes lmsa-pulse {
+  0%,
+  100% {
+    opacity: 0.25;
+    transform: scale(0.85);
+  }
+
+  50% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes lmsa-drawer-fade {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.985);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes lmsa-attention-ring {
+  0% {
+    transform: translateY(0) scale(1);
+    box-shadow:
+      0 0 0 0 color-mix(in srgb, var(--text-error) 0%, transparent),
+      inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  }
+
+  35% {
+    transform: translateY(-1px) scale(1.01);
+    box-shadow:
+      0 0 0 1px color-mix(in srgb, var(--text-error) 30%, transparent),
+      0 0 0 7px color-mix(in srgb, var(--text-error) 14%, transparent),
+      inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  }
+
+  100% {
+    transform: translateY(0) scale(1);
+    box-shadow:
+      0 0 0 0 color-mix(in srgb, var(--text-error) 0%, transparent),
+      inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  }
+}

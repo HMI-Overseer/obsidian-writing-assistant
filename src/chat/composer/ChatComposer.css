@@ -1,0 +1,42 @@
+@layer components {
+  .lmsa-command-bar {
+    @apply lmsa-relative lmsa-z-[1] lmsa-flex lmsa-flex-col lmsa-gap-2;
+  }
+
+  .lmsa-command-label {
+    @apply lmsa-pl-1 lmsa-text-obsidian-muted;
+    font-size: var(--font-ui-smaller);
+    letter-spacing: 0.02em;
+  }
+
+  .lmsa-command-chips {
+    @apply lmsa-flex lmsa-flex-wrap lmsa-gap-2;
+  }
+
+  .lmsa-composer-chips {
+    @apply lmsa-flex lmsa-flex-wrap lmsa-gap-1.5 lmsa-px-1 lmsa-pb-2.5;
+  }
+
+  .lmsa-composer-chips:empty {
+    @apply lmsa-hidden;
+  }
+
+  .lmsa-chip-icon {
+    @apply lmsa-inline-flex lmsa-flex-none lmsa-items-center;
+    color: var(--interactive-accent);
+  }
+
+  .lmsa-chip-icon svg {
+    width: 11px;
+    height: 11px;
+  }
+
+  .lmsa-chip-label {
+    @apply lmsa-min-w-0 lmsa-flex-1 lmsa-truncate lmsa-whitespace-nowrap;
+  }
+
+  .lmsa-chip-remove svg {
+    width: 10px;
+    height: 10px;
+  }
+}

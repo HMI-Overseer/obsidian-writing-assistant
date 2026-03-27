@@ -1,22 +1,15 @@
-import type { ChatHistory, Conversation, ConversationMessage } from "../shared/types";
-import { MAX_CONVERSATIONS } from "../constants";
-import { generateId } from "../utils";
-
-// ---------------------------------------------------------------------------
-// Title generation
-// ---------------------------------------------------------------------------
+import { MAX_CONVERSATIONS } from "../../constants";
+import type { ChatHistory, Conversation, ConversationMessage } from "../../shared/types";
+import { generateId } from "../../utils";
 
 export function generateConversationTitle(firstUserMessage: string): string {
   const cleaned = firstUserMessage.replace(/\s+/g, " ").trim();
   if (cleaned.length <= 60) return cleaned;
+
   const truncated = cleaned.slice(0, 60);
   const lastSpace = truncated.lastIndexOf(" ");
-  return (lastSpace > 30 ? truncated.slice(0, lastSpace) : truncated) + "…";
+  return (lastSpace > 30 ? truncated.slice(0, lastSpace) : truncated) + "...";
 }
-
-// ---------------------------------------------------------------------------
-// Message helpers
-// ---------------------------------------------------------------------------
 
 export function makeMessage(
   role: "user" | "assistant",
@@ -24,10 +17,6 @@ export function makeMessage(
 ): ConversationMessage {
   return { id: generateId(), role, content };
 }
-
-// ---------------------------------------------------------------------------
-// Conversation creation
-// ---------------------------------------------------------------------------
 
 export function createConversation(modelId: string, modelName: string): Conversation {
   const now = Date.now();
@@ -43,10 +32,6 @@ export function createConversation(modelId: string, modelName: string): Conversa
   };
 }
 
-// ---------------------------------------------------------------------------
-// History normalisation (used when loading from disk)
-// ---------------------------------------------------------------------------
-
 export function normalizeChatHistory(raw: unknown): ChatHistory {
   if (!raw || typeof raw !== "object") {
     return { conversations: [], activeConversationId: null };
@@ -56,14 +41,16 @@ export function normalizeChatHistory(raw: unknown): ChatHistory {
 
   const conversations: Conversation[] = Array.isArray(obj.conversations)
     ? obj.conversations
-        .filter((c): c is Record<string, unknown> => !!c && typeof c === "object")
+        .filter((conversation): conversation is Record<string, unknown> => {
+          return !!conversation && typeof conversation === "object";
+        })
         .map(normalizeConversation)
-        .filter((c): c is Conversation => c !== null)
+        .filter((conversation): conversation is Conversation => conversation !== null)
     : [];
 
   const activeConversationId =
     typeof obj.activeConversationId === "string" &&
-    conversations.some((c) => c.id === obj.activeConversationId)
+    conversations.some((conversation) => conversation.id === obj.activeConversationId)
       ? obj.activeConversationId
       : (conversations[0]?.id ?? null);
 
@@ -82,58 +69,54 @@ function normalizeConversation(raw: Record<string, unknown>): Conversation | nul
 
   const messages: ConversationMessage[] = Array.isArray(raw.messages)
     ? raw.messages
-        .filter(
-          (m): m is Record<string, unknown> =>
-            !!m &&
-            typeof m === "object" &&
-            (m.role === "user" || m.role === "assistant") &&
-            typeof m.content === "string"
-        )
-        .map((m) => ({
-          id: typeof m.id === "string" && m.id ? m.id : generateId(),
-          role: m.role as "user" | "assistant",
-          content: m.content as string,
+        .filter((message): message is Record<string, unknown> => {
+          return (
+            !!message &&
+            typeof message === "object" &&
+            (message.role === "user" || message.role === "assistant") &&
+            typeof message.content === "string"
+          );
+        })
+        .map((message) => ({
+          id: typeof message.id === "string" && message.id ? message.id : generateId(),
+          role: message.role as "user" | "assistant",
+          content: message.content as string,
         }))
     : [];
 
   return { id, title, createdAt, updatedAt, modelId, modelName, messages, draft };
 }
 
-// ---------------------------------------------------------------------------
-// Pruning
-// ---------------------------------------------------------------------------
-
-/**
- * Ensures the history never exceeds MAX_CONVERSATIONS.
- * Removes the oldest conversations by updatedAt, never removing activeId.
- * Returns true if any pruning occurred.
- */
 export function pruneHistory(history: ChatHistory): boolean {
   if (history.conversations.length <= MAX_CONVERSATIONS) return false;
 
-  const sorted = [...history.conversations].sort((a, b) => a.updatedAt - b.updatedAt);
+  const sorted = [...history.conversations].sort(
+    (left, right) => left.updatedAt - right.updatedAt
+  );
   const toRemove = new Set<string>();
 
-  for (const conv of sorted) {
+  for (const conversation of sorted) {
     if (history.conversations.length - toRemove.size <= MAX_CONVERSATIONS) break;
-    if (conv.id !== history.activeConversationId) {
-      toRemove.add(conv.id);
+    if (conversation.id !== history.activeConversationId) {
+      toRemove.add(conversation.id);
     }
   }
 
-  history.conversations = history.conversations.filter((c) => !toRemove.has(c.id));
+  history.conversations = history.conversations.filter(
+    (conversation) => !toRemove.has(conversation.id)
+  );
   return toRemove.size > 0;
 }
-
-// ---------------------------------------------------------------------------
-// Relative date formatting for list items
-// ---------------------------------------------------------------------------
 
 export function formatRelativeDate(timestamp: number): string {
   const now = new Date();
   const date = new Date(timestamp);
 
-  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const todayStart = new Date(
+    now.getFullYear(),
+    now.getMonth(),
+    now.getDate()
+  ).getTime();
   const yesterdayStart = todayStart - 86400000;
   const weekStart = todayStart - 6 * 86400000;
 
@@ -149,5 +132,9 @@ export function formatRelativeDate(timestamp: number): string {
     return date.toLocaleDateString([], { month: "short", day: "numeric" });
   }
 
-  return date.toLocaleDateString([], { year: "numeric", month: "short", day: "numeric" });
+  return date.toLocaleDateString([], {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
 }

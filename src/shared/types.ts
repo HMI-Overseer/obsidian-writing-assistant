@@ -3,11 +3,6 @@
   content: string;
 }
 
-export interface ChatState {
-  messages: Message[];
-  draft: string;
-}
-
 export interface CompletionModel {
   id: string;
   name: string;
@@ -138,6 +133,4 @@ export interface PluginSettings {
   embeddingModels: EmbeddingModel[];
   commands: CustomCommand[];
   chatHistory: ChatHistory;
-  /** @deprecated Kept only for one-time migration from the pre-history schema. */
-  chatState?: ChatState;
 }

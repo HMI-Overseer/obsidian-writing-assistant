@@ -1,3 +1,15 @@
-@import "./tailwind.css";
-@import "./chat.css";
-@import "./settings.css";
+/* Base — Tailwind layers + shared lmsa-ui-* primitives */
+@import "./base.css";
+
+/* Chat */
+@import "../chat/view/createChatLayout.css";
+@import "../chat/view/ChatHistoryDrawer.css";
+@import "../chat/messages/ChatTranscript.css";
+@import "../chat/models/ChatModelSelector.css";
+@import "../chat/composer/ChatComposer.css";
+@import "../chat/animations.css";
+
+/* Settings */
+@import "../settings/SettingsTab.css";
+@import "../settings/ui.css";
+@import "../settings/models.css";

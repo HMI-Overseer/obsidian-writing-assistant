@@ -1,0 +1,127 @@
+@layer components {
+  .lmsa-history-drawer {
+    @apply lmsa-absolute lmsa-z-10 lmsa-hidden lmsa-flex-col lmsa-overflow-hidden lmsa-rounded-[24px] lmsa-border lmsa-border-obsidian-border;
+    inset: 12px 12px 10px;
+    background:
+      radial-gradient(circle at top left, color-mix(in srgb, var(--interactive-accent) 12%, transparent), transparent 42%),
+      linear-gradient(180deg, color-mix(in srgb, var(--background-primary) 95%, transparent), color-mix(in srgb, var(--background-secondary) 92%, transparent));
+    backdrop-filter: blur(22px);
+    -webkit-backdrop-filter: blur(22px);
+    box-shadow:
+      0 24px 64px rgba(0, 0, 0, 0.2),
+      inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  }
+
+  .lmsa-history-drawer::before {
+    content: "";
+    @apply lmsa-pointer-events-none lmsa-absolute lmsa-inset-x-8 lmsa-top-0 lmsa-h-px;
+    background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--interactive-accent) 55%, white), transparent);
+    opacity: 0.9;
+  }
+
+  .lmsa-history-drawer.is-open {
+    @apply lmsa-flex;
+    animation: lmsa-drawer-fade 180ms ease forwards;
+  }
+
+  .lmsa-history-header {
+    @apply lmsa-flex lmsa-flex-shrink-0 lmsa-items-center lmsa-justify-between lmsa-gap-2.5 lmsa-px-5 lmsa-pb-4 lmsa-pt-[18px];
+    border-bottom: 1px solid color-mix(in srgb, var(--background-modifier-border) 78%, transparent);
+  }
+
+  .lmsa-history-title-group {
+    @apply lmsa-flex lmsa-min-w-0 lmsa-items-baseline lmsa-gap-2;
+  }
+
+  .lmsa-history-title {
+    @apply lmsa-text-base lmsa-font-bold lmsa-text-obsidian-text;
+  }
+
+  .lmsa-history-count {
+    color: var(--text-faint);
+    font-size: var(--font-ui-smaller);
+  }
+
+  .lmsa-history-header-actions {
+    @apply lmsa-flex lmsa-flex-shrink-0 lmsa-gap-1.5;
+  }
+
+  .lmsa-history-list {
+    @apply lmsa-flex lmsa-flex-1 lmsa-flex-col lmsa-gap-2 lmsa-overflow-y-auto lmsa-p-3;
+  }
+
+  .lmsa-history-empty {
+    @apply lmsa-mx-2 lmsa-my-4 lmsa-rounded-[20px] lmsa-px-5 lmsa-py-10 lmsa-text-center lmsa-text-obsidian-muted;
+    font-size: var(--font-ui-small);
+    background: color-mix(in srgb, var(--background-secondary) 55%, transparent);
+    border: 1px dashed color-mix(in srgb, var(--interactive-accent) 24%, var(--background-modifier-border));
+  }
+
+  .lmsa-history-item {
+    @apply lmsa-cursor-default lmsa-pb-3 lmsa-pl-4 lmsa-pr-3 lmsa-pt-3;
+    background: color-mix(in srgb, var(--background-secondary) 34%, transparent);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+  }
+
+  .lmsa-history-item:hover {
+    transform: translateY(-1px);
+    box-shadow:
+      0 12px 28px rgba(0, 0, 0, 0.12),
+      inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  }
+
+  .lmsa-history-item.is-active {
+    border-color: color-mix(in srgb, var(--interactive-accent) 34%, var(--background-modifier-border));
+    background:
+      linear-gradient(135deg, color-mix(in srgb, var(--interactive-accent) 16%, var(--background-secondary)), color-mix(in srgb, var(--interactive-accent) 8%, var(--background-primary)));
+    box-shadow:
+      0 14px 30px rgba(0, 0, 0, 0.14),
+      0 0 0 1px color-mix(in srgb, var(--interactive-accent) 16%, transparent);
+  }
+
+  .lmsa-history-item-body {
+    @apply lmsa-flex lmsa-min-w-0 lmsa-flex-1 lmsa-cursor-pointer lmsa-flex-col lmsa-gap-1;
+  }
+
+  .lmsa-history-item-title {
+    @apply lmsa-truncate lmsa-whitespace-nowrap lmsa-font-medium lmsa-text-obsidian-text;
+    font-size: var(--font-ui-small);
+  }
+
+  .lmsa-history-item.is-active .lmsa-history-item-title {
+    color: var(--interactive-accent);
+  }
+
+  .lmsa-history-item-meta {
+    @apply lmsa-truncate lmsa-whitespace-nowrap;
+    color: var(--text-faint);
+    font-size: var(--font-ui-smaller);
+  }
+
+  .lmsa-history-item-delete-area {
+    @apply lmsa-flex lmsa-flex-shrink-0 lmsa-items-center lmsa-gap-1;
+  }
+
+  .lmsa-history-trash-btn {
+    @apply lmsa-scale-95 lmsa-opacity-0 lmsa-transition-all lmsa-duration-[140ms];
+  }
+
+  .lmsa-history-item:hover .lmsa-history-trash-btn {
+    @apply lmsa-scale-100 lmsa-opacity-100;
+  }
+}
+
+@media (max-width: 700px) {
+  .lmsa-history-drawer {
+    inset: 8px 8px 8px;
+    border-radius: 20px;
+  }
+
+  .lmsa-history-header {
+    @apply lmsa-px-4;
+  }
+
+  .lmsa-history-list {
+    @apply lmsa-p-2;
+  }
+}

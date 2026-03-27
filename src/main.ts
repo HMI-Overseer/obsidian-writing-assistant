@@ -3,7 +3,6 @@ import { Notice, Plugin } from "obsidian";
 import type {
   ChatHistory,
   CompletionModel,
-  Conversation,
   CustomCommand,
   EmbeddingModel,
   PluginSettings,
@@ -11,12 +10,9 @@ import type {
 import { DEFAULT_CHAT_HISTORY, DEFAULT_SETTINGS, DEFAULT_SYSTEM_PROMPT, VIEW_TYPE_CHAT } from "./constants";
 import { normalizeLMStudioBaseUrl } from "./api/LMStudioClient";
 import { ChatView } from "./chat";
-import { normalizeChatState } from "./chat/chatState";
-import { generateConversationTitle, normalizeChatHistory } from "./chat/conversationHistory";
-import { generateId } from "./utils";
+import { normalizeChatHistory } from "./chat/conversation/conversationUtils";
 import { LMStudioSettingTab } from "./settings";
 
-const LEGACY_DEFAULT_COMPLETION_ID = "default";
 const DEFAULT_COMPLETION_TEMPERATURE = 0.7;
 const DEFAULT_COMPLETION_MAX_TOKENS = 2000;
 
@@ -34,17 +30,6 @@ function normalizeCompletionModel(
     maxTokens:
       typeof model?.maxTokens === "number" ? model.maxTokens : DEFAULT_COMPLETION_MAX_TOKENS,
   };
-}
-
-function isUntouchedLegacyDefaultModel(model: CompletionModel): boolean {
-  return (
-    model.id === LEGACY_DEFAULT_COMPLETION_ID &&
-    model.name === "Default" &&
-    model.modelId === "" &&
-    model.systemPrompt === DEFAULT_SYSTEM_PROMPT &&
-    model.temperature === DEFAULT_COMPLETION_TEMPERATURE &&
-    model.maxTokens === DEFAULT_COMPLETION_MAX_TOKENS
-  );
 }
 
 export default class LMStudioWritingAssistant extends Plugin {
@@ -101,49 +86,11 @@ export default class LMStudioWritingAssistant extends Plugin {
   }
 
   async loadSettings(): Promise<void> {
-    const data = (await this.loadData()) as Partial<
-      PluginSettings & {
-        modelId?: string;
-        systemPrompt?: string;
-        temperature?: number;
-        maxTokens?: number;
-      }
-    > | null;
+    const data = (await this.loadData()) as Partial<PluginSettings> | null;
 
-    const legacyModelConfigured =
-      typeof data?.modelId === "string" ||
-      typeof data?.systemPrompt === "string" ||
-      typeof data?.temperature === "number" ||
-      typeof data?.maxTokens === "number";
-
-    const rawCompletionModels = Array.isArray(data?.completionModels)
-      ? data.completionModels
-      : legacyModelConfigured
-        ? [
-            {
-              id: LEGACY_DEFAULT_COMPLETION_ID,
-              name: "Default",
-              modelId: data?.modelId ?? "",
-              systemPrompt: data?.systemPrompt ?? DEFAULT_SYSTEM_PROMPT,
-              temperature: data?.temperature ?? DEFAULT_COMPLETION_TEMPERATURE,
-              maxTokens: data?.maxTokens ?? DEFAULT_COMPLETION_MAX_TOKENS,
-            },
-          ]
-        : [];
-
-    const completionModels: CompletionModel[] = rawCompletionModels
-      .map((model, index) => normalizeCompletionModel(model, index))
-      .flatMap((model) => {
-        if (isUntouchedLegacyDefaultModel(model)) {
-          return [];
-        }
-
-        if (model.id === LEGACY_DEFAULT_COMPLETION_ID) {
-          return [{ ...model, id: generateId() }];
-        }
-
-        return [model];
-      });
+    const completionModels: CompletionModel[] = Array.isArray(data?.completionModels)
+      ? data.completionModels.map((model, index) => normalizeCompletionModel(model, index))
+      : [];
 
     const embeddingModels: EmbeddingModel[] = Array.isArray(data?.embeddingModels)
       ? data.embeddingModels.map((model, index) => ({
@@ -162,48 +109,10 @@ export default class LMStudioWritingAssistant extends Plugin {
         }))
       : [];
 
-    let chatHistory: ChatHistory;
-
-    if (data?.chatHistory && typeof data.chatHistory === "object") {
-      chatHistory = normalizeChatHistory(data.chatHistory);
-    } else if (data?.chatState) {
-      const legacy = normalizeChatState(data.chatState);
-      const legacyMessages = legacy.messages.filter(
-        (m) => m.role === "user" || m.role === "assistant"
-      );
-
-      if (legacyMessages.length > 0 || legacy.draft) {
-        const firstUserMessage =
-          legacyMessages.find((m) => m.role === "user")?.content ?? "";
-        const migratedModel = completionModels[0] ?? null;
-
-        const migratedConversation: Conversation = {
-          id: generateId(),
-          title: firstUserMessage
-            ? generateConversationTitle(firstUserMessage)
-            : "Previous conversation",
-          createdAt: Date.now(),
-          updatedAt: Date.now(),
-          modelId: migratedModel?.id ?? "",
-          modelName: migratedModel?.name ?? "",
-          messages: legacyMessages.map((m) => ({
-            id: generateId(),
-            role: m.role as "user" | "assistant",
-            content: m.content,
-          })),
-          draft: legacy.draft,
-        };
-
-        chatHistory = {
-          conversations: [migratedConversation],
-          activeConversationId: migratedConversation.id,
-        };
-      } else {
-        chatHistory = { ...DEFAULT_CHAT_HISTORY };
-      }
-    } else {
-      chatHistory = { ...DEFAULT_CHAT_HISTORY };
-    }
+    const chatHistory: ChatHistory =
+      data?.chatHistory && typeof data.chatHistory === "object"
+        ? normalizeChatHistory(data.chatHistory)
+        : { ...DEFAULT_CHAT_HISTORY };
 
     this.settings = {
       lmStudioUrl: normalizeLMStudioBaseUrl(data?.lmStudioUrl ?? DEFAULT_SETTINGS.lmStudioUrl),
@@ -221,14 +130,11 @@ export default class LMStudioWritingAssistant extends Plugin {
       embeddingModels,
       commands,
       chatHistory,
-      chatState: undefined,
     };
   }
 
   async saveSettings(): Promise<void> {
-    const toSave = { ...this.settings };
-    delete toSave.chatState;
-    await this.saveData(toSave);
+    await this.saveData(this.settings);
   }
 
   private initLeafIfNeeded(): void {

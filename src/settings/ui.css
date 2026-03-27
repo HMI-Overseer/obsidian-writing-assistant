@@ -1,0 +1,182 @@
+@layer components {
+  .lmsa-settings-panel {
+    @apply lmsa-relative lmsa-overflow-hidden;
+    background:
+      radial-gradient(circle at top left, color-mix(in srgb, var(--interactive-accent) 10%, transparent), transparent 42%),
+      linear-gradient(180deg, color-mix(in srgb, var(--background-primary) 95%, transparent), color-mix(in srgb, var(--background-secondary) 90%, transparent));
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+    box-shadow:
+      0 24px 56px rgba(0, 0, 0, 0.1),
+      inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  }
+
+  .lmsa-settings-panel::before {
+    content: "";
+    @apply lmsa-pointer-events-none lmsa-absolute lmsa-inset-x-5 lmsa-top-0 lmsa-h-px;
+    background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--interactive-accent) 55%, white), transparent);
+    opacity: 0.85;
+  }
+
+  .lmsa-settings-panel-header {
+    @apply lmsa-flex lmsa-flex-col lmsa-gap-2 lmsa-px-6 lmsa-pb-5 lmsa-pt-6;
+    border-bottom: 1px solid color-mix(in srgb, var(--background-modifier-border) 82%, transparent);
+  }
+
+  .lmsa-settings-panel-desc {
+    @apply lmsa-m-0 lmsa-text-obsidian-muted;
+    line-height: 1.65;
+  }
+
+  .lmsa-settings-content {
+    @apply lmsa-flex lmsa-flex-col lmsa-gap-5 lmsa-p-5;
+  }
+
+  .lmsa-settings-section {
+    @apply lmsa-overflow-hidden;
+    background:
+      linear-gradient(180deg, color-mix(in srgb, var(--background-primary) 88%, transparent), color-mix(in srgb, var(--background-secondary) 94%, transparent));
+    box-shadow:
+      0 14px 34px rgba(0, 0, 0, 0.06),
+      inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  }
+
+  .lmsa-settings-section-header {
+    @apply lmsa-flex lmsa-items-start lmsa-justify-between lmsa-gap-4 lmsa-px-5 lmsa-pb-0 lmsa-pt-5;
+  }
+
+  .lmsa-settings-section-heading {
+    @apply lmsa-flex lmsa-min-w-0 lmsa-flex-1 lmsa-flex-col lmsa-gap-1.5;
+  }
+
+  .lmsa-settings-section-actions {
+    @apply lmsa-flex lmsa-flex-wrap lmsa-justify-end lmsa-gap-2;
+  }
+
+  .lmsa-settings-section-title {
+    @apply lmsa-m-0 lmsa-font-semibold lmsa-text-obsidian-text;
+    font-size: 1rem;
+  }
+
+  .lmsa-settings-section-desc {
+    @apply lmsa-m-0 lmsa-text-obsidian-muted;
+    line-height: 1.6;
+  }
+
+  .lmsa-settings-section-body {
+    @apply lmsa-px-5 lmsa-pb-4 lmsa-pt-4;
+  }
+
+  .lmsa-settings-section-footer {
+    @apply lmsa-flex lmsa-flex-wrap lmsa-justify-end lmsa-gap-2 lmsa-px-5 lmsa-pb-5 lmsa-pt-0;
+  }
+
+  .lmsa-settings-section-footer:empty {
+    display: none;
+  }
+
+  .lmsa-settings-section-body .setting-item {
+    @apply lmsa-m-0 lmsa-gap-4 lmsa-px-0 lmsa-py-4;
+    border-top: 1px solid color-mix(in srgb, var(--background-modifier-border) 76%, transparent);
+  }
+
+  .lmsa-settings-section-body .setting-item:first-child {
+    border-top: 0;
+    padding-top: 0;
+  }
+
+  .lmsa-settings-section-body .setting-item:last-child {
+    padding-bottom: 0;
+  }
+
+  .lmsa-settings-section-body .setting-item-info {
+    @apply lmsa-pr-3;
+  }
+
+  .lmsa-settings-section-body .setting-item-name {
+    @apply lmsa-font-semibold lmsa-text-obsidian-text;
+  }
+
+  .lmsa-settings-section-body .setting-item-description,
+  .lmsa-settings-section-body .setting-item-description > div {
+    @apply lmsa-text-obsidian-muted;
+    line-height: 1.55;
+  }
+
+  .lmsa-modal .setting-item {
+    @apply lmsa-px-0;
+  }
+
+  .lmsa-settings-root input[type="text"],
+  .lmsa-settings-root input[type="number"],
+  .lmsa-settings-root textarea,
+  .lmsa-settings-root select,
+  .lmsa-settings-root .dropdown {
+    @apply lmsa-rounded-[12px] lmsa-border lmsa-border-obsidian-border lmsa-bg-obsidian-surface-primary lmsa-px-3 lmsa-py-2 lmsa-text-obsidian-text;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  }
+
+  .lmsa-settings-root input[type="text"]:focus,
+  .lmsa-settings-root input[type="number"]:focus,
+  .lmsa-settings-root textarea:focus,
+  .lmsa-settings-root select:focus,
+  .lmsa-settings-root .dropdown:focus {
+    border-color: color-mix(in srgb, var(--interactive-accent) 38%, var(--background-modifier-border));
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--interactive-accent) 18%, transparent);
+  }
+
+  .lmsa-empty-state,
+  .lmsa-settings-note,
+  .lmsa-advanced-note {
+    @apply lmsa-m-0 lmsa-rounded-[16px] lmsa-border lmsa-p-4 lmsa-text-obsidian-muted;
+    border-color: color-mix(in srgb, var(--interactive-accent) 18%, var(--background-modifier-border));
+    background: color-mix(in srgb, var(--background-secondary) 58%, transparent);
+    line-height: 1.6;
+  }
+
+  .lmsa-empty-state {
+    border-style: dashed;
+  }
+
+  .lmsa-settings-note-title {
+    @apply lmsa-mb-2 lmsa-font-semibold lmsa-text-obsidian-text;
+  }
+
+  .lmsa-hint-list {
+    @apply lmsa-m-0 lmsa-pl-5 lmsa-text-obsidian-muted;
+  }
+
+  .lmsa-hint-list li + li {
+    margin-top: 6px;
+  }
+
+  @media (max-width: 700px) {
+    .lmsa-settings-panel-header {
+      @apply lmsa-px-4 lmsa-pt-5;
+    }
+
+    .lmsa-settings-content {
+      @apply lmsa-px-4 lmsa-py-4;
+    }
+
+    .lmsa-settings-section-header {
+      @apply lmsa-px-4 lmsa-pt-4 lmsa-flex-col;
+    }
+
+    .lmsa-settings-section-body {
+      @apply lmsa-px-4 lmsa-py-3;
+    }
+
+    .lmsa-settings-section-footer {
+      @apply lmsa-px-4 lmsa-pb-4 lmsa-justify-start;
+    }
+
+    .lmsa-settings-section-actions {
+      @apply lmsa-justify-start;
+    }
+
+    .lmsa-settings-section-body .setting-item {
+      @apply lmsa-flex-col lmsa-items-stretch;
+    }
+  }
+}

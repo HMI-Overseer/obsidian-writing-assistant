@@ -1,9 +1,9 @@
-
-  /*
+/* Base — Tailwind layers + shared lmsa-ui-* primitives */
+/*
    * Shared semantic primitives for plugin surfaces.
    * Keep these scoped to the plugin and based on Obsidian theme vars.
    */
-  .lmsa-ui-surface {
+.lmsa-ui-surface {
     border-radius: 1rem;
     border-width: 1px;
     border-color: var(--background-modifier-border);
@@ -12,16 +12,14 @@
     --tw-shadow-colored: 0 14px 40px var(--tw-shadow-color);
     box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow);
 }
-
-  .lmsa-ui-panel {
+.lmsa-ui-panel {
     border-radius: 20px;
     border-width: 1px;
     border-color: var(--background-modifier-border);
     background: color-mix(in srgb, var(--background-primary) 92%, transparent);
     box-shadow: 0 14px 40px rgba(0, 0, 0, 0.05);
 }
-
-  .lmsa-ui-card {
+.lmsa-ui-card {
     border-radius: 18px;
     border-width: 1px;
     border-color: var(--background-modifier-border);
@@ -29,8 +27,7 @@
     background: color-mix(in srgb, var(--background-secondary) 92%, transparent);
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.04);
 }
-
-  .lmsa-ui-pill {
+.lmsa-ui-pill {
     white-space: nowrap;
     border-radius: 9999px;
     border-width: 1px;
@@ -42,8 +39,7 @@
     color: var(--text-normal);
     font-size: var(--font-ui-smaller);
 }
-
-  .lmsa-ui-pill-button {
+.lmsa-ui-pill-button {
     cursor: pointer;
     white-space: nowrap;
     border-radius: 9999px;
@@ -57,12 +53,10 @@
     font-size: var(--font-ui-small);
     background: color-mix(in srgb, var(--background-secondary) 88%, transparent);
 }
-
-  .lmsa-ui-pill-button:hover {
+.lmsa-ui-pill-button:hover {
     background-color: var(--background-modifier-hover);
 }
-
-  .lmsa-ui-icon-btn {
+.lmsa-ui-icon-btn {
     display: inline-flex;
     height: 34px;
     width: 34px;
@@ -75,13 +69,11 @@
     background-color: var(--background-primary);
     color: var(--text-muted);
 }
-
-  .lmsa-ui-icon-btn:hover {
+.lmsa-ui-icon-btn:hover {
     background-color: var(--background-modifier-hover);
     color: var(--text-normal);
 }
-
-  .lmsa-ui-btn {
+.lmsa-ui-btn {
     display: inline-flex;
     min-height: 2.25rem;
     align-items: center;
@@ -94,35 +86,29 @@
     font-size: 0.875rem;
     line-height: 1.25rem;
 }
-
-  .lmsa-ui-btn:disabled {
+.lmsa-ui-btn:disabled {
     cursor: default;
     opacity: 0.45;
 }
-
-  .lmsa-ui-btn-secondary {
+.lmsa-ui-btn-secondary {
     border-width: 1px;
     border-color: var(--background-modifier-border);
     background-color: var(--background-secondary);
     color: var(--text-normal);
 }
-
-  .lmsa-ui-btn-secondary:hover:not(:disabled) {
+.lmsa-ui-btn-secondary:hover:not(:disabled) {
     background-color: var(--background-modifier-hover);
 }
-
-  .lmsa-ui-btn-primary {
+.lmsa-ui-btn-primary {
     border-style: none;
     background-color: var(--interactive-accent);
     font-weight: 600;
     color: var(--text-on-accent);
 }
-
-  .lmsa-ui-btn-primary:hover:not(:disabled) {
+.lmsa-ui-btn-primary:hover:not(:disabled) {
     background: var(--interactive-accent-hover);
   }
-
-  .lmsa-ui-compact-btn {
+.lmsa-ui-compact-btn {
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -134,31 +120,26 @@
     padding-bottom: 0.25rem;
     font-size: var(--font-ui-smaller);
 }
-
-  .lmsa-ui-compact-btn-secondary {
+.lmsa-ui-compact-btn-secondary {
     border-width: 1px;
     border-color: var(--background-modifier-border);
     background-color: var(--background-secondary);
     color: var(--text-muted);
 }
-
-  .lmsa-ui-compact-btn-secondary:hover {
+.lmsa-ui-compact-btn-secondary:hover {
     background-color: var(--background-modifier-hover);
     color: var(--text-normal);
 }
-
-  .lmsa-ui-compact-btn-danger {
+.lmsa-ui-compact-btn-danger {
     border-width: 1px;
     background-color: var(--background-primary);
     border-color: var(--background-modifier-error);
     color: var(--text-error);
 }
-
-  .lmsa-ui-compact-btn-danger:hover {
+.lmsa-ui-compact-btn-danger:hover {
     background: color-mix(in srgb, var(--background-modifier-error) 15%, var(--background-primary));
   }
-
-  .lmsa-ui-control-btn {
+.lmsa-ui-control-btn {
     display: inline-flex;
     cursor: pointer;
     align-items: center;
@@ -174,15 +155,13 @@
     color: var(--text-muted);
     font-size: var(--font-ui-smaller);
 }
-
-  .lmsa-ui-control-btn:hover,
+.lmsa-ui-control-btn:hover,
   .lmsa-ui-control-btn.is-active {
     background-color: var(--background-modifier-hover);
     color: var(--text-normal);
     border-color: var(--background-modifier-border-hover, var(--background-modifier-border));
 }
-
-  .lmsa-ui-chip {
+.lmsa-ui-chip {
     display: inline-flex;
     max-width: 220px;
     align-items: center;
@@ -197,8 +176,7 @@
     border: 1px solid color-mix(in srgb, var(--interactive-accent) 40%, var(--background-modifier-border));
     background: color-mix(in srgb, var(--interactive-accent) 10%, var(--background-secondary));
 }
-
-  .lmsa-ui-chip-dismiss {
+.lmsa-ui-chip-dismiss {
     display: inline-flex;
     height: 1rem;
     width: 1rem;
@@ -212,13 +190,11 @@
     padding: 0px;
     color: var(--text-faint);
 }
-
-  .lmsa-ui-chip-dismiss:hover {
+.lmsa-ui-chip-dismiss:hover {
     color: var(--text-muted);
     background: color-mix(in srgb, var(--background-modifier-border) 60%, transparent);
   }
-
-  .lmsa-ui-list-item {
+.lmsa-ui-list-item {
     display: flex;
     align-items: center;
     gap: 0.375rem;
@@ -229,16 +205,14 @@
     transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
     transition-duration: 100ms;
 }
-
-  .lmsa-ui-list-item:hover {
+.lmsa-ui-list-item:hover {
     border-color: var(--background-modifier-border);
     background-color: var(--background-modifier-hover);
 }
-
-  .lmsa-ui-muted {
+.lmsa-ui-muted {
     color: var(--text-muted);
   }
-  .lmsa-root {
+.lmsa-root {
     overflow: hidden;
     height: 100%;
     font-size: var(--font-ui-small);
@@ -246,8 +220,7 @@
       radial-gradient(circle at top, color-mix(in srgb, var(--interactive-accent) 9%, transparent), transparent 42%),
       linear-gradient(180deg, var(--background-primary), var(--background-secondary-alt, var(--background-secondary)) 120%);
 }
-
-  .lmsa-shell {
+.lmsa-shell {
     margin-left: auto;
     margin-right: auto;
     display: flex;
@@ -255,8 +228,7 @@
     max-width: 980px;
     flex-direction: column;
 }
-
-  .lmsa-header {
+.lmsa-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -266,21 +238,18 @@
     padding-bottom: 0.75rem;
     padding-top: 18px;
 }
-
-  .lmsa-header-copy {
+.lmsa-header-copy {
     display: flex;
     min-width: 0px;
     flex-direction: column;
     gap: 0.25rem;
 }
-
-  .lmsa-header-title {
+.lmsa-header-title {
     font-weight: 700;
     color: var(--text-normal);
     font-size: 1.05rem;
 }
-
-  .lmsa-header-meta {
+.lmsa-header-meta {
     min-width: 0px;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -289,49 +258,41 @@
     font-size: var(--font-ui-smaller);
     line-height: 1.45;
 }
-
-  .lmsa-header-actions {
+.lmsa-header-actions {
     display: flex;
     align-items: center;
     gap: 0.625rem;
 }
-
-  .lmsa-header-actions .lmsa-status-pill {
+.lmsa-header-actions .lmsa-status-pill {
     padding-left: 0.75rem;
     padding-right: 0.75rem;
     padding-top: 0.5rem;
     padding-bottom: 0.5rem;
     font-size: var(--font-ui-small);
 }
-
-  .lmsa-header-actions .lmsa-ui-icon-btn {
+.lmsa-header-actions .lmsa-ui-icon-btn {
     height: 2.5rem;
     width: 2.5rem;
     border-radius: 12px;
 }
-
-  .lmsa-header-btn svg {
+.lmsa-header-btn svg {
     width: 22px;
     height: 22px;
   }
-
-  .lmsa-status-pill {
+.lmsa-status-pill {
     background: color-mix(in srgb, var(--background-secondary) 84%, transparent);
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
   }
-
-  .lmsa-status-pill.is-muted {
+.lmsa-status-pill.is-muted {
     color: var(--text-muted);
   }
-
-  .lmsa-messages-pane {
+.lmsa-messages-pane {
     position: relative;
     min-height: 0px;
     flex: 1 1 0%;
     overflow: visible;
 }
-
-  .lmsa-messages {
+.lmsa-messages {
     display: flex;
     height: 100%;
     flex-direction: column;
@@ -343,8 +304,7 @@
     padding-top: 0.625rem;
     transition: opacity 180ms ease;
 }
-
-  .lmsa-history-backdrop {
+.lmsa-history-backdrop {
     pointer-events: none;
     position: absolute;
     inset: 0px;
@@ -353,13 +313,11 @@
     background: transparent;
     transition: opacity 180ms ease;
 }
-
-  .lmsa-history-backdrop.is-open {
+.lmsa-history-backdrop.is-open {
     pointer-events: auto;
     opacity: 1;
 }
-
-  .lmsa-empty-view {
+.lmsa-empty-view {
     pointer-events: none;
     position: absolute;
     inset: 0px;
@@ -373,143 +331,23 @@
     color: var(--text-muted);
     transition: opacity 180ms ease;
 }
-
-  .lmsa-empty-view--hidden {
+.lmsa-empty-view--hidden {
     display: none;
 }
-
-  .lmsa-messages-pane.is-history-open .lmsa-messages,
+.lmsa-messages-pane.is-history-open .lmsa-messages,
   .lmsa-messages-pane.is-history-open .lmsa-empty-view {
     opacity: 0;
   }
-
-  .lmsa-empty-title {
+.lmsa-empty-title {
     font-weight: 700;
     color: var(--text-normal);
     font-size: 1.1rem;
 }
-
-  .lmsa-empty-copy {
+.lmsa-empty-copy {
     max-width: 42ch;
     line-height: 1.6;
 }
-
-  .lmsa-message {
-    display: flex;
-    width: 100%;
-    gap: 0.75rem;
-}
-
-  .lmsa-message--user {
-    justify-content: flex-end;
-}
-
-  .lmsa-message-avatar {
-    display: inline-flex;
-    height: 34px;
-    width: 34px;
-    flex: 0 0 34px;
-    align-items: center;
-    justify-content: center;
-    border-radius: 10px;
-    border-width: 1px;
-    border-color: var(--background-modifier-border);
-    background-color: var(--background-secondary);
-    color: var(--text-muted);
-}
-
-  .lmsa-message--assistant .lmsa-message-avatar {
-    color: var(--interactive-accent);
-    background: color-mix(in srgb, var(--interactive-accent) 12%, var(--background-secondary));
-  }
-
-  .lmsa-message--user .lmsa-message-avatar {
-    order: 2;
-    border-color: transparent;
-    background-color: var(--interactive-accent);
-    --tw-text-opacity: 1;
-    color: rgb(255 255 255 / var(--tw-text-opacity, 1));
-    color: var(--text-on-accent);
-}
-
-  .lmsa-message-column {
-    display: flex;
-    width: 100%;
-    min-width: 0px;
-    max-width: 780px;
-    flex-direction: column;
-    gap: 0.375rem;
-}
-
-  .lmsa-message--user .lmsa-message-column {
-    align-items: flex-end;
-}
-
-  .lmsa-message-chrome {
-    display: flex;
-    width: 100%;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.75rem;
-}
-
-  .lmsa-message-role {
-    font-weight: 600;
-    color: var(--text-muted);
-    font-size: var(--font-ui-smaller);
-}
-
-  .lmsa-message-body {
-    width: 100%;
-    padding-left: 15px;
-    padding-right: 15px;
-    padding-top: 14px;
-    padding-bottom: 14px;
-    -moz-user-select: text;
-         user-select: text;
-    -webkit-user-select: text;
-    cursor: text;
-}
-
-  .lmsa-message--user .lmsa-message-body {
-    background: color-mix(in srgb, var(--interactive-accent) 15%, var(--background-primary));
-    border-color: color-mix(in srgb, var(--interactive-accent) 35%, var(--background-modifier-border));
-  }
-
-  .lmsa-message-body.is-streaming {
-    position: relative;
-}
-
-  .lmsa-message-body.is-streaming::after {
-    content: "";
-    display: inline-block;
-    width: 8px;
-    height: 8px;
-    margin-left: 8px;
-    border-radius: 999px;
-    background: var(--interactive-accent);
-    animation: lmsa-pulse 0.9s ease-in-out infinite;
-  }
-
-  .lmsa-message-body.is-error {
-    background: color-mix(in srgb, var(--background-modifier-error) 65%, transparent);
-    border-color: color-mix(in srgb, var(--text-error) 40%, var(--background-modifier-border));
-  }
-
-  .lmsa-message-body.is-muted {
-    opacity: 0.8;
-}
-
-  .lmsa-message-content {
-    white-space: pre-wrap;
-    overflow-wrap: break-word;
-    line-height: 1.65;
-    -moz-user-select: text;
-         user-select: text;
-    -webkit-user-select: text;
-}
-
-  .lmsa-composer {
+.lmsa-composer {
     position: relative;
     display: flex;
     flex-direction: column;
@@ -518,29 +356,7 @@
     padding-right: 18px;
     padding-bottom: 18px;
 }
-
-  .lmsa-command-bar {
-    position: relative;
-    z-index: 1;
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-}
-
-  .lmsa-command-label {
-    padding-left: 0.25rem;
-    color: var(--text-muted);
-    font-size: var(--font-ui-smaller);
-    letter-spacing: 0.02em;
-}
-
-  .lmsa-command-chips {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.5rem;
-}
-
-  .lmsa-composer-panel {
+.lmsa-composer-panel {
     position: relative;
     z-index: 1;
     overflow: visible;
@@ -555,8 +371,7 @@
       0 18px 48px rgba(0, 0, 0, 0.12),
       inset 0 1px 0 rgba(255, 255, 255, 0.06);
 }
-
-  .lmsa-composer-panel::before {
+.lmsa-composer-panel::before {
     content: "";
     pointer-events: none;
     position: absolute;
@@ -567,16 +382,14 @@
     background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--interactive-accent) 55%, white), transparent);
     opacity: 0.8;
   }
-
-  .lmsa-composer-panel:focus-within {
+.lmsa-composer-panel:focus-within {
     border-color: color-mix(in srgb, var(--interactive-accent) 45%, var(--background-modifier-border));
     box-shadow:
       0 24px 60px rgba(0, 0, 0, 0.14),
       0 0 0 1px color-mix(in srgb, var(--interactive-accent) 24%, transparent),
       inset 0 1px 0 rgba(255, 255, 255, 0.08);
   }
-
-  .lmsa-textarea {
+.lmsa-textarea {
     box-sizing: border-box;
     width: 100%;
     resize: none;
@@ -594,16 +407,13 @@
     max-height: 260px;
     overflow-y: auto;
 }
-
-  .lmsa-textarea::-moz-placeholder {
+.lmsa-textarea::-moz-placeholder {
     color: color-mix(in srgb, var(--text-muted) 82%, transparent);
   }
-
-  .lmsa-textarea::placeholder {
+.lmsa-textarea::placeholder {
     color: color-mix(in srgb, var(--text-muted) 82%, transparent);
   }
-
-  .lmsa-textarea:hover,
+.lmsa-textarea:hover,
   .lmsa-textarea:focus,
   .lmsa-textarea:focus-visible {
     outline: none;
@@ -611,8 +421,7 @@
     box-shadow: none;
     background: transparent;
   }
-
-  .lmsa-composer-footer {
+.lmsa-composer-footer {
     margin-top: 0.25rem;
     display: flex;
     align-items: center;
@@ -621,20 +430,13 @@
     padding-top: 0.75rem;
     border-top: 1px solid color-mix(in srgb, var(--background-modifier-border) 78%, transparent);
 }
-
-  .lmsa-composer-footer-meta {
+.lmsa-composer-footer-meta {
     display: flex;
     min-width: 0px;
     align-items: center;
     gap: 0.625rem;
 }
-
-  .lmsa-model-selector-wrap {
-    position: relative;
-    flex: none;
-}
-
-  .lmsa-compose-hint {
+.lmsa-compose-hint {
     border-radius: 9999px;
     padding-left: 0.625rem;
     padding-right: 0.625rem;
@@ -644,185 +446,16 @@
     font-size: var(--font-ui-smaller);
     background: color-mix(in srgb, var(--background-secondary) 52%, transparent);
 }
-
-  .lmsa-btn-row {
+.lmsa-btn-row {
     display: flex;
     flex-wrap: wrap;
     justify-content: flex-end;
     gap: 0.5rem;
 }
-
-  .lmsa-stop-btn {
+.lmsa-stop-btn {
     color: var(--text-error);
   }
-
-  .lmsa-composer-chips {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.375rem;
-    padding-left: 0.25rem;
-    padding-right: 0.25rem;
-    padding-bottom: 0.625rem;
-}
-
-  .lmsa-composer-chips:empty {
-    display: none;
-}
-
-  .lmsa-chip-icon {
-    display: inline-flex;
-    flex: none;
-    align-items: center;
-    color: var(--interactive-accent);
-}
-
-  .lmsa-chip-icon svg {
-    width: 11px;
-    height: 11px;
-  }
-
-  .lmsa-chip-label {
-    min-width: 0px;
-    flex: 1 1 0%;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-  .lmsa-chip-remove svg {
-    width: 10px;
-    height: 10px;
-  }
-
-  .lmsa-model-selector-btn {
-    min-width: 0px;
-    max-width: 200px;
-    flex-shrink: 0;
-    background: color-mix(in srgb, var(--background-secondary) 60%, transparent);
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
-}
-
-  .lmsa-model-selector-icon,
-  .lmsa-model-selector-chevron {
-    display: inline-flex;
-    flex: none;
-    align-items: center;
-}
-
-  .lmsa-model-selector-icon svg {
-    width: 14px;
-    height: 14px;
-  }
-
-  .lmsa-model-selector-label {
-    min-width: 0px;
-    flex: 1 1 0%;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-  .lmsa-model-selector-chevron {
-    color: color-mix(in srgb, var(--interactive-accent) 64%, var(--text-muted));
-  }
-
-  .lmsa-model-selector-chevron svg {
-    width: 12px;
-    height: 12px;
-  }
-
-  .lmsa-model-dropdown {
-    position: absolute;
-    bottom: calc(100% + 8px);
-    left: 0px;
-    z-index: 120;
-    max-height: 320px;
-    overflow-y: auto;
-    border-radius: 18px;
-    border-width: 1px;
-    border-color: var(--background-modifier-border);
-    padding: 0.5rem;
-    width: min(320px, calc(100vw - 48px));
-    background:
-      linear-gradient(180deg, color-mix(in srgb, var(--background-primary) 95%, transparent), color-mix(in srgb, var(--background-secondary) 92%, transparent));
-    backdrop-filter: blur(22px);
-    -webkit-backdrop-filter: blur(22px);
-    box-shadow:
-      0 20px 56px rgba(0, 0, 0, 0.18),
-      inset 0 1px 0 rgba(255, 255, 255, 0.05);
-    transform-origin: bottom left;
-}
-
-  .lmsa-model-dropdown-item {
-    display: flex;
-    width: 100%;
-    cursor: pointer;
-    align-items: center;
-    gap: 0.5rem;
-    border-radius: 12px;
-    border-style: none;
-    background-color: transparent;
-    padding-left: 0.75rem;
-    padding-right: 0.75rem;
-    padding-top: 0.625rem;
-    padding-bottom: 0.625rem;
-    text-align: left;
-    color: var(--text-normal);
-    font-size: var(--font-ui-small);
-}
-
-  .lmsa-model-dropdown-item:hover {
-    background-color: var(--background-modifier-hover);
-    transform: translateY(-1px);
-}
-
-  .lmsa-model-dropdown-item.is-active {
-    color: var(--interactive-accent);
-    background: color-mix(in srgb, var(--interactive-accent) 11%, var(--background-secondary));
-  }
-
-  .lmsa-model-dropdown-check {
-    display: inline-flex;
-    height: 1rem;
-    width: 1rem;
-    flex: 0 0 16px;
-    align-items: center;
-    justify-content: center;
-}
-
-  .lmsa-model-dropdown-check svg {
-    width: 14px;
-    height: 14px;
-  }
-
-  .lmsa-model-dropdown-name {
-    flex: 1 1 0%;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    font-weight: 500;
-}
-
-  .lmsa-model-dropdown-id {
-    max-width: 140px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    color: var(--text-muted);
-    font-size: var(--font-ui-smaller);
-}
-
-  .lmsa-model-dropdown-empty {
-    padding-left: 0.625rem;
-    padding-right: 0.625rem;
-    padding-top: 1rem;
-    padding-bottom: 1rem;
-    text-align: center;
-    color: var(--text-muted);
-    font-size: var(--font-ui-smaller);
-}
-
-  .lmsa-history-drawer {
+.lmsa-history-drawer {
     position: absolute;
     z-index: 10;
     display: none;
@@ -841,8 +474,7 @@
       0 24px 64px rgba(0, 0, 0, 0.2),
       inset 0 1px 0 rgba(255, 255, 255, 0.06);
 }
-
-  .lmsa-history-drawer::before {
+.lmsa-history-drawer::before {
     content: "";
     pointer-events: none;
     position: absolute;
@@ -853,13 +485,11 @@
     background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--interactive-accent) 55%, white), transparent);
     opacity: 0.9;
   }
-
-  .lmsa-history-drawer.is-open {
+.lmsa-history-drawer.is-open {
     display: flex;
     animation: lmsa-drawer-fade 180ms ease forwards;
 }
-
-  .lmsa-history-header {
+.lmsa-history-header {
     display: flex;
     flex-shrink: 0;
     align-items: center;
@@ -871,33 +501,28 @@
     padding-top: 18px;
     border-bottom: 1px solid color-mix(in srgb, var(--background-modifier-border) 78%, transparent);
 }
-
-  .lmsa-history-title-group {
+.lmsa-history-title-group {
     display: flex;
     min-width: 0px;
     align-items: baseline;
     gap: 0.5rem;
 }
-
-  .lmsa-history-title {
+.lmsa-history-title {
     font-size: 1rem;
     line-height: 1.5rem;
     font-weight: 700;
     color: var(--text-normal);
 }
-
-  .lmsa-history-count {
+.lmsa-history-count {
     color: var(--text-faint);
     font-size: var(--font-ui-smaller);
   }
-
-  .lmsa-history-header-actions {
+.lmsa-history-header-actions {
     display: flex;
     flex-shrink: 0;
     gap: 0.375rem;
 }
-
-  .lmsa-history-list {
+.lmsa-history-list {
     display: flex;
     flex: 1 1 0%;
     flex-direction: column;
@@ -905,8 +530,7 @@
     overflow-y: auto;
     padding: 0.75rem;
 }
-
-  .lmsa-history-empty {
+.lmsa-history-empty {
     margin-left: 0.5rem;
     margin-right: 0.5rem;
     margin-top: 1rem;
@@ -922,8 +546,7 @@
     background: color-mix(in srgb, var(--background-secondary) 55%, transparent);
     border: 1px dashed color-mix(in srgb, var(--interactive-accent) 24%, var(--background-modifier-border));
 }
-
-  .lmsa-history-item {
+.lmsa-history-item {
     cursor: default;
     padding-bottom: 0.75rem;
     padding-left: 1rem;
@@ -932,15 +555,13 @@
     background: color-mix(in srgb, var(--background-secondary) 34%, transparent);
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
 }
-
-  .lmsa-history-item:hover {
+.lmsa-history-item:hover {
     transform: translateY(-1px);
     box-shadow:
       0 12px 28px rgba(0, 0, 0, 0.12),
       inset 0 1px 0 rgba(255, 255, 255, 0.04);
   }
-
-  .lmsa-history-item.is-active {
+.lmsa-history-item.is-active {
     border-color: color-mix(in srgb, var(--interactive-accent) 34%, var(--background-modifier-border));
     background:
       linear-gradient(135deg, color-mix(in srgb, var(--interactive-accent) 16%, var(--background-secondary)), color-mix(in srgb, var(--interactive-accent) 8%, var(--background-primary)));
@@ -948,8 +569,7 @@
       0 14px 30px rgba(0, 0, 0, 0.14),
       0 0 0 1px color-mix(in srgb, var(--interactive-accent) 16%, transparent);
   }
-
-  .lmsa-history-item-body {
+.lmsa-history-item-body {
     display: flex;
     min-width: 0px;
     flex: 1 1 0%;
@@ -957,8 +577,7 @@
     flex-direction: column;
     gap: 0.25rem;
 }
-
-  .lmsa-history-item-title {
+.lmsa-history-item-title {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -966,27 +585,23 @@
     color: var(--text-normal);
     font-size: var(--font-ui-small);
 }
-
-  .lmsa-history-item.is-active .lmsa-history-item-title {
+.lmsa-history-item.is-active .lmsa-history-item-title {
     color: var(--interactive-accent);
   }
-
-  .lmsa-history-item-meta {
+.lmsa-history-item-meta {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
     color: var(--text-faint);
     font-size: var(--font-ui-smaller);
 }
-
-  .lmsa-history-item-delete-area {
+.lmsa-history-item-delete-area {
     display: flex;
     flex-shrink: 0;
     align-items: center;
     gap: 0.25rem;
 }
-
-  .lmsa-history-trash-btn {
+.lmsa-history-trash-btn {
     --tw-scale-x: .95;
     --tw-scale-y: .95;
     transform: translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y));
@@ -995,24 +610,413 @@
     transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
     transition-duration: 140ms;
 }
-
-  .lmsa-history-item:hover .lmsa-history-trash-btn {
+.lmsa-history-item:hover .lmsa-history-trash-btn {
     --tw-scale-x: 1;
     --tw-scale-y: 1;
     transform: translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y));
     opacity: 1;
 }
-  .lmsa-settings-root {
+.lmsa-message {
+    display: flex;
+    width: 100%;
+    gap: 0.75rem;
+}
+.lmsa-message--user {
+    justify-content: flex-end;
+}
+.lmsa-message-avatar {
+    display: inline-flex;
+    height: 34px;
+    width: 34px;
+    flex: 0 0 34px;
+    align-items: center;
+    justify-content: center;
+    border-radius: 10px;
+    border-width: 1px;
+    border-color: var(--background-modifier-border);
+    background-color: var(--background-secondary);
+    color: var(--text-muted);
+}
+.lmsa-message--assistant .lmsa-message-avatar {
+    color: var(--interactive-accent);
+    background: color-mix(in srgb, var(--interactive-accent) 12%, var(--background-secondary));
+  }
+.lmsa-message--user .lmsa-message-avatar {
+    order: 2;
+    border-color: transparent;
+    background-color: var(--interactive-accent);
+    --tw-text-opacity: 1;
+    color: rgb(255 255 255 / var(--tw-text-opacity, 1));
+    color: var(--text-on-accent);
+}
+.lmsa-message-column {
+    display: flex;
+    width: 100%;
+    min-width: 0px;
+    max-width: 780px;
+    flex-direction: column;
+    gap: 0.375rem;
+}
+.lmsa-message--user .lmsa-message-column {
+    align-items: flex-end;
+}
+.lmsa-message-chrome {
+    display: flex;
+    width: 100%;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+}
+.lmsa-message-role {
+    font-weight: 600;
+    color: var(--text-muted);
+    font-size: var(--font-ui-smaller);
+}
+.lmsa-message-body {
+    width: 100%;
+    padding-left: 15px;
+    padding-right: 15px;
+    padding-top: 14px;
+    padding-bottom: 14px;
+    -moz-user-select: text;
+         user-select: text;
+    -webkit-user-select: text;
+    cursor: text;
+}
+.lmsa-message--user .lmsa-message-body {
+    background: color-mix(in srgb, var(--interactive-accent) 15%, var(--background-primary));
+    border-color: color-mix(in srgb, var(--interactive-accent) 35%, var(--background-modifier-border));
+  }
+.lmsa-message-body.is-streaming {
+    position: relative;
+}
+.lmsa-message-body.is-streaming::after {
+    content: "";
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    margin-left: 8px;
+    border-radius: 999px;
+    background: var(--interactive-accent);
+    animation: lmsa-pulse 0.9s ease-in-out infinite;
+  }
+.lmsa-message-body.is-error {
+    background: color-mix(in srgb, var(--background-modifier-error) 65%, transparent);
+    border-color: color-mix(in srgb, var(--text-error) 40%, var(--background-modifier-border));
+  }
+.lmsa-message-body.is-muted {
+    opacity: 0.8;
+}
+.lmsa-message-content {
+    overflow-wrap: break-word;
+    line-height: 1.65;
+    -moz-user-select: text;
+         user-select: text;
+    -webkit-user-select: text;
+}
+.lmsa-message-content--plain {
+    white-space: pre-wrap;
+}
+.lmsa-message-content--markdown {
+    white-space: normal;
+  }
+.lmsa-message-content--markdown > :first-child {
+    margin-top: 0;
+  }
+.lmsa-message-content--markdown > :last-child {
+    margin-bottom: 0;
+  }
+.lmsa-message-content--markdown :is(p, ul, ol, blockquote, pre, table) {
+    margin-block: 0.75em;
+  }
+.lmsa-message-content--markdown :is(h1, h2, h3, h4, h5, h6) {
+    margin: 1.1em 0 0.55em;
+    line-height: 1.3;
+  }
+.lmsa-message-content--markdown li + li {
+    margin-top: 0.2em;
+  }
+.lmsa-message-content--markdown pre,
+  .lmsa-message-content--markdown code {
+    white-space: pre;
+    word-break: normal;
+  }
+.lmsa-message-content--markdown pre {
+    max-width: 100%;
+    overflow-x: auto;
+  }
+.lmsa-message-content--markdown table {
+    display: block;
+    max-width: 100%;
+    overflow-x: auto;
+  }
+.lmsa-model-selector-wrap {
+    position: relative;
+    flex: none;
+}
+.lmsa-model-selector-btn {
+    min-width: 0px;
+    max-width: 280px;
+    flex-shrink: 0;
+    background: color-mix(in srgb, var(--background-secondary) 60%, transparent);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+.lmsa-model-selector-btn.is-attention {
+    border-color: color-mix(in srgb, var(--text-error) 48%, var(--background-modifier-border));
+    box-shadow:
+      0 0 0 1px color-mix(in srgb, var(--text-error) 20%, transparent),
+      0 0 0 5px color-mix(in srgb, var(--text-error) 12%, transparent),
+      inset 0 1px 0 rgba(255, 255, 255, 0.04);
+    animation: lmsa-attention-ring 0.7s ease;
+  }
+.lmsa-model-selector-status {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    border-radius: 9999px;
+    padding-left: 0.5rem;
+    padding-right: 0.5rem;
+    padding-top: 3px;
+    padding-bottom: 3px;
+    font-weight: 500;
+    font-size: 11px;
+    line-height: 1;
+    border: 1px solid transparent;
+}
+.lmsa-model-selector-status.is-hidden {
+    display: none;
+}
+.lmsa-model-selector-status.is-loaded {
+    color: color-mix(in srgb, var(--color-green, #29a36a) 86%, var(--text-normal));
+    background: color-mix(in srgb, var(--color-green, #29a36a) 14%, transparent);
+    border-color: color-mix(in srgb, var(--color-green, #29a36a) 28%, transparent);
+  }
+.lmsa-model-selector-status.is-unloaded,
+  .lmsa-model-selector-status.is-unknown {
+    color: color-mix(in srgb, var(--text-error) 92%, var(--text-normal));
+    background: color-mix(in srgb, var(--text-error) 12%, transparent);
+    border-color: color-mix(in srgb, var(--text-error) 24%, transparent);
+  }
+.lmsa-model-selector-icon,
+  .lmsa-model-selector-chevron {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+}
+.lmsa-model-selector-icon svg {
+    width: 14px;
+    height: 14px;
+  }
+.lmsa-model-selector-label {
+    min-width: 0px;
+    flex: 1 1 0%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.lmsa-model-selector-chevron {
+    color: color-mix(in srgb, var(--interactive-accent) 64%, var(--text-muted));
+  }
+.lmsa-model-selector-chevron svg {
+    width: 12px;
+    height: 12px;
+  }
+.lmsa-model-dropdown {
+    position: absolute;
+    bottom: calc(100% + 8px);
+    left: 0px;
+    z-index: 120;
+    max-height: 360px;
+    overflow-y: auto;
+    border-radius: 16px;
+    border-width: 1px;
+    border-color: var(--background-modifier-border);
+    padding: 0.5rem;
+    width: min(372px, calc(100vw - 48px));
+    background:
+      linear-gradient(180deg, color-mix(in srgb, var(--background-primary) 97%, transparent), color-mix(in srgb, var(--background-secondary) 94%, transparent));
+    backdrop-filter: blur(22px);
+    -webkit-backdrop-filter: blur(22px);
+    box-shadow:
+      0 22px 56px rgba(0, 0, 0, 0.22),
+      inset 0 1px 0 rgba(255, 255, 255, 0.04);
+    transform-origin: bottom left;
+    overflow: hidden auto;
+}
+.lmsa-model-dropdown-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.375rem;
+}
+.lmsa-model-dropdown-item {
+    display: flex;
+    width: 100%;
+    cursor: pointer;
+    align-items: center;
+    gap: 0.625rem;
+    border-radius: 12px;
+    border-width: 1px;
+    border-color: transparent;
+    padding-left: 0.75rem;
+    padding-right: 0.75rem;
+    padding-top: 11px;
+    padding-bottom: 11px;
+    text-align: left;
+    color: var(--text-normal);
+    font-size: var(--font-ui-small);
+    background: color-mix(in srgb, var(--background-secondary) 58%, transparent);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+    transition: background-color 140ms ease, border-color 140ms ease, color 140ms ease;
+}
+.lmsa-model-dropdown-item:hover {
+    background: color-mix(in srgb, var(--background-modifier-hover) 90%, var(--background-secondary));
+    border-color: color-mix(in srgb, var(--background-modifier-border) 85%, transparent);
+  }
+.lmsa-model-dropdown-item.is-active {
+    color: var(--text-on-accent);
+    background:
+      linear-gradient(90deg, color-mix(in srgb, var(--interactive-accent) 92%, black 6%), color-mix(in srgb, var(--interactive-accent) 82%, black 4%));
+    border-color: color-mix(in srgb, white 12%, transparent);
+    box-shadow:
+      0 0 0 1px color-mix(in srgb, var(--interactive-accent) 16%, transparent),
+      inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  }
+.lmsa-model-dropdown-leading {
+    display: flex;
+    height: 1.25rem;
+    width: 1.25rem;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+}
+.lmsa-model-dropdown-copy {
+    display: flex;
+    min-width: 0px;
+    flex: 1 1 0%;
+    align-items: center;
+}
+.lmsa-model-dropdown-check {
+    display: inline-flex;
+    height: 1rem;
+    width: 1rem;
+    align-items: center;
+    justify-content: center;
+    color: transparent;
+}
+.lmsa-model-dropdown-item.is-active .lmsa-model-dropdown-check {
+    color: var(--text-on-accent);
+  }
+.lmsa-model-dropdown-check svg {
+    width: 13px;
+    height: 13px;
+  }
+.lmsa-model-dropdown-name {
+    flex: 1 1 0%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-weight: 500;
+    letter-spacing: 0.01em;
+}
+.lmsa-model-dropdown-state {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    border-radius: 9999px;
+    padding-left: 9px;
+    padding-right: 9px;
+    padding-top: 3px;
+    padding-bottom: 3px;
+    font-weight: 500;
+    font-size: 10px;
+    line-height: 1;
+    border: 1px solid transparent;
+    letter-spacing: 0.01em;
+}
+.lmsa-model-dropdown-state.is-loaded {
+    color: color-mix(in srgb, var(--color-green, #29a36a) 86%, var(--text-normal));
+    background: color-mix(in srgb, var(--color-green, #29a36a) 16%, transparent);
+    border-color: color-mix(in srgb, var(--color-green, #29a36a) 24%, transparent);
+  }
+.lmsa-model-dropdown-state.is-unloaded,
+  .lmsa-model-dropdown-state.is-unknown {
+    color: color-mix(in srgb, var(--text-error) 92%, var(--text-normal));
+    background: color-mix(in srgb, var(--text-error) 11%, transparent);
+    border-color: color-mix(in srgb, var(--text-error) 20%, transparent);
+  }
+.lmsa-model-dropdown-item.is-active .lmsa-model-dropdown-state {
+    color: var(--text-on-accent);
+    background: color-mix(in srgb, white 20%, transparent);
+    border-color: color-mix(in srgb, white 18%, transparent);
+  }
+.lmsa-model-dropdown-empty {
+    padding-left: 1rem;
+    padding-right: 1rem;
+    padding-top: 1.25rem;
+    padding-bottom: 1.25rem;
+    text-align: center;
+    color: var(--text-muted);
+    font-size: var(--font-ui-smaller);
+}
+.lmsa-command-bar {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+.lmsa-command-label {
+    padding-left: 0.25rem;
+    color: var(--text-muted);
+    font-size: var(--font-ui-smaller);
+    letter-spacing: 0.02em;
+}
+.lmsa-command-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+.lmsa-composer-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.375rem;
+    padding-left: 0.25rem;
+    padding-right: 0.25rem;
+    padding-bottom: 0.625rem;
+}
+.lmsa-composer-chips:empty {
+    display: none;
+}
+.lmsa-chip-icon {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    color: var(--interactive-accent);
+}
+.lmsa-chip-icon svg {
+    width: 11px;
+    height: 11px;
+  }
+.lmsa-chip-label {
+    min-width: 0px;
+    flex: 1 1 0%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.lmsa-chip-remove svg {
+    width: 10px;
+    height: 10px;
+  }
+.lmsa-settings-root {
     padding-bottom: 2rem;
 }
-
-  .lmsa-settings-shell {
+.lmsa-settings-shell {
     display: flex;
     flex-direction: column;
     gap: 1.25rem;
 }
-
-  .lmsa-settings-topbar {
+.lmsa-settings-topbar {
     position: relative;
     display: flex;
     flex-direction: column;
@@ -1033,9 +1037,7 @@
       0 20px 48px rgba(0, 0, 0, 0.08),
       inset 0 1px 0 rgba(255, 255, 255, 0.06);
 }
-
-  .lmsa-settings-topbar::before,
-  .lmsa-settings-panel::before {
+.lmsa-settings-topbar::before {
     content: "";
     pointer-events: none;
     position: absolute;
@@ -1046,23 +1048,20 @@
     background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--interactive-accent) 55%, white), transparent);
     opacity: 0.85;
   }
-
-  .lmsa-settings-brand {
+.lmsa-settings-brand {
     display: flex;
     min-width: 0px;
     flex-direction: column;
     gap: 0.25rem;
 }
-
-  .lmsa-settings-eyebrow {
+.lmsa-settings-eyebrow {
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.18em;
     color: color-mix(in srgb, var(--interactive-accent) 72%, var(--text-muted));
     font-size: 0.68rem;
 }
-
-  .lmsa-settings-title,
+.lmsa-settings-title,
   .lmsa-settings-panel-title {
     margin: 0px;
     font-weight: 700;
@@ -1070,14 +1069,7 @@
     font-size: 1.35rem;
     line-height: 1.15;
 }
-
-  .lmsa-settings-panel-desc {
-    margin: 0px;
-    color: var(--text-muted);
-    line-height: 1.65;
-}
-
-  .lmsa-settings-nav {
+.lmsa-settings-nav {
     display: flex;
     width: 100%;
     min-width: 0px;
@@ -1089,8 +1081,7 @@
     padding-bottom: 0.125rem;
     scrollbar-width: thin;
 }
-
-  .lmsa-settings-tab-btn {
+.lmsa-settings-tab-btn {
     display: inline-flex;
     min-width: -moz-max-content;
     min-width: max-content;
@@ -1114,15 +1105,13 @@
       transform 140ms ease,
       box-shadow 140ms ease;
 }
-
-  .lmsa-settings-tab-btn:hover {
+.lmsa-settings-tab-btn:hover {
     color: var(--text-normal);
     border-color: color-mix(in srgb, var(--interactive-accent) 18%, var(--background-modifier-border));
     background: color-mix(in srgb, var(--background-modifier-hover) 78%, transparent);
     transform: translateY(-1px);
   }
-
-  .lmsa-settings-tab-btn.is-active {
+.lmsa-settings-tab-btn.is-active {
     color: var(--text-normal);
     border-color: color-mix(in srgb, var(--interactive-accent) 34%, var(--background-modifier-border));
     background:
@@ -1131,18 +1120,37 @@
       0 16px 32px rgba(0, 0, 0, 0.08),
       0 0 0 1px color-mix(in srgb, var(--interactive-accent) 14%, transparent);
   }
-
-  .lmsa-settings-tab-label {
+.lmsa-settings-tab-label {
     white-space: nowrap;
     font-weight: 600;
     font-size: 0.95rem;
 }
-
-  .lmsa-settings-stage {
+.lmsa-settings-stage {
     min-width: 0px;
 }
+.lmsa-tab-desc,
+  .lmsa-divider {
+    display: none;
+  }
+@media (max-width: 980px) {
+    .lmsa-settings-nav {
+        padding-bottom: 0.25rem;
+    }
+  }
+@media (max-width: 700px) {
+    .lmsa-settings-topbar {
+        padding-left: 1rem;
+        padding-right: 1rem;
+        padding-top: 1rem;
+        padding-bottom: 1rem;
+    }
 
-  .lmsa-settings-panel {
+    .lmsa-settings-tab-btn {
+        min-width: -moz-max-content;
+        min-width: max-content;
+    }
+  }
+.lmsa-settings-panel {
     position: relative;
     overflow: hidden;
     background:
@@ -1154,8 +1162,18 @@
       0 24px 56px rgba(0, 0, 0, 0.1),
       inset 0 1px 0 rgba(255, 255, 255, 0.06);
 }
-
-  .lmsa-settings-panel-header {
+.lmsa-settings-panel::before {
+    content: "";
+    pointer-events: none;
+    position: absolute;
+    left: 1.25rem;
+    right: 1.25rem;
+    top: 0px;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--interactive-accent) 55%, white), transparent);
+    opacity: 0.85;
+  }
+.lmsa-settings-panel-header {
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
@@ -1165,15 +1183,18 @@
     padding-top: 1.5rem;
     border-bottom: 1px solid color-mix(in srgb, var(--background-modifier-border) 82%, transparent);
 }
-
-  .lmsa-settings-content {
+.lmsa-settings-panel-desc {
+    margin: 0px;
+    color: var(--text-muted);
+    line-height: 1.65;
+}
+.lmsa-settings-content {
     display: flex;
     flex-direction: column;
     gap: 1.25rem;
     padding: 1.25rem;
 }
-
-  .lmsa-settings-section {
+.lmsa-settings-section {
     overflow: hidden;
     background:
       linear-gradient(180deg, color-mix(in srgb, var(--background-primary) 88%, transparent), color-mix(in srgb, var(--background-secondary) 94%, transparent));
@@ -1181,8 +1202,7 @@
       0 14px 34px rgba(0, 0, 0, 0.06),
       inset 0 1px 0 rgba(255, 255, 255, 0.05);
 }
-
-  .lmsa-settings-section-header {
+.lmsa-settings-section-header {
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
@@ -1192,43 +1212,37 @@
     padding-bottom: 0px;
     padding-top: 1.25rem;
 }
-
-  .lmsa-settings-section-heading {
+.lmsa-settings-section-heading {
     display: flex;
     min-width: 0px;
     flex: 1 1 0%;
     flex-direction: column;
     gap: 0.375rem;
 }
-
-  .lmsa-settings-section-actions {
+.lmsa-settings-section-actions {
     display: flex;
     flex-wrap: wrap;
     justify-content: flex-end;
     gap: 0.5rem;
 }
-
-  .lmsa-settings-section-title {
+.lmsa-settings-section-title {
     margin: 0px;
     font-weight: 600;
     color: var(--text-normal);
     font-size: 1rem;
 }
-
-  .lmsa-settings-section-desc {
+.lmsa-settings-section-desc {
     margin: 0px;
     color: var(--text-muted);
     line-height: 1.6;
 }
-
-  .lmsa-settings-section-body {
+.lmsa-settings-section-body {
     padding-left: 1.25rem;
     padding-right: 1.25rem;
     padding-bottom: 1rem;
     padding-top: 1rem;
 }
-
-  .lmsa-settings-section-footer {
+.lmsa-settings-section-footer {
     display: flex;
     flex-wrap: wrap;
     justify-content: flex-end;
@@ -1238,12 +1252,10 @@
     padding-bottom: 1.25rem;
     padding-top: 0px;
 }
-
-  .lmsa-settings-section-footer:empty {
+.lmsa-settings-section-footer:empty {
     display: none;
   }
-
-  .lmsa-settings-section-body .setting-item {
+.lmsa-settings-section-body .setting-item {
     margin: 0px;
     gap: 1rem;
     padding-left: 0px;
@@ -1252,37 +1264,30 @@
     padding-bottom: 1rem;
     border-top: 1px solid color-mix(in srgb, var(--background-modifier-border) 76%, transparent);
 }
-
-  .lmsa-settings-section-body .setting-item:first-child {
+.lmsa-settings-section-body .setting-item:first-child {
     border-top: 0;
     padding-top: 0;
   }
-
-  .lmsa-settings-section-body .setting-item:last-child {
+.lmsa-settings-section-body .setting-item:last-child {
     padding-bottom: 0;
   }
-
-  .lmsa-settings-section-body .setting-item-info {
+.lmsa-settings-section-body .setting-item-info {
     padding-right: 0.75rem;
 }
-
-  .lmsa-settings-section-body .setting-item-name {
+.lmsa-settings-section-body .setting-item-name {
     font-weight: 600;
     color: var(--text-normal);
 }
-
-  .lmsa-settings-section-body .setting-item-description,
+.lmsa-settings-section-body .setting-item-description,
   .lmsa-settings-section-body .setting-item-description > div {
     color: var(--text-muted);
     line-height: 1.55;
 }
-
-  .lmsa-modal .setting-item {
+.lmsa-modal .setting-item {
     padding-left: 0px;
     padding-right: 0px;
 }
-
-  .lmsa-settings-root input[type="text"],
+.lmsa-settings-root input[type="text"],
   .lmsa-settings-root input[type="number"],
   .lmsa-settings-root textarea,
   .lmsa-settings-root select,
@@ -1298,8 +1303,7 @@
     color: var(--text-normal);
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
-
-  .lmsa-settings-root input[type="text"]:focus,
+.lmsa-settings-root input[type="text"]:focus,
   .lmsa-settings-root input[type="number"]:focus,
   .lmsa-settings-root textarea:focus,
   .lmsa-settings-root select:focus,
@@ -1307,19 +1311,82 @@
     border-color: color-mix(in srgb, var(--interactive-accent) 38%, var(--background-modifier-border));
     box-shadow: 0 0 0 1px color-mix(in srgb, var(--interactive-accent) 18%, transparent);
   }
-
-  .lmsa-tab-desc,
-  .lmsa-divider {
-    display: none;
-  }
-
-  .lmsa-item-list {
-    display: flex;
-    flex-direction: column;
-    gap: 0.75rem;
+.lmsa-empty-state,
+  .lmsa-settings-note,
+  .lmsa-advanced-note {
+    margin: 0px;
+    border-radius: 16px;
+    border-width: 1px;
+    padding: 1rem;
+    color: var(--text-muted);
+    border-color: color-mix(in srgb, var(--interactive-accent) 18%, var(--background-modifier-border));
+    background: color-mix(in srgb, var(--background-secondary) 58%, transparent);
+    line-height: 1.6;
 }
+.lmsa-empty-state {
+    border-style: dashed;
+  }
+.lmsa-settings-note-title {
+    margin-bottom: 0.5rem;
+    font-weight: 600;
+    color: var(--text-normal);
+}
+.lmsa-hint-list {
+    margin: 0px;
+    padding-left: 1.25rem;
+    color: var(--text-muted);
+}
+.lmsa-hint-list li + li {
+    margin-top: 6px;
+  }
+@media (max-width: 700px) {
+    .lmsa-settings-panel-header {
+        padding-left: 1rem;
+        padding-right: 1rem;
+        padding-top: 1.25rem;
+    }
 
-  .lmsa-connection-status {
+    .lmsa-settings-content {
+        padding-left: 1rem;
+        padding-right: 1rem;
+        padding-top: 1rem;
+        padding-bottom: 1rem;
+    }
+
+    .lmsa-settings-section-header {
+        flex-direction: column;
+        padding-left: 1rem;
+        padding-right: 1rem;
+        padding-top: 1rem;
+    }
+
+    .lmsa-settings-section-body {
+        padding-left: 1rem;
+        padding-right: 1rem;
+        padding-top: 0.75rem;
+        padding-bottom: 0.75rem;
+    }
+
+    .lmsa-settings-section-footer {
+        justify-content: flex-start;
+        padding-left: 1rem;
+        padding-right: 1rem;
+        padding-bottom: 1rem;
+    }
+
+    .lmsa-settings-section-actions {
+        justify-content: flex-start;
+    }
+
+    .lmsa-settings-section-body .setting-item {
+        flex-direction: column;
+        align-items: stretch;
+    }
+  }
+.lmsa-settings-discovery-status {
+    margin-bottom: 16px;
+  }
+.lmsa-connection-status {
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
@@ -1328,33 +1395,24 @@
     padding: 1rem;
     background: color-mix(in srgb, var(--background-secondary) 62%, transparent);
 }
-
-  .lmsa-settings-discovery-status {
-    margin-bottom: 16px;
-  }
-
-  .lmsa-connection-status.is-loading {
+.lmsa-connection-status.is-loading {
     border-color: color-mix(in srgb, var(--interactive-accent) 20%, var(--background-modifier-border));
   }
-
-  .lmsa-connection-status.is-connected {
+.lmsa-connection-status.is-connected {
     border-color: color-mix(in srgb, var(--color-green) 42%, var(--background-modifier-border));
     background: color-mix(in srgb, var(--color-green) 8%, var(--background-secondary));
   }
-
-  .lmsa-connection-status.is-error {
+.lmsa-connection-status.is-error {
     border-color: color-mix(in srgb, var(--background-modifier-error) 72%, var(--background-modifier-border));
     background: color-mix(in srgb, var(--background-modifier-error) 8%, var(--background-secondary));
   }
-
-  .lmsa-connection-status-summary {
+.lmsa-connection-status-summary {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
     gap: 0.5rem;
 }
-
-  .lmsa-connection-status-badge,
+.lmsa-connection-status-badge,
   .lmsa-model-state-badge {
     display: inline-flex;
     align-items: center;
@@ -1369,31 +1427,31 @@
     background: color-mix(in srgb, var(--background-modifier-hover) 84%, transparent);
     color: var(--text-normal);
 }
-
-  .lmsa-connection-status.is-connected .lmsa-connection-status-badge,
+.lmsa-connection-status.is-connected .lmsa-connection-status-badge,
   .lmsa-model-state-badge.is-loaded {
     background: color-mix(in srgb, var(--color-green) 18%, transparent);
     color: color-mix(in srgb, var(--color-green) 74%, var(--text-normal));
   }
-
-  .lmsa-connection-status.is-error .lmsa-connection-status-badge,
+.lmsa-connection-status.is-error .lmsa-connection-status-badge,
   .lmsa-model-state-badge.is-unloaded {
     background: color-mix(in srgb, var(--background-modifier-error) 18%, transparent);
     color: color-mix(in srgb, var(--background-modifier-error) 88%, var(--text-normal));
   }
-
-  .lmsa-connection-status-text {
+.lmsa-connection-status-text {
     font-weight: 600;
     color: var(--text-normal);
 }
-
-  .lmsa-connection-status-meta {
+.lmsa-connection-status-meta {
     color: var(--text-muted);
     line-height: 1.55;
     word-break: break-word;
 }
-
-  .lmsa-item-row {
+.lmsa-item-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+.lmsa-item-row {
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
@@ -1405,163 +1463,62 @@
     background: color-mix(in srgb, var(--background-secondary) 62%, transparent);
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
 }
-
-  .lmsa-item-info {
+.lmsa-item-info {
     display: flex;
     min-width: 0px;
     flex: 1 1 0%;
     flex-direction: column;
     gap: 0.375rem;
 }
-
-  .lmsa-live-model-row {
+.lmsa-live-model-row {
     gap: 0.75rem;
 }
-
-  .lmsa-live-model-header {
+.lmsa-live-model-header {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
     gap: 0.5rem;
 }
-
-  .lmsa-item-name {
+.lmsa-item-name {
     font-weight: 600;
     color: var(--text-normal);
 }
-
-  .lmsa-item-sub,
+.lmsa-item-sub,
   .lmsa-item-meta {
     color: var(--text-muted);
     line-height: 1.55;
     word-break: break-word;
 }
-
-  .lmsa-item-sub {
+.lmsa-item-sub {
     white-space: pre-wrap;
   }
-
-  .lmsa-item-actions {
+.lmsa-item-actions {
     display: flex;
     flex-wrap: wrap;
     justify-content: flex-end;
     gap: 0.5rem;
 }
-
-  .lmsa-btn-secondary,
+.lmsa-btn-secondary,
   .lmsa-btn-danger,
   .lmsa-btn-add {
     white-space: nowrap;
 }
-
-  .lmsa-btn-danger {
+.lmsa-btn-danger {
     border-width: 1px;
     border-color: color-mix(in srgb, var(--background-modifier-error) 72%, var(--background-modifier-border));
     background: color-mix(in srgb, var(--background-primary) 92%, transparent);
     color: var(--text-error);
 }
-
-  .lmsa-btn-danger:hover:not(:disabled) {
+.lmsa-btn-danger:hover:not(:disabled) {
     background: color-mix(in srgb, var(--background-modifier-error) 14%, var(--background-primary));
   }
-
-  .lmsa-empty-state,
-  .lmsa-settings-note,
-  .lmsa-advanced-note {
-    margin: 0px;
-    border-radius: 16px;
-    border-width: 1px;
-    padding: 1rem;
-    color: var(--text-muted);
-    border-color: color-mix(in srgb, var(--interactive-accent) 18%, var(--background-modifier-border));
-    background: color-mix(in srgb, var(--background-secondary) 58%, transparent);
-    line-height: 1.6;
-}
-
-  .lmsa-empty-state {
-    border-style: dashed;
-  }
-
-  .lmsa-settings-note-title {
-    margin-bottom: 0.5rem;
-    font-weight: 600;
-    color: var(--text-normal);
-}
-
-  .lmsa-hint-list {
-    margin: 0px;
-    padding-left: 1.25rem;
-    color: var(--text-muted);
-}
-
-  .lmsa-hint-list li + li {
-    margin-top: 6px;
-  }
-
-  @media (max-width: 980px) {
-    .lmsa-settings-nav {
-        padding-bottom: 0.25rem;
-    }
-  }
-
-  @media (max-width: 700px) {
-    .lmsa-settings-topbar,
-    .lmsa-settings-panel-header,
-    .lmsa-settings-content,
-    .lmsa-settings-section-header,
-    .lmsa-settings-section-body,
-    .lmsa-settings-section-footer {
-        padding-left: 1rem;
-        padding-right: 1rem;
-    }
-
-    .lmsa-settings-topbar {
-        padding-top: 1rem;
-        padding-bottom: 1rem;
-    }
-
-    .lmsa-settings-panel-header {
-        padding-top: 1.25rem;
-    }
-
-    .lmsa-settings-content {
-        padding-top: 1rem;
-        padding-bottom: 1rem;
-    }
-
-    .lmsa-settings-section-header {
-        padding-top: 1rem;
-        flex-direction: column;
-    }
-
-    .lmsa-settings-section-actions,
-    .lmsa-settings-section-footer {
-        justify-content: flex-start;
-    }
-
-    .lmsa-settings-section-body {
-        padding-top: 0.75rem;
-        padding-bottom: 0.75rem;
-    }
-
-    .lmsa-settings-section-footer {
-        padding-bottom: 1rem;
-    }
-
-    .lmsa-settings-tab-btn {
-        min-width: -moz-max-content;
-        min-width: max-content;
-    }
-
-    .lmsa-settings-section-body .setting-item,
+@media (max-width: 700px) {
     .lmsa-item-row {
         flex-direction: column;
         align-items: stretch;
     }
 
-    .lmsa-item-actions,
-    .lmsa-settings-section-actions,
-    .lmsa-settings-section-footer {
+    .lmsa-item-actions {
         justify-content: flex-start;
     }
   }
@@ -1655,6 +1612,9 @@
 .lmsa-h-4 {
     height: 1rem;
 }
+.lmsa-h-5 {
+    height: 1.25rem;
+}
 .lmsa-h-\[30px\] {
     height: 30px;
 }
@@ -1664,8 +1624,8 @@
 .lmsa-h-full {
     height: 100%;
 }
-.lmsa-max-h-\[320px\] {
-    max-height: 320px;
+.lmsa-max-h-\[360px\] {
+    max-height: 360px;
 }
 .lmsa-min-h-0 {
     min-height: 0px;
@@ -1678,6 +1638,9 @@
 }
 .lmsa-w-4 {
     width: 1rem;
+}
+.lmsa-w-5 {
+    width: 1.25rem;
 }
 .lmsa-w-\[30px\] {
     width: 30px;
@@ -1695,14 +1658,11 @@
     min-width: -moz-max-content;
     min-width: max-content;
 }
-.lmsa-max-w-\[140px\] {
-    max-width: 140px;
-}
-.lmsa-max-w-\[200px\] {
-    max-width: 200px;
-}
 .lmsa-max-w-\[220px\] {
     max-width: 220px;
+}
+.lmsa-max-w-\[280px\] {
+    max-width: 280px;
 }
 .lmsa-max-w-\[42ch\] {
     max-width: 42ch;
@@ -1718,9 +1678,6 @@
 }
 .lmsa-flex-1 {
     flex: 1 1 0%;
-}
-.lmsa-flex-\[0_0_16px\] {
-    flex: 0 0 16px;
 }
 .lmsa-flex-\[0_0_30px\] {
     flex: 0 0 30px;
@@ -1833,9 +1790,6 @@
 .lmsa-whitespace-nowrap {
     white-space: nowrap;
 }
-.lmsa-break-words {
-    overflow-wrap: break-word;
-}
 .lmsa-rounded-2xl {
     border-radius: 1rem;
 }
@@ -1946,6 +1900,10 @@
     padding-left: 18px;
     padding-right: 18px;
 }
+.lmsa-px-\[9px\] {
+    padding-left: 9px;
+    padding-right: 9px;
+}
 .lmsa-py-0 {
     padding-top: 0px;
     padding-bottom: 0px;
@@ -1966,17 +1924,17 @@
     padding-top: 0.5rem;
     padding-bottom: 0.5rem;
 }
-.lmsa-py-2\.5 {
-    padding-top: 0.625rem;
-    padding-bottom: 0.625rem;
-}
 .lmsa-py-3 {
     padding-top: 0.75rem;
     padding-bottom: 0.75rem;
 }
-.lmsa-py-4 {
-    padding-top: 1rem;
-    padding-bottom: 1rem;
+.lmsa-py-5 {
+    padding-top: 1.25rem;
+    padding-bottom: 1.25rem;
+}
+.lmsa-py-\[11px\] {
+    padding-top: 11px;
+    padding-bottom: 11px;
 }
 .lmsa-py-\[14px\] {
     padding-top: 14px;
@@ -1985,6 +1943,10 @@
 .lmsa-py-\[18px\] {
     padding-top: 18px;
     padding-bottom: 18px;
+}
+.lmsa-py-\[3px\] {
+    padding-top: 3px;
+    padding-bottom: 3px;
 }
 .lmsa-py-\[5px\] {
     padding-top: 5px;
@@ -2042,6 +2004,9 @@
 .lmsa-pt-2 {
     padding-top: 0.5rem;
 }
+.lmsa-pt-4 {
+    padding-top: 1rem;
+}
 .lmsa-pt-\[14px\] {
     padding-top: 14px;
 }
@@ -2093,6 +2058,66 @@
 .lmsa-duration-\[140ms\] {
     transition-duration: 140ms;
 }
+/* Chat */
+@media (max-width: 700px) {
+  .lmsa-header,
+  .lmsa-composer-footer {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+  .lmsa-header-actions,
+  .lmsa-btn-row {
+        width: 100%;
+        justify-content: flex-start;
+    }
+
+  .lmsa-composer-footer-meta {
+        width: 100%;
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+  .lmsa-compose-hint {
+        align-self: flex-start;
+    }
+  .lmsa-history-drawer {
+    inset: 8px 8px 8px;
+    border-radius: 20px;
+  }
+
+  .lmsa-history-header {
+        padding-left: 1rem;
+        padding-right: 1rem;
+    }
+
+  .lmsa-history-list {
+        padding: 0.5rem;
+    }
+  .lmsa-message {
+        gap: 0.625rem;
+    }
+
+  .lmsa-message-avatar {
+        height: 30px;
+        width: 30px;
+        flex: 0 0 30px;
+    }
+  .lmsa-model-selector-wrap {
+        width: 100%;
+    }
+
+  .lmsa-model-selector-btn {
+        width: 100%;
+        max-width: none;
+    }
+
+  .lmsa-model-dropdown {
+        left: 0px;
+        right: 0px;
+    width: auto;
+    }
+}
 @keyframes lmsa-pulse {
   0%,
   100% {
@@ -2116,65 +2141,27 @@
     transform: translateY(0) scale(1);
   }
 }
-@media (max-width: 700px) {
-  .lmsa-header,
-  .lmsa-composer-footer {
-        flex-direction: column;
-        align-items: stretch;
-    }
-
-  .lmsa-header-actions,
-  .lmsa-btn-row {
-        width: 100%;
-        justify-content: flex-start;
-    }
-
-  .lmsa-message {
-        gap: 0.625rem;
-    }
-
-  .lmsa-message-avatar {
-        height: 30px;
-        width: 30px;
-        flex: 0 0 30px;
-    }
-
-  .lmsa-composer-footer-meta {
-        width: 100%;
-        flex-direction: column;
-        align-items: stretch;
-    }
-
-  .lmsa-model-selector-wrap {
-        width: 100%;
-    }
-
-  .lmsa-model-selector-btn {
-        width: 100%;
-        max-width: none;
-    }
-
-  .lmsa-model-dropdown {
-        left: 0px;
-        right: 0px;
-    width: auto;
-    }
-
-  .lmsa-compose-hint {
-        align-self: flex-start;
-    }
-
-  .lmsa-history-drawer {
-    inset: 8px 8px 8px;
-    border-radius: 20px;
+@keyframes lmsa-attention-ring {
+  0% {
+    transform: translateY(0) scale(1);
+    box-shadow:
+      0 0 0 0 color-mix(in srgb, var(--text-error) 0%, transparent),
+      inset 0 1px 0 rgba(255, 255, 255, 0.04);
   }
 
-  .lmsa-history-header {
-        padding-left: 1rem;
-        padding-right: 1rem;
-    }
+  35% {
+    transform: translateY(-1px) scale(1.01);
+    box-shadow:
+      0 0 0 1px color-mix(in srgb, var(--text-error) 30%, transparent),
+      0 0 0 7px color-mix(in srgb, var(--text-error) 14%, transparent),
+      inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  }
 
-  .lmsa-history-list {
-        padding: 0.5rem;
-    }
+  100% {
+    transform: translateY(0) scale(1);
+    box-shadow:
+      0 0 0 0 color-mix(in srgb, var(--text-error) 0%, transparent),
+      inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  }
 }
+/* Settings */

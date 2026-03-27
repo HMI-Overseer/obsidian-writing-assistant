@@ -1,6 +1,12 @@
 import type { WorkspaceLeaf } from "obsidian";
 import { ItemView, Notice, setIcon } from "obsidian";
-import type { CompletionModel, Conversation, ConversationMessage, Message } from "../shared/types";
+import type {
+  CompletionModel,
+  Conversation,
+  ConversationMessage,
+  CustomCommand,
+  Message,
+} from "../shared/types";
 import { VIEW_TYPE_CHAT, MAX_CONVERSATIONS } from "../constants";
 import { resolveCompletionModel } from "../utils";
 import { LMStudioClient } from "../api";
@@ -218,7 +224,7 @@ export class ChatView extends ItemView {
     } else if (history.conversations.length > 0) {
       this.loadConversationIntoView(history.conversations[0]);
     } else {
-      // No history at all  Estart fresh silently (don't persist until there's content)
+      // No history at all; start fresh silently until there is content.
       const fresh = createConversation("", "");
       history.conversations.unshift(fresh);
       history.activeConversationId = fresh.id;
@@ -361,7 +367,7 @@ export class ChatView extends ItemView {
         this.setStatus("Ready", true);
         this.scrollToBottom();
       } else {
-        // No conversations left  Estart a fresh one
+        // No conversations left; start a fresh one.
         const fresh = createConversation("", "");
         history.conversations.unshift(fresh);
         history.activeConversationId = fresh.id;
@@ -401,14 +407,14 @@ export class ChatView extends ItemView {
 
     const history = this.plugin.settings.chatHistory;
     const idx = history.conversations.findIndex((c) => c.id === id);
-    if (idx === -1) return; // Deleted externally  Edon't resurrect
+    if (idx === -1) return; // Deleted externally; do not resurrect it.
 
     const conv = history.conversations[idx];
     const draft = this.textareaEl?.value ?? "";
     const isEmpty = this.messageHistory.length === 0 && !draft.trim();
 
     if (isEmpty && !conv.title) {
-      // Empty unsaved conversation  Ediscard rather than clutter history
+      // Empty unsaved conversation; discard it rather than clutter history.
       history.conversations.splice(idx, 1);
       if (history.activeConversationId === id) {
         history.activeConversationId = history.conversations[0]?.id ?? null;
@@ -560,7 +566,7 @@ export class ChatView extends ItemView {
     }
   }
 
-  private async runCommand(command: import("../shared/types").CustomCommand): Promise<void> {
+  private async runCommand(command: CustomCommand): Promise<void> {
     const selection = this.app.workspace.activeEditor?.editor?.getSelection() ?? "";
     const noteText = (await getActiveNoteText(this.app, this.plugin.settings.maxContextChars)) ?? "";
     const prompt = command.prompt

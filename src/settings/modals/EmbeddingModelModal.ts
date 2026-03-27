@@ -1,9 +1,11 @@
-﻿import type { App } from "obsidian";
+import type { App } from "obsidian";
 import { Modal, Notice, Setting } from "obsidian";
 import type LMStudioWritingAssistant from "../../main";
 import { LMStudioModelsService } from "../../api";
 import type { EmbeddingModel } from "../../shared/types";
 import { generateId } from "../../utils";
+
+type EmbeddingModelPrefill = Partial<Pick<EmbeddingModel, "name" | "modelId">>;
 
 export class EmbeddingModelModal extends Modal {
   private model: EmbeddingModel;
@@ -12,10 +14,17 @@ export class EmbeddingModelModal extends Modal {
     app: App,
     private plugin: LMStudioWritingAssistant,
     source: EmbeddingModel | null,
-    private onSave: (model: EmbeddingModel) => void
+    private onSave: (model: EmbeddingModel) => void,
+    prefill?: EmbeddingModelPrefill
   ) {
     super(app);
-    this.model = source ? { ...source } : { id: generateId(), name: "", modelId: "" };
+    this.model = source
+      ? { ...source, ...prefill }
+      : {
+          id: generateId(),
+          name: prefill?.name ?? "",
+          modelId: prefill?.modelId ?? "",
+        };
   }
 
   async onOpen(): Promise<void> {

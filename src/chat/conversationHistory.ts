@@ -140,9 +140,6 @@ export function formatRelativeDate(timestamp: number): string {
   if (timestamp >= todayStart) return "Today";
   if (timestamp >= yesterdayStart) return "Yesterday";
 
-  const timeStr = date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-  const _ = timeStr; // suppress unused
-
   if (timestamp >= weekStart) {
     return date.toLocaleDateString([], { weekday: "short" });
   }

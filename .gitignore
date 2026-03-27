@@ -25,8 +25,10 @@ Thumbs.db
 # Obsidian vault config (if the repo is inside a vault)
 .obsidian/
 
-# Claude Code local memory
+# AI slop
 .claude/
+AGENTS.md
 
 # Obsidian
 data.json
+

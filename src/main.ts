@@ -226,7 +226,8 @@ export default class LMStudioWritingAssistant extends Plugin {
   }
 
   async saveSettings(): Promise<void> {
-    const { chatState: _dropped, ...toSave } = this.settings;
+    const toSave = { ...this.settings };
+    delete toSave.chatState;
     await this.saveData(toSave);
   }
 

@@ -59,7 +59,7 @@ export class ChatHistoryDrawer {
   }
 
   // ---------------------------------------------------------------------------
-  // Private  EDOM construction
+  // Private DOM construction
   // ---------------------------------------------------------------------------
 
   private buildShell(): void {

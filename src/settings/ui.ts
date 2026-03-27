@@ -1,5 +1,7 @@
 export type SettingsSectionRefs = {
   sectionEl: HTMLElement;
+  headerEl: HTMLElement;
+  headerActionsEl: HTMLElement;
   bodyEl: HTMLElement;
   footerEl: HTMLElement;
 };
@@ -11,14 +13,16 @@ export function createSettingsSection(
 ): SettingsSectionRefs {
   const sectionEl = container.createDiv({ cls: "lmsa-settings-section lmsa-ui-card" });
   const headerEl = sectionEl.createDiv({ cls: "lmsa-settings-section-header" });
+  const headingEl = headerEl.createDiv({ cls: "lmsa-settings-section-heading" });
+  const headerActionsEl = headerEl.createDiv({ cls: "lmsa-settings-section-actions" });
 
-  headerEl.createEl("h3", {
+  headingEl.createEl("h3", {
     cls: "lmsa-settings-section-title",
     text: title,
   });
 
   if (description) {
-    headerEl.createEl("p", {
+    headingEl.createEl("p", {
       cls: "lmsa-settings-section-desc",
       text: description,
     });
@@ -27,5 +31,5 @@ export function createSettingsSection(
   const bodyEl = sectionEl.createDiv({ cls: "lmsa-settings-section-body" });
   const footerEl = sectionEl.createDiv({ cls: "lmsa-settings-section-footer" });
 
-  return { sectionEl, bodyEl, footerEl };
+  return { sectionEl, headerEl, headerActionsEl, bodyEl, footerEl };
 }

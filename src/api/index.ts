@@ -1,1 +1,2 @@
-export { LMStudioClient } from "./LMStudioClient";
+﻿export { LMStudioClient } from "./LMStudioClient";
+export { LMStudioModelsService } from "./LMStudioModelsService";

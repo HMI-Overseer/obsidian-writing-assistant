@@ -8,17 +8,44 @@ import type {
   EmbeddingModel,
   PluginSettings,
 } from "./shared/types";
-import { DEFAULT_CHAT_HISTORY, DEFAULT_COMPLETION_MODEL, DEFAULT_SETTINGS, VIEW_TYPE_CHAT } from "./constants";
+import { DEFAULT_CHAT_HISTORY, DEFAULT_SETTINGS, DEFAULT_SYSTEM_PROMPT, VIEW_TYPE_CHAT } from "./constants";
 import { normalizeLMStudioBaseUrl } from "./api/LMStudioClient";
 import { ChatView } from "./chat";
 import { normalizeChatState } from "./chat/chatState";
-import {
-  createConversation,
-  generateConversationTitle,
-  normalizeChatHistory,
-} from "./chat/conversationHistory";
+import { generateConversationTitle, normalizeChatHistory } from "./chat/conversationHistory";
 import { generateId } from "./utils";
 import { LMStudioSettingTab } from "./settings";
+
+const LEGACY_DEFAULT_COMPLETION_ID = "default";
+const DEFAULT_COMPLETION_TEMPERATURE = 0.7;
+const DEFAULT_COMPLETION_MAX_TOKENS = 2000;
+
+function normalizeCompletionModel(
+  model: Partial<CompletionModel> | null | undefined,
+  index: number
+): CompletionModel {
+  return {
+    id: model?.id || `model-${index + 1}`,
+    name: model?.name || `Model ${index + 1}`,
+    modelId: model?.modelId ?? "",
+    systemPrompt: model?.systemPrompt ?? DEFAULT_SYSTEM_PROMPT,
+    temperature:
+      typeof model?.temperature === "number" ? model.temperature : DEFAULT_COMPLETION_TEMPERATURE,
+    maxTokens:
+      typeof model?.maxTokens === "number" ? model.maxTokens : DEFAULT_COMPLETION_MAX_TOKENS,
+  };
+}
+
+function isUntouchedLegacyDefaultModel(model: CompletionModel): boolean {
+  return (
+    model.id === LEGACY_DEFAULT_COMPLETION_ID &&
+    model.name === "Default" &&
+    model.modelId === "" &&
+    model.systemPrompt === DEFAULT_SYSTEM_PROMPT &&
+    model.temperature === DEFAULT_COMPLETION_TEMPERATURE &&
+    model.maxTokens === DEFAULT_COMPLETION_MAX_TOKENS
+  );
+}
 
 export default class LMStudioWritingAssistant extends Plugin {
   settings!: PluginSettings;
@@ -83,25 +110,40 @@ export default class LMStudioWritingAssistant extends Plugin {
       }
     > | null;
 
-    // -----------------------------------------------------------------------
-    // Normalise completion models (unchanged from before)
-    // -----------------------------------------------------------------------
-    const legacyModel: CompletionModel = {
-      ...DEFAULT_COMPLETION_MODEL,
-      modelId: data?.modelId ?? DEFAULT_COMPLETION_MODEL.modelId,
-      systemPrompt: data?.systemPrompt ?? DEFAULT_COMPLETION_MODEL.systemPrompt,
-      temperature: data?.temperature ?? DEFAULT_COMPLETION_MODEL.temperature,
-      maxTokens: data?.maxTokens ?? DEFAULT_COMPLETION_MODEL.maxTokens,
-    };
+    const legacyModelConfigured =
+      typeof data?.modelId === "string" ||
+      typeof data?.systemPrompt === "string" ||
+      typeof data?.temperature === "number" ||
+      typeof data?.maxTokens === "number";
 
-    const completionModels: CompletionModel[] = Array.isArray(data?.completionModels)
-      ? data.completionModels.map((model, index) => ({
-          ...DEFAULT_COMPLETION_MODEL,
-          ...model,
-          id: model?.id || `model-${index + 1}`,
-          name: model?.name || `Model ${index + 1}`,
-        }))
-      : [{ ...legacyModel }];
+    const rawCompletionModels = Array.isArray(data?.completionModels)
+      ? data.completionModels
+      : legacyModelConfigured
+        ? [
+            {
+              id: LEGACY_DEFAULT_COMPLETION_ID,
+              name: "Default",
+              modelId: data?.modelId ?? "",
+              systemPrompt: data?.systemPrompt ?? DEFAULT_SYSTEM_PROMPT,
+              temperature: data?.temperature ?? DEFAULT_COMPLETION_TEMPERATURE,
+              maxTokens: data?.maxTokens ?? DEFAULT_COMPLETION_MAX_TOKENS,
+            },
+          ]
+        : [];
+
+    const completionModels: CompletionModel[] = rawCompletionModels
+      .map((model, index) => normalizeCompletionModel(model, index))
+      .flatMap((model) => {
+        if (isUntouchedLegacyDefaultModel(model)) {
+          return [];
+        }
+
+        if (model.id === LEGACY_DEFAULT_COMPLETION_ID) {
+          return [{ ...model, id: generateId() }];
+        }
+
+        return [model];
+      });
 
     const embeddingModels: EmbeddingModel[] = Array.isArray(data?.embeddingModels)
       ? data.embeddingModels.map((model, index) => ({
@@ -120,22 +162,11 @@ export default class LMStudioWritingAssistant extends Plugin {
         }))
       : [];
 
-    const activeCompletionModelId =
-      data?.activeCompletionModelId &&
-      completionModels.some((model) => model.id === data.activeCompletionModelId)
-        ? data.activeCompletionModelId
-        : completionModels[0].id;
-
-    // -----------------------------------------------------------------------
-    // Chat history — with one-time migration from legacy chatState
-    // -----------------------------------------------------------------------
     let chatHistory: ChatHistory;
 
     if (data?.chatHistory && typeof data.chatHistory === "object") {
-      // Already on new schema — normalise and use.
       chatHistory = normalizeChatHistory(data.chatHistory);
     } else if (data?.chatState) {
-      // Legacy single-conversation schema — promote to history.
       const legacy = normalizeChatState(data.chatState);
       const legacyMessages = legacy.messages.filter(
         (m) => m.role === "user" || m.role === "assistant"
@@ -144,9 +175,7 @@ export default class LMStudioWritingAssistant extends Plugin {
       if (legacyMessages.length > 0 || legacy.draft) {
         const firstUserMessage =
           legacyMessages.find((m) => m.role === "user")?.content ?? "";
-        const activeModel =
-          completionModels.find((m) => m.id === activeCompletionModelId) ??
-          completionModels[0];
+        const migratedModel = completionModels[0] ?? null;
 
         const migratedConversation: Conversation = {
           id: generateId(),
@@ -155,8 +184,8 @@ export default class LMStudioWritingAssistant extends Plugin {
             : "Previous conversation",
           createdAt: Date.now(),
           updatedAt: Date.now(),
-          modelId: activeModel.id,
-          modelName: activeModel.name,
+          modelId: migratedModel?.id ?? "",
+          modelName: migratedModel?.name ?? "",
           messages: legacyMessages.map((m) => ({
             id: generateId(),
             role: m.role as "user" | "assistant",
@@ -177,22 +206,26 @@ export default class LMStudioWritingAssistant extends Plugin {
     }
 
     this.settings = {
-      ...DEFAULT_SETTINGS,
-      ...data,
       lmStudioUrl: normalizeLMStudioBaseUrl(data?.lmStudioUrl ?? DEFAULT_SETTINGS.lmStudioUrl),
+      bypassCors:
+        typeof data?.bypassCors === "boolean" ? data.bypassCors : DEFAULT_SETTINGS.bypassCors,
+      includeNoteContext:
+        typeof data?.includeNoteContext === "boolean"
+          ? data.includeNoteContext
+          : DEFAULT_SETTINGS.includeNoteContext,
+      maxContextChars:
+        typeof data?.maxContextChars === "number"
+          ? data.maxContextChars
+          : DEFAULT_SETTINGS.maxContextChars,
       completionModels,
       embeddingModels,
       commands,
-      activeCompletionModelId,
       chatHistory,
-      // Intentionally omit chatState — it will vanish from data.json on next save.
       chatState: undefined,
     };
   }
 
   async saveSettings(): Promise<void> {
-    // Strip the deprecated chatState field before writing so it disappears from
-    // data.json after the first save following migration.
     const { chatState: _dropped, ...toSave } = this.settings;
     await this.saveData(toSave);
   }

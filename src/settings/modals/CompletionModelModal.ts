@@ -1,8 +1,8 @@
-import type { App } from "obsidian";
+﻿import type { App } from "obsidian";
 import { Modal, Notice, Setting } from "obsidian";
 import type LMStudioWritingAssistant from "../../main";
-import { LMStudioClient } from "../../api";
-import type { CompletionModel, LMStudioModel } from "../../shared/types";
+import { LMStudioModelsService } from "../../api";
+import type { CompletionModel, LMStudioModelDigest } from "../../shared/types";
 import { DEFAULT_SYSTEM_PROMPT } from "../../constants";
 import { generateId } from "../../utils";
 
@@ -10,8 +10,8 @@ type CompletionModelPrefill = Partial<
   Pick<CompletionModel, "name" | "modelId" | "maxTokens" | "systemPrompt" | "temperature">
 >;
 
-function getDisplayName(model: LMStudioModel): string {
-  return model.displayName || model.id;
+function getDisplayName(model: LMStudioModelDigest): string {
+  return model.displayName || model.targetModelId;
 }
 
 export class CompletionModelModal extends Modal {
@@ -61,29 +61,28 @@ export class CompletionModelModal extends Modal {
 
     new Setting(contentEl)
       .setName("Model ID")
-      .setDesc("The model ID shown in LM Studio. Type or pick a suggestion.")
+      .setDesc("The selected LM Studio model or variant this profile should target.")
       .addText((text) => {
         text.inputEl.setAttribute("list", datalistId);
         text.inputEl.style.width = "100%";
         text
-          .setPlaceholder("e.g. mistralai/magistral-small-2509")
+          .setPlaceholder("e.g. mistralai/magistral-small-2509@q4_k_m")
           .setValue(this.model.modelId)
           .onChange((value) => (this.model.modelId = value));
       });
 
     void (async () => {
       try {
-        const client = new LMStudioClient(
+        const modelsService = new LMStudioModelsService(
           this.plugin.settings.lmStudioUrl,
           this.plugin.settings.bypassCors
         );
-        const models = await client.listModels();
-        const completionModels = models.filter((model) => !model.type || model.type === "llm");
+        const result = await modelsService.getCompletionCandidates();
 
-        for (const model of completionModels.length > 0 ? completionModels : models) {
+        for (const model of result.candidates) {
           const option = document.createElement("option");
-          option.value = model.id;
-          option.label = `${getDisplayName(model)} (${model.id})`;
+          option.value = model.targetModelId;
+          option.label = `${getDisplayName(model)} (${model.targetModelId})`;
           datalist.appendChild(option);
         }
       } catch {

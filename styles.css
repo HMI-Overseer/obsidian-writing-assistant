@@ -1015,8 +1015,9 @@
   .lmsa-settings-topbar {
     position: relative;
     display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: flex-start;
     gap: 1.25rem;
     overflow: hidden;
     padding-left: 1.25rem;
@@ -1078,6 +1079,7 @@
 
   .lmsa-settings-nav {
     display: flex;
+    width: 100%;
     min-width: 0px;
     flex-wrap: nowrap;
     align-items: stretch;
@@ -1182,12 +1184,28 @@
 
   .lmsa-settings-section-header {
     display: flex;
-    flex-direction: column;
-    gap: 0.375rem;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
     padding-left: 1.25rem;
     padding-right: 1.25rem;
     padding-bottom: 0px;
     padding-top: 1.25rem;
+}
+
+  .lmsa-settings-section-heading {
+    display: flex;
+    min-width: 0px;
+    flex: 1 1 0%;
+    flex-direction: column;
+    gap: 0.375rem;
+}
+
+  .lmsa-settings-section-actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 0.5rem;
 }
 
   .lmsa-settings-section-title {
@@ -1310,6 +1328,10 @@
     padding: 1rem;
     background: color-mix(in srgb, var(--background-secondary) 62%, transparent);
 }
+
+  .lmsa-settings-discovery-status {
+    margin-bottom: 16px;
+  }
 
   .lmsa-connection-status.is-loading {
     border-color: color-mix(in srgb, var(--interactive-accent) 20%, var(--background-modifier-border));
@@ -1477,11 +1499,6 @@
   }
 
   @media (max-width: 980px) {
-    .lmsa-settings-topbar {
-        flex-direction: column;
-        align-items: stretch;
-    }
-
     .lmsa-settings-nav {
         padding-bottom: 0.25rem;
     }
@@ -1514,6 +1531,12 @@
 
     .lmsa-settings-section-header {
         padding-top: 1rem;
+        flex-direction: column;
+    }
+
+    .lmsa-settings-section-actions,
+    .lmsa-settings-section-footer {
+        justify-content: flex-start;
     }
 
     .lmsa-settings-section-body {
@@ -1537,6 +1560,7 @@
     }
 
     .lmsa-item-actions,
+    .lmsa-settings-section-actions,
     .lmsa-settings-section-footer {
         justify-content: flex-start;
     }
@@ -1749,6 +1773,9 @@
 }
 .lmsa-items-stretch {
     align-items: stretch;
+}
+.lmsa-justify-start {
+    justify-content: flex-start;
 }
 .lmsa-justify-end {
     justify-content: flex-end;

@@ -1,18 +1,9 @@
-import type { ChatHistory, CompletionModel, PluginSettings } from "./shared/types";
+import type { ChatHistory, PluginSettings } from "./shared/types";
 
 export const VIEW_TYPE_CHAT = "lm-studio-chat";
 
 export const DEFAULT_SYSTEM_PROMPT =
   "You are a helpful creative writing assistant. Be concise, specific, and match the tone of the existing text.";
-
-export const DEFAULT_COMPLETION_MODEL: CompletionModel = {
-  id: "default",
-  name: "Default",
-  modelId: "",
-  systemPrompt: DEFAULT_SYSTEM_PROMPT,
-  temperature: 0.7,
-  maxTokens: 2000,
-};
 
 export const MAX_CONVERSATIONS = 50;
 
@@ -26,8 +17,7 @@ export const DEFAULT_SETTINGS: PluginSettings = {
   bypassCors: true,
   includeNoteContext: true,
   maxContextChars: 12000,
-  activeCompletionModelId: "default",
-  completionModels: [{ ...DEFAULT_COMPLETION_MODEL }],
+  completionModels: [],
   embeddingModels: [],
   commands: [],
   chatHistory: { ...DEFAULT_CHAT_HISTORY },

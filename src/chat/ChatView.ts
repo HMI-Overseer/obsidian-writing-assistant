@@ -1,8 +1,8 @@
 import type { WorkspaceLeaf } from "obsidian";
 import { ItemView, Notice, setIcon } from "obsidian";
-import type { Conversation, ConversationMessage, Message } from "../shared/types";
+import type { CompletionModel, Conversation, ConversationMessage, Message } from "../shared/types";
 import { VIEW_TYPE_CHAT, MAX_CONVERSATIONS } from "../constants";
-import { resolveActiveCompletionModel } from "../utils";
+import { resolveCompletionModel } from "../utils";
 import { LMStudioClient } from "../api";
 import { getActiveFileName, getActiveNoteContext, getActiveNoteText } from "../context/noteContext";
 import { CHAT_DRAFT_SAVE_DELAY_MS } from "./chatState";
@@ -24,6 +24,8 @@ type BubbleRefs = {
 function isAbortError(error: unknown): boolean {
   return error instanceof Error && error.name === "AbortError";
 }
+
+const NO_MODEL_SELECTED_LABEL = "No model selected";
 
 export class ChatView extends ItemView {
   plugin: LMStudioWritingAssistant;
@@ -175,6 +177,7 @@ export class ChatView extends ItemView {
 
     this.registerEvent(
       this.app.workspace.on("active-leaf-change", () => {
+        this.updateHeader();
         this.updateComposerChips();
         this.renderCommandBar();
       })
@@ -216,12 +219,40 @@ export class ChatView extends ItemView {
       this.loadConversationIntoView(history.conversations[0]);
     } else {
       // No history at all  Estart fresh silently (don't persist until there's content)
-      const activeModel = resolveActiveCompletionModel(this.plugin.settings);
-      const fresh = createConversation(activeModel.id, activeModel.name);
+      const fresh = createConversation("", "");
       history.conversations.unshift(fresh);
       history.activeConversationId = fresh.id;
       this.activeConversationId = fresh.id;
       this.messageHistory = [];
+    }
+  }
+
+  private getActiveConversation(): Conversation | null {
+    const id = this.activeConversationId;
+    if (!id) return null;
+    return this.plugin.settings.chatHistory.conversations.find((conversation) => conversation.id === id) ?? null;
+  }
+
+  private getResolvedConversationModel(
+    conversation: Conversation | null = this.getActiveConversation()
+  ): CompletionModel | null {
+    return conversation
+      ? resolveCompletionModel(this.plugin.settings, conversation.modelId)
+      : null;
+  }
+
+  private async setActiveConversationModel(model: CompletionModel): Promise<void> {
+    const conversation = this.getActiveConversation();
+    if (!conversation) return;
+
+    conversation.modelId = model.id;
+    conversation.modelName = model.name;
+    await this.plugin.saveSettings();
+    this.updateHeader();
+
+    if (this.historyDrawer.isOpen()) {
+      const history = this.plugin.settings.chatHistory;
+      this.historyDrawer.refresh(history.conversations, this.activeConversationId);
     }
   }
 
@@ -272,8 +303,7 @@ export class ChatView extends ItemView {
     // Save current before switching
     await this.persistActiveConversation();
 
-    const activeModel = resolveActiveCompletionModel(this.plugin.settings);
-    const newConv = createConversation(activeModel.id, activeModel.name);
+    const newConv = createConversation("", "");
 
     history.conversations.unshift(newConv);
     pruneHistory(history);
@@ -332,8 +362,7 @@ export class ChatView extends ItemView {
         this.scrollToBottom();
       } else {
         // No conversations left  Estart a fresh one
-        const activeModel = resolveActiveCompletionModel(this.plugin.settings);
-        const fresh = createConversation(activeModel.id, activeModel.name);
+        const fresh = createConversation("", "");
         history.conversations.unshift(fresh);
         history.activeConversationId = fresh.id;
         this.activeConversationId = fresh.id;
@@ -418,14 +447,14 @@ export class ChatView extends ItemView {
   // ---------------------------------------------------------------------------
 
   private updateHeader(): void {
-    const activeModel = resolveActiveCompletionModel(this.plugin.settings);
+    const activeModel = this.getResolvedConversationModel();
     this.headerMetaEl.setText(
-      activeModel.modelId
+      activeModel?.modelId
         ? `${activeModel.name} · ${activeModel.modelId}`
-        : "No completion model selected yet"
+        : NO_MODEL_SELECTED_LABEL
     );
     const label = this.modelSelectorBtn?.querySelector<HTMLElement>(".lmsa-model-selector-label");
-    if (label) label.setText(activeModel.name || "No model");
+    if (label) label.setText(activeModel?.name || NO_MODEL_SELECTED_LABEL);
   }
 
   private setStatus(text: string, muted = false): void {
@@ -481,10 +510,11 @@ export class ChatView extends ItemView {
     this.modelSelectorBtn.addClass("is-active");
 
     const models = this.plugin.settings.completionModels;
+    const activeProfileId = this.getActiveConversation()?.modelId ?? "";
     if (models.length === 0) {
       this.modelDropdownEl.createDiv({
         cls: "lmsa-model-dropdown-empty",
-        text: "No models configured. Add one in Settings.",
+        text: "No profiles configured. Add one in Settings.",
       });
       return;
     }
@@ -492,7 +522,7 @@ export class ChatView extends ItemView {
     for (const model of models) {
       const item = this.modelDropdownEl.createEl("button", { cls: "lmsa-model-dropdown-item lmsa-ui-list-item" });
       const checkSpan = item.createEl("span", { cls: "lmsa-model-dropdown-check" });
-      if (model.id === this.plugin.settings.activeCompletionModelId) {
+      if (model.id === activeProfileId) {
         item.addClass("is-active");
         setIcon(checkSpan, "check");
       }
@@ -502,9 +532,7 @@ export class ChatView extends ItemView {
       }
       item.addEventListener("click", async (e) => {
         e.stopPropagation();
-        this.plugin.settings.activeCompletionModelId = model.id;
-        await this.plugin.saveSettings();
-        this.updateHeader();
+        await this.setActiveConversationModel(model);
         this.closeModelDropdown();
       });
     }
@@ -585,9 +613,9 @@ export class ChatView extends ItemView {
     const text = (promptOverride ?? this.textareaEl.value).trim();
     if (!text) return;
 
-    const activeModel = resolveActiveCompletionModel(this.plugin.settings);
-    if (!activeModel.modelId) {
-      new Notice("No active completion model is configured yet. Open the plugin settings and add one.");
+    const activeModel = this.getResolvedConversationModel();
+    if (!activeModel?.modelId) {
+      new Notice("No model selected. Choose a saved profile in the chat selector or add one in Settings.");
       return;
     }
 

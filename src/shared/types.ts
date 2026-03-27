@@ -1,4 +1,4 @@
-export interface Message {
+﻿export interface Message {
   role: "system" | "user" | "assistant";
   content: string;
 }
@@ -37,6 +37,19 @@ export interface LMStudioModel {
   description?: string | null;
   variants?: string[];
   selectedVariant?: string;
+}
+
+export type LMStudioModelKind = "completion" | "embedding";
+
+export interface LMStudioModelDigest {
+  id: string;
+  kind: LMStudioModelKind;
+  displayName: string;
+  targetModelId: string;
+  isLoaded: boolean;
+  activeContextLength?: number;
+  maxContextLength?: number;
+  summary?: string;
 }
 
 export interface LMStudioQuantization {
@@ -99,9 +112,9 @@ export interface Conversation {
   title: string;
   createdAt: number;
   updatedAt: number;
-  /** CompletionModel.id at creation time ? used to resolve the live model. */
+  /** CompletionModel.id selected for this conversation. */
   modelId: string;
-  /** Display snapshot ? survives model rename or deletion. */
+  /** Display snapshot that survives model rename or deletion. */
   modelName: string;
   messages: ConversationMessage[];
   draft: string;
@@ -121,7 +134,6 @@ export interface PluginSettings {
   bypassCors: boolean;
   includeNoteContext: boolean;
   maxContextChars: number;
-  activeCompletionModelId: string;
   completionModels: CompletionModel[];
   embeddingModels: EmbeddingModel[];
   commands: CustomCommand[];

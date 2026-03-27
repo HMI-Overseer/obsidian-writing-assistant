@@ -1,7 +1,7 @@
-import type { App } from "obsidian";
+﻿import type { App } from "obsidian";
 import { Modal, Notice, Setting } from "obsidian";
 import type LMStudioWritingAssistant from "../../main";
-import { LMStudioClient } from "../../api";
+import { LMStudioModelsService } from "../../api";
 import type { EmbeddingModel } from "../../shared/types";
 import { generateId } from "../../utils";
 
@@ -39,7 +39,7 @@ export class EmbeddingModelModal extends Modal {
 
     new Setting(contentEl)
       .setName("Model ID")
-      .setDesc("The embedding model ID as shown in LM Studio.")
+      .setDesc("The embedding model ID or selected variant reported by LM Studio.")
       .addText((text) => {
         text.inputEl.setAttribute("list", datalistId);
         text.inputEl.style.width = "100%";
@@ -51,25 +51,16 @@ export class EmbeddingModelModal extends Modal {
 
     void (async () => {
       try {
-        const client = new LMStudioClient(
+        const modelsService = new LMStudioModelsService(
           this.plugin.settings.lmStudioUrl,
           this.plugin.settings.bypassCors
         );
-        const allModels = await client.listModels();
-        const embeddings = allModels.filter(
-          (model) =>
-            model.type === "embedding" ||
-            model.type === "embeddings" ||
-            model.id.includes("embed") ||
-            model.id.includes("embedding") ||
-            model.id.includes("e5") ||
-            model.id.includes("bge")
-        );
+        const result = await modelsService.getEmbeddingCandidates();
 
-        for (const model of embeddings.length > 0 ? embeddings : allModels) {
+        for (const model of result.candidates) {
           const option = document.createElement("option");
-          option.value = model.id;
-          option.label = model.displayName ? `${model.displayName} (${model.id})` : model.id;
+          option.value = model.targetModelId;
+          option.label = `${model.displayName} (${model.targetModelId})`;
           datalist.appendChild(option);
         }
       } catch {

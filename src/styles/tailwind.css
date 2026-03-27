@@ -1,0 +1,135 @@
+@tailwind components;
+@tailwind utilities;
+
+@layer components {
+  /*
+   * Shared semantic primitives for plugin surfaces.
+   * Keep these scoped to the plugin and based on Obsidian theme vars.
+   */
+  .lmsa-ui-surface {
+    @apply lmsa-rounded-2xl lmsa-border lmsa-border-obsidian-border lmsa-bg-obsidian-surface-primary lmsa-shadow-panel;
+  }
+
+  .lmsa-ui-panel {
+    @apply lmsa-rounded-[20px] lmsa-border lmsa-border-obsidian-border;
+    background: color-mix(in srgb, var(--background-primary) 92%, transparent);
+    box-shadow: 0 14px 40px rgba(0, 0, 0, 0.05);
+  }
+
+  .lmsa-ui-card {
+    @apply lmsa-rounded-[18px] lmsa-border lmsa-border-obsidian-border lmsa-text-obsidian-text;
+    background: color-mix(in srgb, var(--background-secondary) 92%, transparent);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.04);
+  }
+
+  .lmsa-ui-pill {
+    @apply lmsa-whitespace-nowrap lmsa-rounded-full lmsa-border lmsa-border-obsidian-border lmsa-px-2.5 lmsa-py-1.5 lmsa-text-obsidian-text;
+    font-size: var(--font-ui-smaller);
+  }
+
+  .lmsa-ui-pill-button {
+    @apply lmsa-cursor-pointer lmsa-whitespace-nowrap lmsa-rounded-full lmsa-border lmsa-border-obsidian-border lmsa-px-3 lmsa-py-[7px] lmsa-text-obsidian-text;
+    font-size: var(--font-ui-small);
+    background: color-mix(in srgb, var(--background-secondary) 88%, transparent);
+  }
+
+  .lmsa-ui-pill-button:hover {
+    @apply lmsa-bg-[var(--background-modifier-hover)];
+  }
+
+  .lmsa-ui-icon-btn {
+    @apply lmsa-inline-flex lmsa-h-[34px] lmsa-w-[34px] lmsa-cursor-pointer lmsa-items-center lmsa-justify-center lmsa-rounded-[10px] lmsa-border lmsa-border-obsidian-border lmsa-bg-obsidian-surface-primary lmsa-text-obsidian-muted;
+  }
+
+  .lmsa-ui-icon-btn:hover {
+    @apply lmsa-bg-[var(--background-modifier-hover)] lmsa-text-obsidian-text;
+  }
+
+  .lmsa-ui-btn {
+    @apply lmsa-inline-flex lmsa-min-h-9 lmsa-items-center lmsa-justify-center lmsa-rounded-[10px] lmsa-px-[14px] lmsa-py-2 lmsa-text-sm;
+  }
+
+  .lmsa-ui-btn:disabled {
+    @apply lmsa-cursor-default lmsa-opacity-45;
+  }
+
+  .lmsa-ui-btn-secondary {
+    @apply lmsa-border lmsa-border-obsidian-border lmsa-bg-obsidian-surface-secondary lmsa-text-obsidian-text;
+  }
+
+  .lmsa-ui-btn-secondary:hover:not(:disabled) {
+    @apply lmsa-bg-[var(--background-modifier-hover)];
+  }
+
+  .lmsa-ui-btn-primary {
+    @apply lmsa-border-none lmsa-bg-obsidian-accent lmsa-font-semibold;
+    color: var(--text-on-accent);
+  }
+
+  .lmsa-ui-btn-primary:hover:not(:disabled) {
+    background: var(--interactive-accent-hover);
+  }
+
+  .lmsa-ui-compact-btn {
+    @apply lmsa-inline-flex lmsa-items-center lmsa-justify-center lmsa-whitespace-nowrap lmsa-rounded-md lmsa-px-2 lmsa-py-1;
+    font-size: var(--font-ui-smaller);
+  }
+
+  .lmsa-ui-compact-btn-secondary {
+    @apply lmsa-border lmsa-border-obsidian-border lmsa-bg-obsidian-surface-secondary lmsa-text-obsidian-muted;
+  }
+
+  .lmsa-ui-compact-btn-secondary:hover {
+    @apply lmsa-bg-[var(--background-modifier-hover)] lmsa-text-obsidian-text;
+  }
+
+  .lmsa-ui-compact-btn-danger {
+    @apply lmsa-border lmsa-bg-obsidian-surface-primary;
+    border-color: var(--background-modifier-error);
+    color: var(--text-error);
+  }
+
+  .lmsa-ui-compact-btn-danger:hover {
+    background: color-mix(in srgb, var(--background-modifier-error) 15%, var(--background-primary));
+  }
+
+  .lmsa-ui-control-btn {
+    @apply lmsa-inline-flex lmsa-cursor-pointer lmsa-items-center lmsa-gap-[5px] lmsa-rounded-lg lmsa-border lmsa-border-obsidian-border lmsa-bg-transparent lmsa-px-2 lmsa-py-[5px] lmsa-text-obsidian-muted;
+    font-size: var(--font-ui-smaller);
+  }
+
+  .lmsa-ui-control-btn:hover,
+  .lmsa-ui-control-btn.is-active {
+    @apply lmsa-bg-[var(--background-modifier-hover)] lmsa-text-obsidian-text;
+    border-color: var(--background-modifier-border-hover, var(--background-modifier-border));
+  }
+
+  .lmsa-ui-chip {
+    @apply lmsa-inline-flex lmsa-max-w-[220px] lmsa-items-center lmsa-gap-[5px] lmsa-rounded-full lmsa-pb-1 lmsa-pl-2 lmsa-pr-1.5 lmsa-pt-1 lmsa-text-obsidian-muted;
+    font-size: var(--font-ui-smaller);
+    border: 1px solid color-mix(in srgb, var(--interactive-accent) 40%, var(--background-modifier-border));
+    background: color-mix(in srgb, var(--interactive-accent) 10%, var(--background-secondary));
+  }
+
+  .lmsa-ui-chip-dismiss {
+    @apply lmsa-inline-flex lmsa-h-4 lmsa-w-4 lmsa-flex-none lmsa-cursor-pointer lmsa-items-center lmsa-justify-center lmsa-rounded-full lmsa-border-none lmsa-bg-transparent lmsa-p-0;
+    color: var(--text-faint);
+  }
+
+  .lmsa-ui-chip-dismiss:hover {
+    color: var(--text-muted);
+    background: color-mix(in srgb, var(--background-modifier-border) 60%, transparent);
+  }
+
+  .lmsa-ui-list-item {
+    @apply lmsa-flex lmsa-items-center lmsa-gap-1.5 lmsa-rounded-xl lmsa-border lmsa-border-transparent lmsa-transition-colors lmsa-duration-100;
+  }
+
+  .lmsa-ui-list-item:hover {
+    @apply lmsa-border-obsidian-border lmsa-bg-[var(--background-modifier-hover)];
+  }
+
+  .lmsa-ui-muted {
+    color: var(--text-muted);
+  }
+}

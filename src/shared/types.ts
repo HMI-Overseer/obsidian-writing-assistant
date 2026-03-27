@@ -17,6 +17,51 @@ export interface CompletionModel {
   maxTokens: number;
 }
 
+export interface LMStudioModel {
+  id: string;
+  key: string;
+  displayName: string;
+  type?: string;
+  publisher?: string;
+  ownedBy?: string;
+  state: "loaded" | "available";
+  isLoaded: boolean;
+  architecture?: string;
+  quantization?: LMStudioQuantization;
+  sizeBytes?: number;
+  paramsString?: string | null;
+  loadedInstances: LMStudioLoadedInstance[];
+  maxContextLength?: number;
+  format?: string;
+  capabilities?: LMStudioModelCapabilities;
+  description?: string | null;
+  variants?: string[];
+  selectedVariant?: string;
+}
+
+export interface LMStudioQuantization {
+  name?: string;
+  bitsPerWeight?: number;
+}
+
+export interface LMStudioLoadedInstanceConfig {
+  contextLength?: number;
+  evalBatchSize?: number;
+  parallel?: number;
+  flashAttention?: boolean;
+  offloadKvCacheToGpu?: boolean;
+}
+
+export interface LMStudioLoadedInstance {
+  id: string;
+  config?: LMStudioLoadedInstanceConfig;
+}
+
+export interface LMStudioModelCapabilities {
+  vision?: boolean;
+  trainedForToolUse?: boolean;
+}
+
 export interface EmbeddingModel {
   id: string;
   name: string;
@@ -54,9 +99,9 @@ export interface Conversation {
   title: string;
   createdAt: number;
   updatedAt: number;
-  /** CompletionModel.id at creation time — used to resolve the live model. */
+  /** CompletionModel.id at creation time ? used to resolve the live model. */
   modelId: string;
-  /** Display snapshot — survives model rename or deletion. */
+  /** Display snapshot ? survives model rename or deletion. */
   modelName: string;
   messages: ConversationMessage[];
   draft: string;

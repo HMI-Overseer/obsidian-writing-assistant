@@ -1,4 +1,5 @@
 import esbuild from "esbuild";
+import { spawn } from "child_process";
 import process from "process";
 import builtins from "builtin-modules";
 
@@ -9,6 +10,33 @@ If you want to view the source, please visit the GitHub repository of this plugi
 `;
 
 const prod = process.argv[2] === "production";
+const postcssArgs = ["node_modules/postcss-cli/index.js", "src/styles/index.css", "-o", "styles.css"];
+
+function runCssBuild(watch = false) {
+  return new Promise((resolve, reject) => {
+    const args = watch ? [...postcssArgs, "--watch"] : postcssArgs;
+    const child = spawn(process.execPath, args, {
+      stdio: "inherit",
+      shell: false,
+    });
+
+    child.once("error", reject);
+
+    if (watch) {
+      child.once("spawn", () => resolve(child));
+      return;
+    }
+
+    child.once("exit", (code) => {
+      if (code === 0) {
+        resolve(child);
+        return;
+      }
+
+      reject(new Error(`PostCSS exited with code ${code ?? "unknown"}.`));
+    });
+  });
+}
 
 const context = await esbuild.context({
   banner: { js: banner },
@@ -39,8 +67,24 @@ const context = await esbuild.context({
 });
 
 if (prod) {
+  await runCssBuild();
   await context.rebuild();
+  await context.dispose();
   process.exit(0);
 } else {
+  const cssWatcher = await runCssBuild(true);
+  const cleanup = async () => {
+    cssWatcher.kill();
+    await context.dispose();
+    process.exit(0);
+  };
+
+  process.once("SIGINT", () => {
+    void cleanup();
+  });
+  process.once("SIGTERM", () => {
+    void cleanup();
+  });
+
   await context.watch();
 }

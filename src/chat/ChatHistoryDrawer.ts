@@ -11,16 +11,20 @@ export type DrawerCallbacks = {
 };
 
 export class ChatHistoryDrawer {
-  private drawerEl: HTMLElement;
-  private listEl: HTMLElement;
-  private countEl: HTMLElement;
+  private hostEl: HTMLElement;
+  private backdropEl: HTMLElement;
+  private drawerEl: HTMLElement;  private listEl!: HTMLElement;
+  private countEl!: HTMLElement;
   private callbacks: DrawerCallbacks;
 
   /** id of a conversation currently showing the confirm/cancel delete UI */
   private pendingDeleteId: string | null = null;
 
   constructor(containerEl: HTMLElement, callbacks: DrawerCallbacks) {
+    this.hostEl = containerEl;
     this.callbacks = callbacks;
+    this.backdropEl = containerEl.createDiv({ cls: "lmsa-history-backdrop" });
+    this.backdropEl.addEventListener("click", () => this.callbacks.onClose());
     this.drawerEl = containerEl.createDiv({ cls: "lmsa-history-drawer" });
     this.buildShell();
   }
@@ -32,10 +36,14 @@ export class ChatHistoryDrawer {
   open(conversations: Conversation[], activeId: string | null): void {
     this.pendingDeleteId = null;
     this.render(conversations, activeId);
+    this.hostEl.addClass("is-history-open");
+    this.backdropEl.addClass("is-open");
     this.drawerEl.addClass("is-open");
   }
 
   close(): void {
+    this.hostEl.removeClass("is-history-open");
+    this.backdropEl.removeClass("is-open");
     this.drawerEl.removeClass("is-open");
     this.pendingDeleteId = null;
   }
@@ -51,7 +59,7 @@ export class ChatHistoryDrawer {
   }
 
   // ---------------------------------------------------------------------------
-  // Private — DOM construction
+  // Private  EDOM construction
   // ---------------------------------------------------------------------------
 
   private buildShell(): void {
@@ -64,7 +72,7 @@ export class ChatHistoryDrawer {
     const actions = header.createDiv({ cls: "lmsa-history-header-actions" });
 
     const newBtn = actions.createEl("button", {
-      cls: "lmsa-header-btn",
+      cls: "lmsa-header-btn lmsa-ui-icon-btn",
       attr: { "aria-label": "New conversation" },
     });
     setIcon(newBtn, "plus");
@@ -94,7 +102,7 @@ export class ChatHistoryDrawer {
 
   private renderItem(conv: Conversation, isActive: boolean): void {
     const item = this.listEl.createDiv({
-      cls: "lmsa-history-item" + (isActive ? " is-active" : ""),
+      cls: "lmsa-history-item lmsa-ui-list-item" + (isActive ? " is-active" : ""),
       attr: { "data-conv-id": conv.id },
     });
 
@@ -126,7 +134,7 @@ export class ChatHistoryDrawer {
     if (this.pendingDeleteId === convId) {
       // Show confirm / cancel
       const confirmBtn = container.createEl("button", {
-        cls: "lmsa-history-delete-confirm",
+        cls: "lmsa-history-delete-confirm lmsa-ui-compact-btn lmsa-ui-compact-btn-danger",
         text: "Delete",
       });
       confirmBtn.addEventListener("click", (e) => {
@@ -136,7 +144,7 @@ export class ChatHistoryDrawer {
       });
 
       const cancelBtn = container.createEl("button", {
-        cls: "lmsa-history-delete-cancel",
+        cls: "lmsa-history-delete-cancel lmsa-ui-compact-btn lmsa-ui-compact-btn-secondary",
         text: "Cancel",
       });
       cancelBtn.addEventListener("click", (e) => {
@@ -147,7 +155,7 @@ export class ChatHistoryDrawer {
       });
     } else {
       const trashBtn = container.createEl("button", {
-        cls: "lmsa-header-btn lmsa-history-trash-btn",
+        cls: "lmsa-header-btn lmsa-history-trash-btn lmsa-ui-icon-btn",
         attr: { "aria-label": "Delete conversation" },
       });
       setIcon(trashBtn, "trash-2");
@@ -169,3 +177,9 @@ export class ChatHistoryDrawer {
     }
   }
 }
+
+
+
+
+
+

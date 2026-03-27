@@ -1,5 +1,6 @@
-﻿import type LMStudioWritingAssistant from "../main";
+import type LMStudioWritingAssistant from "../main";
 import { EmbeddingModelModal } from "./modals";
+import { createSettingsSection } from "./ui";
 
 export function renderEmbeddingModelsTab(
   container: HTMLElement,
@@ -8,12 +9,13 @@ export function renderEmbeddingModelsTab(
 ): void {
   const { settings } = plugin;
 
-  container.createEl("p", {
-    cls: "lmsa-tab-desc",
-    text: "Embedding models are reserved for semantic search and future retrieval features.",
-  });
+  const library = createSettingsSection(
+    container,
+    "Embedding Profiles",
+    "Reserve these profiles for semantic search, retrieval, and future note-aware features."
+  );
 
-  const listEl = container.createDiv({ cls: "lmsa-item-list" });
+  const listEl = library.bodyEl.createDiv({ cls: "lmsa-item-list" });
 
   const renderList = () => {
     listEl.empty();
@@ -33,7 +35,10 @@ export function renderEmbeddingModelsTab(
 
       const actions = row.createDiv({ cls: "lmsa-item-actions" });
       actions
-        .createEl("button", { cls: "lmsa-btn-secondary", text: "Edit" })
+        .createEl("button", {
+          cls: "lmsa-btn-secondary lmsa-ui-btn lmsa-ui-btn-secondary",
+          text: "Edit",
+        })
         .addEventListener("click", () => {
           new EmbeddingModelModal(plugin.app, plugin, model, async (updated) => {
             const index = settings.embeddingModels.findIndex((item) => item.id === updated.id);
@@ -44,7 +49,7 @@ export function renderEmbeddingModelsTab(
         });
 
       actions
-        .createEl("button", { cls: "lmsa-btn-danger", text: "Delete" })
+        .createEl("button", { cls: "lmsa-btn-danger lmsa-ui-btn", text: "Delete" })
         .addEventListener("click", async () => {
           settings.embeddingModels = settings.embeddingModels.filter(
             (item) => item.id !== model.id
@@ -57,8 +62,11 @@ export function renderEmbeddingModelsTab(
 
   renderList();
 
-  container
-    .createEl("button", { cls: "lmsa-btn-add", text: "+ Add embedding model" })
+  library.footerEl
+    .createEl("button", {
+      cls: "lmsa-btn-add lmsa-ui-btn lmsa-ui-btn-primary",
+      text: "Add embedding model",
+    })
     .addEventListener("click", () => {
       new EmbeddingModelModal(plugin.app, plugin, null, async (model) => {
         settings.embeddingModels.push(model);

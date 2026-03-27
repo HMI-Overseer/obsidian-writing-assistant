@@ -9,6 +9,7 @@ import type {
   PluginSettings,
 } from "./shared/types";
 import { DEFAULT_CHAT_HISTORY, DEFAULT_COMPLETION_MODEL, DEFAULT_SETTINGS, VIEW_TYPE_CHAT } from "./constants";
+import { normalizeLMStudioBaseUrl } from "./api/LMStudioClient";
 import { ChatView } from "./chat";
 import { normalizeChatState } from "./chat/chatState";
 import {
@@ -178,6 +179,7 @@ export default class LMStudioWritingAssistant extends Plugin {
     this.settings = {
       ...DEFAULT_SETTINGS,
       ...data,
+      lmStudioUrl: normalizeLMStudioBaseUrl(data?.lmStudioUrl ?? DEFAULT_SETTINGS.lmStudioUrl),
       completionModels,
       embeddingModels,
       commands,

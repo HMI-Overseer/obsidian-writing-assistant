@@ -1,6 +1,25 @@
-import type { Message } from "../shared/types";
+import type {
+  LMStudioLoadedInstance,
+  LMStudioLoadedInstanceConfig,
+  LMStudioModel,
+  LMStudioModelCapabilities,
+  LMStudioQuantization,
+  Message,
+} from "../shared/types";
 import * as http from "http";
 import * as https from "https";
+
+type RequestMethod = "GET" | "POST";
+type JsonRecord = Record<string, unknown>;
+export type LMStudioModelListSource = "native" | "openai";
+
+export interface LMStudioModelListResult {
+  models: LMStudioModel[];
+  source: LMStudioModelListSource;
+  endpoint: string;
+}
+
+const DEFAULT_LM_STUDIO_ROOT_URL = "http://localhost:1234";
 
 function createAbortError(): Error {
   const error = new Error("The request was aborted.");
@@ -8,14 +27,262 @@ function createAbortError(): Error {
   return error;
 }
 
+function isRecord(value: unknown): value is JsonRecord {
+  return typeof value === "object" && value !== null;
+}
+
+function readString(value: unknown): string | undefined {
+  return typeof value === "string" && value.trim() ? value : undefined;
+}
+
+function readNullableString(value: unknown): string | null | undefined {
+  if (value === null) return null;
+  return readString(value);
+}
+
+function readNumber(value: unknown): number | undefined {
+  return typeof value === "number" && Number.isFinite(value) ? value : undefined;
+}
+
+function readBoolean(value: unknown): boolean | undefined {
+  return typeof value === "boolean" ? value : undefined;
+}
+
+function readStringArray(value: unknown): string[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+
+  const items = value.filter((entry): entry is string => typeof entry === "string" && entry.trim().length > 0);
+  return items.length > 0 ? items : undefined;
+}
+
+function stripKnownApiSuffix(pathname: string): string {
+  const trimmed = pathname.trim().replace(/\/+$/, "");
+  if (!trimmed || trimmed === "/") return "";
+  if (trimmed.endsWith("/api/v1")) return trimmed.slice(0, -7);
+  if (trimmed.endsWith("/v1")) return trimmed.slice(0, -3);
+  return trimmed;
+}
+
+function joinBasePath(rootPath: string, suffix: string): string {
+  const trimmedRoot = rootPath.replace(/\/+$/, "");
+  return trimmedRoot ? `${trimmedRoot}${suffix}` : suffix;
+}
+
+function normalizeQuantization(value: unknown): LMStudioQuantization | undefined {
+  if (typeof value === "string" && value.trim()) {
+    return { name: value };
+  }
+
+  if (!isRecord(value)) return undefined;
+
+  const name = readString(value.name);
+  const bitsPerWeight = readNumber(value.bits_per_weight);
+  if (!name && bitsPerWeight === undefined) return undefined;
+
+  return {
+    name,
+    bitsPerWeight,
+  };
+}
+
+function normalizeLoadedInstanceConfig(value: unknown): LMStudioLoadedInstanceConfig | undefined {
+  if (!isRecord(value)) return undefined;
+
+  const config: LMStudioLoadedInstanceConfig = {
+    contextLength: readNumber(value.context_length),
+    evalBatchSize: readNumber(value.eval_batch_size),
+    parallel: readNumber(value.parallel),
+    flashAttention: readBoolean(value.flash_attention),
+    offloadKvCacheToGpu: readBoolean(value.offload_kv_cache_to_gpu),
+  };
+
+  if (Object.values(config).every((entry) => entry === undefined)) {
+    return undefined;
+  }
+
+  return config;
+}
+
+function normalizeLoadedInstance(value: unknown): LMStudioLoadedInstance | null {
+  if (!isRecord(value)) return null;
+
+  const id = readString(value.id);
+  if (!id) return null;
+
+  return {
+    id,
+    config: normalizeLoadedInstanceConfig(value.config),
+  };
+}
+
+function normalizeCapabilities(value: unknown): LMStudioModelCapabilities | undefined {
+  if (!isRecord(value)) return undefined;
+
+  const capabilities: LMStudioModelCapabilities = {
+    vision: readBoolean(value.vision),
+    trainedForToolUse: readBoolean(value.trained_for_tool_use),
+  };
+
+  if (Object.values(capabilities).every((entry) => entry === undefined)) {
+    return undefined;
+  }
+
+  return capabilities;
+}
+
+function normalizeNativeModel(value: unknown): LMStudioModel | null {
+  if (!isRecord(value)) return null;
+
+  const key =
+    readString(value.key) ??
+    readString(value.id) ??
+    readString(value.selected_variant);
+  if (!key) return null;
+
+  const loadedInstances = Array.isArray(value.loaded_instances)
+    ? value.loaded_instances
+        .map(normalizeLoadedInstance)
+        .filter((entry): entry is LMStudioLoadedInstance => entry !== null)
+    : [];
+  const publisher = readString(value.publisher);
+
+  return {
+    id: key,
+    key,
+    displayName: readString(value.display_name) ?? key,
+    type: readString(value.type),
+    publisher,
+    ownedBy: publisher,
+    state: loadedInstances.length > 0 ? "loaded" : "available",
+    isLoaded: loadedInstances.length > 0,
+    architecture: readString(value.architecture),
+    quantization: normalizeQuantization(value.quantization),
+    sizeBytes: readNumber(value.size_bytes),
+    paramsString: readNullableString(value.params_string),
+    loadedInstances,
+    maxContextLength: readNumber(value.max_context_length),
+    format: readString(value.format),
+    capabilities: normalizeCapabilities(value.capabilities),
+    description: readNullableString(value.description),
+    variants: readStringArray(value.variants),
+    selectedVariant: readString(value.selected_variant),
+  };
+}
+
+function normalizeOpenAIModel(value: unknown): LMStudioModel | null {
+  if (!isRecord(value)) return null;
+
+  const id = readString(value.id);
+  if (!id) return null;
+
+  const isLoaded = readString(value.state) === "loaded";
+  const ownedBy = readString(value.owned_by);
+
+  return {
+    id,
+    key: id,
+    displayName: id,
+    type: readString(value.type),
+    publisher: ownedBy,
+    ownedBy,
+    state: isLoaded ? "loaded" : "available",
+    isLoaded,
+    architecture: readString(value.architecture),
+    quantization: normalizeQuantization(value.quantization),
+    loadedInstances: isLoaded ? [{ id }] : [],
+    maxContextLength: readNumber(value.max_context_length),
+  };
+}
+
+function normalizeModelList(
+  payload: unknown,
+  source: LMStudioModelListSource
+): LMStudioModel[] | null {
+  if (!isRecord(payload)) return null;
+
+  const rawModels = source === "native" ? payload.models : payload.data;
+  if (!Array.isArray(rawModels)) return null;
+
+  const normalize = source === "native" ? normalizeNativeModel : normalizeOpenAIModel;
+  return rawModels
+    .map(normalize)
+    .filter((model): model is LMStudioModel => model !== null);
+}
+
+function formatError(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+function createModelListError(nativeError: unknown, openAIError: unknown): Error {
+  return new Error(
+    `Failed to fetch models from LM Studio. Native /api/v1/models error: ${formatError(
+      nativeError
+    )}. OpenAI-compatible /v1/models error: ${formatError(openAIError)}.`
+  );
+}
+
+export function resolveLMStudioBaseUrls(input: string): {
+  serverRootUrl: string;
+  openAIBaseUrl: string;
+  nativeApiBaseUrl: string;
+} {
+  const trimmed = input.trim().replace(/\/+$/, "");
+  const fallbackRoot = DEFAULT_LM_STUDIO_ROOT_URL;
+
+  if (!trimmed) {
+    return {
+      serverRootUrl: fallbackRoot,
+      openAIBaseUrl: `${fallbackRoot}/v1`,
+      nativeApiBaseUrl: `${fallbackRoot}/api/v1`,
+    };
+  }
+
+  try {
+    const url = new URL(trimmed);
+    const rootPath = stripKnownApiSuffix(url.pathname);
+    const serverRootUrl = `${url.origin}${rootPath}`;
+
+    return {
+      serverRootUrl,
+      openAIBaseUrl: `${url.origin}${joinBasePath(rootPath, "/v1")}`,
+      nativeApiBaseUrl: `${url.origin}${joinBasePath(rootPath, "/api/v1")}`,
+    };
+  } catch {
+    const serverRootUrl = stripKnownApiSuffix(trimmed) || fallbackRoot;
+
+    return {
+      serverRootUrl,
+      openAIBaseUrl: `${serverRootUrl}/v1`,
+      nativeApiBaseUrl: `${serverRootUrl}/api/v1`,
+    };
+  }
+}
+
+export function normalizeLMStudioBaseUrl(input: string): string {
+  return resolveLMStudioBaseUrls(input).openAIBaseUrl;
+}
+
 export class LMStudioClient {
-  constructor(
-    private baseUrl: string,
-    private bypassCors: boolean = true
-  ) {}
+  private readonly openAIBaseUrl: string;
+  private readonly nativeApiBaseUrl: string;
+
+  constructor(baseUrl: string, private bypassCors: boolean = true) {
+    const resolved = resolveLMStudioBaseUrls(baseUrl);
+    this.openAIBaseUrl = resolved.openAIBaseUrl;
+    this.nativeApiBaseUrl = resolved.nativeApiBaseUrl;
+  }
+
+  getResolvedBaseUrl(): string {
+    return this.openAIBaseUrl;
+  }
+
+  getResolvedNativeApiBaseUrl(): string {
+    return this.nativeApiBaseUrl;
+  }
 
   private nodeRequest(
-    method: "GET" | "POST",
+    method: RequestMethod,
+    baseUrl: string,
     path: string,
     body?: string,
     signal?: AbortSignal
@@ -26,13 +293,13 @@ export class LMStudioClient {
         return;
       }
 
-      const url = new URL(this.baseUrl + path);
+      const url = new URL(`${baseUrl}${path}`);
       const lib = url.protocol === "https:" ? https : http;
 
       const options: http.RequestOptions = {
         hostname: url.hostname,
-        port: parseInt(url.port) || (url.protocol === "https:" ? 443 : 80),
-        path: url.pathname,
+        port: parseInt(url.port, 10) || (url.protocol === "https:" ? 443 : 80),
+        path: `${url.pathname}${url.search}`,
         method,
         headers: {
           "Content-Type": "application/json",
@@ -65,17 +332,76 @@ export class LMStudioClient {
     });
   }
 
-  async listModels(signal?: AbortSignal): Promise<string[]> {
+  private async request(
+    method: RequestMethod,
+    baseUrl: string,
+    path: string,
+    body?: string,
+    signal?: AbortSignal
+  ): Promise<string> {
     if (this.bypassCors) {
-      const data = await this.nodeRequest("GET", "/models", undefined, signal);
-      const json = JSON.parse(data);
-      return (json.data as { id: string }[]).map((model) => model.id);
+      return this.nodeRequest(method, baseUrl, path, body, signal);
     }
 
-    const res = await fetch(`${this.baseUrl}/models`, { signal });
+    const res = await fetch(`${baseUrl}${path}`, {
+      method,
+      headers: { "Content-Type": "application/json" },
+      ...(body ? { body } : {}),
+      signal,
+    });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const json = await res.json();
-    return (json.data as { id: string }[]).map((model) => model.id);
+    return res.text();
+  }
+
+  private async requestJson(
+    method: RequestMethod,
+    baseUrl: string,
+    path: string,
+    body?: string,
+    signal?: AbortSignal
+  ): Promise<unknown> {
+    return JSON.parse(await this.request(method, baseUrl, path, body, signal));
+  }
+
+  async listModelsWithSource(signal?: AbortSignal): Promise<LMStudioModelListResult> {
+    const nativeEndpoint = `${this.nativeApiBaseUrl}/models`;
+
+    try {
+      const payload = await this.requestJson("GET", this.nativeApiBaseUrl, "/models", undefined, signal);
+      const models = normalizeModelList(payload, "native");
+      if (!models) {
+        throw new Error("LM Studio returned an unexpected native model list response.");
+      }
+
+      return {
+        models,
+        source: "native",
+        endpoint: nativeEndpoint,
+      };
+    } catch (nativeError) {
+      const openAIEndpoint = `${this.openAIBaseUrl}/models`;
+
+      try {
+        const payload = await this.requestJson("GET", this.openAIBaseUrl, "/models", undefined, signal);
+        const models = normalizeModelList(payload, "openai");
+        if (!models) {
+          throw new Error("LM Studio returned an unexpected OpenAI-compatible model list response.");
+        }
+
+        return {
+          models,
+          source: "openai",
+          endpoint: openAIEndpoint,
+        };
+      } catch (openAIError) {
+        throw createModelListError(nativeError, openAIError);
+      }
+    }
+  }
+
+  async listModels(signal?: AbortSignal): Promise<LMStudioModel[]> {
+    const result = await this.listModelsWithSource(signal);
+    return result.models;
   }
 
   async complete(
@@ -93,21 +419,18 @@ export class LMStudioClient {
       stream: false,
     });
 
-    if (this.bypassCors) {
-      const data = await this.nodeRequest("POST", "/chat/completions", payload, signal);
-      const json = JSON.parse(data);
-      return json.choices[0].message.content as string;
+    const json = await this.requestJson(
+      "POST",
+      this.openAIBaseUrl,
+      "/chat/completions",
+      payload,
+      signal
+    );
+    if (!isRecord(json)) {
+      throw new Error("LM Studio returned an invalid chat completion response.");
     }
 
-    const res = await fetch(`${this.baseUrl}/chat/completions`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: payload,
-      signal,
-    });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const json = await res.json();
-    return json.choices[0].message.content as string;
+    return (json.choices as Array<{ message?: { content?: string } }>)[0]?.message?.content ?? "";
   }
 
   async *stream(
@@ -134,7 +457,7 @@ export class LMStudioClient {
   ): AsyncGenerator<string> {
     if (signal?.aborted) throw createAbortError();
 
-    const url = new URL(`${this.baseUrl}/chat/completions`);
+    const url = new URL(`${this.openAIBaseUrl}/chat/completions`);
     const lib = url.protocol === "https:" ? https : http;
     const body = JSON.stringify({
       model,
@@ -169,7 +492,7 @@ export class LMStudioClient {
     try {
       const options: http.RequestOptions = {
         hostname: url.hostname,
-        port: parseInt(url.port) || (url.protocol === "https:" ? 443 : 80),
+        port: parseInt(url.port, 10) || (url.protocol === "https:" ? 443 : 80),
         path: url.pathname,
         method: "POST",
         headers: {
@@ -247,7 +570,7 @@ export class LMStudioClient {
     temperature: number,
     signal?: AbortSignal
   ): AsyncGenerator<string> {
-    const res = await fetch(`${this.baseUrl}/chat/completions`, {
+    const res = await fetch(`${this.openAIBaseUrl}/chat/completions`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({

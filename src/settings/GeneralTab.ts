@@ -1,28 +1,31 @@
-﻿import { Setting } from "obsidian";
+import { Setting } from "obsidian";
+import { normalizeLMStudioBaseUrl } from "../api/LMStudioClient";
 import type LMStudioWritingAssistant from "../main";
+import { createSettingsSection } from "./ui";
 
 export function renderGeneralTab(container: HTMLElement, plugin: LMStudioWritingAssistant): void {
-  container.createEl("p", {
-    cls: "lmsa-tab-desc",
-    text: "Configure the LM Studio connection and the default context behavior for the chat view.",
-  });
+  const connection = createSettingsSection(
+    container,
+    "Connection",
+    "Point the plugin at your LM Studio server and choose how requests should be routed from Obsidian."
+  );
 
-  container.createEl("h3", { text: "Connection" });
-
-  new Setting(container)
+  new Setting(connection.bodyEl)
     .setName("LM Studio URL")
-    .setDesc("Base URL for the LM Studio server.")
+    .setDesc(
+      "Base URL for the LM Studio server. You can enter the server root, `/v1`, or `/api/v1`; the plugin will resolve the right endpoint for each request."
+    )
     .addText((text) =>
       text
-        .setPlaceholder("http://localhost:1234/v1")
+        .setPlaceholder("http://localhost:1234")
         .setValue(plugin.settings.lmStudioUrl)
         .onChange(async (value) => {
-          plugin.settings.lmStudioUrl = value.replace(/\/$/, "");
+          plugin.settings.lmStudioUrl = normalizeLMStudioBaseUrl(value);
           await plugin.saveSettings();
         })
     );
 
-  new Setting(container)
+  new Setting(connection.bodyEl)
     .setName("Bypass CORS via Node.js")
     .setDesc(
       "Use Electron's Node.js HTTP stack instead of the browser fetch API. Recommended because it avoids needing CORS enabled in LM Studio."
@@ -34,9 +37,13 @@ export function renderGeneralTab(container: HTMLElement, plugin: LMStudioWriting
       })
     );
 
-  container.createEl("h3", { text: "Context" });
+  const context = createSettingsSection(
+    container,
+    "Context",
+    "Decide how much of the current note should travel with each request so chat responses stay grounded in your writing."
+  );
 
-  new Setting(container)
+  new Setting(context.bodyEl)
     .setName("Include active note as context")
     .setDesc(
       "Append the content of the currently open note to the system prompt before each request."

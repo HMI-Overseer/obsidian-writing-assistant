@@ -2,9 +2,17 @@ import type { App } from "obsidian";
 import { Modal, Notice, Setting } from "obsidian";
 import type LMStudioWritingAssistant from "../../main";
 import { LMStudioClient } from "../../api";
-import type { CompletionModel } from "../../shared/types";
+import type { CompletionModel, LMStudioModel } from "../../shared/types";
 import { DEFAULT_SYSTEM_PROMPT } from "../../constants";
 import { generateId } from "../../utils";
+
+type CompletionModelPrefill = Partial<
+  Pick<CompletionModel, "name" | "modelId" | "maxTokens" | "systemPrompt" | "temperature">
+>;
+
+function getDisplayName(model: LMStudioModel): string {
+  return model.displayName || model.id;
+}
 
 export class CompletionModelModal extends Modal {
   private model: CompletionModel;
@@ -13,18 +21,19 @@ export class CompletionModelModal extends Modal {
     app: App,
     private plugin: LMStudioWritingAssistant,
     source: CompletionModel | null,
-    private onSave: (model: CompletionModel) => void
+    private onSave: (model: CompletionModel) => void,
+    prefill?: CompletionModelPrefill
   ) {
     super(app);
     this.model = source
-      ? { ...source }
+      ? { ...source, ...prefill }
       : {
           id: generateId(),
-          name: "",
-          modelId: "",
-          systemPrompt: DEFAULT_SYSTEM_PROMPT,
-          temperature: 0.7,
-          maxTokens: 2000,
+          name: prefill?.name ?? "",
+          modelId: prefill?.modelId ?? "",
+          systemPrompt: prefill?.systemPrompt ?? DEFAULT_SYSTEM_PROMPT,
+          temperature: prefill?.temperature ?? 0.7,
+          maxTokens: prefill?.maxTokens ?? 2000,
         };
   }
 
@@ -69,9 +78,12 @@ export class CompletionModelModal extends Modal {
           this.plugin.settings.bypassCors
         );
         const models = await client.listModels();
-        for (const model of models) {
+        const completionModels = models.filter((model) => !model.type || model.type === "llm");
+
+        for (const model of completionModels.length > 0 ? completionModels : models) {
           const option = document.createElement("option");
-          option.value = model;
+          option.value = model.id;
+          option.label = `${getDisplayName(model)} (${model.id})`;
           datalist.appendChild(option);
         }
       } catch {

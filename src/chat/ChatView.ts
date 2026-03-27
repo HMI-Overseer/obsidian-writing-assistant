@@ -78,10 +78,10 @@ export class ChatView extends ItemView {
     this.headerMetaEl = titleGroup.createEl("div", { cls: "lmsa-header-meta" });
 
     const headerActions = header.createDiv({ cls: "lmsa-header-actions" });
-    this.statusPillEl = headerActions.createDiv({ cls: "lmsa-status-pill" });
+    this.statusPillEl = headerActions.createDiv({ cls: "lmsa-status-pill lmsa-ui-pill" });
 
     this.historyBtn = headerActions.createEl("button", {
-      cls: "lmsa-header-btn",
+      cls: "lmsa-header-btn lmsa-ui-icon-btn",
       attr: { "aria-label": "Chat history" },
     });
     setIcon(this.historyBtn, "clock");
@@ -116,14 +116,14 @@ export class ChatView extends ItemView {
     const composer = shell.createDiv({ cls: "lmsa-composer" });
     this.commandBarEl = composer.createDiv({ cls: "lmsa-command-bar" });
 
-    const composerPanel = composer.createDiv({ cls: "lmsa-composer-panel" });
+    const composerPanel = composer.createDiv({ cls: "lmsa-composer-panel lmsa-ui-panel" });
 
     // Context chips
     this.contextChipsEl = composerPanel.createDiv({ cls: "lmsa-composer-chips" });
 
     this.textareaEl = composerPanel.createEl("textarea", {
       cls: "lmsa-textarea",
-      attr: { placeholder: "Message LM Studio about your writing...", rows: "3" },
+      attr: { placeholder: "Send a message to the model...", rows: "3" },
     }) as HTMLTextAreaElement;
 
     this.textareaEl.addEventListener("keydown", (event) => {
@@ -137,14 +137,13 @@ export class ChatView extends ItemView {
       this.scheduleDraftSave();
     });
 
-    // Model dropdown
-    this.modelDropdownEl = composerPanel.createDiv({ cls: "lmsa-model-dropdown" });
-    this.modelDropdownEl.style.display = "none";
 
     // Composer footer
     const composerFooter = composerPanel.createDiv({ cls: "lmsa-composer-footer" });
+    const composerFooterMeta = composerFooter.createDiv({ cls: "lmsa-composer-footer-meta" });
+    const modelSelectorWrap = composerFooterMeta.createDiv({ cls: "lmsa-model-selector-wrap" });
 
-    this.modelSelectorBtn = composerFooter.createEl("button", { cls: "lmsa-model-selector-btn" });
+    this.modelSelectorBtn = modelSelectorWrap.createEl("button", { cls: "lmsa-model-selector-btn lmsa-ui-control-btn" });
     const iconSpan = this.modelSelectorBtn.createEl("span", { cls: "lmsa-model-selector-icon" });
     setIcon(iconSpan, "cpu");
     this.modelSelectorBtn.createEl("span", { cls: "lmsa-model-selector-label" });
@@ -155,15 +154,17 @@ export class ChatView extends ItemView {
       this.toggleModelDropdown();
     });
 
-    composerFooter.createDiv({ cls: "lmsa-compose-hint", text: "Enter to send · Shift+Enter for newline" });
+    this.modelDropdownEl = modelSelectorWrap.createDiv({ cls: "lmsa-model-dropdown" });
+    this.modelDropdownEl.style.display = "none";
 
+    composerFooterMeta.createDiv({ cls: "lmsa-compose-hint", text: "Enter to send, Shift+Enter for newline" });
     const buttonRow = composerFooter.createDiv({ cls: "lmsa-btn-row" });
 
-    this.stopBtn = buttonRow.createEl("button", { cls: "lmsa-secondary-btn lmsa-stop-btn", text: "Stop" });
+    this.stopBtn = buttonRow.createEl("button", { cls: "lmsa-secondary-btn lmsa-stop-btn lmsa-ui-btn lmsa-ui-btn-secondary", text: "Stop" });
     this.stopBtn.disabled = true;
     this.stopBtn.addEventListener("click", () => this.stopGeneration());
 
-    this.sendBtn = buttonRow.createEl("button", { cls: "lmsa-send-btn", text: "Send" });
+    this.sendBtn = buttonRow.createEl("button", { cls: "lmsa-send-btn lmsa-ui-btn lmsa-ui-btn-primary", text: "Send" });
     this.sendBtn.addEventListener("click", () => { void this.handleSend(); });
 
     // Close dropdowns/drawer on outside click
@@ -214,7 +215,7 @@ export class ChatView extends ItemView {
     } else if (history.conversations.length > 0) {
       this.loadConversationIntoView(history.conversations[0]);
     } else {
-      // No history at all — start fresh silently (don't persist until there's content)
+      // No history at all  Estart fresh silently (don't persist until there's content)
       const activeModel = resolveActiveCompletionModel(this.plugin.settings);
       const fresh = createConversation(activeModel.id, activeModel.name);
       history.conversations.unshift(fresh);
@@ -330,7 +331,7 @@ export class ChatView extends ItemView {
         this.setStatus("Ready", true);
         this.scrollToBottom();
       } else {
-        // No conversations left — start a fresh one
+        // No conversations left  Estart a fresh one
         const activeModel = resolveActiveCompletionModel(this.plugin.settings);
         const fresh = createConversation(activeModel.id, activeModel.name);
         history.conversations.unshift(fresh);
@@ -371,14 +372,14 @@ export class ChatView extends ItemView {
 
     const history = this.plugin.settings.chatHistory;
     const idx = history.conversations.findIndex((c) => c.id === id);
-    if (idx === -1) return; // Deleted externally — don't resurrect
+    if (idx === -1) return; // Deleted externally  Edon't resurrect
 
     const conv = history.conversations[idx];
     const draft = this.textareaEl?.value ?? "";
     const isEmpty = this.messageHistory.length === 0 && !draft.trim();
 
     if (isEmpty && !conv.title) {
-      // Empty unsaved conversation — discard rather than clutter history
+      // Empty unsaved conversation  Ediscard rather than clutter history
       history.conversations.splice(idx, 1);
       if (history.activeConversationId === id) {
         history.activeConversationId = history.conversations[0]?.id ?? null;
@@ -449,12 +450,12 @@ export class ChatView extends ItemView {
     const fileName = getActiveFileName(this.app);
     if (!fileName || !this.plugin.settings.includeNoteContext || !this.sessionContextEnabled) return;
 
-    const chip = this.contextChipsEl.createDiv({ cls: "lmsa-chip" });
+    const chip = this.contextChipsEl.createDiv({ cls: "lmsa-chip lmsa-ui-chip" });
     const fileIcon = chip.createEl("span", { cls: "lmsa-chip-icon" });
     setIcon(fileIcon, "file-text");
     chip.createEl("span", { cls: "lmsa-chip-label", text: fileName });
     const removeBtn = chip.createEl("button", {
-      cls: "lmsa-chip-remove",
+      cls: "lmsa-chip-remove lmsa-ui-chip-dismiss",
       attr: { "aria-label": "Remove context" },
     });
     setIcon(removeBtn.createEl("span"), "x");
@@ -489,7 +490,7 @@ export class ChatView extends ItemView {
     }
 
     for (const model of models) {
-      const item = this.modelDropdownEl.createEl("button", { cls: "lmsa-model-dropdown-item" });
+      const item = this.modelDropdownEl.createEl("button", { cls: "lmsa-model-dropdown-item lmsa-ui-list-item" });
       const checkSpan = item.createEl("span", { cls: "lmsa-model-dropdown-check" });
       if (model.id === this.plugin.settings.activeCompletionModelId) {
         item.addClass("is-active");
@@ -526,7 +527,7 @@ export class ChatView extends ItemView {
     this.commandBarEl.createEl("div", { cls: "lmsa-command-label", text: "Quick commands" });
     const chips = this.commandBarEl.createDiv({ cls: "lmsa-command-chips" });
     for (const command of this.plugin.settings.commands) {
-      const chip = chips.createEl("button", { cls: "lmsa-command-chip", text: command.name });
+      const chip = chips.createEl("button", { cls: "lmsa-command-chip lmsa-ui-pill-button", text: command.name });
       chip.addEventListener("click", () => { void this.runCommand(command); });
     }
   }
@@ -696,7 +697,7 @@ export class ChatView extends ItemView {
     const chromeEl = columnEl.createDiv({ cls: "lmsa-message-chrome" });
     chromeEl.createDiv({ cls: "lmsa-message-role", text: role === "user" ? "You" : "Assistant" });
 
-    const bodyEl = columnEl.createDiv({ cls: "lmsa-message-body" });
+    const bodyEl = columnEl.createDiv({ cls: "lmsa-message-body lmsa-ui-card" });
     const contentEl = bodyEl.createDiv({ cls: "lmsa-message-content" });
 
     this.scrollToBottom();
@@ -739,3 +740,9 @@ export class ChatView extends ItemView {
     }
   }
 }
+
+
+
+
+
+

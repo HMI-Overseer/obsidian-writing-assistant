@@ -58,15 +58,18 @@ export class EmbeddingModelModal extends Modal {
         const allModels = await client.listModels();
         const embeddings = allModels.filter(
           (model) =>
-            model.includes("embed") ||
-            model.includes("embedding") ||
-            model.includes("e5") ||
-            model.includes("bge")
+            model.type === "embedding" ||
+            model.type === "embeddings" ||
+            model.id.includes("embed") ||
+            model.id.includes("embedding") ||
+            model.id.includes("e5") ||
+            model.id.includes("bge")
         );
 
         for (const model of embeddings.length > 0 ? embeddings : allModels) {
           const option = document.createElement("option");
-          option.value = model;
+          option.value = model.id;
+          option.label = model.displayName ? `${model.displayName} (${model.id})` : model.id;
           datalist.appendChild(option);
         }
       } catch {

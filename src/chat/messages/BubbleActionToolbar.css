@@ -1,6 +1,8 @@
 @layer components {
   .lmsa-bubble-toolbar {
     @apply lmsa-flex lmsa-items-center lmsa-justify-end lmsa-gap-1;
+    flex-basis: 100%;
+    order: 3;
     margin-top: 4px;
     opacity: 0;
     transition: opacity 120ms ease;
@@ -12,12 +14,14 @@
   }
 
   .lmsa-message.is-editing .lmsa-bubble-toolbar,
-  .lmsa-message-body.is-streaming ~ .lmsa-bubble-toolbar {
+  .lmsa-message:has(.lmsa-message-body.is-streaming) > .lmsa-bubble-toolbar {
     display: none;
   }
 
   .lmsa-message-actions {
     @apply lmsa-flex lmsa-items-center lmsa-gap-0.5;
+    padding-right: 35px;
+    padding-top: 5px;
   }
 
   .lmsa-action-btn {

@@ -1,6 +1,7 @@
 @layer components {
   .lmsa-message {
-    @apply lmsa-flex lmsa-w-full lmsa-gap-3;
+    @apply lmsa-flex lmsa-w-full lmsa-flex-wrap;
+    gap: 0 0.75rem;
   }
 
   .lmsa-message--user {
@@ -22,11 +23,15 @@
   }
 
   .lmsa-message-column {
-    @apply lmsa-flex lmsa-min-w-0 lmsa-w-full lmsa-max-w-[780px] lmsa-flex-col lmsa-gap-1.5;
+    @apply lmsa-flex lmsa-min-w-0 lmsa-flex-1 lmsa-max-w-[780px] lmsa-flex-col lmsa-gap-1.5;
   }
 
   .lmsa-message--user .lmsa-message-column {
     @apply lmsa-items-end;
+  }
+
+  .lmsa-message--user .lmsa-message-chrome {
+    @apply lmsa-justify-end;
   }
 
   .lmsa-message-chrome {
@@ -130,7 +135,7 @@
 
 @media (max-width: 700px) {
   .lmsa-message {
-    @apply lmsa-gap-2.5;
+    gap: 0 0.625rem;
   }
 
   .lmsa-message-avatar {

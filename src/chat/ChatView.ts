@@ -308,11 +308,17 @@ export class ChatView extends ItemView {
   }
 
   private async handleVersionChange(messageId: string, newIndex: number): Promise<void> {
-    if (!this.sessionStore) return;
+    if (!this.sessionStore || !this.transcript) return;
 
     this.sessionStore.switchMessageVersion(messageId, newIndex);
     await this.sessionStore.persistActiveConversation();
-    await this.syncConversationUi();
+
+    const snapshot = this.sessionStore.getSnapshot();
+    await this.transcript.updateBubbleVersion(
+      messageId,
+      snapshot.messageHistory,
+      this.createBubbleActionCallbacks()
+    );
   }
 
   private updateHeader(): void {

@@ -58,6 +58,46 @@ export class ChatTranscript {
     return this.bubblesByMessageId.get(messageId) ?? null;
   }
 
+  async updateBubbleVersion(
+    messageId: string,
+    messages: ConversationMessage[],
+    callbacks: BubbleActionCallbacks
+  ): Promise<void> {
+    const bubble = this.bubblesByMessageId.get(messageId);
+    if (!bubble) return;
+
+    const message = messages.find((m) => m.id === messageId);
+    if (!message) return;
+
+    const lastAssistantIndex = this.findLastAssistantIndex(messages);
+    const messageIndex = messages.indexOf(message);
+    const isLastAssistant = messageIndex === lastAssistantIndex;
+
+    // Scroll anchor: capture toolbar position before content swap
+    const oldToolbarEl = bubble.rowEl.querySelector(
+      ".lmsa-bubble-toolbar"
+    ) as HTMLElement | null;
+    const anchorY = oldToolbarEl?.getBoundingClientRect().top ?? null;
+
+    // In-place content swap
+    await this.renderBubbleContent(bubble, message.content);
+
+    // Replace toolbar with updated version nav state
+    oldToolbarEl?.remove();
+    this.attachBubbleActions(bubble, message, isLastAssistant, callbacks);
+
+    // Restore scroll anchor so version nav stays at the same screen position
+    if (anchorY !== null) {
+      const newToolbarEl = bubble.rowEl.querySelector(
+        ".lmsa-bubble-toolbar"
+      ) as HTMLElement | null;
+      if (newToolbarEl) {
+        const delta = newToolbarEl.getBoundingClientRect().top - anchorY;
+        this.refs.messagesEl.scrollTop += delta;
+      }
+    }
+  }
+
   createBubble(role: "user" | "assistant", messageId?: string): BubbleRefs {
     const rowEl = this.refs.messagesEl.createDiv({
       cls: `lmsa-message lmsa-message--${role}`,
@@ -223,7 +263,7 @@ export class ChatTranscript {
     isLastAssistant: boolean,
     callbacks: BubbleActionCallbacks
   ): void {
-    const toolbarEl = bubble.columnEl.createDiv({ cls: "lmsa-bubble-toolbar" });
+    const toolbarEl = bubble.rowEl.createDiv({ cls: "lmsa-bubble-toolbar" });
 
     if (message.role === "assistant" && message.versions && message.versions.length > 1) {
       BubbleVersionNav.render(toolbarEl, message, callbacks.onVersionChange);

@@ -5,7 +5,6 @@ import type { ChatLayoutRefs, ModelAvailabilityState } from "../types";
 import { setIcon } from "obsidian";
 
 const MODEL_SELECTOR_ATTENTION_DURATION_MS = 700;
-const NO_MODEL_SELECTED_LABEL = "No model selected";
 
 type ChatModelSelectorOptions = {
   getActiveModel: () => CompletionModel | null;
@@ -27,6 +26,7 @@ export class ChatModelSelector {
       | "modelSelectorBtn"
       | "modelSelectorLabelEl"
       | "modelSelectorStatusEl"
+      | "modelSelectorChevronEl"
       | "modelDropdownEl"
     >,
     private readonly options: ChatModelSelectorOptions
@@ -39,9 +39,6 @@ export class ChatModelSelector {
 
   syncActiveModel(): void {
     const activeModel = this.options.getActiveModel();
-    this.refs.modelSelectorLabelEl.setText(
-      activeModel?.name || NO_MODEL_SELECTED_LABEL
-    );
 
     if (!activeModel?.modelId) {
       this.knownModelAvailability.clear();
@@ -66,6 +63,7 @@ export class ChatModelSelector {
     this.refs.modelDropdownEl.style.display = "none";
     this.modelDropdownOpen = false;
     this.refs.modelSelectorBtn.removeClass("is-active");
+    setIcon(this.refs.modelSelectorChevronEl, "chevron-down");
   }
 
   clearAttention(): void {
@@ -148,6 +146,7 @@ export class ChatModelSelector {
     this.refs.modelDropdownEl.style.display = "block";
     this.modelDropdownOpen = true;
     this.refs.modelSelectorBtn.addClass("is-active");
+    setIcon(this.refs.modelSelectorChevronEl, "chevron-up");
 
     const loadingList = this.refs.modelDropdownEl.createDiv({
       cls: "lmsa-model-dropdown-list",
@@ -183,18 +182,10 @@ export class ChatModelSelector {
 
     const activeModel = this.options.getActiveModel();
     if (!activeModel?.modelId) {
-      this.refs.modelSelectorStatusEl.setText("");
       this.refs.modelSelectorStatusEl.addClass("is-hidden");
       return;
     }
 
-    const textByState: Record<ModelAvailabilityState, string> = {
-      loaded: "Loaded",
-      unloaded: "Unloaded",
-      unknown: "Unknown",
-    };
-
-    this.refs.modelSelectorStatusEl.setText(textByState[state]);
     this.refs.modelSelectorStatusEl.addClass(`is-${state}`);
   }
 
@@ -219,11 +210,10 @@ export class ChatModelSelector {
     }
 
     for (const model of models) {
-      const item = listEl.createEl("button", {
-        cls: "lmsa-model-dropdown-item lmsa-ui-list-item",
+      const item = listEl.createDiv({
+        cls: "lmsa-model-dropdown-item",
       });
-      const leading = item.createDiv({ cls: "lmsa-model-dropdown-leading" });
-      const checkSpan = leading.createEl("span", {
+      const checkSpan = item.createEl("span", {
         cls: "lmsa-model-dropdown-check",
       });
       if (model.id === activeProfileId) {
@@ -238,16 +228,9 @@ export class ChatModelSelector {
       });
 
       const itemState = this.getModelAvailabilityStateForId(model.modelId);
-      const stateBadge = item.createEl("span", {
+      item.createEl("span", {
         cls: `lmsa-model-dropdown-state is-${itemState}`,
       });
-      stateBadge.setText(
-        itemState === "loaded"
-          ? "Loaded"
-          : itemState === "unloaded"
-            ? "Unloaded"
-            : "Unknown"
-      );
 
       item.addEventListener("click", async (event) => {
         event.stopPropagation();

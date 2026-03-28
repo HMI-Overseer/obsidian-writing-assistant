@@ -9,7 +9,7 @@ type ConversationControllerDeps = {
   getDrawer: () => ChatHistoryDrawer | null;
   getGeneration: () => ChatGenerationController;
   syncConversationUi: () => Promise<void>;
-  setStatus: (text: string, muted?: boolean) => void;
+  refreshAvailability: () => Promise<void>;
 };
 
 export class ChatConversationController {
@@ -44,7 +44,7 @@ export class ChatConversationController {
     await store.persistActiveConversation();
     await store.newConversation();
     await this.deps.syncConversationUi();
-    this.deps.setStatus("Ready", true);
+    void this.deps.refreshAvailability();
     this.deps.getDrawer()?.close();
   }
 
@@ -67,7 +67,7 @@ export class ChatConversationController {
     if (!didSwitch) return;
 
     await this.deps.syncConversationUi();
-    this.deps.setStatus("Ready", true);
+    void this.deps.refreshAvailability();
     this.deps.getDrawer()?.close();
   }
 
@@ -77,7 +77,7 @@ export class ChatConversationController {
 
     await store.deleteConversation(id);
     await this.deps.syncConversationUi();
-    this.deps.setStatus("Ready", true);
+    void this.deps.refreshAvailability();
 
     const drawer = this.deps.getDrawer();
     if (drawer?.isOpen()) {

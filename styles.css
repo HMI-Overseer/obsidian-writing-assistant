@@ -249,26 +249,60 @@
     color: var(--text-normal);
     font-size: 1.05rem;
 }
+.lmsa-header-meta-wrap {
+    position: relative;
+}
 .lmsa-header-meta {
+    display: inline-flex;
+    min-width: 0px;
+    cursor: pointer;
+    align-items: center;
+    gap: 0.375rem;
+    color: var(--text-muted);
+    font-size: var(--font-ui-smaller);
+    line-height: 1.45;
+    padding: 2px 6px;
+    margin: -2px -6px;
+    border-radius: 6px;
+    transition: background-color 140ms ease, color 140ms ease;
+}
+.lmsa-header-meta:hover {
+    background: color-mix(in srgb, var(--background-modifier-hover) 60%, transparent);
+    color: var(--text-normal);
+  }
+.lmsa-header-meta.is-active {
+    color: var(--text-normal);
+  }
+.lmsa-header-meta.is-attention {
+    animation: lmsa-header-meta-attention 0.7s ease;
+  }
+.lmsa-header-meta-label {
     min-width: 0px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    color: var(--text-muted);
-    font-size: var(--font-ui-smaller);
-    line-height: 1.45;
 }
+.lmsa-header-meta-chevron {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    opacity: 0.4;
+    transition: opacity 140ms ease;
+}
+.lmsa-header-meta:hover .lmsa-header-meta-chevron {
+    opacity: 0.75;
+  }
+.lmsa-header-meta.is-active .lmsa-header-meta-chevron {
+    opacity: 0.75;
+  }
+.lmsa-header-meta-chevron svg {
+    width: 10px;
+    height: 10px;
+  }
 .lmsa-header-actions {
     display: flex;
     align-items: center;
     gap: 0.625rem;
-}
-.lmsa-header-actions .lmsa-status-pill {
-    padding-left: 0.75rem;
-    padding-right: 0.75rem;
-    padding-top: 0.5rem;
-    padding-bottom: 0.5rem;
-    font-size: var(--font-ui-small);
 }
 .lmsa-header-actions .lmsa-ui-icon-btn {
     height: 2.5rem;
@@ -278,13 +312,6 @@
 .lmsa-header-btn svg {
     width: 22px;
     height: 22px;
-  }
-.lmsa-status-pill {
-    background: color-mix(in srgb, var(--background-secondary) 84%, transparent);
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
-  }
-.lmsa-status-pill.is-muted {
-    color: var(--text-muted);
   }
 .lmsa-messages-pane {
     position: relative;
@@ -446,15 +473,46 @@
     font-size: var(--font-ui-smaller);
     background: color-mix(in srgb, var(--background-secondary) 52%, transparent);
 }
-.lmsa-btn-row {
+.lmsa-action-btn {
     display: flex;
-    flex-wrap: wrap;
-    justify-content: flex-end;
-    gap: 0.5rem;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    border-radius: 50%;
 }
-.lmsa-stop-btn {
-    color: var(--text-error);
+.lmsa-action-btn svg {
+    width: 18px;
+    height: 18px;
   }
+.lmsa-action-btn.is-stop {
+    background: transparent;
+    color: var(--text-error);
+    border: 1px solid color-mix(in srgb, var(--text-error) 40%, var(--background-modifier-border));
+  }
+.lmsa-action-btn.is-stop:hover {
+    background: color-mix(in srgb, var(--text-error) 12%, transparent);
+  }
+.lmsa-collapsed-overlay {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem;
+    text-align: center;
+    color: var(--text-muted);
+    height: 100%;
+}
+.lmsa-collapsed-text {
+    font-size: var(--font-ui-small);
+    line-height: 1.6;
+  }
+.lmsa-root.is-collapsed .lmsa-shell > *:not(.lmsa-collapsed-overlay) {
+    display: none;
+}
+.lmsa-root.is-collapsed .lmsa-collapsed-overlay {
+    display: flex;
+}
 .lmsa-history-drawer {
     position: absolute;
     z-index: 10;
@@ -755,17 +813,16 @@
     align-items: center;
     justify-content: flex-end;
     gap: 0.25rem;
-    margin-top: 8px;
+    margin-top: 4px;
     opacity: 0;
     transition: opacity 120ms ease;
 }
-.lmsa-message:hover .lmsa-bubble-toolbar {
+.lmsa-message:hover .lmsa-bubble-toolbar,
+  .lmsa-bubble-toolbar:hover {
     opacity: 1;
   }
-.lmsa-message.is-editing .lmsa-bubble-toolbar {
-    display: none;
-  }
-.lmsa-message-body.is-streaming .lmsa-bubble-toolbar {
+.lmsa-message.is-editing .lmsa-bubble-toolbar,
+  .lmsa-message-body.is-streaming ~ .lmsa-bubble-toolbar {
     display: none;
   }
 .lmsa-message-actions {
@@ -887,80 +944,36 @@
 .lmsa-inline-editor-save:hover {
     background: var(--interactive-accent-hover);
   }
-.lmsa-model-selector-wrap {
-    position: relative;
-    flex: none;
-}
-.lmsa-model-selector-btn {
-    min-width: 0px;
-    max-width: 280px;
-    flex-shrink: 0;
-    background: color-mix(in srgb, var(--background-secondary) 60%, transparent);
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
-}
-.lmsa-model-selector-btn.is-attention {
-    border-color: color-mix(in srgb, var(--text-error) 48%, var(--background-modifier-border));
-    box-shadow:
-      0 0 0 1px color-mix(in srgb, var(--text-error) 20%, transparent),
-      0 0 0 5px color-mix(in srgb, var(--text-error) 12%, transparent),
-      inset 0 1px 0 rgba(255, 255, 255, 0.04);
-    animation: lmsa-attention-ring 0.7s ease;
-  }
 .lmsa-model-selector-status {
-    display: inline-flex;
+    display: inline-block;
     flex: none;
-    align-items: center;
     border-radius: 9999px;
-    padding-left: 0.5rem;
-    padding-right: 0.5rem;
-    padding-top: 3px;
-    padding-bottom: 3px;
-    font-weight: 500;
-    font-size: 11px;
-    line-height: 1;
-    border: 1px solid transparent;
+    width: 8px;
+    height: 8px;
 }
 .lmsa-model-selector-status.is-hidden {
     display: none;
 }
 .lmsa-model-selector-status.is-loaded {
-    color: color-mix(in srgb, var(--color-green, #29a36a) 86%, var(--text-normal));
-    background: color-mix(in srgb, var(--color-green, #29a36a) 14%, transparent);
-    border-color: color-mix(in srgb, var(--color-green, #29a36a) 28%, transparent);
+    background: var(--color-green, #29a36a);
+    box-shadow:
+      0 0 3px 1px color-mix(in srgb, var(--color-green, #29a36a) 30%, transparent),
+      0 0 8px 2px color-mix(in srgb, var(--color-green, #29a36a) 14%, transparent);
   }
-.lmsa-model-selector-status.is-unloaded,
-  .lmsa-model-selector-status.is-unknown {
-    color: color-mix(in srgb, var(--text-error) 92%, var(--text-normal));
-    background: color-mix(in srgb, var(--text-error) 12%, transparent);
-    border-color: color-mix(in srgb, var(--text-error) 24%, transparent);
+.lmsa-model-selector-status.is-unloaded {
+    background: var(--text-error);
+    box-shadow:
+      0 0 3px 1px color-mix(in srgb, var(--text-error) 30%, transparent),
+      0 0 8px 2px color-mix(in srgb, var(--text-error) 14%, transparent);
   }
-.lmsa-model-selector-icon,
-  .lmsa-model-selector-chevron {
-    display: inline-flex;
-    flex: none;
-    align-items: center;
-}
-.lmsa-model-selector-icon svg {
-    width: 14px;
-    height: 14px;
-  }
-.lmsa-model-selector-label {
-    min-width: 0px;
-    flex: 1 1 0%;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-.lmsa-model-selector-chevron {
-    color: color-mix(in srgb, var(--interactive-accent) 64%, var(--text-muted));
-  }
-.lmsa-model-selector-chevron svg {
-    width: 12px;
-    height: 12px;
+.lmsa-model-selector-status.is-unknown {
+    background: var(--text-faint);
+    box-shadow:
+      0 0 3px 1px color-mix(in srgb, var(--text-faint) 25%, transparent),
+      0 0 8px 2px color-mix(in srgb, var(--text-faint) 10%, transparent);
   }
 .lmsa-model-dropdown {
     position: absolute;
-    bottom: calc(100% + 8px);
     left: 0px;
     z-index: 120;
     max-height: 360px;
@@ -969,6 +982,7 @@
     border-width: 1px;
     border-color: var(--background-modifier-border);
     padding: 0.5rem;
+    top: calc(100% + 6px);
     width: min(372px, calc(100vw - 48px));
     background:
       linear-gradient(180deg, color-mix(in srgb, var(--background-primary) 97%, transparent), color-mix(in srgb, var(--background-secondary) 94%, transparent));
@@ -977,55 +991,36 @@
     box-shadow:
       0 22px 56px rgba(0, 0, 0, 0.22),
       inset 0 1px 0 rgba(255, 255, 255, 0.04);
-    transform-origin: bottom left;
+    transform-origin: top left;
     overflow: hidden auto;
 }
 .lmsa-model-dropdown-list {
     display: flex;
     flex-direction: column;
-    gap: 0.375rem;
+    gap: 0.125rem;
 }
 .lmsa-model-dropdown-item {
     display: flex;
     width: 100%;
     cursor: pointer;
     align-items: center;
-    gap: 0.625rem;
-    border-radius: 12px;
-    border-width: 1px;
-    border-color: transparent;
-    padding-left: 0.75rem;
-    padding-right: 0.75rem;
-    padding-top: 11px;
-    padding-bottom: 11px;
-    text-align: left;
-    color: var(--text-normal);
+    gap: 0.5rem;
+    color: var(--text-muted);
     font-size: var(--font-ui-small);
-    background: color-mix(in srgb, var(--background-secondary) 58%, transparent);
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
-    transition: background-color 140ms ease, border-color 140ms ease, color 140ms ease;
+    padding: 6px 8px;
+    border-radius: 6px;
+    transition: background-color 140ms ease, color 140ms ease;
 }
 .lmsa-model-dropdown-item:hover {
-    background: color-mix(in srgb, var(--background-modifier-hover) 90%, var(--background-secondary));
-    border-color: color-mix(in srgb, var(--background-modifier-border) 85%, transparent);
+    background: color-mix(in srgb, var(--background-modifier-hover) 60%, transparent);
+    color: var(--text-normal);
   }
 .lmsa-model-dropdown-item.is-active {
-    color: var(--text-on-accent);
-    background:
-      linear-gradient(90deg, color-mix(in srgb, var(--interactive-accent) 92%, black 6%), color-mix(in srgb, var(--interactive-accent) 82%, black 4%));
-    border-color: color-mix(in srgb, white 12%, transparent);
-    box-shadow:
-      0 0 0 1px color-mix(in srgb, var(--interactive-accent) 16%, transparent),
-      inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    color: var(--interactive-accent);
   }
-.lmsa-model-dropdown-leading {
-    display: flex;
-    height: 1.25rem;
-    width: 1.25rem;
-    flex: none;
-    align-items: center;
-    justify-content: center;
-}
+.lmsa-model-dropdown-item.is-active:hover {
+    background: color-mix(in srgb, var(--background-modifier-hover) 60%, transparent);
+  }
 .lmsa-model-dropdown-copy {
     display: flex;
     min-width: 0px;
@@ -1036,12 +1031,13 @@
     display: inline-flex;
     height: 1rem;
     width: 1rem;
+    flex: none;
     align-items: center;
     justify-content: center;
     color: transparent;
 }
 .lmsa-model-dropdown-item.is-active .lmsa-model-dropdown-check {
-    color: var(--text-on-accent);
+    color: var(--interactive-accent);
   }
 .lmsa-model-dropdown-check svg {
     width: 13px;
@@ -1052,39 +1048,32 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    font-weight: 500;
     letter-spacing: 0.01em;
 }
 .lmsa-model-dropdown-state {
-    display: inline-flex;
+    display: inline-block;
     flex: none;
-    align-items: center;
     border-radius: 9999px;
-    padding-left: 9px;
-    padding-right: 9px;
-    padding-top: 3px;
-    padding-bottom: 3px;
-    font-weight: 500;
-    font-size: 10px;
-    line-height: 1;
-    border: 1px solid transparent;
-    letter-spacing: 0.01em;
+    width: 8px;
+    height: 8px;
 }
 .lmsa-model-dropdown-state.is-loaded {
-    color: color-mix(in srgb, var(--color-green, #29a36a) 86%, var(--text-normal));
-    background: color-mix(in srgb, var(--color-green, #29a36a) 16%, transparent);
-    border-color: color-mix(in srgb, var(--color-green, #29a36a) 24%, transparent);
+    background: var(--color-green, #29a36a);
+    box-shadow:
+      0 0 3px 1px color-mix(in srgb, var(--color-green, #29a36a) 30%, transparent),
+      0 0 8px 2px color-mix(in srgb, var(--color-green, #29a36a) 14%, transparent);
   }
-.lmsa-model-dropdown-state.is-unloaded,
-  .lmsa-model-dropdown-state.is-unknown {
-    color: color-mix(in srgb, var(--text-error) 92%, var(--text-normal));
-    background: color-mix(in srgb, var(--text-error) 11%, transparent);
-    border-color: color-mix(in srgb, var(--text-error) 20%, transparent);
+.lmsa-model-dropdown-state.is-unloaded {
+    background: var(--text-error);
+    box-shadow:
+      0 0 3px 1px color-mix(in srgb, var(--text-error) 30%, transparent),
+      0 0 8px 2px color-mix(in srgb, var(--text-error) 14%, transparent);
   }
-.lmsa-model-dropdown-item.is-active .lmsa-model-dropdown-state {
-    color: var(--text-on-accent);
-    background: color-mix(in srgb, white 20%, transparent);
-    border-color: color-mix(in srgb, white 18%, transparent);
+.lmsa-model-dropdown-state.is-unknown {
+    background: var(--text-faint);
+    box-shadow:
+      0 0 3px 1px color-mix(in srgb, var(--text-faint) 25%, transparent),
+      0 0 8px 2px color-mix(in srgb, var(--text-faint) 10%, transparent);
   }
 .lmsa-model-dropdown-empty {
     padding-left: 1rem;
@@ -1686,9 +1675,6 @@
     left: 2rem;
     right: 2rem;
 }
-.lmsa-bottom-\[calc\(100\%\+8px\)\] {
-    bottom: calc(100% + 8px);
-}
 .lmsa-left-0 {
     left: 0px;
 }
@@ -1733,6 +1719,9 @@
 }
 .lmsa-box-border {
     box-sizing: border-box;
+}
+.lmsa-inline-block {
+    display: inline-block;
 }
 .lmsa-flex {
     display: flex;
@@ -1804,9 +1793,6 @@
 .lmsa-max-w-\[220px\] {
     max-width: 220px;
 }
-.lmsa-max-w-\[280px\] {
-    max-width: 280px;
-}
 .lmsa-max-w-\[42ch\] {
     max-width: 42ch;
 }
@@ -1815,9 +1801,6 @@
 }
 .lmsa-max-w-\[980px\] {
     max-width: 980px;
-}
-.lmsa-max-w-none {
-    max-width: none;
 }
 .lmsa-flex-1 {
     flex: 1 1 0%;
@@ -2052,10 +2035,6 @@
     padding-left: 18px;
     padding-right: 18px;
 }
-.lmsa-px-\[9px\] {
-    padding-left: 9px;
-    padding-right: 9px;
-}
 .lmsa-py-0 {
     padding-top: 0px;
     padding-bottom: 0px;
@@ -2084,10 +2063,6 @@
     padding-top: 1.25rem;
     padding-bottom: 1.25rem;
 }
-.lmsa-py-\[11px\] {
-    padding-top: 11px;
-    padding-bottom: 11px;
-}
 .lmsa-py-\[14px\] {
     padding-top: 14px;
     padding-bottom: 14px;
@@ -2095,10 +2070,6 @@
 .lmsa-py-\[18px\] {
     padding-top: 18px;
     padding-bottom: 18px;
-}
-.lmsa-py-\[3px\] {
-    padding-top: 3px;
-    padding-bottom: 3px;
 }
 .lmsa-py-\[5px\] {
     padding-top: 5px;
@@ -2165,9 +2136,6 @@
 .lmsa-pt-\[18px\] {
     padding-top: 18px;
 }
-.lmsa-text-left {
-    text-align: left;
-}
 .lmsa-text-center {
     text-align: center;
 }
@@ -2218,8 +2186,7 @@
         align-items: stretch;
     }
 
-  .lmsa-header-actions,
-  .lmsa-btn-row {
+  .lmsa-header-actions {
         width: 100%;
         justify-content: flex-start;
     }
@@ -2255,15 +2222,6 @@
         width: 30px;
         flex: 0 0 30px;
     }
-  .lmsa-model-selector-wrap {
-        width: 100%;
-    }
-
-  .lmsa-model-selector-btn {
-        width: 100%;
-        max-width: none;
-    }
-
   .lmsa-model-dropdown {
         left: 0px;
         right: 0px;
@@ -2293,27 +2251,14 @@
     transform: translateY(0) scale(1);
   }
 }
-@keyframes lmsa-attention-ring {
-  0% {
-    transform: translateY(0) scale(1);
-    box-shadow:
-      0 0 0 0 color-mix(in srgb, var(--text-error) 0%, transparent),
-      inset 0 1px 0 rgba(255, 255, 255, 0.04);
-  }
-
-  35% {
-    transform: translateY(-1px) scale(1.01);
-    box-shadow:
-      0 0 0 1px color-mix(in srgb, var(--text-error) 30%, transparent),
-      0 0 0 7px color-mix(in srgb, var(--text-error) 14%, transparent),
-      inset 0 1px 0 rgba(255, 255, 255, 0.04);
-  }
-
+@keyframes lmsa-header-meta-attention {
+  0%,
   100% {
-    transform: translateY(0) scale(1);
-    box-shadow:
-      0 0 0 0 color-mix(in srgb, var(--text-error) 0%, transparent),
-      inset 0 1px 0 rgba(255, 255, 255, 0.04);
+    color: var(--text-muted);
+  }
+
+  30% {
+    color: var(--text-error);
   }
 }
 /* Settings */

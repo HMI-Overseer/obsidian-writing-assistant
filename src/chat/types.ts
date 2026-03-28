@@ -11,6 +11,7 @@ export type BubbleRenderOptions = {
 export type BubbleRefs = {
   role: BubbleRole;
   rowEl: HTMLElement;
+  columnEl: HTMLElement;
   chromeEl: HTMLElement;
   bodyEl: HTMLElement;
   contentEl: HTMLElement;
@@ -20,18 +21,17 @@ export type ChatLayoutRefs = {
   rootEl: HTMLElement;
   messagesPaneEl: HTMLElement;
   headerMetaEl: HTMLElement;
-  statusPillEl: HTMLElement;
   historyBtn: HTMLButtonElement;
   messagesEl: HTMLElement;
   emptyStateEl: HTMLElement;
   commandBarEl: HTMLElement;
   contextChipsEl: HTMLElement;
   textareaEl: HTMLTextAreaElement;
-  sendBtn: HTMLButtonElement;
-  stopBtn: HTMLButtonElement;
-  modelSelectorBtn: HTMLButtonElement;
+  actionBtn: HTMLButtonElement;
+  modelSelectorBtn: HTMLElement;
   modelSelectorLabelEl: HTMLElement;
   modelSelectorStatusEl: HTMLElement;
+  modelSelectorChevronEl: HTMLElement;
   modelDropdownEl: HTMLElement;
 };
 

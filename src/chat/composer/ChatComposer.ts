@@ -1,5 +1,5 @@
-import type { App } from "obsidian";
 import { setIcon } from "obsidian";
+import type { App } from "obsidian";
 import type { CustomCommand } from "../../shared/types";
 import type LMStudioWritingAssistant from "../../main";
 import { getActiveFileName } from "../../context/noteContext";
@@ -14,17 +14,14 @@ type ChatComposerCallbacks = {
 
 export class ChatComposer {
   private sessionContextEnabled = true;
+  private isSending = false;
 
   constructor(
     private readonly app: App,
     private readonly plugin: LMStudioWritingAssistant,
     private readonly refs: Pick<
       ChatLayoutRefs,
-      | "commandBarEl"
-      | "contextChipsEl"
-      | "textareaEl"
-      | "sendBtn"
-      | "stopBtn"
+      "commandBarEl" | "contextChipsEl" | "textareaEl" | "actionBtn"
     >,
     private readonly callbacks: ChatComposerCallbacks
   ) {
@@ -46,12 +43,12 @@ export class ChatComposer {
       this.callbacks.onDraftChange(this.refs.textareaEl.value);
     });
 
-    this.refs.stopBtn.addEventListener("click", () => {
-      this.callbacks.onStopRequest();
-    });
-
-    this.refs.sendBtn.addEventListener("click", () => {
-      this.callbacks.onSendRequest();
+    this.refs.actionBtn.addEventListener("click", () => {
+      if (this.isSending) {
+        this.callbacks.onStopRequest();
+      } else {
+        this.callbacks.onSendRequest();
+      }
     });
   }
 
@@ -75,9 +72,10 @@ export class ChatComposer {
   }
 
   setSendingState(sending: boolean): void {
-    this.refs.sendBtn.disabled = sending;
-    this.refs.sendBtn.setText(sending ? "Sending..." : "Send");
-    this.refs.stopBtn.disabled = !sending;
+    this.isSending = sending;
+    this.refs.actionBtn.empty();
+    setIcon(this.refs.actionBtn, sending ? "square" : "arrow-up");
+    this.refs.actionBtn.toggleClass("is-stop", sending);
     this.refs.textareaEl.disabled = sending;
   }
 

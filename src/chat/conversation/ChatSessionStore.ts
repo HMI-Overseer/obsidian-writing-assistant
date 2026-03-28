@@ -110,7 +110,11 @@ export class ChatSessionStore {
 
   async newConversation(): Promise<void> {
     const history = this.plugin.settings.chatHistory;
-    const conversation = createConversation("", "");
+    const currentConv = this.getActiveConversation();
+    const conversation = createConversation(
+      currentConv?.modelId ?? "",
+      currentConv?.modelName ?? ""
+    );
 
     history.conversations.unshift(conversation);
     pruneHistory(history);

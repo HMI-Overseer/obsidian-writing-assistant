@@ -28,7 +28,6 @@ export type RegenerateOptions = {
   messageId: string;
   getIsGenerating: () => boolean;
   setIsGenerating: (generating: boolean) => void;
-  setStatus: (text: string, muted?: boolean) => void;
   setActiveAbortController: (controller: AbortController | null) => void;
   syncConversationUi: () => Promise<void>;
 };
@@ -43,7 +42,6 @@ export async function regenerateMessage(options: RegenerateOptions): Promise<voi
     messageId,
     getIsGenerating,
     setIsGenerating,
-    setStatus,
     setActiveAbortController,
     syncConversationUi,
   } = options;
@@ -73,7 +71,6 @@ export async function regenerateMessage(options: RegenerateOptions): Promise<voi
   if (!oldMessage) return;
 
   setIsGenerating(true);
-  setStatus("Regenerating");
 
   await store.persistActiveConversation();
   await syncConversationUi();
@@ -116,7 +113,6 @@ export async function regenerateMessage(options: RegenerateOptions): Promise<voi
       transcript.renderPlainTextContent(assistantBubble, "(no response)");
     }
 
-    setStatus("Ready", true);
   } catch (error) {
     await renderer.flush();
     assistantBubble.bodyEl.removeClass("is-streaming");
@@ -129,7 +125,6 @@ export async function regenerateMessage(options: RegenerateOptions): Promise<voi
         transcript.renderPlainTextContent(assistantBubble, "Generation stopped.");
         assistantBubble.bodyEl.addClass("is-muted");
       }
-      setStatus("Stopped", true);
     } else {
       store.finalizeRegeneration(oldMessage, oldMessage.content);
       assistantBubble.bodyEl.addClass("is-error");
@@ -137,7 +132,6 @@ export async function regenerateMessage(options: RegenerateOptions): Promise<voi
         assistantBubble,
         `Error: ${getErrorMessage(error)}\n\nMake sure LM Studio is running and a model is loaded.`
       );
-      setStatus("Error", true);
     }
   } finally {
     setActiveAbortController(null);

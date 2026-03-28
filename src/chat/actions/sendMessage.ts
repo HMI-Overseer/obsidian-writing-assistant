@@ -29,7 +29,6 @@ export type SendMessageOptions = {
   modelSelector: ChatModelSelector;
   getIsGenerating: () => boolean;
   setIsGenerating: (sending: boolean) => void;
-  setStatus: (text: string, muted?: boolean) => void;
   setActiveAbortController: (controller: AbortController | null) => void;
   syncConversationUi: () => Promise<void>;
   promptOverride?: string;
@@ -45,7 +44,6 @@ export async function sendMessage(options: SendMessageOptions): Promise<void> {
     modelSelector,
     getIsGenerating,
     setIsGenerating,
-    setStatus,
     setActiveAbortController,
     syncConversationUi,
     promptOverride,
@@ -66,7 +64,6 @@ export async function sendMessage(options: SendMessageOptions): Promise<void> {
   composer.clearDraft();
   store.setDraft("");
   setIsGenerating(true);
-  setStatus("Generating");
 
   if (store.ensureConversationTitleFromFirstUserMessage(text)) {
     await syncConversationUi();
@@ -120,21 +117,18 @@ export async function sendMessage(options: SendMessageOptions): Promise<void> {
       plugin
     );
 
-    setStatus("Ready", true);
   } catch (error) {
     await renderer.flush();
     assistantBubble.bodyEl.removeClass("is-streaming");
 
     if (isAbortError(error)) {
       await finalizeAbortedResponse(store, transcript, assistantBubble, renderer);
-      setStatus("Stopped", true);
     } else {
       assistantBubble.bodyEl.addClass("is-error");
       transcript.renderPlainTextContent(
         assistantBubble,
         `Error: ${getErrorMessage(error)}\n\nMake sure LM Studio is running and a model is loaded.`
       );
-      setStatus("Error", true);
     }
   } finally {
     setActiveAbortController(null);

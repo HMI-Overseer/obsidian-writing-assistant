@@ -1,20 +1,18 @@
 @layer components {
   .lmsa-bubble-toolbar {
     @apply lmsa-flex lmsa-items-center lmsa-justify-end lmsa-gap-1;
-    margin-top: 8px;
+    margin-top: 4px;
     opacity: 0;
     transition: opacity 120ms ease;
   }
 
-  .lmsa-message:hover .lmsa-bubble-toolbar {
+  .lmsa-message:hover .lmsa-bubble-toolbar,
+  .lmsa-bubble-toolbar:hover {
     opacity: 1;
   }
 
-  .lmsa-message.is-editing .lmsa-bubble-toolbar {
-    display: none;
-  }
-
-  .lmsa-message-body.is-streaming .lmsa-bubble-toolbar {
+  .lmsa-message.is-editing .lmsa-bubble-toolbar,
+  .lmsa-message-body.is-streaming ~ .lmsa-bubble-toolbar {
     display: none;
   }
 

@@ -25,19 +25,58 @@
     font-size: 1.05rem;
   }
 
+  .lmsa-header-meta-wrap {
+    @apply lmsa-relative;
+  }
+
   .lmsa-header-meta {
-    @apply lmsa-min-w-0 lmsa-truncate lmsa-whitespace-nowrap lmsa-text-obsidian-muted;
+    @apply lmsa-inline-flex lmsa-min-w-0 lmsa-cursor-pointer lmsa-items-center lmsa-gap-1.5 lmsa-text-obsidian-muted;
     font-size: var(--font-ui-smaller);
     line-height: 1.45;
+    padding: 2px 6px;
+    margin: -2px -6px;
+    border-radius: 6px;
+    transition: background-color 140ms ease, color 140ms ease;
+  }
+
+  .lmsa-header-meta:hover {
+    background: color-mix(in srgb, var(--background-modifier-hover) 60%, transparent);
+    color: var(--text-normal);
+  }
+
+  .lmsa-header-meta.is-active {
+    color: var(--text-normal);
+  }
+
+  .lmsa-header-meta.is-attention {
+    animation: lmsa-header-meta-attention 0.7s ease;
+  }
+
+  .lmsa-header-meta-label {
+    @apply lmsa-min-w-0 lmsa-truncate lmsa-whitespace-nowrap;
+  }
+
+  .lmsa-header-meta-chevron {
+    @apply lmsa-inline-flex lmsa-flex-none lmsa-items-center;
+    opacity: 0.4;
+    transition: opacity 140ms ease;
+  }
+
+  .lmsa-header-meta:hover .lmsa-header-meta-chevron {
+    opacity: 0.75;
+  }
+
+  .lmsa-header-meta.is-active .lmsa-header-meta-chevron {
+    opacity: 0.75;
+  }
+
+  .lmsa-header-meta-chevron svg {
+    width: 10px;
+    height: 10px;
   }
 
   .lmsa-header-actions {
     @apply lmsa-flex lmsa-items-center lmsa-gap-2.5;
-  }
-
-  .lmsa-header-actions .lmsa-status-pill {
-    @apply lmsa-px-3 lmsa-py-2;
-    font-size: var(--font-ui-small);
   }
 
   .lmsa-header-actions .lmsa-ui-icon-btn {
@@ -47,15 +86,6 @@
   .lmsa-header-btn svg {
     width: 22px;
     height: 22px;
-  }
-
-  .lmsa-status-pill {
-    background: color-mix(in srgb, var(--background-secondary) 84%, transparent);
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
-  }
-
-  .lmsa-status-pill.is-muted {
-    color: var(--text-muted);
   }
 
   .lmsa-messages-pane {
@@ -168,12 +198,45 @@
     background: color-mix(in srgb, var(--background-secondary) 52%, transparent);
   }
 
-  .lmsa-btn-row {
-    @apply lmsa-flex lmsa-flex-wrap lmsa-justify-end lmsa-gap-2;
+  .lmsa-action-btn {
+    @apply lmsa-flex lmsa-items-center lmsa-justify-center;
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    border-radius: 50%;
   }
 
-  .lmsa-stop-btn {
+  .lmsa-action-btn svg {
+    width: 18px;
+    height: 18px;
+  }
+
+  .lmsa-action-btn.is-stop {
+    background: transparent;
     color: var(--text-error);
+    border: 1px solid color-mix(in srgb, var(--text-error) 40%, var(--background-modifier-border));
+  }
+
+  .lmsa-action-btn.is-stop:hover {
+    background: color-mix(in srgb, var(--text-error) 12%, transparent);
+  }
+
+  .lmsa-collapsed-overlay {
+    @apply lmsa-hidden lmsa-items-center lmsa-justify-center lmsa-p-8 lmsa-text-center lmsa-text-obsidian-muted;
+    height: 100%;
+  }
+
+  .lmsa-collapsed-text {
+    font-size: var(--font-ui-small);
+    line-height: 1.6;
+  }
+
+  .lmsa-root.is-collapsed .lmsa-shell > *:not(.lmsa-collapsed-overlay) {
+    @apply lmsa-hidden;
+  }
+
+  .lmsa-root.is-collapsed .lmsa-collapsed-overlay {
+    @apply lmsa-flex;
   }
 }
 
@@ -183,8 +246,7 @@
     @apply lmsa-flex-col lmsa-items-stretch;
   }
 
-  .lmsa-header-actions,
-  .lmsa-btn-row {
+  .lmsa-header-actions {
     @apply lmsa-w-full lmsa-justify-start;
   }
 

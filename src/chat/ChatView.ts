@@ -20,7 +20,7 @@ import { ChatHistoryDrawer } from "./view/ChatHistoryDrawer";
 import { createChatLayout } from "./view/createChatLayout";
 
 const NO_MODEL_SELECTED_LABEL = "No model selected";
-const MODEL_META_SEPARATOR = " - ";
+const MIN_VIEW_WIDTH_PX = 300;
 
 export class ChatView extends ItemView {
   plugin: LMStudioWritingAssistant;
@@ -34,6 +34,7 @@ export class ChatView extends ItemView {
   private generation!: ChatGenerationController;
   private conversation!: ChatConversationController;
   private lastRenderedConversationId: string | null = null;
+  private resizeObserver: ResizeObserver | null = null;
 
   constructor(leaf: WorkspaceLeaf, plugin: LMStudioWritingAssistant) {
     super(leaf);
@@ -68,7 +69,9 @@ export class ChatView extends ItemView {
       getDrawer: () => this.historyDrawer,
       getGeneration: () => this.generation,
       syncConversationUi: () => this.syncConversationUi(),
-      setStatus: (text, muted) => this.setStatus(text, muted),
+      refreshAvailability: async () => {
+        await this.modelSelector?.refreshAvailability();
+      },
     });
 
     this.composer = new ChatComposer(this.app, this.plugin, this.layout, {
@@ -95,7 +98,7 @@ export class ChatView extends ItemView {
         if (!this.sessionStore) return;
         await this.sessionStore.setActiveConversationModel(model);
         await this.syncConversationUi();
-        void this.modelSelector?.refreshAvailability();
+        await this.modelSelector?.refreshAvailability();
       },
     });
 
@@ -129,11 +132,19 @@ export class ChatView extends ItemView {
     await this.sessionStore.restorePersistedState();
     await this.syncConversationUi();
     this.composer.renderCommandBar();
-    this.setStatus("Ready");
-    void this.modelSelector.refreshAvailability();
+    await this.modelSelector.refreshAvailability();
+
+    this.resizeObserver = new ResizeObserver((entries) => {
+      const entry = entries[0];
+      if (!entry) return;
+      this.handleWidthChange(entry.contentRect.width);
+    });
+    this.resizeObserver.observe(this.contentEl);
   }
 
   async onClose(): Promise<void> {
+    this.resizeObserver?.disconnect();
+    this.resizeObserver = null;
     this.sessionStore?.clearDraftSaveTimer();
     this.generation.stopGeneration();
     await this.sessionStore?.persistActiveConversation();
@@ -163,7 +174,6 @@ export class ChatView extends ItemView {
       modelSelector: this.modelSelector,
       getIsGenerating: () => this.generation.getIsGenerating(),
       setIsGenerating: (sending) => this.generation.setIsGenerating(sending),
-      setStatus: (text, muted) => this.setStatus(text, muted),
       setActiveAbortController: (controller) =>
         this.generation.setActiveAbortController(controller),
       syncConversationUi: () => this.syncConversationUi(),
@@ -274,7 +284,6 @@ export class ChatView extends ItemView {
       store: this.sessionStore,
       messageId,
       syncConversationUi: () => this.syncConversationUi(),
-      setStatus: (text, muted) => this.setStatus(text, muted),
     });
   }
 
@@ -292,7 +301,6 @@ export class ChatView extends ItemView {
       messageId,
       getIsGenerating: () => this.generation.getIsGenerating(),
       setIsGenerating: (generating) => this.generation.setIsGenerating(generating),
-      setStatus: (text, muted) => this.setStatus(text, muted),
       setActiveAbortController: (controller) =>
         this.generation.setActiveAbortController(controller),
       syncConversationUi: () => this.syncConversationUi(),
@@ -312,16 +320,23 @@ export class ChatView extends ItemView {
 
     const activeModel = this.sessionStore.getResolvedConversationModel();
     this.layout.headerMetaEl.setText(
-      activeModel?.modelId
-        ? `${activeModel.name}${MODEL_META_SEPARATOR}${activeModel.modelId}`
-        : NO_MODEL_SELECTED_LABEL
+      activeModel?.name || NO_MODEL_SELECTED_LABEL
     );
   }
 
-  private setStatus(text: string, muted = false): void {
+
+  private handleWidthChange(width: number): void {
     if (!this.layout) return;
 
-    this.layout.statusPillEl.setText(text);
-    this.layout.statusPillEl.toggleClass("is-muted", muted);
+    const isCollapsed = width < MIN_VIEW_WIDTH_PX;
+    this.layout.rootEl.toggleClass("is-collapsed", isCollapsed);
+
+    if (isCollapsed && this.historyDrawer?.isOpen()) {
+      this.historyDrawer.close();
+    }
+
+    if (isCollapsed && this.modelSelector?.isOpen()) {
+      this.modelSelector.close();
+    }
   }
 }

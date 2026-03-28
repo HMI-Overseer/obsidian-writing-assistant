@@ -80,7 +80,7 @@ export class ChatTranscript {
     const contentEl = bodyEl.createDiv({ cls: "lmsa-message-content" });
 
     this.scrollToBottom();
-    return { role, rowEl, chromeEl, bodyEl, contentEl };
+    return { role, rowEl, columnEl, chromeEl, bodyEl, contentEl };
   }
 
   setEmptyStateVisible(isVisible: boolean): void {
@@ -223,7 +223,7 @@ export class ChatTranscript {
     isLastAssistant: boolean,
     callbacks: BubbleActionCallbacks
   ): void {
-    const toolbarEl = bubble.bodyEl.createDiv({ cls: "lmsa-bubble-toolbar" });
+    const toolbarEl = bubble.columnEl.createDiv({ cls: "lmsa-bubble-toolbar" });
 
     if (message.role === "assistant" && message.versions && message.versions.length > 1) {
       BubbleVersionNav.render(toolbarEl, message, callbacks.onVersionChange);

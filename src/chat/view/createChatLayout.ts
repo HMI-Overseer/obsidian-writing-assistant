@@ -7,14 +7,29 @@ export function createChatLayout(contentEl: HTMLElement): ChatLayoutRefs {
 
   const shell = contentEl.createDiv({ cls: "lmsa-shell" });
 
+  const collapsedOverlay = shell.createDiv({ cls: "lmsa-collapsed-overlay" });
+  collapsedOverlay.createEl("div", {
+    cls: "lmsa-collapsed-text",
+    text: "Widen the panel to use the chat",
+  });
+
   const header = shell.createDiv({ cls: "lmsa-header" });
   const titleGroup = header.createDiv({ cls: "lmsa-header-copy" });
   titleGroup.createEl("div", { cls: "lmsa-header-title", text: "LM Studio Chat" });
-  const headerMetaEl = titleGroup.createEl("div", { cls: "lmsa-header-meta" });
+
+  const headerMetaWrap = titleGroup.createDiv({ cls: "lmsa-header-meta-wrap" });
+  const headerMetaBtn = headerMetaWrap.createDiv({ cls: "lmsa-header-meta" });
+  const headerMetaLabel = headerMetaBtn.createEl("span", { cls: "lmsa-header-meta-label" });
+  const modelSelectorStatusEl = headerMetaBtn.createEl("span", {
+    cls: "lmsa-model-selector-status is-hidden",
+  });
+  const headerMetaChevron = headerMetaBtn.createEl("span", { cls: "lmsa-header-meta-chevron" });
+  setIcon(headerMetaChevron, "chevron-down");
+
+  const modelDropdownEl = headerMetaWrap.createDiv({ cls: "lmsa-model-dropdown" });
+  modelDropdownEl.style.display = "none";
 
   const headerActions = header.createDiv({ cls: "lmsa-header-actions" });
-  const statusPillEl = headerActions.createDiv({ cls: "lmsa-status-pill lmsa-ui-pill" });
-
   const historyBtn = headerActions.createEl("button", {
     cls: "lmsa-header-btn lmsa-ui-icon-btn",
     attr: { "aria-label": "Chat history" },
@@ -42,58 +57,32 @@ export function createChatLayout(contentEl: HTMLElement): ChatLayoutRefs {
 
   const composerFooter = composerPanel.createDiv({ cls: "lmsa-composer-footer" });
   const composerFooterMeta = composerFooter.createDiv({ cls: "lmsa-composer-footer-meta" });
-  const modelSelectorWrap = composerFooterMeta.createDiv({ cls: "lmsa-model-selector-wrap" });
-
-  const modelSelectorBtn = modelSelectorWrap.createEl("button", {
-    cls: "lmsa-model-selector-btn lmsa-ui-control-btn",
-  }) as HTMLButtonElement;
-  const iconSpan = modelSelectorBtn.createEl("span", { cls: "lmsa-model-selector-icon" });
-  setIcon(iconSpan, "cpu");
-  const modelSelectorLabelEl = modelSelectorBtn.createEl("span", {
-    cls: "lmsa-model-selector-label",
-  });
-  const modelSelectorStatusEl = modelSelectorBtn.createEl("span", {
-    cls: "lmsa-model-selector-status is-hidden",
-  });
-  const chevronSpan = modelSelectorBtn.createEl("span", { cls: "lmsa-model-selector-chevron" });
-  setIcon(chevronSpan, "chevron-up");
-
-  const modelDropdownEl = modelSelectorWrap.createDiv({ cls: "lmsa-model-dropdown" });
-  modelDropdownEl.style.display = "none";
 
   composerFooterMeta.createDiv({
     cls: "lmsa-compose-hint",
     text: "Enter to send, Shift+Enter for newline",
   });
 
-  const buttonRow = composerFooter.createDiv({ cls: "lmsa-btn-row" });
-  const stopBtn = buttonRow.createEl("button", {
-    cls: "lmsa-secondary-btn lmsa-stop-btn lmsa-ui-btn lmsa-ui-btn-secondary",
-    text: "Stop",
+  const actionBtn = composerFooter.createEl("button", {
+    cls: "lmsa-action-btn lmsa-ui-btn-primary",
   }) as HTMLButtonElement;
-  stopBtn.disabled = true;
-
-  const sendBtn = buttonRow.createEl("button", {
-    cls: "lmsa-send-btn lmsa-ui-btn lmsa-ui-btn-primary",
-    text: "Send",
-  }) as HTMLButtonElement;
+  setIcon(actionBtn, "arrow-up");
 
   return {
     rootEl: contentEl,
     messagesPaneEl,
-    headerMetaEl,
-    statusPillEl,
+    headerMetaEl: headerMetaLabel,
     historyBtn,
     messagesEl,
     emptyStateEl,
     commandBarEl,
     contextChipsEl,
     textareaEl,
-    sendBtn,
-    stopBtn,
-    modelSelectorBtn,
-    modelSelectorLabelEl,
+    actionBtn,
+    modelSelectorBtn: headerMetaBtn,
+    modelSelectorLabelEl: headerMetaLabel,
     modelSelectorStatusEl,
+    modelSelectorChevronEl: headerMetaChevron,
     modelDropdownEl,
   };
 }

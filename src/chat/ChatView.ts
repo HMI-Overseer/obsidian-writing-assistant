@@ -7,9 +7,13 @@ import { getActiveNoteText } from "../context/noteContext";
 import { ChatGenerationController } from "./ChatGenerationController";
 import { ChatConversationController } from "./ChatConversationController";
 import { sendMessage } from "./actions/sendMessage";
+import { branchConversation } from "./actions/branchConversation";
+import { regenerateMessage } from "./actions/regenerateMessage";
 import { ChatComposer } from "./composer/ChatComposer";
 import { ChatSessionStore } from "./conversation/ChatSessionStore";
+import type { BubbleActionCallbacks } from "./messages/ChatTranscript";
 import { ChatTranscript } from "./messages/ChatTranscript";
+import { InlineMessageEditor } from "./messages/InlineMessageEditor";
 import { ChatModelSelector } from "./models/ChatModelSelector";
 import type { ChatLayoutRefs } from "./types";
 import { ChatHistoryDrawer } from "./view/ChatHistoryDrawer";
@@ -29,6 +33,7 @@ export class ChatView extends ItemView {
   private historyDrawer: ChatHistoryDrawer | null = null;
   private generation!: ChatGenerationController;
   private conversation!: ChatConversationController;
+  private lastRenderedConversationId: string | null = null;
 
   constructor(leaf: WorkspaceLeaf, plugin: LMStudioWritingAssistant) {
     super(leaf);
@@ -146,12 +151,7 @@ export class ChatView extends ItemView {
     promptOverride?: string,
     autoInsertAfterResponse = false
   ): Promise<void> {
-    if (
-      !this.sessionStore ||
-      !this.transcript ||
-      !this.composer ||
-      !this.modelSelector
-    ) {
+    if (!this.sessionStore || !this.transcript || !this.composer || !this.modelSelector) {
       return;
     }
 
@@ -193,8 +193,15 @@ export class ChatView extends ItemView {
     if (!this.sessionStore || !this.transcript || !this.composer) return;
 
     const snapshot = this.sessionStore.getSnapshot();
+    const isConversationSwitch = snapshot.activeConversationId !== this.lastRenderedConversationId;
+    this.lastRenderedConversationId = snapshot.activeConversationId;
+
     this.composer.setDraft(snapshot.draft);
-    await this.transcript.renderMessages(snapshot.messageHistory);
+    await this.transcript.renderMessages(
+      snapshot.messageHistory,
+      this.createBubbleActionCallbacks(),
+      isConversationSwitch
+    );
     this.transcript.setEmptyStateVisible(
       snapshot.messageHistory.length === 0 && !this.generation.getIsGenerating()
     );
@@ -208,6 +215,96 @@ export class ChatView extends ItemView {
         snapshot.activeConversationId
       );
     }
+  }
+
+  private createBubbleActionCallbacks(): BubbleActionCallbacks {
+    return {
+      onCopy: (messageId) => this.handleCopyMessage(messageId),
+      onEdit: (messageId) => this.handleEditMessage(messageId),
+      onDelete: (messageId) => this.handleDeleteMessage(messageId),
+      onBranch: (messageId) => void this.handleBranchMessage(messageId),
+      onRegenerate: (messageId) => void this.handleRegenerateMessage(messageId),
+      onVersionChange: (messageId, newIndex) => void this.handleVersionChange(messageId, newIndex),
+    };
+  }
+
+  private handleCopyMessage(messageId: string): void {
+    const snapshot = this.sessionStore?.getSnapshot();
+    const message = snapshot?.messageHistory.find((m) => m.id === messageId);
+    if (!message) return;
+
+    void navigator.clipboard.writeText(message.content).then(() => {
+      new Notice("Copied to clipboard");
+    });
+  }
+
+  private handleEditMessage(messageId: string): void {
+    if (!this.sessionStore || !this.transcript) return;
+
+    const bubble = this.transcript.getBubbleForMessage(messageId);
+    const snapshot = this.sessionStore.getSnapshot();
+    const message = snapshot.messageHistory.find((m) => m.id === messageId);
+    if (!bubble || !message) return;
+
+    const editor = new InlineMessageEditor(bubble, message.content, {
+      onSave: async (newContent) => {
+        if (!this.sessionStore || !this.transcript) return;
+        this.sessionStore.updateMessageContent(messageId, newContent);
+        await this.sessionStore.persistActiveConversation();
+        await this.syncConversationUi();
+      },
+      onCancel: () => {},
+    });
+    editor.activate();
+  }
+
+  private async handleDeleteMessage(messageId: string): Promise<void> {
+    if (!this.sessionStore) return;
+
+    this.sessionStore.removeMessage(messageId);
+    await this.sessionStore.persistActiveConversation();
+    await this.syncConversationUi();
+  }
+
+  private async handleBranchMessage(messageId: string): Promise<void> {
+    if (!this.sessionStore) return;
+
+    this.generation.stopGeneration();
+    await branchConversation({
+      store: this.sessionStore,
+      messageId,
+      syncConversationUi: () => this.syncConversationUi(),
+      setStatus: (text, muted) => this.setStatus(text, muted),
+    });
+  }
+
+  private async handleRegenerateMessage(messageId: string): Promise<void> {
+    if (!this.sessionStore || !this.transcript || !this.composer || !this.modelSelector) {
+      return;
+    }
+
+    await regenerateMessage({
+      plugin: this.plugin,
+      store: this.sessionStore,
+      transcript: this.transcript,
+      composer: this.composer,
+      modelSelector: this.modelSelector,
+      messageId,
+      getIsGenerating: () => this.generation.getIsGenerating(),
+      setIsGenerating: (generating) => this.generation.setIsGenerating(generating),
+      setStatus: (text, muted) => this.setStatus(text, muted),
+      setActiveAbortController: (controller) =>
+        this.generation.setActiveAbortController(controller),
+      syncConversationUi: () => this.syncConversationUi(),
+    });
+  }
+
+  private async handleVersionChange(messageId: string, newIndex: number): Promise<void> {
+    if (!this.sessionStore) return;
+
+    this.sessionStore.switchMessageVersion(messageId, newIndex);
+    await this.sessionStore.persistActiveConversation();
+    await this.syncConversationUi();
   }
 
   private updateHeader(): void {

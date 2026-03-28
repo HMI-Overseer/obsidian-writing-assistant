@@ -1,14 +1,12 @@
+import { Notice } from "obsidian";
 import { LMStudioClient } from "../../api";
 import type LMStudioWritingAssistant from "../../main";
 import type { ChatComposer } from "../composer/ChatComposer";
 import type { ChatSessionStore } from "../conversation/ChatSessionStore";
 import type { ChatTranscript } from "../messages/ChatTranscript";
 import type { ChatModelSelector } from "../models/ChatModelSelector";
-import { makeMessage } from "../conversation/conversationUtils";
-import { validateSendRequest } from "./validateSendRequest";
 import { prepareApiMessages } from "./prepareApiMessages";
 import { StreamingRenderer } from "./StreamingRenderer";
-import { finalizeResponse, finalizeAbortedResponse } from "./finalizeResponse";
 
 function isAbortError(error: unknown): boolean {
   return error instanceof Error && error.name === "AbortError";
@@ -21,62 +19,64 @@ function getErrorMessage(error: unknown): string {
   return "Unknown error";
 }
 
-export type SendMessageOptions = {
+export type RegenerateOptions = {
   plugin: LMStudioWritingAssistant;
   store: ChatSessionStore;
   transcript: ChatTranscript;
   composer: ChatComposer;
   modelSelector: ChatModelSelector;
+  messageId: string;
   getIsGenerating: () => boolean;
-  setIsGenerating: (sending: boolean) => void;
+  setIsGenerating: (generating: boolean) => void;
   setStatus: (text: string, muted?: boolean) => void;
   setActiveAbortController: (controller: AbortController | null) => void;
   syncConversationUi: () => Promise<void>;
-  promptOverride?: string;
-  autoInsertAfterResponse?: boolean;
 };
 
-export async function sendMessage(options: SendMessageOptions): Promise<void> {
+export async function regenerateMessage(options: RegenerateOptions): Promise<void> {
   const {
     plugin,
     store,
     transcript,
     composer,
     modelSelector,
+    messageId,
     getIsGenerating,
     setIsGenerating,
     setStatus,
     setActiveAbortController,
     syncConversationUi,
-    promptOverride,
-    autoInsertAfterResponse = false,
   } = options;
 
-  const validated = await validateSendRequest(
-    store,
-    composer,
-    modelSelector,
-    getIsGenerating(),
-    promptOverride
-  );
-  if (!validated) return;
+  if (getIsGenerating()) return;
 
-  const { text, activeModel } = validated;
-
-  composer.clearDraft();
-  store.setDraft("");
-  setIsGenerating(true);
-  setStatus("Generating");
-
-  if (store.ensureConversationTitleFromFirstUserMessage(text)) {
-    await syncConversationUi();
+  const snapshot = store.getSnapshot();
+  const lastMessage = snapshot.messageHistory[snapshot.messageHistory.length - 1];
+  if (!lastMessage || lastMessage.id !== messageId || lastMessage.role !== "assistant") {
+    new Notice("Can only regenerate the last assistant response.");
+    return;
   }
 
-  const userMessage = makeMessage("user", text);
-  const userBubble = transcript.createBubble("user");
-  await transcript.renderBubbleContent(userBubble, text);
-  store.appendMessage(userMessage);
-  transcript.setEmptyStateVisible(false);
+  const activeModel = store.getResolvedConversationModel();
+  if (!activeModel?.modelId) {
+    new Notice("No model selected.");
+    return;
+  }
+
+  const availabilityState = await modelSelector.refreshAvailability();
+  if (availabilityState !== "loaded") {
+    modelSelector.retriggerAttention();
+    return;
+  }
+
+  const oldMessage = store.removeLastMessage();
+  if (!oldMessage) return;
+
+  setIsGenerating(true);
+  setStatus("Regenerating");
+
+  await store.persistActiveConversation();
+  await syncConversationUi();
 
   const apiMessages = await prepareApiMessages(
     plugin.app,
@@ -86,8 +86,6 @@ export async function sendMessage(options: SendMessageOptions): Promise<void> {
     composer.isSessionContextEnabled(),
     plugin.settings.maxContextChars
   );
-
-  await store.persistActiveConversation();
 
   const assistantBubble = transcript.createBubble("assistant");
   assistantBubble.bodyEl.addClass("is-streaming");
@@ -111,14 +109,12 @@ export async function sendMessage(options: SendMessageOptions): Promise<void> {
     await renderer.flush();
     assistantBubble.bodyEl.removeClass("is-streaming");
 
-    await finalizeResponse(
-      store,
-      transcript,
-      assistantBubble,
-      renderer,
-      autoInsertAfterResponse,
-      plugin
-    );
+    const fullResponse = renderer.getFullResponse();
+    if (fullResponse) {
+      store.finalizeRegeneration(oldMessage, fullResponse);
+    } else {
+      transcript.renderPlainTextContent(assistantBubble, "(no response)");
+    }
 
     setStatus("Ready", true);
   } catch (error) {
@@ -126,9 +122,16 @@ export async function sendMessage(options: SendMessageOptions): Promise<void> {
     assistantBubble.bodyEl.removeClass("is-streaming");
 
     if (isAbortError(error)) {
-      await finalizeAbortedResponse(store, transcript, assistantBubble, renderer);
+      const fullResponse = renderer.getFullResponse();
+      if (fullResponse) {
+        store.finalizeRegeneration(oldMessage, fullResponse);
+      } else {
+        transcript.renderPlainTextContent(assistantBubble, "Generation stopped.");
+        assistantBubble.bodyEl.addClass("is-muted");
+      }
       setStatus("Stopped", true);
     } else {
+      store.finalizeRegeneration(oldMessage, oldMessage.content);
       assistantBubble.bodyEl.addClass("is-error");
       transcript.renderPlainTextContent(
         assistantBubble,

@@ -1,5 +1,10 @@
 import { MAX_CONVERSATIONS } from "../../constants";
-import type { ChatHistory, Conversation, ConversationMessage } from "../../shared/types";
+import type {
+  ChatHistory,
+  Conversation,
+  ConversationMessage,
+  MessageVersion,
+} from "../../shared/types";
 import { generateId } from "../../utils";
 
 export function generateConversationTitle(firstUserMessage: string): string {
@@ -11,10 +16,7 @@ export function generateConversationTitle(firstUserMessage: string): string {
   return (lastSpace > 30 ? truncated.slice(0, lastSpace) : truncated) + "...";
 }
 
-export function makeMessage(
-  role: "user" | "assistant",
-  content: string
-): ConversationMessage {
+export function makeMessage(role: "user" | "assistant", content: string): ConversationMessage {
   return { id: generateId(), role, content };
 }
 
@@ -77,11 +79,33 @@ function normalizeConversation(raw: Record<string, unknown>): Conversation | nul
             typeof message.content === "string"
           );
         })
-        .map((message) => ({
-          id: typeof message.id === "string" && message.id ? message.id : generateId(),
-          role: message.role as "user" | "assistant",
-          content: message.content as string,
-        }))
+        .map((message) => {
+          const base: ConversationMessage = {
+            id: typeof message.id === "string" && message.id ? message.id : generateId(),
+            role: message.role as "user" | "assistant",
+            content: message.content as string,
+          };
+
+          if (Array.isArray(message.versions)) {
+            const validVersions = message.versions.filter(
+              (v): v is MessageVersion =>
+                !!v &&
+                typeof v === "object" &&
+                typeof (v as Record<string, unknown>).content === "string" &&
+                typeof (v as Record<string, unknown>).createdAt === "number"
+            );
+            if (validVersions.length > 0) {
+              base.versions = validVersions;
+              const rawIndex = message.activeVersionIndex;
+              base.activeVersionIndex =
+                typeof rawIndex === "number" && rawIndex >= 0 && rawIndex < validVersions.length
+                  ? rawIndex
+                  : validVersions.length - 1;
+            }
+          }
+
+          return base;
+        })
     : [];
 
   return { id, title, createdAt, updatedAt, modelId, modelName, messages, draft };
@@ -90,9 +114,7 @@ function normalizeConversation(raw: Record<string, unknown>): Conversation | nul
 export function pruneHistory(history: ChatHistory): boolean {
   if (history.conversations.length <= MAX_CONVERSATIONS) return false;
 
-  const sorted = [...history.conversations].sort(
-    (left, right) => left.updatedAt - right.updatedAt
-  );
+  const sorted = [...history.conversations].sort((left, right) => left.updatedAt - right.updatedAt);
   const toRemove = new Set<string>();
 
   for (const conversation of sorted) {
@@ -108,15 +130,24 @@ export function pruneHistory(history: ChatHistory): boolean {
   return toRemove.size > 0;
 }
 
+export function createBranchConversation(
+  source: Conversation,
+  messagesUpTo: ConversationMessage[],
+  branchMessageId: string
+): Conversation {
+  const branch = createConversation(source.modelId, source.modelName);
+  branch.title = `Branch of ${source.title || "Untitled"}`;
+  branch.messages = structuredClone(messagesUpTo);
+  branch.parentConversationId = source.id;
+  branch.branchFromMessageId = branchMessageId;
+  return branch;
+}
+
 export function formatRelativeDate(timestamp: number): string {
   const now = new Date();
   const date = new Date(timestamp);
 
-  const todayStart = new Date(
-    now.getFullYear(),
-    now.getMonth(),
-    now.getDate()
-  ).getTime();
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
   const yesterdayStart = todayStart - 86400000;
   const weekStart = todayStart - 6 * 86400000;
 

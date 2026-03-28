@@ -1,0 +1,46 @@
+@layer components {
+  .lmsa-bubble-toolbar {
+    @apply lmsa-flex lmsa-items-center lmsa-justify-end lmsa-gap-1;
+    margin-top: 8px;
+    opacity: 0;
+    transition: opacity 120ms ease;
+  }
+
+  .lmsa-message:hover .lmsa-bubble-toolbar {
+    opacity: 1;
+  }
+
+  .lmsa-message.is-editing .lmsa-bubble-toolbar {
+    display: none;
+  }
+
+  .lmsa-message-body.is-streaming .lmsa-bubble-toolbar {
+    display: none;
+  }
+
+  .lmsa-message-actions {
+    @apply lmsa-flex lmsa-items-center lmsa-gap-0.5;
+  }
+
+  .lmsa-action-btn {
+    @apply lmsa-inline-flex lmsa-h-6 lmsa-w-6 lmsa-cursor-pointer lmsa-items-center lmsa-justify-center lmsa-rounded-md lmsa-border-none lmsa-bg-transparent lmsa-p-0 lmsa-text-obsidian-muted;
+    transition: background 120ms ease, color 120ms ease;
+  }
+
+  .lmsa-action-btn:hover {
+    @apply lmsa-bg-[var(--background-modifier-hover)] lmsa-text-obsidian-text;
+  }
+
+  .lmsa-action-btn svg {
+    width: 14px;
+    height: 14px;
+  }
+
+  .lmsa-action-btn.is-confirmed {
+    color: var(--interactive-accent);
+  }
+
+  .lmsa-action-btn[data-action="delete"]:hover {
+    color: var(--text-error);
+  }
+}

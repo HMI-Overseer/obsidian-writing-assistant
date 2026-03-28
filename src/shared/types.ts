@@ -25,16 +25,24 @@ export interface CustomCommand {
   autoInsert: boolean;
 }
 
+export interface MessageVersion {
+  content: string;
+  createdAt: number;
+}
+
 /**
  * A single message in a conversation transcript.
- * The `id` field is intentionally included now so that future branching and
- * in-place bubble editing can reference a stable message identity without
- * requiring a schema migration.
+ * The `id` field provides a stable message identity for editing, branching,
+ * and version tracking.
  */
 export interface ConversationMessage {
   id: string;
   role: "user" | "assistant";
   content: string;
+  /** Only present on assistant messages that have been regenerated. Stores ALL versions chronologically. */
+  versions?: MessageVersion[];
+  /** Index into `versions` for the active version. Defaults to last when undefined. */
+  activeVersionIndex?: number;
 }
 
 /**

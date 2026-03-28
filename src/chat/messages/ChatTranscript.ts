@@ -1,15 +1,23 @@
 import { type App, Component, MarkdownRenderer, setIcon } from "obsidian";
 import type { ConversationMessage } from "../../shared/types";
-import type {
-  BubbleRefs,
-  BubbleRenderOptions,
-  ChatLayoutRefs,
-} from "../types";
+import type { BubbleRefs, BubbleRenderOptions, ChatLayoutRefs } from "../types";
+import { BubbleActionToolbar } from "./BubbleActionToolbar";
+import { BubbleVersionNav } from "./BubbleVersionNav";
+
+export type BubbleActionCallbacks = {
+  onCopy: (messageId: string) => void;
+  onEdit: (messageId: string) => void;
+  onDelete: (messageId: string) => void;
+  onBranch: (messageId: string) => void;
+  onRegenerate: (messageId: string) => void;
+  onVersionChange: (messageId: string, newIndex: number) => void;
+};
 
 const AUTO_SCROLL_BOTTOM_THRESHOLD_PX = 48;
 
 export class ChatTranscript {
   private bubbleRenderChildren = new Map<HTMLElement, Component>();
+  private bubblesByMessageId = new Map<string, BubbleRefs>();
   private shouldAutoScroll = true;
 
   constructor(
@@ -22,21 +30,42 @@ export class ChatTranscript {
     });
   }
 
-  async renderMessages(messages: ConversationMessage[]): Promise<void> {
+  async renderMessages(
+    messages: ConversationMessage[],
+    actionCallbacks?: BubbleActionCallbacks,
+    forceScroll = true
+  ): Promise<void> {
     this.clear();
 
-    for (const message of messages) {
-      const bubble = this.createBubble(message.role);
+    const lastAssistantIndex = this.findLastAssistantIndex(messages);
+
+    for (let i = 0; i < messages.length; i++) {
+      const message = messages[i];
+      const bubble = this.createBubble(message.role, message.id);
       await this.renderBubbleContent(bubble, message.content);
+      this.bubblesByMessageId.set(message.id, bubble);
+
+      if (actionCallbacks) {
+        const isLastAssistant = i === lastAssistantIndex;
+        this.attachBubbleActions(bubble, message, isLastAssistant, actionCallbacks);
+      }
     }
 
-    this.scrollToBottom(true);
+    this.scrollToBottom(forceScroll);
   }
 
-  createBubble(role: "user" | "assistant"): BubbleRefs {
+  getBubbleForMessage(messageId: string): BubbleRefs | null {
+    return this.bubblesByMessageId.get(messageId) ?? null;
+  }
+
+  createBubble(role: "user" | "assistant", messageId?: string): BubbleRefs {
     const rowEl = this.refs.messagesEl.createDiv({
       cls: `lmsa-message lmsa-message--${role}`,
     });
+    if (messageId) {
+      rowEl.dataset.messageId = messageId;
+    }
+
     const avatarEl = rowEl.createDiv({ cls: "lmsa-message-avatar" });
     setIcon(avatarEl, role === "user" ? "user-round" : "bot");
 
@@ -51,7 +80,7 @@ export class ChatTranscript {
     const contentEl = bodyEl.createDiv({ cls: "lmsa-message-content" });
 
     this.scrollToBottom();
-    return { role, rowEl, bodyEl, contentEl };
+    return { role, rowEl, chromeEl, bodyEl, contentEl };
   }
 
   setEmptyStateVisible(isVisible: boolean): void {
@@ -67,6 +96,7 @@ export class ChatTranscript {
 
   clear(): void {
     this.clearAllBubbleMarkdownRenders();
+    this.bubblesByMessageId.clear();
     this.refs.messagesEl.empty();
   }
 
@@ -134,8 +164,7 @@ export class ChatTranscript {
     text: string,
     options: BubbleRenderOptions = {}
   ): Promise<void> {
-    const renderVersion =
-      Number(bubble.contentEl.dataset.lmsaRenderVersion ?? "0") + 1;
+    const renderVersion = Number(bubble.contentEl.dataset.lmsaRenderVersion ?? "0") + 1;
     bubble.contentEl.dataset.lmsaRenderVersion = String(renderVersion);
 
     this.clearBubbleMarkdownRender(bubble.contentEl);
@@ -179,5 +208,30 @@ export class ChatTranscript {
       }
       this.owner.removeChild(renderChild);
     }
+  }
+
+  private findLastAssistantIndex(messages: ConversationMessage[]): number {
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (messages[i].role === "assistant") return i;
+    }
+    return -1;
+  }
+
+  private attachBubbleActions(
+    bubble: BubbleRefs,
+    message: ConversationMessage,
+    isLastAssistant: boolean,
+    callbacks: BubbleActionCallbacks
+  ): void {
+    const toolbarEl = bubble.bodyEl.createDiv({ cls: "lmsa-bubble-toolbar" });
+
+    if (message.role === "assistant" && message.versions && message.versions.length > 1) {
+      BubbleVersionNav.render(toolbarEl, message, callbacks.onVersionChange);
+    }
+
+    BubbleActionToolbar.render(toolbarEl, message, {
+      isLastAssistant,
+      callbacks,
+    });
   }
 }

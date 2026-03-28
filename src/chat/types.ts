@@ -11,6 +11,7 @@ export type BubbleRenderOptions = {
 export type BubbleRefs = {
   role: BubbleRole;
   rowEl: HTMLElement;
+  chromeEl: HTMLElement;
   bodyEl: HTMLElement;
   contentEl: HTMLElement;
 };

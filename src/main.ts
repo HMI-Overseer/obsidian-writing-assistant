@@ -8,10 +8,10 @@ import type {
   PluginSettings,
 } from "./shared/types";
 import { DEFAULT_CHAT_HISTORY, DEFAULT_SETTINGS, DEFAULT_SYSTEM_PROMPT, VIEW_TYPE_CHAT } from "./constants";
-import { normalizeLMStudioBaseUrl } from "./api/LMStudioClient";
+import { normalizeLMStudioBaseUrl } from "./api";
 import { ChatView } from "./chat";
 import { normalizeChatHistory } from "./chat/conversation/conversationUtils";
-import { LMStudioSettingTab } from "./settings";
+import { LMStudioSettingTab } from "./settings/SettingsTab";
 
 const DEFAULT_COMPLETION_TEMPERATURE = 0.7;
 const DEFAULT_COMPLETION_MAX_TOKENS = 2000;

@@ -53,6 +53,10 @@ export class ChatHistoryDrawer {
     this.render(conversations, activeId);
   }
 
+  destroy(): void {
+    /* Reserved for future cleanup. */
+  }
+
   private buildShell(): void {
     const header = this.drawerEl.createDiv({ cls: "lmsa-history-header" });
 

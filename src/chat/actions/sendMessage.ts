@@ -1,15 +1,14 @@
-import { Notice } from "obsidian";
 import { LMStudioClient } from "../../api";
-import { getActiveNoteContext } from "../../context/noteContext";
 import type LMStudioWritingAssistant from "../../main";
-import type { Message } from "../../shared/types";
 import type { ChatComposer } from "../composer/ChatComposer";
-import { makeMessage } from "../conversation/conversationUtils";
 import type { ChatSessionStore } from "../conversation/ChatSessionStore";
 import type { ChatTranscript } from "../messages/ChatTranscript";
 import type { ChatModelSelector } from "../models/ChatModelSelector";
-
-const STREAMING_MARKDOWN_RENDER_DEBOUNCE_MS = 80;
+import { makeMessage } from "../conversation/conversationUtils";
+import { validateSendRequest } from "./validateSendRequest";
+import { prepareApiMessages } from "./prepareApiMessages";
+import { StreamingRenderer } from "./StreamingRenderer";
+import { finalizeResponse, finalizeAbortedResponse } from "./finalizeResponse";
 
 function isAbortError(error: unknown): boolean {
   return error instanceof Error && error.name === "AbortError";
@@ -19,41 +18,10 @@ function getErrorMessage(error: unknown): string {
   if (error instanceof Error && error.message) {
     return error.message;
   }
-
   return "Unknown error";
 }
 
-async function insertLastResponse(
-  plugin: LMStudioWritingAssistant,
-  lastAssistantResponse: string
-): Promise<void> {
-  if (!lastAssistantResponse) return;
-
-  const editor = plugin.app.workspace.activeEditor?.editor;
-  if (editor) {
-    const selection = editor.getSelection();
-    if (selection) {
-      editor.replaceSelection(lastAssistantResponse);
-    } else {
-      const cursor = editor.getCursor("to");
-      editor.replaceRange(`\n\n${lastAssistantResponse}`, cursor);
-    }
-    new Notice("Response inserted into note.");
-    return;
-  }
-
-  const file = plugin.app.workspace.getActiveFile();
-  if (file) {
-    const content = await plugin.app.vault.read(file);
-    await plugin.app.vault.modify(file, `${content}\n\n${lastAssistantResponse}`);
-    new Notice("Response appended to note.");
-    return;
-  }
-
-  new Notice("No active note to insert into.");
-}
-
-type SendMessageOptions = {
+export type SendMessageOptions = {
   plugin: LMStudioWritingAssistant;
   store: ChatSessionStore;
   transcript: ChatTranscript;
@@ -84,24 +52,12 @@ export async function sendMessage(options: SendMessageOptions): Promise<void> {
     autoInsertAfterResponse = false,
   } = options;
 
-  if (getIsGenerating() || modelSelector.isCheckingStatus()) return;
+  const validated = await validateSendRequest(
+    store, composer, modelSelector, getIsGenerating(), promptOverride
+  );
+  if (!validated) return;
 
-  const text = (promptOverride ?? composer.getDraft()).trim();
-  if (!text) return;
-
-  const activeModel = store.getResolvedConversationModel();
-  if (!activeModel?.modelId) {
-    new Notice(
-      "No model selected. Choose a saved profile in the chat selector or add one in Settings."
-    );
-    return;
-  }
-
-  const availabilityState = await modelSelector.refreshAvailability();
-  if (availabilityState !== "loaded") {
-    modelSelector.retriggerAttention();
-    return;
-  }
+  const { text, activeModel } = validated;
 
   composer.clearDraft();
   store.setDraft("");
@@ -118,95 +74,20 @@ export async function sendMessage(options: SendMessageOptions): Promise<void> {
   store.appendMessage(userMessage);
   transcript.setEmptyStateVisible(false);
 
-  let systemContent = activeModel.systemPrompt;
-  if (
-    plugin.settings.includeNoteContext &&
-    composer.isSessionContextEnabled()
-  ) {
-    const context = await getActiveNoteContext(
-      plugin.app,
-      plugin.settings.maxContextChars
-    );
-    if (context) {
-      systemContent += context;
-    }
-  }
-
-  const apiMessages: Message[] = [
-    { role: "system", content: systemContent },
-    ...store.getSnapshot().messageHistory.map((message) => ({
-      role: message.role,
-      content: message.content,
-    })),
-  ];
+  const apiMessages = await prepareApiMessages(
+    plugin.app,
+    store,
+    activeModel,
+    plugin.settings.includeNoteContext,
+    composer.isSessionContextEnabled(),
+    plugin.settings.maxContextChars
+  );
 
   await store.persistActiveConversation();
 
   const assistantBubble = transcript.createBubble("assistant");
   assistantBubble.bodyEl.addClass("is-streaming");
-  let fullResponse = "";
-  let hasStreamRenderedMarkdown = false;
-  let lastRenderedStreamingText = "";
-  let queuedStreamingText = "";
-  let streamingRenderTimer: number | null = null;
-  let streamingRenderChain = Promise.resolve();
-
-  const queueStreamingMarkdownRender = (): void => {
-    queuedStreamingText = fullResponse;
-    if (streamingRenderTimer !== null) return;
-
-    streamingRenderTimer = window.setTimeout(() => {
-      streamingRenderTimer = null;
-      streamingRenderChain = streamingRenderChain
-        .then(async () => {
-          const textToRender = queuedStreamingText;
-          if (
-            !textToRender ||
-            textToRender === lastRenderedStreamingText ||
-            !assistantBubble.contentEl.isConnected
-          ) {
-            return;
-          }
-
-          await transcript.renderBubbleContent(assistantBubble, textToRender, {
-            preserveStreaming: true,
-          });
-          hasStreamRenderedMarkdown = true;
-          lastRenderedStreamingText = textToRender;
-          transcript.scrollToBottom();
-        })
-        .catch(() => undefined);
-    }, STREAMING_MARKDOWN_RENDER_DEBOUNCE_MS);
-  };
-
-  const flushStreamingMarkdownRender = async (): Promise<void> => {
-    if (streamingRenderTimer !== null) {
-      window.clearTimeout(streamingRenderTimer);
-      streamingRenderTimer = null;
-    }
-
-    streamingRenderChain = streamingRenderChain
-      .then(async () => {
-        const textToRender = queuedStreamingText;
-        if (
-          !textToRender ||
-          textToRender === lastRenderedStreamingText ||
-          !assistantBubble.contentEl.isConnected
-        ) {
-          return;
-        }
-
-        await transcript.renderBubbleContent(assistantBubble, textToRender, {
-          preserveStreaming: true,
-        });
-        hasStreamRenderedMarkdown = true;
-        lastRenderedStreamingText = textToRender;
-        transcript.scrollToBottom();
-      })
-      .catch(() => undefined);
-
-    await streamingRenderChain;
-  };
+  const renderer = new StreamingRenderer(assistantBubble, transcript);
 
   const client = new LMStudioClient(
     plugin.settings.lmStudioUrl,
@@ -223,56 +104,23 @@ export async function sendMessage(options: SendMessageOptions): Promise<void> {
       activeModel.temperature,
       abortController.signal
     )) {
-      fullResponse += delta;
-      if (!hasStreamRenderedMarkdown) {
-        transcript.renderPlainTextContent(assistantBubble, fullResponse);
-      }
-      queueStreamingMarkdownRender();
-      transcript.scrollToBottom();
+      renderer.appendDelta(delta);
     }
 
-    await flushStreamingMarkdownRender();
+    await renderer.flush();
     assistantBubble.bodyEl.removeClass("is-streaming");
 
-    if (fullResponse) {
-      const assistantMessage = makeMessage("assistant", fullResponse);
-      store.appendMessage(assistantMessage);
-      store.setLastAssistantResponse(fullResponse);
-      if (
-        !hasStreamRenderedMarkdown ||
-        lastRenderedStreamingText !== fullResponse
-      ) {
-        await transcript.renderBubbleContent(assistantBubble, fullResponse);
-      }
-
-      if (autoInsertAfterResponse) {
-        await insertLastResponse(plugin, fullResponse);
-      }
-    } else {
-      transcript.renderPlainTextContent(assistantBubble, "(no response)");
-    }
+    await finalizeResponse(
+      store, transcript, assistantBubble, renderer, autoInsertAfterResponse, plugin
+    );
 
     setStatus("Ready", true);
   } catch (error) {
-    await flushStreamingMarkdownRender();
+    await renderer.flush();
     assistantBubble.bodyEl.removeClass("is-streaming");
 
     if (isAbortError(error)) {
-      if (fullResponse) {
-        const assistantMessage = makeMessage("assistant", fullResponse);
-        store.appendMessage(assistantMessage);
-        store.setLastAssistantResponse(fullResponse);
-        if (
-          !hasStreamRenderedMarkdown ||
-          lastRenderedStreamingText !== fullResponse
-        ) {
-          await transcript.renderBubbleContent(assistantBubble, fullResponse);
-        }
-      } else {
-        transcript.renderPlainTextContent(assistantBubble, "Generation stopped.");
-        assistantBubble.bodyEl.addClass("is-muted");
-      }
-
+      await finalizeAbortedResponse(store, transcript, assistantBubble, renderer);
       setStatus("Stopped", true);
     } else {
       assistantBubble.bodyEl.addClass("is-error");
@@ -287,5 +135,6 @@ export async function sendMessage(options: SendMessageOptions): Promise<void> {
     await store.persistActiveConversation();
     setIsGenerating(false);
     transcript.scrollToBottom();
+    renderer.destroy();
   }
 }

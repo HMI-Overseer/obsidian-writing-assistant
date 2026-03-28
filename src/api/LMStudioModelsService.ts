@@ -1,11 +1,11 @@
 ﻿import { LMStudioClient } from "./LMStudioClient";
-import type { LMStudioModelListSource } from "./LMStudioClient";
 import type {
   LMStudioModel,
   LMStudioModelDigest,
   LMStudioModelKind,
+  LMStudioModelListSource,
   LMStudioQuantization,
-} from "../shared/types";
+} from "./types";
 
 export interface LMStudioDiscoveredModels {
   models: LMStudioModel[];

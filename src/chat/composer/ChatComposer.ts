@@ -135,6 +135,10 @@ export class ChatComposer {
     }
   }
 
+  destroy(): void {
+    /* Reserved for future cleanup. */
+  }
+
   private autoResizeTextarea(): void {
     this.refs.textareaEl.style.height = "auto";
     this.refs.textareaEl.style.height = `${this.refs.textareaEl.scrollHeight}px`;

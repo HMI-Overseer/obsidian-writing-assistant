@@ -1,5 +1,5 @@
 import { Setting } from "obsidian";
-import { normalizeLMStudioBaseUrl } from "../api/LMStudioClient";
+import { normalizeLMStudioBaseUrl } from "../api";
 import type LMStudioWritingAssistant from "../main";
 import { createSettingsSection } from "./ui";
 

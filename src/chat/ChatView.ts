@@ -2,8 +2,10 @@ import type { WorkspaceLeaf } from "obsidian";
 import { ItemView, Notice } from "obsidian";
 import type { CustomCommand } from "../shared/types";
 import type LMStudioWritingAssistant from "../main";
-import { MAX_CONVERSATIONS, VIEW_TYPE_CHAT } from "../constants";
+import { VIEW_TYPE_CHAT } from "../constants";
 import { getActiveNoteText } from "../context/noteContext";
+import { ChatGenerationController } from "./ChatGenerationController";
+import { ChatConversationController } from "./ChatConversationController";
 import { sendMessage } from "./actions/sendMessage";
 import { ChatComposer } from "./composer/ChatComposer";
 import { ChatSessionStore } from "./conversation/ChatSessionStore";
@@ -20,13 +22,13 @@ export class ChatView extends ItemView {
   plugin: LMStudioWritingAssistant;
 
   private layout: ChatLayoutRefs | null = null;
-  private historyDrawer: ChatHistoryDrawer | null = null;
   private sessionStore: ChatSessionStore | null = null;
   private transcript: ChatTranscript | null = null;
   private composer: ChatComposer | null = null;
   private modelSelector: ChatModelSelector | null = null;
-  private activeAbortController: AbortController | null = null;
-  private isGenerating = false;
+  private historyDrawer: ChatHistoryDrawer | null = null;
+  private generation!: ChatGenerationController;
+  private conversation!: ChatConversationController;
 
   constructor(leaf: WorkspaceLeaf, plugin: LMStudioWritingAssistant) {
     super(leaf);
@@ -49,6 +51,21 @@ export class ChatView extends ItemView {
     this.layout = createChatLayout(this.contentEl);
     this.sessionStore = new ChatSessionStore(this.plugin);
     this.transcript = new ChatTranscript(this, this.app, this.layout);
+
+    this.generation = new ChatGenerationController(
+      () => this.composer,
+      () => this.sessionStore,
+      () => this.transcript
+    );
+
+    this.conversation = new ChatConversationController({
+      getStore: () => this.sessionStore,
+      getDrawer: () => this.historyDrawer,
+      getGeneration: () => this.generation,
+      syncConversationUi: () => this.syncConversationUi(),
+      setStatus: (text, muted) => this.setStatus(text, muted),
+    });
+
     this.composer = new ChatComposer(this.app, this.plugin, this.layout, {
       onDraftChange: (draft) => {
         this.sessionStore?.setDraft(draft);
@@ -58,7 +75,7 @@ export class ChatView extends ItemView {
         void this.requestSend();
       },
       onStopRequest: () => {
-        this.stopGeneration();
+        this.generation.stopGeneration();
       },
       onRunCommand: (command) => {
         void this.runCommand(command);
@@ -71,7 +88,6 @@ export class ChatView extends ItemView {
       getModels: () => this.plugin.settings.completionModels,
       onSelectModel: async (model) => {
         if (!this.sessionStore) return;
-
         await this.sessionStore.setActiveConversationModel(model);
         await this.syncConversationUi();
         void this.modelSelector?.refreshAvailability();
@@ -79,21 +95,15 @@ export class ChatView extends ItemView {
     });
 
     this.historyDrawer = new ChatHistoryDrawer(this.layout.messagesPaneEl, {
-      onSelect: (id) => {
-        void this.switchConversation(id);
-      },
-      onNew: () => {
-        void this.startNewConversation();
-      },
-      onDelete: (id) => {
-        void this.deleteConversation(id);
-      },
+      onSelect: (id) => void this.conversation.switchConversation(id),
+      onNew: () => void this.conversation.startNewConversation(),
+      onDelete: (id) => void this.conversation.deleteConversation(id),
       onClose: () => this.historyDrawer?.close(),
     });
 
     this.layout.historyBtn.addEventListener("click", (event) => {
       event.stopPropagation();
-      this.toggleHistoryDrawer();
+      this.conversation.toggleHistoryDrawer();
     });
 
     this.registerDomEvent(document, "click", () => {
@@ -120,7 +130,7 @@ export class ChatView extends ItemView {
 
   async onClose(): Promise<void> {
     this.sessionStore?.clearDraftSaveTimer();
-    this.stopGeneration();
+    this.generation.stopGeneration();
     await this.sessionStore?.persistActiveConversation();
     this.transcript?.destroy();
     this.modelSelector?.destroy();
@@ -151,24 +161,12 @@ export class ChatView extends ItemView {
       transcript: this.transcript,
       composer: this.composer,
       modelSelector: this.modelSelector,
-      getIsGenerating: () => this.isGenerating,
-      setIsGenerating: (sending) => {
-        this.isGenerating = sending;
-        this.composer?.setSendingState(sending);
-        const snapshot = this.sessionStore?.getSnapshot();
-        this.transcript?.setEmptyStateVisible(
-          Boolean(snapshot && snapshot.messageHistory.length === 0 && !sending)
-        );
-      },
-      setStatus: (text, muted) => {
-        this.setStatus(text, muted);
-      },
-      setActiveAbortController: (controller) => {
-        this.activeAbortController = controller;
-      },
-      syncConversationUi: async () => {
-        await this.syncConversationUi();
-      },
+      getIsGenerating: () => this.generation.getIsGenerating(),
+      setIsGenerating: (sending) => this.generation.setIsGenerating(sending),
+      setStatus: (text, muted) => this.setStatus(text, muted),
+      setActiveAbortController: (controller) =>
+        this.generation.setActiveAbortController(controller),
+      syncConversationUi: () => this.syncConversationUi(),
       promptOverride,
       autoInsertAfterResponse,
     });
@@ -191,95 +189,6 @@ export class ChatView extends ItemView {
     await this.requestSend(prompt, command.autoInsert);
   }
 
-  private stopGeneration(): void {
-    if (!this.activeAbortController) return;
-
-    this.activeAbortController.abort();
-    this.activeAbortController = null;
-  }
-
-  private async startNewConversation(): Promise<void> {
-    if (!this.sessionStore) return;
-
-    const conversations = this.sessionStore.getConversations();
-    if (conversations.length >= MAX_CONVERSATIONS) {
-      const oldestConversation = [...conversations]
-        .filter(
-          (conversation) =>
-            conversation.id !== this.sessionStore?.getActiveConversationId()
-        )
-        .sort((left, right) => left.updatedAt - right.updatedAt)[0];
-
-      if (oldestConversation) {
-        const oldestTitle = oldestConversation.title || "Untitled conversation";
-        new Notice(
-          `History is full (${MAX_CONVERSATIONS}/${MAX_CONVERSATIONS}). Starting a new conversation will remove "${oldestTitle}".`,
-          6000
-        );
-      }
-    }
-
-    if (this.isGenerating) {
-      this.stopGeneration();
-    }
-
-    await this.sessionStore.persistActiveConversation();
-    await this.sessionStore.newConversation();
-    await this.syncConversationUi();
-    this.setStatus("Ready", true);
-    this.historyDrawer?.close();
-  }
-
-  private async switchConversation(id: string): Promise<void> {
-    if (!this.sessionStore) return;
-
-    if (id === this.sessionStore.getActiveConversationId()) {
-      this.historyDrawer?.close();
-      return;
-    }
-
-    if (this.isGenerating) {
-      this.stopGeneration();
-    }
-
-    await this.sessionStore.persistActiveConversation();
-    const didSwitch = await this.sessionStore.switchToConversation(id);
-    if (!didSwitch) return;
-
-    await this.syncConversationUi();
-    this.setStatus("Ready", true);
-    this.historyDrawer?.close();
-  }
-
-  private async deleteConversation(id: string): Promise<void> {
-    if (!this.sessionStore) return;
-
-    await this.sessionStore.deleteConversation(id);
-    await this.syncConversationUi();
-    this.setStatus("Ready", true);
-
-    if (this.historyDrawer?.isOpen()) {
-      this.historyDrawer.open(
-        this.sessionStore.getConversations(),
-        this.sessionStore.getActiveConversationId()
-      );
-    }
-  }
-
-  private toggleHistoryDrawer(): void {
-    if (!this.historyDrawer || !this.sessionStore) return;
-
-    if (this.historyDrawer.isOpen()) {
-      this.historyDrawer.close();
-      return;
-    }
-
-    this.historyDrawer.open(
-      this.sessionStore.getConversations(),
-      this.sessionStore.getActiveConversationId()
-    );
-  }
-
   private async syncConversationUi(): Promise<void> {
     if (!this.sessionStore || !this.transcript || !this.composer) return;
 
@@ -287,7 +196,7 @@ export class ChatView extends ItemView {
     this.composer.setDraft(snapshot.draft);
     await this.transcript.renderMessages(snapshot.messageHistory);
     this.transcript.setEmptyStateVisible(
-      snapshot.messageHistory.length === 0 && !this.isGenerating
+      snapshot.messageHistory.length === 0 && !this.generation.getIsGenerating()
     );
     this.updateHeader();
     this.composer.updateContextChips();

@@ -28,6 +28,7 @@ Thumbs.db
 # AI slop
 .claude/
 AGENTS.md
+CLAUDE.md
 
 # Obsidian
 data.json

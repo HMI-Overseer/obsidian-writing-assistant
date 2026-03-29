@@ -6,8 +6,11 @@ import { renderCommandsTab } from "./CommandsTab";
 import { renderCompletionModelsTab } from "./CompletionModelsTab";
 import { renderEmbeddingModelsTab } from "./EmbeddingModelsTab";
 import { renderGeneralTab } from "./GeneralTab";
+import { renderBenchmarkTab } from "./BenchmarkTab";
 
-const TABS = ["General", "Completion Models", "Embedding Models", "Commands", "Advanced"] as const;
+const MAIN_TABS = ["General", "Completion Models", "Embedding Models", "Commands", "Advanced"] as const;
+const BENCH_TABS = ["Benchmark"] as const;
+const TABS = [...MAIN_TABS, ...BENCH_TABS] as const;
 
 type TabName = (typeof TABS)[number];
 
@@ -36,6 +39,10 @@ const TAB_META: Record<TabName, TabMeta> = {
   "Advanced": {
     title: "Advanced Controls",
     description: "Fine tune context sizing and a few maintenance utilities for local-first workflows.",
+  },
+  "Benchmark": {
+    title: "Edit Outcome Benchmark",
+    description: "Test whether models correctly interpret edit outcome annotations using real LM Studio completions.",
   },
 };
 
@@ -70,8 +77,24 @@ export class LMStudioSettingTab extends PluginSettingTab {
     });
 
     const nav = topbar.createDiv({ cls: "lmsa-settings-nav" });
-    for (const tab of TABS) {
+    for (const tab of MAIN_TABS) {
       const button = nav.createEl("button", {
+        cls: "lmsa-settings-tab-btn",
+        attr: { type: "button" },
+      });
+      button.createEl("span", { cls: "lmsa-settings-tab-label", text: tab });
+      if (tab === this.activeTab) {
+        button.addClass("is-active");
+      }
+      button.addEventListener("click", () => {
+        this.activeTab = tab;
+        this.display();
+      });
+    }
+
+    const benchNav = topbar.createDiv({ cls: "lmsa-settings-nav lmsa-settings-nav--bench" });
+    for (const tab of BENCH_TABS) {
+      const button = benchNav.createEl("button", {
         cls: "lmsa-settings-tab-btn",
         attr: { type: "button" },
       });
@@ -116,6 +139,9 @@ export class LMStudioSettingTab extends PluginSettingTab {
         break;
       case "Advanced":
         renderAdvancedTab(content, this.plugin);
+        break;
+      case "Benchmark":
+        renderBenchmarkTab(content, this.plugin, refresh);
         break;
     }
   }

@@ -35,4 +35,5 @@ under the weight of centuries. Birds nested in the
 The old castle stood on the hill, its walls weathered
 under the weight of centuries. Birds nested in the
 REPLACE>>>
+- When reviewing previous edits in this conversation, blocks marked [ACCEPTED] were applied to the document, while [REJECTED] blocks were not. The current document content reflects all accepted changes.
 `;

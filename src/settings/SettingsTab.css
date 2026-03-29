@@ -8,7 +8,7 @@
   }
 
   .lmsa-settings-topbar {
-    @apply lmsa-relative lmsa-flex lmsa-flex-col lmsa-items-stretch lmsa-justify-start lmsa-gap-5 lmsa-overflow-hidden lmsa-px-5 lmsa-py-[18px];
+    @apply lmsa-relative lmsa-flex lmsa-flex-col lmsa-items-stretch lmsa-justify-start lmsa-gap-1 lmsa-overflow-hidden lmsa-px-5 lmsa-py-[4px];
     background:
       radial-gradient(circle at top left, color-mix(in srgb, var(--interactive-accent) 14%, transparent), transparent 44%),
       linear-gradient(180deg, color-mix(in srgb, var(--background-primary) 94%, transparent), color-mix(in srgb, var(--background-secondary) 88%, transparent));
@@ -80,6 +80,12 @@
   .lmsa-settings-tab-label {
     @apply lmsa-font-semibold lmsa-whitespace-nowrap;
     font-size: 0.95rem;
+  }
+
+  .lmsa-settings-nav--bench {
+    @apply lmsa-pt-0;
+    border-top: 1px solid color-mix(in srgb, var(--background-modifier-border) 50%, transparent);
+    padding-top: 8px;
   }
 
   .lmsa-settings-stage {

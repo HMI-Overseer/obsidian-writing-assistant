@@ -90,10 +90,12 @@ export class ChatView extends ItemView {
       onRunCommand: (command) => {
         void this.runCommand(command);
       },
-      onModeChange: () => {
-        /* Mode state lives in the composer; no extra wiring needed. */
+      onModeChange: (mode) => {
+        this.layout!.rootEl.dataset.mode = mode;
       },
     });
+
+    this.layout!.rootEl.dataset.mode = "conversation";
 
     this.modelSelector = new ChatModelSelector(this.plugin, this.layout, {
       getActiveModel: () => this.sessionStore?.getResolvedConversationModel() ?? null,

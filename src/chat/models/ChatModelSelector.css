@@ -63,7 +63,7 @@
   }
 
   .lmsa-model-dropdown-item.is-active {
-    color: var(--interactive-accent);
+    color: var(--lmsa-mode-accent);
   }
 
   .lmsa-model-dropdown-item.is-active:hover {
@@ -80,7 +80,7 @@
   }
 
   .lmsa-model-dropdown-item.is-active .lmsa-model-dropdown-check {
-    color: var(--interactive-accent);
+    color: var(--lmsa-mode-accent);
   }
 
   .lmsa-model-dropdown-check svg {

@@ -10,7 +10,7 @@
 
 /* Status-based left border accent */
 .lmsa-diff-hunk[data-status="accepted"] {
-  border-color: var(--interactive-accent);
+  border-color: var(--lmsa-mode-accent);
 }
 
 .lmsa-diff-hunk[data-status="rejected"] {
@@ -115,15 +115,15 @@
 
 .lmsa-btn-group-item.is-active {
   background: var(--background-primary);
-  color: var(--interactive-accent);
-  border-color: var(--interactive-accent);
+  color: var(--lmsa-mode-accent);
+  border-color: var(--lmsa-mode-accent);
   z-index: 2;
 }
 
 .lmsa-btn-group-item--accept.is-active {
-  background: color-mix(in srgb, var(--interactive-accent) 18%, var(--background-primary));
-  border-color: var(--interactive-accent);
-  color: var(--interactive-accent);
+  background: color-mix(in srgb, var(--lmsa-mode-accent) 18%, var(--background-primary));
+  border-color: var(--lmsa-mode-accent);
+  color: var(--lmsa-mode-accent);
 }
 
 .lmsa-btn-group-item--reject.is-active {

@@ -23,7 +23,7 @@
 
   .lmsa-chip-icon {
     @apply lmsa-inline-flex lmsa-flex-none lmsa-items-center;
-    color: var(--interactive-accent);
+    color: var(--lmsa-mode-accent);
   }
 
   .lmsa-chip-icon svg {
@@ -41,8 +41,8 @@
   }
 
   .lmsa-chip--edit {
-    border-color: var(--interactive-accent);
-    background: color-mix(in srgb, var(--interactive-accent) 8%, var(--background-primary));
+    border-color: var(--lmsa-mode-accent);
+    background: color-mix(in srgb, var(--lmsa-mode-accent) 8%, var(--background-primary));
   }
 
 }

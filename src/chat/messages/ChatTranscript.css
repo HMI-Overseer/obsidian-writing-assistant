@@ -13,12 +13,13 @@
   }
 
   .lmsa-message--assistant .lmsa-message-avatar {
-    color: var(--interactive-accent);
-    background: color-mix(in srgb, var(--interactive-accent) 12%, var(--background-secondary));
+    color: var(--lmsa-mode-accent);
+    background: color-mix(in srgb, var(--lmsa-mode-accent) 12%, var(--background-secondary));
   }
 
   .lmsa-message--user .lmsa-message-avatar {
-    @apply lmsa-order-2 lmsa-border-transparent lmsa-bg-obsidian-accent lmsa-text-white;
+    @apply lmsa-order-2 lmsa-border-transparent lmsa-text-white;
+    background: linear-gradient(135deg, var(--color-blue, #4a90d9), var(--interactive-accent) 50%, var(--color-orange, #e8a84b));
     color: var(--text-on-accent);
   }
 
@@ -44,15 +45,63 @@
   }
 
   .lmsa-message-body {
-    @apply lmsa-w-full lmsa-px-[15px] lmsa-py-[14px];
+    @apply lmsa-relative lmsa-w-full lmsa-px-[15px] lmsa-py-[14px];
     user-select: text;
     -webkit-user-select: text;
     cursor: text;
+    transition: border-color 200ms ease, box-shadow 200ms ease;
+  }
+
+  .lmsa-message-body:hover {
+    border-color: var(--lmsa-chat-border-emphasis);
+    box-shadow:
+      0 10px 30px rgba(0, 0, 0, 0.04),
+      0 0 0 1px var(--lmsa-chat-glow-ring);
+  }
+
+  /* Glow aura — uses ::before since ::after is reserved for streaming dot */
+  .lmsa-message-body::before {
+    content: "";
+    @apply lmsa-pointer-events-none lmsa-absolute;
+    inset: -2px;
+    border-radius: inherit;
+    background: linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--lmsa-chat-accent) 12%, transparent),
+      transparent 60%,
+      color-mix(in srgb, var(--lmsa-chat-accent) 8%, transparent)
+    );
+    z-index: -1;
+    filter: blur(20px);
+    opacity: 0;
+    transition: opacity 300ms ease;
+  }
+
+  .lmsa-message-body:hover::before {
+    opacity: 0.85;
   }
 
   .lmsa-message--user .lmsa-message-body {
-    background: color-mix(in srgb, var(--interactive-accent) 15%, var(--background-primary));
-    border-color: color-mix(in srgb, var(--interactive-accent) 35%, var(--background-modifier-border));
+    background: color-mix(in srgb, var(--lmsa-mode-accent) 15%, var(--background-primary));
+    border-color: color-mix(in srgb, var(--lmsa-mode-accent) 35%, var(--background-modifier-border));
+  }
+
+  .lmsa-message--user .lmsa-message-body:hover {
+    border-color: color-mix(in srgb, var(--lmsa-mode-accent) 50%, var(--background-modifier-border));
+    box-shadow:
+      0 10px 30px rgba(0, 0, 0, 0.04),
+      0 0 0 1px var(--lmsa-chat-glow-ring);
+  }
+
+  .lmsa-message-body.is-error:hover {
+    border-color: color-mix(in srgb, var(--text-error) 50%, var(--background-modifier-border));
+    box-shadow:
+      0 10px 30px rgba(0, 0, 0, 0.04),
+      0 0 0 1px color-mix(in srgb, var(--text-error) 22%, transparent);
+  }
+
+  .lmsa-message-body.is-error::before {
+    display: none;
   }
 
   .lmsa-message-body.is-streaming {
@@ -66,7 +115,7 @@
     height: 8px;
     margin-left: 8px;
     border-radius: 999px;
-    background: var(--interactive-accent);
+    background: var(--lmsa-mode-accent);
     animation: lmsa-pulse 0.9s ease-in-out infinite;
   }
 

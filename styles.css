@@ -216,10 +216,26 @@
     overflow: hidden;
     height: 100%;
     font-size: var(--font-ui-small);
+
+    /* Mode accent — overridden per data-mode */
+    --lmsa-mode-accent: var(--interactive-accent);
+
+    /* Chat hover tokens — derived from mode accent */
+    --lmsa-chat-accent: var(--lmsa-mode-accent);
+    --lmsa-chat-border-emphasis: color-mix(in srgb, var(--lmsa-mode-accent) 30%, var(--background-modifier-border));
+    --lmsa-chat-glow-ring: color-mix(in srgb, var(--lmsa-mode-accent) 22%, transparent);
+
     background:
-      radial-gradient(circle at top, color-mix(in srgb, var(--interactive-accent) 9%, transparent), transparent 42%),
+      radial-gradient(circle at top, color-mix(in srgb, var(--lmsa-mode-accent) 9%, transparent), transparent 42%),
       linear-gradient(180deg, var(--background-primary), var(--background-secondary-alt, var(--background-secondary)) 120%);
+    transition: background 400ms ease;
 }
+.lmsa-root[data-mode="plan"] {
+    --lmsa-mode-accent: var(--color-blue, #4a90d9);
+  }
+.lmsa-root[data-mode="edit"] {
+    --lmsa-mode-accent: var(--color-orange, #e8a84b);
+  }
 .lmsa-shell {
     margin-left: auto;
     margin-right: auto;
@@ -305,13 +321,31 @@
     gap: 0.625rem;
 }
 .lmsa-header-actions .lmsa-ui-icon-btn {
-    height: 2.5rem;
-    width: 2.5rem;
-    border-radius: 12px;
+    height: auto;
+    width: auto;
+    border-radius: 0.375rem;
+    border-style: none;
+    background-color: transparent;
+    padding: 0.375rem;
+    box-shadow: none;
+    outline: none;
+    -webkit-appearance: none;
+       -moz-appearance: none;
+            appearance: none;
+    min-height: unset;
+    transition: background 120ms ease, color 120ms ease;
 }
+.lmsa-header-actions .lmsa-ui-icon-btn:hover {
+    background-color: var(--background-modifier-hover);
+    color: var(--text-normal);
+    box-shadow: none;
+}
+.lmsa-header-actions .lmsa-ui-icon-btn:focus-visible {
+    box-shadow: 0 0 0 2px var(--lmsa-mode-accent);
+  }
 .lmsa-header-btn svg {
-    width: 22px;
-    height: 22px;
+    width: 20px;
+    height: 20px;
   }
 .lmsa-messages-pane {
     position: relative;
@@ -397,7 +431,15 @@
     box-shadow:
       0 18px 48px rgba(0, 0, 0, 0.12),
       inset 0 1px 0 rgba(255, 255, 255, 0.06);
+    transition: border-color 200ms ease, box-shadow 200ms ease;
 }
+.lmsa-composer-panel:hover {
+    border-color: var(--lmsa-chat-border-emphasis);
+    box-shadow:
+      0 18px 48px rgba(0, 0, 0, 0.12),
+      inset 0 1px 0 rgba(255, 255, 255, 0.06),
+      0 0 0 1px var(--lmsa-chat-glow-ring);
+  }
 .lmsa-composer-panel::before {
     content: "";
     pointer-events: none;
@@ -406,14 +448,41 @@
     right: 1rem;
     top: 0px;
     height: 1px;
-    background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--interactive-accent) 55%, white), transparent);
+    background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--lmsa-mode-accent) 55%, white), transparent);
     opacity: 0.8;
+    transition: opacity 200ms ease;
+  }
+.lmsa-composer-panel:hover::before,
+  .lmsa-composer-panel:focus-within::before {
+    opacity: 1;
+  }
+/* Glow aura — uses ::after since ::before is the shimmer line */
+.lmsa-composer-panel::after {
+    content: "";
+    pointer-events: none;
+    position: absolute;
+    inset: -2px;
+    border-radius: inherit;
+    background: linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--lmsa-chat-accent) 12%, transparent),
+      transparent 60%,
+      color-mix(in srgb, var(--lmsa-chat-accent) 8%, transparent)
+    );
+    z-index: -1;
+    filter: blur(20px);
+    opacity: 0;
+    transition: opacity 300ms ease;
+  }
+.lmsa-composer-panel:hover::after,
+  .lmsa-composer-panel:focus-within::after {
+    opacity: 0.85;
   }
 .lmsa-composer-panel:focus-within {
-    border-color: color-mix(in srgb, var(--interactive-accent) 45%, var(--background-modifier-border));
+    border-color: color-mix(in srgb, var(--lmsa-mode-accent) 45%, var(--background-modifier-border));
     box-shadow:
       0 24px 60px rgba(0, 0, 0, 0.14),
-      0 0 0 1px color-mix(in srgb, var(--interactive-accent) 24%, transparent),
+      0 0 0 1px color-mix(in srgb, var(--lmsa-mode-accent) 24%, transparent),
       inset 0 1px 0 rgba(255, 255, 255, 0.08);
   }
 .lmsa-textarea {
@@ -515,12 +584,12 @@
 .lmsa-mode-toggle-btn.is-active {
     background: var(--background-modifier-hover);
     color: var(--text-normal);
-    border-color: color-mix(in srgb, var(--interactive-accent) 40%, var(--background-modifier-border));
+    border-color: color-mix(in srgb, var(--lmsa-mode-accent) 40%, var(--background-modifier-border));
     z-index: 1;
   }
 .lmsa-mode-toggle-btn:focus-visible {
     outline: none;
-    box-shadow: 0 0 0 3px color-mix(in srgb, var(--interactive-accent) 20%, transparent);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--lmsa-mode-accent) 20%, transparent);
     z-index: 2;
   }
 .lmsa-action-btn {
@@ -574,7 +643,7 @@
     border-color: var(--background-modifier-border);
     inset: 12px 12px 10px;
     background:
-      radial-gradient(circle at top left, color-mix(in srgb, var(--interactive-accent) 12%, transparent), transparent 42%),
+      radial-gradient(circle at top left, color-mix(in srgb, var(--lmsa-mode-accent) 12%, transparent), transparent 42%),
       linear-gradient(180deg, color-mix(in srgb, var(--background-primary) 95%, transparent), color-mix(in srgb, var(--background-secondary) 92%, transparent));
     backdrop-filter: blur(22px);
     -webkit-backdrop-filter: blur(22px);
@@ -590,7 +659,7 @@
     right: 2rem;
     top: 0px;
     height: 1px;
-    background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--interactive-accent) 55%, white), transparent);
+    background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--lmsa-mode-accent) 55%, white), transparent);
     opacity: 0.9;
   }
 .lmsa-history-drawer.is-open {
@@ -652,7 +721,7 @@
     color: var(--text-muted);
     font-size: var(--font-ui-small);
     background: color-mix(in srgb, var(--background-secondary) 55%, transparent);
-    border: 1px dashed color-mix(in srgb, var(--interactive-accent) 24%, var(--background-modifier-border));
+    border: 1px dashed color-mix(in srgb, var(--lmsa-mode-accent) 24%, var(--background-modifier-border));
 }
 .lmsa-history-item {
     cursor: default;
@@ -670,12 +739,12 @@
       inset 0 1px 0 rgba(255, 255, 255, 0.04);
   }
 .lmsa-history-item.is-active {
-    border-color: color-mix(in srgb, var(--interactive-accent) 34%, var(--background-modifier-border));
+    border-color: color-mix(in srgb, var(--lmsa-mode-accent) 34%, var(--background-modifier-border));
     background:
-      linear-gradient(135deg, color-mix(in srgb, var(--interactive-accent) 16%, var(--background-secondary)), color-mix(in srgb, var(--interactive-accent) 8%, var(--background-primary)));
+      linear-gradient(135deg, color-mix(in srgb, var(--lmsa-mode-accent) 16%, var(--background-secondary)), color-mix(in srgb, var(--lmsa-mode-accent) 8%, var(--background-primary)));
     box-shadow:
       0 14px 30px rgba(0, 0, 0, 0.14),
-      0 0 0 1px color-mix(in srgb, var(--interactive-accent) 16%, transparent);
+      0 0 0 1px color-mix(in srgb, var(--lmsa-mode-accent) 16%, transparent);
   }
 .lmsa-history-item-body {
     display: flex;
@@ -694,7 +763,7 @@
     font-size: var(--font-ui-small);
 }
 .lmsa-history-item.is-active .lmsa-history-item-title {
-    color: var(--interactive-accent);
+    color: var(--lmsa-mode-accent);
   }
 .lmsa-history-item-meta {
     overflow: hidden;
@@ -747,15 +816,15 @@
     color: var(--text-muted);
 }
 .lmsa-message--assistant .lmsa-message-avatar {
-    color: var(--interactive-accent);
-    background: color-mix(in srgb, var(--interactive-accent) 12%, var(--background-secondary));
+    color: var(--lmsa-mode-accent);
+    background: color-mix(in srgb, var(--lmsa-mode-accent) 12%, var(--background-secondary));
   }
 .lmsa-message--user .lmsa-message-avatar {
     order: 2;
     border-color: transparent;
-    background-color: var(--interactive-accent);
     --tw-text-opacity: 1;
     color: rgb(255 255 255 / var(--tw-text-opacity, 1));
+    background: linear-gradient(135deg, var(--color-blue, #4a90d9), var(--interactive-accent) 50%, var(--color-orange, #e8a84b));
     color: var(--text-on-accent);
 }
 .lmsa-message-column {
@@ -785,6 +854,7 @@
     font-size: var(--font-ui-smaller);
 }
 .lmsa-message-body {
+    position: relative;
     width: 100%;
     padding-left: 15px;
     padding-right: 15px;
@@ -794,10 +864,53 @@
          user-select: text;
     -webkit-user-select: text;
     cursor: text;
+    transition: border-color 200ms ease, box-shadow 200ms ease;
 }
+.lmsa-message-body:hover {
+    border-color: var(--lmsa-chat-border-emphasis);
+    box-shadow:
+      0 10px 30px rgba(0, 0, 0, 0.04),
+      0 0 0 1px var(--lmsa-chat-glow-ring);
+  }
+/* Glow aura — uses ::before since ::after is reserved for streaming dot */
+.lmsa-message-body::before {
+    content: "";
+    pointer-events: none;
+    position: absolute;
+    inset: -2px;
+    border-radius: inherit;
+    background: linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--lmsa-chat-accent) 12%, transparent),
+      transparent 60%,
+      color-mix(in srgb, var(--lmsa-chat-accent) 8%, transparent)
+    );
+    z-index: -1;
+    filter: blur(20px);
+    opacity: 0;
+    transition: opacity 300ms ease;
+  }
+.lmsa-message-body:hover::before {
+    opacity: 0.85;
+  }
 .lmsa-message--user .lmsa-message-body {
-    background: color-mix(in srgb, var(--interactive-accent) 15%, var(--background-primary));
-    border-color: color-mix(in srgb, var(--interactive-accent) 35%, var(--background-modifier-border));
+    background: color-mix(in srgb, var(--lmsa-mode-accent) 15%, var(--background-primary));
+    border-color: color-mix(in srgb, var(--lmsa-mode-accent) 35%, var(--background-modifier-border));
+  }
+.lmsa-message--user .lmsa-message-body:hover {
+    border-color: color-mix(in srgb, var(--lmsa-mode-accent) 50%, var(--background-modifier-border));
+    box-shadow:
+      0 10px 30px rgba(0, 0, 0, 0.04),
+      0 0 0 1px var(--lmsa-chat-glow-ring);
+  }
+.lmsa-message-body.is-error:hover {
+    border-color: color-mix(in srgb, var(--text-error) 50%, var(--background-modifier-border));
+    box-shadow:
+      0 10px 30px rgba(0, 0, 0, 0.04),
+      0 0 0 1px color-mix(in srgb, var(--text-error) 22%, transparent);
+  }
+.lmsa-message-body.is-error::before {
+    display: none;
   }
 .lmsa-message-body.is-streaming {
     position: relative;
@@ -809,7 +922,7 @@
     height: 8px;
     margin-left: 8px;
     border-radius: 999px;
-    background: var(--interactive-accent);
+    background: var(--lmsa-mode-accent);
     animation: lmsa-pulse 0.9s ease-in-out infinite;
   }
 .lmsa-message-body.is-error {
@@ -888,7 +1001,7 @@
     padding-right: 35px;
     padding-top: 5px;
 }
-.lmsa-action-btn {
+.lmsa-message-actions .lmsa-action-btn {
     display: inline-flex;
     height: 1.5rem;
     width: 1.5rem;
@@ -900,20 +1013,33 @@
     background-color: transparent;
     padding: 0px;
     color: var(--text-muted);
+    /* Override Obsidian default button chrome */
+    box-shadow: none;
+    outline: none;
+    -webkit-appearance: none;
+       -moz-appearance: none;
+            appearance: none;
+    min-height: unset;
+    font: inherit;
+    line-height: 1;
     transition: background 120ms ease, color 120ms ease;
 }
-.lmsa-action-btn:hover {
+.lmsa-message-actions .lmsa-action-btn:hover {
     background-color: var(--background-modifier-hover);
     color: var(--text-normal);
+    box-shadow: none;
 }
-.lmsa-action-btn svg {
+.lmsa-message-actions .lmsa-action-btn:focus-visible {
+    box-shadow: 0 0 0 2px var(--lmsa-mode-accent);
+  }
+.lmsa-message-actions .lmsa-action-btn svg {
     width: 14px;
     height: 14px;
   }
-.lmsa-action-btn.is-confirmed {
-    color: var(--interactive-accent);
+.lmsa-message-actions .lmsa-action-btn.is-confirmed {
+    color: var(--lmsa-mode-accent);
   }
-.lmsa-action-btn[data-action="delete"]:hover {
+.lmsa-message-actions .lmsa-action-btn[data-action="delete"]:hover {
     color: var(--text-error);
   }
 .lmsa-version-nav {
@@ -959,8 +1085,8 @@
 }
 .lmsa-message.is-editing .lmsa-message-body {
     border-style: dashed;
-    border-color: color-mix(in srgb, var(--interactive-accent) 50%, var(--background-modifier-border));
-    background: color-mix(in srgb, var(--interactive-accent) 6%, var(--background-primary));
+    border-color: color-mix(in srgb, var(--lmsa-mode-accent) 50%, var(--background-modifier-border));
+    background: color-mix(in srgb, var(--lmsa-mode-accent) 6%, var(--background-primary));
   }
 .lmsa-inline-editor {
     display: flex;
@@ -986,7 +1112,7 @@
     transition: border-color 120ms ease;
 }
 .lmsa-inline-editor-textarea:focus {
-    border-color: var(--interactive-accent);
+    border-color: var(--lmsa-mode-accent);
   }
 .lmsa-inline-editor-actions {
     display: flex;
@@ -1074,7 +1200,7 @@
     color: var(--text-normal);
   }
 .lmsa-model-dropdown-item.is-active {
-    color: var(--interactive-accent);
+    color: var(--lmsa-mode-accent);
   }
 .lmsa-model-dropdown-item.is-active:hover {
     background: color-mix(in srgb, var(--background-modifier-hover) 60%, transparent);
@@ -1095,7 +1221,7 @@
     color: transparent;
 }
 .lmsa-model-dropdown-item.is-active .lmsa-model-dropdown-check {
-    color: var(--interactive-accent);
+    color: var(--lmsa-mode-accent);
   }
 .lmsa-model-dropdown-check svg {
     width: 13px;
@@ -1175,7 +1301,7 @@
     display: inline-flex;
     flex: none;
     align-items: center;
-    color: var(--interactive-accent);
+    color: var(--lmsa-mode-accent);
 }
 .lmsa-chip-icon svg {
     width: 11px;
@@ -1193,8 +1319,8 @@
     height: 10px;
   }
 .lmsa-chip--edit {
-    border-color: var(--interactive-accent);
-    background: color-mix(in srgb, var(--interactive-accent) 8%, var(--background-primary));
+    border-color: var(--lmsa-mode-accent);
+    background: color-mix(in srgb, var(--lmsa-mode-accent) 8%, var(--background-primary));
   }
 .lmsa-settings-root {
     padding-bottom: 2rem;
@@ -2220,9 +2346,6 @@
 .lmsa-hidden {
     display: none;
 }
-.lmsa-h-10 {
-    height: 2.5rem;
-}
 .lmsa-h-4 {
     height: 1rem;
 }
@@ -2237,6 +2360,9 @@
 }
 .lmsa-h-\[34px\] {
     height: 34px;
+}
+.lmsa-h-auto {
+    height: auto;
 }
 .lmsa-h-full {
     height: 100%;
@@ -2253,9 +2379,6 @@
 .lmsa-min-h-\[22px\] {
     min-height: 22px;
 }
-.lmsa-w-10 {
-    width: 2.5rem;
-}
 .lmsa-w-4 {
     width: 1rem;
 }
@@ -2270,6 +2393,9 @@
 }
 .lmsa-w-\[34px\] {
     width: 34px;
+}
+.lmsa-w-auto {
+    width: auto;
 }
 .lmsa-w-full {
     width: 100%;
@@ -2427,9 +2553,6 @@
 .lmsa-rounded-\[10px\] {
     border-radius: 10px;
 }
-.lmsa-rounded-\[12px\] {
-    border-radius: 12px;
-}
 .lmsa-rounded-\[16px\] {
     border-radius: 16px;
 }
@@ -2486,6 +2609,9 @@
 }
 .lmsa-p-0 {
     padding: 0px;
+}
+.lmsa-p-1 {
+    padding: 0.25rem;
 }
 .lmsa-p-2 {
     padding: 0.5rem;
@@ -2779,7 +2905,7 @@
 }
 /* Status-based left border accent */
 .lmsa-diff-hunk[data-status="accepted"] {
-  border-color: var(--interactive-accent);
+  border-color: var(--lmsa-mode-accent);
 }
 .lmsa-diff-hunk[data-status="rejected"] {
   border-color: var(--text-error);
@@ -2886,14 +3012,14 @@
 }
 .lmsa-btn-group-item.is-active {
   background: var(--background-primary);
-  color: var(--interactive-accent);
-  border-color: var(--interactive-accent);
+  color: var(--lmsa-mode-accent);
+  border-color: var(--lmsa-mode-accent);
   z-index: 2;
 }
 .lmsa-btn-group-item--accept.is-active {
-  background: color-mix(in srgb, var(--interactive-accent) 18%, var(--background-primary));
-  border-color: var(--interactive-accent);
-  color: var(--interactive-accent);
+  background: color-mix(in srgb, var(--lmsa-mode-accent) 18%, var(--background-primary));
+  border-color: var(--lmsa-mode-accent);
+  color: var(--lmsa-mode-accent);
 }
 .lmsa-btn-group-item--reject.is-active {
   background: color-mix(in srgb, var(--text-error) 15%, var(--background-primary));

@@ -3,7 +3,7 @@
     @apply lmsa-absolute lmsa-z-10 lmsa-hidden lmsa-flex-col lmsa-overflow-hidden lmsa-rounded-[24px] lmsa-border lmsa-border-obsidian-border;
     inset: 12px 12px 10px;
     background:
-      radial-gradient(circle at top left, color-mix(in srgb, var(--interactive-accent) 12%, transparent), transparent 42%),
+      radial-gradient(circle at top left, color-mix(in srgb, var(--lmsa-mode-accent) 12%, transparent), transparent 42%),
       linear-gradient(180deg, color-mix(in srgb, var(--background-primary) 95%, transparent), color-mix(in srgb, var(--background-secondary) 92%, transparent));
     backdrop-filter: blur(22px);
     -webkit-backdrop-filter: blur(22px);
@@ -15,7 +15,7 @@
   .lmsa-history-drawer::before {
     content: "";
     @apply lmsa-pointer-events-none lmsa-absolute lmsa-inset-x-8 lmsa-top-0 lmsa-h-px;
-    background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--interactive-accent) 55%, white), transparent);
+    background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--lmsa-mode-accent) 55%, white), transparent);
     opacity: 0.9;
   }
 
@@ -54,7 +54,7 @@
     @apply lmsa-mx-2 lmsa-my-4 lmsa-rounded-[20px] lmsa-px-5 lmsa-py-10 lmsa-text-center lmsa-text-obsidian-muted;
     font-size: var(--font-ui-small);
     background: color-mix(in srgb, var(--background-secondary) 55%, transparent);
-    border: 1px dashed color-mix(in srgb, var(--interactive-accent) 24%, var(--background-modifier-border));
+    border: 1px dashed color-mix(in srgb, var(--lmsa-mode-accent) 24%, var(--background-modifier-border));
   }
 
   .lmsa-history-item {
@@ -71,12 +71,12 @@
   }
 
   .lmsa-history-item.is-active {
-    border-color: color-mix(in srgb, var(--interactive-accent) 34%, var(--background-modifier-border));
+    border-color: color-mix(in srgb, var(--lmsa-mode-accent) 34%, var(--background-modifier-border));
     background:
-      linear-gradient(135deg, color-mix(in srgb, var(--interactive-accent) 16%, var(--background-secondary)), color-mix(in srgb, var(--interactive-accent) 8%, var(--background-primary)));
+      linear-gradient(135deg, color-mix(in srgb, var(--lmsa-mode-accent) 16%, var(--background-secondary)), color-mix(in srgb, var(--lmsa-mode-accent) 8%, var(--background-primary)));
     box-shadow:
       0 14px 30px rgba(0, 0, 0, 0.14),
-      0 0 0 1px color-mix(in srgb, var(--interactive-accent) 16%, transparent);
+      0 0 0 1px color-mix(in srgb, var(--lmsa-mode-accent) 16%, transparent);
   }
 
   .lmsa-history-item-body {
@@ -89,7 +89,7 @@
   }
 
   .lmsa-history-item.is-active .lmsa-history-item-title {
-    color: var(--interactive-accent);
+    color: var(--lmsa-mode-accent);
   }
 
   .lmsa-history-item-meta {

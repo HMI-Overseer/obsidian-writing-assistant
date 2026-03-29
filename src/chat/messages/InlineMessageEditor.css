@@ -1,8 +1,8 @@
 @layer components {
   .lmsa-message.is-editing .lmsa-message-body {
     border-style: dashed;
-    border-color: color-mix(in srgb, var(--interactive-accent) 50%, var(--background-modifier-border));
-    background: color-mix(in srgb, var(--interactive-accent) 6%, var(--background-primary));
+    border-color: color-mix(in srgb, var(--lmsa-mode-accent) 50%, var(--background-modifier-border));
+    background: color-mix(in srgb, var(--lmsa-mode-accent) 6%, var(--background-primary));
   }
 
   .lmsa-inline-editor {
@@ -24,7 +24,7 @@
   }
 
   .lmsa-inline-editor-textarea:focus {
-    border-color: var(--interactive-accent);
+    border-color: var(--lmsa-mode-accent);
   }
 
   .lmsa-inline-editor-actions {

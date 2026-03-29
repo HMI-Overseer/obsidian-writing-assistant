@@ -7,14 +7,11 @@ import type {
   EmbeddingModel,
   PluginSettings,
 } from "./shared/types";
-import { DEFAULT_CHAT_HISTORY, DEFAULT_SETTINGS, DEFAULT_SYSTEM_PROMPT, VIEW_TYPE_CHAT } from "./constants";
+import { DEFAULT_CHAT_HISTORY, DEFAULT_SETTINGS, VIEW_TYPE_CHAT } from "./constants";
 import { normalizeLMStudioBaseUrl } from "./api";
 import { ChatView } from "./chat";
 import { normalizeChatHistory } from "./chat/conversation/conversationUtils";
 import { LMStudioSettingTab } from "./settings/SettingsTab";
-
-const DEFAULT_COMPLETION_TEMPERATURE = 0.7;
-const DEFAULT_COMPLETION_MAX_TOKENS = 2000;
 
 function normalizeCompletionModel(
   model: Partial<CompletionModel> | null | undefined,
@@ -24,11 +21,6 @@ function normalizeCompletionModel(
     id: model?.id || `model-${index + 1}`,
     name: model?.name || `Model ${index + 1}`,
     modelId: model?.modelId ?? "",
-    systemPrompt: model?.systemPrompt ?? DEFAULT_SYSTEM_PROMPT,
-    temperature:
-      typeof model?.temperature === "number" ? model.temperature : DEFAULT_COMPLETION_TEMPERATURE,
-    maxTokens:
-      typeof model?.maxTokens === "number" ? model.maxTokens : DEFAULT_COMPLETION_MAX_TOKENS,
   };
 }
 
@@ -40,19 +32,19 @@ export default class LMStudioWritingAssistant extends Plugin {
 
     this.registerView(VIEW_TYPE_CHAT, (leaf: WorkspaceLeaf) => new ChatView(leaf, this));
 
-    this.addRibbonIcon("message-square", "LM Studio Chat", () => {
+    this.addRibbonIcon("message-square", "Writing Assistant Chat", () => {
       this.activateChatView();
     });
 
     this.addCommand({
       id: "open-lm-studio-chat",
-      name: "Open LM Studio Chat",
+      name: "Open Writing Assistant Chat",
       callback: () => this.activateChatView(),
     });
 
     this.addCommand({
       id: "send-selection-to-chat",
-      name: "Send selection to LM Studio Chat",
+      name: "Send selection to Writing Assistant Chat",
       editorCallback: (editor) => {
         const selection = editor.getSelection();
         if (!selection) {
@@ -143,6 +135,38 @@ export default class LMStudioWritingAssistant extends Plugin {
       embeddingModels,
       commands,
       chatHistory,
+      globalSystemPrompt:
+        typeof data?.globalSystemPrompt === "string"
+          ? data.globalSystemPrompt
+          : DEFAULT_SETTINGS.globalSystemPrompt,
+      globalTemperature:
+        typeof data?.globalTemperature === "number"
+          ? data.globalTemperature
+          : DEFAULT_SETTINGS.globalTemperature,
+      globalMaxTokens:
+        typeof data?.globalMaxTokens === "number" || data?.globalMaxTokens === null
+          ? data.globalMaxTokens
+          : DEFAULT_SETTINGS.globalMaxTokens,
+      globalTopP:
+        typeof data?.globalTopP === "number" || data?.globalTopP === null
+          ? data.globalTopP
+          : DEFAULT_SETTINGS.globalTopP,
+      globalTopK:
+        typeof data?.globalTopK === "number" || data?.globalTopK === null
+          ? data.globalTopK
+          : DEFAULT_SETTINGS.globalTopK,
+      globalMinP:
+        typeof data?.globalMinP === "number" || data?.globalMinP === null
+          ? data.globalMinP
+          : DEFAULT_SETTINGS.globalMinP,
+      globalRepeatPenalty:
+        typeof data?.globalRepeatPenalty === "number" || data?.globalRepeatPenalty === null
+          ? data.globalRepeatPenalty
+          : DEFAULT_SETTINGS.globalRepeatPenalty,
+      globalReasoning:
+        typeof data?.globalReasoning === "string" || data?.globalReasoning === null
+          ? data.globalReasoning
+          : DEFAULT_SETTINGS.globalReasoning,
       diffContextLines:
         typeof data?.diffContextLines === "number"
           ? data.diffContextLines

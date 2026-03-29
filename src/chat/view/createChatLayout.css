@@ -1,6 +1,6 @@
 @layer components {
   .lmsa-root {
-    @apply lmsa-overflow-hidden;
+    @apply lmsa-relative lmsa-overflow-hidden;
     height: 100%;
     font-size: var(--font-ui-small);
 

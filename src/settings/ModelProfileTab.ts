@@ -1,6 +1,6 @@
 import type { App } from "obsidian";
-import { Notice } from "obsidian";
-import { LMStudioModelsService } from "../api";
+import { Notice, Setting } from "obsidian";
+import { LMStudioModelsService, normalizeLMStudioBaseUrl } from "../api";
 import type { LMStudioModelCandidateResult } from "../api/LMStudioModelsService";
 import type LMStudioWritingAssistant from "../main";
 import type { LMStudioModelDigest } from "../api/types";
@@ -8,13 +8,15 @@ import { createSettingsSection } from "./ui";
 
 type BaseModel = { id: string; name: string; modelId: string };
 
+export type ProviderOption = "lmstudio" | "openai" | "anthropic";
+
 export type ModelProfileTabConfig<T extends BaseModel> = {
   kind: string;
   profileNoun: string;
   sectionDescription: string;
   sectionIcon?: string;
-  discoverySectionDescription: string;
-  discoverySectionIcon?: string;
+  addSectionDescription: string;
+  addSectionIcon?: string;
   emptyProfilesText: string;
   emptyDiscoveryText: string;
   noModelsFoundText: string;
@@ -35,6 +37,12 @@ export type ModelProfileTabConfig<T extends BaseModel> = {
   ) => Promise<LMStudioModelCandidateResult>;
 };
 
+const PROVIDER_LABELS: Record<ProviderOption, string> = {
+  lmstudio: "LM Studio",
+  openai: "OpenAI",
+  anthropic: "Anthropic",
+};
+
 export function renderModelProfileTab<T extends BaseModel>(
   container: HTMLElement,
   plugin: LMStudioWritingAssistant,
@@ -42,13 +50,12 @@ export function renderModelProfileTab<T extends BaseModel>(
   config: ModelProfileTabConfig<T>
 ): void {
   const { settings } = plugin;
-  const modelsService = new LMStudioModelsService(settings.lmStudioUrl, settings.bypassCors);
 
-  // ── Saved Profiles section ──────────────────────────────────────────
+  // ── Profiles section ─────────────────────────────────────────────────
 
   const library = createSettingsSection(
     container,
-    "Saved Profiles",
+    "Profiles",
     config.sectionDescription,
     config.sectionIcon ? { icon: config.sectionIcon } : undefined
   );
@@ -112,10 +119,38 @@ export function renderModelProfileTab<T extends BaseModel>(
 
   renderList();
 
-  library.footerEl
+  // ── Add Profile section ──────────────────────────────────────────────
+
+  const addSection = createSettingsSection(
+    container,
+    "Add Profile",
+    config.addSectionDescription,
+    config.addSectionIcon ? { icon: config.addSectionIcon } : undefined
+  );
+
+  // Provider selector row
+  const providerRow = addSection.bodyEl.createDiv({ cls: "lmsa-provider-selector-row" });
+  providerRow.createEl("label", {
+    cls: "lmsa-provider-selector-label",
+    text: "Provider",
+  });
+
+  const providerSelect = providerRow.createEl("select", {
+    cls: "lmsa-provider-selector-select",
+  }) as HTMLSelectElement;
+
+  for (const [value, label] of Object.entries(PROVIDER_LABELS)) {
+    providerSelect.createEl("option", { text: label, attr: { value } });
+  }
+
+  // Provider content area — changes based on selected provider
+  const providerContentEl = addSection.bodyEl.createDiv({ cls: "lmsa-provider-content" });
+
+  // Add manually button (always visible in footer)
+  addSection.footerEl
     .createEl("button", {
       cls: "lmsa-btn-add lmsa-ui-btn lmsa-ui-btn-primary",
-      text: "Add profile",
+      text: "Add manually",
     })
     .addEventListener("click", () => {
       config.openModal(plugin.app, plugin, null, async (model) => {
@@ -127,21 +162,51 @@ export function renderModelProfileTab<T extends BaseModel>(
       });
     });
 
-  // ── Discover from LM Studio section ─────────────────────────────────
+  // ── LM Studio provider content ────────────────────────────────────────
 
-  const discovery = createSettingsSection(
-    container,
-    "Discover from LM Studio",
-    config.discoverySectionDescription,
-    config.discoverySectionIcon ? { icon: config.discoverySectionIcon } : undefined
-  );
+  let modelsService = new LMStudioModelsService(settings.lmStudioUrl, settings.bypassCors);
 
-  const refetchButton = discovery.headerActionsEl.createEl("button", {
+  const discoveryEl = providerContentEl.createDiv({ cls: "lmsa-discovery-container" });
+
+  // Connection settings (LM Studio URL + Bypass CORS)
+  const connectionEl = discoveryEl.createDiv({ cls: "lmsa-provider-connection" });
+
+  new Setting(connectionEl)
+    .setName("LM Studio URL")
+    .setDesc(
+      "Base URL for the LM Studio server. The plugin resolves the right endpoint automatically."
+    )
+    .addText((text) =>
+      text
+        .setPlaceholder("http://localhost:1234")
+        .setValue(settings.lmStudioUrl)
+        .onChange(async (value) => {
+          settings.lmStudioUrl = normalizeLMStudioBaseUrl(value);
+          await plugin.saveSettings();
+          modelsService = new LMStudioModelsService(settings.lmStudioUrl, settings.bypassCors);
+        })
+    );
+
+  new Setting(connectionEl)
+    .setName("Bypass CORS via Node.js")
+    .setDesc(
+      "Use Electron's Node.js HTTP stack instead of the browser fetch API. Avoids needing CORS enabled in LM Studio."
+    )
+    .addToggle((toggle) =>
+      toggle.setValue(settings.bypassCors).onChange(async (value) => {
+        settings.bypassCors = value;
+        await plugin.saveSettings();
+        modelsService = new LMStudioModelsService(settings.lmStudioUrl, settings.bypassCors);
+      })
+    );
+
+  const discoveryHeaderEl = discoveryEl.createDiv({ cls: "lmsa-discovery-header" });
+  const refetchButton = discoveryHeaderEl.createEl("button", {
     cls: "lmsa-ui-btn lmsa-ui-btn-primary",
     text: "Refresh models",
   });
 
-  const statusCard = discovery.bodyEl.createDiv({
+  const statusCard = discoveryEl.createDiv({
     cls: "lmsa-connection-status lmsa-settings-discovery-status is-idle",
   });
   const statusSummary = statusCard.createDiv({ cls: "lmsa-connection-status-summary" });
@@ -158,10 +223,17 @@ export function renderModelProfileTab<T extends BaseModel>(
     text: "Saved profiles keep working even when LM Studio is offline.",
   });
 
-  const liveModelsListEl = discovery.bodyEl.createDiv({ cls: "lmsa-item-list" });
+  const liveModelsListEl = discoveryEl.createDiv({ cls: "lmsa-item-list" });
   liveModelsListEl.createEl("p", {
     cls: "lmsa-empty-state",
     text: config.emptyDiscoveryText,
+  });
+
+  // Placeholder for non-LM-Studio providers
+  const placeholderEl = providerContentEl.createDiv({ cls: "lmsa-provider-placeholder" });
+  placeholderEl.createEl("p", {
+    cls: "lmsa-empty-state",
+    text: "Support for this provider is coming soon.",
   });
 
   const setStatus = (
@@ -292,4 +364,20 @@ export function renderModelProfileTab<T extends BaseModel>(
   refetchButton.addEventListener("click", () => {
     void loadLiveModels();
   });
+
+  // ── Provider switching ───────────────────────────────────────────────
+
+  const syncProviderContent = () => {
+    const selected = providerSelect.value as ProviderOption;
+    if (selected === "lmstudio") {
+      discoveryEl.style.display = "";
+      placeholderEl.style.display = "none";
+    } else {
+      discoveryEl.style.display = "none";
+      placeholderEl.style.display = "";
+    }
+  };
+
+  providerSelect.addEventListener("change", syncProviderContent);
+  syncProviderContent();
 }

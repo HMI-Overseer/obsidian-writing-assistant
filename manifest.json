@@ -1,9 +1,9 @@
 {
-  "id": "lm-studio-writing-assistant",
-  "name": "LM Studio Writing Assistant",
+  "id": "obsidian-writing-assistant",
+  "name": "Obsidian Writing Assistant",
   "version": "1.0.0",
   "minAppVersion": "1.0.0",
-  "description": "A chat interface that connects to a local LM Studio instance to assist with writing.",
+  "description": "A chat interface that connects to a local AI instance to assist with writing.",
   "author": "HMI-Overseer",
   "authorUrl": "https://github.com/HMI-Overseer",
   "isDesktopOnly": true

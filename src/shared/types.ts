@@ -9,9 +9,6 @@ export interface CompletionModel {
   id: string;
   name: string;
   modelId: string;
-  systemPrompt: string;
-  temperature: number;
-  maxTokens: number;
 }
 
 export interface EmbeddingModel {
@@ -80,6 +77,19 @@ export interface ChatHistory {
   activeConversationId: string | null;
 }
 
+export type ReasoningLevel = "off" | "low" | "medium" | "high" | "on";
+
+/** Sampling parameters sent to the LM Studio API. */
+export interface SamplingParams {
+  temperature: number;
+  maxTokens: number | null;
+  topP: number | null;
+  topK: number | null;
+  minP: number | null;
+  repeatPenalty: number | null;
+  reasoning: ReasoningLevel | null;
+}
+
 export interface PluginSettings {
   lmStudioUrl: string;
   bypassCors: boolean;
@@ -89,6 +99,22 @@ export interface PluginSettings {
   embeddingModels: EmbeddingModel[];
   commands: CustomCommand[];
   chatHistory: ChatHistory;
+  /** Global system prompt sent before each chat request. */
+  globalSystemPrompt: string;
+  /** Global temperature for chat completions (0–1). */
+  globalTemperature: number;
+  /** Maximum tokens to generate (null = model default). */
+  globalMaxTokens: number | null;
+  /** Top-p / nucleus sampling (null = model default). */
+  globalTopP: number | null;
+  /** Top-k sampling (null = model default). */
+  globalTopK: number | null;
+  /** Min-p sampling threshold (null = model default). */
+  globalMinP: number | null;
+  /** Repeat penalty (null = model default). */
+  globalRepeatPenalty: number | null;
+  /** Reasoning level (null = model default). */
+  globalReasoning: ReasoningLevel | null;
   /** Number of context lines shown above/below each diff hunk. */
   diffContextLines: number;
   /** Minimum fuzzy match confidence (0–1) to consider a match valid. */

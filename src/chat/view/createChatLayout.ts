@@ -15,7 +15,7 @@ export function createChatLayout(contentEl: HTMLElement): ChatLayoutRefs {
 
   const header = shell.createDiv({ cls: "lmsa-header" });
   const titleGroup = header.createDiv({ cls: "lmsa-header-copy" });
-  titleGroup.createEl("div", { cls: "lmsa-header-title", text: "LM Studio Chat" });
+  titleGroup.createEl("div", { cls: "lmsa-header-title", text: "Obsidian Writing Assistant Chat" });
 
   const headerMetaWrap = titleGroup.createDiv({ cls: "lmsa-header-meta-wrap" });
   const headerMetaBtn = headerMetaWrap.createDiv({ cls: "lmsa-header-meta" });
@@ -35,6 +35,12 @@ export function createChatLayout(contentEl: HTMLElement): ChatLayoutRefs {
     attr: { "aria-label": "Chat history" },
   }) as HTMLButtonElement;
   setIcon(historyBtn, "clock");
+
+  const paramsBtn = headerActions.createEl("button", {
+    cls: "lmsa-header-btn lmsa-ui-icon-btn",
+    attr: { "aria-label": "Model parameters" },
+  }) as HTMLButtonElement;
+  setIcon(paramsBtn, "sliders-horizontal");
 
   const messagesPaneEl = shell.createDiv({ cls: "lmsa-messages-pane" });
   const emptyStateEl = messagesPaneEl.createDiv({ cls: "lmsa-empty-view" });
@@ -70,6 +76,8 @@ export function createChatLayout(contentEl: HTMLElement): ChatLayoutRefs {
     messagesPaneEl,
     headerMetaEl: headerMetaLabel,
     historyBtn,
+    paramsBtn,
+    shellEl: shell,
     messagesEl,
     emptyStateEl,
     commandBarEl,

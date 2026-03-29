@@ -1,5 +1,6 @@
-import type { CompletionModel, Message, ConversationMessage } from "../../shared/types";
-import { getActiveNoteContext, getFullNoteContent } from "../../context/noteContext";
+import type { ConversationMessage } from "../../shared/types";
+import type { ChatRequest, ChatTurn, DocumentContext } from "../../shared/chatRequest";
+import { getActiveNoteText, getFullNoteContent } from "../../context/noteContext";
 import { EDIT_SYSTEM_PROMPT } from "../../editing/editSystemPrompt";
 import type { App } from "obsidian";
 import type { ChatSessionStore } from "../conversation/ChatSessionStore";
@@ -7,7 +8,7 @@ import type { ChatSessionStore } from "../conversation/ChatSessionStore";
 export interface PrepareMessagesOptions {
   app: App;
   store: ChatSessionStore;
-  activeModel: CompletionModel;
+  globalSystemPrompt: string;
   includeNoteContext: boolean;
   sessionContextEnabled: boolean;
   maxContextChars: number;
@@ -16,43 +17,52 @@ export interface PrepareMessagesOptions {
 
 export async function prepareApiMessages(
   options: PrepareMessagesOptions
-): Promise<Message[]> {
+): Promise<ChatRequest> {
   const {
     app,
     store,
-    activeModel,
+    globalSystemPrompt,
     includeNoteContext,
     sessionContextEnabled,
     maxContextChars,
     editMode = false,
   } = options;
 
-  let systemContent = activeModel.systemPrompt;
+  const systemPrompt = editMode ? EDIT_SYSTEM_PROMPT : globalSystemPrompt;
+
+  let documentContext: DocumentContext | null = null;
 
   if (editMode) {
-    // Edit mode: append the edit instruction prompt and the full document
-    systemContent += EDIT_SYSTEM_PROMPT;
-
     const noteData = await getFullNoteContent(app);
     if (noteData) {
-      systemContent += `\n\n---\nDocument to edit (${noteData.filePath}):\n${noteData.content}`;
+      documentContext = {
+        filePath: noteData.filePath,
+        content: noteData.content,
+        isFull: true,
+      };
     }
   } else if (includeNoteContext && sessionContextEnabled) {
-    const context = await getActiveNoteContext(app, maxContextChars);
-    if (context) {
-      systemContent += context;
+    const file = app.workspace.getActiveFile();
+    if (file) {
+      const text = await getActiveNoteText(app, maxContextChars);
+      if (text) {
+        documentContext = {
+          filePath: file.path,
+          content: text,
+          isFull: false,
+        };
+      }
     }
   }
 
-  return [
-    { role: "system", content: systemContent },
-    ...store.getSnapshot().messageHistory.map((message) => ({
-      role: message.role as "system" | "user" | "assistant",
-      content: editMode && message.editProposal
-        ? formatEditMessageContent(message)
-        : message.content,
-    })),
-  ];
+  const messages: ChatTurn[] = store.getSnapshot().messageHistory.map((message) => ({
+    role: message.role as "user" | "assistant",
+    content: editMode && message.editProposal
+      ? formatEditMessageContent(message)
+      : message.content,
+  }));
+
+  return { systemPrompt, documentContext, messages };
 }
 
 /**

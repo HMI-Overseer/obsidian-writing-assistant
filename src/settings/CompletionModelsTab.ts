@@ -27,11 +27,11 @@ export function renderCompletionModelsTab(
     kind: "completion",
     profileNoun: "completion profile",
     sectionDescription:
-      "Reusable chat profiles with their own target model, system prompt, temperature, and token limit.",
+      "Reusable chat profiles that target a specific model.",
     sectionIcon: "cpu",
-    discoverySectionDescription:
-      "Load live model suggestions from LM Studio when you want to create or update a completion profile.",
-    discoverySectionIcon: "search",
+    addSectionDescription:
+      "Create a new completion profile by selecting a provider and discovering available models.",
+    addSectionIcon: "plus-circle",
     emptyProfilesText: "No completion profiles configured yet.",
     emptyDiscoveryText:
       "No live model data loaded yet. Use Refresh models to fetch suggestions from LM Studio.",
@@ -39,8 +39,7 @@ export function renderCompletionModelsTab(
       "LM Studio responded, but no completion-ready models were reported.",
     getModels: () => settings.completionModels,
     setModels: (m) => { settings.completionModels = m; },
-    renderItemMeta: (model) =>
-      `Temperature ${model.temperature.toFixed(2)} | Max tokens ${model.maxTokens}`,
+    renderItemMeta: undefined,
     formatDiscoveryMeta: formatDiscoveryContext,
     openModal: (app, p, source, onSave, prefill) => {
       new CompletionModelModal(app, p, source, onSave, prefill).open();

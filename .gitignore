@@ -25,6 +25,9 @@ Thumbs.db
 # Obsidian vault config (if the repo is inside a vault)
 .obsidian/
 
+# Test coverage
+coverage/
+
 # AI slop
 .claude/
 AGENTS.md

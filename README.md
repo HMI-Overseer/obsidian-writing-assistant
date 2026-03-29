@@ -1,6 +1,6 @@
-# LM Studio Writing Assistant
+# Obsidian Writing Assistant
 
-An [Obsidian](https://obsidian.md) plugin that brings a local AI writing assistant into your vault. It connects directly to a running [LM Studio](https://lmstudio.ai) instance over its OpenAI-compatible API — no cloud, no API keys, no data leaving your machine.
+An [Obsidian](https://obsidian.md) plugin that brings a local AI writing assistant into your vault. It connects to a local inference server (e.g. [LM Studio](https://lmstudio.ai)) over an OpenAI-compatible API — no cloud, no API keys, no data leaving your machine.
 
 ---
 
@@ -34,9 +34,9 @@ An [Obsidian](https://obsidian.md) plugin that brings a local AI writing assista
 3. Run `npm run build` to compile
 4. Copy `main.js`, `manifest.json`, and `styles.css` into your vault's plugins folder:
    ```
-   <your-vault>/.obsidian/plugins/lm-studio-writing-assistant/
+   <your-vault>/.obsidian/plugins/obsidian-writing-assistant/
    ```
-5. In Obsidian: **Settings → Community plugins → Reload plugins**, then enable **LM Studio Writing Assistant**
+5. In Obsidian: **Settings → Community plugins → Reload plugins**, then enable **Obsidian Writing Assistant**
 
 ---
 
@@ -45,7 +45,7 @@ An [Obsidian](https://obsidian.md) plugin that brings a local AI writing assista
 1. Start LM Studio and load a model
 2. Start the local server in LM Studio (default port 1234)
 3. Open Obsidian and enable the plugin
-4. Open **Settings → LM Studio Writing Assistant → Completion Models** and add a model profile:
+4. Open **Settings → Obsidian Writing Assistant → Completion Models** and add a model profile:
    - Set the **Model ID** to match what LM Studio shows (the plugin will suggest loaded models if LM Studio is running)
    - Adjust the system prompt, temperature, and max tokens to taste
 5. Click the **message square** icon in the ribbon, or run the command **Open LM Studio Chat**
@@ -55,7 +55,7 @@ An [Obsidian](https://obsidian.md) plugin that brings a local AI writing assista
 
 ## Configuration
 
-All settings are in **Settings → LM Studio Writing Assistant**.
+All settings are in **Settings → Obsidian Writing Assistant**.
 
 ---
 

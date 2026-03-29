@@ -117,6 +117,75 @@
     background: color-mix(in srgb, var(--background-modifier-error) 14%, var(--lmsa-surface-base));
   }
 
+  /* ── Provider selector ────────────────────────────────────────────── */
+
+  .lmsa-provider-selector-row {
+    @apply lmsa-flex lmsa-items-center lmsa-gap-3 lmsa-rounded-[18px] lmsa-border lmsa-p-4;
+    border-color: var(--lmsa-border-default);
+    background: var(--lmsa-surface-raised);
+    margin-bottom: 16px;
+  }
+
+  .lmsa-provider-selector-label {
+    @apply lmsa-font-semibold lmsa-flex-shrink-0;
+    color: var(--lmsa-text-primary);
+  }
+
+  .lmsa-provider-selector-select {
+    @apply lmsa-flex-1 lmsa-rounded-lg lmsa-border lmsa-px-3 lmsa-py-2;
+    font-family: var(--font-text);
+    font-size: var(--font-ui-small);
+    color: var(--text-normal);
+    background: var(--background-secondary);
+    border-color: var(--lmsa-border-default);
+    outline: none;
+    cursor: pointer;
+    transition: border-color 120ms ease;
+    max-width: 240px;
+  }
+
+  .lmsa-provider-selector-select:focus {
+    border-color: var(--lmsa-section-accent);
+  }
+
+  .lmsa-provider-content {
+    @apply lmsa-flex lmsa-flex-col;
+  }
+
+  .lmsa-provider-placeholder {
+    @apply lmsa-flex lmsa-items-center lmsa-justify-center lmsa-rounded-[18px] lmsa-border lmsa-p-6;
+    border-color: var(--lmsa-border-default);
+    border-style: dashed;
+    background: var(--lmsa-surface-raised);
+    min-height: 80px;
+  }
+
+  .lmsa-provider-placeholder .lmsa-empty-state {
+    @apply lmsa-m-0;
+  }
+
+  .lmsa-provider-connection {
+    @apply lmsa-flex lmsa-flex-col lmsa-rounded-[18px] lmsa-border lmsa-p-4;
+    border-color: var(--lmsa-border-default);
+    background: var(--lmsa-surface-raised);
+    margin-bottom: 16px;
+  }
+
+  .lmsa-provider-connection .setting-item {
+    @apply lmsa-border-0 lmsa-p-0;
+  }
+
+  .lmsa-provider-connection .setting-item:not(:last-child) {
+    padding-bottom: 12px;
+    margin-bottom: 12px;
+    border-bottom: 1px solid var(--lmsa-border-default);
+  }
+
+  .lmsa-discovery-header {
+    @apply lmsa-flex lmsa-justify-end;
+    margin-bottom: 12px;
+  }
+
   @media (max-width: 700px) {
     .lmsa-item-row {
       @apply lmsa-flex-col lmsa-items-stretch;
@@ -124,6 +193,14 @@
 
     .lmsa-item-actions {
       @apply lmsa-justify-start;
+    }
+
+    .lmsa-provider-selector-row {
+      @apply lmsa-flex-col lmsa-items-stretch;
+    }
+
+    .lmsa-provider-selector-select {
+      max-width: none;
     }
   }
 }

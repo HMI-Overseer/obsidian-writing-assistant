@@ -1,6 +1,6 @@
 # Contributing
 
-Thanks for your interest in contributing to the LM Studio Writing Assistant. This document covers everything you need to get the project running locally and working on it effectively.
+Thanks for your interest in contributing to the Obsidian Writing Assistant. This document covers everything you need to get the project running locally and working on it effectively.
 
 ---
 
@@ -23,7 +23,7 @@ npm install
 To see changes live inside Obsidian, symlink (or copy) the project folder into your vault's plugin directory:
 
 ```
-<your-vault>/.obsidian/plugins/lm-studio-writing-assistant/
+<your-vault>/.obsidian/plugins/obsidian-writing-assistant/
 ```
 
 Then run the dev watcher:

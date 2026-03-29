@@ -1,5 +1,6 @@
 import type { Component } from "obsidian";
 import { LMStudioClient } from "../../api";
+import { buildSamplingParams } from "./buildSamplingParams";
 import type LMStudioWritingAssistant from "../../main";
 import type { ChatComposer } from "../composer/ChatComposer";
 import type { ChatSessionStore } from "../conversation/ChatSessionStore";
@@ -103,7 +104,7 @@ export async function sendMessage(options: SendMessageOptions): Promise<void> {
   const apiMessages = await prepareApiMessages({
     app: plugin.app,
     store,
-    activeModel,
+    globalSystemPrompt: plugin.settings.globalSystemPrompt,
     includeNoteContext: plugin.settings.includeNoteContext,
     sessionContextEnabled: composer.isSessionContextEnabled(),
     maxContextChars: plugin.settings.maxContextChars,
@@ -127,8 +128,7 @@ export async function sendMessage(options: SendMessageOptions): Promise<void> {
     for await (const delta of client.stream(
       apiMessages,
       activeModel.modelId,
-      activeModel.maxTokens,
-      activeModel.temperature,
+      buildSamplingParams(plugin.settings),
       abortController.signal
     )) {
       renderer.appendDelta(delta);

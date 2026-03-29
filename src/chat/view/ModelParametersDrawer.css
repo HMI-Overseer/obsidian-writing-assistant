@@ -1,0 +1,165 @@
+@layer components {
+  .lmsa-params-drawer {
+    @apply lmsa-absolute lmsa-inset-0 lmsa-z-10 lmsa-hidden lmsa-flex-col lmsa-overflow-hidden;
+    background: var(--background-primary);
+    border-left: 1px solid var(--background-modifier-border);
+  }
+
+  .lmsa-params-drawer.is-open {
+    @apply lmsa-flex;
+    animation: lmsa-params-slide-in 200ms ease forwards;
+  }
+
+  .lmsa-params-header {
+    @apply lmsa-flex lmsa-flex-shrink-0 lmsa-items-center lmsa-justify-between lmsa-gap-2.5 lmsa-px-5 lmsa-pb-4 lmsa-pt-[18px];
+    border-bottom: 1px solid var(--background-modifier-border);
+  }
+
+  .lmsa-params-title {
+    @apply lmsa-text-base lmsa-font-bold lmsa-text-obsidian-text;
+  }
+
+  .lmsa-params-close-btn {
+    @apply lmsa-h-auto lmsa-w-auto lmsa-rounded-md lmsa-border-none lmsa-bg-transparent lmsa-p-1.5;
+    box-shadow: none;
+    outline: none;
+    appearance: none;
+    min-height: unset;
+    color: var(--text-muted);
+    transition: background 120ms ease, color 120ms ease;
+  }
+
+  .lmsa-params-close-btn:hover {
+    @apply lmsa-bg-[var(--background-modifier-hover)] lmsa-text-obsidian-text;
+    box-shadow: none;
+  }
+
+  .lmsa-params-close-btn svg {
+    width: 18px;
+    height: 18px;
+  }
+
+  .lmsa-params-body {
+    @apply lmsa-flex lmsa-flex-1 lmsa-flex-col lmsa-gap-5 lmsa-overflow-y-auto lmsa-p-5;
+  }
+
+  .lmsa-params-section {
+    @apply lmsa-flex lmsa-flex-col lmsa-gap-2;
+  }
+
+  .lmsa-params-label {
+    @apply lmsa-font-semibold;
+    font-size: var(--font-ui-small);
+    color: var(--text-muted);
+  }
+
+  .lmsa-params-textarea {
+    @apply lmsa-w-full lmsa-resize-y lmsa-rounded-lg lmsa-border lmsa-border-obsidian-border lmsa-p-3;
+    font-family: var(--font-text);
+    font-size: var(--font-ui-small);
+    color: var(--text-normal);
+    background: var(--background-secondary);
+    min-height: 120px;
+    outline: none;
+    transition: border-color 120ms ease;
+  }
+
+  .lmsa-params-textarea::placeholder {
+    color: var(--text-faint);
+  }
+
+  .lmsa-params-textarea:focus {
+    border-color: var(--lmsa-mode-accent);
+  }
+
+  .lmsa-params-slider-row {
+    @apply lmsa-flex lmsa-items-center lmsa-gap-3;
+  }
+
+  .lmsa-params-slider {
+    @apply lmsa-flex-1;
+    accent-color: var(--lmsa-mode-accent);
+    height: 6px;
+  }
+
+  .lmsa-params-slider-value {
+    @apply lmsa-flex-shrink-0;
+    font-family: var(--font-monospace);
+    font-size: var(--font-ui-small);
+    color: var(--text-muted);
+    min-width: 2.5em;
+    text-align: right;
+  }
+
+  .lmsa-params-toggle-row {
+    @apply lmsa-flex lmsa-items-center lmsa-gap-2;
+  }
+
+  .lmsa-params-toggle {
+    @apply lmsa-m-0 lmsa-flex-shrink-0;
+    accent-color: var(--lmsa-mode-accent);
+    width: 14px;
+    height: 14px;
+    cursor: pointer;
+  }
+
+  .lmsa-params-toggle-row .lmsa-params-label {
+    @apply lmsa-m-0;
+    cursor: pointer;
+  }
+
+  .lmsa-params-input-row {
+    @apply lmsa-flex lmsa-items-center lmsa-gap-3;
+  }
+
+  .lmsa-params-number-input {
+    @apply lmsa-w-full lmsa-rounded-lg lmsa-border lmsa-border-obsidian-border lmsa-px-3 lmsa-py-2;
+    font-family: var(--font-monospace);
+    font-size: var(--font-ui-small);
+    color: var(--text-normal);
+    background: var(--background-secondary);
+    outline: none;
+    transition: border-color 120ms ease, opacity 120ms ease;
+  }
+
+  .lmsa-params-number-input::placeholder {
+    color: var(--text-faint);
+  }
+
+  .lmsa-params-number-input:focus {
+    border-color: var(--lmsa-mode-accent);
+  }
+
+  .lmsa-params-select {
+    @apply lmsa-w-full lmsa-rounded-lg lmsa-border lmsa-border-obsidian-border lmsa-px-3 lmsa-py-2;
+    font-family: var(--font-text);
+    font-size: var(--font-ui-small);
+    color: var(--text-normal);
+    background: var(--background-secondary);
+    outline: none;
+    cursor: pointer;
+    transition: border-color 120ms ease, opacity 120ms ease;
+  }
+
+  .lmsa-params-select:focus {
+    border-color: var(--lmsa-mode-accent);
+  }
+
+  .lmsa-params-slider-row.is-disabled,
+  .lmsa-params-input-row.is-disabled {
+    opacity: 0.4;
+    pointer-events: none;
+  }
+}
+
+@keyframes lmsa-params-slide-in {
+  from {
+    opacity: 0;
+    transform: translateX(12px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}

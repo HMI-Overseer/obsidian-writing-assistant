@@ -1,6 +1,8 @@
 import type { LMStudioClient } from "../../api/LMStudioClient";
-import type { CompletionModel, Message } from "../../shared/types";
+import type { CompletionModel, SamplingParams } from "../../shared/types";
+import type { ChatRequest } from "../../shared/chatRequest";
 import type { BenchmarkTestCase, BenchmarkRunResult, BenchmarkIterationResult } from "./types";
+import { DEFAULT_COMPLETION_MAX_TOKENS, DEFAULT_COMPLETION_TEMPERATURE } from "../../constants";
 
 /**
  * Runs a single test case for N iterations, returning aggregate results.
@@ -14,18 +16,18 @@ export async function runBenchmarkTest(
   onIteration?: (testId: string, iteration: BenchmarkIterationResult) => void,
   signal?: AbortSignal
 ): Promise<BenchmarkRunResult> {
-  const systemContent =
-    model.systemPrompt +
-    testCase.systemPromptSuffix +
-    `\n\n---\nDocument to edit (test-document.md):\n${testCase.document}`;
-
-  const messages: Message[] = [
-    { role: "system", content: systemContent },
-    ...testCase.messages.map((m) => ({
-      role: m.role as "system" | "user" | "assistant",
+  const request: ChatRequest = {
+    systemPrompt: testCase.systemPromptSuffix,
+    documentContext: {
+      filePath: "test-document.md",
+      content: testCase.document,
+      isFull: true,
+    },
+    messages: testCase.messages.map((m) => ({
+      role: m.role,
       content: m.content,
     })),
-  ];
+  };
 
   const iterations: BenchmarkIterationResult[] = [];
 
@@ -33,11 +35,19 @@ export async function runBenchmarkTest(
     if (signal?.aborted) break;
 
     const start = Date.now();
+    const benchmarkParams: SamplingParams = {
+      temperature: DEFAULT_COMPLETION_TEMPERATURE,
+      maxTokens: DEFAULT_COMPLETION_MAX_TOKENS,
+      topP: null,
+      topK: null,
+      minP: null,
+      repeatPenalty: null,
+      reasoning: null,
+    };
     const rawResponse = await client.complete(
-      messages,
+      request,
       model.modelId,
-      model.maxTokens,
-      model.temperature,
+      benchmarkParams,
       signal
     );
     const durationMs = Date.now() - start;

@@ -24,6 +24,8 @@ export type ChatLayoutRefs = {
   messagesPaneEl: HTMLElement;
   headerMetaEl: HTMLElement;
   historyBtn: HTMLButtonElement;
+  paramsBtn: HTMLButtonElement;
+  shellEl: HTMLElement;
   messagesEl: HTMLElement;
   emptyStateEl: HTMLElement;
   commandBarEl: HTMLElement;

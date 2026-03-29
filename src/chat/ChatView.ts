@@ -19,6 +19,7 @@ import { InlineMessageEditor } from "./messages/InlineMessageEditor";
 import { ChatModelSelector } from "./models/ChatModelSelector";
 import type { ChatLayoutRefs } from "./types";
 import { ChatHistoryDrawer } from "./view/ChatHistoryDrawer";
+import { ModelParametersDrawer } from "./view/ModelParametersDrawer";
 import { createChatLayout } from "./view/createChatLayout";
 
 const NO_MODEL_SELECTED_LABEL = "No model selected";
@@ -33,6 +34,7 @@ export class ChatView extends ItemView {
   private composer: ChatComposer | null = null;
   private modelSelector: ChatModelSelector | null = null;
   private historyDrawer: ChatHistoryDrawer | null = null;
+  private paramsDrawer: ModelParametersDrawer | null = null;
   private generation!: ChatGenerationController;
   private conversation!: ChatConversationController;
   private lastRenderedConversationId: string | null = null;
@@ -48,7 +50,7 @@ export class ChatView extends ItemView {
   }
 
   getDisplayText(): string {
-    return "LM Studio Chat";
+    return "Writing Assistant";
   }
 
   getIcon(): string {
@@ -116,15 +118,79 @@ export class ChatView extends ItemView {
       onClose: () => this.historyDrawer?.close(),
     });
 
+    this.paramsDrawer = new ModelParametersDrawer(this.layout.rootEl, {
+      onClose: () => this.paramsDrawer?.close(),
+      getSettings: () => ({
+        globalSystemPrompt: this.plugin.settings.globalSystemPrompt,
+        globalTemperature: this.plugin.settings.globalTemperature,
+        globalMaxTokens: this.plugin.settings.globalMaxTokens,
+        globalTopP: this.plugin.settings.globalTopP,
+        globalTopK: this.plugin.settings.globalTopK,
+        globalMinP: this.plugin.settings.globalMinP,
+        globalRepeatPenalty: this.plugin.settings.globalRepeatPenalty,
+        globalReasoning: this.plugin.settings.globalReasoning,
+      }),
+      onSystemPromptChange: async (value) => {
+        this.plugin.settings.globalSystemPrompt = value;
+        await this.plugin.saveSettings();
+      },
+      onTemperatureChange: async (value) => {
+        this.plugin.settings.globalTemperature = value;
+        await this.plugin.saveSettings();
+      },
+      onMaxTokensChange: async (value) => {
+        this.plugin.settings.globalMaxTokens = value;
+        await this.plugin.saveSettings();
+      },
+      onTopPChange: async (value) => {
+        this.plugin.settings.globalTopP = value;
+        await this.plugin.saveSettings();
+      },
+      onTopKChange: async (value) => {
+        this.plugin.settings.globalTopK = value;
+        await this.plugin.saveSettings();
+      },
+      onMinPChange: async (value) => {
+        this.plugin.settings.globalMinP = value;
+        await this.plugin.saveSettings();
+      },
+      onRepeatPenaltyChange: async (value) => {
+        this.plugin.settings.globalRepeatPenalty = value;
+        await this.plugin.saveSettings();
+      },
+      onReasoningChange: async (value) => {
+        this.plugin.settings.globalReasoning = value;
+        await this.plugin.saveSettings();
+      },
+    });
+
     this.layout.historyBtn.addEventListener("click", (event) => {
       event.stopPropagation();
+      if (this.paramsDrawer?.isOpen()) {
+        this.paramsDrawer.close();
+      }
       this.conversation.toggleHistoryDrawer();
+    });
+
+    this.layout.paramsBtn.addEventListener("click", (event) => {
+      event.stopPropagation();
+      if (this.paramsDrawer?.isOpen()) {
+        this.paramsDrawer.close();
+      } else {
+        if (this.historyDrawer?.isOpen()) {
+          this.historyDrawer.close();
+        }
+        this.paramsDrawer?.open();
+      }
     });
 
     this.registerDomEvent(document, "click", () => {
       this.modelSelector?.close();
       if (this.historyDrawer?.isOpen()) {
         this.historyDrawer.close();
+      }
+      if (this.paramsDrawer?.isOpen()) {
+        this.paramsDrawer.close();
       }
     });
 
@@ -157,6 +223,7 @@ export class ChatView extends ItemView {
     await this.sessionStore?.persistActiveConversation();
     this.transcript?.destroy();
     this.modelSelector?.destroy();
+    this.paramsDrawer?.destroy();
   }
 
   seedPrompt(text: string): void {
@@ -374,6 +441,10 @@ export class ChatView extends ItemView {
 
     if (isCollapsed && this.historyDrawer?.isOpen()) {
       this.historyDrawer.close();
+    }
+
+    if (isCollapsed && this.paramsDrawer?.isOpen()) {
+      this.paramsDrawer.close();
     }
 
     if (isCollapsed && this.modelSelector?.isOpen()) {

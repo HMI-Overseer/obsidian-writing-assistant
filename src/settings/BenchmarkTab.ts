@@ -1,7 +1,7 @@
-import { Setting, setIcon } from "obsidian";
+import { setIcon } from "obsidian";
 import type LMStudioWritingAssistant from "../main";
 import type { CompletionModel } from "../shared/types";
-import { LMStudioClient } from "../api";
+import { LMStudioClient, LMStudioModelsService } from "../api";
 import { createSettingsSection } from "./ui";
 import { getTestCases } from "./benchmark/testCases";
 import { runBenchmarkTest, runAllBenchmarks } from "./benchmark/benchmarkRunner";
@@ -40,18 +40,103 @@ export function renderBenchmarkTab(
     return;
   }
 
-  new Setting(modelSection.bodyEl)
-    .setName("Completion model")
-    .setDesc("Select from your configured profiles")
-    .addDropdown((dropdown) => {
-      for (const m of models) {
-        dropdown.addOption(m.id, m.name);
+  const selectorWrap = modelSection.bodyEl.createDiv({ cls: "lmsa-header-meta-wrap lmsa-benchmark-model-wrap" });
+  const selectorBtn = selectorWrap.createDiv({ cls: "lmsa-header-meta lmsa-benchmark-model-selector" });
+  const selectorStatusEl = selectorBtn.createEl("span", {
+    cls: "lmsa-model-selector-status is-unknown",
+  });
+  const selectorLabel = selectorBtn.createEl("span", {
+    cls: "lmsa-header-meta-label",
+    text: selectedModel?.name ?? "Select model...",
+  });
+  const selectorChevron = selectorBtn.createEl("span", { cls: "lmsa-header-meta-chevron" });
+  setIcon(selectorChevron, "chevron-down");
+
+  const selectorDropdown = selectorWrap.createDiv({ cls: "lmsa-model-dropdown" });
+  selectorDropdown.style.display = "none";
+  let selectorOpen = false;
+
+  const knownAvailability = new Map<string, string>();
+
+  async function refreshModelAvailability(): Promise<void> {
+    try {
+      const modelsService = new LMStudioModelsService(
+        plugin.settings.lmStudioUrl,
+        plugin.settings.bypassCors
+      );
+      const result = await modelsService.getCompletionCandidates({ forceRefresh: true });
+      knownAvailability.clear();
+      for (const candidate of result.candidates) {
+        knownAvailability.set(
+          candidate.targetModelId,
+          candidate.isLoaded ? "loaded" : "unloaded"
+        );
       }
-      if (selectedModel) dropdown.setValue(selectedModel.id);
-      dropdown.onChange((value) => {
-        selectedModel = models.find((m) => m.id === value) ?? null;
+    } catch {
+      knownAvailability.clear();
+    }
+    updateSelectorStatus();
+  }
+
+  function updateSelectorStatus(): void {
+    selectorStatusEl.removeClass("is-loaded", "is-unloaded", "is-unknown", "is-hidden");
+    if (!selectedModel?.modelId) {
+      selectorStatusEl.addClass("is-hidden");
+      return;
+    }
+    const state = knownAvailability.get(selectedModel.modelId) ?? "unknown";
+    selectorStatusEl.addClass(`is-${state}`);
+  }
+
+  function closeBenchmarkDropdown(): void {
+    selectorDropdown.style.display = "none";
+    selectorOpen = false;
+    selectorBtn.removeClass("is-active");
+    selectorChevron.empty();
+    setIcon(selectorChevron, "chevron-down");
+  }
+
+  function openBenchmarkDropdown(): void {
+    selectorDropdown.empty();
+    selectorDropdown.style.display = "block";
+    selectorOpen = true;
+    selectorBtn.addClass("is-active");
+    selectorChevron.empty();
+    setIcon(selectorChevron, "chevron-up");
+
+    const listEl = selectorDropdown.createDiv({ cls: "lmsa-model-dropdown-list" });
+    for (const m of models) {
+      const item = listEl.createDiv({ cls: "lmsa-model-dropdown-item" });
+      const checkSpan = item.createEl("span", { cls: "lmsa-model-dropdown-check" });
+      if (selectedModel && m.id === selectedModel.id) {
+        item.addClass("is-active");
+        setIcon(checkSpan, "check");
+      }
+      const copy = item.createDiv({ cls: "lmsa-model-dropdown-copy" });
+      copy.createEl("span", { cls: "lmsa-model-dropdown-name", text: m.name });
+      const itemState = knownAvailability.get(m.modelId) ?? "unknown";
+      item.createEl("span", { cls: `lmsa-model-dropdown-state is-${itemState}` });
+      item.addEventListener("click", (event) => {
+        event.stopPropagation();
+        selectedModel = m;
+        selectorLabel.setText(m.name);
+        updateSelectorStatus();
+        closeBenchmarkDropdown();
       });
-    });
+    }
+  }
+
+  void refreshModelAvailability();
+
+  selectorBtn.addEventListener("click", (event) => {
+    event.stopPropagation();
+    if (selectorOpen) closeBenchmarkDropdown();
+    else openBenchmarkDropdown();
+  });
+
+  document.addEventListener("click", () => {
+    if (selectorOpen) closeBenchmarkDropdown();
+  });
 
   // -----------------------------------------------------------------------
   // Test suite (includes iteration setting, cards, and summary)
@@ -65,20 +150,23 @@ export function renderBenchmarkTab(
   );
 
   // Iterations setting
-  new Setting(suiteSection.bodyEl)
-    .setName("Iterations per test")
-    .setDesc("Run each test multiple times to measure consistency. Higher values give more reliable results but take longer.")
-    .addText((text) =>
-      text
-        .setPlaceholder("3")
-        .setValue(String(iterationCount))
-        .onChange((value) => {
-          const parsed = parseInt(value, 10);
-          if (!isNaN(parsed) && parsed >= 1 && parsed <= 20) {
-            iterationCount = parsed;
-          }
-        })
-    );
+  const iterRow = suiteSection.bodyEl.createDiv({ cls: "lmsa-benchmark-setting-row" });
+  const iterInfo = iterRow.createDiv({ cls: "lmsa-benchmark-setting-info" });
+  iterInfo.createEl("span", { cls: "lmsa-benchmark-setting-name", text: "Iterations per test" });
+  iterInfo.createEl("span", {
+    cls: "lmsa-benchmark-setting-desc",
+    text: "Run each test multiple times to measure consistency. Higher values give more reliable results but take longer.",
+  });
+  const iterInput = iterRow.createEl("input", {
+    cls: "lmsa-benchmark-setting-input",
+    attr: { type: "number", min: "1", max: "20", placeholder: "3", value: String(iterationCount) },
+  }) as HTMLInputElement;
+  iterInput.addEventListener("input", () => {
+    const parsed = parseInt(iterInput.value, 10);
+    if (!isNaN(parsed) && parsed >= 1 && parsed <= 20) {
+      iterationCount = parsed;
+    }
+  });
 
   // Header actions: Run All / Abort
   const runAllBtn = suiteSection.headerActionsEl.createEl("button", {

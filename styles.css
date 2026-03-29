@@ -1648,15 +1648,8 @@
     min-width: 0px;
     flex: 1 1 0%;
     flex-direction: row;
-    align-items: flex-start;
+    align-items: center;
     gap: 0.75rem;
-}
-.lmsa-settings-section-heading-text {
-    display: flex;
-    min-width: 0px;
-    flex: 1 1 0%;
-    flex-direction: column;
-    gap: 0.375rem;
 }
 .lmsa-settings-section-actions {
     display: flex;
@@ -1673,7 +1666,9 @@
 .lmsa-settings-section-desc {
     margin: 0px;
     color: var(--lmsa-text-secondary);
+    font-weight: 500;
     line-height: 1.6;
+    padding-bottom: 15px;
 }
 /* ── Section icon badge ────────────────────────────────────────────────── */
 .lmsa-settings-section-icon {
@@ -2046,6 +2041,62 @@
 .lmsa-benchmark-empty {
     color: var(--lmsa-text-secondary);
     font-style: italic;
+  }
+.lmsa-benchmark-model-wrap {
+    display: flex;
+    justify-content: flex-end;
+}
+.lmsa-benchmark-model-selector {
+    margin: 0;
+    padding: 6px 10px;
+    font-size: var(--font-ui-small);
+  }
+.lmsa-benchmark-model-wrap .lmsa-model-dropdown {
+    left: auto;
+    right: 0;
+    transform-origin: top right;
+  }
+/* ------- Setting row ------- */
+.lmsa-benchmark-setting-row {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding-top: 1rem;
+    padding-bottom: 1rem;
+}
+.lmsa-benchmark-setting-info {
+    display: flex;
+    min-width: 0px;
+    flex: 1 1 0%;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+.lmsa-benchmark-setting-name {
+    font-weight: 600;
+    color: var(--lmsa-text-primary);
+    font-size: var(--font-ui-small);
+}
+.lmsa-benchmark-setting-desc {
+    color: var(--lmsa-text-secondary);
+    font-size: var(--font-ui-smaller);
+    line-height: 1.55;
+  }
+.lmsa-benchmark-setting-input {
+    flex: none;
+    width: 64px;
+    border-radius: 12px;
+    border: 1px solid var(--lmsa-border-default);
+    background: var(--lmsa-surface-inset);
+    padding: 8px 12px;
+    color: var(--lmsa-text-primary);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+    transition: border-color 140ms ease, box-shadow 140ms ease;
+    text-align: center;
+}
+.lmsa-benchmark-setting-input:focus {
+    border-color: var(--lmsa-border-emphasis);
+    box-shadow: 0 0 0 2px var(--lmsa-accent-glow);
+    outline: none;
   }
 /* ------- Buttons ------- */
 .lmsa-benchmark-btn {

@@ -89,11 +89,7 @@
   }
 
   .lmsa-settings-section-heading {
-    @apply lmsa-flex lmsa-min-w-0 lmsa-flex-1 lmsa-flex-row lmsa-items-start lmsa-gap-3;
-  }
-
-  .lmsa-settings-section-heading-text {
-    @apply lmsa-flex lmsa-min-w-0 lmsa-flex-1 lmsa-flex-col lmsa-gap-1.5;
+    @apply lmsa-flex lmsa-min-w-0 lmsa-flex-1 lmsa-flex-row lmsa-items-center lmsa-gap-3;
   }
 
   .lmsa-settings-section-actions {
@@ -109,7 +105,9 @@
   .lmsa-settings-section-desc {
     @apply lmsa-m-0;
     color: var(--lmsa-text-secondary);
+    font-weight: 500;
     line-height: 1.6;
+    padding-bottom: 15px;
   }
 
   /* ── Section icon badge ────────────────────────────────────────────────── */

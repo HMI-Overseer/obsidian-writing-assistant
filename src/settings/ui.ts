@@ -29,21 +29,19 @@ export function createSettingsSection(
     setIcon(badge, options.icon);
   }
 
-  const textEl = headingEl.createDiv({ cls: "lmsa-settings-section-heading-text" });
-
-  textEl.createEl("h3", {
+  headingEl.createEl("h3", {
     cls: "lmsa-settings-section-title",
     text: title,
   });
 
+  const bodyEl = sectionEl.createDiv({ cls: "lmsa-settings-section-body" });
+
   if (description) {
-    textEl.createEl("p", {
+    bodyEl.createEl("p", {
       cls: "lmsa-settings-section-desc",
       text: description,
     });
   }
-
-  const bodyEl = sectionEl.createDiv({ cls: "lmsa-settings-section-body" });
   const footerEl = sectionEl.createDiv({ cls: "lmsa-settings-section-footer" });
 
   return { sectionEl, headerEl, headerActionsEl, bodyEl, footerEl };

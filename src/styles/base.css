@@ -38,11 +38,21 @@
   }
 
   .lmsa-ui-icon-btn {
-    @apply lmsa-inline-flex lmsa-h-[34px] lmsa-w-[34px] lmsa-cursor-pointer lmsa-items-center lmsa-justify-center lmsa-rounded-[10px] lmsa-border lmsa-border-obsidian-border lmsa-bg-obsidian-surface-primary lmsa-text-obsidian-muted;
+    @apply lmsa-inline-flex lmsa-h-[34px] lmsa-w-[34px] lmsa-cursor-pointer lmsa-items-center lmsa-justify-center lmsa-rounded-[10px] lmsa-border lmsa-border-obsidian-border lmsa-text-obsidian-muted;
+    background: var(--background-primary) !important;
+    box-shadow: none !important;
+    outline: none;
+    appearance: none;
+    min-height: unset;
+    font: inherit;
+    line-height: 1;
+    transition: background 120ms ease, color 120ms ease;
   }
 
   .lmsa-ui-icon-btn:hover {
-    @apply lmsa-bg-[var(--background-modifier-hover)] lmsa-text-obsidian-text;
+    @apply lmsa-text-obsidian-text;
+    background: var(--background-modifier-hover) !important;
+    box-shadow: none !important;
   }
 
   .lmsa-ui-btn {
@@ -112,13 +122,21 @@
   }
 
   .lmsa-ui-chip-dismiss {
-    @apply lmsa-inline-flex lmsa-h-4 lmsa-w-4 lmsa-flex-none lmsa-cursor-pointer lmsa-items-center lmsa-justify-center lmsa-rounded-full lmsa-border-none lmsa-bg-transparent lmsa-p-0;
-    color: var(--text-faint);
+    @apply lmsa-inline-flex lmsa-h-4 lmsa-w-4 lmsa-flex-none lmsa-cursor-pointer lmsa-items-center lmsa-justify-center lmsa-rounded-full lmsa-border-none lmsa-p-0 lmsa-text-obsidian-muted;
+    background: transparent !important;
+    box-shadow: none !important;
+    outline: none;
+    appearance: none;
+    min-height: unset;
+    font: inherit;
+    line-height: 1;
+    transition: color 120ms ease;
   }
 
   .lmsa-ui-chip-dismiss:hover {
-    color: var(--text-muted);
-    background: color-mix(in srgb, var(--background-modifier-border) 60%, transparent);
+    @apply lmsa-text-obsidian-text;
+    background: var(--background-modifier-hover) !important;
+    box-shadow: none !important;
   }
 
   .lmsa-ui-list-item {

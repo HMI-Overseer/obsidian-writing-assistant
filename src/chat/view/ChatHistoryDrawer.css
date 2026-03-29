@@ -46,6 +46,22 @@
     @apply lmsa-flex lmsa-flex-shrink-0 lmsa-gap-1.5;
   }
 
+  .lmsa-history-header-actions .lmsa-ui-icon-btn {
+    @apply lmsa-h-auto lmsa-w-auto lmsa-rounded-md lmsa-border-none lmsa-p-1.5;
+    background: transparent !important;
+    box-shadow: none !important;
+  }
+
+  .lmsa-history-header-actions .lmsa-ui-icon-btn:hover {
+    background: var(--background-modifier-hover) !important;
+  }
+
+  .lmsa-history-header-actions .lmsa-header-btn svg {
+    width: 20px;
+    height: 20px;
+  }
+
+
   .lmsa-history-list {
     @apply lmsa-flex lmsa-flex-1 lmsa-flex-col lmsa-gap-2 lmsa-overflow-y-auto lmsa-p-3;
   }
@@ -61,13 +77,14 @@
     @apply lmsa-cursor-default lmsa-pb-3 lmsa-pl-4 lmsa-pr-3 lmsa-pt-3;
     background: color-mix(in srgb, var(--background-secondary) 34%, transparent);
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+    transition: border-color 200ms ease, box-shadow 200ms ease;
   }
 
   .lmsa-history-item:hover {
-    transform: translateY(-1px);
+    border-color: var(--lmsa-chat-border-emphasis);
     box-shadow:
-      0 12px 28px rgba(0, 0, 0, 0.12),
-      inset 0 1px 0 rgba(255, 255, 255, 0.04);
+      0 10px 30px rgba(0, 0, 0, 0.04),
+      0 0 0 1px var(--lmsa-chat-glow-ring);
   }
 
   .lmsa-history-item.is-active {
@@ -104,10 +121,17 @@
 
   .lmsa-history-trash-btn {
     @apply lmsa-scale-95 lmsa-opacity-0 lmsa-transition-all lmsa-duration-[140ms];
+    background: transparent !important;
+    box-shadow: none !important;
   }
 
   .lmsa-history-item:hover .lmsa-history-trash-btn {
     @apply lmsa-scale-100 lmsa-opacity-100;
+  }
+
+  .lmsa-history-trash-btn:hover {
+    background: var(--background-modifier-hover) !important;
+    box-shadow: none !important;
   }
 }
 

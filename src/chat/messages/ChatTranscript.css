@@ -14,13 +14,15 @@
 
   .lmsa-message--assistant .lmsa-message-avatar {
     color: var(--lmsa-mode-accent);
-    background: color-mix(in srgb, var(--lmsa-mode-accent) 12%, var(--background-secondary));
+    background: color-mix(in srgb, var(--lmsa-mode-accent) 8%, var(--background-secondary));
+    border-color: color-mix(in srgb, var(--lmsa-mode-accent) 30%, var(--background-modifier-border));
   }
 
   .lmsa-message--user .lmsa-message-avatar {
     @apply lmsa-order-2 lmsa-border-transparent lmsa-text-white;
     background: linear-gradient(135deg, var(--color-blue, #4a90d9), var(--interactive-accent) 50%, var(--color-orange, #e8a84b));
     color: var(--text-on-accent);
+    box-shadow: 0 0px 14px color-mix(in srgb, var(--interactive-accent) 40%, transparent);
   }
 
   .lmsa-message-column {
@@ -81,13 +83,21 @@
     opacity: 0.85;
   }
 
-  .lmsa-message--user .lmsa-message-body {
-    background: color-mix(in srgb, var(--lmsa-mode-accent) 15%, var(--background-primary));
+  .lmsa-message--assistant .lmsa-message-body {
     border-color: color-mix(in srgb, var(--lmsa-mode-accent) 35%, var(--background-modifier-border));
   }
 
+  .lmsa-message--user .lmsa-message-body {
+    background: linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--lmsa-mode-accent) 18%, var(--background-primary)),
+      color-mix(in srgb, var(--lmsa-mode-accent) 8%, var(--background-primary))
+    );
+    border-color: color-mix(in srgb, var(--lmsa-mode-accent) 45%, var(--background-modifier-border));
+  }
+
   .lmsa-message--user .lmsa-message-body:hover {
-    border-color: color-mix(in srgb, var(--lmsa-mode-accent) 50%, var(--background-modifier-border));
+    border-color: color-mix(in srgb, var(--lmsa-mode-accent) 60%, var(--background-modifier-border));
     box-shadow:
       0 10px 30px rgba(0, 0, 0, 0.04),
       0 0 0 1px var(--lmsa-chat-glow-ring);

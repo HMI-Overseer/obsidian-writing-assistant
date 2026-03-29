@@ -52,16 +52,10 @@ export function createChatLayout(contentEl: HTMLElement): ChatLayoutRefs {
 
   const textareaEl = composerPanel.createEl("textarea", {
     cls: "lmsa-textarea",
-    attr: { placeholder: "Send a message to the model...", rows: "3" },
+    attr: { placeholder: "Send a message to the model...", rows: "2" },
   }) as HTMLTextAreaElement;
 
   const composerFooter = composerPanel.createDiv({ cls: "lmsa-composer-footer" });
-  const composerFooterMeta = composerFooter.createDiv({ cls: "lmsa-composer-footer-meta" });
-
-  composerFooterMeta.createDiv({
-    cls: "lmsa-compose-hint",
-    text: "Enter to send, Shift+Enter for newline",
-  });
 
   const composerFooterActions = composerFooter.createDiv({ cls: "lmsa-composer-footer-actions" });
   const modeToggleEl = composerFooterActions.createDiv({ cls: "lmsa-mode-toggle" });

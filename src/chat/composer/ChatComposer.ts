@@ -5,10 +5,10 @@ import type LMStudioWritingAssistant from "../../main";
 import { getActiveFileName } from "../../context/noteContext";
 import type { ChatLayoutRefs, ChatMode } from "../types";
 
-const MODE_OPTIONS: { mode: ChatMode; label: string }[] = [
-  { mode: "plan", label: "Plan" },
-  { mode: "conversation", label: "Chat" },
-  { mode: "edit", label: "Edit" },
+const MODE_OPTIONS: { mode: ChatMode; label: string; icon: string }[] = [
+  { mode: "plan", icon: "zap", label: "Plan" },
+  { mode: "conversation", icon: "message-square", label: "Chat" },
+  { mode: "edit", icon: "pen-line", label: "Edit" },
 ];
 
 const MODE_PLACEHOLDERS: Record<ChatMode, string> = {
@@ -174,12 +174,14 @@ export class ChatComposer {
     this.refs.modeToggleEl.empty();
     this.modeButtons.clear();
 
-    for (const { mode, label } of MODE_OPTIONS) {
+    for (const { mode, label, icon } of MODE_OPTIONS) {
       const btn = this.refs.modeToggleEl.createEl("button", {
         cls: "lmsa-mode-toggle-btn",
-        text: label,
-        attr: { "aria-label": `${label} mode` },
+        attr: { "aria-label": `${label} mode`, "data-mode": mode },
       });
+      const iconEl = btn.createEl("span", { cls: "lmsa-mode-toggle-icon" });
+      setIcon(iconEl, icon);
+      btn.createEl("span", { text: label });
       if (mode === this.currentMode) {
         btn.addClass("is-active");
       }

@@ -66,12 +66,22 @@
     border-radius: 10px;
     border-width: 1px;
     border-color: var(--background-modifier-border);
-    background-color: var(--background-primary);
     color: var(--text-muted);
+    background: var(--background-primary) !important;
+    box-shadow: none !important;
+    outline: none;
+    -webkit-appearance: none;
+       -moz-appearance: none;
+            appearance: none;
+    min-height: unset;
+    font: inherit;
+    line-height: 1;
+    transition: background 120ms ease, color 120ms ease;
 }
 .lmsa-ui-icon-btn:hover {
-    background-color: var(--background-modifier-hover);
     color: var(--text-normal);
+    background: var(--background-modifier-hover) !important;
+    box-shadow: none !important;
 }
 .lmsa-ui-btn {
     display: inline-flex;
@@ -186,14 +196,24 @@
     justify-content: center;
     border-radius: 9999px;
     border-style: none;
-    background-color: transparent;
     padding: 0px;
-    color: var(--text-faint);
+    color: var(--text-muted);
+    background: transparent !important;
+    box-shadow: none !important;
+    outline: none;
+    -webkit-appearance: none;
+       -moz-appearance: none;
+            appearance: none;
+    min-height: unset;
+    font: inherit;
+    line-height: 1;
+    transition: color 120ms ease;
 }
 .lmsa-ui-chip-dismiss:hover {
-    color: var(--text-muted);
-    background: color-mix(in srgb, var(--background-modifier-border) 60%, transparent);
-  }
+    color: var(--text-normal);
+    background: var(--background-modifier-hover) !important;
+    box-shadow: none !important;
+}
 .lmsa-ui-list-item {
     display: flex;
     align-items: center;
@@ -526,23 +546,8 @@
     padding-top: 0.75rem;
     border-top: 1px solid color-mix(in srgb, var(--background-modifier-border) 78%, transparent);
 }
-.lmsa-composer-footer-meta {
-    display: flex;
-    min-width: 0px;
-    align-items: center;
-    gap: 0.625rem;
-}
-.lmsa-compose-hint {
-    border-radius: 9999px;
-    padding-left: 0.625rem;
-    padding-right: 0.625rem;
-    padding-top: 0.25rem;
-    padding-bottom: 0.25rem;
-    color: var(--text-muted);
-    font-size: var(--font-ui-smaller);
-    background: color-mix(in srgb, var(--background-secondary) 52%, transparent);
-}
 .lmsa-composer-footer-actions {
+    margin-left: auto;
     display: flex;
     align-items: center;
     gap: 0.75rem;
@@ -553,7 +558,10 @@
 }
 .lmsa-mode-toggle-btn {
     position: relative;
+    display: inline-flex;
     cursor: pointer;
+    align-items: center;
+    gap: 0.375rem;
     padding-left: 0.75rem;
     padding-right: 0.75rem;
     padding-top: 0.375rem;
@@ -565,8 +573,16 @@
     background: color-mix(in srgb, var(--background-primary) 90%, var(--background-secondary));
     border: 1px solid var(--background-modifier-border);
     border-radius: 0;
-    transition: background 0.12s ease, color 0.12s ease;
+    transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease;
 }
+.lmsa-mode-toggle-icon {
+    display: inline-flex;
+    align-items: center;
+}
+.lmsa-mode-toggle-icon svg {
+    width: 12px;
+    height: 12px;
+  }
 .lmsa-mode-toggle-btn + .lmsa-mode-toggle-btn {
     margin-left: -1px;
   }
@@ -582,10 +598,23 @@
     z-index: 1;
   }
 .lmsa-mode-toggle-btn.is-active {
-    background: var(--background-modifier-hover);
     color: var(--text-normal);
-    border-color: color-mix(in srgb, var(--lmsa-mode-accent) 40%, var(--background-modifier-border));
     z-index: 1;
+  }
+.lmsa-mode-toggle-btn.is-active[data-mode="plan"] {
+    background: color-mix(in srgb, var(--color-blue, #4a90d9) 15%, var(--background-primary));
+    border-color: color-mix(in srgb, var(--color-blue, #4a90d9) 45%, var(--background-modifier-border));
+    color: var(--color-blue, #4a90d9);
+  }
+.lmsa-mode-toggle-btn.is-active[data-mode="conversation"] {
+    background: color-mix(in srgb, var(--interactive-accent) 15%, var(--background-primary));
+    border-color: color-mix(in srgb, var(--interactive-accent) 45%, var(--background-modifier-border));
+    color: var(--interactive-accent);
+  }
+.lmsa-mode-toggle-btn.is-active[data-mode="edit"] {
+    background: color-mix(in srgb, var(--color-orange, #e8a84b) 15%, var(--background-primary));
+    border-color: color-mix(in srgb, var(--color-orange, #e8a84b) 45%, var(--background-modifier-border));
+    color: var(--color-orange, #e8a84b);
   }
 .lmsa-mode-toggle-btn:focus-visible {
     outline: none;
@@ -699,6 +728,22 @@
     flex-shrink: 0;
     gap: 0.375rem;
 }
+.lmsa-history-header-actions .lmsa-ui-icon-btn {
+    height: auto;
+    width: auto;
+    border-radius: 0.375rem;
+    border-style: none;
+    padding: 0.375rem;
+    background: transparent !important;
+    box-shadow: none !important;
+}
+.lmsa-history-header-actions .lmsa-ui-icon-btn:hover {
+    background: var(--background-modifier-hover) !important;
+  }
+.lmsa-history-header-actions .lmsa-header-btn svg {
+    width: 20px;
+    height: 20px;
+  }
 .lmsa-history-list {
     display: flex;
     flex: 1 1 0%;
@@ -731,12 +776,13 @@
     padding-top: 0.75rem;
     background: color-mix(in srgb, var(--background-secondary) 34%, transparent);
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+    transition: border-color 200ms ease, box-shadow 200ms ease;
 }
 .lmsa-history-item:hover {
-    transform: translateY(-1px);
+    border-color: var(--lmsa-chat-border-emphasis);
     box-shadow:
-      0 12px 28px rgba(0, 0, 0, 0.12),
-      inset 0 1px 0 rgba(255, 255, 255, 0.04);
+      0 10px 30px rgba(0, 0, 0, 0.04),
+      0 0 0 1px var(--lmsa-chat-glow-ring);
   }
 .lmsa-history-item.is-active {
     border-color: color-mix(in srgb, var(--lmsa-mode-accent) 34%, var(--background-modifier-border));
@@ -786,6 +832,8 @@
     transition-property: all;
     transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
     transition-duration: 140ms;
+    background: transparent !important;
+    box-shadow: none !important;
 }
 .lmsa-history-item:hover .lmsa-history-trash-btn {
     --tw-scale-x: 1;
@@ -793,6 +841,10 @@
     transform: translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y));
     opacity: 1;
 }
+.lmsa-history-trash-btn:hover {
+    background: var(--background-modifier-hover) !important;
+    box-shadow: none !important;
+  }
 .lmsa-message {
     display: flex;
     width: 100%;
@@ -817,7 +869,8 @@
 }
 .lmsa-message--assistant .lmsa-message-avatar {
     color: var(--lmsa-mode-accent);
-    background: color-mix(in srgb, var(--lmsa-mode-accent) 12%, var(--background-secondary));
+    background: color-mix(in srgb, var(--lmsa-mode-accent) 8%, var(--background-secondary));
+    border-color: color-mix(in srgb, var(--lmsa-mode-accent) 30%, var(--background-modifier-border));
   }
 .lmsa-message--user .lmsa-message-avatar {
     order: 2;
@@ -826,6 +879,7 @@
     color: rgb(255 255 255 / var(--tw-text-opacity, 1));
     background: linear-gradient(135deg, var(--color-blue, #4a90d9), var(--interactive-accent) 50%, var(--color-orange, #e8a84b));
     color: var(--text-on-accent);
+    box-shadow: 0 0px 14px color-mix(in srgb, var(--interactive-accent) 40%, transparent);
 }
 .lmsa-message-column {
     display: flex;
@@ -893,12 +947,19 @@
 .lmsa-message-body:hover::before {
     opacity: 0.85;
   }
-.lmsa-message--user .lmsa-message-body {
-    background: color-mix(in srgb, var(--lmsa-mode-accent) 15%, var(--background-primary));
+.lmsa-message--assistant .lmsa-message-body {
     border-color: color-mix(in srgb, var(--lmsa-mode-accent) 35%, var(--background-modifier-border));
   }
+.lmsa-message--user .lmsa-message-body {
+    background: linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--lmsa-mode-accent) 18%, var(--background-primary)),
+      color-mix(in srgb, var(--lmsa-mode-accent) 8%, var(--background-primary))
+    );
+    border-color: color-mix(in srgb, var(--lmsa-mode-accent) 45%, var(--background-modifier-border));
+  }
 .lmsa-message--user .lmsa-message-body:hover {
-    border-color: color-mix(in srgb, var(--lmsa-mode-accent) 50%, var(--background-modifier-border));
+    border-color: color-mix(in srgb, var(--lmsa-mode-accent) 60%, var(--background-modifier-border));
     box-shadow:
       0 10px 30px rgba(0, 0, 0, 0.04),
       0 0 0 1px var(--lmsa-chat-glow-ring);
@@ -2325,6 +2386,9 @@
 .lmsa-mb-2 {
     margin-bottom: 0.5rem;
 }
+.lmsa-ml-auto {
+    margin-left: auto;
+}
 .lmsa-mt-1 {
     margin-top: 0.25rem;
 }
@@ -2816,19 +2880,9 @@
         justify-content: flex-start;
     }
 
-  .lmsa-composer-footer-meta {
-        width: 100%;
-        flex-direction: column;
-        align-items: stretch;
-    }
-
   .lmsa-composer-footer-actions {
         width: 100%;
         justify-content: space-between;
-    }
-
-  .lmsa-compose-hint {
-        align-self: flex-start;
     }
   .lmsa-history-drawer {
     inset: 8px 8px 8px;

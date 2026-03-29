@@ -1,0 +1,266 @@
+/* -----------------------------------------------------------------------
+ * DiffHunkView — individual diff hunk with unified / side-by-side display
+ * ----------------------------------------------------------------------- */
+
+.lmsa-diff-hunk {
+  @apply lmsa-overflow-hidden lmsa-rounded-xl lmsa-border lmsa-border-obsidian-border;
+  background: var(--background-primary);
+  transition: border-color 0.15s ease;
+}
+
+/* Status-based left border accent */
+.lmsa-diff-hunk[data-status="accepted"] {
+  border-color: var(--interactive-accent);
+}
+
+.lmsa-diff-hunk[data-status="rejected"] {
+  border-color: var(--text-error);
+  opacity: 0.65;
+}
+
+.lmsa-diff-hunk[data-status="applied"] {
+  border-color: var(--text-success, #4ade80);
+  opacity: 0.8;
+}
+
+.lmsa-diff-hunk[data-status="skipped"] {
+  border-color: var(--text-faint);
+  opacity: 0.5;
+}
+
+/* ------- Header ------- */
+
+.lmsa-diff-hunk-header {
+  @apply lmsa-flex lmsa-items-center lmsa-justify-between lmsa-gap-2 lmsa-px-3 lmsa-py-2;
+  border-bottom: 1px solid var(--background-modifier-border);
+  background: var(--background-secondary);
+}
+
+.lmsa-diff-hunk-meta {
+  @apply lmsa-flex lmsa-items-center lmsa-gap-2;
+  font-size: var(--font-ui-smaller);
+}
+
+.lmsa-diff-hunk-location {
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.lmsa-diff-hunk-confidence {
+  color: var(--text-faint);
+}
+
+.lmsa-diff-hunk-confidence.is-low-confidence {
+  color: var(--text-warning, #f59e0b);
+}
+
+.lmsa-diff-hunk-confidence.is-no-match {
+  @apply lmsa-flex lmsa-items-center lmsa-gap-1;
+  color: var(--text-error);
+}
+
+.lmsa-diff-hunk-warn-icon {
+  @apply lmsa-inline-flex lmsa-items-center;
+}
+
+.lmsa-diff-hunk-warn-icon svg {
+  width: 12px;
+  height: 12px;
+}
+
+.lmsa-diff-hunk-actions {
+  @apply lmsa-flex lmsa-items-center lmsa-gap-2;
+}
+
+/* ------- Grouped buttons (shared pattern) ------- */
+
+.lmsa-btn-group {
+  @apply lmsa-inline-flex;
+  border-radius: 8px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.lmsa-btn-group .lmsa-btn-group-item {
+  @apply lmsa-inline-flex lmsa-cursor-pointer lmsa-items-center lmsa-gap-1 lmsa-border lmsa-border-obsidian-border lmsa-bg-transparent lmsa-px-2 lmsa-py-1;
+  font-size: var(--font-ui-smaller);
+  color: var(--text-muted);
+  transition: all 0.1s ease;
+  border-radius: 0;
+  margin-left: -1px;
+}
+
+.lmsa-btn-group .lmsa-btn-group-item:first-child {
+  border-radius: 8px 0 0 8px;
+  margin-left: 0;
+}
+
+.lmsa-btn-group .lmsa-btn-group-item:last-child {
+  border-radius: 0 8px 8px 0;
+}
+
+.lmsa-btn-group .lmsa-btn-group-item:only-child {
+  border-radius: 8px;
+}
+
+.lmsa-btn-group-item svg {
+  width: 12px;
+  height: 12px;
+}
+
+.lmsa-btn-group-item:hover {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+  z-index: 1;
+}
+
+.lmsa-btn-group-item.is-active {
+  background: var(--background-primary);
+  color: var(--interactive-accent);
+  border-color: var(--interactive-accent);
+  z-index: 2;
+}
+
+.lmsa-btn-group-item--accept.is-active {
+  background: color-mix(in srgb, var(--interactive-accent) 18%, var(--background-primary));
+  border-color: var(--interactive-accent);
+  color: var(--interactive-accent);
+}
+
+.lmsa-btn-group-item--reject.is-active {
+  background: color-mix(in srgb, var(--text-error) 15%, var(--background-primary));
+  border-color: var(--text-error);
+  color: var(--text-error);
+}
+
+/* ------- Standalone buttons (undo) ------- */
+
+.lmsa-diff-hunk-btn {
+  @apply lmsa-inline-flex lmsa-cursor-pointer lmsa-items-center lmsa-gap-1 lmsa-rounded-lg lmsa-border lmsa-border-obsidian-border lmsa-bg-transparent lmsa-px-2 lmsa-py-1;
+  font-size: var(--font-ui-smaller);
+  color: var(--text-muted);
+  transition: all 0.1s ease;
+}
+
+.lmsa-diff-hunk-btn svg {
+  width: 12px;
+  height: 12px;
+}
+
+.lmsa-diff-hunk-btn:hover {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+
+.lmsa-diff-hunk-btn--undo:hover {
+  border-color: var(--text-warning, #f59e0b);
+  color: var(--text-warning, #f59e0b);
+}
+
+/* ------- Post-apply badges ------- */
+
+.lmsa-diff-hunk-badge {
+  @apply lmsa-rounded-md lmsa-px-1.5 lmsa-py-0.5;
+  font-size: var(--font-ui-smaller);
+  font-weight: 500;
+}
+
+.lmsa-diff-hunk-badge--applied {
+  background: color-mix(in srgb, var(--text-success, #4ade80) 15%, var(--background-primary));
+  color: var(--text-success, #4ade80);
+}
+
+.lmsa-diff-hunk-badge--skipped {
+  background: color-mix(in srgb, var(--text-faint) 15%, var(--background-primary));
+  color: var(--text-faint);
+}
+
+/* ------- Body: shared line styles ------- */
+
+.lmsa-diff-hunk-body {
+  @apply lmsa-overflow-x-auto;
+  font-family: var(--font-monospace);
+  font-size: var(--font-ui-smaller);
+  line-height: 1.55;
+}
+
+.lmsa-diff-gutter {
+  @apply lmsa-flex-none lmsa-select-none lmsa-text-right;
+  width: 32px;
+  padding: 0 4px;
+  color: var(--text-faint);
+  opacity: 0.6;
+}
+
+.lmsa-diff-prefix {
+  @apply lmsa-flex-none lmsa-select-none;
+  width: 16px;
+  text-align: center;
+}
+
+.lmsa-diff-text {
+  @apply lmsa-flex-1;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* Line type styling */
+.lmsa-diff-line--context {
+  color: var(--text-faint);
+}
+
+.lmsa-diff-line--removed {
+  background: color-mix(in srgb, var(--text-error) 10%, var(--background-primary));
+  color: var(--text-normal);
+}
+
+.lmsa-diff-line--removed .lmsa-diff-prefix {
+  color: var(--text-error);
+}
+
+.lmsa-diff-line--added {
+  background: color-mix(in srgb, var(--text-success, #4ade80) 10%, var(--background-primary));
+  color: var(--text-normal);
+}
+
+.lmsa-diff-line--added .lmsa-diff-prefix {
+  color: var(--text-success, #4ade80);
+}
+
+/* Word-level change highlighting within paired lines */
+.lmsa-diff-line--removed .lmsa-diff-highlight {
+  background: color-mix(in srgb, var(--text-error) 25%, transparent);
+  border-radius: 2px;
+}
+
+.lmsa-diff-line--added .lmsa-diff-highlight {
+  background: color-mix(in srgb, var(--text-success, #4ade80) 25%, transparent);
+  border-radius: 2px;
+}
+
+/* ------- Unified mode ------- */
+
+.lmsa-diff-hunk-body--unified .lmsa-diff-line {
+  @apply lmsa-flex lmsa-min-h-[22px];
+  padding: 0 8px 0 0;
+}
+
+/* ------- Side-by-side mode ------- */
+
+.lmsa-diff-row {
+  @apply lmsa-flex;
+}
+
+.lmsa-diff-side {
+  @apply lmsa-flex lmsa-min-h-[22px];
+  width: 50%;
+  padding: 0 4px 0 0;
+  box-sizing: border-box;
+}
+
+.lmsa-diff-side--left {
+  border-right: 1px solid var(--background-modifier-border);
+}
+
+.lmsa-diff-side--empty {
+  background: color-mix(in srgb, var(--text-faint) 4%, var(--background-primary));
+}

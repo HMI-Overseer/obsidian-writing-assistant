@@ -39,4 +39,10 @@
     width: 10px;
     height: 10px;
   }
+
+  .lmsa-chip--edit {
+    border-color: var(--interactive-accent);
+    background: color-mix(in srgb, var(--interactive-accent) 8%, var(--background-primary));
+  }
+
 }

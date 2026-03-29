@@ -473,6 +473,56 @@
     font-size: var(--font-ui-smaller);
     background: color-mix(in srgb, var(--background-secondary) 52%, transparent);
 }
+.lmsa-composer-footer-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+.lmsa-mode-toggle {
+    display: inline-flex;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+.lmsa-mode-toggle-btn {
+    position: relative;
+    cursor: pointer;
+    padding-left: 0.75rem;
+    padding-right: 0.75rem;
+    padding-top: 0.375rem;
+    padding-bottom: 0.375rem;
+    font-size: var(--font-ui-smaller);
+    font-weight: 500;
+    line-height: 1.25;
+    color: var(--text-muted);
+    background: color-mix(in srgb, var(--background-primary) 90%, var(--background-secondary));
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 0;
+    transition: background 0.12s ease, color 0.12s ease;
+}
+.lmsa-mode-toggle-btn + .lmsa-mode-toggle-btn {
+    margin-left: -1px;
+  }
+.lmsa-mode-toggle-btn:first-child {
+    border-radius: 6px 0 0 6px;
+  }
+.lmsa-mode-toggle-btn:last-child {
+    border-radius: 0 6px 6px 0;
+  }
+.lmsa-mode-toggle-btn:hover {
+    background: var(--background-modifier-hover);
+    color: var(--text-normal);
+    z-index: 1;
+  }
+.lmsa-mode-toggle-btn.is-active {
+    background: var(--background-modifier-hover);
+    color: var(--text-normal);
+    border-color: color-mix(in srgb, var(--interactive-accent) 40%, var(--background-modifier-border));
+    z-index: 1;
+  }
+.lmsa-mode-toggle-btn:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--interactive-accent) 20%, transparent);
+    z-index: 2;
+  }
 .lmsa-action-btn {
     display: flex;
     align-items: center;
@@ -1142,6 +1192,10 @@
     width: 10px;
     height: 10px;
   }
+.lmsa-chip--edit {
+    border-color: var(--interactive-accent);
+    background: color-mix(in srgb, var(--interactive-accent) 8%, var(--background-primary));
+  }
 .lmsa-settings-root {
     padding-bottom: 2rem;
 }
@@ -1770,6 +1824,9 @@
 .lmsa-min-h-9 {
     min-height: 2.25rem;
 }
+.lmsa-min-h-\[22px\] {
+    min-height: 22px;
+}
 .lmsa-w-10 {
     width: 2.5rem;
 }
@@ -1840,6 +1897,11 @@
 }
 .lmsa-cursor-pointer {
     cursor: pointer;
+}
+.lmsa-select-none {
+    -webkit-user-select: none;
+       -moz-user-select: none;
+            user-select: none;
 }
 .lmsa-resize-none {
     resize: none;
@@ -2006,6 +2068,10 @@
 .lmsa-px-1 {
     padding-left: 0.25rem;
     padding-right: 0.25rem;
+}
+.lmsa-px-1\.5 {
+    padding-left: 0.375rem;
+    padding-right: 0.375rem;
 }
 .lmsa-px-2 {
     padding-left: 0.5rem;
@@ -2205,6 +2271,11 @@
         align-items: stretch;
     }
 
+  .lmsa-composer-footer-actions {
+        width: 100%;
+        justify-content: space-between;
+    }
+
   .lmsa-compose-hint {
         align-self: flex-start;
     }
@@ -2268,5 +2339,319 @@
   30% {
     color: var(--text-error);
   }
+}
+/* Diff / Editing */
+/* -----------------------------------------------------------------------
+ * DiffHunkView — individual diff hunk with unified / side-by-side display
+ * ----------------------------------------------------------------------- */
+.lmsa-diff-hunk {
+    overflow: hidden;
+    border-radius: 0.75rem;
+    border-width: 1px;
+    border-color: var(--background-modifier-border);
+  background: var(--background-primary);
+  transition: border-color 0.15s ease;
+}
+/* Status-based left border accent */
+.lmsa-diff-hunk[data-status="accepted"] {
+  border-color: var(--interactive-accent);
+}
+.lmsa-diff-hunk[data-status="rejected"] {
+  border-color: var(--text-error);
+  opacity: 0.65;
+}
+.lmsa-diff-hunk[data-status="applied"] {
+  border-color: var(--text-success, #4ade80);
+  opacity: 0.8;
+}
+.lmsa-diff-hunk[data-status="skipped"] {
+  border-color: var(--text-faint);
+  opacity: 0.5;
+}
+/* ------- Header ------- */
+.lmsa-diff-hunk-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    padding-left: 0.75rem;
+    padding-right: 0.75rem;
+    padding-top: 0.5rem;
+    padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--background-modifier-border);
+  background: var(--background-secondary);
+}
+.lmsa-diff-hunk-meta {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  font-size: var(--font-ui-smaller);
+}
+.lmsa-diff-hunk-location {
+  color: var(--text-muted);
+  font-weight: 500;
+}
+.lmsa-diff-hunk-confidence {
+  color: var(--text-faint);
+}
+.lmsa-diff-hunk-confidence.is-low-confidence {
+  color: var(--text-warning, #f59e0b);
+}
+.lmsa-diff-hunk-confidence.is-no-match {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+  color: var(--text-error);
+}
+.lmsa-diff-hunk-warn-icon {
+    display: inline-flex;
+    align-items: center;
+}
+.lmsa-diff-hunk-warn-icon svg {
+  width: 12px;
+  height: 12px;
+}
+.lmsa-diff-hunk-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+/* ------- Grouped buttons (shared pattern) ------- */
+.lmsa-btn-group {
+    display: inline-flex;
+  border-radius: 8px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+.lmsa-btn-group .lmsa-btn-group-item {
+    display: inline-flex;
+    cursor: pointer;
+    align-items: center;
+    gap: 0.25rem;
+    border-width: 1px;
+    border-color: var(--background-modifier-border);
+    background-color: transparent;
+    padding-left: 0.5rem;
+    padding-right: 0.5rem;
+    padding-top: 0.25rem;
+    padding-bottom: 0.25rem;
+  font-size: var(--font-ui-smaller);
+  color: var(--text-muted);
+  transition: all 0.1s ease;
+  border-radius: 0;
+  margin-left: -1px;
+}
+.lmsa-btn-group .lmsa-btn-group-item:first-child {
+  border-radius: 8px 0 0 8px;
+  margin-left: 0;
+}
+.lmsa-btn-group .lmsa-btn-group-item:last-child {
+  border-radius: 0 8px 8px 0;
+}
+.lmsa-btn-group .lmsa-btn-group-item:only-child {
+  border-radius: 8px;
+}
+.lmsa-btn-group-item svg {
+  width: 12px;
+  height: 12px;
+}
+.lmsa-btn-group-item:hover {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+  z-index: 1;
+}
+.lmsa-btn-group-item.is-active {
+  background: var(--background-primary);
+  color: var(--interactive-accent);
+  border-color: var(--interactive-accent);
+  z-index: 2;
+}
+.lmsa-btn-group-item--accept.is-active {
+  background: color-mix(in srgb, var(--interactive-accent) 18%, var(--background-primary));
+  border-color: var(--interactive-accent);
+  color: var(--interactive-accent);
+}
+.lmsa-btn-group-item--reject.is-active {
+  background: color-mix(in srgb, var(--text-error) 15%, var(--background-primary));
+  border-color: var(--text-error);
+  color: var(--text-error);
+}
+/* ------- Standalone buttons (undo) ------- */
+.lmsa-diff-hunk-btn {
+    display: inline-flex;
+    cursor: pointer;
+    align-items: center;
+    gap: 0.25rem;
+    border-radius: 0.5rem;
+    border-width: 1px;
+    border-color: var(--background-modifier-border);
+    background-color: transparent;
+    padding-left: 0.5rem;
+    padding-right: 0.5rem;
+    padding-top: 0.25rem;
+    padding-bottom: 0.25rem;
+  font-size: var(--font-ui-smaller);
+  color: var(--text-muted);
+  transition: all 0.1s ease;
+}
+.lmsa-diff-hunk-btn svg {
+  width: 12px;
+  height: 12px;
+}
+.lmsa-diff-hunk-btn:hover {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+.lmsa-diff-hunk-btn--undo:hover {
+  border-color: var(--text-warning, #f59e0b);
+  color: var(--text-warning, #f59e0b);
+}
+/* ------- Post-apply badges ------- */
+.lmsa-diff-hunk-badge {
+    border-radius: 0.375rem;
+    padding-left: 0.375rem;
+    padding-right: 0.375rem;
+    padding-top: 0.125rem;
+    padding-bottom: 0.125rem;
+  font-size: var(--font-ui-smaller);
+  font-weight: 500;
+}
+.lmsa-diff-hunk-badge--applied {
+  background: color-mix(in srgb, var(--text-success, #4ade80) 15%, var(--background-primary));
+  color: var(--text-success, #4ade80);
+}
+.lmsa-diff-hunk-badge--skipped {
+  background: color-mix(in srgb, var(--text-faint) 15%, var(--background-primary));
+  color: var(--text-faint);
+}
+/* ------- Body: shared line styles ------- */
+.lmsa-diff-hunk-body {
+    overflow-x: auto;
+  font-family: var(--font-monospace);
+  font-size: var(--font-ui-smaller);
+  line-height: 1.55;
+}
+.lmsa-diff-gutter {
+    flex: none;
+    -webkit-user-select: none;
+       -moz-user-select: none;
+            user-select: none;
+    text-align: right;
+  width: 32px;
+  padding: 0 4px;
+  color: var(--text-faint);
+  opacity: 0.6;
+}
+.lmsa-diff-prefix {
+    flex: none;
+    -webkit-user-select: none;
+       -moz-user-select: none;
+            user-select: none;
+  width: 16px;
+  text-align: center;
+}
+.lmsa-diff-text {
+    flex: 1 1 0%;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+/* Line type styling */
+.lmsa-diff-line--context {
+  color: var(--text-faint);
+}
+.lmsa-diff-line--removed {
+  background: color-mix(in srgb, var(--text-error) 10%, var(--background-primary));
+  color: var(--text-normal);
+}
+.lmsa-diff-line--removed .lmsa-diff-prefix {
+  color: var(--text-error);
+}
+.lmsa-diff-line--added {
+  background: color-mix(in srgb, var(--text-success, #4ade80) 10%, var(--background-primary));
+  color: var(--text-normal);
+}
+.lmsa-diff-line--added .lmsa-diff-prefix {
+  color: var(--text-success, #4ade80);
+}
+/* Word-level change highlighting within paired lines */
+.lmsa-diff-line--removed .lmsa-diff-highlight {
+  background: color-mix(in srgb, var(--text-error) 25%, transparent);
+  border-radius: 2px;
+}
+.lmsa-diff-line--added .lmsa-diff-highlight {
+  background: color-mix(in srgb, var(--text-success, #4ade80) 25%, transparent);
+  border-radius: 2px;
+}
+/* ------- Unified mode ------- */
+.lmsa-diff-hunk-body--unified .lmsa-diff-line {
+    display: flex;
+    min-height: 22px;
+  padding: 0 8px 0 0;
+}
+/* ------- Side-by-side mode ------- */
+.lmsa-diff-row {
+    display: flex;
+}
+.lmsa-diff-side {
+    display: flex;
+    min-height: 22px;
+  width: 50%;
+  padding: 0 4px 0 0;
+  box-sizing: border-box;
+}
+.lmsa-diff-side--left {
+  border-right: 1px solid var(--background-modifier-border);
+}
+.lmsa-diff-side--empty {
+  background: color-mix(in srgb, var(--text-faint) 4%, var(--background-primary));
+}
+/* -----------------------------------------------------------------------
+ * DiffReviewPanel — container for the full edit proposal diff UI
+ * ----------------------------------------------------------------------- */
+.lmsa-diff-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+/* ------- Header ------- */
+.lmsa-diff-header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+}
+.lmsa-diff-target-file {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+  font-size: var(--font-ui-small);
+  font-weight: 600;
+  color: var(--text-normal);
+}
+.lmsa-diff-file-icon {
+    display: inline-flex;
+    align-items: center;
+  color: var(--text-muted);
+}
+.lmsa-diff-file-icon svg {
+  width: 14px;
+  height: 14px;
+}
+/* ------- Prose ------- */
+.lmsa-diff-prose {
+  font-size: var(--font-ui-small);
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+.lmsa-diff-prose p:first-child {
+  margin-top: 0;
+}
+.lmsa-diff-prose p:last-child {
+  margin-bottom: 0;
+}
+/* ------- Hunks container ------- */
+.lmsa-diff-hunks {
+    display: flex;
+    flex-direction: column;
+    gap: 0.625rem;
 }
 /* Settings */

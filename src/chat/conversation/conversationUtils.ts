@@ -104,6 +104,14 @@ function normalizeConversation(raw: Record<string, unknown>): Conversation | nul
             }
           }
 
+          // Preserve edit proposal and applied edit records if present
+          if (message.editProposal && typeof message.editProposal === "object") {
+            base.editProposal = message.editProposal as ConversationMessage["editProposal"];
+          }
+          if (message.appliedEdit && typeof message.appliedEdit === "object") {
+            base.appliedEdit = message.appliedEdit as ConversationMessage["appliedEdit"];
+          }
+
           return base;
         })
     : [];

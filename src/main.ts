@@ -72,6 +72,19 @@ export default class LMStudioWritingAssistant extends Plugin {
       },
     });
 
+    this.addCommand({
+      id: "edit-active-note",
+      name: "Edit active note with AI",
+      editorCallback: async () => {
+        await this.activateChatView();
+        const leaves = this.app.workspace.getLeavesOfType(VIEW_TYPE_CHAT);
+        if (leaves.length > 0) {
+          const view = leaves[0].view as ChatView;
+          view.setMode("edit");
+        }
+      },
+    });
+
     this.addSettingTab(new LMStudioSettingTab(this.app, this));
 
     if (this.app.workspace.layoutReady) {
@@ -130,6 +143,14 @@ export default class LMStudioWritingAssistant extends Plugin {
       embeddingModels,
       commands,
       chatHistory,
+      diffContextLines:
+        typeof data?.diffContextLines === "number"
+          ? data.diffContextLines
+          : DEFAULT_SETTINGS.diffContextLines,
+      diffMinMatchConfidence:
+        typeof data?.diffMinMatchConfidence === "number"
+          ? data.diffMinMatchConfidence
+          : DEFAULT_SETTINGS.diffMinMatchConfidence,
     };
   }
 

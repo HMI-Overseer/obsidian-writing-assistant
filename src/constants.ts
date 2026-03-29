@@ -21,4 +21,6 @@ export const DEFAULT_SETTINGS: PluginSettings = {
   embeddingModels: [],
   commands: [],
   chatHistory: { ...DEFAULT_CHAT_HISTORY },
+  diffContextLines: 3,
+  diffMinMatchConfidence: 0.7,
 };

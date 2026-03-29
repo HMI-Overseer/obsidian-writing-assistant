@@ -31,3 +31,17 @@ export async function getActiveNoteContext(
 export function getActiveFileName(app: App): string | null {
   return app.workspace.getActiveFile()?.name ?? null;
 }
+
+/**
+ * Read the full content of the active note without any truncation.
+ * Used by edit mode where the model needs the complete document.
+ */
+export async function getFullNoteContent(
+  app: App
+): Promise<{ content: string; filePath: string } | null> {
+  const file = app.workspace.getActiveFile();
+  if (!file) return null;
+
+  const content = await app.vault.read(file);
+  return { content, filePath: file.path };
+}

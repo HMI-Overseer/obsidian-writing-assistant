@@ -198,6 +198,58 @@
     background: color-mix(in srgb, var(--background-secondary) 52%, transparent);
   }
 
+  .lmsa-composer-footer-actions {
+    @apply lmsa-flex lmsa-items-center lmsa-gap-3;
+  }
+
+  .lmsa-mode-toggle {
+    @apply lmsa-inline-flex;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  }
+
+  .lmsa-mode-toggle-btn {
+    @apply lmsa-relative lmsa-cursor-pointer lmsa-px-3 lmsa-py-1.5;
+    font-size: var(--font-ui-smaller);
+    font-weight: 500;
+    line-height: 1.25;
+    color: var(--text-muted);
+    background: color-mix(in srgb, var(--background-primary) 90%, var(--background-secondary));
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 0;
+    transition: background 0.12s ease, color 0.12s ease;
+  }
+
+  .lmsa-mode-toggle-btn + .lmsa-mode-toggle-btn {
+    margin-left: -1px;
+  }
+
+  .lmsa-mode-toggle-btn:first-child {
+    border-radius: 6px 0 0 6px;
+  }
+
+  .lmsa-mode-toggle-btn:last-child {
+    border-radius: 0 6px 6px 0;
+  }
+
+  .lmsa-mode-toggle-btn:hover {
+    background: var(--background-modifier-hover);
+    color: var(--text-normal);
+    z-index: 1;
+  }
+
+  .lmsa-mode-toggle-btn.is-active {
+    background: var(--background-modifier-hover);
+    color: var(--text-normal);
+    border-color: color-mix(in srgb, var(--interactive-accent) 40%, var(--background-modifier-border));
+    z-index: 1;
+  }
+
+  .lmsa-mode-toggle-btn:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--interactive-accent) 20%, transparent);
+    z-index: 2;
+  }
+
   .lmsa-action-btn {
     @apply lmsa-flex lmsa-items-center lmsa-justify-center;
     width: 36px;
@@ -252,6 +304,10 @@
 
   .lmsa-composer-footer-meta {
     @apply lmsa-w-full lmsa-flex-col lmsa-items-stretch;
+  }
+
+  .lmsa-composer-footer-actions {
+    @apply lmsa-w-full lmsa-justify-between;
   }
 
   .lmsa-compose-hint {

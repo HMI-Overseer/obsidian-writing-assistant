@@ -1,3 +1,4 @@
+import type { Component } from "obsidian";
 import { Notice } from "obsidian";
 import { LMStudioClient } from "../../api";
 import type LMStudioWritingAssistant from "../../main";
@@ -7,6 +8,8 @@ import type { ChatTranscript } from "../messages/ChatTranscript";
 import type { ChatModelSelector } from "../models/ChatModelSelector";
 import { prepareApiMessages } from "./prepareApiMessages";
 import { StreamingRenderer } from "./StreamingRenderer";
+import { EditStreamingRenderer } from "./EditStreamingRenderer";
+import { finalizeEditResponse } from "./finalizeEditResponse";
 
 function isAbortError(error: unknown): boolean {
   return error instanceof Error && error.name === "AbortError";
@@ -21,6 +24,7 @@ function getErrorMessage(error: unknown): string {
 
 export type RegenerateOptions = {
   plugin: LMStudioWritingAssistant;
+  owner: Component;
   store: ChatSessionStore;
   transcript: ChatTranscript;
   composer: ChatComposer;
@@ -35,6 +39,7 @@ export type RegenerateOptions = {
 export async function regenerateMessage(options: RegenerateOptions): Promise<void> {
   const {
     plugin,
+    owner,
     store,
     transcript,
     composer,
@@ -67,6 +72,8 @@ export async function regenerateMessage(options: RegenerateOptions): Promise<voi
     return;
   }
 
+  const editMode = composer.getMode() === "edit";
+
   const oldMessage = store.removeLastMessage();
   if (!oldMessage) return;
 
@@ -75,18 +82,22 @@ export async function regenerateMessage(options: RegenerateOptions): Promise<voi
   await store.persistActiveConversation();
   await syncConversationUi();
 
-  const apiMessages = await prepareApiMessages(
-    plugin.app,
+  const apiMessages = await prepareApiMessages({
+    app: plugin.app,
     store,
     activeModel,
-    plugin.settings.includeNoteContext,
-    composer.isSessionContextEnabled(),
-    plugin.settings.maxContextChars
-  );
+    includeNoteContext: plugin.settings.includeNoteContext,
+    sessionContextEnabled: composer.isSessionContextEnabled(),
+    maxContextChars: plugin.settings.maxContextChars,
+    editMode,
+  });
 
   const assistantBubble = transcript.createBubble("assistant");
   assistantBubble.bodyEl.addClass("is-streaming");
-  const renderer = new StreamingRenderer(assistantBubble, transcript);
+
+  const renderer = editMode
+    ? new EditStreamingRenderer(assistantBubble, transcript)
+    : new StreamingRenderer(assistantBubble, transcript);
 
   const client = new LMStudioClient(plugin.settings.lmStudioUrl, plugin.settings.bypassCors);
   const abortController = new AbortController();
@@ -106,11 +117,23 @@ export async function regenerateMessage(options: RegenerateOptions): Promise<voi
     await renderer.flush();
     assistantBubble.bodyEl.removeClass("is-streaming");
 
-    const fullResponse = renderer.getFullResponse();
-    if (fullResponse) {
-      store.finalizeRegeneration(oldMessage, fullResponse);
+    if (editMode && renderer instanceof EditStreamingRenderer) {
+      await finalizeEditResponse({
+        app: plugin.app,
+        owner,
+        store,
+        transcript,
+        bubble: assistantBubble,
+        renderer,
+        plugin,
+      });
     } else {
-      transcript.renderPlainTextContent(assistantBubble, "(no response)");
+      const fullResponse = renderer.getFullResponse();
+      if (fullResponse) {
+        store.finalizeRegeneration(oldMessage, fullResponse);
+      } else {
+        transcript.renderPlainTextContent(assistantBubble, "(no response)");
+      }
     }
 
   } catch (error) {
@@ -118,15 +141,29 @@ export async function regenerateMessage(options: RegenerateOptions): Promise<voi
     assistantBubble.bodyEl.removeClass("is-streaming");
 
     if (isAbortError(error)) {
-      const fullResponse = renderer.getFullResponse();
-      if (fullResponse) {
-        store.finalizeRegeneration(oldMessage, fullResponse);
+      if (editMode && renderer instanceof EditStreamingRenderer) {
+        await finalizeEditResponse({
+          app: plugin.app,
+          owner,
+          store,
+          transcript,
+          bubble: assistantBubble,
+          renderer,
+          plugin,
+        });
       } else {
-        transcript.renderPlainTextContent(assistantBubble, "Generation stopped.");
-        assistantBubble.bodyEl.addClass("is-muted");
+        const fullResponse = renderer.getFullResponse();
+        if (fullResponse) {
+          store.finalizeRegeneration(oldMessage, fullResponse);
+        } else {
+          transcript.renderPlainTextContent(assistantBubble, "Generation stopped.");
+          assistantBubble.bodyEl.addClass("is-muted");
+        }
       }
     } else {
-      store.finalizeRegeneration(oldMessage, oldMessage.content);
+      if (!editMode) {
+        store.finalizeRegeneration(oldMessage, oldMessage.content);
+      }
       assistantBubble.bodyEl.addClass("is-error");
       transcript.renderPlainTextContent(
         assistantBubble,

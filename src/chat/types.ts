@@ -1,5 +1,7 @@
 import type { ConversationMessage } from "../shared/types";
 
+export type ChatMode = "plan" | "conversation" | "edit";
+
 export type BubbleRole = "user" | "assistant";
 
 export type ModelAvailabilityState = "loaded" | "unloaded" | "unknown";
@@ -27,6 +29,7 @@ export type ChatLayoutRefs = {
   commandBarEl: HTMLElement;
   contextChipsEl: HTMLElement;
   textareaEl: HTMLTextAreaElement;
+  modeToggleEl: HTMLElement;
   actionBtn: HTMLButtonElement;
   modelSelectorBtn: HTMLElement;
   modelSelectorLabelEl: HTMLElement;

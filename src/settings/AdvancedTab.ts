@@ -27,6 +27,48 @@ export function renderAdvancedTab(container: HTMLElement, plugin: LMStudioWritin
         })
     );
 
+  const editing = createSettingsSection(
+    container,
+    "Document Editing",
+    "Configure how AI-proposed edits are matched against your notes."
+  );
+
+  new Setting(editing.bodyEl)
+    .setName("Diff context lines")
+    .setDesc(
+      "Number of lines shown above and below each diff hunk for context."
+    )
+    .addText((text) =>
+      text
+        .setPlaceholder("3")
+        .setValue(String(plugin.settings.diffContextLines))
+        .onChange(async (value) => {
+          const parsed = parseInt(value, 10);
+          if (!Number.isNaN(parsed) && parsed >= 0 && parsed <= 20) {
+            plugin.settings.diffContextLines = parsed;
+            await plugin.saveSettings();
+          }
+        })
+    );
+
+  new Setting(editing.bodyEl)
+    .setName("Minimum match confidence")
+    .setDesc(
+      "Fuzzy match confidence threshold (0–1). Matches below this score are flagged as unresolved. Default: 0.7"
+    )
+    .addText((text) =>
+      text
+        .setPlaceholder("0.7")
+        .setValue(String(plugin.settings.diffMinMatchConfidence))
+        .onChange(async (value) => {
+          const parsed = parseFloat(value);
+          if (!Number.isNaN(parsed) && parsed >= 0 && parsed <= 1) {
+            plugin.settings.diffMinMatchConfidence = parsed;
+            await plugin.saveSettings();
+          }
+        })
+    );
+
   const utilities = createSettingsSection(
     container,
     "Utilities",

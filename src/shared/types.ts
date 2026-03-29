@@ -1,3 +1,5 @@
+import type { EditProposal, AppliedEditRecord } from "../editing/editTypes";
+
 export interface Message {
   role: "system" | "user" | "assistant";
   content: string;
@@ -43,6 +45,10 @@ export interface ConversationMessage {
   versions?: MessageVersion[];
   /** Index into `versions` for the active version. Defaults to last when undefined. */
   activeVersionIndex?: number;
+  /** Present when this assistant message contains document edit proposals. */
+  editProposal?: EditProposal;
+  /** Present after edits from this message have been applied. */
+  appliedEdit?: AppliedEditRecord;
 }
 
 /**
@@ -83,4 +89,8 @@ export interface PluginSettings {
   embeddingModels: EmbeddingModel[];
   commands: CustomCommand[];
   chatHistory: ChatHistory;
+  /** Number of context lines shown above/below each diff hunk. */
+  diffContextLines: number;
+  /** Minimum fuzzy match confidence (0–1) to consider a match valid. */
+  diffMinMatchConfidence: number;
 }

@@ -1,3 +1,4 @@
+import type { Component } from "obsidian";
 import { LMStudioClient } from "../../api";
 import type LMStudioWritingAssistant from "../../main";
 import type { ChatComposer } from "../composer/ChatComposer";
@@ -8,7 +9,9 @@ import { makeMessage } from "../conversation/conversationUtils";
 import { validateSendRequest } from "./validateSendRequest";
 import { prepareApiMessages } from "./prepareApiMessages";
 import { StreamingRenderer } from "./StreamingRenderer";
+import { EditStreamingRenderer } from "./EditStreamingRenderer";
 import { finalizeResponse, finalizeAbortedResponse } from "./finalizeResponse";
+import { finalizeEditResponse } from "./finalizeEditResponse";
 
 function isAbortError(error: unknown): boolean {
   return error instanceof Error && error.name === "AbortError";
@@ -23,6 +26,7 @@ function getErrorMessage(error: unknown): string {
 
 export type SendMessageOptions = {
   plugin: LMStudioWritingAssistant;
+  owner: Component;
   store: ChatSessionStore;
   transcript: ChatTranscript;
   composer: ChatComposer;
@@ -33,11 +37,13 @@ export type SendMessageOptions = {
   syncConversationUi: () => Promise<void>;
   promptOverride?: string;
   autoInsertAfterResponse?: boolean;
+  editMode?: boolean;
 };
 
 export async function sendMessage(options: SendMessageOptions): Promise<void> {
   const {
     plugin,
+    owner,
     store,
     transcript,
     composer,
@@ -48,6 +54,7 @@ export async function sendMessage(options: SendMessageOptions): Promise<void> {
     syncConversationUi,
     promptOverride,
     autoInsertAfterResponse = false,
+    editMode = false,
   } = options;
 
   const validated = await validateSendRequest(
@@ -60,6 +67,24 @@ export async function sendMessage(options: SendMessageOptions): Promise<void> {
   if (!validated) return;
 
   const { text, activeModel } = validated;
+
+  // Skip any pending hunks from previous edit proposals
+  const history = store.getSnapshot().messageHistory;
+  let proposalChanged = false;
+  for (const msg of history) {
+    if (msg.editProposal) {
+      for (const hunk of msg.editProposal.hunks) {
+        if (hunk.status === "pending") {
+          hunk.status = "rejected";
+          proposalChanged = true;
+        }
+      }
+    }
+  }
+  if (proposalChanged) {
+    await store.persistActiveConversation();
+    await syncConversationUi();
+  }
 
   composer.clearDraft();
   store.setDraft("");
@@ -75,20 +100,24 @@ export async function sendMessage(options: SendMessageOptions): Promise<void> {
   store.appendMessage(userMessage);
   transcript.setEmptyStateVisible(false);
 
-  const apiMessages = await prepareApiMessages(
-    plugin.app,
+  const apiMessages = await prepareApiMessages({
+    app: plugin.app,
     store,
     activeModel,
-    plugin.settings.includeNoteContext,
-    composer.isSessionContextEnabled(),
-    plugin.settings.maxContextChars
-  );
+    includeNoteContext: plugin.settings.includeNoteContext,
+    sessionContextEnabled: composer.isSessionContextEnabled(),
+    maxContextChars: plugin.settings.maxContextChars,
+    editMode,
+  });
 
   await store.persistActiveConversation();
 
   const assistantBubble = transcript.createBubble("assistant");
   assistantBubble.bodyEl.addClass("is-streaming");
-  const renderer = new StreamingRenderer(assistantBubble, transcript);
+
+  const renderer = editMode
+    ? new EditStreamingRenderer(assistantBubble, transcript)
+    : new StreamingRenderer(assistantBubble, transcript);
 
   const client = new LMStudioClient(plugin.settings.lmStudioUrl, plugin.settings.bypassCors);
   const abortController = new AbortController();
@@ -108,21 +137,46 @@ export async function sendMessage(options: SendMessageOptions): Promise<void> {
     await renderer.flush();
     assistantBubble.bodyEl.removeClass("is-streaming");
 
-    await finalizeResponse(
-      store,
-      transcript,
-      assistantBubble,
-      renderer,
-      autoInsertAfterResponse,
-      plugin
-    );
+    if (editMode && renderer instanceof EditStreamingRenderer) {
+      await finalizeEditResponse({
+        app: plugin.app,
+        owner,
+        store,
+        transcript,
+        bubble: assistantBubble,
+        renderer,
+        plugin,
+      });
+    } else {
+      await finalizeResponse(
+        store,
+        transcript,
+        assistantBubble,
+        renderer as StreamingRenderer,
+        autoInsertAfterResponse,
+        plugin
+      );
+    }
 
   } catch (error) {
     await renderer.flush();
     assistantBubble.bodyEl.removeClass("is-streaming");
 
     if (isAbortError(error)) {
-      await finalizeAbortedResponse(store, transcript, assistantBubble, renderer);
+      if (editMode && renderer instanceof EditStreamingRenderer) {
+        // In edit mode, still try to finalize any complete blocks on abort
+        await finalizeEditResponse({
+          app: plugin.app,
+          owner,
+          store,
+          transcript,
+          bubble: assistantBubble,
+          renderer,
+          plugin,
+        });
+      } else {
+        await finalizeAbortedResponse(store, transcript, assistantBubble, renderer as StreamingRenderer);
+      }
     } else {
       assistantBubble.bodyEl.addClass("is-error");
       transcript.renderPlainTextContent(

@@ -63,7 +63,10 @@ export function createChatLayout(contentEl: HTMLElement): ChatLayoutRefs {
     text: "Enter to send, Shift+Enter for newline",
   });
 
-  const actionBtn = composerFooter.createEl("button", {
+  const composerFooterActions = composerFooter.createDiv({ cls: "lmsa-composer-footer-actions" });
+  const modeToggleEl = composerFooterActions.createDiv({ cls: "lmsa-mode-toggle" });
+
+  const actionBtn = composerFooterActions.createEl("button", {
     cls: "lmsa-action-btn lmsa-ui-btn-primary",
   }) as HTMLButtonElement;
   setIcon(actionBtn, "arrow-up");
@@ -78,6 +81,7 @@ export function createChatLayout(contentEl: HTMLElement): ChatLayoutRefs {
     commandBarEl,
     contextChipsEl,
     textareaEl,
+    modeToggleEl,
     actionBtn,
     modelSelectorBtn: headerMetaBtn,
     modelSelectorLabelEl: headerMetaLabel,

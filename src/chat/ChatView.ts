@@ -1,12 +1,14 @@
 import type { WorkspaceLeaf } from "obsidian";
 import { ItemView, Notice } from "obsidian";
 import type { CustomCommand } from "../shared/types";
+import type { ChatMode } from "./types";
 import type LMStudioWritingAssistant from "../main";
 import { VIEW_TYPE_CHAT } from "../constants";
 import { getActiveNoteText } from "../context/noteContext";
 import { ChatGenerationController } from "./ChatGenerationController";
 import { ChatConversationController } from "./ChatConversationController";
 import { sendMessage } from "./actions/sendMessage";
+import { renderDiffPanel } from "./actions/finalizeEditResponse";
 import { branchConversation } from "./actions/branchConversation";
 import { regenerateMessage } from "./actions/regenerateMessage";
 import { ChatComposer } from "./composer/ChatComposer";
@@ -88,6 +90,9 @@ export class ChatView extends ItemView {
       onRunCommand: (command) => {
         void this.runCommand(command);
       },
+      onModeChange: () => {
+        /* Mode state lives in the composer; no extra wiring needed. */
+      },
     });
 
     this.modelSelector = new ChatModelSelector(this.plugin, this.layout, {
@@ -158,6 +163,10 @@ export class ChatView extends ItemView {
     this.sessionStore?.scheduleDraftSave();
   }
 
+  setMode(mode: ChatMode): void {
+    this.composer?.setMode(mode);
+  }
+
   private async requestSend(
     promptOverride?: string,
     autoInsertAfterResponse = false
@@ -166,8 +175,11 @@ export class ChatView extends ItemView {
       return;
     }
 
+    const useEditMode = this.composer.getMode() === "edit";
+
     await sendMessage({
       plugin: this.plugin,
+      owner: this,
       store: this.sessionStore,
       transcript: this.transcript,
       composer: this.composer,
@@ -179,6 +191,7 @@ export class ChatView extends ItemView {
       syncConversationUi: () => this.syncConversationUi(),
       promptOverride,
       autoInsertAfterResponse,
+      editMode: useEditMode,
     });
   }
 
@@ -212,11 +225,30 @@ export class ChatView extends ItemView {
       this.createBubbleActionCallbacks(),
       isConversationSwitch
     );
+
+    // Re-render DiffReviewPanels for historical messages with edit proposals
+    for (const message of snapshot.messageHistory) {
+      if (message.editProposal) {
+        const bubble = this.transcript.getBubbleForMessage(message.id);
+        if (bubble) {
+          renderDiffPanel(
+            this.app,
+            this,
+            this.sessionStore,
+            bubble,
+            message.editProposal,
+            message.appliedEdit
+          );
+        }
+      }
+    }
+
     this.transcript.setEmptyStateVisible(
       snapshot.messageHistory.length === 0 && !this.generation.getIsGenerating()
     );
     this.updateHeader();
     this.composer.updateContextChips();
+    this.composer.renderCommandBar();
     this.modelSelector?.syncActiveModel();
 
     if (this.historyDrawer?.isOpen()) {
@@ -294,6 +326,7 @@ export class ChatView extends ItemView {
 
     await regenerateMessage({
       plugin: this.plugin,
+      owner: this,
       store: this.sessionStore,
       transcript: this.transcript,
       composer: this.composer,

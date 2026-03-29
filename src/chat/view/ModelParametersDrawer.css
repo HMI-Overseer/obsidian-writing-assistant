@@ -1,22 +1,30 @@
 @layer components {
   .lmsa-params-drawer {
-    @apply lmsa-absolute lmsa-inset-0 lmsa-z-10 lmsa-hidden lmsa-flex-col lmsa-overflow-hidden;
+    @apply lmsa-absolute lmsa-z-10 lmsa-hidden lmsa-flex-col lmsa-overflow-hidden;
+    /* top/right set dynamically via JS to align with the anchor button */
+    width: 320px;
+    max-width: 100%;
+    max-height: calc(100% - var(--lmsa-params-top, 0px));
     background: var(--background-primary);
-    border-left: 1px solid var(--background-modifier-border);
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 12px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12), 0 2px 8px rgba(0, 0, 0, 0.08);
+    transform-origin: top right;
   }
 
   .lmsa-params-drawer.is-open {
     @apply lmsa-flex;
-    animation: lmsa-params-slide-in 200ms ease forwards;
+    animation: lmsa-params-expand 200ms ease forwards;
   }
 
   .lmsa-params-header {
-    @apply lmsa-flex lmsa-flex-shrink-0 lmsa-items-center lmsa-justify-between lmsa-gap-2.5 lmsa-px-5 lmsa-pb-4 lmsa-pt-[18px];
+    @apply lmsa-flex lmsa-flex-shrink-0 lmsa-items-center lmsa-justify-between lmsa-gap-2.5 lmsa-px-4 lmsa-py-2.5;
     border-bottom: 1px solid var(--background-modifier-border);
   }
 
   .lmsa-params-title {
-    @apply lmsa-text-base lmsa-font-bold lmsa-text-obsidian-text;
+    @apply lmsa-font-semibold lmsa-text-obsidian-text;
+    font-size: var(--font-ui-small);
   }
 
   .lmsa-params-close-btn {
@@ -27,6 +35,8 @@
     min-height: unset;
     color: var(--text-muted);
     transition: background 120ms ease, color 120ms ease;
+    /* Push to the right edge so it aligns with the anchor button */
+    margin-right: -2px;
   }
 
   .lmsa-params-close-btn:hover {
@@ -35,8 +45,8 @@
   }
 
   .lmsa-params-close-btn svg {
-    width: 18px;
-    height: 18px;
+    width: 20px;
+    height: 20px;
   }
 
   .lmsa-params-body {
@@ -152,14 +162,14 @@
   }
 }
 
-@keyframes lmsa-params-slide-in {
+@keyframes lmsa-params-expand {
   from {
     opacity: 0;
-    transform: translateX(12px);
+    transform: scale(0.9);
   }
 
   to {
     opacity: 1;
-    transform: translateX(0);
+    transform: scale(1);
   }
 }

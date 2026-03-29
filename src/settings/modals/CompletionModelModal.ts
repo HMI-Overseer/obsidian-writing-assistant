@@ -10,6 +10,7 @@ export class CompletionModelModal extends ModelProfileModal<CompletionModel> {
       id: generateId(),
       name: prefill?.name ?? "",
       modelId: prefill?.modelId ?? "",
+      provider: prefill?.provider ?? "lmstudio",
     };
   }
 

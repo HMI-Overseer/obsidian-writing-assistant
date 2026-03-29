@@ -5,16 +5,20 @@ export interface Message {
   content: string;
 }
 
+export type ProviderOption = "lmstudio" | "openai" | "anthropic";
+
 export interface CompletionModel {
   id: string;
   name: string;
   modelId: string;
+  provider: ProviderOption;
 }
 
 export interface EmbeddingModel {
   id: string;
   name: string;
   modelId: string;
+  provider: ProviderOption;
 }
 
 export interface CustomCommand {

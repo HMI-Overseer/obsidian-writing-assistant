@@ -3,8 +3,9 @@ import { Modal, Notice, Setting } from "obsidian";
 import type LMStudioWritingAssistant from "../../main";
 import { LMStudioModelsService } from "../../api";
 import type { LMStudioModelCandidateResult } from "../../api/LMStudioModelsService";
+import type { ProviderOption } from "../../shared/types";
 
-type BaseModel = { id: string; name: string; modelId: string };
+type BaseModel = { id: string; name: string; modelId: string; provider: ProviderOption };
 
 export abstract class ModelProfileModal<T extends BaseModel> extends Modal {
   protected model: T;

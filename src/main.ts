@@ -11,18 +11,8 @@ import { DEFAULT_CHAT_HISTORY, DEFAULT_SETTINGS, VIEW_TYPE_CHAT } from "./consta
 import { normalizeLMStudioBaseUrl } from "./api";
 import { ChatView } from "./chat";
 import { normalizeChatHistory } from "./chat/conversation/conversationUtils";
+import { normalizeCompletionModel, normalizeEmbeddingModel } from "./shared/normalizeModels";
 import { LMStudioSettingTab } from "./settings/SettingsTab";
-
-function normalizeCompletionModel(
-  model: Partial<CompletionModel> | null | undefined,
-  index: number
-): CompletionModel {
-  return {
-    id: model?.id || `model-${index + 1}`,
-    name: model?.name || `Model ${index + 1}`,
-    modelId: model?.modelId ?? "",
-  };
-}
 
 export default class LMStudioWritingAssistant extends Plugin {
   settings!: PluginSettings;
@@ -98,11 +88,7 @@ export default class LMStudioWritingAssistant extends Plugin {
       : [];
 
     const embeddingModels: EmbeddingModel[] = Array.isArray(data?.embeddingModels)
-      ? data.embeddingModels.map((model, index) => ({
-          id: model?.id || `embedding-${index + 1}`,
-          name: model?.name || `Embedding ${index + 1}`,
-          modelId: model?.modelId ?? "",
-        }))
+      ? data.embeddingModels.map((model, index) => normalizeEmbeddingModel(model, index))
       : [];
 
     const commands: CustomCommand[] = Array.isArray(data?.commands)

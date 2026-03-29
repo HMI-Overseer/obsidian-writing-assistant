@@ -10,6 +10,7 @@ export class EmbeddingModelModal extends ModelProfileModal<EmbeddingModel> {
       id: generateId(),
       name: prefill?.name ?? "",
       modelId: prefill?.modelId ?? "",
+      provider: prefill?.provider ?? "lmstudio",
     };
   }
 

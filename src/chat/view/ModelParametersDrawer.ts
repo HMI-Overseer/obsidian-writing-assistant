@@ -37,6 +37,8 @@ interface NullableNumberRefs {
 }
 
 export class ModelParametersDrawer {
+  private containerEl: HTMLElement;
+  private anchorEl: HTMLElement;
   private drawerEl: HTMLElement;
   private promptTextareaEl!: HTMLTextAreaElement;
   private temperatureSliderEl!: HTMLInputElement;
@@ -52,7 +54,9 @@ export class ModelParametersDrawer {
   private callbacks: ParamsDrawerCallbacks;
   private saveTimer: ReturnType<typeof setTimeout> | null = null;
 
-  constructor(containerEl: HTMLElement, callbacks: ParamsDrawerCallbacks) {
+  constructor(containerEl: HTMLElement, anchorEl: HTMLElement, callbacks: ParamsDrawerCallbacks) {
+    this.containerEl = containerEl;
+    this.anchorEl = anchorEl;
     this.callbacks = callbacks;
 
     this.drawerEl = containerEl.createDiv({ cls: "lmsa-params-drawer" });
@@ -61,6 +65,7 @@ export class ModelParametersDrawer {
   }
 
   open(): void {
+    this.positionAtAnchor();
     this.syncFromSettings();
     this.drawerEl.addClass("is-open");
   }
@@ -72,6 +77,17 @@ export class ModelParametersDrawer {
 
   isOpen(): boolean {
     return this.drawerEl.hasClass("is-open");
+  }
+
+  private positionAtAnchor(): void {
+    const containerRect = this.containerEl.getBoundingClientRect();
+    const anchorRect = this.anchorEl.getBoundingClientRect();
+
+    const top = anchorRect.top - containerRect.top;
+    const right = containerRect.right - anchorRect.right;
+
+    this.drawerEl.style.top = `${top}px`;
+    this.drawerEl.style.right = `${right}px`;
   }
 
   destroy(): void {

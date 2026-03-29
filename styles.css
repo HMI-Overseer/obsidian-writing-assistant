@@ -848,17 +848,23 @@
   }
 .lmsa-params-drawer {
     position: absolute;
-    inset: 0px;
     z-index: 10;
     display: none;
     flex-direction: column;
     overflow: hidden;
+    /* top/right set dynamically via JS to align with the anchor button */
+    width: 320px;
+    max-width: 100%;
+    max-height: calc(100% - var(--lmsa-params-top, 0px));
     background: var(--background-primary);
-    border-left: 1px solid var(--background-modifier-border);
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 12px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12), 0 2px 8px rgba(0, 0, 0, 0.08);
+    transform-origin: top right;
 }
 .lmsa-params-drawer.is-open {
     display: flex;
-    animation: lmsa-params-slide-in 200ms ease forwards;
+    animation: lmsa-params-expand 200ms ease forwards;
 }
 .lmsa-params-header {
     display: flex;
@@ -866,17 +872,16 @@
     align-items: center;
     justify-content: space-between;
     gap: 0.625rem;
-    padding-left: 1.25rem;
-    padding-right: 1.25rem;
-    padding-bottom: 1rem;
-    padding-top: 18px;
+    padding-left: 1rem;
+    padding-right: 1rem;
+    padding-top: 0.625rem;
+    padding-bottom: 0.625rem;
     border-bottom: 1px solid var(--background-modifier-border);
 }
 .lmsa-params-title {
-    font-size: 1rem;
-    line-height: 1.5rem;
-    font-weight: 700;
+    font-weight: 600;
     color: var(--text-normal);
+    font-size: var(--font-ui-small);
 }
 .lmsa-params-close-btn {
     height: auto;
@@ -893,6 +898,8 @@
     min-height: unset;
     color: var(--text-muted);
     transition: background 120ms ease, color 120ms ease;
+    /* Push to the right edge so it aligns with the anchor button */
+    margin-right: -2px;
 }
 .lmsa-params-close-btn:hover {
     background-color: var(--background-modifier-hover);
@@ -900,8 +907,8 @@
     box-shadow: none;
 }
 .lmsa-params-close-btn svg {
-    width: 18px;
-    height: 18px;
+    width: 20px;
+    height: 20px;
   }
 .lmsa-params-body {
     display: flex;
@@ -3234,15 +3241,15 @@
         padding: 0.5rem;
     }
 }
-@keyframes lmsa-params-slide-in {
+@keyframes lmsa-params-expand {
   from {
     opacity: 0;
-    transform: translateX(12px);
+    transform: scale(0.9);
   }
 
   to {
     opacity: 1;
-    transform: translateX(0);
+    transform: scale(1);
   }
 }
 @media (max-width: 700px) {

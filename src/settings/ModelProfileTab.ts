@@ -4,11 +4,12 @@ import { LMStudioModelsService, normalizeLMStudioBaseUrl } from "../api";
 import type { LMStudioModelCandidateResult } from "../api/LMStudioModelsService";
 import type LMStudioWritingAssistant from "../main";
 import type { LMStudioModelDigest } from "../api/types";
+import type { ProviderOption } from "../shared/types";
 import { createSettingsSection } from "./ui";
 
-type BaseModel = { id: string; name: string; modelId: string };
+type BaseModel = { id: string; name: string; modelId: string; provider: ProviderOption };
 
-export type ProviderOption = "lmstudio" | "openai" | "anthropic";
+export type { ProviderOption };
 
 export type ModelProfileTabConfig<T extends BaseModel> = {
   kind: string;
@@ -159,7 +160,7 @@ export function renderModelProfileTab<T extends BaseModel>(
         config.setModels(currentModels);
         await plugin.saveSettings();
         refresh();
-      });
+      }, { provider: providerSelect.value as ProviderOption } as Partial<T>);
     });
 
   // ── LM Studio provider content ────────────────────────────────────────
@@ -308,6 +309,7 @@ export function renderModelProfileTab<T extends BaseModel>(
             {
               name: model.displayName,
               modelId: model.targetModelId,
+              provider: providerSelect.value as ProviderOption,
             } as Partial<T>
           );
         });

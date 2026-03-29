@@ -118,7 +118,7 @@ export class ChatView extends ItemView {
       onClose: () => this.historyDrawer?.close(),
     });
 
-    this.paramsDrawer = new ModelParametersDrawer(this.layout.rootEl, {
+    this.paramsDrawer = new ModelParametersDrawer(this.layout.rootEl, this.layout.paramsBtn, {
       onClose: () => this.paramsDrawer?.close(),
       getSettings: () => ({
         globalSystemPrompt: this.plugin.settings.globalSystemPrompt,
@@ -319,6 +319,13 @@ export class ChatView extends ItemView {
     this.composer.updateContextChips();
     this.composer.renderCommandBar();
     this.modelSelector?.syncActiveModel();
+
+    const activeModel = this.sessionStore.getResolvedConversationModel();
+    const showParams = activeModel?.provider === "lmstudio";
+    this.layout!.paramsBtn.style.display = showParams ? "" : "none";
+    if (!showParams && this.paramsDrawer?.isOpen()) {
+      this.paramsDrawer.close();
+    }
 
     if (this.historyDrawer?.isOpen()) {
       this.historyDrawer.refresh(

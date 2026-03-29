@@ -275,6 +275,8 @@
 
   .lmsa-empty-state {
     border-style: dashed;
+    border-color: color-mix(in srgb, var(--lmsa-section-accent) 40%, var(--lmsa-border-emphasis));
+    color: color-mix(in srgb, var(--lmsa-section-accent) 50%, var(--lmsa-text-secondary));
   }
 
   .lmsa-settings-note-title {

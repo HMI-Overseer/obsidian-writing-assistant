@@ -131,21 +131,27 @@
     color: var(--lmsa-text-primary);
   }
 
-  .lmsa-provider-selector-select {
-    @apply lmsa-flex-1 lmsa-rounded-lg lmsa-border lmsa-px-3 lmsa-py-2;
+  .lmsa-settings-root select.lmsa-provider-selector-select {
+    @apply lmsa-flex-1;
     font-family: var(--font-text);
     font-size: var(--font-ui-small);
     color: var(--text-normal);
     background: var(--background-secondary);
-    border-color: var(--lmsa-border-default);
+    border: 1px solid color-mix(in srgb, var(--lmsa-section-accent) 40%, var(--lmsa-border-default));
+    border-radius: 0.5rem;
     outline: none;
     cursor: pointer;
-    transition: border-color 120ms ease;
-    max-width: 240px;
+    height: auto;
+    min-height: 36px;
+    padding: 8px 12px;
+    overflow: visible;
+    text-overflow: ellipsis;
+    transition: border-color 120ms ease, box-shadow 120ms ease;
   }
 
-  .lmsa-provider-selector-select:focus {
+  .lmsa-settings-root select.lmsa-provider-selector-select:focus {
     border-color: var(--lmsa-section-accent);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--lmsa-section-accent) 25%, transparent);
   }
 
   .lmsa-provider-content {

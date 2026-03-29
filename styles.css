@@ -2029,6 +2029,8 @@
 }
 .lmsa-empty-state {
     border-style: dashed;
+    border-color: color-mix(in srgb, var(--lmsa-section-accent) 40%, var(--lmsa-border-emphasis));
+    color: color-mix(in srgb, var(--lmsa-section-accent) 50%, var(--lmsa-text-secondary));
   }
 .lmsa-settings-note-title {
     margin-bottom: 0.5rem;
@@ -2235,26 +2237,26 @@
     font-weight: 600;
     color: var(--lmsa-text-primary);
 }
-.lmsa-provider-selector-select {
+.lmsa-settings-root select.lmsa-provider-selector-select {
     flex: 1 1 0%;
-    border-radius: 0.5rem;
-    border-width: 1px;
-    padding-left: 0.75rem;
-    padding-right: 0.75rem;
-    padding-top: 0.5rem;
-    padding-bottom: 0.5rem;
     font-family: var(--font-text);
     font-size: var(--font-ui-small);
     color: var(--text-normal);
     background: var(--background-secondary);
-    border-color: var(--lmsa-border-default);
+    border: 1px solid color-mix(in srgb, var(--lmsa-section-accent) 40%, var(--lmsa-border-default));
+    border-radius: 0.5rem;
     outline: none;
     cursor: pointer;
-    transition: border-color 120ms ease;
-    max-width: 240px;
+    height: auto;
+    min-height: 36px;
+    padding: 8px 12px;
+    overflow: visible;
+    text-overflow: ellipsis;
+    transition: border-color 120ms ease, box-shadow 120ms ease;
 }
-.lmsa-provider-selector-select:focus {
+.lmsa-settings-root select.lmsa-provider-selector-select:focus {
     border-color: var(--lmsa-section-accent);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--lmsa-section-accent) 25%, transparent);
   }
 .lmsa-provider-content {
     display: flex;
@@ -3653,24 +3655,24 @@
  * --interactive-accent for themes that omit the extended palette.
  * ----------------------------------------------------------------------- */
 .lmsa-settings-root .lmsa-settings-shell[data-tab="general"] {
-  --lmsa-section-accent: var(--color-purple, var(--interactive-accent));
-  --lmsa-section-accent-secondary: var(--color-blue, var(--interactive-accent));
+  --lmsa-section-accent: var(--interactive-accent);
+  --lmsa-section-accent-secondary: var(--interactive-accent);
 }
 .lmsa-settings-root .lmsa-settings-shell[data-tab="completion"] {
-  --lmsa-section-accent: var(--color-blue, var(--interactive-accent));
-  --lmsa-section-accent-secondary: var(--color-cyan, var(--interactive-accent));
+  --lmsa-section-accent: var(--interactive-accent);
+  --lmsa-section-accent-secondary: var(--interactive-accent);
 }
 .lmsa-settings-root .lmsa-settings-shell[data-tab="embedding"] {
-  --lmsa-section-accent: var(--color-purple, var(--interactive-accent));
-  --lmsa-section-accent-secondary: var(--color-purple, var(--interactive-accent));
+  --lmsa-section-accent: var(--interactive-accent);
+  --lmsa-section-accent-secondary: var(--interactive-accent);
 }
 .lmsa-settings-root .lmsa-settings-shell[data-tab="commands"] {
   --lmsa-section-accent: var(--color-orange, var(--interactive-accent));
-  --lmsa-section-accent-secondary: var(--color-red, var(--interactive-accent));
+  --lmsa-section-accent-secondary: var(--color-orange, var(--interactive-accent));
 }
 .lmsa-settings-root .lmsa-settings-shell[data-tab="advanced"] {
   --lmsa-section-accent: var(--color-red, var(--interactive-accent));
-  --lmsa-section-accent-secondary: var(--color-pink, var(--interactive-accent));
+  --lmsa-section-accent-secondary: var(--color-red, var(--interactive-accent));
 }
 .lmsa-settings-root .lmsa-settings-shell[data-tab="benchmark"] {
   --lmsa-section-accent: var(--color-green, var(--interactive-accent));

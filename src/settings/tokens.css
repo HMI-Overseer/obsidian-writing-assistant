@@ -47,28 +47,28 @@
  * ----------------------------------------------------------------------- */
 
 .lmsa-settings-root .lmsa-settings-shell[data-tab="general"] {
-  --lmsa-section-accent: var(--color-purple, var(--interactive-accent));
-  --lmsa-section-accent-secondary: var(--color-blue, var(--interactive-accent));
+  --lmsa-section-accent: var(--interactive-accent);
+  --lmsa-section-accent-secondary: var(--interactive-accent);
 }
 
 .lmsa-settings-root .lmsa-settings-shell[data-tab="completion"] {
-  --lmsa-section-accent: var(--color-blue, var(--interactive-accent));
-  --lmsa-section-accent-secondary: var(--color-cyan, var(--interactive-accent));
+  --lmsa-section-accent: var(--interactive-accent);
+  --lmsa-section-accent-secondary: var(--interactive-accent);
 }
 
 .lmsa-settings-root .lmsa-settings-shell[data-tab="embedding"] {
-  --lmsa-section-accent: var(--color-purple, var(--interactive-accent));
-  --lmsa-section-accent-secondary: var(--color-purple, var(--interactive-accent));
+  --lmsa-section-accent: var(--interactive-accent);
+  --lmsa-section-accent-secondary: var(--interactive-accent);
 }
 
 .lmsa-settings-root .lmsa-settings-shell[data-tab="commands"] {
   --lmsa-section-accent: var(--color-orange, var(--interactive-accent));
-  --lmsa-section-accent-secondary: var(--color-red, var(--interactive-accent));
+  --lmsa-section-accent-secondary: var(--color-orange, var(--interactive-accent));
 }
 
 .lmsa-settings-root .lmsa-settings-shell[data-tab="advanced"] {
   --lmsa-section-accent: var(--color-red, var(--interactive-accent));
-  --lmsa-section-accent-secondary: var(--color-pink, var(--interactive-accent));
+  --lmsa-section-accent-secondary: var(--color-red, var(--interactive-accent));
 }
 
 .lmsa-settings-root .lmsa-settings-shell[data-tab="benchmark"] {

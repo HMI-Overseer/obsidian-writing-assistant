@@ -23,8 +23,10 @@ export function renderEmbeddingModelsTab(
     profileNoun: "embedding profile",
     sectionDescription:
       "Reusable embedding profiles for semantic search, retrieval, and future note-aware features.",
+    sectionIcon: "database",
     discoverySectionDescription:
       "Load live embedding model suggestions from LM Studio when you want to create or update an embedding profile.",
+    discoverySectionIcon: "search",
     emptyProfilesText: "No embedding models configured.",
     emptyDiscoveryText:
       "No live model data loaded yet. Use Refresh models to fetch suggestions from LM Studio.",

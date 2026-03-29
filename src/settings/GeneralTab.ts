@@ -7,7 +7,8 @@ export function renderGeneralTab(container: HTMLElement, plugin: LMStudioWriting
   const connection = createSettingsSection(
     container,
     "Connection",
-    "Point the plugin at your LM Studio server and choose how requests should be routed from Obsidian."
+    "Point the plugin at your LM Studio server and choose how requests should be routed from Obsidian.",
+    { icon: "plug" }
   );
 
   new Setting(connection.bodyEl)
@@ -40,7 +41,8 @@ export function renderGeneralTab(container: HTMLElement, plugin: LMStudioWriting
   const context = createSettingsSection(
     container,
     "Context",
-    "Decide how much of the current note should travel with each request so chat responses stay grounded in your writing."
+    "Decide how much of the current note should travel with each request so chat responses stay grounded in your writing.",
+    { icon: "file-text" }
   );
 
   new Setting(context.bodyEl)

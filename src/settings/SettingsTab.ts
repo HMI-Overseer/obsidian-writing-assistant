@@ -19,6 +19,15 @@ type TabMeta = {
   description: string;
 };
 
+const TAB_SLUGS: Record<TabName, string> = {
+  "General": "general",
+  "Completion Models": "completion",
+  "Embedding Models": "embedding",
+  "Commands": "commands",
+  "Advanced": "advanced",
+  "Benchmark": "benchmark",
+};
+
 const TAB_META: Record<TabName, TabMeta> = {
   "General": {
     title: "Connection and Context",
@@ -66,14 +75,14 @@ export class LMStudioSettingTab extends PluginSettingTab {
     const shell = containerEl.createDiv({ cls: "lmsa-settings-shell" });
 
     const topbar = shell.createDiv({ cls: "lmsa-settings-topbar lmsa-ui-panel" });
-    const brand = topbar.createDiv({ cls: "lmsa-settings-brand" });
-    brand.createEl("div", {
-      cls: "lmsa-settings-eyebrow",
-      text: "Local-first writing assistant",
-    });
-    brand.createEl("h2", {
+    const titleRow = topbar.createDiv({ cls: "lmsa-settings-title-row" });
+    titleRow.createEl("h2", {
       cls: "lmsa-settings-title",
-      text: "Plugin Settings",
+      text: "Obsidian Writing Assistant",
+    });
+    titleRow.createEl("span", {
+      cls: "lmsa-settings-version",
+      text: `v${this.plugin.manifest.version}`,
     });
 
     const nav = topbar.createDiv({ cls: "lmsa-settings-nav" });
@@ -107,6 +116,8 @@ export class LMStudioSettingTab extends PluginSettingTab {
         this.display();
       });
     }
+
+    shell.setAttribute("data-tab", TAB_SLUGS[this.activeTab]);
 
     const stage = shell.createDiv({ cls: "lmsa-settings-stage" });
     const panel = stage.createDiv({ cls: "lmsa-settings-panel lmsa-ui-panel" });

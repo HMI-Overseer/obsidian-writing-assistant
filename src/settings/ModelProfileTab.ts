@@ -12,7 +12,9 @@ export type ModelProfileTabConfig<T extends BaseModel> = {
   kind: string;
   profileNoun: string;
   sectionDescription: string;
+  sectionIcon?: string;
   discoverySectionDescription: string;
+  discoverySectionIcon?: string;
   emptyProfilesText: string;
   emptyDiscoveryText: string;
   noModelsFoundText: string;
@@ -47,7 +49,8 @@ export function renderModelProfileTab<T extends BaseModel>(
   const library = createSettingsSection(
     container,
     "Saved Profiles",
-    config.sectionDescription
+    config.sectionDescription,
+    config.sectionIcon ? { icon: config.sectionIcon } : undefined
   );
 
   const listEl = library.bodyEl.createDiv({ cls: "lmsa-item-list" });
@@ -129,7 +132,8 @@ export function renderModelProfileTab<T extends BaseModel>(
   const discovery = createSettingsSection(
     container,
     "Discover from LM Studio",
-    config.discoverySectionDescription
+    config.discoverySectionDescription,
+    config.discoverySectionIcon ? { icon: config.discoverySectionIcon } : undefined
   );
 
   const refetchButton = discovery.headerActionsEl.createEl("button", {

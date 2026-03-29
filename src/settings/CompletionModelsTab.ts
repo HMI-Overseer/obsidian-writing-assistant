@@ -28,8 +28,10 @@ export function renderCompletionModelsTab(
     profileNoun: "completion profile",
     sectionDescription:
       "Reusable chat profiles with their own target model, system prompt, temperature, and token limit.",
+    sectionIcon: "cpu",
     discoverySectionDescription:
       "Load live model suggestions from LM Studio when you want to create or update a completion profile.",
+    discoverySectionIcon: "search",
     emptyProfilesText: "No completion profiles configured yet.",
     emptyDiscoveryText:
       "No live model data loaded yet. Use Refresh models to fetch suggestions from LM Studio.",

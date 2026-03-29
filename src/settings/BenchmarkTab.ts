@@ -28,7 +28,8 @@ export function renderBenchmarkTab(
   const modelSection = createSettingsSection(
     container,
     "Model Selection",
-    "Choose a completion model to run benchmarks against. The model must be loaded in LM Studio."
+    "Choose a completion model to run benchmarks against. The model must be loaded in LM Studio.",
+    { icon: "target" }
   );
 
   if (models.length === 0) {
@@ -59,7 +60,8 @@ export function renderBenchmarkTab(
   const suiteSection = createSettingsSection(
     container,
     "Test Suite",
-    "Each test sends a synthetic conversation to the model and evaluates whether it correctly interprets edit outcome annotations."
+    "Each test sends a synthetic conversation to the model and evaluates whether it correctly interprets edit outcome annotations.",
+    { icon: "flask-conical" }
   );
 
   // Iterations setting

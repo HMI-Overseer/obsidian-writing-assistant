@@ -1,0 +1,77 @@
+/* ---------------------------------------------------------------------------
+ * Settings Design Tokens
+ *
+ * Single source of truth for all settings-panel styling decisions.
+ * Scoped under .lmsa-settings-root so nothing leaks into Obsidian.
+ * Every value references Obsidian theme variables via color-mix() and
+ * falls back gracefully across light / dark themes.
+ * --------------------------------------------------------------------------- */
+
+.lmsa-settings-root {
+  /* ── Surface hierarchy ─────────────────────────────────────────────────── */
+  --lmsa-surface-base: var(--background-primary);
+  --lmsa-surface-raised: color-mix(in srgb, var(--background-secondary) 92%, transparent);
+  --lmsa-surface-overlay: color-mix(in srgb, var(--background-primary) 95%, transparent);
+  --lmsa-surface-inset: color-mix(in srgb, var(--background-secondary) 60%, var(--background-primary));
+
+  /* ── Border hierarchy ──────────────────────────────────────────────────── */
+  --lmsa-border-subtle: color-mix(in srgb, var(--background-modifier-border) 60%, transparent);
+  --lmsa-border-default: var(--background-modifier-border);
+  --lmsa-border-emphasis: color-mix(in srgb, var(--interactive-accent) 30%, var(--background-modifier-border));
+
+  /* ── Accent ────────────────────────────────────────────────────────────── */
+  --lmsa-accent: var(--interactive-accent);
+  --lmsa-accent-hover: var(--interactive-accent-hover);
+  --lmsa-accent-muted: color-mix(in srgb, var(--interactive-accent) 55%, var(--text-muted));
+  --lmsa-accent-subtle: color-mix(in srgb, var(--interactive-accent) 14%, transparent);
+  --lmsa-accent-glow: color-mix(in srgb, var(--interactive-accent) 18%, transparent);
+
+  /* ── Text ──────────────────────────────────────────────────────────────── */
+  --lmsa-text-primary: var(--text-normal);
+  --lmsa-text-secondary: var(--text-muted);
+  --lmsa-text-faint: var(--text-faint);
+
+  /* ── Glow / decoration ─────────────────────────────────────────────────── */
+  --lmsa-glow-opacity: 0.12;
+  --lmsa-shimmer-opacity: 0.85;
+
+  /* ── Section accent (defaults — overridden per-tab via data-tab) ────── */
+  --lmsa-section-accent: var(--interactive-accent);
+  --lmsa-section-accent-secondary: var(--interactive-accent);
+}
+
+/* ── Per-tab accent overrides ─────────────────────────────────────────────
+ * Obsidian exposes --color-red, --color-blue, --color-purple, etc. as
+ * theme-aware palette colors.  Every reference falls back to
+ * --interactive-accent for themes that omit the extended palette.
+ * ----------------------------------------------------------------------- */
+
+.lmsa-settings-root .lmsa-settings-shell[data-tab="general"] {
+  --lmsa-section-accent: var(--color-purple, var(--interactive-accent));
+  --lmsa-section-accent-secondary: var(--color-blue, var(--interactive-accent));
+}
+
+.lmsa-settings-root .lmsa-settings-shell[data-tab="completion"] {
+  --lmsa-section-accent: var(--color-blue, var(--interactive-accent));
+  --lmsa-section-accent-secondary: var(--color-cyan, var(--interactive-accent));
+}
+
+.lmsa-settings-root .lmsa-settings-shell[data-tab="embedding"] {
+  --lmsa-section-accent: var(--color-purple, var(--interactive-accent));
+  --lmsa-section-accent-secondary: var(--color-purple, var(--interactive-accent));
+}
+
+.lmsa-settings-root .lmsa-settings-shell[data-tab="commands"] {
+  --lmsa-section-accent: var(--color-orange, var(--interactive-accent));
+  --lmsa-section-accent-secondary: var(--color-red, var(--interactive-accent));
+}
+
+.lmsa-settings-root .lmsa-settings-shell[data-tab="advanced"] {
+  --lmsa-section-accent: var(--color-red, var(--interactive-accent));
+  --lmsa-section-accent-secondary: var(--color-pink, var(--interactive-accent));
+}
+
+.lmsa-settings-root .lmsa-settings-shell[data-tab="benchmark"] {
+  --lmsa-section-accent: var(--color-green, var(--interactive-accent));
+  --lmsa-section-accent-secondary: var(--color-cyan, var(--interactive-accent));
+}

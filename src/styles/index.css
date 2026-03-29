@@ -16,7 +16,8 @@
 @import "../chat/messages/DiffHunkView.css";
 @import "../chat/messages/DiffReviewPanel.css";
 
-/* Settings */
+/* Settings — tokens first, then layout + components */
+@import "../settings/tokens.css";
 @import "../settings/SettingsTab.css";
 @import "../settings/ui.css";
 @import "../settings/models.css";

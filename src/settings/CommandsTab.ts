@@ -12,7 +12,8 @@ export function renderCommandsTab(
   const library = createSettingsSection(
     container,
     "Command Library",
-    "Prompt shortcuts that appear in chat and can automatically pull from your current selection or note."
+    "Prompt shortcuts that appear in chat and can automatically pull from your current selection or note.",
+    { icon: "terminal" }
   );
 
   const note = library.bodyEl.createDiv({ cls: "lmsa-settings-note" });

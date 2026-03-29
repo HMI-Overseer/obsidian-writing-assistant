@@ -6,7 +6,8 @@ export function renderAdvancedTab(container: HTMLElement, plugin: LMStudioWritin
   const context = createSettingsSection(
     container,
     "Context Budget",
-    "Keep prompts lean when you are working in large notes or experimenting with tighter local model limits."
+    "Keep prompts lean when you are working in large notes or experimenting with tighter local model limits.",
+    { icon: "ruler" }
   );
 
   new Setting(context.bodyEl)
@@ -30,7 +31,8 @@ export function renderAdvancedTab(container: HTMLElement, plugin: LMStudioWritin
   const editing = createSettingsSection(
     container,
     "Document Editing",
-    "Configure how AI-proposed edits are matched against your notes."
+    "Configure how AI-proposed edits are matched against your notes.",
+    { icon: "file-diff" }
   );
 
   new Setting(editing.bodyEl)
@@ -72,7 +74,8 @@ export function renderAdvancedTab(container: HTMLElement, plugin: LMStudioWritin
   const utilities = createSettingsSection(
     container,
     "Utilities",
-    "Small maintenance actions for checking or sharing the local connection setup."
+    "Small maintenance actions for checking or sharing the local connection setup.",
+    { icon: "wrench" }
   );
 
   new Setting(utilities.bodyEl)

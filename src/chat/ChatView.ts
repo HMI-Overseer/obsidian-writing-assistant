@@ -17,10 +17,9 @@ import type { BubbleActionCallbacks } from "./messages/ChatTranscript";
 import { ChatTranscript } from "./messages/ChatTranscript";
 import { InlineMessageEditor } from "./messages/InlineMessageEditor";
 import { ChatModelSelector } from "./models/ChatModelSelector";
-import { CacheSettingsPopover } from "./models/CacheSettingsPopover";
+import { ProfileSettingsPopover } from "./models/ProfileSettingsPopover";
 import type { ChatLayoutRefs } from "./types";
 import { ChatHistoryDrawer } from "./view/ChatHistoryDrawer";
-import { ModelParametersDrawer } from "./view/ModelParametersDrawer";
 import { createChatLayout } from "./view/createChatLayout";
 import { sumConversationUsage } from "./usageSummary";
 import { estimateTokenCount } from "../shared/tokenEstimation";
@@ -37,9 +36,8 @@ export class ChatView extends ItemView {
   private transcript: ChatTranscript | null = null;
   private composer: ChatComposer | null = null;
   private modelSelector: ChatModelSelector | null = null;
-  private cachePopover: CacheSettingsPopover | null = null;
+  private profilePopover: ProfileSettingsPopover | null = null;
   private historyDrawer: ChatHistoryDrawer | null = null;
-  private paramsDrawer: ModelParametersDrawer | null = null;
   private generation!: ChatGenerationController;
   private conversation!: ChatConversationController;
   private lastRenderedConversationId: string | null = null;
@@ -116,27 +114,16 @@ export class ChatView extends ItemView {
       },
     });
 
-    this.cachePopover = new CacheSettingsPopover(this.layout, {
+    this.profilePopover = new ProfileSettingsPopover(this.layout, {
       getActiveModel: () => this.sessionStore?.getResolvedConversationModel() ?? null,
-      onSettingsChange: async (modelId, settings) => {
+      onCacheSettingsChange: async (modelId, settings) => {
         const model = this.plugin.settings.completionModels.find((m) => m.id === modelId);
         if (model) {
           model.anthropicCacheSettings = settings;
           await this.plugin.saveSettings();
         }
       },
-    });
-
-    this.historyDrawer = new ChatHistoryDrawer(this.layout.messagesPaneEl, {
-      onSelect: (id) => void this.conversation.switchConversation(id),
-      onNew: () => void this.conversation.startNewConversation(),
-      onDelete: (id) => void this.conversation.deleteConversation(id),
-      onClose: () => this.historyDrawer?.close(),
-    });
-
-    this.paramsDrawer = new ModelParametersDrawer(this.layout.rootEl, this.layout.paramsBtn, {
-      onClose: () => this.paramsDrawer?.close(),
-      getSettings: () => ({
+      getParamSettings: () => ({
         globalSystemPrompt: this.plugin.settings.globalSystemPrompt,
         globalTemperature: this.plugin.settings.globalTemperature,
         globalMaxTokens: this.plugin.settings.globalMaxTokens,
@@ -180,36 +167,34 @@ export class ChatView extends ItemView {
       },
     });
 
+    this.historyDrawer = new ChatHistoryDrawer(this.layout.messagesPaneEl, {
+      onSelect: (id) => void this.conversation.switchConversation(id),
+      onNew: () => void this.conversation.startNewConversation(),
+      onDelete: (id) => void this.conversation.deleteConversation(id),
+      onClose: () => this.historyDrawer?.close(),
+    });
+
     this.layout.historyBtn.addEventListener("click", (event) => {
       event.stopPropagation();
-      if (this.paramsDrawer?.isOpen()) {
-        this.paramsDrawer.close();
+      if (this.profilePopover?.isOpen()) {
+        this.profilePopover.close();
       }
       this.conversation.toggleHistoryDrawer();
     });
 
-    this.layout.paramsBtn.addEventListener("click", (event) => {
-      event.stopPropagation();
-      if (this.paramsDrawer?.isOpen()) {
-        this.paramsDrawer.close();
-      } else {
-        if (this.historyDrawer?.isOpen()) {
-          this.historyDrawer.close();
-        }
-        this.paramsDrawer?.open();
+    this.layout.modelSelectorBtn.addEventListener("click", () => {
+      if (this.profilePopover?.isOpen()) {
+        this.profilePopover.close();
       }
     });
 
     this.registerDomEvent(document, "click", () => {
       this.modelSelector?.close();
-      if (this.cachePopover?.isOpen()) {
-        this.cachePopover.close();
+      if (this.profilePopover?.isOpen()) {
+        this.profilePopover.close();
       }
       if (this.historyDrawer?.isOpen()) {
         this.historyDrawer.close();
-      }
-      if (this.paramsDrawer?.isOpen()) {
-        this.paramsDrawer.close();
       }
     });
 
@@ -242,8 +227,7 @@ export class ChatView extends ItemView {
     await this.sessionStore?.persistActiveConversation();
     this.transcript?.destroy();
     this.modelSelector?.destroy();
-    this.cachePopover?.destroy();
-    this.paramsDrawer?.destroy();
+    this.profilePopover?.destroy();
   }
 
   seedPrompt(text: string): void {
@@ -340,14 +324,7 @@ export class ChatView extends ItemView {
     this.composer.renderCommandBar();
     this.modelSelector?.syncActiveModel();
 
-    const activeModel = this.sessionStore.getResolvedConversationModel();
-    const showParams = activeModel?.provider === "lmstudio";
-    this.layout!.paramsBtn.style.display = showParams ? "" : "none";
-    if (!showParams && this.paramsDrawer?.isOpen()) {
-      this.paramsDrawer.close();
-    }
-
-    this.cachePopover?.syncVisibility();
+    this.profilePopover?.syncVisibility();
 
     if (this.historyDrawer?.isOpen()) {
       this.historyDrawer.refresh(
@@ -475,16 +452,12 @@ export class ChatView extends ItemView {
       this.historyDrawer.close();
     }
 
-    if (isCollapsed && this.paramsDrawer?.isOpen()) {
-      this.paramsDrawer.close();
-    }
-
     if (isCollapsed && this.modelSelector?.isOpen()) {
       this.modelSelector.close();
     }
 
-    if (isCollapsed && this.cachePopover?.isOpen()) {
-      this.cachePopover.close();
+    if (isCollapsed && this.profilePopover?.isOpen()) {
+      this.profilePopover.close();
     }
   }
 

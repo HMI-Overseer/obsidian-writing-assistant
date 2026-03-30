@@ -24,7 +24,6 @@ export type ChatLayoutRefs = {
   messagesPaneEl: HTMLElement;
   headerMetaEl: HTMLElement;
   historyBtn: HTMLButtonElement;
-  paramsBtn: HTMLButtonElement;
   shellEl: HTMLElement;
   messagesEl: HTMLElement;
   emptyStateEl: HTMLElement;
@@ -38,8 +37,8 @@ export type ChatLayoutRefs = {
   modelSelectorStatusEl: HTMLElement;
   modelSelectorChevronEl: HTMLElement;
   modelDropdownEl: HTMLElement;
-  cacheSettingsBtn: HTMLButtonElement;
-  cacheSettingsPopoverEl: HTMLElement;
+  profileSettingsBtn: HTMLButtonElement;
+  profileSettingsPopoverEl: HTMLElement;
   usageSummaryEl: HTMLElement;
   contextCapacityEl: HTMLElement;
 };

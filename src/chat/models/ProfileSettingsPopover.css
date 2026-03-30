@@ -1,0 +1,234 @@
+@layer components {
+  /* ── Button ─────────────────────────────────────────────────────────── */
+
+  .lmsa-profile-settings-btn {
+    @apply lmsa-ml-1 lmsa-inline-flex lmsa-flex-none lmsa-cursor-pointer lmsa-items-center lmsa-justify-center lmsa-rounded-md lmsa-border-none lmsa-p-1;
+    color: var(--text-muted);
+    min-height: unset;
+    background: transparent !important;
+    box-shadow: none !important;
+    outline: none;
+    appearance: none;
+    transition: background 120ms ease, color 120ms ease;
+  }
+
+  .lmsa-profile-settings-btn:hover {
+    background: color-mix(in srgb, var(--background-modifier-hover) 60%, transparent) !important;
+    color: var(--text-normal);
+  }
+
+  .lmsa-profile-settings-btn svg {
+    width: 14px;
+    height: 14px;
+  }
+
+  /* ── Popover shell ──────────────────────────────────────────────────── */
+
+  .lmsa-profile-popover {
+    @apply lmsa-absolute lmsa-left-0 lmsa-z-[120] lmsa-flex-col lmsa-rounded-2xl lmsa-border lmsa-border-obsidian-border lmsa-p-4;
+    top: calc(100% + 6px);
+    width: min(340px, calc(100vw - 48px));
+    max-height: min(500px, calc(100vh - 120px));
+    overflow-y: auto;
+    background:
+      linear-gradient(
+        180deg,
+        color-mix(in srgb, var(--background-primary) 97%, transparent),
+        color-mix(in srgb, var(--background-secondary) 94%, transparent)
+      );
+    backdrop-filter: blur(22px);
+    -webkit-backdrop-filter: blur(22px);
+    box-shadow:
+      0 22px 56px rgba(0, 0, 0, 0.22),
+      inset 0 1px 0 rgba(255, 255, 255, 0.04);
+    transform-origin: top left;
+  }
+
+  .lmsa-profile-popover-title {
+    @apply lmsa-flex lmsa-flex-col lmsa-gap-1 lmsa-font-bold lmsa-text-obsidian-text;
+    font-size: var(--font-ui-small);
+    margin-bottom: 0.75rem;
+  }
+
+  .lmsa-profile-popover-subtitle {
+    @apply lmsa-font-normal lmsa-text-obsidian-muted;
+    font-size: var(--font-ui-smaller);
+    line-height: 1.4;
+  }
+
+  .lmsa-profile-popover-body {
+    @apply lmsa-flex lmsa-flex-col lmsa-gap-4;
+  }
+
+  .lmsa-profile-popover-section {
+    @apply lmsa-flex lmsa-flex-col lmsa-gap-3;
+  }
+
+  .lmsa-profile-popover-section-title {
+    @apply lmsa-font-semibold lmsa-text-obsidian-text;
+    font-size: var(--font-ui-smaller);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    opacity: 0.7;
+  }
+
+  .lmsa-profile-popover-empty {
+    @apply lmsa-py-4 lmsa-text-center lmsa-text-obsidian-muted;
+    font-size: var(--font-ui-smaller);
+  }
+
+  /* ── Cache settings rows ────────────────────────────────────────────── */
+
+  .lmsa-profile-popover-row {
+    @apply lmsa-flex lmsa-items-center lmsa-justify-between lmsa-gap-4;
+  }
+
+  .lmsa-profile-popover-label {
+    font-weight: 500;
+    font-size: var(--font-ui-smaller);
+  }
+
+  .lmsa-profile-popover-control {
+    @apply lmsa-flex;
+  }
+
+  .lmsa-profile-toggle {
+    cursor: pointer;
+  }
+
+  .lmsa-profile-ttl-select {
+    appearance: auto;
+    font-size: var(--font-ui-smaller);
+    cursor: pointer;
+  }
+
+  .lmsa-profile-ttl-select:disabled {
+    opacity: 0.5;
+  }
+
+  .lmsa-profile-ttl-select:focus {
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--interactive-accent) 30%, transparent);
+  }
+
+  /* ── Model parameter controls (reused from params drawer) ───────────── */
+
+  .lmsa-profile-popover .lmsa-params-body {
+    @apply lmsa-flex lmsa-flex-col lmsa-gap-5;
+    padding: 0;
+  }
+
+  .lmsa-params-section {
+    @apply lmsa-flex lmsa-flex-col lmsa-gap-2;
+  }
+
+  .lmsa-params-label {
+    @apply lmsa-font-semibold;
+    font-size: var(--font-ui-small);
+    color: var(--text-muted);
+  }
+
+  .lmsa-params-textarea {
+    @apply lmsa-w-full lmsa-resize-y lmsa-rounded-lg lmsa-border lmsa-border-obsidian-border lmsa-p-3;
+    font-family: var(--font-text);
+    font-size: var(--font-ui-small);
+    color: var(--text-normal);
+    background: var(--background-secondary);
+    min-height: 120px;
+    outline: none;
+    transition: border-color 120ms ease;
+  }
+
+  .lmsa-params-textarea::placeholder {
+    color: var(--text-faint);
+  }
+
+  .lmsa-params-textarea:focus {
+    border-color: var(--lmsa-mode-accent);
+  }
+
+  .lmsa-params-slider-row {
+    @apply lmsa-flex lmsa-items-center lmsa-gap-3;
+  }
+
+  .lmsa-params-slider {
+    @apply lmsa-flex-1;
+    accent-color: var(--lmsa-mode-accent);
+    height: 6px;
+  }
+
+  .lmsa-params-slider-value {
+    @apply lmsa-flex-shrink-0;
+    font-family: var(--font-monospace);
+    font-size: var(--font-ui-small);
+    color: var(--text-muted);
+    min-width: 2.5em;
+    text-align: right;
+  }
+
+  .lmsa-params-toggle-row {
+    @apply lmsa-flex lmsa-items-center lmsa-gap-2;
+  }
+
+  .lmsa-params-toggle {
+    @apply lmsa-m-0 lmsa-flex-shrink-0;
+    accent-color: var(--lmsa-mode-accent);
+    width: 14px;
+    height: 14px;
+    cursor: pointer;
+  }
+
+  .lmsa-params-toggle-row .lmsa-params-label {
+    @apply lmsa-m-0;
+    cursor: pointer;
+  }
+
+  .lmsa-params-input-row {
+    @apply lmsa-flex lmsa-items-center lmsa-gap-3;
+  }
+
+  .lmsa-params-number-input {
+    @apply lmsa-w-full lmsa-rounded-lg lmsa-border lmsa-border-obsidian-border lmsa-px-3 lmsa-py-2;
+    font-family: var(--font-monospace);
+    font-size: var(--font-ui-small);
+    color: var(--text-normal);
+    background: var(--background-secondary);
+    outline: none;
+    transition: border-color 120ms ease, opacity 120ms ease;
+  }
+
+  .lmsa-params-number-input::placeholder {
+    color: var(--text-faint);
+  }
+
+  .lmsa-params-number-input:focus {
+    border-color: var(--lmsa-mode-accent);
+  }
+
+  .lmsa-params-select {
+    @apply lmsa-w-full lmsa-rounded-lg lmsa-border lmsa-border-obsidian-border lmsa-px-3 lmsa-py-2;
+    font-family: var(--font-text);
+    font-size: var(--font-ui-small);
+    color: var(--text-normal);
+    background: var(--background-secondary);
+    outline: none;
+    cursor: pointer;
+    transition: border-color 120ms ease, opacity 120ms ease;
+  }
+
+  .lmsa-params-select:focus {
+    border-color: var(--lmsa-mode-accent);
+  }
+
+  .lmsa-params-slider-row.is-disabled,
+  .lmsa-params-input-row.is-disabled {
+    opacity: 0.4;
+    pointer-events: none;
+  }
+}
+
+@media (max-width: 700px) {
+  .lmsa-profile-popover {
+    @apply lmsa-left-0 lmsa-right-0;
+    width: auto;
+  }
+}

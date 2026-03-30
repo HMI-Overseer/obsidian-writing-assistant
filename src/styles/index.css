@@ -4,14 +4,13 @@
 /* Chat */
 @import "../chat/view/createChatLayout.css";
 @import "../chat/view/ChatHistoryDrawer.css";
-@import "../chat/view/ModelParametersDrawer.css";
 @import "../chat/messages/ChatTranscript.css";
 @import "../chat/messages/BubbleActionToolbar.css";
 @import "../chat/messages/BubbleVersionNav.css";
 @import "../chat/messages/UsageBadge.css";
 @import "../chat/messages/InlineMessageEditor.css";
 @import "../chat/models/ChatModelSelector.css";
-@import "../chat/models/CacheSettingsPopover.css";
+@import "../chat/models/ProfileSettingsPopover.css";
 @import "../chat/composer/ChatComposer.css";
 @import "../chat/animations.css";
 

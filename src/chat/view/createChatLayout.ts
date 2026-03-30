@@ -29,15 +29,14 @@ export function createChatLayout(contentEl: HTMLElement): ChatLayoutRefs {
   const modelDropdownEl = headerMetaWrap.createDiv({ cls: "lmsa-model-dropdown" });
   modelDropdownEl.style.display = "none";
 
-  const cacheSettingsBtn = headerMetaWrap.createEl("button", {
-    cls: "lmsa-cache-settings-btn",
-    attr: { "aria-label": "Cache settings" },
+  const profileSettingsBtn = headerMetaWrap.createEl("button", {
+    cls: "lmsa-profile-settings-btn",
+    attr: { "aria-label": "Profile settings" },
   }) as HTMLButtonElement;
-  setIcon(cacheSettingsBtn, "settings");
-  cacheSettingsBtn.style.display = "none";
+  setIcon(profileSettingsBtn, "settings");
 
-  const cacheSettingsPopoverEl = headerMetaWrap.createDiv({ cls: "lmsa-cache-popover" });
-  cacheSettingsPopoverEl.style.display = "none";
+  const profileSettingsPopoverEl = headerMetaWrap.createDiv({ cls: "lmsa-profile-popover" });
+  profileSettingsPopoverEl.style.display = "none";
 
   const headerActions = header.createDiv({ cls: "lmsa-header-actions" });
   const historyBtn = headerActions.createEl("button", {
@@ -45,12 +44,6 @@ export function createChatLayout(contentEl: HTMLElement): ChatLayoutRefs {
     attr: { "aria-label": "Chat history" },
   }) as HTMLButtonElement;
   setIcon(historyBtn, "clock");
-
-  const paramsBtn = headerActions.createEl("button", {
-    cls: "lmsa-header-btn lmsa-ui-icon-btn",
-    attr: { "aria-label": "Model parameters" },
-  }) as HTMLButtonElement;
-  setIcon(paramsBtn, "sliders-horizontal");
 
   const messagesPaneEl = shell.createDiv({ cls: "lmsa-messages-pane" });
   const emptyStateEl = messagesPaneEl.createDiv({ cls: "lmsa-empty-view" });
@@ -95,7 +88,6 @@ export function createChatLayout(contentEl: HTMLElement): ChatLayoutRefs {
     messagesPaneEl,
     headerMetaEl: headerMetaLabel,
     historyBtn,
-    paramsBtn,
     shellEl: shell,
     messagesEl,
     emptyStateEl,
@@ -109,8 +101,8 @@ export function createChatLayout(contentEl: HTMLElement): ChatLayoutRefs {
     modelSelectorStatusEl,
     modelSelectorChevronEl: headerMetaChevron,
     modelDropdownEl,
-    cacheSettingsBtn,
-    cacheSettingsPopoverEl,
+    profileSettingsBtn,
+    profileSettingsPopoverEl,
     usageSummaryEl,
     contextCapacityEl,
   };

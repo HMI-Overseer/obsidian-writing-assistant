@@ -9,7 +9,7 @@ import type { ChatTranscript } from "../messages/ChatTranscript";
 import type { StreamingRenderer } from "./StreamingRenderer";
 import { estimateCost } from "../../api/pricing";
 
-function attachUsageToMessage(
+export function attachUsageToMessage(
   message: ReturnType<typeof makeMessage>,
   modelId?: string,
   provider?: ProviderOption,

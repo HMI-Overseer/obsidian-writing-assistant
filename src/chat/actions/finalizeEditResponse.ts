@@ -10,6 +10,9 @@ import { DiffReviewPanel } from "../messages/DiffReviewPanel";
 import type { BubbleRefs } from "../types";
 import type { EditStreamingRenderer } from "./EditStreamingRenderer";
 import type LMStudioWritingAssistant from "../../main";
+import type { ProviderOption } from "../../shared/types";
+import type { UsageResult } from "../../api/usageTypes";
+import { attachUsageToMessage } from "./finalizeResponse";
 
 export interface FinalizeEditOptions {
   app: App;
@@ -19,6 +22,9 @@ export interface FinalizeEditOptions {
   bubble: BubbleRefs;
   renderer: EditStreamingRenderer;
   plugin: LMStudioWritingAssistant;
+  modelId?: string;
+  provider?: ProviderOption;
+  usage?: UsageResult | null;
 }
 
 /**
@@ -29,7 +35,7 @@ export interface FinalizeEditOptions {
  * are found. Falls back to normal message rendering if no blocks are present.
  */
 export async function finalizeEditResponse(options: FinalizeEditOptions): Promise<void> {
-  const { app, owner, store, transcript, bubble, renderer, plugin } = options;
+  const { app, owner, store, transcript, bubble, renderer, plugin, modelId, provider, usage } = options;
 
   const fullResponse = renderer.getFullResponse();
   if (!fullResponse) {
@@ -40,7 +46,7 @@ export async function finalizeEditResponse(options: FinalizeEditOptions): Promis
   const file = app.workspace.getActiveFile();
   if (!file) {
     // No active file — fall back to normal rendering
-    await renderAsNormalMessage(store, transcript, bubble, fullResponse);
+    await renderAsNormalMessage(store, transcript, bubble, fullResponse, modelId, provider, usage);
     return;
   }
 
@@ -50,7 +56,7 @@ export async function finalizeEditResponse(options: FinalizeEditOptions): Promis
     if (fullResponse.includes("<<<SEARCH")) {
       new Notice("Edit blocks were detected but couldn't be parsed.");
     }
-    await renderAsNormalMessage(store, transcript, bubble, fullResponse);
+    await renderAsNormalMessage(store, transcript, bubble, fullResponse, modelId, provider, usage);
     return;
   }
 
@@ -75,6 +81,7 @@ export async function finalizeEditResponse(options: FinalizeEditOptions): Promis
   // Save message with the proposal attached
   const assistantMessage = makeMessage("assistant", fullResponse);
   assistantMessage.editProposal = proposal;
+  attachUsageToMessage(assistantMessage, modelId, provider, usage);
   store.appendMessage(assistantMessage);
   store.setLastAssistantResponse(fullResponse);
 
@@ -130,9 +137,13 @@ async function renderAsNormalMessage(
   store: ChatSessionStore,
   transcript: ChatTranscript,
   bubble: BubbleRefs,
-  fullResponse: string
+  fullResponse: string,
+  modelId?: string,
+  provider?: ProviderOption,
+  usage?: UsageResult | null
 ): Promise<void> {
   const assistantMessage = makeMessage("assistant", fullResponse);
+  attachUsageToMessage(assistantMessage, modelId, provider, usage);
   store.appendMessage(assistantMessage);
   store.setLastAssistantResponse(fullResponse);
   await transcript.renderBubbleContent(bubble, fullResponse);

@@ -144,6 +144,9 @@ export async function regenerateMessage(options: RegenerateOptions): Promise<voi
         bubble: assistantBubble,
         renderer,
         plugin,
+        modelId: activeModel.modelId,
+        provider: activeModel.provider,
+        usage,
       });
     } else {
       const fullResponse = renderer.getFullResponse();
@@ -172,6 +175,8 @@ export async function regenerateMessage(options: RegenerateOptions): Promise<voi
           bubble: assistantBubble,
           renderer,
           plugin,
+          modelId: activeModel.modelId,
+          provider: activeModel.provider,
         });
       } else {
         const fullResponse = renderer.getFullResponse();

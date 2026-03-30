@@ -41,6 +41,8 @@ export interface MessageUsage {
 export interface MessageVersion {
   content: string;
   createdAt: number;
+  /** Usage snapshot for this version's generation. */
+  usage?: MessageUsage;
 }
 
 /**

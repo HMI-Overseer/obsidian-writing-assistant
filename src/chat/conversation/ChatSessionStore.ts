@@ -186,9 +186,9 @@ export class ChatSessionStore {
     if (oldMessage.versions && oldMessage.versions.length > 0) {
       versions = [...oldMessage.versions];
     } else {
-      versions = [{ content: oldMessage.content, createdAt: now }];
+      versions = [{ content: oldMessage.content, createdAt: now, usage: oldMessage.usage }];
     }
-    versions.push({ content: newContent, createdAt: now });
+    versions.push({ content: newContent, createdAt: now, usage: metadata?.usage });
 
     const newMessage: ConversationMessage = {
       id: oldMessage.id,

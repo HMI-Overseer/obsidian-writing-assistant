@@ -21,6 +21,7 @@ import type { ChatLayoutRefs } from "./types";
 import { ChatHistoryDrawer } from "./view/ChatHistoryDrawer";
 import { ModelParametersDrawer } from "./view/ModelParametersDrawer";
 import { createChatLayout } from "./view/createChatLayout";
+import { sumConversationUsage } from "./usageSummary";
 
 const NO_MODEL_SELECTED_LABEL = "No model selected";
 const MIN_VIEW_WIDTH_PX = 300;
@@ -465,23 +466,9 @@ export class ChatView extends ItemView {
     const el = this.layout?.usageSummaryEl;
     if (!el) return;
 
-    let totalCost = 0;
-    let totalInputTokens = 0;
-    let totalOutputTokens = 0;
-    let hasUsage = false;
+    const totals = sumConversationUsage(messages);
 
-    for (const msg of messages) {
-      if (msg.usage) {
-        hasUsage = true;
-        totalInputTokens += msg.usage.inputTokens;
-        totalOutputTokens += msg.usage.outputTokens;
-        if (msg.usage.estimatedCostUsd) {
-          totalCost += msg.usage.estimatedCostUsd;
-        }
-      }
-    }
-
-    if (!hasUsage) {
+    if (!totals.hasUsage) {
       el.style.display = "none";
       return;
     }
@@ -489,18 +476,18 @@ export class ChatView extends ItemView {
     el.style.display = "";
     el.empty();
 
-    const totalTokens = totalInputTokens + totalOutputTokens;
+    const totalTokens = totals.totalInputTokens + totals.totalOutputTokens;
     const tokenText = totalTokens >= 1_000
       ? `${(totalTokens / 1_000).toFixed(1)}k tokens`
       : `${totalTokens} tokens`;
 
     const parts: string[] = [];
-    if (totalCost > 0) {
-      const costStr = totalCost < 0.01
-        ? `$${totalCost.toFixed(4)}`
-        : totalCost < 1
-          ? `$${totalCost.toFixed(3)}`
-          : `$${totalCost.toFixed(2)}`;
+    if (totals.totalCost > 0) {
+      const costStr = totals.totalCost < 0.01
+        ? `$${totals.totalCost.toFixed(4)}`
+        : totals.totalCost < 1
+          ? `$${totals.totalCost.toFixed(3)}`
+          : `$${totals.totalCost.toFixed(2)}`;
       parts.push(`Session: ${costStr}`);
     }
     parts.push(tokenText);

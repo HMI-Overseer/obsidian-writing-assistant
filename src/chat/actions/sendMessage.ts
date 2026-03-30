@@ -150,6 +150,9 @@ export async function sendMessage(options: SendMessageOptions): Promise<void> {
         bubble: assistantBubble,
         renderer,
         plugin,
+        modelId: activeModel.modelId,
+        provider: activeModel.provider,
+        usage,
       });
     } else {
       await finalizeResponse(
@@ -180,6 +183,8 @@ export async function sendMessage(options: SendMessageOptions): Promise<void> {
           bubble: assistantBubble,
           renderer,
           plugin,
+          modelId: activeModel.modelId,
+          provider: activeModel.provider,
         });
       } else {
         await finalizeAbortedResponse(store, transcript, assistantBubble, renderer as StreamingRenderer,

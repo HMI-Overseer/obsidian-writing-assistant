@@ -1,21 +1,22 @@
 import type { ChatRequest } from "../shared/chatRequest";
 import type { SamplingParams } from "../shared/types";
+import type { CompletionResult, StreamResult } from "./usageTypes";
 
 /** Provider-agnostic chat completion client. */
 export interface ChatClient {
-  /** Non-streaming completion. Returns the full response text. */
+  /** Non-streaming completion. Returns the response text and optional usage. */
   complete(
     request: ChatRequest,
     model: string,
     params: SamplingParams,
     signal?: AbortSignal
-  ): Promise<string>;
+  ): Promise<CompletionResult>;
 
-  /** Streaming completion. Yields text deltas. */
+  /** Streaming completion. Returns text deltas and a usage promise. */
   stream(
     request: ChatRequest,
     model: string,
     params: SamplingParams,
     signal?: AbortSignal
-  ): AsyncGenerator<string>;
+  ): StreamResult;
 }

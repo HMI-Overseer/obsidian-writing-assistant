@@ -1,5 +1,29 @@
+import type { ProviderOption } from "../shared/types";
+
 export type RequestMethod = "GET" | "POST";
 export type JsonRecord = Record<string, unknown>;
+
+// ── Provider-agnostic model discovery types ──────────────────────────────
+
+export interface ModelDigest {
+  id: string;
+  kind: "completion" | "embedding";
+  displayName: string;
+  targetModelId: string;
+  provider: ProviderOption;
+  /** Whether the model is currently loaded/active. Only meaningful for local providers. */
+  isLoaded?: boolean;
+  activeContextLength?: number;
+  maxContextLength?: number;
+  /** Free-form summary line shown below the model ID. */
+  summary?: string;
+}
+
+export interface ModelCandidateResult {
+  candidates: ModelDigest[];
+  source: string;
+  discoveredAt: number;
+}
 
 export type LMStudioModelListSource = "native" | "openai";
 

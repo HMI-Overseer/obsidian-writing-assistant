@@ -1341,6 +1341,43 @@
     min-width: 28px;
     text-align: center;
 }
+.lmsa-usage-badge {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-basis: 100%;
+    order: 2;
+    margin-top: 4px;
+    font-size: var(--font-smallest);
+    color: var(--text-muted);
+    opacity: 0.7;
+}
+.lmsa-message:hover .lmsa-usage-badge {
+    opacity: 1;
+  }
+.lmsa-usage-tokens {
+    display: inline-flex;
+    align-items: center;
+}
+.lmsa-usage-cost {
+    display: inline-flex;
+    align-items: center;
+    color: var(--text-accent);
+}
+.lmsa-usage-model {
+    display: inline-flex;
+    align-items: center;
+    font-size: var(--font-smallest);
+    opacity: 0.6;
+}
+.lmsa-usage-summary {
+    display: flex;
+    align-items: center;
+    font-size: var(--font-smallest);
+    color: var(--text-muted);
+    padding: 0 4px;
+    min-height: 20px;
+}
 .lmsa-message.is-editing .lmsa-message-body {
     border-style: dashed;
     border-color: color-mix(in srgb, var(--lmsa-mode-accent) 50%, var(--background-modifier-border));

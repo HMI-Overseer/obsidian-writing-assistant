@@ -1,4 +1,4 @@
-import type { LMStudioClient } from "../../api/LMStudioClient";
+import type { ChatClient } from "../../api/chatClient";
 import type { CompletionModel, SamplingParams } from "../../shared/types";
 import type { ChatRequest } from "../../shared/chatRequest";
 import type { BenchmarkTestCase, BenchmarkRunResult, BenchmarkIterationResult } from "./types";
@@ -9,7 +9,7 @@ import { DEFAULT_COMPLETION_MAX_TOKENS, DEFAULT_COMPLETION_TEMPERATURE } from ".
  * Invokes `onIteration` after each individual iteration completes.
  */
 export async function runBenchmarkTest(
-  client: LMStudioClient,
+  client: ChatClient,
   model: CompletionModel,
   testCase: BenchmarkTestCase,
   iterationCount: number,
@@ -44,12 +44,13 @@ export async function runBenchmarkTest(
       repeatPenalty: null,
       reasoning: null,
     };
-    const rawResponse = await client.complete(
+    const completionResult = await client.complete(
       request,
       model.modelId,
       benchmarkParams,
       signal
     );
+    const rawResponse = completionResult.text;
     const durationMs = Date.now() - start;
     const result = testCase.evaluate(rawResponse, testCase);
 
@@ -77,7 +78,7 @@ export async function runBenchmarkTest(
  * Invokes `onTestComplete` after all iterations of a test finish.
  */
 export async function runAllBenchmarks(
-  client: LMStudioClient,
+  client: ChatClient,
   model: CompletionModel,
   testCases: BenchmarkTestCase[],
   iterationCount: number,

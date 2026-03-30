@@ -175,7 +175,11 @@ export class ChatSessionStore {
     return this.messageHistory.slice(0, index + 1);
   }
 
-  finalizeRegeneration(oldMessage: ConversationMessage, newContent: string): ConversationMessage {
+  finalizeRegeneration(
+    oldMessage: ConversationMessage,
+    newContent: string,
+    metadata?: Pick<ConversationMessage, "modelId" | "provider" | "usage">
+  ): ConversationMessage {
     const now = Date.now();
 
     let versions: MessageVersion[];
@@ -192,6 +196,7 @@ export class ChatSessionStore {
       content: newContent,
       versions,
       activeVersionIndex: versions.length - 1,
+      ...metadata,
     };
 
     this.messageHistory.push(newMessage);

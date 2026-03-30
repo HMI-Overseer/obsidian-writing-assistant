@@ -25,7 +25,8 @@ export function nodeRequest(
   baseUrl: string,
   path: string,
   body?: string,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  headers?: Record<string, string>
 ): Promise<string> {
   return new Promise((resolve, reject) => {
     if (signal?.aborted) {
@@ -44,6 +45,7 @@ export function nodeRequest(
       headers: {
         "Content-Type": "application/json",
         ...(body ? { "Content-Length": Buffer.byteLength(body) } : {}),
+        ...headers,
       },
     };
 
@@ -72,16 +74,82 @@ export function nodeRequest(
   });
 }
 
+export interface NodeRequestWithHeadersResult {
+  body: string;
+  headers: Record<string, string>;
+}
+
+export function nodeRequestWithHeaders(
+  method: RequestMethod,
+  baseUrl: string,
+  path: string,
+  body?: string,
+  signal?: AbortSignal,
+  headers?: Record<string, string>
+): Promise<NodeRequestWithHeadersResult> {
+  return new Promise((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(createAbortError());
+      return;
+    }
+
+    const url = new URL(`${baseUrl}${path}`);
+    const lib = url.protocol === "https:" ? https : http;
+
+    const options: http.RequestOptions = {
+      hostname: url.hostname,
+      port: parseInt(url.port, 10) || (url.protocol === "https:" ? 443 : 80),
+      path: `${url.pathname}${url.search}`,
+      method,
+      headers: {
+        "Content-Type": "application/json",
+        ...(body ? { "Content-Length": Buffer.byteLength(body) } : {}),
+        ...headers,
+      },
+    };
+
+    const req = lib.request(options, (res) => {
+      let data = "";
+      res.on("data", (chunk: Buffer) => (data += chunk.toString()));
+      res.on("end", () => {
+        if (res.statusCode && res.statusCode >= 400) {
+          reject(new Error(`HTTP ${res.statusCode}: ${data}`));
+          return;
+        }
+        const responseHeaders: Record<string, string> = {};
+        for (const [key, value] of Object.entries(res.headers)) {
+          if (typeof value === "string") {
+            responseHeaders[key] = value;
+          }
+        }
+        resolve({ body: data, headers: responseHeaders });
+      });
+      res.on("error", reject);
+    });
+
+    const abortHandler = () => {
+      req.destroy(createAbortError());
+    };
+
+    signal?.addEventListener("abort", abortHandler, { once: true });
+    req.on("close", () => signal?.removeEventListener("abort", abortHandler));
+    req.on("error", reject);
+    if (body) req.write(body);
+    req.end();
+  });
+}
+
 export async function fetchRequest(
   method: RequestMethod,
   baseUrl: string,
   path: string,
   body?: string,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  headers?: Record<string, string>
 ): Promise<string> {
   const res = await fetch(`${baseUrl}${path}`, {
     method,
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...headers },
     ...(body ? { body } : {}),
     signal,
   });
@@ -95,12 +163,13 @@ export async function request(
   path: string,
   bypassCors: boolean,
   body?: string,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  headers?: Record<string, string>
 ): Promise<string> {
   if (bypassCors) {
-    return nodeRequest(method, baseUrl, path, body, signal);
+    return nodeRequest(method, baseUrl, path, body, signal, headers);
   }
-  return fetchRequest(method, baseUrl, path, body, signal);
+  return fetchRequest(method, baseUrl, path, body, signal, headers);
 }
 
 export async function requestJson(
@@ -109,7 +178,8 @@ export async function requestJson(
   path: string,
   bypassCors: boolean,
   body?: string,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  headers?: Record<string, string>
 ): Promise<unknown> {
-  return JSON.parse(await request(method, baseUrl, path, bypassCors, body, signal));
+  return JSON.parse(await request(method, baseUrl, path, bypassCors, body, signal, headers));
 }

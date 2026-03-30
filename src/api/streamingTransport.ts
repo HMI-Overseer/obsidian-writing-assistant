@@ -2,10 +2,23 @@ import * as http from "http";
 import * as https from "https";
 import { createAbortError } from "./httpTransport";
 
+/** Extracts a text delta from a parsed SSE JSON payload. Returns null if the event is not a text delta. */
+export type DeltaExtractor = (json: unknown) => string | null;
+
+/** Default extractor for OpenAI-compatible SSE streams. */
+export function openAIDeltaExtractor(json: unknown): string | null {
+  const record = json as Record<string, unknown>;
+  const choices = record.choices as Array<{ delta?: { content?: string } }> | undefined;
+  return choices?.[0]?.delta?.content ?? null;
+}
+
 export async function* streamNode(
   url: string,
   body: string,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  headers?: Record<string, string>,
+  extractDelta: DeltaExtractor = openAIDeltaExtractor,
+  onEvent?: (json: unknown) => void
 ): AsyncGenerator<string> {
   if (signal?.aborted) throw createAbortError();
 
@@ -43,10 +56,34 @@ export async function* streamNode(
       headers: {
         "Content-Type": "application/json",
         "Content-Length": Buffer.byteLength(body),
+        ...headers,
       },
     };
 
     req = lib.request(options, (res) => {
+      // Check for HTTP errors before processing the stream.
+      // Without this, error responses (401, 400, 429, etc.) are silently
+      // fed through the SSE parser, yielding zero deltas and producing an
+      // empty response with no error shown to the user.
+      if (res.statusCode && res.statusCode >= 400) {
+        let errorBody = "";
+        res.on("data", (chunk: Buffer) => (errorBody += chunk.toString()));
+        res.on("end", () => {
+          let message = `HTTP ${res.statusCode}`;
+          try {
+            const parsed = JSON.parse(errorBody) as Record<string, unknown>;
+            const err = parsed.error as Record<string, unknown> | undefined;
+            if (typeof err?.message === "string") message += `: ${err.message}`;
+          } catch {
+            if (errorBody.length > 0 && errorBody.length < 200) message += `: ${errorBody}`;
+          }
+          error = new Error(message);
+          done = true;
+          notify();
+        });
+        return;
+      }
+
       let buffer = "";
       res.on("data", (chunk: Buffer) => {
         buffer += chunk.toString();
@@ -60,7 +97,9 @@ export async function* streamNode(
           if (payload === "[DONE]") continue;
 
           try {
-            const delta = JSON.parse(payload).choices?.[0]?.delta?.content;
+            const parsed = JSON.parse(payload) as unknown;
+            onEvent?.(parsed);
+            const delta = extractDelta(parsed);
             if (delta) {
               queue.push(delta);
               notify();
@@ -111,11 +150,14 @@ export async function* streamNode(
 export async function* streamFetch(
   url: string,
   body: string,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  headers?: Record<string, string>,
+  extractDelta: DeltaExtractor = openAIDeltaExtractor,
+  onEvent?: (json: unknown) => void
 ): AsyncGenerator<string> {
   const res = await fetch(url, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...headers },
     body,
     signal,
   });
@@ -141,7 +183,9 @@ export async function* streamFetch(
       if (payload === "[DONE]") return;
 
       try {
-        const delta = JSON.parse(payload).choices?.[0]?.delta?.content;
+        const parsed = JSON.parse(payload) as unknown;
+        onEvent?.(parsed);
+        const delta = extractDelta(parsed);
         if (delta) yield delta;
       } catch {
         // Skip malformed chunks from the stream.

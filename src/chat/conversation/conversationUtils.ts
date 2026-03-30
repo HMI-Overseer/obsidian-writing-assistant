@@ -112,6 +112,14 @@ function normalizeConversation(raw: Record<string, unknown>): Conversation | nul
             base.appliedEdit = message.appliedEdit as ConversationMessage["appliedEdit"];
           }
 
+          // Preserve per-message model identity and usage
+          if (typeof message.modelId === "string") base.modelId = message.modelId;
+          if (typeof message.provider === "string") base.provider = message.provider as ConversationMessage["provider"];
+          if (message.usage && typeof message.usage === "object") {
+            base.usage = message.usage as ConversationMessage["usage"];
+          }
+          if (message.isError === true) base.isError = true;
+
           return base;
         })
     : [];

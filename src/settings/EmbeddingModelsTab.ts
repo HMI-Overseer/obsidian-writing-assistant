@@ -1,14 +1,15 @@
+import { LMStudioModelsService } from "../api";
+import type { ModelDigest } from "../api/types";
 import type LMStudioWritingAssistant from "../main";
 import type { EmbeddingModel } from "../shared/types";
-import type { LMStudioModelDigest } from "../api/types";
 import { EmbeddingModelModal } from "./modals";
 import { renderModelProfileTab } from "./ModelProfileTab";
 
-function formatEmbeddingSummary(model: LMStudioModelDigest): string {
+function formatEmbeddingSummary(model: ModelDigest): string {
   if (model.summary) return model.summary;
   return model.isLoaded
-    ? "Loaded in LM Studio and ready for embedding requests."
-    : "Available in LM Studio.";
+    ? "Loaded and ready for embedding requests."
+    : "Available for embedding requests.";
 }
 
 export function renderEmbeddingModelsTab(
@@ -29,15 +30,22 @@ export function renderEmbeddingModelsTab(
     addSectionIcon: "plus-circle",
     emptyProfilesText: "No embedding models configured.",
     emptyDiscoveryText:
-      "No live model data loaded yet. Use Refresh models to fetch suggestions from LM Studio.",
+      "No live model data loaded yet. Use Refresh models to discover available models.",
     noModelsFoundText:
-      "LM Studio responded, but no embedding-ready models were reported.",
+      "The provider responded, but no embedding-ready models were reported.",
     getModels: () => settings.embeddingModels,
     setModels: (m) => { settings.embeddingModels = m; },
     formatDiscoveryMeta: formatEmbeddingSummary,
     openModal: (app, p, source, onSave, prefill) => {
       new EmbeddingModelModal(app, p, source, onSave, prefill).open();
     },
-    getCandidates: (service, opts) => service.getEmbeddingCandidates(opts),
+    fetchCandidates: {
+      lmstudio: (opts) => {
+        const lm = settings.providerSettings.lmstudio;
+        const svc = new LMStudioModelsService(lm.baseUrl, lm.bypassCors);
+        return svc.getEmbeddingCandidates(opts);
+      },
+      // Anthropic has no embedding models — omitted so UI shows the "not available" message
+    },
   });
 }

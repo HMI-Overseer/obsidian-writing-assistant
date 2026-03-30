@@ -1,7 +1,8 @@
 import { setIcon } from "obsidian";
 import type LMStudioWritingAssistant from "../main";
 import type { CompletionModel } from "../shared/types";
-import { LMStudioClient, LMStudioModelsService } from "../api";
+import { LMStudioModelsService } from "../api";
+import { createChatClient } from "../providers/registry";
 import { createSettingsSection } from "./ui";
 import { getTestCases } from "./benchmark/testCases";
 import { runBenchmarkTest, runAllBenchmarks } from "./benchmark/benchmarkRunner";
@@ -60,9 +61,10 @@ export function renderBenchmarkTab(
 
   async function refreshModelAvailability(): Promise<void> {
     try {
+      const lmSettings = plugin.settings.providerSettings.lmstudio;
       const modelsService = new LMStudioModelsService(
-        plugin.settings.lmStudioUrl,
-        plugin.settings.bypassCors
+        lmSettings.baseUrl,
+        lmSettings.bypassCors
       );
       const result = await modelsService.getCompletionCandidates({ forceRefresh: true });
       knownAvailability.clear();
@@ -444,7 +446,7 @@ export function renderBenchmarkTab(
     updateSummary();
 
     try {
-      const client = new LMStudioClient(plugin.settings.lmStudioUrl, plugin.settings.bypassCors);
+      const client = createChatClient(selectedModel.provider, plugin.settings.providerSettings);
       const result = await runBenchmarkTest(
         client,
         selectedModel,
@@ -491,7 +493,7 @@ export function renderBenchmarkTab(
     updateSummary();
 
     try {
-      const client = new LMStudioClient(plugin.settings.lmStudioUrl, plugin.settings.bypassCors);
+      const client = createChatClient(selectedModel.provider, plugin.settings.providerSettings);
       await runAllBenchmarks(
         client,
         selectedModel,

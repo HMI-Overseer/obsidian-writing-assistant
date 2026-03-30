@@ -1,6 +1,7 @@
 import type { Message, SamplingParams } from "../shared/types";
 import type { ChatRequest } from "../shared/chatRequest";
 import type { ChatClient } from "./chatClient";
+import type { CompletionResult, StreamResult, UsageResult } from "./usageTypes";
 import type { LMStudioModel, LMStudioModelListResult } from "./types";
 import { resolveLMStudioBaseUrls } from "./urlResolution";
 import { normalizeModelList } from "./modelNormalization";
@@ -77,7 +78,7 @@ export class LMStudioClient implements ChatClient {
     model: string,
     params: SamplingParams,
     signal?: AbortSignal
-  ): Promise<string> {
+  ): Promise<CompletionResult> {
     const messages = this.buildMessages(request);
     const payload = buildCompletionPayload(model, messages, params, false);
 
@@ -93,24 +94,38 @@ export class LMStudioClient implements ChatClient {
       throw new Error("LM Studio returned an invalid chat completion response.");
     }
 
-    return (json.choices as Array<{ message?: { content?: string } }>)[0]?.message?.content ?? "";
+    const text = (json.choices as Array<{ message?: { content?: string } }>)[0]?.message?.content ?? "";
+
+    // Extract usage from OpenAI-compatible response.
+    let usage: UsageResult | null = null;
+    const rawUsage = json.usage as Record<string, unknown> | undefined;
+    if (rawUsage) {
+      const inputTokens = typeof rawUsage.prompt_tokens === "number" ? rawUsage.prompt_tokens : 0;
+      const outputTokens = typeof rawUsage.completion_tokens === "number" ? rawUsage.completion_tokens : 0;
+      if (inputTokens > 0 || outputTokens > 0) {
+        usage = { inputTokens, outputTokens };
+      }
+    }
+
+    return { text, usage };
   }
 
-  async *stream(
+  stream(
     request: ChatRequest,
     model: string,
     params: SamplingParams,
     signal?: AbortSignal
-  ): AsyncGenerator<string> {
+  ): StreamResult {
     const messages = this.buildMessages(request);
     const url = `${this.openAIBaseUrl}/chat/completions`;
     const body = buildCompletionPayload(model, messages, params, true);
 
-    if (this.bypassCors) {
-      yield* streamNode(url, body, signal);
-    } else {
-      yield* streamFetch(url, body, signal);
-    }
+    const deltas = this.bypassCors
+      ? streamNode(url, body, signal)
+      : streamFetch(url, body, signal);
+
+    // OpenAI-compatible streaming doesn't include usage in SSE deltas.
+    return { deltas, usage: Promise.resolve(null) };
   }
 
   private buildMessages(request: ChatRequest): Message[] {

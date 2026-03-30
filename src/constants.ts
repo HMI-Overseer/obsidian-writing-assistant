@@ -18,6 +18,11 @@ export const DEFAULT_CHAT_HISTORY: ChatHistory = {
 export const DEFAULT_SETTINGS: PluginSettings = {
   lmStudioUrl: "http://localhost:1234/v1",
   bypassCors: true,
+  providerSettings: {
+    lmstudio: { baseUrl: "http://localhost:1234/v1", bypassCors: true },
+    anthropic: { apiKey: "" },
+    openai: { apiKey: "", baseUrl: "https://api.openai.com/v1" },
+  },
   includeNoteContext: true,
   maxContextChars: 12000,
   globalSystemPrompt: "",

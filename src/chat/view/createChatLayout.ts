@@ -63,6 +63,9 @@ export function createChatLayout(contentEl: HTMLElement): ChatLayoutRefs {
 
   const composerFooter = composerPanel.createDiv({ cls: "lmsa-composer-footer" });
 
+  const usageSummaryEl = composerFooter.createDiv({ cls: "lmsa-usage-summary" });
+  usageSummaryEl.style.display = "none";
+
   const composerFooterActions = composerFooter.createDiv({ cls: "lmsa-composer-footer-actions" });
   const modeToggleEl = composerFooterActions.createDiv({ cls: "lmsa-mode-toggle" });
 
@@ -90,5 +93,6 @@ export function createChatLayout(contentEl: HTMLElement): ChatLayoutRefs {
     modelSelectorStatusEl,
     modelSelectorChevronEl: headerMetaChevron,
     modelDropdownEl,
+    usageSummaryEl,
   };
 }

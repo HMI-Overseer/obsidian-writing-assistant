@@ -1,5 +1,5 @@
 import type { Component } from "obsidian";
-import { LMStudioClient } from "../../api";
+import { createChatClient } from "../../providers/registry";
 import { buildSamplingParams } from "./buildSamplingParams";
 import type LMStudioWritingAssistant from "../../main";
 import type { ChatComposer } from "../composer/ChatComposer";
@@ -120,19 +120,23 @@ export async function sendMessage(options: SendMessageOptions): Promise<void> {
     ? new EditStreamingRenderer(assistantBubble, transcript)
     : new StreamingRenderer(assistantBubble, transcript);
 
-  const client = new LMStudioClient(plugin.settings.lmStudioUrl, plugin.settings.bypassCors);
+  const client = createChatClient(activeModel.provider, plugin.settings.providerSettings);
   const abortController = new AbortController();
   setActiveAbortController(abortController);
 
   try {
-    for await (const delta of client.stream(
+    const streamResult = client.stream(
       apiMessages,
       activeModel.modelId,
       buildSamplingParams(plugin.settings),
       abortController.signal
-    )) {
+    );
+
+    for await (const delta of streamResult.deltas) {
       renderer.appendDelta(delta);
     }
+
+    const usage = await streamResult.usage;
 
     await renderer.flush();
     assistantBubble.bodyEl.removeClass("is-streaming");
@@ -154,7 +158,10 @@ export async function sendMessage(options: SendMessageOptions): Promise<void> {
         assistantBubble,
         renderer as StreamingRenderer,
         autoInsertAfterResponse,
-        plugin
+        plugin,
+        activeModel.modelId,
+        activeModel.provider,
+        usage
       );
     }
 
@@ -175,14 +182,19 @@ export async function sendMessage(options: SendMessageOptions): Promise<void> {
           plugin,
         });
       } else {
-        await finalizeAbortedResponse(store, transcript, assistantBubble, renderer as StreamingRenderer);
+        await finalizeAbortedResponse(store, transcript, assistantBubble, renderer as StreamingRenderer,
+          activeModel.modelId, activeModel.provider);
       }
     } else {
+      const errorText = `Error: ${getErrorMessage(error)}`;
+      const errorMessage = makeMessage("assistant", errorText);
+      errorMessage.isError = true;
+      errorMessage.modelId = activeModel.modelId;
+      errorMessage.provider = activeModel.provider;
+      store.appendMessage(errorMessage);
+
       assistantBubble.bodyEl.addClass("is-error");
-      transcript.renderPlainTextContent(
-        assistantBubble,
-        `Error: ${getErrorMessage(error)}\n\nMake sure LM Studio is running and a model is loaded.`
-      );
+      transcript.renderPlainTextContent(assistantBubble, errorText);
     }
   } finally {
     setActiveAbortController(null);

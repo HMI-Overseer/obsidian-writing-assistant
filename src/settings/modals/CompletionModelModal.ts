@@ -1,5 +1,6 @@
 import type { LMStudioModelsService } from "../../api";
-import type { LMStudioModelCandidateResult } from "../../api/LMStudioModelsService";
+import type { AnthropicModelsService } from "../../api/AnthropicModelsService";
+import type { ModelCandidateResult } from "../../api/types";
 import type { CompletionModel } from "../../shared/types";
 import { generateId } from "../../utils";
 import { ModelProfileModal } from "./ModelProfileModal";
@@ -18,9 +19,15 @@ export class CompletionModelModal extends ModelProfileModal<CompletionModel> {
     return "lmsa-completion-models-list";
   }
 
-  protected getCandidates(
+  protected getLMStudioCandidates(
     service: LMStudioModelsService
-  ): Promise<LMStudioModelCandidateResult> {
+  ): Promise<ModelCandidateResult> {
+    return service.getCompletionCandidates();
+  }
+
+  protected getAnthropicCandidates(
+    service: AnthropicModelsService
+  ): Promise<ModelCandidateResult> {
     return service.getCompletionCandidates();
   }
 

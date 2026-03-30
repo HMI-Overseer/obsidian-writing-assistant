@@ -1,10 +1,32 @@
 import { Notice } from "obsidian";
 import type LMStudioWritingAssistant from "../../main";
+import type { ProviderOption } from "../../shared/types";
+import type { UsageResult } from "../../api/usageTypes";
 import type { BubbleRefs } from "../types";
 import { makeMessage } from "../conversation/conversationUtils";
 import type { ChatSessionStore } from "../conversation/ChatSessionStore";
 import type { ChatTranscript } from "../messages/ChatTranscript";
 import type { StreamingRenderer } from "./StreamingRenderer";
+import { estimateCost } from "../../api/pricing";
+
+function attachUsageToMessage(
+  message: ReturnType<typeof makeMessage>,
+  modelId?: string,
+  provider?: ProviderOption,
+  usage?: UsageResult | null
+): void {
+  if (modelId) message.modelId = modelId;
+  if (provider) message.provider = provider;
+  if (usage) {
+    message.usage = {
+      inputTokens: usage.inputTokens,
+      outputTokens: usage.outputTokens,
+      ...(usage.cacheCreationInputTokens !== undefined && { cacheCreationInputTokens: usage.cacheCreationInputTokens }),
+      ...(usage.cacheReadInputTokens !== undefined && { cacheReadInputTokens: usage.cacheReadInputTokens }),
+      ...(modelId && { estimatedCostUsd: estimateCost(modelId, usage) ?? undefined }),
+    };
+  }
+}
 
 export async function finalizeResponse(
   store: ChatSessionStore,
@@ -12,12 +34,16 @@ export async function finalizeResponse(
   bubble: BubbleRefs,
   renderer: StreamingRenderer,
   autoInsertAfterResponse: boolean,
-  plugin: LMStudioWritingAssistant
+  plugin: LMStudioWritingAssistant,
+  modelId?: string,
+  provider?: ProviderOption,
+  usage?: UsageResult | null
 ): Promise<void> {
   const fullResponse = renderer.getFullResponse();
 
   if (fullResponse) {
     const assistantMessage = makeMessage("assistant", fullResponse);
+    attachUsageToMessage(assistantMessage, modelId, provider, usage);
     store.appendMessage(assistantMessage);
     store.setLastAssistantResponse(fullResponse);
 
@@ -40,12 +66,15 @@ export async function finalizeAbortedResponse(
   store: ChatSessionStore,
   transcript: ChatTranscript,
   bubble: BubbleRefs,
-  renderer: StreamingRenderer
+  renderer: StreamingRenderer,
+  modelId?: string,
+  provider?: ProviderOption
 ): Promise<void> {
   const fullResponse = renderer.getFullResponse();
 
   if (fullResponse) {
     const assistantMessage = makeMessage("assistant", fullResponse);
+    attachUsageToMessage(assistantMessage, modelId, provider);
     store.appendMessage(assistantMessage);
     store.setLastAssistantResponse(fullResponse);
 

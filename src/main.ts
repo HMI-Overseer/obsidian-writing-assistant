@@ -6,6 +6,7 @@ import type {
   CustomCommand,
   EmbeddingModel,
   PluginSettings,
+  ProviderSettingsMap,
 } from "./shared/types";
 import { DEFAULT_CHAT_HISTORY, DEFAULT_SETTINGS, VIEW_TYPE_CHAT } from "./constants";
 import { normalizeLMStudioBaseUrl } from "./api";
@@ -13,6 +14,35 @@ import { ChatView } from "./chat";
 import { normalizeChatHistory } from "./chat/conversation/conversationUtils";
 import { normalizeCompletionModel, normalizeEmbeddingModel } from "./shared/normalizeModels";
 import { LMStudioSettingTab } from "./settings/SettingsTab";
+
+function migrateProviderSettings(
+  data: Partial<PluginSettings> | null,
+  lmStudioUrl: string,
+  bypassCors: boolean
+): ProviderSettingsMap {
+  const saved = data?.providerSettings;
+  return {
+    lmstudio: {
+      baseUrl: saved?.lmstudio?.baseUrl ?? lmStudioUrl,
+      bypassCors: typeof saved?.lmstudio?.bypassCors === "boolean"
+        ? saved.lmstudio.bypassCors
+        : bypassCors,
+    },
+    anthropic: {
+      apiKey: typeof saved?.anthropic?.apiKey === "string"
+        ? saved.anthropic.apiKey
+        : DEFAULT_SETTINGS.providerSettings.anthropic.apiKey,
+    },
+    openai: {
+      apiKey: typeof saved?.openai?.apiKey === "string"
+        ? saved.openai.apiKey
+        : DEFAULT_SETTINGS.providerSettings.openai.apiKey,
+      baseUrl: typeof saved?.openai?.baseUrl === "string"
+        ? saved.openai.baseUrl
+        : DEFAULT_SETTINGS.providerSettings.openai.baseUrl,
+    },
+  };
+}
 
 export default class LMStudioWritingAssistant extends Plugin {
   settings!: PluginSettings;
@@ -105,10 +135,16 @@ export default class LMStudioWritingAssistant extends Plugin {
         ? normalizeChatHistory(data.chatHistory)
         : { ...DEFAULT_CHAT_HISTORY };
 
+    const lmStudioUrl = normalizeLMStudioBaseUrl(data?.lmStudioUrl ?? DEFAULT_SETTINGS.lmStudioUrl);
+    const bypassCors =
+      typeof data?.bypassCors === "boolean" ? data.bypassCors : DEFAULT_SETTINGS.bypassCors;
+
+    const providerSettings = migrateProviderSettings(data, lmStudioUrl, bypassCors);
+
     this.settings = {
-      lmStudioUrl: normalizeLMStudioBaseUrl(data?.lmStudioUrl ?? DEFAULT_SETTINGS.lmStudioUrl),
-      bypassCors:
-        typeof data?.bypassCors === "boolean" ? data.bypassCors : DEFAULT_SETTINGS.bypassCors,
+      lmStudioUrl,
+      bypassCors,
+      providerSettings,
       includeNoteContext:
         typeof data?.includeNoteContext === "boolean"
           ? data.includeNoteContext

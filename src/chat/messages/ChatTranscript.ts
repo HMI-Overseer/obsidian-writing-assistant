@@ -3,6 +3,7 @@ import type { ConversationMessage } from "../../shared/types";
 import type { BubbleRefs, BubbleRenderOptions, ChatLayoutRefs } from "../types";
 import { BubbleActionToolbar } from "./BubbleActionToolbar";
 import { BubbleVersionNav } from "./BubbleVersionNav";
+import { renderUsageBadge } from "./UsageBadge";
 
 export type BubbleActionCallbacks = {
   onCopy: (messageId: string) => void;
@@ -42,7 +43,14 @@ export class ChatTranscript {
     for (let i = 0; i < messages.length; i++) {
       const message = messages[i];
       const bubble = this.createBubble(message.role, message.id);
-      await this.renderBubbleContent(bubble, message.content);
+
+      if (message.isError) {
+        bubble.bodyEl.addClass("is-error");
+        this.renderPlainTextContent(bubble, message.content);
+      } else {
+        await this.renderBubbleContent(bubble, message.content);
+      }
+
       this.bubblesByMessageId.set(message.id, bubble);
 
       if (actionCallbacks) {
@@ -263,6 +271,11 @@ export class ChatTranscript {
     isLastAssistant: boolean,
     callbacks: BubbleActionCallbacks
   ): void {
+    // Usage badge — shown below assistant bubbles before the toolbar.
+    if (message.role === "assistant") {
+      renderUsageBadge(bubble.rowEl, message.usage, message.modelId, message.provider);
+    }
+
     const toolbarEl = bubble.rowEl.createDiv({ cls: "lmsa-bubble-toolbar" });
 
     if (message.role === "assistant" && message.versions && message.versions.length > 1) {

@@ -12,6 +12,8 @@ export interface CompletionModel {
   name: string;
   modelId: string;
   provider: ProviderOption;
+  /** Optional context window size in tokens. Enables future context-aware truncation. */
+  contextWindowSize?: number;
 }
 
 export interface EmbeddingModel {
@@ -26,6 +28,14 @@ export interface CustomCommand {
   name: string;
   prompt: string;
   autoInsert: boolean;
+}
+
+export interface MessageUsage {
+  inputTokens: number;
+  outputTokens: number;
+  cacheCreationInputTokens?: number;
+  cacheReadInputTokens?: number;
+  estimatedCostUsd?: number;
 }
 
 export interface MessageVersion {
@@ -50,6 +60,14 @@ export interface ConversationMessage {
   editProposal?: EditProposal;
   /** Present after edits from this message have been applied. */
   appliedEdit?: AppliedEditRecord;
+  /** The actual model ID sent to the API (e.g., "claude-sonnet-4-20250514"). */
+  modelId?: string;
+  /** The provider that generated this message. */
+  provider?: ProviderOption;
+  /** Token usage and estimated cost for this response. */
+  usage?: MessageUsage;
+  /** When true, the message content is an error (e.g. API failure). Rendered with error styling. */
+  isError?: boolean;
 }
 
 /**
@@ -94,9 +112,32 @@ export interface SamplingParams {
   reasoning: ReasoningLevel | null;
 }
 
-export interface PluginSettings {
-  lmStudioUrl: string;
+export interface LMStudioProviderSettings {
+  baseUrl: string;
   bypassCors: boolean;
+}
+
+export interface AnthropicProviderSettings {
+  apiKey: string;
+}
+
+export interface OpenAIProviderSettings {
+  apiKey: string;
+  baseUrl: string;
+}
+
+export interface ProviderSettingsMap {
+  lmstudio: LMStudioProviderSettings;
+  anthropic: AnthropicProviderSettings;
+  openai: OpenAIProviderSettings;
+}
+
+export interface PluginSettings {
+  /** @deprecated Use providerSettings.lmstudio.baseUrl */
+  lmStudioUrl: string;
+  /** @deprecated Use providerSettings.lmstudio.bypassCors */
+  bypassCors: boolean;
+  providerSettings: ProviderSettingsMap;
   includeNoteContext: boolean;
   maxContextChars: number;
   completionModels: CompletionModel[];

@@ -1,6 +1,6 @@
 import type { WorkspaceLeaf } from "obsidian";
 import { ItemView, Notice } from "obsidian";
-import type { CustomCommand } from "../shared/types";
+import type { ConversationMessage, CustomCommand } from "../shared/types";
 import type { ChatMode } from "./types";
 import type LMStudioWritingAssistant from "../main";
 import { VIEW_TYPE_CHAT } from "../constants";
@@ -333,6 +333,8 @@ export class ChatView extends ItemView {
         snapshot.activeConversationId
       );
     }
+
+    this.updateUsageSummary(snapshot.messageHistory);
   }
 
   private createBubbleActionCallbacks(): BubbleActionCallbacks {
@@ -457,5 +459,52 @@ export class ChatView extends ItemView {
     if (isCollapsed && this.modelSelector?.isOpen()) {
       this.modelSelector.close();
     }
+  }
+
+  private updateUsageSummary(messages: ConversationMessage[]): void {
+    const el = this.layout?.usageSummaryEl;
+    if (!el) return;
+
+    let totalCost = 0;
+    let totalInputTokens = 0;
+    let totalOutputTokens = 0;
+    let hasUsage = false;
+
+    for (const msg of messages) {
+      if (msg.usage) {
+        hasUsage = true;
+        totalInputTokens += msg.usage.inputTokens;
+        totalOutputTokens += msg.usage.outputTokens;
+        if (msg.usage.estimatedCostUsd) {
+          totalCost += msg.usage.estimatedCostUsd;
+        }
+      }
+    }
+
+    if (!hasUsage) {
+      el.style.display = "none";
+      return;
+    }
+
+    el.style.display = "";
+    el.empty();
+
+    const totalTokens = totalInputTokens + totalOutputTokens;
+    const tokenText = totalTokens >= 1_000
+      ? `${(totalTokens / 1_000).toFixed(1)}k tokens`
+      : `${totalTokens} tokens`;
+
+    const parts: string[] = [];
+    if (totalCost > 0) {
+      const costStr = totalCost < 0.01
+        ? `$${totalCost.toFixed(4)}`
+        : totalCost < 1
+          ? `$${totalCost.toFixed(3)}`
+          : `$${totalCost.toFixed(2)}`;
+      parts.push(`Session: ${costStr}`);
+    }
+    parts.push(tokenText);
+
+    el.setText(parts.join(" \u00b7 "));
   }
 }

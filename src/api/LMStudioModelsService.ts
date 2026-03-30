@@ -1,11 +1,12 @@
 ﻿import { LMStudioClient } from "./LMStudioClient";
 import type {
   LMStudioModel,
-  LMStudioModelDigest,
-  LMStudioModelKind,
   LMStudioModelListSource,
   LMStudioQuantization,
+  ModelCandidateResult,
+  ModelDigest,
 } from "./types";
+import type { ModelsService, ModelsQueryOptions } from "./modelsService";
 
 export interface LMStudioDiscoveredModels {
   models: LMStudioModel[];
@@ -14,17 +15,7 @@ export interface LMStudioDiscoveredModels {
   discoveredAt: number;
 }
 
-export interface LMStudioModelCandidateResult {
-  candidates: LMStudioModelDigest[];
-  source: LMStudioModelListSource;
-  endpoint: string;
-  discoveredAt: number;
-}
-
-export interface LMStudioModelsQueryOptions {
-  forceRefresh?: boolean;
-  signal?: AbortSignal;
-}
+export type LMStudioModelsQueryOptions = ModelsQueryOptions;
 
 function formatQuantization(quantization?: LMStudioQuantization): string | null {
   if (!quantization) return null;
@@ -71,7 +62,9 @@ function sortModels(left: LMStudioModel, right: LMStudioModel): number {
   return left.displayName.localeCompare(right.displayName);
 }
 
-function buildSummary(model: LMStudioModel, kind: LMStudioModelKind): string | undefined {
+type ModelKind = "completion" | "embedding";
+
+function buildSummary(model: LMStudioModel, kind: ModelKind): string | undefined {
   const pieces =
     kind === "completion"
       ? []
@@ -81,7 +74,7 @@ function buildSummary(model: LMStudioModel, kind: LMStudioModelKind): string | u
   return summary || undefined;
 }
 
-function toDigest(model: LMStudioModel, kind: LMStudioModelKind): LMStudioModelDigest {
+function toDigest(model: LMStudioModel, kind: ModelKind): ModelDigest {
   const targetModelId = model.key;
 
   return {
@@ -89,6 +82,7 @@ function toDigest(model: LMStudioModel, kind: LMStudioModelKind): LMStudioModelD
     kind,
     displayName: model.displayName || model.id,
     targetModelId,
+    provider: "lmstudio",
     isLoaded: model.isLoaded,
     activeContextLength: getActiveContextLength(model),
     maxContextLength: model.maxContextLength,
@@ -96,7 +90,7 @@ function toDigest(model: LMStudioModel, kind: LMStudioModelKind): LMStudioModelD
   };
 }
 
-export class LMStudioModelsService {
+export class LMStudioModelsService implements ModelsService {
   private static readonly cache = new Map<string, LMStudioDiscoveredModels>();
   private readonly client: LMStudioClient;
   private readonly cacheKey: string;
@@ -127,7 +121,7 @@ export class LMStudioModelsService {
 
   async getCompletionCandidates(
     options: LMStudioModelsQueryOptions = {}
-  ): Promise<LMStudioModelCandidateResult> {
+  ): Promise<ModelCandidateResult> {
     const discovery = await this.discoverModels(options);
     const candidates = discovery.models
       .filter(isCompletionModel)
@@ -137,14 +131,13 @@ export class LMStudioModelsService {
     return {
       candidates,
       source: discovery.source,
-      endpoint: discovery.endpoint,
       discoveredAt: discovery.discoveredAt,
     };
   }
 
   async getEmbeddingCandidates(
     options: LMStudioModelsQueryOptions = {}
-  ): Promise<LMStudioModelCandidateResult> {
+  ): Promise<ModelCandidateResult> {
     const discovery = await this.discoverModels(options);
     const candidates = discovery.models
       .filter(isEmbeddingModel)
@@ -154,7 +147,6 @@ export class LMStudioModelsService {
     return {
       candidates,
       source: discovery.source,
-      endpoint: discovery.endpoint,
       discoveredAt: discovery.discoveredAt,
     };
   }

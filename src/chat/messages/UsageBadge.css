@@ -1,0 +1,38 @@
+@layer components {
+  .lmsa-usage-badge {
+    @apply lmsa-flex lmsa-items-center lmsa-gap-2;
+    flex-basis: 100%;
+    order: 2;
+    margin-top: 4px;
+    font-size: var(--font-smallest);
+    color: var(--text-muted);
+    opacity: 0.7;
+  }
+
+  .lmsa-message:hover .lmsa-usage-badge {
+    opacity: 1;
+  }
+
+  .lmsa-usage-tokens {
+    @apply lmsa-inline-flex lmsa-items-center;
+  }
+
+  .lmsa-usage-cost {
+    @apply lmsa-inline-flex lmsa-items-center;
+    color: var(--text-accent);
+  }
+
+  .lmsa-usage-model {
+    @apply lmsa-inline-flex lmsa-items-center;
+    font-size: var(--font-smallest);
+    opacity: 0.6;
+  }
+
+  .lmsa-usage-summary {
+    @apply lmsa-flex lmsa-items-center;
+    font-size: var(--font-smallest);
+    color: var(--text-muted);
+    padding: 0 4px;
+    min-height: 20px;
+  }
+}

@@ -8,6 +8,7 @@
 @import "../chat/messages/ChatTranscript.css";
 @import "../chat/messages/BubbleActionToolbar.css";
 @import "../chat/messages/BubbleVersionNav.css";
+@import "../chat/messages/UsageBadge.css";
 @import "../chat/messages/InlineMessageEditor.css";
 @import "../chat/models/ChatModelSelector.css";
 @import "../chat/composer/ChatComposer.css";

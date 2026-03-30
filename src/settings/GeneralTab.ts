@@ -1,8 +1,30 @@
 import { Setting } from "obsidian";
 import type LMStudioWritingAssistant from "../main";
+import { ApiKeysModal } from "./modals";
 import { createSettingsSection } from "./ui";
 
 export function renderGeneralTab(container: HTMLElement, plugin: LMStudioWritingAssistant): void {
+  // ── Provider API Keys ──────────────────────────────────────────────
+  const keys = createSettingsSection(
+    container,
+    "Provider API Keys",
+    "Manage API keys for cloud providers like Anthropic and OpenAI. Keys are stored locally and never shared.",
+    { icon: "key-round" }
+  );
+
+  new Setting(keys.bodyEl)
+    .setName("Configure API keys")
+    .setDesc("Open a window to enter or update your provider API keys.")
+    .addButton((button) =>
+      button
+        .setButtonText("Manage keys")
+        .setCta()
+        .onClick(() => {
+          new ApiKeysModal(plugin.app, plugin).open();
+        })
+    );
+
+  // ── Active Note ────────────────────────────────────────────────────
   const context = createSettingsSection(
     container,
     "Active Note",

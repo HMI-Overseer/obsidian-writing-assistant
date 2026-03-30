@@ -96,12 +96,19 @@ export class ChatModelSelector {
       return "unknown";
     }
 
+    // Cloud providers are always assumed available — skip LM Studio discovery
+    if (activeModel.provider !== "lmstudio") {
+      this.setModelAvailabilityState("loaded");
+      return "loaded";
+    }
+
     this.isCheckingModelStatus = true;
 
     try {
+      const lmSettings = this.plugin.settings.providerSettings.lmstudio;
       const modelsService = new LMStudioModelsService(
-        this.plugin.settings.lmStudioUrl,
-        this.plugin.settings.bypassCors
+        lmSettings.baseUrl,
+        lmSettings.bypassCors
       );
       const result = await modelsService.getCompletionCandidates({ forceRefresh });
       const states = new Map<string, ModelAvailabilityState>();

@@ -1,9 +1,8 @@
 import type { App } from "obsidian";
 import { Notice, Setting } from "obsidian";
-import { LMStudioModelsService, normalizeLMStudioBaseUrl } from "../api";
-import type { LMStudioModelCandidateResult } from "../api/LMStudioModelsService";
+import { normalizeLMStudioBaseUrl } from "../api";
+import type { ModelCandidateResult, ModelDigest } from "../api/types";
 import type LMStudioWritingAssistant from "../main";
-import type { LMStudioModelDigest } from "../api/types";
 import type { ProviderOption } from "../shared/types";
 import { createSettingsSection } from "./ui";
 
@@ -12,7 +11,7 @@ type BaseModel = { id: string; name: string; modelId: string; provider: Provider
 export type { ProviderOption };
 
 export type ModelProfileTabConfig<T extends BaseModel> = {
-  kind: string;
+  kind: "completion" | "embedding";
   profileNoun: string;
   sectionDescription: string;
   sectionIcon?: string;
@@ -24,7 +23,7 @@ export type ModelProfileTabConfig<T extends BaseModel> = {
   getModels: () => T[];
   setModels: (models: T[]) => void;
   renderItemMeta?: (model: T) => string | null;
-  formatDiscoveryMeta: (model: LMStudioModelDigest) => string;
+  formatDiscoveryMeta: (model: ModelDigest) => string;
   openModal: (
     app: App,
     plugin: LMStudioWritingAssistant,
@@ -32,10 +31,10 @@ export type ModelProfileTabConfig<T extends BaseModel> = {
     onSave: (model: T) => void,
     prefill?: Partial<T>
   ) => void;
-  getCandidates: (
-    service: LMStudioModelsService,
-    options: { forceRefresh: boolean }
-  ) => Promise<LMStudioModelCandidateResult>;
+  /** Per-provider model fetchers. Only providers with an entry here show the discovery UI. */
+  fetchCandidates: Partial<
+    Record<ProviderOption, (options: { forceRefresh: boolean }) => Promise<ModelCandidateResult>>
+  >;
 };
 
 const PROVIDER_LABELS: Record<ProviderOption, string> = {
@@ -147,32 +146,28 @@ export function renderModelProfileTab<T extends BaseModel>(
   // Provider content area — changes based on selected provider
   const providerContentEl = addSection.bodyEl.createDiv({ cls: "lmsa-provider-content" });
 
-  // Add manually button (always visible in footer)
-  addSection.footerEl
-    .createEl("button", {
-      cls: "lmsa-btn-add lmsa-ui-btn lmsa-ui-btn-primary",
-      text: "Add manually",
-    })
-    .addEventListener("click", () => {
-      config.openModal(plugin.app, plugin, null, async (model) => {
-        const currentModels = config.getModels();
-        currentModels.push(model);
-        config.setModels(currentModels);
-        await plugin.saveSettings();
-        refresh();
-      }, { provider: providerSelect.value as ProviderOption } as Partial<T>);
-    });
+  // Add manually button (always visible in footer, hidden for unsupported provider+kind combos)
+  const addManuallyBtn = addSection.footerEl.createEl("button", {
+    cls: "lmsa-btn-add lmsa-ui-btn lmsa-ui-btn-primary",
+    text: "Add manually",
+  });
+  addManuallyBtn.addEventListener("click", () => {
+    config.openModal(plugin.app, plugin, null, async (model) => {
+      const currentModels = config.getModels();
+      currentModels.push(model);
+      config.setModels(currentModels);
+      await plugin.saveSettings();
+      refresh();
+    }, { provider: providerSelect.value as ProviderOption } as Partial<T>);
+  });
 
-  // ── LM Studio provider content ────────────────────────────────────────
+  // ── Per-provider connection settings ──────────────────────────────────
 
-  let modelsService = new LMStudioModelsService(settings.lmStudioUrl, settings.bypassCors);
+  // LM Studio: URL + Bypass CORS
+  const lmConnectionEl = providerContentEl.createDiv({ cls: "lmsa-provider-connection" });
+  const lmSettings = settings.providerSettings.lmstudio;
 
-  const discoveryEl = providerContentEl.createDiv({ cls: "lmsa-discovery-container" });
-
-  // Connection settings (LM Studio URL + Bypass CORS)
-  const connectionEl = discoveryEl.createDiv({ cls: "lmsa-provider-connection" });
-
-  new Setting(connectionEl)
+  new Setting(lmConnectionEl)
     .setName("LM Studio URL")
     .setDesc(
       "Base URL for the LM Studio server. The plugin resolves the right endpoint automatically."
@@ -180,26 +175,52 @@ export function renderModelProfileTab<T extends BaseModel>(
     .addText((text) =>
       text
         .setPlaceholder("http://localhost:1234")
-        .setValue(settings.lmStudioUrl)
+        .setValue(lmSettings.baseUrl)
         .onChange(async (value) => {
-          settings.lmStudioUrl = normalizeLMStudioBaseUrl(value);
+          const normalized = normalizeLMStudioBaseUrl(value);
+          lmSettings.baseUrl = normalized;
+          settings.lmStudioUrl = normalized;
           await plugin.saveSettings();
-          modelsService = new LMStudioModelsService(settings.lmStudioUrl, settings.bypassCors);
         })
     );
 
-  new Setting(connectionEl)
+  new Setting(lmConnectionEl)
     .setName("Bypass CORS via Node.js")
     .setDesc(
       "Use Electron's Node.js HTTP stack instead of the browser fetch API. Avoids needing CORS enabled in LM Studio."
     )
     .addToggle((toggle) =>
-      toggle.setValue(settings.bypassCors).onChange(async (value) => {
+      toggle.setValue(lmSettings.bypassCors).onChange(async (value) => {
+        lmSettings.bypassCors = value;
         settings.bypassCors = value;
         await plugin.saveSettings();
-        modelsService = new LMStudioModelsService(settings.lmStudioUrl, settings.bypassCors);
       })
     );
+
+  // Anthropic: info notice (API key is managed in General → Provider API Keys)
+  const anthropicConnectionEl = providerContentEl.createDiv({ cls: "lmsa-provider-connection" });
+  anthropicConnectionEl.createEl("p", {
+    cls: "lmsa-settings-section-desc",
+    text: "API key is managed in Settings → General → Provider API Keys.",
+  });
+
+  // Anthropic embedding: not-available message (shown instead of discovery)
+  const anthropicNoEmbeddingEl = providerContentEl.createDiv({ cls: "lmsa-provider-anthropic-no-embed" });
+  anthropicNoEmbeddingEl.createEl("p", {
+    cls: "lmsa-empty-state",
+    text: "Anthropic does not offer embedding models. Select a different provider, or use LM Studio with a local embedding model.",
+  });
+
+  // OpenAI: placeholder
+  const openaiPlaceholderEl = providerContentEl.createDiv({ cls: "lmsa-provider-placeholder" });
+  openaiPlaceholderEl.createEl("p", {
+    cls: "lmsa-empty-state",
+    text: "Support for this provider is coming soon.",
+  });
+
+  // ── Shared discovery UI ───────────────────────────────────────────────
+
+  const discoveryEl = providerContentEl.createDiv({ cls: "lmsa-discovery-container" });
 
   const discoveryHeaderEl = discoveryEl.createDiv({ cls: "lmsa-discovery-header" });
   const refetchButton = discoveryHeaderEl.createEl("button", {
@@ -217,24 +238,17 @@ export function renderModelProfileTab<T extends BaseModel>(
   });
   const statusText = statusSummary.createSpan({
     cls: "lmsa-connection-status-text",
-    text: `Load ${config.kind} models from LM Studio when you need them.`,
+    text: `Refresh to discover available ${config.kind} models.`,
   });
   const statusMeta = statusCard.createDiv({
     cls: "lmsa-connection-status-meta",
-    text: "Saved profiles keep working even when LM Studio is offline.",
+    text: "Saved profiles keep working regardless of provider availability.",
   });
 
   const liveModelsListEl = discoveryEl.createDiv({ cls: "lmsa-item-list" });
   liveModelsListEl.createEl("p", {
     cls: "lmsa-empty-state",
     text: config.emptyDiscoveryText,
-  });
-
-  // Placeholder for non-LM-Studio providers
-  const placeholderEl = providerContentEl.createDiv({ cls: "lmsa-provider-placeholder" });
-  placeholderEl.createEl("p", {
-    cls: "lmsa-empty-state",
-    text: "Support for this provider is coming soon.",
   });
 
   const setStatus = (
@@ -250,7 +264,7 @@ export function renderModelProfileTab<T extends BaseModel>(
     statusMeta.setText(meta);
   };
 
-  const renderLiveModels = (models: LMStudioModelDigest[]) => {
+  const renderLiveModels = (models: ModelDigest[]) => {
     liveModelsListEl.empty();
 
     if (models.length === 0) {
@@ -266,10 +280,13 @@ export function renderModelProfileTab<T extends BaseModel>(
       const info = row.createDiv({ cls: "lmsa-item-info" });
       const header = info.createDiv({ cls: "lmsa-live-model-header" });
       header.createDiv({ cls: "lmsa-item-name", text: model.displayName });
-      header.createSpan({
-        cls: `lmsa-model-state-badge ${model.isLoaded ? "is-loaded" : "is-unloaded"}`,
-        text: model.isLoaded ? "Loaded" : "Not loaded",
-      });
+
+      if (model.isLoaded !== undefined) {
+        header.createSpan({
+          cls: `lmsa-model-state-badge ${model.isLoaded ? "is-loaded" : "is-unloaded"}`,
+          text: model.isLoaded ? "Loaded" : "Not loaded",
+        });
+      }
 
       info.createDiv({
         cls: "lmsa-item-sub",
@@ -318,11 +335,17 @@ export function renderModelProfileTab<T extends BaseModel>(
   };
 
   const loadLiveModels = async () => {
+    const selected = providerSelect.value as ProviderOption;
+    const fetcher = config.fetchCandidates[selected];
+    if (!fetcher) return;
+
+    const providerLabel = PROVIDER_LABELS[selected];
+
     refetchButton.disabled = true;
     setStatus(
       "loading",
       "Loading...",
-      `Fetching ${config.kind} models from LM Studio...`,
+      `Fetching ${config.kind} models from ${providerLabel}...`,
       "This only refreshes live discovery suggestions. Your saved profiles are unchanged."
     );
     liveModelsListEl.empty();
@@ -332,26 +355,28 @@ export function renderModelProfileTab<T extends BaseModel>(
     });
 
     try {
-      const result = await config.getCandidates(modelsService, { forceRefresh: true });
+      const result = await fetcher({ forceRefresh: true });
       const reachableAt = new Date(result.discoveredAt).toLocaleTimeString();
-      const transport =
-        result.source === "native"
-          ? "the native LM Studio API"
-          : "the OpenAI-compatible LM Studio API";
 
       setStatus(
         "connected",
         "Connected",
         `${result.candidates.length} ${config.kind} model${result.candidates.length === 1 ? "" : "s"} found`,
-        `Last checked at ${reachableAt} through ${transport}. Loaded models appear first.`
+        `Last checked at ${reachableAt} via ${providerLabel}.`
       );
       renderLiveModels(result.candidates);
-    } catch {
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      const isAuthError = message.includes("401") || message.includes("key");
+      const hint = isAuthError
+        ? "Check your API key in Settings → General → Provider API Keys."
+        : `Could not reach ${providerLabel}. Check your connection settings and try again.`;
+
       setStatus(
         "error",
         "Unavailable",
-        "Could not load models from LM Studio",
-        "Check the LM Studio URL in General settings, make sure the local server is running, and try again."
+        `Could not load models from ${providerLabel}`,
+        hint
       );
       liveModelsListEl.empty();
       liveModelsListEl.createEl("p", {
@@ -371,13 +396,21 @@ export function renderModelProfileTab<T extends BaseModel>(
 
   const syncProviderContent = () => {
     const selected = providerSelect.value as ProviderOption;
-    if (selected === "lmstudio") {
-      discoveryEl.style.display = "";
-      placeholderEl.style.display = "none";
-    } else {
-      discoveryEl.style.display = "none";
-      placeholderEl.style.display = "";
-    }
+    const hasFetcher = selected in config.fetchCandidates;
+
+    // Connection settings visibility
+    lmConnectionEl.style.display = selected === "lmstudio" ? "" : "none";
+    anthropicConnectionEl.style.display =
+      selected === "anthropic" && config.kind !== "embedding" ? "" : "none";
+    anthropicNoEmbeddingEl.style.display =
+      selected === "anthropic" && config.kind === "embedding" ? "" : "none";
+    openaiPlaceholderEl.style.display = selected === "openai" ? "" : "none";
+
+    // Shared discovery block — visible when provider has a fetcher
+    discoveryEl.style.display = hasFetcher ? "" : "none";
+
+    // Add manually button — hidden for unsupported combos
+    addManuallyBtn.style.display = hasFetcher ? "" : "none";
   };
 
   providerSelect.addEventListener("change", syncProviderContent);

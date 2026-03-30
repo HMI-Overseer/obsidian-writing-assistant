@@ -107,6 +107,11 @@ export async function regenerateMessage(options: RegenerateOptions): Promise<voi
     editMode,
   });
 
+  // Attach Anthropic cache settings if enabled on the active model.
+  if (activeModel.anthropicCacheSettings?.enabled) {
+    apiMessages.anthropicCacheSettings = activeModel.anthropicCacheSettings;
+  }
+
   const assistantBubble = transcript.createBubble("assistant");
   assistantBubble.bodyEl.addClass("is-streaming");
 

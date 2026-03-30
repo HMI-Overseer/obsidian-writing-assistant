@@ -114,6 +114,11 @@ export async function sendMessage(options: SendMessageOptions): Promise<void> {
     editMode,
   });
 
+  // Attach Anthropic cache settings if enabled on the active model.
+  if (activeModel.anthropicCacheSettings?.enabled) {
+    apiMessages.anthropicCacheSettings = activeModel.anthropicCacheSettings;
+  }
+
   await store.persistActiveConversation();
 
   const assistantBubble = transcript.createBubble("assistant");

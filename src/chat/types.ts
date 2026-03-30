@@ -38,6 +38,8 @@ export type ChatLayoutRefs = {
   modelSelectorStatusEl: HTMLElement;
   modelSelectorChevronEl: HTMLElement;
   modelDropdownEl: HTMLElement;
+  cacheSettingsBtn: HTMLButtonElement;
+  cacheSettingsPopoverEl: HTMLElement;
   usageSummaryEl: HTMLElement;
   contextCapacityEl: HTMLElement;
 };

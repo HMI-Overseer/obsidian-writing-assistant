@@ -1,3 +1,5 @@
+import type { AnthropicCacheSettings } from "./types";
+
 /** Document context attached to the request. */
 export interface DocumentContext {
   /** File path within the vault. */
@@ -28,4 +30,6 @@ export interface ChatRequest {
   documentContext: DocumentContext | null;
   /** Conversation turns in chronological order. */
   messages: ChatTurn[];
+  /** Anthropic prompt caching settings. Attached when the active model has caching enabled. */
+  anthropicCacheSettings?: AnthropicCacheSettings;
 }

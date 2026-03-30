@@ -11,6 +11,7 @@
 @import "../chat/messages/UsageBadge.css";
 @import "../chat/messages/InlineMessageEditor.css";
 @import "../chat/models/ChatModelSelector.css";
+@import "../chat/models/CacheSettingsPopover.css";
 @import "../chat/composer/ChatComposer.css";
 @import "../chat/animations.css";
 

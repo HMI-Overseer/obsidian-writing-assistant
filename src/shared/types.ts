@@ -7,6 +7,13 @@ export interface Message {
 
 export type ProviderOption = "lmstudio" | "openai" | "anthropic";
 
+export type CacheTtl = "default" | "1h";
+
+export interface AnthropicCacheSettings {
+  enabled: boolean;
+  ttl: CacheTtl;
+}
+
 export interface CompletionModel {
   id: string;
   name: string;
@@ -14,6 +21,8 @@ export interface CompletionModel {
   provider: ProviderOption;
   /** Optional context window size in tokens. Enables future context-aware truncation. */
   contextWindowSize?: number;
+  /** Anthropic prompt caching configuration. Only relevant when provider is "anthropic". */
+  anthropicCacheSettings?: AnthropicCacheSettings;
 }
 
 export interface EmbeddingModel {

@@ -17,6 +17,7 @@ import type { BubbleActionCallbacks } from "./messages/ChatTranscript";
 import { ChatTranscript } from "./messages/ChatTranscript";
 import { InlineMessageEditor } from "./messages/InlineMessageEditor";
 import { ChatModelSelector } from "./models/ChatModelSelector";
+import { CacheSettingsPopover } from "./models/CacheSettingsPopover";
 import type { ChatLayoutRefs } from "./types";
 import { ChatHistoryDrawer } from "./view/ChatHistoryDrawer";
 import { ModelParametersDrawer } from "./view/ModelParametersDrawer";
@@ -36,6 +37,7 @@ export class ChatView extends ItemView {
   private transcript: ChatTranscript | null = null;
   private composer: ChatComposer | null = null;
   private modelSelector: ChatModelSelector | null = null;
+  private cachePopover: CacheSettingsPopover | null = null;
   private historyDrawer: ChatHistoryDrawer | null = null;
   private paramsDrawer: ModelParametersDrawer | null = null;
   private generation!: ChatGenerationController;
@@ -114,6 +116,17 @@ export class ChatView extends ItemView {
       },
     });
 
+    this.cachePopover = new CacheSettingsPopover(this.layout, {
+      getActiveModel: () => this.sessionStore?.getResolvedConversationModel() ?? null,
+      onSettingsChange: async (modelId, settings) => {
+        const model = this.plugin.settings.completionModels.find((m) => m.id === modelId);
+        if (model) {
+          model.anthropicCacheSettings = settings;
+          await this.plugin.saveSettings();
+        }
+      },
+    });
+
     this.historyDrawer = new ChatHistoryDrawer(this.layout.messagesPaneEl, {
       onSelect: (id) => void this.conversation.switchConversation(id),
       onNew: () => void this.conversation.startNewConversation(),
@@ -189,6 +202,9 @@ export class ChatView extends ItemView {
 
     this.registerDomEvent(document, "click", () => {
       this.modelSelector?.close();
+      if (this.cachePopover?.isOpen()) {
+        this.cachePopover.close();
+      }
       if (this.historyDrawer?.isOpen()) {
         this.historyDrawer.close();
       }
@@ -226,6 +242,7 @@ export class ChatView extends ItemView {
     await this.sessionStore?.persistActiveConversation();
     this.transcript?.destroy();
     this.modelSelector?.destroy();
+    this.cachePopover?.destroy();
     this.paramsDrawer?.destroy();
   }
 
@@ -329,6 +346,8 @@ export class ChatView extends ItemView {
     if (!showParams && this.paramsDrawer?.isOpen()) {
       this.paramsDrawer.close();
     }
+
+    this.cachePopover?.syncVisibility();
 
     if (this.historyDrawer?.isOpen()) {
       this.historyDrawer.refresh(
@@ -462,6 +481,10 @@ export class ChatView extends ItemView {
 
     if (isCollapsed && this.modelSelector?.isOpen()) {
       this.modelSelector.close();
+    }
+
+    if (isCollapsed && this.cachePopover?.isOpen()) {
+      this.cachePopover.close();
     }
   }
 

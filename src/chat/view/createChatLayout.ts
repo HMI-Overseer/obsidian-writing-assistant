@@ -29,6 +29,16 @@ export function createChatLayout(contentEl: HTMLElement): ChatLayoutRefs {
   const modelDropdownEl = headerMetaWrap.createDiv({ cls: "lmsa-model-dropdown" });
   modelDropdownEl.style.display = "none";
 
+  const cacheSettingsBtn = headerMetaWrap.createEl("button", {
+    cls: "lmsa-cache-settings-btn",
+    attr: { "aria-label": "Cache settings" },
+  }) as HTMLButtonElement;
+  setIcon(cacheSettingsBtn, "settings");
+  cacheSettingsBtn.style.display = "none";
+
+  const cacheSettingsPopoverEl = headerMetaWrap.createDiv({ cls: "lmsa-cache-popover" });
+  cacheSettingsPopoverEl.style.display = "none";
+
   const headerActions = header.createDiv({ cls: "lmsa-header-actions" });
   const historyBtn = headerActions.createEl("button", {
     cls: "lmsa-header-btn lmsa-ui-icon-btn",
@@ -99,6 +109,8 @@ export function createChatLayout(contentEl: HTMLElement): ChatLayoutRefs {
     modelSelectorStatusEl,
     modelSelectorChevronEl: headerMetaChevron,
     modelDropdownEl,
+    cacheSettingsBtn,
+    cacheSettingsPopoverEl,
     usageSummaryEl,
     contextCapacityEl,
   };

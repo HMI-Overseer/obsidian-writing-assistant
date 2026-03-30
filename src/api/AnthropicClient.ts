@@ -6,12 +6,11 @@ import { nodeRequestWithHeaders } from "./httpTransport";
 import { streamNode } from "./streamingTransport";
 import type { DeltaExtractor } from "./streamingTransport";
 import { ANTHROPIC_BASE_URL, ANTHROPIC_VERSION } from "./anthropicConstants";
-const DEFAULT_MAX_TOKENS = 4096;
-
-interface AnthropicMessage {
-  role: "user" | "assistant";
-  content: string;
-}
+import {
+  buildAnthropicMessages,
+  buildAnthropicHeaders,
+  buildAnthropicPayload,
+} from "./buildAnthropicPayload";
 
 /** Extracts text deltas from Anthropic SSE content_block_delta events. */
 const anthropicDeltaExtractor: DeltaExtractor = (json: unknown): string | null => {
@@ -59,8 +58,9 @@ export class AnthropicClient implements ChatClient {
     params: SamplingParams,
     signal?: AbortSignal
   ): Promise<CompletionResult> {
-    const { system, messages } = this.buildMessages(request);
-    const payload = this.buildPayload(model, system, messages, params, false);
+    const cacheSettings = request.anthropicCacheSettings;
+    const { system, messages } = buildAnthropicMessages(request, cacheSettings);
+    const payload = buildAnthropicPayload(model, system, messages, params, false);
 
     const { body } = await nodeRequestWithHeaders(
       "POST",
@@ -68,7 +68,7 @@ export class AnthropicClient implements ChatClient {
       "/v1/messages",
       payload,
       signal,
-      this.buildHeaders()
+      buildAnthropicHeaders(this.apiKey, ANTHROPIC_VERSION, cacheSettings)
     );
 
     const json = JSON.parse(body) as Record<string, unknown>;
@@ -90,8 +90,9 @@ export class AnthropicClient implements ChatClient {
     params: SamplingParams,
     signal?: AbortSignal
   ): StreamResult {
-    const { system, messages } = this.buildMessages(request);
-    const payload = this.buildPayload(model, system, messages, params, true);
+    const cacheSettings = request.anthropicCacheSettings;
+    const { system, messages } = buildAnthropicMessages(request, cacheSettings);
+    const payload = buildAnthropicPayload(model, system, messages, params, true);
     const url = `${ANTHROPIC_BASE_URL}/v1/messages`;
 
     // Accumulate usage from SSE metadata events.
@@ -147,7 +148,7 @@ export class AnthropicClient implements ChatClient {
 
     // Wrap the raw generator so we can resolve usage when it ends.
     const rawGenerator = streamNode(
-      url, payload, signal, this.buildHeaders(), anthropicDeltaExtractor, onEvent
+      url, payload, signal, buildAnthropicHeaders(this.apiKey, ANTHROPIC_VERSION, cacheSettings), anthropicDeltaExtractor, onEvent
     );
 
     async function* wrappedDeltas(): AsyncGenerator<string> {
@@ -161,62 +162,4 @@ export class AnthropicClient implements ChatClient {
     return { deltas: wrappedDeltas(), usage: usagePromise };
   }
 
-  private buildHeaders(): Record<string, string> {
-    return {
-      "x-api-key": this.apiKey,
-      "anthropic-version": ANTHROPIC_VERSION,
-      "Content-Type": "application/json",
-    };
-  }
-
-  private buildMessages(request: ChatRequest): {
-    system: string;
-    messages: AnthropicMessage[];
-  } {
-    const systemParts: string[] = [];
-
-    if (request.systemPrompt) {
-      systemParts.push(request.systemPrompt);
-    }
-
-    if (request.documentContext) {
-      const label = request.documentContext.isFull
-        ? `Document to edit (${request.documentContext.filePath})`
-        : `Current note (${request.documentContext.filePath})`;
-      systemParts.push(`---\n${label}:\n${request.documentContext.content}`);
-    }
-
-    const messages: AnthropicMessage[] = request.messages.map((turn) => ({
-      role: turn.role,
-      content: turn.content,
-    }));
-
-    return { system: systemParts.join("\n\n"), messages };
-  }
-
-  private buildPayload(
-    model: string,
-    system: string,
-    messages: AnthropicMessage[],
-    params: SamplingParams,
-    stream: boolean
-  ): string {
-    const body: Record<string, unknown> = {
-      model,
-      messages,
-      max_tokens: params.maxTokens ?? DEFAULT_MAX_TOKENS,
-      stream,
-    };
-
-    if (system) {
-      body.system = system;
-    }
-
-    if (params.temperature !== undefined) body.temperature = params.temperature;
-    if (params.topP !== null) body.top_p = params.topP;
-    if (params.topK !== null) body.top_k = params.topK;
-    // minP and repeatPenalty are intentionally omitted — Anthropic does not support them.
-
-    return JSON.stringify(body);
-  }
 }

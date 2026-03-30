@@ -1,0 +1,82 @@
+@layer components {
+  .lmsa-cache-settings-btn {
+    @apply lmsa-ml-1 lmsa-inline-flex lmsa-flex-none lmsa-cursor-pointer lmsa-items-center lmsa-justify-center lmsa-rounded-md lmsa-border-none lmsa-p-1;
+    color: var(--text-muted);
+    min-height: unset;
+    background: transparent !important;
+    box-shadow: none !important;
+    outline: none;
+    appearance: none;
+    transition: background 120ms ease, color 120ms ease;
+  }
+
+  .lmsa-cache-settings-btn:hover {
+    background: color-mix(in srgb, var(--background-modifier-hover) 60%, transparent) !important;
+    box-shadow: none !important;
+    color: var(--text-normal);
+  }
+
+  .lmsa-cache-settings-btn svg {
+    width: 14px;
+    height: 14px;
+  }
+
+  .lmsa-cache-popover {
+    @apply lmsa-absolute lmsa-z-[120] lmsa-flex lmsa-flex-col lmsa-gap-4 lmsa-rounded-xl lmsa-border lmsa-border-obsidian-border lmsa-p-5;
+    top: calc(100% + 6px);
+    left: 0;
+    width: min(300px, calc(100vw - 48px));
+    background:
+      linear-gradient(180deg, color-mix(in srgb, var(--background-primary) 97%, transparent), color-mix(in srgb, var(--background-secondary) 94%, transparent));
+    backdrop-filter: blur(22px);
+    -webkit-backdrop-filter: blur(22px);
+    box-shadow:
+      0 22px 56px rgba(0, 0, 0, 0.22),
+      inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  }
+
+  .lmsa-cache-popover-title {
+    @apply lmsa-flex lmsa-flex-col lmsa-gap-1 lmsa-pb-1 lmsa-font-semibold lmsa-text-obsidian-text;
+    font-size: var(--font-ui-small);
+  }
+
+  .lmsa-cache-popover-subtitle {
+    @apply lmsa-font-normal lmsa-text-obsidian-muted;
+    font-size: var(--font-ui-smaller);
+    line-height: 1.4;
+  }
+
+  .lmsa-cache-popover-row {
+    @apply lmsa-flex lmsa-items-center lmsa-justify-between lmsa-gap-4 lmsa-py-0.5;
+  }
+
+  .lmsa-cache-popover-label {
+    @apply lmsa-text-obsidian-text;
+    font-size: var(--font-ui-smaller);
+    font-weight: 500;
+  }
+
+  .lmsa-cache-popover-control {
+    @apply lmsa-flex lmsa-items-center;
+  }
+
+  .lmsa-cache-toggle {
+    @apply lmsa-cursor-pointer;
+  }
+
+  .lmsa-cache-ttl-select {
+    @apply lmsa-cursor-pointer lmsa-rounded-md lmsa-border lmsa-border-obsidian-border lmsa-bg-transparent lmsa-px-2 lmsa-py-1 lmsa-text-obsidian-text;
+    font-size: var(--font-ui-smaller);
+    outline: none;
+    appearance: auto;
+  }
+
+  .lmsa-cache-ttl-select:disabled {
+    @apply lmsa-cursor-not-allowed;
+    opacity: 0.5;
+  }
+
+  .lmsa-cache-ttl-select:focus-visible {
+    box-shadow: 0 0 0 2px var(--interactive-accent);
+  }
+}

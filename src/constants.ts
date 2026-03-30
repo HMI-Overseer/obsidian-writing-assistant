@@ -10,6 +10,9 @@ export const DEFAULT_COMPLETION_MAX_TOKENS = 2000;
 
 export const MAX_CONVERSATIONS = 50;
 
+export const CONTEXT_WARNING_THRESHOLD = 0.80;
+export const CONTEXT_DANGER_THRESHOLD = 0.95;
+
 export const DEFAULT_CHAT_HISTORY: ChatHistory = {
   conversations: [],
   activeConversationId: null,

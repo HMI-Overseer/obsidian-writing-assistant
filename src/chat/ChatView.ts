@@ -22,6 +22,8 @@ import { ChatHistoryDrawer } from "./view/ChatHistoryDrawer";
 import { ModelParametersDrawer } from "./view/ModelParametersDrawer";
 import { createChatLayout } from "./view/createChatLayout";
 import { sumConversationUsage } from "./usageSummary";
+import { estimateTokenCount } from "../shared/tokenEstimation";
+import { CONTEXT_WARNING_THRESHOLD, CONTEXT_DANGER_THRESHOLD } from "../constants";
 
 const NO_MODEL_SELECTED_LABEL = "No model selected";
 const MIN_VIEW_WIDTH_PX = 300;
@@ -336,6 +338,7 @@ export class ChatView extends ItemView {
     }
 
     this.updateUsageSummary(snapshot.messageHistory);
+    this.updateContextCapacity(snapshot.messageHistory);
   }
 
   private createBubbleActionCallbacks(): BubbleActionCallbacks {
@@ -493,5 +496,64 @@ export class ChatView extends ItemView {
     parts.push(tokenText);
 
     el.setText(parts.join(" \u00b7 "));
+  }
+
+  private updateContextCapacity(messages: ConversationMessage[]): void {
+    const el = this.layout?.contextCapacityEl;
+    if (!el) return;
+
+    const activeModel = this.sessionStore?.getResolvedConversationModel();
+    const contextWindow = activeModel?.contextWindowSize;
+
+    if (!contextWindow) {
+      el.style.display = "none";
+      return;
+    }
+
+    // Use real token count from last API response if available, else estimate.
+    const lastReal = this.sessionStore?.getLastRequestInputTokens();
+    let estimatedTokens: number;
+
+    if (lastReal !== null && lastReal !== undefined && lastReal > 0) {
+      estimatedTokens = lastReal;
+    } else {
+      // Build a lightweight estimate from conversation content.
+      const systemPrompt = this.plugin.settings.globalSystemPrompt;
+      const chatTurns = messages
+        .filter((m) => !m.isError)
+        .map((m) => ({ role: m.role, content: m.content }));
+      estimatedTokens = estimateTokenCount({
+        systemPrompt,
+        documentContext: null,
+        messages: chatTurns,
+      });
+    }
+
+    const ratio = estimatedTokens / contextWindow;
+    const percent = Math.min(Math.round(ratio * 100), 100);
+
+    el.style.display = "";
+    el.removeClass("is-warning", "is-danger");
+    if (ratio >= CONTEXT_DANGER_THRESHOLD) {
+      el.addClass("is-danger");
+    } else if (ratio >= CONTEXT_WARNING_THRESHOLD) {
+      el.addClass("is-warning");
+    }
+
+    const fillEl = el.querySelector(".lmsa-context-capacity-fill") as HTMLElement | null;
+    if (fillEl) {
+      fillEl.style.width = `${percent}%`;
+    }
+
+    const labelEl = el.querySelector(".lmsa-context-capacity-label") as HTMLElement | null;
+    if (labelEl) {
+      const formatTokens = (n: number): string => {
+        if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+        if (n >= 1_000) return `${(n / 1_000).toFixed(1)}k`;
+        return String(n);
+      };
+      const prefix = lastReal ? "" : "~";
+      labelEl.setText(`${prefix}${formatTokens(estimatedTokens)} / ${formatTokens(contextWindow)} tokens (${percent}%)`);
+    }
   }
 }

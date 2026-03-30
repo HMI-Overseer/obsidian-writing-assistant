@@ -131,6 +131,9 @@ export async function regenerateMessage(options: RegenerateOptions): Promise<voi
     }
 
     const usage = await streamResult.usage;
+    if (usage) {
+      store.setLastRequestInputTokens(usage.inputTokens);
+    }
 
     await renderer.flush();
     assistantBubble.bodyEl.removeClass("is-streaming");

@@ -9,6 +9,7 @@ export function normalizeCompletionModel(
     name: model?.name || `Model ${index + 1}`,
     modelId: model?.modelId ?? "",
     provider: model?.provider ?? "lmstudio",
+    ...(model?.contextWindowSize && { contextWindowSize: model.contextWindowSize }),
   };
 }
 

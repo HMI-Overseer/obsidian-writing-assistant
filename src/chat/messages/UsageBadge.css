@@ -35,4 +35,41 @@
     padding: 0 4px;
     min-height: 20px;
   }
+
+  /* Context capacity bar */
+  .lmsa-context-capacity {
+    @apply lmsa-flex lmsa-flex-col;
+    gap: 2px;
+    padding: 2px 4px;
+    font-size: var(--font-smallest);
+    color: var(--text-muted);
+  }
+
+  .lmsa-context-capacity-bar {
+    width: 100%;
+    height: 4px;
+    border-radius: 2px;
+    background: var(--background-modifier-border);
+    overflow: hidden;
+  }
+
+  .lmsa-context-capacity-fill {
+    height: 100%;
+    width: 0%;
+    border-radius: 2px;
+    background: var(--interactive-accent);
+    transition: width 0.3s ease, background-color 0.3s ease;
+  }
+
+  .lmsa-context-capacity.is-warning .lmsa-context-capacity-fill {
+    background: var(--text-warning, #e6a700);
+  }
+
+  .lmsa-context-capacity.is-danger .lmsa-context-capacity-fill {
+    background: var(--text-error, #e93147);
+  }
+
+  .lmsa-context-capacity-label {
+    line-height: 1;
+  }
 }

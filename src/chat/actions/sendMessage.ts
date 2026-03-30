@@ -1,4 +1,5 @@
 import type { Component } from "obsidian";
+import { Notice } from "obsidian";
 import { createChatClient } from "../../providers/registry";
 import { buildSamplingParams } from "./buildSamplingParams";
 import type LMStudioWritingAssistant from "../../main";
@@ -13,6 +14,8 @@ import { StreamingRenderer } from "./StreamingRenderer";
 import { EditStreamingRenderer } from "./EditStreamingRenderer";
 import { finalizeResponse, finalizeAbortedResponse } from "./finalizeResponse";
 import { finalizeEditResponse } from "./finalizeEditResponse";
+import { estimateTokenCount } from "../../shared/tokenEstimation";
+import { CONTEXT_DANGER_THRESHOLD } from "../../constants";
 
 function isAbortError(error: unknown): boolean {
   return error instanceof Error && error.name === "AbortError";
@@ -120,6 +123,16 @@ export async function sendMessage(options: SendMessageOptions): Promise<void> {
     ? new EditStreamingRenderer(assistantBubble, transcript)
     : new StreamingRenderer(assistantBubble, transcript);
 
+  // Pre-send context capacity check.
+  const contextWindow = activeModel.contextWindowSize;
+  if (contextWindow) {
+    const estimatedTokens = estimateTokenCount(apiMessages);
+    if (estimatedTokens / contextWindow >= CONTEXT_DANGER_THRESHOLD) {
+      const pct = Math.round((estimatedTokens / contextWindow) * 100);
+      new Notice(`Context is ~${pct}% full. The model may truncate older messages.`);
+    }
+  }
+
   const client = createChatClient(activeModel.provider, plugin.settings.providerSettings);
   const abortController = new AbortController();
   setActiveAbortController(abortController);
@@ -137,6 +150,9 @@ export async function sendMessage(options: SendMessageOptions): Promise<void> {
     }
 
     const usage = await streamResult.usage;
+    if (usage) {
+      store.setLastRequestInputTokens(usage.inputTokens);
+    }
 
     await renderer.flush();
     assistantBubble.bodyEl.removeClass("is-streaming");

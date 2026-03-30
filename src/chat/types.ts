@@ -39,6 +39,7 @@ export type ChatLayoutRefs = {
   modelSelectorChevronEl: HTMLElement;
   modelDropdownEl: HTMLElement;
   usageSummaryEl: HTMLElement;
+  contextCapacityEl: HTMLElement;
 };
 
 export type ChatSessionSnapshot = {

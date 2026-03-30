@@ -327,7 +327,8 @@ export function renderModelProfileTab<T extends BaseModel>(
               name: model.displayName,
               modelId: model.targetModelId,
               provider: providerSelect.value as ProviderOption,
-            } as Partial<T>
+              contextWindowSize: model.activeContextLength ?? model.maxContextLength,
+            } as unknown as Partial<T>
           );
         });
       }

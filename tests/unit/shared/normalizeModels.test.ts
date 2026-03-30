@@ -96,6 +96,21 @@ describe("normalizeCompletionModel", () => {
   test("defaults modelId to empty string when missing", () => {
     expect(normalizeCompletionModel({}, 0).modelId).toBe("");
   });
+
+  test("preserves contextWindowSize when present", () => {
+    const model: CompletionModel = {
+      ...SAVED_MODEL,
+      contextWindowSize: 128000,
+    };
+    const fromDisk = jsonRoundTrip(model);
+    const result = normalizeCompletionModel(fromDisk as Partial<CompletionModel>, 0);
+    expect(result.contextWindowSize).toBe(128000);
+  });
+
+  test("does not add contextWindowSize when absent", () => {
+    const result = normalizeCompletionModel(SAVED_MODEL, 0);
+    expect(result).not.toHaveProperty("contextWindowSize");
+  });
 });
 
 describe("normalizeEmbeddingModel", () => {

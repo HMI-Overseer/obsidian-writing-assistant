@@ -26,8 +26,7 @@ export function createChatLayout(contentEl: HTMLElement): ChatLayoutRefs {
   const headerMetaChevron = headerMetaBtn.createEl("span", { cls: "lmsa-header-meta-chevron" });
   setIcon(headerMetaChevron, "chevron-down");
 
-  const modelDropdownEl = headerMetaWrap.createDiv({ cls: "lmsa-model-dropdown" });
-  modelDropdownEl.style.display = "none";
+  const modelDropdownEl = headerMetaWrap.createDiv({ cls: "lmsa-model-dropdown lmsa-hidden" });
 
   const profileSettingsBtn = headerMetaWrap.createEl("button", {
     cls: "lmsa-profile-settings-btn",
@@ -35,8 +34,7 @@ export function createChatLayout(contentEl: HTMLElement): ChatLayoutRefs {
   }) as HTMLButtonElement;
   setIcon(profileSettingsBtn, "settings");
 
-  const profileSettingsPopoverEl = headerMetaWrap.createDiv({ cls: "lmsa-profile-popover" });
-  profileSettingsPopoverEl.style.display = "none";
+  const profileSettingsPopoverEl = headerMetaWrap.createDiv({ cls: "lmsa-profile-popover lmsa-hidden" });
 
   const headerActions = header.createDiv({ cls: "lmsa-header-actions" });
   const historyBtn = headerActions.createEl("button", {
@@ -66,14 +64,12 @@ export function createChatLayout(contentEl: HTMLElement): ChatLayoutRefs {
 
   const composerFooter = composerPanel.createDiv({ cls: "lmsa-composer-footer" });
 
-  const contextCapacityEl = composerFooter.createDiv({ cls: "lmsa-context-capacity" });
-  contextCapacityEl.style.display = "none";
+  const contextCapacityEl = composerFooter.createDiv({ cls: "lmsa-context-capacity lmsa-hidden" });
   const capacityBar = contextCapacityEl.createDiv({ cls: "lmsa-context-capacity-bar" });
   capacityBar.createDiv({ cls: "lmsa-context-capacity-fill" });
   contextCapacityEl.createEl("span", { cls: "lmsa-context-capacity-label" });
 
-  const usageSummaryEl = composerFooter.createDiv({ cls: "lmsa-usage-summary" });
-  usageSummaryEl.style.display = "none";
+  const usageSummaryEl = composerFooter.createDiv({ cls: "lmsa-usage-summary lmsa-hidden" });
 
   const composerFooterActions = composerFooter.createDiv({ cls: "lmsa-composer-footer-actions" });
   const modeToggleEl = composerFooterActions.createDiv({ cls: "lmsa-mode-toggle" });

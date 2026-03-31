@@ -49,7 +49,7 @@ export class CommandModal extends Modal {
           .setValue(this.command.prompt)
           .onChange((value) => (this.command.prompt = value));
         text.inputEl.rows = 8;
-        text.inputEl.style.width = "100%";
+        text.inputEl.addClass("lmsa-input-full");
       });
 
     new SettingItem(contentEl)

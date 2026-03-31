@@ -88,11 +88,11 @@ export class ProfileSettingsPopover {
   syncVisibility(): void {
     const model = this.callbacks.getActiveModel();
     if (!model) {
-      this.refs.profileSettingsBtn.style.display = "none";
+      this.refs.profileSettingsBtn.addClass("lmsa-hidden");
       if (this.popoverOpen) this.close();
       return;
     }
-    this.refs.profileSettingsBtn.style.display = "";
+    this.refs.profileSettingsBtn.removeClass("lmsa-hidden");
   }
 
   open(): void {
@@ -100,14 +100,14 @@ export class ProfileSettingsPopover {
     if (!model) return;
 
     this.popoverOpen = true;
-    this.refs.profileSettingsPopoverEl.style.display = "block";
+    this.refs.profileSettingsPopoverEl.removeClass("lmsa-hidden");
     this.renderContent(model);
   }
 
   close(): void {
     this.flushPendingSave();
     this.popoverOpen = false;
-    this.refs.profileSettingsPopoverEl.style.display = "none";
+    this.refs.profileSettingsPopoverEl.addClass("lmsa-hidden");
   }
 
   isOpen(): boolean {

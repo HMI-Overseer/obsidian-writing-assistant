@@ -17,7 +17,7 @@ export class InlineMessageEditor {
     const contentHeight = this.bubble.contentEl.offsetHeight;
 
     this.bubble.rowEl.addClass("is-editing");
-    this.bubble.contentEl.style.display = "none";
+    this.bubble.contentEl.addClass("lmsa-hidden");
 
     this.editorEl = this.bubble.bodyEl.createDiv({ cls: "lmsa-inline-editor" });
 
@@ -75,7 +75,7 @@ export class InlineMessageEditor {
 
   destroy(): void {
     this.bubble.rowEl.removeClass("is-editing");
-    this.bubble.contentEl.style.display = "";
+    this.bubble.contentEl.removeClass("lmsa-hidden");
     this.editorEl?.remove();
     this.editorEl = null;
     this.textareaEl = null;

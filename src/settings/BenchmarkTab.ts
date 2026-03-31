@@ -53,8 +53,7 @@ export function renderBenchmarkTab(
   const selectorChevron = selectorBtn.createEl("span", { cls: "lmsa-header-meta-chevron" });
   setIcon(selectorChevron, "chevron-down");
 
-  const selectorDropdown = selectorWrap.createDiv({ cls: "lmsa-model-dropdown" });
-  selectorDropdown.style.display = "none";
+  const selectorDropdown = selectorWrap.createDiv({ cls: "lmsa-model-dropdown lmsa-hidden" });
   let selectorOpen = false;
 
   const knownAvailability = new Map<string, string>();
@@ -91,7 +90,7 @@ export function renderBenchmarkTab(
   }
 
   function closeBenchmarkDropdown(): void {
-    selectorDropdown.style.display = "none";
+    selectorDropdown.addClass("lmsa-hidden");
     selectorOpen = false;
     selectorBtn.removeClass("is-active");
     selectorChevron.empty();
@@ -100,7 +99,7 @@ export function renderBenchmarkTab(
 
   function openBenchmarkDropdown(): void {
     selectorDropdown.empty();
-    selectorDropdown.style.display = "block";
+    selectorDropdown.removeClass("lmsa-hidden");
     selectorOpen = true;
     selectorBtn.addClass("is-active");
     selectorChevron.empty();
@@ -181,7 +180,7 @@ export function renderBenchmarkTab(
     cls: "lmsa-benchmark-btn lmsa-benchmark-btn--abort",
     text: "Abort",
   });
-  abortBtn.style.display = "none";
+  abortBtn.addClass("lmsa-hidden");
 
   const testCardsEl = suiteSection.bodyEl.createDiv({ cls: "lmsa-benchmark-cards" });
 
@@ -221,7 +220,7 @@ export function renderBenchmarkTab(
 
     // Progress indicator (shows during multi-iteration runs)
     const progressEl = cardHeader.createDiv({ cls: "lmsa-benchmark-progress" });
-    progressEl.style.display = "none";
+    progressEl.addClass("lmsa-hidden");
 
     const cardActions = cardHeader.createDiv({ cls: "lmsa-benchmark-card-actions" });
 
@@ -239,15 +238,14 @@ export function renderBenchmarkTab(
     setIcon(toggleIcon, "chevron-down");
     toggleBtn.createSpan({ text: "Details" });
 
-    const detailsEl = card.createDiv({ cls: "lmsa-benchmark-card-details" });
-    detailsEl.style.display = "none";
+    const detailsEl = card.createDiv({ cls: "lmsa-benchmark-card-details lmsa-hidden" });
 
     toggleBtn.addClass("is-disabled");
 
     toggleBtn.addEventListener("click", () => {
       if (toggleBtn.hasClass("is-disabled")) return;
-      const visible = detailsEl.style.display !== "none";
-      detailsEl.style.display = visible ? "none" : "block";
+      const visible = !detailsEl.hasClass("lmsa-hidden");
+      detailsEl.toggleClass("lmsa-hidden", visible);
       toggleIcon.empty();
       setIcon(toggleIcon, visible ? "chevron-down" : "chevron-up");
     });
@@ -278,7 +276,7 @@ export function renderBenchmarkTab(
   function setRunningState(running: boolean): void {
     isRunning = running;
     runAllBtn.toggleClass("is-disabled", running);
-    abortBtn.style.display = running ? "" : "none";
+    abortBtn.toggleClass("lmsa-hidden", !running);
 
     for (const refs of cardEls.values()) {
       refs.runBtn.toggleClass("is-disabled", running);
@@ -288,7 +286,7 @@ export function renderBenchmarkTab(
   function updateCardProgress(testId: string, completed: number, total: number): void {
     const refs = cardEls.get(testId);
     if (!refs) return;
-    refs.progressEl.style.display = "";
+    refs.progressEl.removeClass("lmsa-hidden");
     refs.progressEl.setText(`Iteration ${completed}/${total}`);
   }
 
@@ -298,7 +296,7 @@ export function renderBenchmarkTab(
     results.set(testId, result);
 
     const { statusEl, progressEl, detailsEl, toggleBtn } = refs;
-    progressEl.style.display = "none";
+    progressEl.addClass("lmsa-hidden");
     statusEl.empty();
     statusEl.removeClass("is-passed", "is-failed", "is-running", "is-mixed");
     toggleBtn.removeClass("is-disabled");
@@ -363,7 +361,7 @@ export function renderBenchmarkTab(
     refs.statusEl.removeClass("is-passed", "is-failed", "is-mixed");
     refs.statusEl.addClass("is-running");
     refs.statusEl.setText("Running...");
-    refs.progressEl.style.display = "";
+    refs.progressEl.removeClass("lmsa-hidden");
     refs.progressEl.setText(`Iteration 0/${iterationCount}`);
   }
 
@@ -465,7 +463,7 @@ export function renderBenchmarkTab(
       const refs = cardEls.get(tc.id);
       if (refs) {
         refs.statusEl.empty();
-        refs.progressEl.style.display = "none";
+        refs.progressEl.addClass("lmsa-hidden");
         refs.statusEl.removeClass("is-running", "is-passed", "is-mixed");
         refs.statusEl.addClass("is-failed");
         refs.statusEl.setText(err instanceof Error && err.name === "AbortError" ? "Aborted" : "Error");
@@ -519,7 +517,7 @@ export function renderBenchmarkTab(
           const refs = cardEls.get(tc.id);
           if (refs) {
             refs.statusEl.empty();
-            refs.progressEl.style.display = "none";
+            refs.progressEl.addClass("lmsa-hidden");
             refs.statusEl.removeClass("is-running", "is-passed", "is-mixed");
             refs.statusEl.addClass("is-failed");
             refs.statusEl.setText("Aborted");

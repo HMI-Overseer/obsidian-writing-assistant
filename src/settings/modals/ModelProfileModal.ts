@@ -74,7 +74,7 @@ export abstract class ModelProfileModal<T extends BaseModel> extends Modal {
       .setDesc(modelIdDesc)
       .addText((text) => {
         text.inputEl.setAttribute("list", datalistId);
-        text.inputEl.style.width = "100%";
+        text.inputEl.addClass("lmsa-input-full");
         text
           .setPlaceholder(modelIdPlaceholder)
           .setValue(this.model.modelId)

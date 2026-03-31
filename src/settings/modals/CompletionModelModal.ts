@@ -40,7 +40,7 @@ export class CompletionModelModal extends ModelProfileModal<CompletionModel> {
       .setDesc("Maximum context length for this model. Auto-filled from discovery, or set manually.")
       .addText((text) => {
         text.inputEl.type = "number";
-        text.inputEl.style.width = "100%";
+        text.inputEl.addClass("lmsa-input-full");
         text
           .setPlaceholder("e.g. 128000")
           .setValue(this.model.contextWindowSize ? String(this.model.contextWindowSize) : "")

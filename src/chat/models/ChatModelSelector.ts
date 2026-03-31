@@ -60,7 +60,7 @@ export class ChatModelSelector {
   }
 
   close(): void {
-    this.refs.modelDropdownEl.style.display = "none";
+    this.refs.modelDropdownEl.addClass("lmsa-hidden");
     this.modelDropdownOpen = false;
     this.refs.modelSelectorBtn.removeClass("is-active");
     setIcon(this.refs.modelSelectorChevronEl, "chevron-down");
@@ -150,7 +150,7 @@ export class ChatModelSelector {
 
   private open(): void {
     this.refs.modelDropdownEl.empty();
-    this.refs.modelDropdownEl.style.display = "block";
+    this.refs.modelDropdownEl.removeClass("lmsa-hidden");
     this.modelDropdownOpen = true;
     this.refs.modelSelectorBtn.addClass("is-active");
     setIcon(this.refs.modelSelectorChevronEl, "chevron-up");

@@ -2223,6 +2223,10 @@
 .lmsa-hint-list li + li {
     margin-top: 6px;
   }
+/* ── Full-width inputs ─────────────────────────────────────────────────── */
+.lmsa-input-full {
+    width: 100%;
+  }
 /* ── Responsive ────────────────────────────────────────────────────────── */
 @media (max-width: 700px) {
     .lmsa-settings-panel-header {
@@ -3851,6 +3855,16 @@
 .lmsa-settings-root .lmsa-settings-shell[data-tab="benchmark"] {
   --lmsa-section-accent: var(--color-green, var(--interactive-accent));
   --lmsa-section-accent-secondary: var(--color-cyan, var(--interactive-accent));
+}
+/* Override Obsidian's button background-color: var(--interactive-normal) */
+.lmsa-settings-tab-btn {
+  background-color: transparent !important;
+}
+.lmsa-settings-tab-btn.is-active {
+  background-color: color-mix(in srgb, var(--lmsa-section-accent) 10%, var(--lmsa-surface-raised)) !important;
+}
+.lmsa-settings-tab-btn:hover:not(.is-active) {
+  background-color: color-mix(in srgb, var(--background-modifier-hover) 60%, transparent) !important;
 }
 /* -----------------------------------------------------------------------
  * BenchmarkTab — test card layout and result display

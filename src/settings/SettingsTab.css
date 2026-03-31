@@ -139,3 +139,16 @@
     }
   }
 }
+
+/* Override Obsidian's button background-color: var(--interactive-normal) */
+.lmsa-settings-tab-btn {
+  background-color: transparent !important;
+}
+
+.lmsa-settings-tab-btn.is-active {
+  background-color: color-mix(in srgb, var(--lmsa-section-accent) 10%, var(--lmsa-surface-raised)) !important;
+}
+
+.lmsa-settings-tab-btn:hover:not(.is-active) {
+  background-color: color-mix(in srgb, var(--background-modifier-hover) 60%, transparent) !important;
+}

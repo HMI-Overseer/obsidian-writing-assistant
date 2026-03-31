@@ -400,18 +400,22 @@ export function renderModelProfileTab<T extends BaseModel>(
     const hasFetcher = selected in config.fetchCandidates;
 
     // Connection settings visibility
-    lmConnectionEl.style.display = selected === "lmstudio" ? "" : "none";
-    anthropicConnectionEl.style.display =
-      selected === "anthropic" && config.kind !== "embedding" ? "" : "none";
-    anthropicNoEmbeddingEl.style.display =
-      selected === "anthropic" && config.kind === "embedding" ? "" : "none";
-    openaiPlaceholderEl.style.display = selected === "openai" ? "" : "none";
+    lmConnectionEl.toggleClass("lmsa-hidden", selected !== "lmstudio");
+    anthropicConnectionEl.toggleClass(
+      "lmsa-hidden",
+      selected !== "anthropic" || config.kind === "embedding",
+    );
+    anthropicNoEmbeddingEl.toggleClass(
+      "lmsa-hidden",
+      selected !== "anthropic" || config.kind !== "embedding",
+    );
+    openaiPlaceholderEl.toggleClass("lmsa-hidden", selected !== "openai");
 
     // Shared discovery block — visible when provider has a fetcher
-    discoveryEl.style.display = hasFetcher ? "" : "none";
+    discoveryEl.toggleClass("lmsa-hidden", !hasFetcher);
 
     // Add manually button — hidden for unsupported combos
-    addManuallyBtn.style.display = hasFetcher ? "" : "none";
+    addManuallyBtn.toggleClass("lmsa-hidden", !hasFetcher);
   };
 
   providerSelect.addEventListener("change", syncProviderContent);

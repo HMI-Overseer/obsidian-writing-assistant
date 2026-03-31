@@ -468,11 +468,11 @@ export class ChatView extends ItemView {
     const totals = sumConversationUsage(messages);
 
     if (!totals.hasUsage) {
-      el.style.display = "none";
+      el.addClass("lmsa-hidden");
       return;
     }
 
-    el.style.display = "";
+    el.removeClass("lmsa-hidden");
     el.empty();
 
     const totalTokens = totals.totalInputTokens + totals.totalOutputTokens;
@@ -502,7 +502,7 @@ export class ChatView extends ItemView {
     const contextWindow = activeModel?.contextWindowSize;
 
     if (!contextWindow) {
-      el.style.display = "none";
+      el.addClass("lmsa-hidden");
       return;
     }
 
@@ -528,8 +528,7 @@ export class ChatView extends ItemView {
     const ratio = estimatedTokens / contextWindow;
     const percent = Math.min(Math.round(ratio * 100), 100);
 
-    el.style.display = "";
-    el.removeClass("is-warning", "is-danger");
+    el.removeClass("lmsa-hidden", "is-warning", "is-danger");
     if (ratio >= CONTEXT_DANGER_THRESHOLD) {
       el.addClass("is-danger");
     } else if (ratio >= CONTEXT_WARNING_THRESHOLD) {

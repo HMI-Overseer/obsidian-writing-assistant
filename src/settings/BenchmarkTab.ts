@@ -12,7 +12,7 @@ export function renderBenchmarkTab(
   container: HTMLElement,
   plugin: LMStudioWritingAssistant,
   _refresh: () => void
-): void {
+): () => void {
   const models = plugin.settings.completionModels;
   let selectedModel: CompletionModel | null = models[0] ?? null;
   let abortController: AbortController | null = null;
@@ -136,9 +136,10 @@ export function renderBenchmarkTab(
     else openBenchmarkDropdown();
   });
 
-  document.addEventListener("click", () => {
+  const onDocumentClick = (): void => {
     if (selectorOpen) closeBenchmarkDropdown();
-  });
+  };
+  document.addEventListener("click", onDocumentClick);
 
   // -----------------------------------------------------------------------
   // Test suite (includes iteration setting, cards, and summary)
@@ -536,4 +537,9 @@ export function renderBenchmarkTab(
   abortBtn.addEventListener("click", () => {
     abortController?.abort();
   });
+
+  return () => {
+    document.removeEventListener("click", onDocumentClick);
+    abortController?.abort();
+  };
 }

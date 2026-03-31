@@ -174,7 +174,7 @@ export class ChatView extends ItemView {
       onClose: () => this.historyDrawer?.close(),
     });
 
-    this.layout.historyBtn.addEventListener("click", (event) => {
+    this.registerDomEvent(this.layout.historyBtn, "click", (event) => {
       event.stopPropagation();
       if (this.profilePopover?.isOpen()) {
         this.profilePopover.close();
@@ -182,7 +182,7 @@ export class ChatView extends ItemView {
       this.conversation.toggleHistoryDrawer();
     });
 
-    this.layout.modelSelectorBtn.addEventListener("click", () => {
+    this.registerDomEvent(this.layout.modelSelectorBtn, "click", () => {
       if (this.profilePopover?.isOpen()) {
         this.profilePopover.close();
       }

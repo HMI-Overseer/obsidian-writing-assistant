@@ -57,6 +57,7 @@ const TAB_META: Record<TabName, TabMeta> = {
 
 export class LMStudioSettingTab extends PluginSettingTab {
   private activeTab: TabName = "General";
+  private cleanupBenchmark: (() => void) | null = null;
 
   constructor(
     app: App,
@@ -65,7 +66,14 @@ export class LMStudioSettingTab extends PluginSettingTab {
     super(app, plugin);
   }
 
+  hide(): void {
+    this.cleanupBenchmark?.();
+    this.cleanupBenchmark = null;
+  }
+
   display(): void {
+    this.cleanupBenchmark?.();
+    this.cleanupBenchmark = null;
     const { containerEl } = this;
     const activeMeta = TAB_META[this.activeTab];
 
@@ -152,7 +160,7 @@ export class LMStudioSettingTab extends PluginSettingTab {
         renderAdvancedTab(content, this.plugin);
         break;
       case "Benchmark":
-        renderBenchmarkTab(content, this.plugin, refresh);
+        this.cleanupBenchmark = renderBenchmarkTab(content, this.plugin, refresh);
         break;
     }
   }

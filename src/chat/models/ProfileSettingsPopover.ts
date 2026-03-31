@@ -45,6 +45,8 @@ interface NullableNumberRefs {
 export class ProfileSettingsPopover {
   private popoverOpen = false;
   private saveTimer: ReturnType<typeof setTimeout> | null = null;
+  private readonly onBtnClick: (event: MouseEvent) => void;
+  private readonly onPopoverClick: (event: MouseEvent) => void;
 
   // Parameter control refs (populated when LM Studio section renders)
   private promptTextareaEl: HTMLTextAreaElement | null = null;
@@ -66,18 +68,21 @@ export class ProfileSettingsPopover {
     >,
     private readonly callbacks: ProfileSettingsCallbacks
   ) {
-    this.refs.profileSettingsBtn.addEventListener("click", (event) => {
+    this.onBtnClick = (event: MouseEvent) => {
       event.stopPropagation();
       if (this.popoverOpen) {
         this.close();
       } else {
         this.open();
       }
-    });
+    };
 
-    this.refs.profileSettingsPopoverEl.addEventListener("click", (event) => {
+    this.onPopoverClick = (event: MouseEvent) => {
       event.stopPropagation();
-    });
+    };
+
+    this.refs.profileSettingsBtn.addEventListener("click", this.onBtnClick);
+    this.refs.profileSettingsPopoverEl.addEventListener("click", this.onPopoverClick);
   }
 
   syncVisibility(): void {
@@ -112,6 +117,8 @@ export class ProfileSettingsPopover {
   destroy(): void {
     this.flushPendingSave();
     this.close();
+    this.refs.profileSettingsBtn.removeEventListener("click", this.onBtnClick);
+    this.refs.profileSettingsPopoverEl.removeEventListener("click", this.onPopoverClick);
   }
 
   // ---------------------------------------------------------------------------

@@ -1,5 +1,6 @@
 import type { App } from "obsidian";
-import { Modal, Setting } from "obsidian";
+import { Modal } from "obsidian";
+import { SettingItem } from "../ui";
 import type LMStudioWritingAssistant from "../../main";
 
 /**
@@ -26,7 +27,7 @@ export class ApiKeysModal extends Modal {
     });
 
     // ── Anthropic ──────────────────────────────────────────────────────
-    new Setting(contentEl)
+    new SettingItem(contentEl)
       .setName("Anthropic")
       .setDesc("Used for Claude models.")
       .addText((text) => {
@@ -42,7 +43,7 @@ export class ApiKeysModal extends Modal {
       });
 
     // ── OpenAI ─────────────────────────────────────────────────────────
-    new Setting(contentEl)
+    new SettingItem(contentEl)
       .setName("OpenAI")
       .setDesc("Used for GPT models. (Coming soon)")
       .addText((text) => {
@@ -58,7 +59,7 @@ export class ApiKeysModal extends Modal {
       });
 
     // ── Close button ───────────────────────────────────────────────────
-    new Setting(contentEl).addButton((button) =>
+    new SettingItem(contentEl).addButton((button) =>
       button
         .setButtonText("Done")
         .setCta()

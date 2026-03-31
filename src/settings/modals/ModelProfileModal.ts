@@ -1,5 +1,6 @@
 import type { App } from "obsidian";
-import { Modal, Notice, Setting } from "obsidian";
+import { Modal, Notice } from "obsidian";
+import { SettingItem } from "../ui";
 import type LMStudioWritingAssistant from "../../main";
 import { LMStudioModelsService } from "../../api";
 import { AnthropicModelsService } from "../../api/AnthropicModelsService";
@@ -46,7 +47,7 @@ export abstract class ModelProfileModal<T extends BaseModel> extends Modal {
     datalist.id = datalistId;
     contentEl.appendChild(datalist);
 
-    new Setting(contentEl)
+    new SettingItem(contentEl)
       .setName("Display name")
       .setDesc("A label for this reusable model profile.")
       .addText((text) =>
@@ -68,7 +69,7 @@ export abstract class ModelProfileModal<T extends BaseModel> extends Modal {
         ? "e.g. gpt-4o"
         : "e.g. model-id";
 
-    new Setting(contentEl)
+    new SettingItem(contentEl)
       .setName("Model ID")
       .setDesc(modelIdDesc)
       .addText((text) => {
@@ -83,7 +84,7 @@ export abstract class ModelProfileModal<T extends BaseModel> extends Modal {
     this.populateDatalist(datalist);
     this.renderExtraFields(contentEl);
 
-    new Setting(contentEl)
+    new SettingItem(contentEl)
       .addButton((button) => button.setButtonText("Cancel").onClick(() => this.close()))
       .addButton((button) =>
         button

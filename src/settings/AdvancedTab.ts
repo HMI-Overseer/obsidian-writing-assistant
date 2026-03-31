@@ -1,6 +1,5 @@
-import { Setting } from "obsidian";
 import type LMStudioWritingAssistant from "../main";
-import { createSettingsSection } from "./ui";
+import { createSettingsSection, SettingItem } from "./ui";
 
 export function renderAdvancedTab(container: HTMLElement, plugin: LMStudioWritingAssistant): void {
   const editing = createSettingsSection(
@@ -10,7 +9,7 @@ export function renderAdvancedTab(container: HTMLElement, plugin: LMStudioWritin
     { icon: "file-diff" }
   );
 
-  new Setting(editing.bodyEl)
+  new SettingItem(editing.bodyEl)
     .setName("Diff context lines")
     .setDesc(
       "Number of lines shown above and below each diff hunk for context."
@@ -28,7 +27,7 @@ export function renderAdvancedTab(container: HTMLElement, plugin: LMStudioWritin
         })
     );
 
-  new Setting(editing.bodyEl)
+  new SettingItem(editing.bodyEl)
     .setName("Minimum match confidence")
     .setDesc(
       "Fuzzy match confidence threshold (0–1). Matches below this score are flagged as unresolved. Default: 0.7"

@@ -113,16 +113,8 @@
     height: 12px;
   }
 
-  /* ------- Override setting-item background inside benchmark section ------- */
-
   .lmsa-benchmark-cards {
     @apply lmsa-mt-2;
-  }
-
-  .lmsa-settings-section-body > .setting-item:has(~ .lmsa-benchmark-cards) {
-    border-top: 0;
-    background: transparent;
-    padding-top: 0;
   }
 
   /* ------- Test cards ------- */

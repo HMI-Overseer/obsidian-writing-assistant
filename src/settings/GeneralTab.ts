@@ -1,7 +1,6 @@
-import { Setting } from "obsidian";
 import type LMStudioWritingAssistant from "../main";
 import { ApiKeysModal } from "./modals";
-import { createSettingsSection } from "./ui";
+import { createSettingsSection, SettingItem } from "./ui";
 
 export function renderGeneralTab(container: HTMLElement, plugin: LMStudioWritingAssistant): void {
   // ── Provider API Keys ──────────────────────────────────────────────
@@ -12,7 +11,7 @@ export function renderGeneralTab(container: HTMLElement, plugin: LMStudioWriting
     { icon: "key-round" }
   );
 
-  new Setting(keys.bodyEl)
+  new SettingItem(keys.bodyEl)
     .setName("Configure API keys")
     .setDesc("Open a window to enter or update your provider API keys.")
     .addButton((button) =>
@@ -32,7 +31,7 @@ export function renderGeneralTab(container: HTMLElement, plugin: LMStudioWriting
     { icon: "file-text" }
   );
 
-  new Setting(context.bodyEl)
+  new SettingItem(context.bodyEl)
     .setName("Include active note as context")
     .setDesc(
       "Send the content of the currently open note alongside each request."

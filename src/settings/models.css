@@ -177,11 +177,11 @@
     margin-bottom: 16px;
   }
 
-  .lmsa-provider-connection .setting-item {
+  .lmsa-provider-connection .lmsa-setting-item {
     @apply lmsa-border-0 lmsa-p-0;
   }
 
-  .lmsa-provider-connection .setting-item:not(:last-child) {
+  .lmsa-provider-connection .lmsa-setting-item:not(:last-child) {
     padding-bottom: 12px;
     margin-bottom: 12px;
     border-bottom: 1px solid var(--lmsa-border-default);

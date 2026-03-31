@@ -1,10 +1,10 @@
 import type { App } from "obsidian";
-import { Notice, Setting } from "obsidian";
+import { Notice } from "obsidian";
 import { normalizeLMStudioBaseUrl } from "../api";
 import type { ModelCandidateResult, ModelDigest } from "../api/types";
 import type LMStudioWritingAssistant from "../main";
 import type { ProviderOption } from "../shared/types";
-import { createSettingsSection } from "./ui";
+import { createSettingsSection, SettingItem } from "./ui";
 
 type BaseModel = { id: string; name: string; modelId: string; provider: ProviderOption };
 
@@ -167,7 +167,7 @@ export function renderModelProfileTab<T extends BaseModel>(
   const lmConnectionEl = providerContentEl.createDiv({ cls: "lmsa-provider-connection" });
   const lmSettings = settings.providerSettings.lmstudio;
 
-  new Setting(lmConnectionEl)
+  new SettingItem(lmConnectionEl)
     .setName("LM Studio URL")
     .setDesc(
       "Base URL for the LM Studio server. The plugin resolves the right endpoint automatically."
@@ -184,7 +184,7 @@ export function renderModelProfileTab<T extends BaseModel>(
         })
     );
 
-  new Setting(lmConnectionEl)
+  new SettingItem(lmConnectionEl)
     .setName("Bypass CORS via Node.js")
     .setDesc(
       "Use Electron's Node.js HTTP stack instead of the browser fetch API. Avoids needing CORS enabled in LM Studio."

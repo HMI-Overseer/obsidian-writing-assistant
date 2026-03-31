@@ -1,5 +1,6 @@
 import type { App } from "obsidian";
-import { Modal, Notice, Setting } from "obsidian";
+import { Modal, Notice } from "obsidian";
+import { SettingItem } from "../ui";
 import type { CustomCommand } from "../../shared/types";
 import { generateId } from "../../utils";
 
@@ -29,7 +30,7 @@ export class CommandModal extends Modal {
       text: this.command.name ? `Edit: ${this.command.name}` : "Add Command",
     });
 
-    new Setting(contentEl)
+    new SettingItem(contentEl)
       .setName("Command name")
       .setDesc("This appears as a quick-action button in the chat view.")
       .addText((text) =>
@@ -39,7 +40,7 @@ export class CommandModal extends Modal {
           .onChange((value) => (this.command.name = value))
       );
 
-    new Setting(contentEl)
+    new SettingItem(contentEl)
       .setName("Prompt template")
       .setDesc("Supports {{selection}} and {{note}} placeholders.")
       .addTextArea((text) => {
@@ -51,7 +52,7 @@ export class CommandModal extends Modal {
         text.inputEl.style.width = "100%";
       });
 
-    new Setting(contentEl)
+    new SettingItem(contentEl)
       .setName("Auto insert response")
       .setDesc(
         "Insert the assistant response into the current note automatically after the command completes."
@@ -62,7 +63,7 @@ export class CommandModal extends Modal {
           .onChange((value) => (this.command.autoInsert = value))
       );
 
-    new Setting(contentEl)
+    new SettingItem(contentEl)
       .addButton((button) => button.setButtonText("Cancel").onClick(() => this.close()))
       .addButton((button) =>
         button

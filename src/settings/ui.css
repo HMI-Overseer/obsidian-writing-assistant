@@ -144,15 +144,14 @@
     display: none;
   }
 
-  /* ── Obsidian .setting-item overrides ──────────────────────────────────── */
+  /* ── Setting item ──────────────────────────────────────────────────────── */
 
-  .lmsa-settings-section-body .setting-item {
-    @apply lmsa-relative lmsa-m-0 lmsa-gap-4 lmsa-px-0 lmsa-py-4;
-    border-top: none;
+  .lmsa-setting-item {
+    @apply lmsa-relative lmsa-m-0 lmsa-flex lmsa-items-center lmsa-gap-4 lmsa-px-0 lmsa-py-4;
   }
 
   /* Gradient separator line between setting items */
-  .lmsa-settings-section-body .setting-item:not(:first-child)::before {
+  .lmsa-setting-item:not(:first-child)::before {
     content: "";
     @apply lmsa-pointer-events-none lmsa-absolute lmsa-inset-x-0 lmsa-top-0 lmsa-h-px;
     background: linear-gradient(
@@ -163,32 +162,73 @@
     );
   }
 
-  .lmsa-settings-section-body .setting-item:first-child {
+  .lmsa-setting-item:first-child {
     padding-top: 0;
   }
 
-  .lmsa-settings-section-body .setting-item:last-child {
+  .lmsa-setting-item:last-child {
     padding-bottom: 0;
   }
 
-  .lmsa-settings-section-body .setting-item-info {
-    @apply lmsa-pr-3;
+  .lmsa-setting-item-info {
+    @apply lmsa-flex-1 lmsa-pr-3;
   }
 
-  .lmsa-settings-section-body .setting-item-name {
+  .lmsa-setting-item-name {
     @apply lmsa-font-semibold;
     color: var(--lmsa-text-primary);
   }
 
-  .lmsa-settings-section-body .setting-item-description,
-  .lmsa-settings-section-body .setting-item-description > div {
+  .lmsa-setting-item-desc {
     color: var(--lmsa-text-secondary);
     line-height: 1.55;
   }
 
-  .lmsa-modal .setting-item {
+  .lmsa-setting-item-control {
+    @apply lmsa-flex lmsa-flex-shrink-0 lmsa-items-center lmsa-gap-2;
+  }
+
+  .lmsa-modal .lmsa-setting-item {
     @apply lmsa-px-0;
   }
+
+  /* ── Toggle ──────────────────────────────────────────────────────────── */
+
+  .lmsa-toggle {
+    @apply lmsa-relative lmsa-inline-block lmsa-flex-shrink-0 lmsa-cursor-pointer;
+    width: 40px;
+    height: 22px;
+    border-radius: 11px;
+    background: var(--lmsa-border-default);
+    transition: background 150ms ease;
+    outline: none;
+  }
+
+  .lmsa-toggle::after {
+    content: "";
+    @apply lmsa-absolute;
+    top: 3px;
+    left: 3px;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: var(--lmsa-text-primary);
+    transition: transform 150ms ease;
+  }
+
+  .lmsa-toggle.is-enabled {
+    background: var(--interactive-accent, var(--lmsa-section-accent));
+  }
+
+  .lmsa-toggle.is-enabled::after {
+    transform: translateX(18px);
+    background: #fff;
+  }
+
+  .lmsa-toggle:focus-visible {
+    box-shadow: 0 0 0 2px var(--lmsa-accent-glow);
+  }
+
 
   /* ── Form inputs ───────────────────────────────────────────────────────── */
 
@@ -320,7 +360,7 @@
       @apply lmsa-justify-start;
     }
 
-    .lmsa-settings-section-body .setting-item {
+    .lmsa-setting-item {
       @apply lmsa-flex-col lmsa-items-stretch;
     }
   }

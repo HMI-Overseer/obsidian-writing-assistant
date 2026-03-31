@@ -2037,19 +2037,20 @@
 .lmsa-settings-section-footer:empty {
     display: none;
   }
-/* ── Obsidian .setting-item overrides ──────────────────────────────────── */
-.lmsa-settings-section-body .setting-item {
+/* ── Setting item ──────────────────────────────────────────────────────── */
+.lmsa-setting-item {
     position: relative;
     margin: 0px;
+    display: flex;
+    align-items: center;
     gap: 1rem;
     padding-left: 0px;
     padding-right: 0px;
     padding-top: 1rem;
     padding-bottom: 1rem;
-    border-top: none;
 }
 /* Gradient separator line between setting items */
-.lmsa-settings-section-body .setting-item:not(:first-child)::before {
+.lmsa-setting-item:not(:first-child)::before {
     content: "";
     pointer-events: none;
     position: absolute;
@@ -2064,28 +2065,68 @@
       color-mix(in srgb, var(--lmsa-section-accent-secondary) 20%, transparent)
     );
   }
-.lmsa-settings-section-body .setting-item:first-child {
+.lmsa-setting-item:first-child {
     padding-top: 0;
   }
-.lmsa-settings-section-body .setting-item:last-child {
+.lmsa-setting-item:last-child {
     padding-bottom: 0;
   }
-.lmsa-settings-section-body .setting-item-info {
+.lmsa-setting-item-info {
+    flex: 1 1 0%;
     padding-right: 0.75rem;
 }
-.lmsa-settings-section-body .setting-item-name {
+.lmsa-setting-item-name {
     font-weight: 600;
     color: var(--lmsa-text-primary);
 }
-.lmsa-settings-section-body .setting-item-description,
-  .lmsa-settings-section-body .setting-item-description > div {
+.lmsa-setting-item-desc {
     color: var(--lmsa-text-secondary);
     line-height: 1.55;
   }
-.lmsa-modal .setting-item {
+.lmsa-setting-item-control {
+    display: flex;
+    flex-shrink: 0;
+    align-items: center;
+    gap: 0.5rem;
+}
+.lmsa-modal .lmsa-setting-item {
     padding-left: 0px;
     padding-right: 0px;
 }
+/* ── Toggle ──────────────────────────────────────────────────────────── */
+.lmsa-toggle {
+    position: relative;
+    display: inline-block;
+    flex-shrink: 0;
+    cursor: pointer;
+    width: 40px;
+    height: 22px;
+    border-radius: 11px;
+    background: var(--lmsa-border-default);
+    transition: background 150ms ease;
+    outline: none;
+}
+.lmsa-toggle::after {
+    content: "";
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: var(--lmsa-text-primary);
+    transition: transform 150ms ease;
+  }
+.lmsa-toggle.is-enabled {
+    background: var(--interactive-accent, var(--lmsa-section-accent));
+  }
+.lmsa-toggle.is-enabled::after {
+    transform: translateX(18px);
+    background: #fff;
+  }
+.lmsa-toggle:focus-visible {
+    box-shadow: 0 0 0 2px var(--lmsa-accent-glow);
+  }
 /* ── Form inputs ───────────────────────────────────────────────────────── */
 .lmsa-settings-root input[type="text"],
   .lmsa-settings-root input[type="number"],
@@ -2222,7 +2263,7 @@
         justify-content: flex-start;
     }
 
-    .lmsa-settings-section-body .setting-item {
+    .lmsa-setting-item {
         flex-direction: column;
         align-items: stretch;
     }
@@ -2424,11 +2465,11 @@
     background: var(--lmsa-surface-raised);
     margin-bottom: 16px;
 }
-.lmsa-provider-connection .setting-item {
+.lmsa-provider-connection .lmsa-setting-item {
     border-width: 0px;
     padding: 0px;
 }
-.lmsa-provider-connection .setting-item:not(:last-child) {
+.lmsa-provider-connection .lmsa-setting-item:not(:last-child) {
     padding-bottom: 12px;
     margin-bottom: 12px;
     border-bottom: 1px solid var(--lmsa-border-default);
@@ -2565,15 +2606,9 @@
     width: 12px;
     height: 12px;
   }
-/* ------- Override setting-item background inside benchmark section ------- */
 .lmsa-benchmark-cards {
     margin-top: 0.5rem;
 }
-.lmsa-settings-section-body > .setting-item:has(~ .lmsa-benchmark-cards) {
-    border-top: 0;
-    background: transparent;
-    padding-top: 0;
-  }
 /* ------- Test cards ------- */
 .lmsa-benchmark-cards {
     display: flex;

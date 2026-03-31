@@ -1,4 +1,4 @@
-import { Setting } from "obsidian";
+import { SettingItem } from "../ui";
 import type { LMStudioModelsService } from "../../api";
 import type { AnthropicModelsService } from "../../api/AnthropicModelsService";
 import type { ModelCandidateResult } from "../../api/types";
@@ -35,7 +35,7 @@ export class CompletionModelModal extends ModelProfileModal<CompletionModel> {
   }
 
   protected renderExtraFields(contentEl: HTMLElement): void {
-    new Setting(contentEl)
+    new SettingItem(contentEl)
       .setName("Context window (tokens)")
       .setDesc("Maximum context length for this model. Auto-filled from discovery, or set manually.")
       .addText((text) => {
@@ -55,7 +55,7 @@ export class CompletionModelModal extends ModelProfileModal<CompletionModel> {
       });
 
     if (this.model.provider === "anthropic") {
-      new Setting(contentEl)
+      new SettingItem(contentEl)
         .setName("Prompt caching")
         .setDesc(
           "Cache the system prompt and conversation prefix to reduce cost on repeated requests."
@@ -71,7 +71,7 @@ export class CompletionModelModal extends ModelProfileModal<CompletionModel> {
             });
         });
 
-      new Setting(contentEl)
+      new SettingItem(contentEl)
         .setName("Cache TTL")
         .setDesc(
           "5 min is default. Extended (1 hour) costs 2x the cache write price but reduces read costs over longer sessions."

@@ -12,6 +12,18 @@ export function openAIDeltaExtractor(json: unknown): string | null {
   return choices?.[0]?.delta?.content ?? null;
 }
 
+/** Extracts an error message from an SSE event payload, or returns null if the event is not an error. */
+export function extractSSEError(json: unknown): string | null {
+  const record = json as Record<string, unknown>;
+  if (!record.error) return null;
+  if (typeof record.error === "string") return record.error;
+  if (typeof record.error === "object") {
+    const err = record.error as Record<string, unknown>;
+    if (typeof err.message === "string") return err.message;
+  }
+  return "Unknown streaming error";
+}
+
 export async function* streamNode(
   url: string,
   body: string,
@@ -96,16 +108,27 @@ export async function* streamNode(
           const payload = trimmed.slice(6);
           if (payload === "[DONE]") continue;
 
+          let parsed: unknown;
           try {
-            const parsed = JSON.parse(payload) as unknown;
-            onEvent?.(parsed);
-            const delta = extractDelta(parsed);
-            if (delta) {
-              queue.push(delta);
-              notify();
-            }
+            parsed = JSON.parse(payload);
           } catch {
-            // Skip malformed chunks from the stream.
+            continue; // Skip malformed chunks from the stream.
+          }
+
+          onEvent?.(parsed);
+
+          const sseError = extractSSEError(parsed);
+          if (sseError) {
+            error = new Error(sseError);
+            done = true;
+            notify();
+            return;
+          }
+
+          const delta = extractDelta(parsed);
+          if (delta) {
+            queue.push(delta);
+            notify();
           }
         }
       });
@@ -161,7 +184,18 @@ export async function* streamFetch(
     body,
     signal,
   });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  if (!res.ok) {
+    const errorBody = await res.text().catch(() => "");
+    let message = `HTTP ${res.status}`;
+    try {
+      const parsed = JSON.parse(errorBody) as Record<string, unknown>;
+      const err = parsed.error as Record<string, unknown> | undefined;
+      if (typeof err?.message === "string") message += `: ${err.message}`;
+    } catch {
+      if (errorBody.length > 0 && errorBody.length < 200) message += `: ${errorBody}`;
+    }
+    throw new Error(message);
+  }
   if (!res.body) throw new Error("No response body");
 
   const reader = res.body.getReader();
@@ -182,14 +216,20 @@ export async function* streamFetch(
       const payload = trimmed.slice(6);
       if (payload === "[DONE]") return;
 
+      let parsed: unknown;
       try {
-        const parsed = JSON.parse(payload) as unknown;
-        onEvent?.(parsed);
-        const delta = extractDelta(parsed);
-        if (delta) yield delta;
+        parsed = JSON.parse(payload);
       } catch {
-        // Skip malformed chunks from the stream.
+        continue; // Skip malformed chunks from the stream.
       }
+
+      onEvent?.(parsed);
+
+      const sseError = extractSSEError(parsed);
+      if (sseError) throw new Error(sseError);
+
+      const delta = extractDelta(parsed);
+      if (delta) yield delta;
     }
   }
 }

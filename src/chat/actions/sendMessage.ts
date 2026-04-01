@@ -141,6 +141,7 @@ export async function sendMessage(options: SendMessageOptions): Promise<void> {
   const client = createChatClient(activeModel.provider, plugin.settings.providerSettings);
   const abortController = new AbortController();
   setActiveAbortController(abortController);
+  let hasTransientError = false;
 
   try {
     const streamResult = client.stream(
@@ -212,13 +213,10 @@ export async function sendMessage(options: SendMessageOptions): Promise<void> {
           activeModel.modelId, activeModel.provider);
       }
     } else {
+      // Display the error in the chat bubble but don't persist it — errors are
+      // transient and shouldn't clutter conversation history.
+      hasTransientError = true;
       const errorText = `Error: ${getErrorMessage(error)}`;
-      const errorMessage = makeMessage("assistant", errorText);
-      errorMessage.isError = true;
-      errorMessage.modelId = activeModel.modelId;
-      errorMessage.provider = activeModel.provider;
-      store.appendMessage(errorMessage);
-
       assistantBubble.bodyEl.addClass("is-error");
       transcript.renderPlainTextContent(assistantBubble, errorText);
     }
@@ -227,6 +225,10 @@ export async function sendMessage(options: SendMessageOptions): Promise<void> {
     await store.persistActiveConversation();
     setIsGenerating(false);
     renderer.destroy();
-    await syncConversationUi();
+    // Skip full UI sync when showing a transient error bubble — syncConversationUi
+    // rebuilds the transcript from the store and would wipe the unpersisted error.
+    if (!hasTransientError) {
+      await syncConversationUi();
+    }
   }
 }

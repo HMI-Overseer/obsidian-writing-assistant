@@ -10,6 +10,7 @@ import { ChatConversationController } from "./ChatConversationController";
 import { sendMessage } from "./actions/sendMessage";
 import { renderDiffPanel } from "./actions/finalizeEditResponse";
 import { branchConversation } from "./actions/branchConversation";
+import { generateResponse } from "./actions/generateResponse";
 import { regenerateMessage } from "./actions/regenerateMessage";
 import { ChatComposer } from "./composer/ChatComposer";
 import { ChatSessionStore } from "./conversation/ChatSessionStore";
@@ -206,6 +207,10 @@ export class ChatView extends ItemView {
       })
     );
 
+    this.registerDomEvent(this.layout.generateResponseBtn, "click", () => {
+      void this.handleGenerateResponse();
+    });
+
     await this.sessionStore.restorePersistedState();
     await this.syncConversationUi();
     this.composer.renderCommandBar();
@@ -335,6 +340,7 @@ export class ChatView extends ItemView {
 
     this.updateUsageSummary(snapshot.messageHistory);
     this.updateContextCapacity(snapshot.messageHistory);
+    this.updateGenerateResponseButton(snapshot.messageHistory);
   }
 
   private createBubbleActionCallbacks(): BubbleActionCallbacks {
@@ -441,6 +447,39 @@ export class ChatView extends ItemView {
     );
   }
 
+
+  private async handleGenerateResponse(): Promise<void> {
+    if (!this.sessionStore || !this.transcript || !this.composer || !this.modelSelector) {
+      return;
+    }
+
+    await generateResponse({
+      plugin: this.plugin,
+      owner: this,
+      store: this.sessionStore,
+      transcript: this.transcript,
+      composer: this.composer,
+      modelSelector: this.modelSelector,
+      getIsGenerating: () => this.generation.getIsGenerating(),
+      setIsGenerating: (generating) => this.generation.setIsGenerating(generating),
+      setActiveAbortController: (controller) =>
+        this.generation.setActiveAbortController(controller),
+      syncConversationUi: () => this.syncConversationUi(),
+    });
+  }
+
+  private updateGenerateResponseButton(messages: ConversationMessage[]): void {
+    const btn = this.layout?.generateResponseBtn;
+    if (!btn) return;
+
+    const shouldShow =
+      !this.generation.getIsGenerating() &&
+      messages.length > 0 &&
+      (messages[messages.length - 1].role === "user" ||
+        messages[messages.length - 1].isError === true);
+
+    btn.toggleClass("lmsa-hidden", !shouldShow);
+  }
 
   private handleWidthChange(width: number): void {
     if (!this.layout) return;

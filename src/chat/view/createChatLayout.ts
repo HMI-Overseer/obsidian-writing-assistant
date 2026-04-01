@@ -53,6 +53,15 @@ export function createChatLayout(contentEl: HTMLElement): ChatLayoutRefs {
   const messagesEl = messagesPaneEl.createDiv({ cls: "lmsa-messages" });
 
   const composer = shell.createDiv({ cls: "lmsa-composer" });
+
+  const generateResponseBtn = composer.createEl("button", {
+    cls: "lmsa-generate-response-btn lmsa-ui-pill-button lmsa-hidden",
+    attr: { "aria-label": "Generate response" },
+  }) as HTMLButtonElement;
+  const genBtnIcon = generateResponseBtn.createEl("span", { cls: "lmsa-generate-response-icon" });
+  setIcon(genBtnIcon, "sparkles");
+  generateResponseBtn.createEl("span", { text: "Generate response" });
+
   const commandBarEl = composer.createDiv({ cls: "lmsa-command-bar" });
   const composerPanel = composer.createDiv({ cls: "lmsa-composer-panel lmsa-ui-panel" });
   const contextChipsEl = composerPanel.createDiv({ cls: "lmsa-composer-chips" });
@@ -101,5 +110,6 @@ export function createChatLayout(contentEl: HTMLElement): ChatLayoutRefs {
     profileSettingsPopoverEl,
     usageSummaryEl,
     contextCapacityEl,
+    generateResponseBtn,
   };
 }

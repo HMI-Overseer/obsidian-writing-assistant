@@ -163,6 +163,22 @@
     line-height: 1.6;
   }
 
+  .lmsa-generate-response-btn {
+    @apply lmsa-mx-auto lmsa-inline-flex lmsa-items-center lmsa-gap-1.5;
+    align-self: center;
+    transition: background 140ms ease, border-color 140ms ease;
+  }
+
+  .lmsa-generate-response-icon {
+    @apply lmsa-inline-flex lmsa-items-center;
+    color: var(--lmsa-mode-accent);
+  }
+
+  .lmsa-generate-response-icon svg {
+    width: 14px;
+    height: 14px;
+  }
+
   .lmsa-composer {
     @apply lmsa-relative lmsa-flex lmsa-flex-col lmsa-gap-2.5 lmsa-px-[18px] lmsa-pb-[18px];
   }

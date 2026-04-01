@@ -47,7 +47,6 @@ const PROVIDER_LABELS: Record<ProviderOption, string> = {
 export function renderModelProfileTab<T extends BaseModel>(
   container: HTMLElement,
   plugin: LMStudioWritingAssistant,
-  refresh: () => void,
   config: ModelProfileTabConfig<T>
 ): void {
   const { settings } = plugin;
@@ -113,7 +112,7 @@ export function renderModelProfileTab<T extends BaseModel>(
         .addEventListener("click", async () => {
           config.setModels(config.getModels().filter((item) => item.id !== model.id));
           await plugin.saveSettings();
-          refresh();
+          renderList();
         });
     }
   };
@@ -158,7 +157,7 @@ export function renderModelProfileTab<T extends BaseModel>(
       currentModels.push(model);
       config.setModels(currentModels);
       await plugin.saveSettings();
-      refresh();
+      renderList();
     }, { provider: providerSelect.value as ProviderOption } as Partial<T>);
   });
 
@@ -324,7 +323,11 @@ export function renderModelProfileTab<T extends BaseModel>(
               config.setModels(currentModels);
               await plugin.saveSettings();
               new Notice(`Added ${config.profileNoun} for ${configuredModel.modelId}.`);
-              refresh();
+              renderList();
+              configureButton.textContent = "Added";
+              configureButton.disabled = true;
+              configureButton.classList.remove("lmsa-ui-btn-primary");
+              configureButton.classList.add("lmsa-btn-secondary");
             },
             {
               name: model.displayName,

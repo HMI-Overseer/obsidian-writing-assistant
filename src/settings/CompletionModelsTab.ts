@@ -26,12 +26,11 @@ function formatDiscoveryMeta(model: ModelDigest): string {
 
 export function renderCompletionModelsTab(
   container: HTMLElement,
-  plugin: LMStudioWritingAssistant,
-  refresh: () => void
+  plugin: LMStudioWritingAssistant
 ): void {
   const { settings } = plugin;
 
-  renderModelProfileTab<CompletionModel>(container, plugin, refresh, {
+  renderModelProfileTab<CompletionModel>(container, plugin, {
     kind: "completion",
     profileNoun: "completion profile",
     sectionDescription:

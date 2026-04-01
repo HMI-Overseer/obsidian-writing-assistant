@@ -181,10 +181,12 @@
     @apply lmsa-border-0 lmsa-p-0;
   }
 
+  .lmsa-provider-connection .lmsa-setting-item:not(:first-child) {
+    padding-top: 12px;
+  }
+
   .lmsa-provider-connection .lmsa-setting-item:not(:last-child) {
     padding-bottom: 12px;
-    margin-bottom: 12px;
-    border-bottom: 1px solid var(--lmsa-border-default);
   }
 
   .lmsa-discovery-header {

@@ -2503,10 +2503,11 @@
     border-width: 0px;
     padding: 0px;
 }
+.lmsa-provider-connection .lmsa-setting-item:not(:first-child) {
+    padding-top: 12px;
+  }
 .lmsa-provider-connection .lmsa-setting-item:not(:last-child) {
     padding-bottom: 12px;
-    margin-bottom: 12px;
-    border-bottom: 1px solid var(--lmsa-border-default);
   }
 .lmsa-discovery-header {
     display: flex;

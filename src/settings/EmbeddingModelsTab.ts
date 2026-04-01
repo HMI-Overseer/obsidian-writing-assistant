@@ -13,12 +13,11 @@ function formatEmbeddingSummary(model: ModelDigest): string {
 
 export function renderEmbeddingModelsTab(
   container: HTMLElement,
-  plugin: LMStudioWritingAssistant,
-  refresh: () => void
+  plugin: LMStudioWritingAssistant
 ): void {
   const { settings } = plugin;
 
-  renderModelProfileTab<EmbeddingModel>(container, plugin, refresh, {
+  renderModelProfileTab<EmbeddingModel>(container, plugin, {
     kind: "embedding",
     profileNoun: "embedding profile",
     sectionDescription:

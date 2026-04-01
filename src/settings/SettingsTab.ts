@@ -148,10 +148,10 @@ export class LMStudioSettingTab extends PluginSettingTab {
         renderGeneralTab(content, this.plugin);
         break;
       case "Completion Models":
-        renderCompletionModelsTab(content, this.plugin, refresh);
+        renderCompletionModelsTab(content, this.plugin);
         break;
       case "Embedding Models":
-        renderEmbeddingModelsTab(content, this.plugin, refresh);
+        renderEmbeddingModelsTab(content, this.plugin);
         break;
       case "Commands":
         renderCommandsTab(content, this.plugin, refresh);

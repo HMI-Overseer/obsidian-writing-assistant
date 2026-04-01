@@ -2,7 +2,6 @@ import type { ChatClient } from "../../api/chatClient";
 import type { CompletionModel, SamplingParams } from "../../shared/types";
 import type { ChatRequest } from "../../shared/chatRequest";
 import type { BenchmarkTestCase, BenchmarkRunResult, BenchmarkIterationResult } from "./types";
-import { DEFAULT_COMPLETION_MAX_TOKENS, DEFAULT_COMPLETION_TEMPERATURE } from "../../constants";
 
 /**
  * Runs a single test case for N iterations, returning aggregate results.
@@ -13,6 +12,7 @@ export async function runBenchmarkTest(
   model: CompletionModel,
   testCase: BenchmarkTestCase,
   iterationCount: number,
+  params: SamplingParams,
   onIteration?: (testId: string, iteration: BenchmarkIterationResult) => void,
   signal?: AbortSignal
 ): Promise<BenchmarkRunResult> {
@@ -29,25 +29,20 @@ export async function runBenchmarkTest(
     })),
   };
 
+  if (model.anthropicCacheSettings?.enabled) {
+    request.anthropicCacheSettings = model.anthropicCacheSettings;
+  }
+
   const iterations: BenchmarkIterationResult[] = [];
 
   for (let i = 0; i < iterationCount; i++) {
     if (signal?.aborted) break;
 
     const start = Date.now();
-    const benchmarkParams: SamplingParams = {
-      temperature: DEFAULT_COMPLETION_TEMPERATURE,
-      maxTokens: DEFAULT_COMPLETION_MAX_TOKENS,
-      topP: null,
-      topK: null,
-      minP: null,
-      repeatPenalty: null,
-      reasoning: null,
-    };
     const completionResult = await client.complete(
       request,
       model.modelId,
-      benchmarkParams,
+      params,
       signal
     );
     const rawResponse = completionResult.text;
@@ -82,6 +77,7 @@ export async function runAllBenchmarks(
   model: CompletionModel,
   testCases: BenchmarkTestCase[],
   iterationCount: number,
+  params: SamplingParams,
   onTestComplete: (result: BenchmarkRunResult, index: number) => void,
   onIteration?: (testId: string, iteration: BenchmarkIterationResult) => void,
   signal?: AbortSignal
@@ -91,7 +87,7 @@ export async function runAllBenchmarks(
   for (let i = 0; i < testCases.length; i++) {
     if (signal?.aborted) break;
 
-    const result = await runBenchmarkTest(client, model, testCases[i], iterationCount, onIteration, signal);
+    const result = await runBenchmarkTest(client, model, testCases[i], iterationCount, params, onIteration, signal);
     results.push(result);
     onTestComplete(result, i);
   }

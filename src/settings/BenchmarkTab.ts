@@ -6,6 +6,8 @@ import { createSettingsSection } from "./ui";
 import { getTestCases } from "./benchmark/testCases";
 import { runBenchmarkTest, runAllBenchmarks } from "./benchmark/benchmarkRunner";
 import type { BenchmarkRunResult, BenchmarkTestCase } from "./benchmark/types";
+import { ProfileSettingsPopover } from "../chat/models/ProfileSettingsPopover";
+import { buildSamplingParams } from "../chat/actions/buildSamplingParams";
 
 export function renderBenchmarkTab(
   container: HTMLElement,
@@ -51,6 +53,73 @@ export function renderBenchmarkTab(
   });
   const selectorChevron = selectorBtn.createEl("span", { cls: "lmsa-header-meta-chevron" });
   setIcon(selectorChevron, "chevron-down");
+
+  const profileSettingsBtn = selectorWrap.createEl("button", {
+    cls: "lmsa-profile-settings-btn",
+    attr: { "aria-label": "Profile settings" },
+  }) as HTMLButtonElement;
+  setIcon(profileSettingsBtn, "settings");
+
+  const profileSettingsPopoverEl = selectorWrap.createDiv({
+    cls: "lmsa-profile-popover lmsa-hidden",
+  });
+
+  const profilePopover = new ProfileSettingsPopover(
+    { profileSettingsBtn, profileSettingsPopoverEl },
+    {
+      getActiveModel: () => selectedModel,
+      onCacheSettingsChange: async (modelId, settings) => {
+        const model = plugin.settings.completionModels.find((m) => m.id === modelId);
+        if (model) {
+          model.anthropicCacheSettings = settings;
+          await plugin.saveSettings();
+        }
+      },
+      getParamSettings: () => ({
+        globalSystemPrompt: plugin.settings.globalSystemPrompt,
+        globalTemperature: plugin.settings.globalTemperature,
+        globalMaxTokens: plugin.settings.globalMaxTokens,
+        globalTopP: plugin.settings.globalTopP,
+        globalTopK: plugin.settings.globalTopK,
+        globalMinP: plugin.settings.globalMinP,
+        globalRepeatPenalty: plugin.settings.globalRepeatPenalty,
+        globalReasoning: plugin.settings.globalReasoning,
+      }),
+      onSystemPromptChange: async (value) => {
+        plugin.settings.globalSystemPrompt = value;
+        await plugin.saveSettings();
+      },
+      onTemperatureChange: async (value) => {
+        plugin.settings.globalTemperature = value;
+        await plugin.saveSettings();
+      },
+      onMaxTokensChange: async (value) => {
+        plugin.settings.globalMaxTokens = value;
+        await plugin.saveSettings();
+      },
+      onTopPChange: async (value) => {
+        plugin.settings.globalTopP = value;
+        await plugin.saveSettings();
+      },
+      onTopKChange: async (value) => {
+        plugin.settings.globalTopK = value;
+        await plugin.saveSettings();
+      },
+      onMinPChange: async (value) => {
+        plugin.settings.globalMinP = value;
+        await plugin.saveSettings();
+      },
+      onRepeatPenaltyChange: async (value) => {
+        plugin.settings.globalRepeatPenalty = value;
+        await plugin.saveSettings();
+      },
+      onReasoningChange: async (value) => {
+        plugin.settings.globalReasoning = value;
+        await plugin.saveSettings();
+      },
+    }
+  );
+  profilePopover.syncVisibility();
 
   const selectorDropdown = selectorWrap.createDiv({ cls: "lmsa-model-dropdown lmsa-hidden" });
   let selectorOpen = false;
@@ -114,6 +183,7 @@ export function renderBenchmarkTab(
         selectedModel = m;
         selectorLabel.setText(m.name);
         updateSelectorStatus();
+        profilePopover.syncVisibility();
         closeBenchmarkDropdown();
       });
     }
@@ -123,6 +193,7 @@ export function renderBenchmarkTab(
 
   selectorBtn.addEventListener("click", (event) => {
     event.stopPropagation();
+    if (profilePopover.isOpen()) profilePopover.close();
     if (selectorOpen) closeBenchmarkDropdown();
     else openBenchmarkDropdown();
   });
@@ -269,6 +340,11 @@ export function renderBenchmarkTab(
     isRunning = running;
     runAllBtn.toggleClass("is-disabled", running);
     abortBtn.toggleClass("lmsa-hidden", !running);
+    profileSettingsBtn.disabled = running;
+
+    if (running && profilePopover.isOpen()) {
+      profilePopover.close();
+    }
 
     for (const refs of cardEls.values()) {
       refs.runBtn.toggleClass("is-disabled", running);
@@ -443,6 +519,7 @@ export function renderBenchmarkTab(
         selectedModel,
         tc,
         iterationCount,
+        buildSamplingParams(plugin.settings),
         (_testId, _iter) => {
           globalCompletedIterations++;
           updateCardProgress(tc.id, globalCompletedIterations, iterationCount);
@@ -490,6 +567,7 @@ export function renderBenchmarkTab(
         selectedModel,
         testCases,
         iterationCount,
+        buildSamplingParams(plugin.settings),
         (result, _index) => {
           updateCard(result.testId, result);
           updateSummary();
@@ -530,6 +608,7 @@ export function renderBenchmarkTab(
 
   return () => {
     document.removeEventListener("click", onDocumentClick);
+    profilePopover.destroy();
     abortController?.abort();
   };
 }

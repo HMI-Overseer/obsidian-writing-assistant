@@ -30,6 +30,13 @@
       0 0 8px 2px color-mix(in srgb, var(--text-faint) 10%, transparent);
   }
 
+  .lmsa-model-selector-status.is-cloud {
+    background: var(--color-blue, #4a90d9);
+    box-shadow:
+      0 0 3px 1px color-mix(in srgb, var(--color-blue, #4a90d9) 30%, transparent),
+      0 0 8px 2px color-mix(in srgb, var(--color-blue, #4a90d9) 14%, transparent);
+  }
+
   .lmsa-model-dropdown {
     @apply lmsa-absolute lmsa-left-0 lmsa-z-[120] lmsa-max-h-[360px] lmsa-overflow-y-auto lmsa-rounded-[16px] lmsa-border lmsa-border-obsidian-border lmsa-p-2;
     top: calc(100% + 6px);
@@ -118,6 +125,13 @@
     box-shadow:
       0 0 3px 1px color-mix(in srgb, var(--text-faint) 25%, transparent),
       0 0 8px 2px color-mix(in srgb, var(--text-faint) 10%, transparent);
+  }
+
+  .lmsa-model-dropdown-state.is-cloud {
+    background: var(--color-blue, #4a90d9);
+    box-shadow:
+      0 0 3px 1px color-mix(in srgb, var(--color-blue, #4a90d9) 30%, transparent),
+      0 0 8px 2px color-mix(in srgb, var(--color-blue, #4a90d9) 14%, transparent);
   }
 
   .lmsa-model-dropdown-empty {

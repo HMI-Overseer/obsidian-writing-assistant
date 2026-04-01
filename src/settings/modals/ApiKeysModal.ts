@@ -38,6 +38,7 @@ export class ApiKeysModal extends Modal {
           .setValue(settings.providerSettings.anthropic.apiKey)
           .onChange(async (value) => {
             settings.providerSettings.anthropic.apiKey = value;
+            this.plugin.modelAvailability.invalidate();
             await this.plugin.saveSettings();
           });
       });

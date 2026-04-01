@@ -1,4 +1,3 @@
-import { LMStudioModelsService } from "../api";
 import type { ModelDigest } from "../api/types";
 import type LMStudioWritingAssistant from "../main";
 import type { EmbeddingModel } from "../shared/types";
@@ -40,11 +39,7 @@ export function renderEmbeddingModelsTab(
       new EmbeddingModelModal(app, p, source, onSave, prefill).open();
     },
     fetchCandidates: {
-      lmstudio: (opts) => {
-        const lm = settings.providerSettings.lmstudio;
-        const svc = new LMStudioModelsService(lm.baseUrl, lm.bypassCors);
-        return svc.getEmbeddingCandidates(opts);
-      },
+      lmstudio: (opts) => plugin.modelAvailability.discoverEmbeddingCandidates(opts),
       // Anthropic has no embedding models — omitted so UI shows the "not available" message
     },
   });

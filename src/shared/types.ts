@@ -7,6 +7,8 @@ export interface Message {
 
 export type ProviderOption = "lmstudio" | "openai" | "anthropic";
 
+export type ModelAvailabilityState = "loaded" | "unloaded" | "unknown" | "cloud";
+
 export type CacheTtl = "default" | "1h";
 
 export interface AnthropicCacheSettings {

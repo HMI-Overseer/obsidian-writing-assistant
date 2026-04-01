@@ -2,8 +2,8 @@ import type { App } from "obsidian";
 import { Modal, Notice } from "obsidian";
 import { SettingItem } from "../ui";
 import type LMStudioWritingAssistant from "../../main";
-import { LMStudioModelsService } from "../../api";
-import { AnthropicModelsService } from "../../api/AnthropicModelsService";
+import type { LMStudioModelsService } from "../../api";
+import type { AnthropicModelsService } from "../../api/AnthropicModelsService";
 import type { ModelCandidateResult } from "../../api/types";
 import type { ProviderOption } from "../../shared/types";
 
@@ -118,13 +118,12 @@ export abstract class ModelProfileModal<T extends BaseModel> extends Modal {
     void (async () => {
       try {
         if (this.model.provider === "lmstudio") {
-          const lmSettings = this.plugin.settings.providerSettings.lmstudio;
-          const service = new LMStudioModelsService(lmSettings.baseUrl, lmSettings.bypassCors);
+          const service = this.plugin.modelAvailability.getLMStudioService();
           fillOptions(await this.getLMStudioCandidates(service));
         } else if (this.model.provider === "anthropic") {
           const apiKey = this.plugin.settings.providerSettings.anthropic.apiKey;
           if (!apiKey) return;
-          const service = new AnthropicModelsService(apiKey);
+          const service = this.plugin.modelAvailability.getAnthropicService();
           fillOptions(await this.getAnthropicCandidates(service));
         }
       } catch {

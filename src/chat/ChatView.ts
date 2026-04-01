@@ -590,7 +590,8 @@ export class ChatView extends ItemView {
       documentContext: this.cachedDocumentContext,
       messages: snapshot?.messageHistory ?? [],
       draft: draft ?? this.composer?.getDraft() ?? "",
-      contextWindowSize: activeModel?.contextWindowSize,
+      contextWindowSize: activeModel?.contextWindowSize
+        ?? this.plugin.modelAvailability.getActiveContextLength(activeModel?.modelId ?? ""),
     };
   }
 }

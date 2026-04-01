@@ -1305,6 +1305,12 @@
       0 0 3px 1px color-mix(in srgb, var(--text-faint) 25%, transparent),
       0 0 8px 2px color-mix(in srgb, var(--text-faint) 10%, transparent);
   }
+.lmsa-model-selector-status.is-cloud {
+    background: var(--color-blue, #4a90d9);
+    box-shadow:
+      0 0 3px 1px color-mix(in srgb, var(--color-blue, #4a90d9) 30%, transparent),
+      0 0 8px 2px color-mix(in srgb, var(--color-blue, #4a90d9) 14%, transparent);
+  }
 .lmsa-model-dropdown {
     position: absolute;
     left: 0px;
@@ -1407,6 +1413,12 @@
     box-shadow:
       0 0 3px 1px color-mix(in srgb, var(--text-faint) 25%, transparent),
       0 0 8px 2px color-mix(in srgb, var(--text-faint) 10%, transparent);
+  }
+.lmsa-model-dropdown-state.is-cloud {
+    background: var(--color-blue, #4a90d9);
+    box-shadow:
+      0 0 3px 1px color-mix(in srgb, var(--color-blue, #4a90d9) 30%, transparent),
+      0 0 8px 2px color-mix(in srgb, var(--color-blue, #4a90d9) 14%, transparent);
   }
 .lmsa-model-dropdown-empty {
     padding-left: 1rem;

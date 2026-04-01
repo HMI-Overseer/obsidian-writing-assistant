@@ -9,7 +9,7 @@ import type {
   ProviderSettingsMap,
 } from "./shared/types";
 import { DEFAULT_CHAT_HISTORY, DEFAULT_SETTINGS, VIEW_TYPE_CHAT } from "./constants";
-import { normalizeLMStudioBaseUrl } from "./api";
+import { normalizeLMStudioBaseUrl, ModelAvailabilityService } from "./api";
 import { ChatView } from "./chat";
 import { normalizeChatHistory } from "./chat/conversation/conversationUtils";
 import { normalizeCompletionModel, normalizeEmbeddingModel } from "./shared/normalizeModels";
@@ -46,9 +46,11 @@ function migrateProviderSettings(
 
 export default class LMStudioWritingAssistant extends Plugin {
   settings!: PluginSettings;
+  modelAvailability!: ModelAvailabilityService;
 
   async onload(): Promise<void> {
     await this.loadSettings();
+    this.modelAvailability = new ModelAvailabilityService(() => this.settings.providerSettings);
 
     this.registerView(VIEW_TYPE_CHAT, (leaf: WorkspaceLeaf) => new ChatView(leaf, this));
 

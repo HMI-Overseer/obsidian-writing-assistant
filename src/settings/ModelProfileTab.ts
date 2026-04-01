@@ -4,6 +4,7 @@ import { normalizeLMStudioBaseUrl } from "../api";
 import type { ModelCandidateResult, ModelDigest } from "../api/types";
 import type LMStudioWritingAssistant from "../main";
 import type { ProviderOption } from "../shared/types";
+import { getProviderDescriptor } from "../providers/registry";
 import { createSettingsSection, SettingItem } from "./ui";
 
 type BaseModel = { id: string; name: string; modelId: string; provider: ProviderOption };
@@ -180,6 +181,7 @@ export function renderModelProfileTab<T extends BaseModel>(
           const normalized = normalizeLMStudioBaseUrl(value);
           lmSettings.baseUrl = normalized;
           settings.lmStudioUrl = normalized;
+          plugin.modelAvailability.invalidate();
           await plugin.saveSettings();
         })
     );
@@ -193,6 +195,7 @@ export function renderModelProfileTab<T extends BaseModel>(
       toggle.setValue(lmSettings.bypassCors).onChange(async (value) => {
         lmSettings.bypassCors = value;
         settings.bypassCors = value;
+        plugin.modelAvailability.invalidate();
         await plugin.saveSettings();
       })
     );
@@ -327,7 +330,9 @@ export function renderModelProfileTab<T extends BaseModel>(
               name: model.displayName,
               modelId: model.targetModelId,
               provider: providerSelect.value as ProviderOption,
-              contextWindowSize: model.activeContextLength ?? model.maxContextLength,
+              ...(getProviderDescriptor(providerSelect.value as ProviderOption).kind === "cloud" && {
+                contextWindowSize: model.activeContextLength ?? model.maxContextLength,
+              }),
             } as unknown as Partial<T>
           );
         });

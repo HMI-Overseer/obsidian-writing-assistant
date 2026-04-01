@@ -1,5 +1,3 @@
-import { LMStudioModelsService } from "../api";
-import { AnthropicModelsService } from "../api/AnthropicModelsService";
 import type { ModelDigest } from "../api/types";
 import type LMStudioWritingAssistant from "../main";
 import type { CompletionModel } from "../shared/types";
@@ -55,15 +53,8 @@ export function renderCompletionModelsTab(
       new CompletionModelModal(app, p, source, onSave, prefill).open();
     },
     fetchCandidates: {
-      lmstudio: (opts) => {
-        const lm = settings.providerSettings.lmstudio;
-        const svc = new LMStudioModelsService(lm.baseUrl, lm.bypassCors);
-        return svc.getCompletionCandidates(opts);
-      },
-      anthropic: (opts) => {
-        const svc = new AnthropicModelsService(settings.providerSettings.anthropic.apiKey);
-        return svc.getCompletionCandidates(opts);
-      },
+      lmstudio: (opts) => plugin.modelAvailability.discoverCompletionCandidates("lmstudio", opts),
+      anthropic: (opts) => plugin.modelAvailability.discoverCompletionCandidates("anthropic", opts),
     },
   });
 }

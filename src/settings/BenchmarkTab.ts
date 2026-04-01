@@ -1,8 +1,7 @@
 import { setIcon } from "obsidian";
 import type LMStudioWritingAssistant from "../main";
-import type { CompletionModel } from "../shared/types";
-import { LMStudioModelsService } from "../api";
-import { createChatClient } from "../providers/registry";
+import type { CompletionModel, ModelAvailabilityState, ProviderOption } from "../shared/types";
+import { getProviderDescriptor, createChatClient } from "../providers/registry";
 import { createSettingsSection } from "./ui";
 import { getTestCases } from "./benchmark/testCases";
 import { runBenchmarkTest, runAllBenchmarks } from "./benchmark/benchmarkRunner";
@@ -56,36 +55,29 @@ export function renderBenchmarkTab(
   const selectorDropdown = selectorWrap.createDiv({ cls: "lmsa-model-dropdown lmsa-hidden" });
   let selectorOpen = false;
 
-  const knownAvailability = new Map<string, string>();
+  function getModelState(modelId: string, provider: ProviderOption): ModelAvailabilityState {
+    return plugin.modelAvailability.getAvailability(modelId, provider).state;
+  }
 
   async function refreshModelAvailability(): Promise<void> {
-    try {
-      const lmSettings = plugin.settings.providerSettings.lmstudio;
-      const modelsService = new LMStudioModelsService(
-        lmSettings.baseUrl,
-        lmSettings.bypassCors
-      );
-      const result = await modelsService.getCompletionCandidates({ forceRefresh: true });
-      knownAvailability.clear();
-      for (const candidate of result.candidates) {
-        knownAvailability.set(
-          candidate.targetModelId,
-          candidate.isLoaded ? "loaded" : "unloaded"
-        );
+    if (selectedModel) {
+      const descriptor = getProviderDescriptor(selectedModel.provider);
+      if (descriptor.kind !== "cloud") {
+        try {
+          await plugin.modelAvailability.refreshLocalModels({ forceRefresh: true });
+        } catch { /* handled by service */ }
       }
-    } catch {
-      knownAvailability.clear();
     }
     updateSelectorStatus();
   }
 
   function updateSelectorStatus(): void {
-    selectorStatusEl.removeClass("is-loaded", "is-unloaded", "is-unknown", "is-hidden");
+    selectorStatusEl.removeClass("is-loaded", "is-unloaded", "is-unknown", "is-cloud", "is-hidden");
     if (!selectedModel?.modelId) {
       selectorStatusEl.addClass("is-hidden");
       return;
     }
-    const state = knownAvailability.get(selectedModel.modelId) ?? "unknown";
+    const state = getModelState(selectedModel.modelId, selectedModel.provider);
     selectorStatusEl.addClass(`is-${state}`);
   }
 
@@ -115,7 +107,7 @@ export function renderBenchmarkTab(
       }
       const copy = item.createDiv({ cls: "lmsa-model-dropdown-copy" });
       copy.createEl("span", { cls: "lmsa-model-dropdown-name", text: m.name });
-      const itemState = knownAvailability.get(m.modelId) ?? "unknown";
+      const itemState = getModelState(m.modelId, m.provider);
       item.createEl("span", { cls: `lmsa-model-dropdown-state is-${itemState}` });
       item.addEventListener("click", (event) => {
         event.stopPropagation();

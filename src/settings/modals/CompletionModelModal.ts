@@ -4,6 +4,7 @@ import type { AnthropicModelsService } from "../../api/AnthropicModelsService";
 import type { ModelCandidateResult } from "../../api/types";
 import type { CompletionModel, CacheTtl } from "../../shared/types";
 import { generateId } from "../../utils";
+import { getProviderDescriptor } from "../../providers/registry";
 import { ModelProfileModal } from "./ModelProfileModal";
 
 export class CompletionModelModal extends ModelProfileModal<CompletionModel> {
@@ -35,24 +36,28 @@ export class CompletionModelModal extends ModelProfileModal<CompletionModel> {
   }
 
   protected renderExtraFields(contentEl: HTMLElement): void {
-    new SettingItem(contentEl)
-      .setName("Context window (tokens)")
-      .setDesc("Maximum context length for this model. Auto-filled from discovery, or set manually.")
-      .addText((text) => {
-        text.inputEl.type = "number";
-        text.inputEl.addClass("lmsa-input-full");
-        text
-          .setPlaceholder("e.g. 128000")
-          .setValue(this.model.contextWindowSize ? String(this.model.contextWindowSize) : "")
-          .onChange((value) => {
-            const parsed = parseInt(value, 10);
-            if (parsed > 0) {
-              this.model.contextWindowSize = parsed;
-            } else {
-              delete this.model.contextWindowSize;
-            }
-          });
-      });
+    const descriptor = getProviderDescriptor(this.model.provider);
+
+    if (descriptor.kind === "cloud") {
+      new SettingItem(contentEl)
+        .setName("Context window (tokens)")
+        .setDesc("Maximum context length for this model. Auto-filled from discovery, or set manually.")
+        .addText((text) => {
+          text.inputEl.type = "number";
+          text.inputEl.addClass("lmsa-input-full");
+          text
+            .setPlaceholder("e.g. 128000")
+            .setValue(this.model.contextWindowSize ? String(this.model.contextWindowSize) : "")
+            .onChange((value) => {
+              const parsed = parseInt(value, 10);
+              if (parsed > 0) {
+                this.model.contextWindowSize = parsed;
+              } else {
+                delete this.model.contextWindowSize;
+              }
+            });
+        });
+    }
 
     if (this.model.provider === "anthropic") {
       new SettingItem(contentEl)

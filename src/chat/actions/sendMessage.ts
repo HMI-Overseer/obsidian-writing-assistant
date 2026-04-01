@@ -131,7 +131,8 @@ export async function sendMessage(options: SendMessageOptions): Promise<void> {
     : new StreamingRenderer(assistantBubble, transcript);
 
   // Pre-send context capacity check.
-  const contextWindow = activeModel.contextWindowSize;
+  const contextWindow = activeModel.contextWindowSize
+    ?? plugin.modelAvailability.getActiveContextLength(activeModel.modelId);
   if (contextWindow) {
     const estimatedTokens = estimateTokenCount(apiMessages);
     if (estimatedTokens / contextWindow >= CONTEXT_DANGER_THRESHOLD) {

@@ -85,7 +85,7 @@ export async function regenerateMessage(options: RegenerateOptions): Promise<voi
   }
 
   const availabilityState = await modelSelector.refreshAvailability();
-  if (availabilityState !== "loaded") {
+  if (availabilityState !== "loaded" && availabilityState !== "cloud") {
     modelSelector.retriggerAttention();
     return;
   }

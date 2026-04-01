@@ -4,7 +4,6 @@ export type ChatMode = "plan" | "conversation" | "edit";
 
 export type BubbleRole = "user" | "assistant";
 
-export type ModelAvailabilityState = "loaded" | "unloaded" | "unknown";
 
 export type BubbleRenderOptions = {
   preserveStreaming?: boolean;

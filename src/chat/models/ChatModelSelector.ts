@@ -1,7 +1,6 @@
-import { LMStudioModelsService } from "../../api";
 import type LMStudioWritingAssistant from "../../main";
-import type { CompletionModel } from "../../shared/types";
-import type { ChatLayoutRefs, ModelAvailabilityState } from "../types";
+import type { CompletionModel, ModelAvailabilityState } from "../../shared/types";
+import type { ChatLayoutRefs } from "../types";
 import { setIcon } from "obsidian";
 
 const MODEL_SELECTOR_ATTENTION_DURATION_MS = 700;
@@ -17,7 +16,6 @@ export class ChatModelSelector {
   private modelDropdownOpen = false;
   private modelSelectorAttentionTimer: number | null = null;
   private isCheckingModelStatus = false;
-  private knownModelAvailability = new Map<string, ModelAvailabilityState>();
 
   constructor(
     private readonly plugin: LMStudioWritingAssistant,
@@ -41,14 +39,15 @@ export class ChatModelSelector {
     const activeModel = this.options.getActiveModel();
 
     if (!activeModel?.modelId) {
-      this.knownModelAvailability.clear();
       this.setModelAvailabilityState("unknown");
       return;
     }
 
-    this.setModelAvailabilityState(
-      this.getModelAvailabilityStateForId(activeModel.modelId)
+    const { state } = this.plugin.modelAvailability.getAvailability(
+      activeModel.modelId,
+      activeModel.provider,
     );
+    this.setModelAvailabilityState(state);
   }
 
   isCheckingStatus(): boolean {
@@ -91,44 +90,27 @@ export class ChatModelSelector {
   ): Promise<ModelAvailabilityState> {
     const activeModel = this.options.getActiveModel();
     if (!activeModel?.modelId) {
-      this.knownModelAvailability.clear();
       this.setModelAvailabilityState("unknown");
       return "unknown";
     }
 
-    // Cloud providers are always assumed available — skip LM Studio discovery
-    if (activeModel.provider !== "lmstudio") {
-      this.setModelAvailabilityState("loaded");
-      return "loaded";
+    const availability = this.plugin.modelAvailability;
+    const info = availability.getAvailability(activeModel.modelId, activeModel.provider);
+
+    if (info.state === "cloud") {
+      this.setModelAvailabilityState("cloud");
+      return "cloud";
     }
 
     this.isCheckingModelStatus = true;
 
     try {
-      const lmSettings = this.plugin.settings.providerSettings.lmstudio;
-      const modelsService = new LMStudioModelsService(
-        lmSettings.baseUrl,
-        lmSettings.bypassCors
-      );
-      const result = await modelsService.getCompletionCandidates({ forceRefresh });
-      const states = new Map<string, ModelAvailabilityState>();
-
-      for (const candidate of result.candidates) {
-        states.set(
-          candidate.targetModelId,
-          candidate.isLoaded ? "loaded" : "unloaded"
-        );
-      }
-
-      this.applyKnownModelAvailability(states);
-      return this.getModelAvailabilityStateForId(activeModel.modelId);
+      await availability.refreshLocalModels({ forceRefresh });
+      const refreshed = availability.getAvailability(activeModel.modelId, activeModel.provider);
+      this.setModelAvailabilityState(refreshed.state);
+      return refreshed.state;
     } catch {
-      const states = new Map<string, ModelAvailabilityState>();
-      for (const model of this.options.getModels()) {
-        states.set(model.modelId, "unknown");
-      }
-
-      this.applyKnownModelAvailability(states);
+      this.setModelAvailabilityState("unknown");
       return "unknown";
     } finally {
       this.isCheckingModelStatus = false;
@@ -166,24 +148,12 @@ export class ChatModelSelector {
     void this.renderDropdownItems();
   }
 
-  private getModelAvailabilityStateForId(
-    modelId: string
-  ): ModelAvailabilityState {
-    return this.knownModelAvailability.get(modelId) ?? "unknown";
-  }
-
-  private applyKnownModelAvailability(
-    states: Map<string, ModelAvailabilityState>
-  ): void {
-    this.knownModelAvailability = states;
-    this.syncActiveModel();
-  }
-
   private setModelAvailabilityState(state: ModelAvailabilityState): void {
     this.refs.modelSelectorStatusEl.removeClass(
       "is-loaded",
       "is-unloaded",
       "is-unknown",
+      "is-cloud",
       "is-hidden"
     );
 
@@ -234,7 +204,10 @@ export class ChatModelSelector {
         text: model.name,
       });
 
-      const itemState = this.getModelAvailabilityStateForId(model.modelId);
+      const { state: itemState } = this.plugin.modelAvailability.getAvailability(
+        model.modelId,
+        model.provider,
+      );
       item.createEl("span", {
         cls: `lmsa-model-dropdown-state is-${itemState}`,
       });

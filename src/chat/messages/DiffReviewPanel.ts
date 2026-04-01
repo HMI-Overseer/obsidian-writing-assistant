@@ -1,4 +1,4 @@
-import { type App, Component, MarkdownRenderer, Notice, setIcon, type TFile } from "obsidian";
+import { type App, Component, MarkdownRenderer, Notice, setIcon } from "obsidian";
 import type { EditProposal, AppliedEditRecord } from "../../editing/editTypes";
 import { applyHunksLive } from "../../editing/documentApplicator";
 import { DiffHunkView } from "./DiffHunkView";
@@ -202,37 +202,44 @@ export class DiffReviewPanel {
 
     this.isProcessing = true;
     try {
-      const file = this.app.vault.getAbstractFileByPath(this.proposal.targetFilePath);
+      const file = this.app.vault.getFileByPath(this.proposal.targetFilePath);
       if (!file) {
         new Notice("File not found.");
         return;
       }
 
-      const currentContent = await this.app.vault.read(file as TFile);
-
       // Reverse the hunk: search for replaceText, put back searchText
       const replaceText = hunk.resolvedEdit.editBlock.replaceText;
       const searchText = hunk.resolvedEdit.editBlock.searchText;
 
-      // Prefer the tracked offset for accuracy; fall back to indexOf
-      let idx = -1;
-      const trackedOffset = this.hunkAppliedOffsets.get(hunkId);
-      if (
-        trackedOffset !== undefined &&
-        currentContent.slice(trackedOffset, trackedOffset + replaceText.length) === replaceText
-      ) {
-        idx = trackedOffset;
-      } else {
-        idx = currentContent.indexOf(replaceText);
-      }
+      let undoFailed = false;
+      let restored = "";
+      await this.app.vault.process(file, (currentContent) => {
+        // Prefer the tracked offset for accuracy; fall back to indexOf
+        let idx = -1;
+        const trackedOffset = this.hunkAppliedOffsets.get(hunkId);
+        if (
+          trackedOffset !== undefined &&
+          currentContent.slice(trackedOffset, trackedOffset + replaceText.length) === replaceText
+        ) {
+          idx = trackedOffset;
+        } else {
+          idx = currentContent.indexOf(replaceText);
+        }
 
-      if (idx === -1) {
+        if (idx === -1) {
+          undoFailed = true;
+          return currentContent;
+        }
+
+        restored = currentContent.slice(0, idx) + searchText + currentContent.slice(idx + replaceText.length);
+        return restored;
+      });
+
+      if (undoFailed) {
         new Notice("Cannot undo — the document has been modified since this edit was applied.");
         return;
       }
-
-      const restored = currentContent.slice(0, idx) + searchText + currentContent.slice(idx + replaceText.length);
-      await this.app.vault.modify(file as TFile, restored);
 
       hunk.status = "pending";
       hunkView.resetToPending();

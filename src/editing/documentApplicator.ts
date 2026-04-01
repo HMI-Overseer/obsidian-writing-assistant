@@ -1,4 +1,4 @@
-import type { App, TFile } from "obsidian";
+import type { App } from "obsidian";
 import type { DiffHunk } from "./editTypes";
 
 /**
@@ -28,41 +28,44 @@ export async function applyHunksLive(
   targetFilePath: string,
   hunks: DiffHunk[]
 ): Promise<LiveApplyResult> {
-  const file = app.vault.getAbstractFileByPath(targetFilePath) as TFile | null;
+  const file = app.vault.getFileByPath(targetFilePath);
   if (!file) throw new Error(`File not found: ${targetFilePath}`);
-
-  const currentContent = await app.vault.read(file);
 
   // Sort by descending offset so earlier positions stay valid after later splices
   const sortedHunks = [...hunks]
     .filter((h) => h.resolvedEdit.confidence > 0)
     .sort((a, b) => b.resolvedEdit.matchOffset - a.resolvedEdit.matchOffset);
 
-  let result = currentContent;
+  let preContent = "";
   const appliedIds: string[] = [];
   const appliedOffsets = new Map<string, number>();
 
-  for (const hunk of sortedHunks) {
-    const searchText = hunk.resolvedEdit.editBlock.searchText;
-    const replaceText = hunk.resolvedEdit.editBlock.replaceText;
-    const idx = result.indexOf(searchText);
+  await app.vault.process(file, (currentContent) => {
+    preContent = currentContent;
+    let result = currentContent;
 
-    if (idx !== -1) {
-      // Guard against applying to the wrong location if the document drifted significantly
-      const expectedOffset = hunk.resolvedEdit.matchOffset;
-      if (expectedOffset >= 0 && Math.abs(idx - expectedOffset) > MAX_OFFSET_DRIFT) {
-        continue;
+    for (const hunk of sortedHunks) {
+      const searchText = hunk.resolvedEdit.editBlock.searchText;
+      const replaceText = hunk.resolvedEdit.editBlock.replaceText;
+      const idx = result.indexOf(searchText);
+
+      if (idx !== -1) {
+        // Guard against applying to the wrong location if the document drifted significantly
+        const expectedOffset = hunk.resolvedEdit.matchOffset;
+        if (expectedOffset >= 0 && Math.abs(idx - expectedOffset) > MAX_OFFSET_DRIFT) {
+          continue;
+        }
+
+        result = result.slice(0, idx) + replaceText + result.slice(idx + searchText.length);
+        appliedIds.push(hunk.id);
+        appliedOffsets.set(hunk.id, idx);
       }
-
-      result = result.slice(0, idx) + replaceText + result.slice(idx + searchText.length);
-      appliedIds.push(hunk.id);
-      appliedOffsets.set(hunk.id, idx);
     }
-  }
 
-  if (appliedIds.length > 0) {
-    await app.vault.modify(file, result);
-  }
+    return result;
+  });
 
-  return { preContent: currentContent, postContent: result, appliedHunkIds: appliedIds, appliedOffsets };
+  const postContent = appliedIds.length > 0 ? await app.vault.read(file) : preContent;
+
+  return { preContent, postContent, appliedHunkIds: appliedIds, appliedOffsets };
 }

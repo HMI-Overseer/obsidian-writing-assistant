@@ -111,8 +111,7 @@ async function insertLastResponse(
 
   const file = plugin.app.workspace.getActiveFile();
   if (file) {
-    const content = await plugin.app.vault.read(file);
-    await plugin.app.vault.modify(file, `${content}\n\n${lastAssistantResponse}`);
+    await plugin.app.vault.process(file, (content) => `${content}\n\n${lastAssistantResponse}`);
     new Notice("Response appended to note.");
     return;
   }

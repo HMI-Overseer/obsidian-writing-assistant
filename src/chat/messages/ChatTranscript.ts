@@ -146,6 +146,7 @@ export class ChatTranscript {
     this.clearAllBubbleMarkdownRenders();
     this.bubblesByMessageId.clear();
     this.refs.messagesEl.empty();
+    this.shouldAutoScroll = true;
   }
 
   destroy(): void {

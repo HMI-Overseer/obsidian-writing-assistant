@@ -284,7 +284,7 @@ export class ChatSessionStore {
 
     history.conversations[conversationIndex] = {
       ...conversation,
-      messages: [...this.messageHistory],
+      messages: this.messageHistory.filter((m) => !m.isError),
       draft: this.draft,
       updatedAt: Date.now(),
     };

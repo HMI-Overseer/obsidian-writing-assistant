@@ -39,6 +39,7 @@ export type SendMessageOptions = {
   setIsGenerating: (sending: boolean) => void;
   setActiveAbortController: (controller: AbortController | null) => void;
   syncConversationUi: () => Promise<void>;
+  onCalibrate?: (estimatedTokens: number, actualTokens: number) => void;
   promptOverride?: string;
   autoInsertAfterResponse?: boolean;
   editMode?: boolean;
@@ -56,6 +57,7 @@ export async function sendMessage(options: SendMessageOptions): Promise<void> {
     setIsGenerating,
     setActiveAbortController,
     syncConversationUi,
+    onCalibrate,
     promptOverride,
     autoInsertAfterResponse = false,
     editMode = false,
@@ -155,8 +157,9 @@ export async function sendMessage(options: SendMessageOptions): Promise<void> {
     }
 
     const usage = await streamResult.usage;
-    if (usage) {
-      store.setLastRequestInputTokens(usage.inputTokens);
+    if (usage && onCalibrate) {
+      const estimated = estimateTokenCount(apiMessages);
+      onCalibrate(estimated, usage.inputTokens);
     }
 
     await renderer.flush();

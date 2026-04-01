@@ -23,6 +23,7 @@ type ChatComposerCallbacks = {
   onStopRequest: () => void;
   onRunCommand: (command: CustomCommand) => void;
   onModeChange: (mode: ChatMode) => void;
+  onContextToggle: () => void;
 };
 
 export class ChatComposer {
@@ -140,6 +141,7 @@ export class ChatComposer {
       event.stopPropagation();
       this.sessionContextEnabled = false;
       this.updateContextChips();
+      this.callbacks.onContextToggle();
     });
   }
 

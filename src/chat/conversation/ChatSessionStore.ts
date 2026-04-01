@@ -17,8 +17,6 @@ export class ChatSessionStore {
   private lastAssistantResponse = "";
   private draft = "";
   private draftSaveTimer: number | null = null;
-  /** Transient (not persisted): real input token count from the last API response. */
-  private lastRequestInputTokens: number | null = null;
 
   constructor(private readonly plugin: LMStudioWritingAssistant) {}
 
@@ -33,14 +31,6 @@ export class ChatSessionStore {
 
   getConversations(): Conversation[] {
     return this.plugin.settings.chatHistory.conversations;
-  }
-
-  getLastRequestInputTokens(): number | null {
-    return this.lastRequestInputTokens;
-  }
-
-  setLastRequestInputTokens(tokens: number | null): void {
-    this.lastRequestInputTokens = tokens;
   }
 
   getActiveConversationId(): string | null {
@@ -314,7 +304,6 @@ export class ChatSessionStore {
       [...conversation.messages].reverse().find((message) => message.role === "assistant")
         ?.content ?? "";
     this.draft = conversation.draft;
-    this.lastRequestInputTokens = null;
     this.plugin.settings.chatHistory.activeConversationId = conversation.id;
   }
 }

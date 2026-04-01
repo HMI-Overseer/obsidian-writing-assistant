@@ -9,6 +9,7 @@ import type { ChatTranscript } from "../messages/ChatTranscript";
 import type { ChatModelSelector } from "../models/ChatModelSelector";
 import { makeMessage } from "../conversation/conversationUtils";
 import { prepareApiMessages } from "./prepareApiMessages";
+import { estimateTokenCount } from "../../shared/tokenEstimation";
 import { StreamingRenderer } from "./StreamingRenderer";
 import { EditStreamingRenderer } from "./EditStreamingRenderer";
 import { finalizeResponse, finalizeAbortedResponse } from "./finalizeResponse";
@@ -36,6 +37,7 @@ export type GenerateResponseOptions = {
   setIsGenerating: (generating: boolean) => void;
   setActiveAbortController: (controller: AbortController | null) => void;
   syncConversationUi: () => Promise<void>;
+  onCalibrate?: (estimatedTokens: number, actualTokens: number) => void;
 };
 
 export async function generateResponse(options: GenerateResponseOptions): Promise<void> {
@@ -50,6 +52,7 @@ export async function generateResponse(options: GenerateResponseOptions): Promis
     setIsGenerating,
     setActiveAbortController,
     syncConversationUi,
+    onCalibrate,
   } = options;
 
   if (getIsGenerating()) return;
@@ -135,8 +138,9 @@ export async function generateResponse(options: GenerateResponseOptions): Promis
     }
 
     const usage = await streamResult.usage;
-    if (usage) {
-      store.setLastRequestInputTokens(usage.inputTokens);
+    if (usage && onCalibrate) {
+      const estimated = estimateTokenCount(apiMessages);
+      onCalibrate(estimated, usage.inputTokens);
     }
 
     await renderer.flush();

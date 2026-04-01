@@ -1,12 +1,15 @@
 import type { WorkspaceLeaf } from "obsidian";
 import { ItemView, Notice } from "obsidian";
 import type { ConversationMessage, CustomCommand } from "../shared/types";
+import type { DocumentContext } from "../shared/chatRequest";
 import type { ChatMode } from "./types";
 import type LMStudioWritingAssistant from "../main";
 import { VIEW_TYPE_CHAT } from "../constants";
 import { getActiveNoteText } from "../context/noteContext";
 import { ChatGenerationController } from "./ChatGenerationController";
 import { ChatConversationController } from "./ChatConversationController";
+import type { ContextInputs } from "./ContextCapacityUpdater";
+import { ContextCapacityUpdater } from "./ContextCapacityUpdater";
 import { sendMessage } from "./actions/sendMessage";
 import { renderDiffPanel } from "./actions/finalizeEditResponse";
 import { branchConversation } from "./actions/branchConversation";
@@ -23,8 +26,6 @@ import type { ChatLayoutRefs } from "./types";
 import { ChatHistoryDrawer } from "./view/ChatHistoryDrawer";
 import { createChatLayout } from "./view/createChatLayout";
 import { sumConversationUsage } from "./usageSummary";
-import { estimateTokenCount } from "../shared/tokenEstimation";
-import { CONTEXT_WARNING_THRESHOLD, CONTEXT_DANGER_THRESHOLD } from "../constants";
 
 const NO_MODEL_SELECTED_LABEL = "No model selected";
 const MIN_VIEW_WIDTH_PX = 300;
@@ -39,10 +40,12 @@ export class ChatView extends ItemView {
   private modelSelector: ChatModelSelector | null = null;
   private profilePopover: ProfileSettingsPopover | null = null;
   private historyDrawer: ChatHistoryDrawer | null = null;
+  private contextUpdater: ContextCapacityUpdater | null = null;
   private generation!: ChatGenerationController;
   private conversation!: ChatConversationController;
   private lastRenderedConversationId: string | null = null;
   private resizeObserver: ResizeObserver | null = null;
+  private cachedDocumentContext: DocumentContext | null = null;
 
   constructor(leaf: WorkspaceLeaf, plugin: LMStudioWritingAssistant) {
     super(leaf);
@@ -82,10 +85,13 @@ export class ChatView extends ItemView {
       },
     });
 
+    this.contextUpdater = new ContextCapacityUpdater(this.layout.contextCapacityEl);
+
     this.composer = new ChatComposer(this.app, this.plugin, this.layout, {
       onDraftChange: (draft) => {
         this.sessionStore?.setDraft(draft);
         this.sessionStore?.scheduleDraftSave();
+        this.contextUpdater?.scheduleUpdate(this.buildContextInputs(draft));
       },
       onSendRequest: () => {
         void this.requestSend();
@@ -99,6 +105,10 @@ export class ChatView extends ItemView {
       onModeChange: (mode) => {
         this.layout!.rootEl.dataset.mode = mode;
       },
+      onContextToggle: () => {
+        this.cachedDocumentContext = null;
+        this.contextUpdater?.immediateUpdate(this.buildContextInputs());
+      },
     });
 
     this.layout!.rootEl.dataset.mode = "conversation";
@@ -109,6 +119,7 @@ export class ChatView extends ItemView {
       getModels: () => this.plugin.settings.completionModels,
       onSelectModel: async (model) => {
         if (!this.sessionStore) return;
+        this.contextUpdater?.resetCalibration();
         await this.sessionStore.setActiveConversationModel(model);
         await this.syncConversationUi();
         await this.modelSelector?.refreshAvailability();
@@ -204,6 +215,9 @@ export class ChatView extends ItemView {
         this.updateHeader();
         this.composer?.updateContextChips();
         this.composer?.renderCommandBar();
+        void this.refreshDocumentContext().then(() => {
+          this.contextUpdater?.scheduleUpdate(this.buildContextInputs());
+        });
       })
     );
 
@@ -230,6 +244,7 @@ export class ChatView extends ItemView {
     this.sessionStore?.clearDraftSaveTimer();
     this.generation.stopGeneration();
     await this.sessionStore?.persistActiveConversation();
+    this.contextUpdater?.destroy();
     this.transcript?.destroy();
     this.modelSelector?.destroy();
     this.profilePopover?.destroy();
@@ -267,6 +282,7 @@ export class ChatView extends ItemView {
       setActiveAbortController: (controller) =>
         this.generation.setActiveAbortController(controller),
       syncConversationUi: () => this.syncConversationUi(),
+      onCalibrate: (est, actual) => this.contextUpdater?.calibrate(est, actual),
       promptOverride,
       autoInsertAfterResponse,
       editMode: useEditMode,
@@ -339,7 +355,8 @@ export class ChatView extends ItemView {
     }
 
     this.updateUsageSummary(snapshot.messageHistory);
-    this.updateContextCapacity(snapshot.messageHistory);
+    await this.refreshDocumentContext();
+    this.contextUpdater?.immediateUpdate(this.buildContextInputs());
     this.updateGenerateResponseButton(snapshot.messageHistory);
   }
 
@@ -421,6 +438,7 @@ export class ChatView extends ItemView {
       setActiveAbortController: (controller) =>
         this.generation.setActiveAbortController(controller),
       syncConversationUi: () => this.syncConversationUi(),
+      onCalibrate: (est, actual) => this.contextUpdater?.calibrate(est, actual),
     });
   }
 
@@ -436,6 +454,7 @@ export class ChatView extends ItemView {
       snapshot.messageHistory,
       this.createBubbleActionCallbacks()
     );
+    this.contextUpdater?.immediateUpdate(this.buildContextInputs());
   }
 
   private updateHeader(): void {
@@ -465,6 +484,7 @@ export class ChatView extends ItemView {
       setActiveAbortController: (controller) =>
         this.generation.setActiveAbortController(controller),
       syncConversationUi: () => this.syncConversationUi(),
+      onCalibrate: (est, actual) => this.contextUpdater?.calibrate(est, actual),
     });
   }
 
@@ -533,61 +553,44 @@ export class ChatView extends ItemView {
     el.setText(parts.join(" \u00b7 "));
   }
 
-  private updateContextCapacity(messages: ConversationMessage[]): void {
-    const el = this.layout?.contextCapacityEl;
-    if (!el) return;
-
-    const activeModel = this.sessionStore?.getResolvedConversationModel();
-    const contextWindow = activeModel?.contextWindowSize;
-
-    if (!contextWindow) {
-      el.addClass("lmsa-hidden");
+  private async refreshDocumentContext(): Promise<void> {
+    if (
+      !this.plugin.settings.includeNoteContext ||
+      !this.composer?.isSessionContextEnabled()
+    ) {
+      this.cachedDocumentContext = null;
       return;
     }
 
-    // Use real token count from last API response if available, else estimate.
-    const lastReal = this.sessionStore?.getLastRequestInputTokens();
-    let estimatedTokens: number;
-
-    if (lastReal !== null && lastReal !== undefined && lastReal > 0) {
-      estimatedTokens = lastReal;
-    } else {
-      // Build a lightweight estimate from conversation content.
-      const systemPrompt = this.plugin.settings.globalSystemPrompt;
-      const chatTurns = messages
-        .filter((m) => !m.isError)
-        .map((m) => ({ role: m.role, content: m.content }));
-      estimatedTokens = estimateTokenCount({
-        systemPrompt,
-        documentContext: null,
-        messages: chatTurns,
-      });
+    const file = this.app.workspace.getActiveFile();
+    if (!file) {
+      this.cachedDocumentContext = null;
+      return;
     }
 
-    const ratio = estimatedTokens / contextWindow;
-    const percent = Math.min(Math.round(ratio * 100), 100);
-
-    el.removeClass("lmsa-hidden", "is-warning", "is-danger");
-    if (ratio >= CONTEXT_DANGER_THRESHOLD) {
-      el.addClass("is-danger");
-    } else if (ratio >= CONTEXT_WARNING_THRESHOLD) {
-      el.addClass("is-warning");
+    const text = await getActiveNoteText(this.app, this.plugin.settings.maxContextChars);
+    if (!text) {
+      this.cachedDocumentContext = null;
+      return;
     }
 
-    const fillEl = el.querySelector(".lmsa-context-capacity-fill") as HTMLElement | null;
-    if (fillEl) {
-      fillEl.style.width = `${percent}%`;
-    }
+    this.cachedDocumentContext = {
+      filePath: file.path,
+      content: text,
+      isFull: false,
+    };
+  }
 
-    const labelEl = el.querySelector(".lmsa-context-capacity-label") as HTMLElement | null;
-    if (labelEl) {
-      const formatTokens = (n: number): string => {
-        if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
-        if (n >= 1_000) return `${(n / 1_000).toFixed(1)}k`;
-        return String(n);
-      };
-      const prefix = lastReal ? "" : "~";
-      labelEl.setText(`${prefix}${formatTokens(estimatedTokens)} / ${formatTokens(contextWindow)} tokens (${percent}%)`);
-    }
+  private buildContextInputs(draft?: string): ContextInputs {
+    const snapshot = this.sessionStore?.getSnapshot();
+    const activeModel = this.sessionStore?.getResolvedConversationModel();
+
+    return {
+      systemPrompt: this.plugin.settings.globalSystemPrompt,
+      documentContext: this.cachedDocumentContext,
+      messages: snapshot?.messageHistory ?? [],
+      draft: draft ?? this.composer?.getDraft() ?? "",
+      contextWindowSize: activeModel?.contextWindowSize,
+    };
   }
 }

@@ -18,7 +18,7 @@ const CHARS_PER_TOKEN = 4;
  * Operates on the provider-independent `ChatRequest`, so it estimates
  * exactly the same content that will be serialized and sent.
  */
-export function estimateTokenCount(request: ChatRequest): number {
+export function estimateTokenCount(request: ChatRequest, draft?: string): number {
   let totalChars = 0;
 
   if (request.systemPrompt) {
@@ -33,6 +33,10 @@ export function estimateTokenCount(request: ChatRequest): number {
 
   for (const turn of request.messages) {
     totalChars += turn.content.length;
+  }
+
+  if (draft) {
+    totalChars += draft.length;
   }
 
   return Math.ceil(totalChars / CHARS_PER_TOKEN);

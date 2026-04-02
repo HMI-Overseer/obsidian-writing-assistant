@@ -282,7 +282,7 @@ export class ChatView extends ItemView {
       composer: this.composer,
       modelSelector: this.modelSelector,
       getIsGenerating: () => this.generation.getIsGenerating(),
-      setIsGenerating: (sending) => this.generation.setIsGenerating(sending),
+      setIsGenerating: (sending) => this.setIsGeneratingAndSync(sending),
       setActiveAbortController: (controller) =>
         this.generation.setActiveAbortController(controller),
       syncConversationUi: () => this.syncConversationUi(),
@@ -438,7 +438,7 @@ export class ChatView extends ItemView {
       modelSelector: this.modelSelector,
       messageId,
       getIsGenerating: () => this.generation.getIsGenerating(),
-      setIsGenerating: (generating) => this.generation.setIsGenerating(generating),
+      setIsGenerating: (generating) => this.setIsGeneratingAndSync(generating),
       setActiveAbortController: (controller) =>
         this.generation.setActiveAbortController(controller),
       syncConversationUi: () => this.syncConversationUi(),
@@ -484,7 +484,7 @@ export class ChatView extends ItemView {
       composer: this.composer,
       modelSelector: this.modelSelector,
       getIsGenerating: () => this.generation.getIsGenerating(),
-      setIsGenerating: (generating) => this.generation.setIsGenerating(generating),
+      setIsGenerating: (generating) => this.setIsGeneratingAndSync(generating),
       setActiveAbortController: (controller) =>
         this.generation.setActiveAbortController(controller),
       syncConversationUi: () => this.syncConversationUi(),
@@ -496,13 +496,22 @@ export class ChatView extends ItemView {
     const btn = this.layout?.generateResponseBtn;
     if (!btn) return;
 
+    const isGenerating = this.generation.getIsGenerating();
     const shouldShow =
-      !this.generation.getIsGenerating() &&
       messages.length > 0 &&
-      (messages[messages.length - 1].role === "user" ||
+      (isGenerating ||
+        messages[messages.length - 1].role === "user" ||
         messages[messages.length - 1].isError === true);
 
     btn.toggleClass("lmsa-hidden", !shouldShow);
+    btn.toggleClass("is-generating", isGenerating);
+    btn.toggleAttribute("disabled", isGenerating);
+  }
+
+  private setIsGeneratingAndSync(generating: boolean): void {
+    this.generation.setIsGenerating(generating);
+    const messages = this.sessionStore?.getSnapshot().messageHistory ?? [];
+    this.updateGenerateResponseButton(messages);
   }
 
   private handleWidthChange(width: number): void {

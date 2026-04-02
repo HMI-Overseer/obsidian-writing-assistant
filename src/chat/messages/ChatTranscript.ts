@@ -14,7 +14,7 @@ export type BubbleActionCallbacks = {
   onVersionChange: (messageId: string, newIndex: number) => void;
 };
 
-const AUTO_SCROLL_BOTTOM_THRESHOLD_PX = 48;
+const AUTO_SCROLL_BOTTOM_THRESHOLD_PX = 10;
 
 export class ChatTranscript {
   private bubbleRenderChildren = new Map<HTMLElement, Component>();
@@ -36,7 +36,9 @@ export class ChatTranscript {
     actionCallbacks?: BubbleActionCallbacks,
     forceScroll = true
   ): Promise<void> {
+    const wasAutoScroll = this.shouldAutoScroll;
     this.clear();
+    this.shouldAutoScroll = wasAutoScroll;
 
     const lastAssistantIndex = this.findLastAssistantIndex(messages);
 

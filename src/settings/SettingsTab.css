@@ -11,7 +11,7 @@
   /* ── Topbar ────────────────────────────────────────────────────────────── */
 
   .lmsa-settings-topbar {
-    @apply lmsa-relative lmsa-flex lmsa-flex-col lmsa-items-stretch lmsa-justify-start lmsa-gap-0 lmsa-overflow-hidden lmsa-px-5 lmsa-py-[4px];
+    @apply lmsa-relative lmsa-flex lmsa-flex-col lmsa-items-stretch lmsa-justify-start lmsa-gap-2 lmsa-overflow-visible lmsa-px-5 lmsa-py-3;
     background:
       radial-gradient(circle at top left, color-mix(in srgb, var(--lmsa-section-accent) 14%, transparent), transparent 44%),
       linear-gradient(180deg, var(--lmsa-surface-overlay), var(--lmsa-surface-raised));
@@ -66,32 +66,64 @@
   /* ── Tab navigation ────────────────────────────────────────────────────── */
 
   .lmsa-settings-nav {
-    @apply lmsa-flex lmsa-w-full lmsa-min-w-0 lmsa-flex-nowrap lmsa-items-end lmsa-gap-1 lmsa-overflow-x-auto;
+    @apply lmsa-flex lmsa-w-full lmsa-min-w-0 lmsa-flex-wrap lmsa-items-center lmsa-gap-1.5;
     scrollbar-width: thin;
     padding-bottom: 0;
   }
 
   .lmsa-settings-tab-btn {
-    @apply lmsa-relative lmsa-inline-flex lmsa-min-w-max lmsa-flex-none lmsa-items-center lmsa-justify-center lmsa-border-0 lmsa-px-3 lmsa-py-1.5 lmsa-text-center;
-    border-radius: 8px 8px 0 0;
-    background: transparent;
+    @apply lmsa-relative lmsa-inline-flex lmsa-min-w-max lmsa-flex-none lmsa-items-center lmsa-justify-center lmsa-border lmsa-px-4 lmsa-py-2 lmsa-text-center;
+    border-radius: 9999px;
+    border-color: color-mix(in srgb, var(--lmsa-border-subtle) 50%, transparent);
+    background: color-mix(in srgb, var(--lmsa-surface-overlay) 60%, transparent);
     color: var(--lmsa-text-secondary);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.06),
+      0 1px 3px rgba(0, 0, 0, 0.04);
     transition:
-      background-color 140ms ease,
-      color 140ms ease,
-      box-shadow 140ms ease;
+      background 180ms ease,
+      color 180ms ease,
+      border-color 180ms ease,
+      box-shadow 180ms ease,
+      transform 100ms ease;
   }
 
   .lmsa-settings-tab-btn:hover {
     color: var(--lmsa-text-primary);
-    background: color-mix(in srgb, var(--background-modifier-hover) 60%, transparent);
+    background: color-mix(in srgb, var(--lmsa-surface-overlay) 80%, transparent);
+    border-color: color-mix(in srgb, var(--lmsa-border-default) 70%, transparent);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.08),
+      0 2px 8px rgba(0, 0, 0, 0.06);
+    transform: translateY(-0.5px);
   }
 
   .lmsa-settings-tab-btn.is-active {
     color: var(--lmsa-section-accent);
-    background: color-mix(in srgb, var(--lmsa-section-accent) 10%, var(--lmsa-surface-raised));
+    background:
+      radial-gradient(ellipse at 50% 0%, color-mix(in srgb, var(--lmsa-section-accent) 12%, transparent), transparent 70%),
+      color-mix(in srgb, var(--lmsa-section-accent) 10%, var(--lmsa-surface-raised));
+    border-color: color-mix(in srgb, var(--lmsa-section-accent) 25%, var(--lmsa-border-subtle));
     box-shadow:
-      inset 0 2px 0 var(--lmsa-section-accent);
+      inset 0 1px 0 color-mix(in srgb, var(--lmsa-section-accent) 15%, rgba(255, 255, 255, 0.1)),
+      0 0 12px color-mix(in srgb, var(--lmsa-section-accent) 14%, transparent),
+      0 2px 8px rgba(0, 0, 0, 0.06);
+  }
+
+  .lmsa-settings-tab-btn.is-active::after {
+    content: "";
+    @apply lmsa-pointer-events-none lmsa-absolute lmsa-top-0 lmsa-h-px;
+    inset-inline: 20%;
+    border-radius: 9999px;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      color-mix(in srgb, var(--lmsa-section-accent) 60%, rgba(255, 255, 255, 0.5)),
+      transparent
+    );
+    opacity: var(--lmsa-shimmer-opacity);
   }
 
   .lmsa-settings-tab-label {
@@ -100,9 +132,23 @@
   }
 
   .lmsa-settings-nav--bench {
-    @apply lmsa-pt-0;
-    border-top: 1px solid var(--lmsa-border-subtle);
-    padding-top: 8px;
+    @apply lmsa-relative lmsa-pt-0;
+    border-top: none;
+    padding-top: 4px;
+    margin-top: 2px;
+  }
+
+  .lmsa-settings-nav--bench::before {
+    content: "";
+    @apply lmsa-pointer-events-none lmsa-absolute lmsa-top-0 lmsa-h-px;
+    left: 10%;
+    right: 10%;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      var(--lmsa-border-subtle),
+      transparent
+    );
   }
 
   /* ── Stage ─────────────────────────────────────────────────────────────── */
@@ -130,20 +176,22 @@
     }
 
     .lmsa-settings-tab-btn {
-      @apply lmsa-min-w-max;
+      @apply lmsa-min-w-max lmsa-px-3 lmsa-py-1.5;
     }
   }
 }
 
 /* Override Obsidian's button background-color: var(--interactive-normal) */
 .lmsa-settings-tab-btn {
-  background-color: transparent !important;
+  background: color-mix(in srgb, var(--lmsa-surface-overlay) 60%, transparent) !important;
 }
 
 .lmsa-settings-tab-btn.is-active {
-  background-color: color-mix(in srgb, var(--lmsa-section-accent) 10%, var(--lmsa-surface-raised)) !important;
+  background:
+    radial-gradient(ellipse at 50% 0%, color-mix(in srgb, var(--lmsa-section-accent) 12%, transparent), transparent 70%),
+    color-mix(in srgb, var(--lmsa-section-accent) 10%, var(--lmsa-surface-raised)) !important;
 }
 
 .lmsa-settings-tab-btn:hover:not(.is-active) {
-  background-color: color-mix(in srgb, var(--background-modifier-hover) 60%, transparent) !important;
+  background: color-mix(in srgb, var(--lmsa-surface-overlay) 80%, transparent) !important;
 }

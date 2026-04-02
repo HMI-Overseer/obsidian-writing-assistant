@@ -1,9 +1,52 @@
 import { setIcon } from "obsidian";
 import type { ChatLayoutRefs } from "../types";
 
+const SVG_NS = "http://www.w3.org/2000/svg";
+const GLASS_FILTER_ID = "lmsa-glass";
+
+function ensureGlassFilter(root: HTMLElement): void {
+  if (root.querySelector(`#${GLASS_FILTER_ID}`)) return;
+
+  const svg = document.createElementNS(SVG_NS, "svg");
+  svg.setAttribute("role", "presentation");
+  svg.classList.add("lmsa-hidden");
+
+  const filter = document.createElementNS(SVG_NS, "filter");
+  filter.setAttribute("id", GLASS_FILTER_ID);
+  filter.setAttribute("x", "-50%");
+  filter.setAttribute("y", "-50%");
+  filter.setAttribute("width", "200%");
+  filter.setAttribute("height", "200%");
+  filter.setAttribute("primitiveUnits", "objectBoundingBox");
+
+  const turbulence = document.createElementNS(SVG_NS, "feTurbulence");
+  turbulence.setAttribute("type", "fractalNoise");
+  turbulence.setAttribute("baseFrequency", "0.50 0.99");
+  turbulence.setAttribute("numOctaves", "2");
+  turbulence.setAttribute("seed", "5");
+  turbulence.setAttribute("result", "map");
+
+  const blur = document.createElementNS(SVG_NS, "feGaussianBlur");
+  blur.setAttribute("in", "SourceGraphic");
+  blur.setAttribute("stdDeviation", "0.1");
+  blur.setAttribute("result", "blur");
+
+  const displacement = document.createElementNS(SVG_NS, "feDisplacementMap");
+  displacement.setAttribute("in", "blur");
+  displacement.setAttribute("in2", "map");
+  displacement.setAttribute("scale", "0.1");
+  displacement.setAttribute("xChannelSelector", "R");
+  displacement.setAttribute("yChannelSelector", "G");
+
+  filter.append(turbulence, blur, displacement);
+  svg.appendChild(filter);
+  root.prepend(svg);
+}
+
 export function createChatLayout(contentEl: HTMLElement): ChatLayoutRefs {
   contentEl.empty();
   contentEl.addClass("lmsa-root");
+  ensureGlassFilter(contentEl);
 
   const shell = contentEl.createDiv({ cls: "lmsa-shell" });
 
@@ -61,6 +104,10 @@ export function createChatLayout(contentEl: HTMLElement): ChatLayoutRefs {
   const genBtnIcon = generateResponseBtn.createEl("span", { cls: "lmsa-generate-response-icon" });
   setIcon(genBtnIcon, "sparkles");
   generateResponseBtn.createEl("span", { text: "Generate response" });
+  generateResponseBtn.createEl("span", {
+    cls: "lmsa-generate-response-loading",
+    text: "Loading...",
+  });
 
   const commandBarEl = composer.createDiv({ cls: "lmsa-command-bar" });
   const composerPanel = composer.createDiv({ cls: "lmsa-composer-panel lmsa-ui-panel" });

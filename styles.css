@@ -430,14 +430,28 @@
     line-height: 1.6;
 }
 .lmsa-generate-response-btn {
-    margin-left: auto;
-    margin-right: auto;
+    position: absolute;
+    z-index: 10;
     display: inline-flex;
     align-items: center;
     gap: 0.375rem;
-    align-self: center;
-    transition: background 140ms ease, border-color 140ms ease;
+    left: 50%;
+    top: 0;
+    transform: translate(-50%, calc(-100% - 10px));
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    background: linear-gradient(
+      135deg,
+      rgba(255, 255, 255, 0.2) 0%,
+      rgba(255, 255, 255, 0.08) 50%,
+      rgba(255, 255, 255, 0.03) 100%
+    );
+    backdrop-filter: url(#lmsa-glass);
+    -webkit-backdrop-filter: url(#lmsa-glass);
+    transition: all 0.8s cubic-bezier(0.175, 0.885, 0.32, 2.2);
 }
+.lmsa-generate-response-btn:hover {
+    transform: translate(-50%, calc(-100% - 10px)) scale(1.05);
+  }
 .lmsa-generate-response-icon {
     display: inline-flex;
     align-items: center;
@@ -446,6 +460,37 @@
 .lmsa-generate-response-icon svg {
     width: 14px;
     height: 14px;
+  }
+/* Loading text — hidden by default */
+.lmsa-generate-response-loading {
+    display: none;
+  }
+/* Generating state: swap content */
+.lmsa-generate-response-btn.is-generating .lmsa-generate-response-icon,
+  .lmsa-generate-response-btn.is-generating > span:not(.lmsa-generate-response-loading) {
+    display: none;
+  }
+.lmsa-generate-response-btn.is-generating .lmsa-generate-response-loading {
+    display: inline-block;
+    font-weight: 500;
+    font-size: var(--font-ui-small);
+    background: linear-gradient(
+      90deg,
+      var(--text-normal) 0%,
+      var(--text-normal) 40%,
+      rgba(255, 255, 255, 0.9) 50%,
+      var(--text-normal) 60%,
+      var(--text-normal) 100%
+    );
+    background-size: 200% 100%;
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    animation: lmsa-shimmer-sweep 2s ease-in-out infinite;
+  }
+.lmsa-generate-response-btn.is-generating {
+    pointer-events: none;
+    cursor: default;
   }
 .lmsa-composer {
     position: relative;
@@ -1756,12 +1801,12 @@
     flex-direction: column;
     align-items: stretch;
     justify-content: flex-start;
-    gap: 0px;
-    overflow: hidden;
+    gap: 0.5rem;
+    overflow: visible;
     padding-left: 1.25rem;
     padding-right: 1.25rem;
-    padding-top: 4px;
-    padding-bottom: 4px;
+    padding-top: 0.75rem;
+    padding-bottom: 0.75rem;
     background:
       radial-gradient(circle at top left, color-mix(in srgb, var(--lmsa-section-accent) 14%, transparent), transparent 44%),
       linear-gradient(180deg, var(--lmsa-surface-overlay), var(--lmsa-surface-raised));
@@ -1818,10 +1863,9 @@
     display: flex;
     width: 100%;
     min-width: 0px;
-    flex-wrap: nowrap;
-    align-items: flex-end;
-    gap: 0.25rem;
-    overflow-x: auto;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.375rem;
     scrollbar-width: thin;
     padding-bottom: 0;
 }
@@ -1833,29 +1877,63 @@
     flex: none;
     align-items: center;
     justify-content: center;
-    border-width: 0px;
-    padding-left: 0.75rem;
-    padding-right: 0.75rem;
-    padding-top: 0.375rem;
-    padding-bottom: 0.375rem;
+    border-width: 1px;
+    padding-left: 1rem;
+    padding-right: 1rem;
+    padding-top: 0.5rem;
+    padding-bottom: 0.5rem;
     text-align: center;
-    border-radius: 8px 8px 0 0;
-    background: transparent;
+    border-radius: 9999px;
+    border-color: color-mix(in srgb, var(--lmsa-border-subtle) 50%, transparent);
+    background: color-mix(in srgb, var(--lmsa-surface-overlay) 60%, transparent);
     color: var(--lmsa-text-secondary);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.06),
+      0 1px 3px rgba(0, 0, 0, 0.04);
     transition:
-      background-color 140ms ease,
-      color 140ms ease,
-      box-shadow 140ms ease;
+      background 180ms ease,
+      color 180ms ease,
+      border-color 180ms ease,
+      box-shadow 180ms ease,
+      transform 100ms ease;
 }
 .lmsa-settings-tab-btn:hover {
     color: var(--lmsa-text-primary);
-    background: color-mix(in srgb, var(--background-modifier-hover) 60%, transparent);
+    background: color-mix(in srgb, var(--lmsa-surface-overlay) 80%, transparent);
+    border-color: color-mix(in srgb, var(--lmsa-border-default) 70%, transparent);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.08),
+      0 2px 8px rgba(0, 0, 0, 0.06);
+    transform: translateY(-0.5px);
   }
 .lmsa-settings-tab-btn.is-active {
     color: var(--lmsa-section-accent);
-    background: color-mix(in srgb, var(--lmsa-section-accent) 10%, var(--lmsa-surface-raised));
+    background:
+      radial-gradient(ellipse at 50% 0%, color-mix(in srgb, var(--lmsa-section-accent) 12%, transparent), transparent 70%),
+      color-mix(in srgb, var(--lmsa-section-accent) 10%, var(--lmsa-surface-raised));
+    border-color: color-mix(in srgb, var(--lmsa-section-accent) 25%, var(--lmsa-border-subtle));
     box-shadow:
-      inset 0 2px 0 var(--lmsa-section-accent);
+      inset 0 1px 0 color-mix(in srgb, var(--lmsa-section-accent) 15%, rgba(255, 255, 255, 0.1)),
+      0 0 12px color-mix(in srgb, var(--lmsa-section-accent) 14%, transparent),
+      0 2px 8px rgba(0, 0, 0, 0.06);
+  }
+.lmsa-settings-tab-btn.is-active::after {
+    content: "";
+    pointer-events: none;
+    position: absolute;
+    top: 0px;
+    height: 1px;
+    inset-inline: 20%;
+    border-radius: 9999px;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      color-mix(in srgb, var(--lmsa-section-accent) 60%, rgba(255, 255, 255, 0.5)),
+      transparent
+    );
+    opacity: var(--lmsa-shimmer-opacity);
   }
 .lmsa-settings-tab-label {
     white-space: nowrap;
@@ -1863,9 +1941,26 @@
     font-size: 0.8rem;
 }
 .lmsa-settings-nav--bench {
-    border-top: 1px solid var(--lmsa-border-subtle);
-    padding-top: 8px;
+    position: relative;
+    border-top: none;
+    padding-top: 4px;
+    margin-top: 2px;
 }
+.lmsa-settings-nav--bench::before {
+    content: "";
+    pointer-events: none;
+    position: absolute;
+    top: 0px;
+    height: 1px;
+    left: 10%;
+    right: 10%;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      var(--lmsa-border-subtle),
+      transparent
+    );
+  }
 /* ── Stage ─────────────────────────────────────────────────────────────── */
 .lmsa-settings-stage {
     min-width: 0px;
@@ -1891,6 +1986,10 @@
     .lmsa-settings-tab-btn {
         min-width: -moz-max-content;
         min-width: max-content;
+        padding-left: 0.75rem;
+        padding-right: 0.75rem;
+        padding-top: 0.375rem;
+        padding-bottom: 0.375rem;
     }
   }
 /* ── Panel ─────────────────────────────────────────────────────────────── */
@@ -3125,9 +3224,6 @@
 .lmsa-flex-wrap {
     flex-wrap: wrap;
 }
-.lmsa-flex-nowrap {
-    flex-wrap: nowrap;
-}
 .lmsa-items-start {
     align-items: flex-start;
 }
@@ -3357,10 +3453,6 @@
     padding-top: 14px;
     padding-bottom: 14px;
 }
-.lmsa-py-\[4px\] {
-    padding-top: 4px;
-    padding-bottom: 4px;
-}
 .lmsa-py-\[5px\] {
     padding-top: 5px;
     padding-bottom: 5px;
@@ -3469,6 +3561,15 @@
     transition-duration: 140ms;
 }
 /* Chat */
+/* Override lmsa-ui-pill-button base + Obsidian button background */
+.lmsa-generate-response-btn {
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.2) 0%,
+    rgba(255, 255, 255, 0.08) 50%,
+    rgba(255, 255, 255, 0.03) 100%
+  ) !important;
+}
 @media (max-width: 700px) {
   .lmsa-header,
   .lmsa-composer-footer {
@@ -3539,6 +3640,15 @@
   to {
     opacity: 1;
     transform: translateY(0) scale(1);
+  }
+}
+@keyframes lmsa-shimmer-sweep {
+  0% {
+    background-position: 200% center;
+  }
+
+  100% {
+    background-position: -200% center;
   }
 }
 @keyframes lmsa-header-meta-attention {
@@ -3937,13 +4047,15 @@
 }
 /* Override Obsidian's button background-color: var(--interactive-normal) */
 .lmsa-settings-tab-btn {
-  background-color: transparent !important;
+  background: color-mix(in srgb, var(--lmsa-surface-overlay) 60%, transparent) !important;
 }
 .lmsa-settings-tab-btn.is-active {
-  background-color: color-mix(in srgb, var(--lmsa-section-accent) 10%, var(--lmsa-surface-raised)) !important;
+  background:
+    radial-gradient(ellipse at 50% 0%, color-mix(in srgb, var(--lmsa-section-accent) 12%, transparent), transparent 70%),
+    color-mix(in srgb, var(--lmsa-section-accent) 10%, var(--lmsa-surface-raised)) !important;
 }
 .lmsa-settings-tab-btn:hover:not(.is-active) {
-  background-color: color-mix(in srgb, var(--background-modifier-hover) 60%, transparent) !important;
+  background: color-mix(in srgb, var(--lmsa-surface-overlay) 80%, transparent) !important;
 }
 /* -----------------------------------------------------------------------
  * BenchmarkTab — test card layout and result display

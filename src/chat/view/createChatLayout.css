@@ -164,9 +164,24 @@
   }
 
   .lmsa-generate-response-btn {
-    @apply lmsa-mx-auto lmsa-inline-flex lmsa-items-center lmsa-gap-1.5;
-    align-self: center;
-    transition: background 140ms ease, border-color 140ms ease;
+    @apply lmsa-absolute lmsa-z-10 lmsa-inline-flex lmsa-items-center lmsa-gap-1.5;
+    left: 50%;
+    top: 0;
+    transform: translate(-50%, calc(-100% - 10px));
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    background: linear-gradient(
+      135deg,
+      rgba(255, 255, 255, 0.2) 0%,
+      rgba(255, 255, 255, 0.08) 50%,
+      rgba(255, 255, 255, 0.03) 100%
+    );
+    backdrop-filter: url(#lmsa-glass);
+    -webkit-backdrop-filter: url(#lmsa-glass);
+    transition: all 0.8s cubic-bezier(0.175, 0.885, 0.32, 2.2);
+  }
+
+  .lmsa-generate-response-btn:hover {
+    transform: translate(-50%, calc(-100% - 10px)) scale(1.05);
   }
 
   .lmsa-generate-response-icon {
@@ -177,6 +192,41 @@
   .lmsa-generate-response-icon svg {
     width: 14px;
     height: 14px;
+  }
+
+  /* Loading text — hidden by default */
+  .lmsa-generate-response-loading {
+    display: none;
+  }
+
+  /* Generating state: swap content */
+  .lmsa-generate-response-btn.is-generating .lmsa-generate-response-icon,
+  .lmsa-generate-response-btn.is-generating > span:not(.lmsa-generate-response-loading) {
+    display: none;
+  }
+
+  .lmsa-generate-response-btn.is-generating .lmsa-generate-response-loading {
+    display: inline-block;
+    font-weight: 500;
+    font-size: var(--font-ui-small);
+    background: linear-gradient(
+      90deg,
+      var(--text-normal) 0%,
+      var(--text-normal) 40%,
+      rgba(255, 255, 255, 0.9) 50%,
+      var(--text-normal) 60%,
+      var(--text-normal) 100%
+    );
+    background-size: 200% 100%;
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    animation: lmsa-shimmer-sweep 2s ease-in-out infinite;
+  }
+
+  .lmsa-generate-response-btn.is-generating {
+    pointer-events: none;
+    cursor: default;
   }
 
   .lmsa-composer {
@@ -392,6 +442,16 @@
   .lmsa-root.is-collapsed .lmsa-collapsed-overlay {
     @apply lmsa-flex;
   }
+}
+
+/* Override lmsa-ui-pill-button base + Obsidian button background */
+.lmsa-generate-response-btn {
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.2) 0%,
+    rgba(255, 255, 255, 0.08) 50%,
+    rgba(255, 255, 255, 0.03) 100%
+  ) !important;
 }
 
 @media (max-width: 700px) {

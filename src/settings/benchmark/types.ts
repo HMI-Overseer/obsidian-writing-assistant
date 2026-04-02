@@ -48,4 +48,15 @@ export interface BenchmarkRunResult {
   avgDurationMs: number;
 }
 
+export interface BenchmarkTestSuite {
+  id: string;
+  /** Tab label (e.g., "Edit annotations"). */
+  name: string;
+  /** Shown below tabs when the suite is active. */
+  description: string;
+  /** Optional Obsidian icon name for the tab. */
+  icon?: string;
+  testCases: BenchmarkTestCase[];
+}
+
 export type TestRunState = "idle" | "running" | "done" | "error";

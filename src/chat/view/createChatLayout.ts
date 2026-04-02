@@ -121,8 +121,6 @@ export function createChatLayout(contentEl: HTMLElement): ChatLayoutRefs {
   const composerFooter = composerPanel.createDiv({ cls: "lmsa-composer-footer" });
 
   const contextCapacityEl = composerFooter.createDiv({ cls: "lmsa-context-capacity lmsa-hidden" });
-  const capacityBar = contextCapacityEl.createDiv({ cls: "lmsa-context-capacity-bar" });
-  capacityBar.createDiv({ cls: "lmsa-context-capacity-fill" });
   contextCapacityEl.createEl("span", { cls: "lmsa-context-capacity-label" });
 
   const usageSummaryEl = composerFooter.createDiv({ cls: "lmsa-usage-summary lmsa-hidden" });

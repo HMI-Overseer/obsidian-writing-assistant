@@ -101,13 +101,6 @@ export class ContextCapacityUpdater {
       this.capacityEl.addClass("is-warning");
     }
 
-    const fillEl = this.capacityEl.querySelector(
-      ".lmsa-context-capacity-fill"
-    ) as HTMLElement | null;
-    if (fillEl) {
-      fillEl.style.width = `${percent}%`;
-    }
-
     const labelEl = this.capacityEl.querySelector(
       ".lmsa-context-capacity-label"
     ) as HTMLElement | null;

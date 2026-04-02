@@ -98,7 +98,7 @@ export class ChatComposer {
 
   clearDraft(): void {
     this.setDraft("");
-    this.refs.textareaEl.style.height = "auto";
+    this.refs.textareaEl.setCssStyles({ height: "auto" });
   }
 
   setSendingState(sending: boolean): void {
@@ -199,7 +199,7 @@ export class ChatComposer {
   }
 
   private autoResizeTextarea(): void {
-    this.refs.textareaEl.style.height = "auto";
-    this.refs.textareaEl.style.height = `${this.refs.textareaEl.scrollHeight}px`;
+    this.refs.textareaEl.setCssStyles({ height: "auto" });
+    this.refs.textareaEl.setCssStyles({ height: `${this.refs.textareaEl.scrollHeight}px` });
   }
 }

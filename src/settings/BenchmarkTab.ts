@@ -38,7 +38,7 @@ export function renderBenchmarkTab(
   if (models.length === 0) {
     modelSection.bodyEl.createEl("p", {
       cls: "lmsa-benchmark-empty",
-      text: "No completion models configured. Add one in the Completion Models tab first.",
+      text: "No completion models configured. Add one in the completion models tab first.",
     });
     return;
   }
@@ -215,7 +215,7 @@ export function renderBenchmarkTab(
   // Header actions: Run All / Abort
   const runAllBtn = suitesSection.headerActionsEl.createEl("button", {
     cls: "lmsa-benchmark-btn lmsa-benchmark-btn--run-all",
-    text: "Run All",
+    text: "Run all",
   });
 
   const abortBtn = suitesSection.headerActionsEl.createEl("button", {

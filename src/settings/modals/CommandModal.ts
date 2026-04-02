@@ -35,7 +35,7 @@ export class CommandModal extends Modal {
       .setDesc("This appears as a quick-action button in the chat view.")
       .addText((text) =>
         text
-          .setPlaceholder("e.g. Tighten dialogue")
+          .setPlaceholder("Tighten dialogue")
           .setValue(this.command.name)
           .onChange((value) => (this.command.name = value))
       );

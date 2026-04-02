@@ -203,7 +203,7 @@ export function renderModelProfileTab<T extends BaseModel>(
   const anthropicConnectionEl = providerContentEl.createDiv({ cls: "lmsa-provider-connection" });
   anthropicConnectionEl.createEl("p", {
     cls: "lmsa-settings-section-desc",
-    text: "API key is managed in Settings → General → Provider API Keys.",
+    text: "API key is managed in settings → general → provider API keys.",
   });
 
   // Anthropic embedding: not-available message (shown instead of discovery)

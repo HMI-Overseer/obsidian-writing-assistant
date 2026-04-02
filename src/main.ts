@@ -54,19 +54,19 @@ export default class LMStudioWritingAssistant extends Plugin {
 
     this.registerView(VIEW_TYPE_CHAT, (leaf: WorkspaceLeaf) => new ChatView(leaf, this));
 
-    this.addRibbonIcon("message-square", "Writing Assistant Chat", () => {
+    this.addRibbonIcon("message-square", "Writing assistant chat", () => {
       this.activateChatView();
     });
 
     this.addCommand({
       id: "open-lm-studio-chat",
-      name: "Open Writing Assistant Chat",
+      name: "Open writing assistant chat",
       callback: () => this.activateChatView(),
     });
 
     this.addCommand({
       id: "send-selection-to-chat",
-      name: "Send selection to Writing Assistant Chat",
+      name: "Send selection to writing assistant chat",
       editorCallback: (editor) => {
         const selection = editor.getSelection();
         if (!selection) {
@@ -109,7 +109,8 @@ export default class LMStudioWritingAssistant extends Plugin {
   }
 
   onunload(): void {
-    this.app.workspace.detachLeavesOfType(VIEW_TYPE_CHAT);
+    // Obsidian handles view cleanup automatically on plugin unload.
+    // Detaching leaves here would reset their position on reload.
   }
 
   async loadSettings(): Promise<void> {

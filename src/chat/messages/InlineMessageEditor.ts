@@ -101,7 +101,7 @@ export class InlineMessageEditor {
 
   private autoResize(): void {
     if (!this.textareaEl) return;
-    this.textareaEl.style.height = "auto";
-    this.textareaEl.style.height = `${this.textareaEl.scrollHeight}px`;
+    this.textareaEl.setCssStyles({ height: "auto" });
+    this.textareaEl.setCssStyles({ height: `${this.textareaEl.scrollHeight}px` });
   }
 }

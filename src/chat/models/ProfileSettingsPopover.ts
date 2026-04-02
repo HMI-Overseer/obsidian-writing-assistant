@@ -166,7 +166,7 @@ export class ProfileSettingsPopover {
     const section = body.createDiv({ cls: "lmsa-profile-popover-section" });
     section.createEl("div", {
       cls: "lmsa-profile-popover-section-title",
-      text: "Prompt Caching",
+      text: "Prompt caching",
     });
 
     // Toggle row
@@ -226,14 +226,14 @@ export class ProfileSettingsPopover {
     const section = body.createDiv({ cls: "lmsa-profile-popover-section" });
     section.createEl("div", {
       cls: "lmsa-profile-popover-section-title",
-      text: "Model Parameters",
+      text: "Model parameters",
     });
 
     const paramsBody = section.createDiv({ cls: "lmsa-params-body" });
 
     // System Prompt
     const promptSection = paramsBody.createDiv({ cls: "lmsa-params-section" });
-    promptSection.createEl("label", { cls: "lmsa-params-label", text: "System Prompt" });
+    promptSection.createEl("label", { cls: "lmsa-params-label", text: "System prompt" });
     this.promptTextareaEl = promptSection.createEl("textarea", {
       cls: "lmsa-params-textarea",
       attr: { placeholder: "Enter a system prompt...", rows: "6" },

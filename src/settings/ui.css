@@ -27,11 +27,8 @@
     border-bottom: 1px solid color-mix(in srgb, var(--lmsa-border-default) 82%, transparent);
   }
 
-  .lmsa-settings-panel-desc {
-    @apply lmsa-m-0;
-    color: var(--lmsa-text-secondary);
-    line-height: 1.65;
-  }
+  /* panel description is now handled by .setting-item-description
+     in SettingsTab.css via Setting.setHeading().setDesc() */
 
   /* ── Content area ──────────────────────────────────────────────────────── */
 

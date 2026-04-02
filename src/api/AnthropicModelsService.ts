@@ -116,7 +116,6 @@ export class AnthropicModelsService implements ModelsService {
     const allModels: AnthropicRawModel[] = [];
     let afterId: string | undefined;
 
-    // eslint-disable-next-line no-constant-condition
     while (true) {
       const query = new URLSearchParams({ limit: String(PAGE_LIMIT) });
       if (afterId) query.set("after_id", afterId);

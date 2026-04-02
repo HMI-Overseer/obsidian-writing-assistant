@@ -1,5 +1,5 @@
 import type { App } from "obsidian";
-import { PluginSettingTab } from "obsidian";
+import { PluginSettingTab, Setting } from "obsidian";
 import type LMStudioWritingAssistant from "../main";
 import { renderAdvancedTab } from "./AdvancedTab";
 import { renderCommandsTab } from "./CommandsTab";
@@ -10,9 +10,7 @@ import { renderBenchmarkTab } from "./BenchmarkTab";
 
 const MAIN_TABS = ["General", "Completion Models", "Embedding Models", "Commands", "Advanced"] as const;
 const BENCH_TABS = ["Benchmark"] as const;
-const TABS = [...MAIN_TABS, ...BENCH_TABS] as const;
-
-type TabName = (typeof TABS)[number];
+type TabName = (typeof MAIN_TABS)[number] | (typeof BENCH_TABS)[number];
 
 type TabMeta = {
   title: string;
@@ -83,15 +81,6 @@ export class LMStudioSettingTab extends PluginSettingTab {
     const shell = containerEl.createDiv({ cls: "lmsa-settings-shell" });
 
     const topbar = shell.createDiv({ cls: "lmsa-settings-topbar lmsa-ui-panel" });
-    const titleRow = topbar.createDiv({ cls: "lmsa-settings-title-row" });
-    titleRow.createEl("h2", {
-      cls: "lmsa-settings-title",
-      text: "Obsidian Writing Assistant",
-    });
-    titleRow.createEl("span", {
-      cls: "lmsa-settings-version",
-      text: `v${this.plugin.manifest.version}`,
-    });
 
     const nav = topbar.createDiv({ cls: "lmsa-settings-nav" });
     for (const tab of MAIN_TABS) {
@@ -131,14 +120,11 @@ export class LMStudioSettingTab extends PluginSettingTab {
     const panel = stage.createDiv({ cls: "lmsa-settings-panel lmsa-ui-panel" });
 
     const panelHeader = panel.createDiv({ cls: "lmsa-settings-panel-header" });
-    panelHeader.createEl("h3", {
-      cls: "lmsa-settings-panel-title",
-      text: activeMeta.title,
-    });
-    panelHeader.createEl("p", {
-      cls: "lmsa-settings-panel-desc",
-      text: activeMeta.description,
-    });
+    const panelHeading = new Setting(panelHeader)
+      .setName(activeMeta.title)
+      .setDesc(activeMeta.description)
+      .setHeading();
+    panelHeading.settingEl.addClass("lmsa-settings-panel-heading");
 
     const content = panel.createDiv({ cls: "lmsa-settings-content" });
     const refresh = () => this.display();

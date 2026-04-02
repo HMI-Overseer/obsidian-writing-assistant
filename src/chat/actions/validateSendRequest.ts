@@ -24,7 +24,7 @@ export async function validateSendRequest(
   const activeModel = store.getResolvedConversationModel();
   if (!activeModel?.modelId) {
     new Notice(
-      "No model selected. Choose a saved profile in the chat selector or add one in Settings."
+      "No model selected. Choose a saved profile in the chat selector or add one in settings."
     );
     return null;
   }

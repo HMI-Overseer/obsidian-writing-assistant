@@ -37,7 +37,7 @@ export function parseEditBlocks(text: string): ParseResult {
   let lastIndex = 0;
 
   for (const match of text.matchAll(BLOCK_REGEX)) {
-    const matchStart = match.index!;
+    const matchStart = match.index ?? 0;
     if (matchStart > lastIndex) {
       proseSegments.push(text.slice(lastIndex, matchStart));
     }

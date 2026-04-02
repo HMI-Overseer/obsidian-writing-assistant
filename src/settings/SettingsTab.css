@@ -41,32 +41,27 @@
     font-size: 0.68rem;
   }
 
-  .lmsa-settings-title-row {
-    @apply lmsa-flex lmsa-items-baseline lmsa-py-4;
-    gap: 0 !important;
+  /* Title row removed — Obsidian shows the plugin name in the sidebar */
+
+  .lmsa-settings-panel-heading.setting-item {
+    border: none;
+    padding: 0;
+    margin: 0;
   }
 
-  .lmsa-settings-title {
+  .lmsa-settings-panel-heading .setting-item-name {
     @apply lmsa-font-bold;
-    margin: 0 !important;
-    padding: 0 4px 0 0 !important;
-    color: var(--lmsa-accent-muted);
-    font-size: 1.35rem;
-    line-height: 1.15;
-  }
-
-  .lmsa-settings-panel-title {
-    @apply lmsa-m-0 lmsa-font-bold;
     color: var(--lmsa-text-primary);
     font-size: 1.35rem;
     line-height: 1.15;
   }
 
-  .lmsa-settings-version {
-    @apply lmsa-whitespace-nowrap;
-    font-size: 0.7rem;
-    color: var(--lmsa-text-faint);
+  .lmsa-settings-panel-heading .setting-item-description {
+    color: var(--lmsa-text-secondary);
+    line-height: 1.65;
   }
+
+  /* Version badge removed — available via manifest */
 
   /* ── Tab navigation ────────────────────────────────────────────────────── */
 

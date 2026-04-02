@@ -61,7 +61,7 @@ export class ChatHistoryDrawer {
     const header = this.drawerEl.createDiv({ cls: "lmsa-history-header" });
 
     const titleGroup = header.createDiv({ cls: "lmsa-history-title-group" });
-    titleGroup.createEl("span", { cls: "lmsa-history-title", text: "Chat History" });
+    titleGroup.createEl("span", { cls: "lmsa-history-title", text: "Chat history" });
     this.countEl = titleGroup.createEl("span", {
       cls: "lmsa-history-count",
       text: "",

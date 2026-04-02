@@ -57,7 +57,7 @@ export class ChatView extends ItemView {
   }
 
   getDisplayText(): string {
-    return "Writing Assistant";
+    return "Writing assistant";
   }
 
   getIcon(): string {
@@ -103,7 +103,9 @@ export class ChatView extends ItemView {
         void this.runCommand(command);
       },
       onModeChange: (mode) => {
-        this.layout!.rootEl.dataset.mode = mode;
+        if (this.layout) {
+          this.layout.rootEl.dataset.mode = mode;
+        }
       },
       onContextToggle: () => {
         this.cachedDocumentContext = null;
@@ -111,7 +113,9 @@ export class ChatView extends ItemView {
       },
     });
 
-    this.layout!.rootEl.dataset.mode = "conversation";
+    if (this.layout) {
+      this.layout.rootEl.dataset.mode = "conversation";
+    }
 
     this.modelSelector = new ChatModelSelector(this.plugin, this.layout, {
       getActiveModel: () => this.sessionStore?.getResolvedConversationModel() ?? null,

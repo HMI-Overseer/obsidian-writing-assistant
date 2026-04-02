@@ -20,7 +20,7 @@ export class ApiKeysModal extends Modal {
     const { settings } = this.plugin;
 
     contentEl.addClass("lmsa-modal");
-    contentEl.createEl("h2", { text: "Provider API Keys" });
+    contentEl.createEl("h2", { text: "Provider API keys" });
     contentEl.createEl("p", {
       cls: "lmsa-modal-desc",
       text: "API keys are stored locally in the plugin's data file and never sent anywhere except the provider's own API.",
@@ -46,7 +46,7 @@ export class ApiKeysModal extends Modal {
     // ── OpenAI ─────────────────────────────────────────────────────────
     new SettingItem(contentEl)
       .setName("OpenAI")
-      .setDesc("Used for GPT models. (Coming soon)")
+      .setDesc("Used for GPT models (coming soon)")
       .addText((text) => {
         text.inputEl.type = "password";
         text.inputEl.autocomplete = "off";

@@ -52,7 +52,7 @@ export abstract class ModelProfileModal<T extends BaseModel> extends Modal {
       .setDesc("A label for this reusable model profile.")
       .addText((text) =>
         text
-          .setPlaceholder("e.g. My Profile")
+          .setPlaceholder("My profile")
           .setValue(this.model.name)
           .onChange((value) => (this.model.name = value))
       );

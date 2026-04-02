@@ -46,7 +46,7 @@ export class CompletionModelModal extends ModelProfileModal<CompletionModel> {
           text.inputEl.type = "number";
           text.inputEl.addClass("lmsa-input-full");
           text
-            .setPlaceholder("e.g. 128000")
+            .setPlaceholder("128000")
             .setValue(this.model.contextWindowSize ? String(this.model.contextWindowSize) : "")
             .onChange((value) => {
               const parsed = parseInt(value, 10);

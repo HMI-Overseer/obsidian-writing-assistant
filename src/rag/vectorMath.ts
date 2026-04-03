@@ -53,18 +53,60 @@ export function topKSimilar(
 }
 
 /**
- * Deduplicate retrieval results by file path.
- * Keeps only the highest-scoring chunk per file.
+ * Limit retrieval results per file path.
+ * Keeps up to `maxPerFile` highest-scoring chunks per file (default 2).
  */
-export function deduplicateByFile(results: RetrievalResult[]): RetrievalResult[] {
-  const seen = new Map<string, RetrievalResult>();
+export function limitPerFile(
+  results: RetrievalResult[],
+  maxPerFile: number = 2,
+): RetrievalResult[] {
+  const counts = new Map<string, number>();
+  const filtered: RetrievalResult[] = [];
 
+  // Results are already sorted by descending score from topKSimilar.
   for (const result of results) {
-    const existing = seen.get(result.chunk.filePath);
-    if (!existing || result.score > existing.score) {
-      seen.set(result.chunk.filePath, result);
+    const count = counts.get(result.chunk.filePath) ?? 0;
+    if (count < maxPerFile) {
+      filtered.push(result);
+      counts.set(result.chunk.filePath, count + 1);
     }
   }
 
-  return [...seen.values()].sort((a, b) => b.score - a.score);
+  return filtered;
+}
+
+/**
+ * Apply an adaptive score boost to results from files linked by the active note.
+ *
+ * Only outgoing links are used (not backlinks) — outgoing links are intentional
+ * references the author made, encoding genuine semantic relationships.
+ *
+ * The boost tapers as link count increases to prevent hub notes (MOCs, indexes)
+ * from inflating everything they touch:
+ *   boostFactor = 1 + (strength / (1 + linkCount / 10))
+ *   At  5 links: ~1.10 boost (with default strength 0.15)
+ *   At 20 links: ~1.05 boost
+ *   At 50 links: ~1.02 boost (negligible)
+ *
+ * Results are re-sorted by boosted score after application.
+ */
+export function boostLinkedFiles(
+  results: RetrievalResult[],
+  linkedFilePaths: Set<string>,
+  strength: number = 0.15,
+): RetrievalResult[] {
+  if (linkedFilePaths.size === 0) return results;
+
+  const linkCount = linkedFilePaths.size;
+  const boostFactor = 1 + (strength / (1 + linkCount / 10));
+
+  const boosted = results.map((r) => {
+    if (linkedFilePaths.has(r.chunk.filePath)) {
+      return { ...r, score: r.score * boostFactor };
+    }
+    return r;
+  });
+
+  boosted.sort((a, b) => b.score - a.score);
+  return boosted;
 }

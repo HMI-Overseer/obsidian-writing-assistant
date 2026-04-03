@@ -1,15 +1,8 @@
 import type { SamplingParams, AnthropicCacheSettings } from "../shared/types";
-import type { ChatRequest, RagContextBlock } from "../shared/chatRequest";
+import type { ChatRequest } from "../shared/chatRequest";
+import { formatRagContext } from "../rag/formatContext";
 
 const DEFAULT_MAX_TOKENS = 4096;
-
-function formatRagContext(blocks: RagContextBlock[]): string {
-  const entries = blocks.map((b) => {
-    const heading = b.headingPath ? ` > ${b.headingPath}` : "";
-    return `[${b.filePath}${heading}]\n${b.content}`;
-  });
-  return `---\nRelated notes (retrieved by relevance):\n\n${entries.join("\n\n")}\n---`;
-}
 
 export interface AnthropicMessage {
   role: "user" | "assistant";

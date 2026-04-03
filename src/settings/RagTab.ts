@@ -220,6 +220,21 @@ export function renderRagTab(
         });
       });
 
+    new SettingItem(retrieval.bodyEl)
+      .setName("Graph-aware boost")
+      .setDesc("Boost retrieval scores for notes linked from the currently active note. Tapers automatically for hub notes with many links.")
+      .addToggle((toggle) =>
+        toggle.setValue(rag.graphBoostEnabled).onChange(async (value) => {
+          rag.graphBoostEnabled = value;
+          await plugin.saveSettings();
+          await plugin.ragService.configure(
+            rag,
+            plugin.settings.embeddingModels,
+            plugin.settings.providerSettings,
+          );
+        }),
+      );
+
     // ── Chunking ──────────────────────────────────────────────────────
     const chunking = createSettingsSection(
       conditionalWrapper,

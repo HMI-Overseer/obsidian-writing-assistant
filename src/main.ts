@@ -34,6 +34,18 @@ function normalizeRagSettings(raw: unknown): RagSettings {
     excludePatterns: Array.isArray(data.excludePatterns)
       ? data.excludePatterns.filter((p): p is string => typeof p === "string")
       : [...DEFAULT_RAG_SETTINGS.excludePatterns],
+    maxContextChars:
+      typeof data.maxContextChars === "number"
+        ? data.maxContextChars
+        : DEFAULT_RAG_SETTINGS.maxContextChars,
+    graphBoostEnabled:
+      typeof data.graphBoostEnabled === "boolean"
+        ? data.graphBoostEnabled
+        : DEFAULT_RAG_SETTINGS.graphBoostEnabled,
+    graphBoostStrength:
+      typeof data.graphBoostStrength === "number"
+        ? data.graphBoostStrength
+        : DEFAULT_RAG_SETTINGS.graphBoostStrength,
   };
 }
 

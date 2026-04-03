@@ -1,5 +1,5 @@
 import type { Message, SamplingParams } from "../shared/types";
-import type { ChatRequest, RagContextBlock } from "../shared/chatRequest";
+import type { ChatRequest } from "../shared/chatRequest";
 import type { ChatClient } from "./chatClient";
 import type { CompletionResult, StreamResult, UsageResult } from "./usageTypes";
 import type { LMStudioModel, LMStudioModelListResult } from "./types";
@@ -9,14 +9,7 @@ import { requestJson, createModelListError } from "./httpTransport";
 import { isRecord } from "./parsing";
 import { streamNode, streamFetch } from "./streamingTransport";
 import { buildCompletionPayload } from "./buildPayload";
-
-function formatRagContext(blocks: RagContextBlock[]): string {
-  const entries = blocks.map((b) => {
-    const heading = b.headingPath ? ` > ${b.headingPath}` : "";
-    return `[${b.filePath}${heading}]\n${b.content}`;
-  });
-  return `---\nRelated notes (retrieved by relevance):\n\n${entries.join("\n\n")}\n---`;
-}
+import { formatRagContext } from "../rag/formatContext";
 
 // Re-export for consumers that import from this file
 export { normalizeLMStudioBaseUrl } from "./urlResolution";
@@ -157,12 +150,16 @@ export class LMStudioClient implements ChatClient {
       messages.push({ role: turn.role, content: turn.content });
     }
 
-    // RAG context goes after conversation history to preserve cache-friendly ordering.
-    if (request.ragContext && request.ragContext.length > 0) {
-      messages.push({
-        role: "system",
-        content: formatRagContext(request.ragContext),
-      });
+    // RAG context is appended to the last user message (not a system message)
+    // to prevent prompt injection from retrieved content being treated as instructions.
+    if (request.ragContext && request.ragContext.length > 0 && messages.length > 0) {
+      const lastIdx = messages.length - 1;
+      if (messages[lastIdx].role === "user") {
+        messages[lastIdx] = {
+          ...messages[lastIdx],
+          content: messages[lastIdx].content + "\n\n" + formatRagContext(request.ragContext),
+        };
+      }
     }
 
     return messages;

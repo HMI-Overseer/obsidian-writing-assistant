@@ -1,5 +1,5 @@
 import { describe, test, expect } from "vitest";
-import { chunkDocument, fnv1aHash } from "../../../src/rag/chunker";
+import { chunkDocument, fnv1aHash, buildEmbeddingText, preprocessMarkdown } from "../../../src/rag/chunker";
 
 const DEFAULT_CHUNK_SIZE = 1500;
 const DEFAULT_OVERLAP = 200;
@@ -115,6 +115,93 @@ describe("chunkDocument", () => {
     const chunks = chunkDocument("deep.md", content, DEFAULT_CHUNK_SIZE, DEFAULT_OVERLAP);
     const deepChunk = chunks.find((c) => c.content.includes("Deep content"));
     expect(deepChunk?.headingPath).toBe("Level 1 > Level 2 > Level 3");
+  });
+});
+
+describe("buildEmbeddingText", () => {
+  test("prepends file name and heading path", () => {
+    const chunk = {
+      id: "notes/Character Bible.md::0",
+      filePath: "notes/Character Bible.md",
+      headingPath: "Backstory > Childhood",
+      content: "Born in a small village.",
+      startOffset: 0,
+      chunkIndex: 0,
+    };
+    const result = buildEmbeddingText(chunk);
+    expect(result).toBe("Character Bible > Backstory > Childhood\nBorn in a small village.");
+  });
+
+  test("uses only file name when no heading path", () => {
+    const chunk = {
+      id: "notes/Lore.md::0",
+      filePath: "notes/Lore.md",
+      headingPath: "",
+      content: "World lore content.",
+      startOffset: 0,
+      chunkIndex: 0,
+    };
+    const result = buildEmbeddingText(chunk);
+    expect(result).toBe("Lore\nWorld lore content.");
+  });
+
+  test("handles root-level files", () => {
+    const chunk = {
+      id: "README.md::0",
+      filePath: "README.md",
+      headingPath: "Getting Started",
+      content: "Instructions here.",
+      startOffset: 0,
+      chunkIndex: 0,
+    };
+    const result = buildEmbeddingText(chunk);
+    expect(result).toBe("README > Getting Started\nInstructions here.");
+  });
+});
+
+describe("preprocessMarkdown", () => {
+  test("strips YAML frontmatter", () => {
+    const input = "---\ntags: [fiction]\ndate: 2025-01-01\n---\nActual content here.";
+    expect(preprocessMarkdown(input)).toBe("Actual content here.");
+  });
+
+  test("resolves wikilinks", () => {
+    expect(preprocessMarkdown("See [[Character Bible]].")).toBe("See Character Bible.");
+    expect(preprocessMarkdown("See [[Character Bible|the bible]].")).toBe("See the bible.");
+  });
+
+  test("removes image embeds", () => {
+    expect(preprocessMarkdown("![[screenshot.png]]")).toBe("");
+    expect(preprocessMarkdown("![alt text](image.png)")).toBe("");
+  });
+
+  test("strips markdown links but keeps text", () => {
+    expect(preprocessMarkdown("[click here](https://example.com)")).toBe("click here");
+  });
+
+  test("cleans tag syntax", () => {
+    expect(preprocessMarkdown("Tagged #fiction/fantasy and #wip")).toBe("Tagged fiction fantasy and wip");
+  });
+
+  test("preserves code blocks", () => {
+    const input = "Before\n```js\nconst x = [[not a link]];\n```\nAfter";
+    const result = preprocessMarkdown(input);
+    expect(result).toContain("```js\nconst x = [[not a link]];\n```");
+    expect(result).toContain("Before");
+    expect(result).toContain("After");
+  });
+
+  test("does not strip heading markers as tags", () => {
+    const input = "# My Heading\n\nSome text with #tag";
+    const result = preprocessMarkdown(input);
+    expect(result).toContain("# My Heading");
+    expect(result).toContain("tag");
+    expect(result).not.toContain("#tag");
+  });
+
+  test("handles content with no markdown syntax", () => {
+    const input = "Just plain text.";
+    expect(preprocessMarkdown(input)).toBe("Just plain text.");
   });
 });
 

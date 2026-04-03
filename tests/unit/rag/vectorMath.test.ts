@@ -1,5 +1,5 @@
 import { describe, test, expect } from "vitest";
-import { cosineSimilarity, topKSimilar, deduplicateByFile } from "../../../src/rag/vectorMath";
+import { cosineSimilarity, topKSimilar, limitPerFile, boostLinkedFiles } from "../../../src/rag/vectorMath";
 import type { IndexedChunk, RetrievalResult } from "../../../src/rag/types";
 
 function makeChunk(id: string, filePath: string, vector: number[]): IndexedChunk {
@@ -83,28 +83,90 @@ describe("topKSimilar", () => {
   });
 });
 
-describe("deduplicateByFile", () => {
-  test("keeps highest-scoring chunk per file", () => {
+describe("limitPerFile", () => {
+  test("keeps up to maxPerFile chunks per file (default 2)", () => {
+    const results: RetrievalResult[] = [
+      { chunk: { id: "a::0", filePath: "a.md", headingPath: "", content: "", startOffset: 0, chunkIndex: 0 }, score: 0.9 },
+      { chunk: { id: "b::0", filePath: "b.md", headingPath: "", content: "", startOffset: 0, chunkIndex: 0 }, score: 0.8 },
+      { chunk: { id: "a::1", filePath: "a.md", headingPath: "", content: "", startOffset: 100, chunkIndex: 1 }, score: 0.7 },
+      { chunk: { id: "a::2", filePath: "a.md", headingPath: "", content: "", startOffset: 200, chunkIndex: 2 }, score: 0.6 },
+    ];
+
+    const limited = limitPerFile(results);
+    expect(limited).toHaveLength(3); // a::0, b::0, a::1 (a::2 dropped)
+    expect(limited.map((r) => r.chunk.id)).toEqual(["a::0", "b::0", "a::1"]);
+  });
+
+  test("respects custom maxPerFile", () => {
     const results: RetrievalResult[] = [
       { chunk: { id: "a::0", filePath: "a.md", headingPath: "", content: "", startOffset: 0, chunkIndex: 0 }, score: 0.9 },
       { chunk: { id: "a::1", filePath: "a.md", headingPath: "", content: "", startOffset: 100, chunkIndex: 1 }, score: 0.7 },
       { chunk: { id: "b::0", filePath: "b.md", headingPath: "", content: "", startOffset: 0, chunkIndex: 0 }, score: 0.8 },
     ];
 
-    const deduped = deduplicateByFile(results);
-    expect(deduped).toHaveLength(2);
-    expect(deduped[0].chunk.filePath).toBe("a.md");
-    expect(deduped[0].score).toBe(0.9);
-    expect(deduped[1].chunk.filePath).toBe("b.md");
+    const limited = limitPerFile(results, 1);
+    expect(limited).toHaveLength(2);
+    expect(limited[0].chunk.id).toBe("a::0");
+    expect(limited[1].chunk.id).toBe("b::0");
   });
 
-  test("returns results sorted by score", () => {
+  test("preserves input order", () => {
     const results: RetrievalResult[] = [
       { chunk: { id: "b::0", filePath: "b.md", headingPath: "", content: "", startOffset: 0, chunkIndex: 0 }, score: 0.5 },
       { chunk: { id: "a::0", filePath: "a.md", headingPath: "", content: "", startOffset: 0, chunkIndex: 0 }, score: 0.9 },
     ];
 
-    const deduped = deduplicateByFile(results);
-    expect(deduped[0].score).toBeGreaterThan(deduped[1].score);
+    const limited = limitPerFile(results);
+    expect(limited[0].chunk.id).toBe("b::0");
+    expect(limited[1].chunk.id).toBe("a::0");
+  });
+});
+
+describe("boostLinkedFiles", () => {
+  function makeResult(filePath: string, score: number): RetrievalResult {
+    return {
+      chunk: { id: `${filePath}::0`, filePath, headingPath: "", content: "", startOffset: 0, chunkIndex: 0 },
+      score,
+    };
+  }
+
+  test("boosts scores for linked files and re-sorts", () => {
+    const results = [
+      makeResult("a.md", 0.8),
+      makeResult("b.md", 0.75),
+    ];
+    const linked = new Set(["b.md"]);
+    const boosted = boostLinkedFiles(results, linked, 0.15);
+
+    // b.md should now score higher than a.md due to boost.
+    expect(boosted[0].chunk.filePath).toBe("b.md");
+    expect(boosted[0].score).toBeGreaterThan(0.75);
+    expect(boosted[1].chunk.filePath).toBe("a.md");
+    expect(boosted[1].score).toBe(0.8); // Unchanged.
+  });
+
+  test("returns unchanged results when no linked files", () => {
+    const results = [makeResult("a.md", 0.9), makeResult("b.md", 0.8)];
+    const boosted = boostLinkedFiles(results, new Set(), 0.15);
+    expect(boosted).toEqual(results);
+  });
+
+  test("tapers boost as link count increases", () => {
+    const results = [makeResult("a.md", 0.5)];
+
+    // Few links — strong boost.
+    const fewLinks = new Set(["a.md", "x.md", "y.md"]);
+    const fewBoosted = boostLinkedFiles(results, fewLinks, 0.15);
+
+    // Many links — weak boost.
+    const manyLinks = new Set([
+      "a.md", ...Array.from({ length: 49 }, (_, i) => `link${i}.md`),
+    ]);
+    const manyBoosted = boostLinkedFiles(results, manyLinks, 0.15);
+
+    expect(fewBoosted[0].score).toBeGreaterThan(manyBoosted[0].score);
+    // Both should still be greater than the original.
+    expect(fewBoosted[0].score).toBeGreaterThan(0.5);
+    expect(manyBoosted[0].score).toBeGreaterThan(0.5);
   });
 });

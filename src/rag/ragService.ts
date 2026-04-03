@@ -32,6 +32,9 @@ export class RagService {
 
   /** Tracks the settings used by the currently configured pipeline. */
   private configuredModelId: string | null = null;
+  private maxContextChars = 6000;
+  private graphBoostEnabled = true;
+  private graphBoostStrength = 0.15;
 
   constructor(app: App) {
     this.app = app;
@@ -109,17 +112,23 @@ export class RagService {
 
     this.embeddingClient = client;
     this.configuredModelId = model.modelId;
+    this.maxContextChars = ragSettings.maxContextChars;
+    this.graphBoostEnabled = ragSettings.graphBoostEnabled;
+    this.graphBoostStrength = ragSettings.graphBoostStrength;
     this.store = new VectorStore(model.modelId, 0, ragSettings.chunkSize, ragSettings.chunkOverlap);
 
     // Load persisted index from disk (no API calls).
     await this.loadIndex();
 
     this.retriever = new Retriever({
+      app: this.app,
       store: this.store,
       embeddingClient: client,
       embeddingModelId: model.modelId,
       topK: ragSettings.topK,
       minScore: ragSettings.minScore,
+      graphBoostEnabled: this.graphBoostEnabled,
+      graphBoostStrength: this.graphBoostStrength,
     });
   }
 
@@ -160,11 +169,14 @@ export class RagService {
 
     // Update retriever to point at the new store.
     this.retriever = new Retriever({
+      app: this.app,
       store: this.store,
       embeddingClient: this.embeddingClient,
       embeddingModelId: this.configuredModelId,
       topK: ragSettings.topK,
       minScore: ragSettings.minScore,
+      graphBoostEnabled: this.graphBoostEnabled,
+      graphBoostStrength: this.graphBoostStrength,
     });
 
     this.indexer = new VaultIndexer({
@@ -205,15 +217,46 @@ export class RagService {
   /**
    * Retrieve relevant context for a user query.
    * Returns null if RAG is not ready, or an empty array on failure.
+   *
+   * Applies two-layer filtering after retrieval:
+   * 1. Score gap detection — cuts off results after a large relevance drop.
+   * 2. Relative threshold — excludes results below 60% of the best score.
+   * 3. Character budget — ensures total context stays within budget.
    */
-  async retrieve(query: string): Promise<RagContextBlock[] | null> {
+  async retrieve(query: string, activeFilePath?: string): Promise<RagContextBlock[] | null> {
     if (!this.retriever || !this.isReady()) {
       return null;
     }
 
     try {
-      const results = await this.retriever.retrieve(query);
-      return results.map((r) => ({
+      const results = await this.retriever.retrieve(query, activeFilePath);
+      if (results.length === 0) return null;
+
+      let filtered = results;
+
+      // Relative threshold: exclude results below 60% of the best score.
+      const bestScore = filtered[0].score;
+      filtered = filtered.filter((r) => r.score >= bestScore * 0.6);
+
+      // Score gap detection: cut off after a >30% relative drop between consecutive results.
+      for (let i = 1; i < filtered.length; i++) {
+        if (filtered[i].score < filtered[i - 1].score * 0.7) {
+          filtered = filtered.slice(0, i);
+          break;
+        }
+      }
+
+      // Character budget: drop lowest-scoring results if total exceeds budget.
+      const maxChars = this.maxContextChars;
+      let totalChars = 0;
+      const budgeted: typeof filtered = [];
+      for (const r of filtered) {
+        totalChars += r.chunk.content.length;
+        if (totalChars > maxChars && budgeted.length > 0) break;
+        budgeted.push(r);
+      }
+
+      return budgeted.map((r) => ({
         filePath: r.chunk.filePath,
         headingPath: r.chunk.headingPath,
         content: r.chunk.content,

@@ -1,5 +1,48 @@
 import type { DocumentChunk } from "./types";
 
+/**
+ * Preprocess raw markdown content before chunking and embedding.
+ * Strips syntax that pollutes the embedding space while preserving
+ * semantically meaningful text. Code blocks are left intact.
+ */
+export function preprocessMarkdown(content: string): string {
+  // 1. Protect code blocks from being mangled by later regexes.
+  //    Replace them with placeholders, then restore after cleaning.
+  const codeBlocks: string[] = [];
+  const PLACEHOLDER_PREFIX = "%%CODEBLOCK_";
+  const PLACEHOLDER_SUFFIX = "%%";
+  let processed = content.replace(/```[\s\S]*?```/g, (match) => {
+    codeBlocks.push(match);
+    return `${PLACEHOLDER_PREFIX}${codeBlocks.length - 1}${PLACEHOLDER_SUFFIX}`;
+  });
+
+  // 2. Strip YAML frontmatter (must be at the very start of the file).
+  processed = processed.replace(/^---\n[\s\S]*?\n---\n?/, "");
+
+  // 3. Remove image embeds: ![[image.png]] and ![alt](url)
+  processed = processed.replace(/!\[\[.*?\]\]/g, "");
+  processed = processed.replace(/!\[.*?\]\(.*?\)/g, "");
+
+  // 4. Resolve wikilinks: [[Note|Display]] → Display, [[Note]] → Note
+  processed = processed.replace(/\[\[([^\]|]+)\|([^\]]+)\]\]/g, "$2");
+  processed = processed.replace(/\[\[([^\]]+)\]\]/g, "$1");
+
+  // 5. Strip markdown links: [text](url) → text
+  processed = processed.replace(/\[([^\]]+)\]\([^)]+\)/g, "$1");
+
+  // 6. Clean tag syntax: #tag/subtag → tag subtag
+  //    Only match tags at word boundaries, not inside headings.
+  processed = processed.replace(/(?<=^|\s)#([a-zA-Z][\w/]*)/gm, (_, tag: string) =>
+    tag.replace(/\//g, " "),
+  );
+
+  // 7. Restore code blocks.
+  const placeholderRe = new RegExp(`${PLACEHOLDER_PREFIX}(\\d+)${PLACEHOLDER_SUFFIX}`, "g");
+  processed = processed.replace(placeholderRe, (_, idx) => codeBlocks[Number(idx)]);
+
+  return processed;
+}
+
 /** Minimum chunk size in characters. Smaller chunks are merged with neighbors. */
 const MIN_CHUNK_CHARS = 50;
 
@@ -205,6 +248,24 @@ function mergeSmallChunks(chunks: DocumentChunk[]): DocumentChunk[] {
   }
 
   return result;
+}
+
+/**
+ * Build the text sent to the embedding model for a chunk.
+ * Prepends the note title and heading breadcrumb so the embedding vector
+ * captures *where* in the vault this chunk lives — not just its content.
+ *
+ * The stored `content` field is NOT modified; only the embedding input changes.
+ */
+export function buildEmbeddingText(chunk: DocumentChunk): string {
+  // Derive a human-readable note title from the file path.
+  const fileName = chunk.filePath.replace(/\.md$/, "").split("/").pop() ?? "";
+  const parts: string[] = [];
+  if (fileName) parts.push(fileName);
+  if (chunk.headingPath) parts.push(chunk.headingPath);
+
+  const prefix = parts.length > 0 ? parts.join(" > ") + "\n" : "";
+  return prefix + chunk.content;
 }
 
 /**

@@ -70,11 +70,18 @@ export async function prepareApiMessages(
   if (!editMode && ragService?.isReady()) {
     const lastUserMessage = messages.findLast((m) => m.role === "user");
     if (lastUserMessage) {
-      ragContext = await ragService.retrieve(lastUserMessage.content);
+      const activeFile = app.workspace.getActiveFile();
+      ragContext = await ragService.retrieve(lastUserMessage.content, activeFile?.path);
     }
   }
 
-  return { systemPrompt, documentContext, ragContext, messages };
+  // When RAG context is present, add a grounding instruction so the model
+  // knows retrieved notes exist and should be consulted as reference material.
+  const finalSystemPrompt = ragContext && ragContext.length > 0
+    ? systemPrompt + "\n\nWhen retrieved notes are provided, use them as reference material. If the retrieved notes don't contain relevant information for the question, rely on your general knowledge instead."
+    : systemPrompt;
+
+  return { systemPrompt: finalSystemPrompt, documentContext, ragContext, messages };
 }
 
 /**

@@ -26,6 +26,9 @@ export const DEFAULT_RAG_SETTINGS: RagSettings = {
   topK: 5,
   minScore: 0.3,
   excludePatterns: ["templates/**"],
+  maxContextChars: 6000,
+  graphBoostEnabled: true,
+  graphBoostStrength: 0.15,
 };
 
 export const DEFAULT_SETTINGS: PluginSettings = {

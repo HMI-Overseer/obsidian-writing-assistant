@@ -3,7 +3,7 @@ import type { App, TAbstractFile } from "obsidian";
 import type { EmbeddingClient } from "./embeddingClient";
 import type { IndexedChunk, FileIndexMeta, IndexingState } from "./types";
 import type { VectorStore } from "./vectorStore";
-import { chunkDocument, fnv1aHash } from "./chunker";
+import { chunkDocument, fnv1aHash, buildEmbeddingText, preprocessMarkdown } from "./chunker";
 
 /** Number of files to process per batch before yielding to the UI thread. */
 const BATCH_SIZE = 5;
@@ -220,7 +220,8 @@ export class VaultIndexer {
         continue;
       }
 
-      const chunks = chunkDocument(file.path, content, this.chunkSize, this.chunkOverlap);
+      const cleaned = preprocessMarkdown(content);
+      const chunks = chunkDocument(file.path, cleaned, this.chunkSize, this.chunkOverlap);
 
       if (chunks.length === 0) {
         this.store.removeFile(file.path);
@@ -233,7 +234,7 @@ export class VaultIndexer {
         if (signal?.aborted || this.destroyed) return;
 
         const batch = chunks.slice(i, i + EMBED_BATCH_SIZE);
-        const texts = batch.map((c) => c.content);
+        const texts = batch.map((c) => buildEmbeddingText(c));
         const result = await this.client.embed(texts, this.modelId, signal);
 
         for (let j = 0; j < batch.length; j++) {

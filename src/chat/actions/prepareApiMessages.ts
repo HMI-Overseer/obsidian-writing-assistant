@@ -1,9 +1,10 @@
 import type { ConversationMessage } from "../../shared/types";
-import type { ChatRequest, ChatTurn, DocumentContext } from "../../shared/chatRequest";
+import type { ChatRequest, ChatTurn, DocumentContext, RagContextBlock } from "../../shared/chatRequest";
 import { getActiveNoteText, getFullNoteContent } from "../../context/noteContext";
 import { EDIT_SYSTEM_PROMPT } from "../../editing/editSystemPrompt";
 import type { App } from "obsidian";
 import type { ChatSessionStore } from "../conversation/ChatSessionStore";
+import type { RagService } from "../../rag";
 
 export interface PrepareMessagesOptions {
   app: App;
@@ -13,6 +14,7 @@ export interface PrepareMessagesOptions {
   sessionContextEnabled: boolean;
   maxContextChars: number;
   editMode?: boolean;
+  ragService?: RagService;
 }
 
 export async function prepareApiMessages(
@@ -26,6 +28,7 @@ export async function prepareApiMessages(
     sessionContextEnabled,
     maxContextChars,
     editMode = false,
+    ragService,
   } = options;
 
   const systemPrompt = editMode ? EDIT_SYSTEM_PROMPT : globalSystemPrompt;
@@ -62,7 +65,16 @@ export async function prepareApiMessages(
       : message.content,
   }));
 
-  return { systemPrompt, documentContext, messages };
+  // Retrieve RAG context based on the latest user message.
+  let ragContext: RagContextBlock[] | null = null;
+  if (!editMode && ragService?.isReady()) {
+    const lastUserMessage = messages.findLast((m) => m.role === "user");
+    if (lastUserMessage) {
+      ragContext = await ragService.retrieve(lastUserMessage.content);
+    }
+  }
+
+  return { systemPrompt, documentContext, ragContext, messages };
 }
 
 /**

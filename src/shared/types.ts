@@ -145,6 +145,23 @@ export interface ProviderSettingsMap {
   openai: OpenAIProviderSettings;
 }
 
+/** RAG-specific settings. */
+export interface RagSettings {
+  enabled: boolean;
+  /** EmbeddingModel.id from the embeddingModels array. */
+  activeEmbeddingModelId: string | null;
+  /** Target chunk size in characters. */
+  chunkSize: number;
+  /** Overlap between chunks in characters. */
+  chunkOverlap: number;
+  /** Number of retrieval results to inject as context. */
+  topK: number;
+  /** Minimum similarity score (0–1) to include a result. */
+  minScore: number;
+  /** File patterns to exclude from indexing (glob strings). */
+  excludePatterns: string[];
+}
+
 export interface PluginSettings {
   /** @deprecated Use providerSettings.lmstudio.baseUrl */
   lmStudioUrl: string;
@@ -177,4 +194,6 @@ export interface PluginSettings {
   diffContextLines: number;
   /** Minimum fuzzy match confidence (0–1) to consider a match valid. */
   diffMinMatchConfidence: number;
+  /** RAG (retrieval-augmented generation) settings. */
+  rag: RagSettings;
 }

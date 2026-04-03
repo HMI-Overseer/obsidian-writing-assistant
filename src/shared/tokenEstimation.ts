@@ -31,6 +31,12 @@ export function estimateTokenCount(request: ChatRequest, draft?: string): number
     totalChars += request.documentContext.content.length;
   }
 
+  if (request.ragContext) {
+    for (const block of request.ragContext) {
+      totalChars += block.filePath.length + block.headingPath.length + block.content.length + 40;
+    }
+  }
+
   for (const turn of request.messages) {
     totalChars += turn.content.length;
   }

@@ -1,0 +1,282 @@
+import { Notice } from "obsidian";
+import type LMStudioWritingAssistant from "../main";
+import type { IndexingState } from "../rag/types";
+import { createSettingsSection, SettingItem } from "./ui";
+import { DEFAULT_RAG_SETTINGS } from "../constants";
+
+/**
+ * Renders the Retrieval (RAG) settings tab.
+ * Returns a cleanup function to unregister the indexing state listener.
+ */
+export function renderRagTab(
+  container: HTMLElement,
+  plugin: LMStudioWritingAssistant,
+): () => void {
+  const { rag } = plugin.settings;
+
+  // Wrapper for conditional sections so we can show/hide them.
+  const conditionalWrapper = container.createDiv({ cls: "lmsa-rag-conditional" });
+
+  // ── Enable / Disable ──────────────────────────────────────────────
+  const general = createSettingsSection(
+    container,
+    "Vault retrieval",
+    "Automatically find and inject relevant vault content into each chat request using embedding-based search.",
+    { icon: "search" },
+  );
+
+  new SettingItem(general.bodyEl)
+    .setName("Enable vault retrieval")
+    .setDesc("When enabled, the plugin can index your vault and retrieve relevant notes for each chat message.")
+    .addToggle((toggle) =>
+      toggle.setValue(rag.enabled).onChange(async (value) => {
+        rag.enabled = value;
+        await plugin.saveSettings();
+        await plugin.ragService.configure(
+          rag,
+          plugin.settings.embeddingModels,
+          plugin.settings.providerSettings,
+        );
+        renderConditionalSections();
+      }),
+    );
+
+  // ── Embedding Model ───────────────────────────────────────────────
+  const models = plugin.settings.embeddingModels;
+
+  new SettingItem(general.bodyEl)
+    .setName("Embedding model")
+    .setDesc("Select which embedding model to use. Configure models in the embedding models tab.")
+    .addDropdown((dropdown) => {
+      dropdown.addOption("", "None selected");
+      for (const model of models) {
+        dropdown.addOption(model.id, model.name);
+      }
+      dropdown.setValue(rag.activeEmbeddingModelId ?? "");
+      dropdown.onChange(async (value) => {
+        rag.activeEmbeddingModelId = value || null;
+        await plugin.saveSettings();
+        await plugin.ragService.configure(
+          rag,
+          plugin.settings.embeddingModels,
+          plugin.settings.providerSettings,
+        );
+      });
+    });
+
+  // Move the conditional wrapper after the general section in the DOM.
+  container.appendChild(conditionalWrapper);
+
+  /** Renders or clears the conditional sections based on rag.enabled. */
+  function renderConditionalSections(): void {
+    conditionalWrapper.empty();
+
+    if (!rag.enabled) return;
+
+    // ── Index Status (live-updating) ──────────────────────────────────
+    const status = createSettingsSection(
+      conditionalWrapper,
+      "Index",
+      "Manage the vector index used for retrieval.",
+      { icon: "database" },
+    );
+
+    const statusRow = status.bodyEl.createDiv({ cls: "lmsa-rag-status" });
+    const statusTextEl = statusRow.createEl("p", { cls: "lmsa-rag-status-text" });
+    const driftNoticeEl = statusRow.createEl("p", { cls: "lmsa-rag-drift-notice" });
+    const progressRow = statusRow.createDiv({ cls: "lmsa-rag-progress" });
+    const progressTextEl = progressRow.createEl("span", { cls: "lmsa-rag-progress-text" });
+
+    // ── Action buttons via SettingItem ──
+    const buildItem = new SettingItem(status.bodyEl);
+    buildItem.settingEl.addClass("lmsa-rag-action-row");
+    buildItem.addButton((button) =>
+      button.setButtonText("Build index").setCta().onClick(async () => {
+        if (!rag.enabled || !rag.activeEmbeddingModelId) {
+          new Notice("Enable retrieval and select an embedding model first.");
+          return;
+        }
+        await plugin.ragService.startIndexing(
+          rag,
+          plugin.settings.embeddingModels,
+          plugin.settings.providerSettings,
+        );
+      }),
+    );
+
+    const rebuildItem = new SettingItem(status.bodyEl);
+    rebuildItem.settingEl.addClass("lmsa-rag-action-row");
+    rebuildItem.addButton((button) =>
+      button.setButtonText("Rebuild index").onClick(async () => {
+        if (!rag.enabled || !rag.activeEmbeddingModelId) {
+          new Notice("Enable retrieval and select an embedding model first.");
+          return;
+        }
+        await plugin.ragService.rebuild(
+          rag,
+          plugin.settings.embeddingModels,
+          plugin.settings.providerSettings,
+        );
+      }),
+    );
+
+    const stopItem = new SettingItem(status.bodyEl);
+    stopItem.settingEl.addClass("lmsa-rag-action-row");
+    stopItem.addButton((button) =>
+      button.setButtonText("Stop").onClick(() => {
+        plugin.ragService.stopIndexing();
+      }),
+    );
+
+    // ── State rendering function ──
+    function updateDisplay(state: IndexingState): void {
+      const fileCount = plugin.ragService.getFileCount();
+      const chunkCount = plugin.ragService.getChunkCount();
+      const hasIndex = chunkCount > 0;
+      const isIndexing = state.status === "indexing";
+      const isError = state.status === "error";
+
+      // Status text
+      if (!rag.activeEmbeddingModelId) {
+        statusTextEl.textContent = "No embedding model selected.";
+      } else if (isError) {
+        statusTextEl.textContent = `Error: ${state.message}`;
+        statusTextEl.addClass("mod-error");
+      } else if (isIndexing) {
+        statusTextEl.textContent = "Indexing in progress...";
+        statusTextEl.removeClass("mod-error");
+      } else if (hasIndex) {
+        statusTextEl.textContent = `${fileCount} files, ${chunkCount} chunks indexed.`;
+        statusTextEl.removeClass("mod-error");
+      } else {
+        statusTextEl.textContent = "Index not built. Click build index to start.";
+        statusTextEl.removeClass("mod-error");
+      }
+
+      // Settings drift notice
+      const showDrift = hasIndex && rag.enabled && plugin.ragService.needsReindex(rag);
+      driftNoticeEl.textContent = showDrift
+        ? "Settings changed since last build. Rebuild recommended."
+        : "";
+      driftNoticeEl.toggleClass("is-visible", showDrift);
+
+      // Progress
+      if (isIndexing) {
+        const pct = state.filesTotal > 0
+          ? Math.round((state.filesProcessed / state.filesTotal) * 100)
+          : 0;
+        progressTextEl.textContent = `${state.filesProcessed} / ${state.filesTotal} files (${pct}%)`;
+      } else {
+        progressTextEl.textContent = "";
+      }
+      progressRow.toggleClass("is-visible", isIndexing);
+
+      // Button visibility
+      const canAct = !!rag.activeEmbeddingModelId;
+      buildItem.settingEl.toggleClass("is-visible", canAct && !hasIndex && !isIndexing);
+      rebuildItem.settingEl.toggleClass("is-visible", canAct && hasIndex && !isIndexing);
+      stopItem.settingEl.toggleClass("is-visible", isIndexing);
+    }
+
+    // Initial render.
+    updateDisplay(plugin.ragService.getIndexingState());
+
+    // Subscribe to live state updates.
+    plugin.ragService.onIndexingStateChange((state) => updateDisplay(state));
+
+    // ── Retrieval ─────────────────────────────────────────────────────
+    const retrieval = createSettingsSection(
+      conditionalWrapper,
+      "Retrieval",
+      "Control how many and which results are injected as context.",
+      { icon: "filter" },
+    );
+
+    new SettingItem(retrieval.bodyEl)
+      .setName("Results per query")
+      .setDesc(`Number of relevant chunks to inject, 1–20 (default: ${DEFAULT_RAG_SETTINGS.topK}).`)
+      .addText((text) => {
+        text.setValue(String(rag.topK));
+        text.onChange(async (value) => {
+          const num = parseInt(value, 10);
+          if (!isNaN(num) && num >= 1 && num <= 20) {
+            rag.topK = num;
+            await plugin.saveSettings();
+          }
+        });
+      });
+
+    new SettingItem(retrieval.bodyEl)
+      .setName("Minimum similarity")
+      .setDesc(`Only include results above this score, 0–0.8 (default: ${DEFAULT_RAG_SETTINGS.minScore}).`)
+      .addText((text) => {
+        text.setValue(String(rag.minScore));
+        text.onChange(async (value) => {
+          const num = parseFloat(value);
+          if (!isNaN(num) && num >= 0 && num <= 0.8) {
+            rag.minScore = num;
+            await plugin.saveSettings();
+          }
+        });
+      });
+
+    // ── Chunking ──────────────────────────────────────────────────────
+    const chunking = createSettingsSection(
+      conditionalWrapper,
+      "Chunking",
+      "Configure how vault notes are split into retrieval-friendly pieces.",
+      { icon: "scissors" },
+    );
+
+    new SettingItem(chunking.bodyEl)
+      .setName("Chunk size")
+      .setDesc(`Target characters per chunk, 500–3000 (default: ${DEFAULT_RAG_SETTINGS.chunkSize}).`)
+      .addText((text) => {
+        text.setValue(String(rag.chunkSize));
+        text.onChange(async (value) => {
+          const num = parseInt(value, 10);
+          if (!isNaN(num) && num >= 500 && num <= 3000) {
+            rag.chunkSize = num;
+            await plugin.saveSettings();
+          }
+        });
+      });
+
+    new SettingItem(chunking.bodyEl)
+      .setName("Chunk overlap")
+      .setDesc(`Characters of overlap between adjacent chunks, 0–500 (default: ${DEFAULT_RAG_SETTINGS.chunkOverlap}).`)
+      .addText((text) => {
+        text.setValue(String(rag.chunkOverlap));
+        text.onChange(async (value) => {
+          const num = parseInt(value, 10);
+          if (!isNaN(num) && num >= 0 && num <= 500) {
+            rag.chunkOverlap = num;
+            await plugin.saveSettings();
+          }
+        });
+      });
+
+    new SettingItem(chunking.bodyEl)
+      .setName("Exclude patterns")
+      .setDesc("Glob patterns for files to exclude from indexing (one per line).")
+      .addTextArea((textarea) => {
+        textarea.setValue(rag.excludePatterns.join("\n"));
+        textarea.setPlaceholder("e.g. templates/**");
+        textarea.onChange(async (value) => {
+          rag.excludePatterns = value
+            .split("\n")
+            .map((line) => line.trim())
+            .filter((line) => line.length > 0);
+          await plugin.saveSettings();
+        });
+      });
+  }
+
+  // Initial render of conditional sections.
+  renderConditionalSections();
+
+  // Return cleanup function.
+  return () => {
+    plugin.ragService.onIndexingStateChange(null);
+  };
+}

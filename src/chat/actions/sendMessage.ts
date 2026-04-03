@@ -114,6 +114,7 @@ export async function sendMessage(options: SendMessageOptions): Promise<void> {
     sessionContextEnabled: composer.isSessionContextEnabled(),
     maxContextChars: plugin.settings.maxContextChars,
     editMode,
+    ragService: plugin.ragService,
   });
 
   // Attach Anthropic cache settings if enabled on the active model.

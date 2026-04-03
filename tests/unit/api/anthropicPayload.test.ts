@@ -11,6 +11,7 @@ function makeRequest(overrides: Partial<ChatRequest> = {}): ChatRequest {
   return {
     systemPrompt: "You are helpful.",
     documentContext: null,
+    ragContext: null,
     messages: [{ role: "user", content: "Hello" }],
     ...overrides,
   };

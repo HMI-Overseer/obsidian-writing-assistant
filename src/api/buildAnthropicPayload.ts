@@ -1,7 +1,15 @@
 import type { SamplingParams, AnthropicCacheSettings } from "../shared/types";
-import type { ChatRequest } from "../shared/chatRequest";
+import type { ChatRequest, RagContextBlock } from "../shared/chatRequest";
 
 const DEFAULT_MAX_TOKENS = 4096;
+
+function formatRagContext(blocks: RagContextBlock[]): string {
+  const entries = blocks.map((b) => {
+    const heading = b.headingPath ? ` > ${b.headingPath}` : "";
+    return `[${b.filePath}${heading}]\n${b.content}`;
+  });
+  return `---\nRelated notes (retrieved by relevance):\n\n${entries.join("\n\n")}\n---`;
+}
 
 export interface AnthropicMessage {
   role: "user" | "assistant";
@@ -44,6 +52,18 @@ export function buildAnthropicMessages(
     role: turn.role,
     content: turn.content,
   }));
+
+  // Inject RAG context after conversation history to preserve cache prefix.
+  // Appended to the last user message so earlier messages remain cache-stable.
+  if (request.ragContext && request.ragContext.length > 0 && messages.length > 0) {
+    const lastIdx = messages.length - 1;
+    if (messages[lastIdx].role === "user") {
+      messages[lastIdx] = {
+        ...messages[lastIdx],
+        content: messages[lastIdx].content + "\n\n" + formatRagContext(request.ragContext),
+      };
+    }
+  }
 
   // When caching is enabled, send system as a content block with cache_control.
   if (cacheSettings?.enabled && systemText) {

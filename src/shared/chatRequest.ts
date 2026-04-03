@@ -19,6 +19,14 @@ export interface ChatTurn {
   content: string;
 }
 
+/** A block of RAG-retrieved context injected into the request. */
+export interface RagContextBlock {
+  filePath: string;
+  headingPath: string;
+  content: string;
+  score: number;
+}
+
 /**
  * Provider-independent chat completion request.
  * Produced by the chat domain, consumed by provider-specific clients.
@@ -28,6 +36,8 @@ export interface ChatRequest {
   systemPrompt: string;
   /** Optional document context (active note). null = no document attached. */
   documentContext: DocumentContext | null;
+  /** RAG retrieval results. null = RAG disabled or no results. */
+  ragContext: RagContextBlock[] | null;
   /** Conversation turns in chronological order. */
   messages: ChatTurn[];
   /** Anthropic prompt caching settings. Attached when the active model has caching enabled. */

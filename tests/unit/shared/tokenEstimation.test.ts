@@ -6,6 +6,7 @@ function makeRequest(overrides: Partial<ChatRequest> = {}): ChatRequest {
   return {
     systemPrompt: "",
     documentContext: null,
+    ragContext: null,
     messages: [],
     ...overrides,
   };

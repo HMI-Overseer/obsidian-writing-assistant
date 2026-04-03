@@ -1,4 +1,4 @@
-import type { ChatHistory, PluginSettings } from "./shared/types";
+import type { ChatHistory, PluginSettings, RagSettings } from "./shared/types";
 
 export const VIEW_TYPE_CHAT = "lm-studio-chat";
 
@@ -16,6 +16,16 @@ export const CONTEXT_DANGER_THRESHOLD = 0.95;
 export const DEFAULT_CHAT_HISTORY: ChatHistory = {
   conversations: [],
   activeConversationId: null,
+};
+
+export const DEFAULT_RAG_SETTINGS: RagSettings = {
+  enabled: false,
+  activeEmbeddingModelId: null,
+  chunkSize: 1500,
+  chunkOverlap: 200,
+  topK: 5,
+  minScore: 0.3,
+  excludePatterns: ["templates/**"],
 };
 
 export const DEFAULT_SETTINGS: PluginSettings = {
@@ -42,4 +52,5 @@ export const DEFAULT_SETTINGS: PluginSettings = {
   chatHistory: { ...DEFAULT_CHAT_HISTORY },
   diffContextLines: 3,
   diffMinMatchConfidence: 0.7,
+  rag: { ...DEFAULT_RAG_SETTINGS },
 };

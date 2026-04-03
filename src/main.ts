@@ -7,13 +7,35 @@ import type {
   EmbeddingModel,
   PluginSettings,
   ProviderSettingsMap,
+  RagSettings,
 } from "./shared/types";
-import { DEFAULT_CHAT_HISTORY, DEFAULT_SETTINGS, VIEW_TYPE_CHAT } from "./constants";
+import { DEFAULT_CHAT_HISTORY, DEFAULT_RAG_SETTINGS, DEFAULT_SETTINGS, VIEW_TYPE_CHAT } from "./constants";
 import { normalizeLMStudioBaseUrl, ModelAvailabilityService } from "./api";
 import { ChatView } from "./chat";
 import { normalizeChatHistory } from "./chat/conversation/conversationUtils";
 import { normalizeCompletionModel, normalizeEmbeddingModel } from "./shared/normalizeModels";
 import { LMStudioSettingTab } from "./settings/SettingsTab";
+import { RagService } from "./rag";
+
+function normalizeRagSettings(raw: unknown): RagSettings {
+  const data = (typeof raw === "object" && raw !== null ? raw : {}) as Partial<RagSettings>;
+  return {
+    enabled: typeof data.enabled === "boolean" ? data.enabled : DEFAULT_RAG_SETTINGS.enabled,
+    activeEmbeddingModelId:
+      typeof data.activeEmbeddingModelId === "string"
+        ? data.activeEmbeddingModelId
+        : DEFAULT_RAG_SETTINGS.activeEmbeddingModelId,
+    chunkSize:
+      typeof data.chunkSize === "number" ? data.chunkSize : DEFAULT_RAG_SETTINGS.chunkSize,
+    chunkOverlap:
+      typeof data.chunkOverlap === "number" ? data.chunkOverlap : DEFAULT_RAG_SETTINGS.chunkOverlap,
+    topK: typeof data.topK === "number" ? data.topK : DEFAULT_RAG_SETTINGS.topK,
+    minScore: typeof data.minScore === "number" ? data.minScore : DEFAULT_RAG_SETTINGS.minScore,
+    excludePatterns: Array.isArray(data.excludePatterns)
+      ? data.excludePatterns.filter((p): p is string => typeof p === "string")
+      : [...DEFAULT_RAG_SETTINGS.excludePatterns],
+  };
+}
 
 function migrateProviderSettings(
   data: Partial<PluginSettings> | null,
@@ -47,10 +69,17 @@ function migrateProviderSettings(
 export default class LMStudioWritingAssistant extends Plugin {
   settings!: PluginSettings;
   modelAvailability!: ModelAvailabilityService;
+  ragService!: RagService;
 
   async onload(): Promise<void> {
     await this.loadSettings();
     this.modelAvailability = new ModelAvailabilityService(() => this.settings.providerSettings);
+    this.ragService = new RagService(this.app);
+    await this.ragService.configure(
+      this.settings.rag,
+      this.settings.embeddingModels,
+      this.settings.providerSettings,
+    );
 
     this.registerView(VIEW_TYPE_CHAT, (leaf: WorkspaceLeaf) => new ChatView(leaf, this));
 
@@ -109,6 +138,7 @@ export default class LMStudioWritingAssistant extends Plugin {
   }
 
   onunload(): void {
+    this.ragService.destroy();
     // Obsidian handles view cleanup automatically on plugin unload.
     // Detaching leaves here would reset their position on reload.
   }
@@ -200,6 +230,7 @@ export default class LMStudioWritingAssistant extends Plugin {
         typeof data?.diffMinMatchConfidence === "number"
           ? data.diffMinMatchConfidence
           : DEFAULT_SETTINGS.diffMinMatchConfidence,
+      rag: normalizeRagSettings(data?.rag),
     };
   }
 

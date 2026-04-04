@@ -111,6 +111,10 @@ export async function generateResponse(options: GenerateResponseOptions): Promis
     ragService: plugin.ragService,
   });
 
+  const ragSources = apiMessages.ragContext?.map(({ filePath, headingPath, score, content }) =>
+    ({ filePath, headingPath, score, content })
+  );
+
   if (activeModel.anthropicCacheSettings?.enabled) {
     apiMessages.anthropicCacheSettings = activeModel.anthropicCacheSettings;
   }
@@ -170,7 +174,8 @@ export async function generateResponse(options: GenerateResponseOptions): Promis
         plugin,
         activeModel.modelId,
         activeModel.provider,
-        usage
+        usage,
+        ragSources
       );
     }
   } catch (error) {
@@ -197,7 +202,8 @@ export async function generateResponse(options: GenerateResponseOptions): Promis
           assistantBubble,
           renderer as StreamingRenderer,
           activeModel.modelId,
-          activeModel.provider
+          activeModel.provider,
+          ragSources
         );
       }
     } else {

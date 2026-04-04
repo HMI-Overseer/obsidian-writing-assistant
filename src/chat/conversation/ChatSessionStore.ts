@@ -3,6 +3,7 @@ import type {
   Conversation,
   ConversationMessage,
   MessageVersion,
+  RagSourceRef,
 } from "../../shared/types";
 import type LMStudioWritingAssistant from "../../main";
 import { resolveCompletionModel } from "../../utils";
@@ -178,7 +179,7 @@ export class ChatSessionStore {
   finalizeRegeneration(
     oldMessage: ConversationMessage,
     newContent: string,
-    metadata?: Pick<ConversationMessage, "modelId" | "provider" | "usage">
+    metadata?: Pick<ConversationMessage, "modelId" | "provider" | "usage" | "ragSources">
   ): ConversationMessage {
     const now = Date.now();
 
@@ -186,9 +187,9 @@ export class ChatSessionStore {
     if (oldMessage.versions && oldMessage.versions.length > 0) {
       versions = [...oldMessage.versions];
     } else {
-      versions = [{ content: oldMessage.content, createdAt: now, usage: oldMessage.usage }];
+      versions = [{ content: oldMessage.content, createdAt: now, usage: oldMessage.usage, ragSources: oldMessage.ragSources }];
     }
-    versions.push({ content: newContent, createdAt: now, usage: metadata?.usage });
+    versions.push({ content: newContent, createdAt: now, usage: metadata?.usage, ragSources: metadata?.ragSources });
 
     const newMessage: ConversationMessage = {
       id: oldMessage.id,
@@ -210,6 +211,7 @@ export class ChatSessionStore {
     if (newIndex < 0 || newIndex >= message.versions.length) return false;
 
     message.content = message.versions[newIndex].content;
+    message.ragSources = message.versions[newIndex].ragSources;
     message.activeVersionIndex = newIndex;
 
     if (message.role === "assistant") {
@@ -274,7 +276,7 @@ export class ChatSessionStore {
 
     history.conversations[conversationIndex] = {
       ...conversation,
-      messages: this.messageHistory.filter((m) => !m.isError),
+      messages: this.messageHistory.filter((m) => !m.isError).map(stripRagChunkContent),
       draft: this.draft,
       updatedAt: Date.now(),
     };
@@ -306,4 +308,22 @@ export class ChatSessionStore {
     this.draft = conversation.draft;
     this.plugin.settings.chatHistory.activeConversationId = conversation.id;
   }
+}
+
+/** Strip chunk text content from RAG sources to keep persisted data lean. */
+function stripRagSources(sources?: RagSourceRef[]): RagSourceRef[] | undefined {
+  if (!sources) return undefined;
+  return sources.map(({ filePath, headingPath, score }) => ({ filePath, headingPath, score }));
+}
+
+/** Return a shallow copy of the message with chunk content stripped from ragSources (top-level and per-version). */
+function stripRagChunkContent(message: ConversationMessage): ConversationMessage {
+  if (!message.ragSources && !message.versions?.some((v) => v.ragSources)) return message;
+  return {
+    ...message,
+    ragSources: stripRagSources(message.ragSources),
+    versions: message.versions?.map((v) =>
+      v.ragSources ? { ...v, ragSources: stripRagSources(v.ragSources) } : v
+    ),
+  };
 }

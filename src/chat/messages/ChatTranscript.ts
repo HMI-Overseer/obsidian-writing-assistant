@@ -4,6 +4,7 @@ import type { BubbleRefs, BubbleRenderOptions, ChatLayoutRefs } from "../types";
 import { BubbleActionToolbar } from "./BubbleActionToolbar";
 import { BubbleVersionNav } from "./BubbleVersionNav";
 import { renderUsageBadge } from "./UsageBadge";
+import { renderRagSources } from "./RagSourcesList";
 
 export type BubbleActionCallbacks = {
   onCopy: (messageId: string) => void;
@@ -277,6 +278,9 @@ export class ChatTranscript {
     // Usage badge — shown below assistant bubbles before the toolbar.
     if (message.role === "assistant") {
       renderUsageBadge(bubble.rowEl, message.usage, message.modelId, message.provider);
+      if (message.ragSources?.length) {
+        renderRagSources(bubble.bodyEl, message.ragSources, this.app);
+      }
     }
 
     const toolbarEl = bubble.rowEl.createDiv({ cls: "lmsa-bubble-toolbar" });

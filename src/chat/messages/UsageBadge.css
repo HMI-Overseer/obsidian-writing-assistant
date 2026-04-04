@@ -1,6 +1,6 @@
 @layer components {
   .lmsa-usage-badge {
-    @apply lmsa-flex lmsa-items-center lmsa-gap-2;
+    @apply lmsa-flex lmsa-items-center lmsa-justify-end lmsa-gap-2;
     flex-basis: 100%;
     order: 2;
     margin-top: 4px;
@@ -19,7 +19,7 @@
 
   .lmsa-usage-cost {
     @apply lmsa-inline-flex lmsa-items-center;
-    color: var(--text-accent);
+    color: var(--lmsa-mode-accent);
   }
 
   .lmsa-usage-model {
@@ -39,7 +39,7 @@
   /* Context capacity bar */
   .lmsa-context-capacity {
     padding: 2px 4px;
-    font-size: var(--font-smallest);
+    font-size: var(--font-ui-small);
     color: var(--text-muted);
   }
 

@@ -1,6 +1,6 @@
 import { Notice } from "obsidian";
 import type LMStudioWritingAssistant from "../../main";
-import type { ProviderOption } from "../../shared/types";
+import type { ProviderOption, RagSourceRef } from "../../shared/types";
 import type { UsageResult } from "../../api/usageTypes";
 import type { BubbleRefs } from "../types";
 import { makeMessage } from "../conversation/conversationUtils";
@@ -37,13 +37,15 @@ export async function finalizeResponse(
   plugin: LMStudioWritingAssistant,
   modelId?: string,
   provider?: ProviderOption,
-  usage?: UsageResult | null
+  usage?: UsageResult | null,
+  ragSources?: RagSourceRef[]
 ): Promise<void> {
   const fullResponse = renderer.getFullResponse();
 
   if (fullResponse) {
     const assistantMessage = makeMessage("assistant", fullResponse);
     attachUsageToMessage(assistantMessage, modelId, provider, usage);
+    if (ragSources) assistantMessage.ragSources = ragSources;
     store.appendMessage(assistantMessage);
     store.setLastAssistantResponse(fullResponse);
 
@@ -68,13 +70,15 @@ export async function finalizeAbortedResponse(
   bubble: BubbleRefs,
   renderer: StreamingRenderer,
   modelId?: string,
-  provider?: ProviderOption
+  provider?: ProviderOption,
+  ragSources?: RagSourceRef[]
 ): Promise<void> {
   const fullResponse = renderer.getFullResponse();
 
   if (fullResponse) {
     const assistantMessage = makeMessage("assistant", fullResponse);
     attachUsageToMessage(assistantMessage, modelId, provider);
+    if (ragSources) assistantMessage.ragSources = ragSources;
     store.appendMessage(assistantMessage);
     store.setLastAssistantResponse(fullResponse);
 

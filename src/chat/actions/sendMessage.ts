@@ -117,6 +117,10 @@ export async function sendMessage(options: SendMessageOptions): Promise<void> {
     ragService: plugin.ragService,
   });
 
+  const ragSources = apiMessages.ragContext?.map(({ filePath, headingPath, score, content }) =>
+    ({ filePath, headingPath, score, content })
+  );
+
   // Attach Anthropic cache settings if enabled on the active model.
   if (activeModel.anthropicCacheSettings?.enabled) {
     apiMessages.anthropicCacheSettings = activeModel.anthropicCacheSettings;
@@ -190,7 +194,8 @@ export async function sendMessage(options: SendMessageOptions): Promise<void> {
         plugin,
         activeModel.modelId,
         activeModel.provider,
-        usage
+        usage,
+        ragSources
       );
     }
 
@@ -214,7 +219,7 @@ export async function sendMessage(options: SendMessageOptions): Promise<void> {
         });
       } else {
         await finalizeAbortedResponse(store, transcript, assistantBubble, renderer as StreamingRenderer,
-          activeModel.modelId, activeModel.provider);
+          activeModel.modelId, activeModel.provider, ragSources);
       }
     } else {
       const errorText = `Error: ${getErrorMessage(error)}`;

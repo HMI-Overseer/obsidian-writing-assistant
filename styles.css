@@ -1211,6 +1211,7 @@
 .lmsa-usage-badge {
     display: flex;
     align-items: center;
+    justify-content: flex-end;
     gap: 0.5rem;
     flex-basis: 100%;
     order: 2;
@@ -1229,7 +1230,7 @@
 .lmsa-usage-cost {
     display: inline-flex;
     align-items: center;
-    color: var(--text-accent);
+    color: var(--lmsa-mode-accent);
 }
 .lmsa-usage-model {
     display: inline-flex;
@@ -1248,7 +1249,7 @@
 /* Context capacity bar */
 .lmsa-context-capacity {
     padding: 2px 4px;
-    font-size: var(--font-smallest);
+    font-size: var(--font-ui-small);
     color: var(--text-muted);
   }
 .lmsa-context-capacity.is-warning .lmsa-context-capacity-label {
@@ -1259,6 +1260,78 @@
   }
 .lmsa-context-capacity-label {
     line-height: 1;
+  }
+.lmsa-rag-sources {
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid var(--background-modifier-border);
+    font-size: var(--font-ui-small);
+    color: var(--text-muted);
+  }
+.lmsa-rag-sources-summary {
+    cursor: pointer;
+    -webkit-user-select: none;
+       -moz-user-select: none;
+            user-select: none;
+    opacity: 0.7;
+  }
+.lmsa-rag-sources-summary:hover {
+    opacity: 1;
+  }
+.lmsa-rag-sources-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    margin-top: 4px;
+    padding-left: 8px;
+}
+.lmsa-rag-source-row {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    line-height: 1.4;
+}
+.lmsa-rag-source-link {
+    position: relative;
+    color: var(--text-accent);
+    text-decoration: none;
+    cursor: pointer;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.lmsa-rag-source-link:hover {
+    text-decoration: underline;
+    overflow: visible;
+  }
+.lmsa-rag-source-score {
+    flex-shrink: 0;
+    opacity: 0.6;
+}
+/* Hover tooltip for chunk content preview */
+.lmsa-rag-source-tooltip {
+    display: none;
+    position: absolute;
+    left: 0;
+    top: 100%;
+    z-index: var(--layer-popover);
+    width: 500px;
+    max-height: 300px;
+    overflow-y: auto;
+    padding: 12px;
+    border-radius: var(--radius-s);
+    background: var(--background-secondary);
+    border: 1px solid var(--background-modifier-border);
+    color: var(--text-normal);
+    font-size: var(--font-ui-small);
+    line-height: 1.6;
+    white-space: pre-wrap;
+    word-break: break-word;
+    box-shadow: var(--shadow-s);
+  }
+.lmsa-rag-source-link:hover > .lmsa-rag-source-tooltip {
+    display: block;
   }
 .lmsa-message.is-editing .lmsa-message-body {
     border-style: dashed;

@@ -111,6 +111,10 @@ export async function regenerateMessage(options: RegenerateOptions): Promise<voi
     ragService: plugin.ragService,
   });
 
+  const ragSources = apiMessages.ragContext?.map(({ filePath, headingPath, score, content }) =>
+    ({ filePath, headingPath, score, content })
+  );
+
   // Attach Anthropic cache settings if enabled on the active model.
   if (activeModel.anthropicCacheSettings?.enabled) {
     apiMessages.anthropicCacheSettings = activeModel.anthropicCacheSettings;
@@ -168,6 +172,7 @@ export async function regenerateMessage(options: RegenerateOptions): Promise<voi
           modelId: activeModel.modelId,
           provider: activeModel.provider,
           ...(usage && { usage: buildMessageUsage(activeModel.modelId, usage) }),
+          ragSources,
         });
       } else {
         transcript.renderPlainTextContent(assistantBubble, "(no response)");

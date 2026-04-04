@@ -49,11 +49,22 @@ export interface MessageUsage {
   estimatedCostUsd?: number;
 }
 
+/** A RAG source reference attached to an assistant message. */
+export interface RagSourceRef {
+  filePath: string;
+  headingPath: string;
+  score: number;
+  /** Chunk text — populated in memory for hover preview, stripped on persist. */
+  content?: string;
+}
+
 export interface MessageVersion {
   content: string;
   createdAt: number;
   /** Usage snapshot for this version's generation. */
   usage?: MessageUsage;
+  /** RAG sources used for this version's generation. */
+  ragSources?: RagSourceRef[];
 }
 
 /**
@@ -81,6 +92,8 @@ export interface ConversationMessage {
   usage?: MessageUsage;
   /** When true, the message content is an error (e.g. API failure). Rendered with error styling. */
   isError?: boolean;
+  /** RAG sources used for the active version of this response. */
+  ragSources?: RagSourceRef[];
 }
 
 /**

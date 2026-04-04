@@ -1,5 +1,5 @@
 import type { App } from "obsidian";
-import { PluginSettingTab, Setting } from "obsidian";
+import { PluginSettingTab, setIcon, Setting } from "obsidian";
 import type LMStudioWritingAssistant from "../main";
 import { renderAdvancedTab } from "./AdvancedTab";
 import { renderCommandsTab } from "./CommandsTab";
@@ -10,9 +10,27 @@ import { renderRagTab } from "./RagTab";
 import { renderKnowledgeGraphTab } from "./KnowledgeGraphTab";
 import { renderBenchmarkTab } from "./BenchmarkTab";
 
-const MAIN_TABS = ["General", "Completion Models", "Embedding Models", "Retrieval", "Knowledge Graph", "Commands", "Advanced"] as const;
-const BENCH_TABS = ["Benchmark"] as const;
-type TabName = (typeof MAIN_TABS)[number] | (typeof BENCH_TABS)[number];
+type TabName = "General" | "Completion Models" | "Embedding Models" | "Retrieval" | "Knowledge Graph" | "Commands" | "Advanced" | "Benchmark";
+
+type NavItem = { tab: TabName; rail: string; icon: string };
+type NavGroup = { label: string; items: NavItem[] };
+
+const NAV_GROUPS: NavGroup[] = [
+  { label: "Plugin", items: [
+    { tab: "General",           rail: "General",    icon: "settings" },
+    { tab: "Completion Models",  rail: "Completion", icon: "cpu" },
+    { tab: "Embedding Models",   rail: "Embedding",  icon: "binary" },
+  ]},
+  { label: "Knowledge", items: [
+    { tab: "Retrieval",        rail: "RAG",   icon: "search" },
+    { tab: "Knowledge Graph",  rail: "Graph", icon: "git-fork" },
+  ]},
+  { label: "Config", items: [
+    { tab: "Commands",  rail: "Commands",  icon: "terminal" },
+    { tab: "Advanced",  rail: "Advanced",  icon: "sliders-horizontal" },
+    { tab: "Benchmark", rail: "Benchmark", icon: "flask-conical" },
+  ]},
+];
 
 type TabMeta = {
   title: string;
@@ -101,42 +119,31 @@ export class LMStudioSettingTab extends PluginSettingTab {
     containerEl.addClass("lmsa-settings-root");
 
     const shell = containerEl.createDiv({ cls: "lmsa-settings-shell" });
-
-    const topbar = shell.createDiv({ cls: "lmsa-settings-topbar lmsa-ui-panel" });
-
-    const nav = topbar.createDiv({ cls: "lmsa-settings-nav" });
-    for (const tab of MAIN_TABS) {
-      const button = nav.createEl("button", {
-        cls: "lmsa-settings-tab-btn",
-        attr: { type: "button" },
-      });
-      button.createEl("span", { cls: "lmsa-settings-tab-label", text: tab });
-      if (tab === this.activeTab) {
-        button.addClass("is-active");
-      }
-      button.addEventListener("click", () => {
-        this.activeTab = tab;
-        this.display();
-      });
-    }
-
-    const benchNav = topbar.createDiv({ cls: "lmsa-settings-nav lmsa-settings-nav--bench" });
-    for (const tab of BENCH_TABS) {
-      const button = benchNav.createEl("button", {
-        cls: "lmsa-settings-tab-btn",
-        attr: { type: "button" },
-      });
-      button.createEl("span", { cls: "lmsa-settings-tab-label", text: tab });
-      if (tab === this.activeTab) {
-        button.addClass("is-active");
-      }
-      button.addEventListener("click", () => {
-        this.activeTab = tab;
-        this.display();
-      });
-    }
-
     shell.setAttribute("data-tab", TAB_SLUGS[this.activeTab]);
+
+    const rail = shell.createDiv({ cls: "lmsa-settings-rail" });
+    for (const group of NAV_GROUPS) {
+      const groupActive = group.items.some((i) => i.tab === this.activeTab);
+      const groupEl = rail.createDiv({ cls: "lmsa-settings-rail-group" });
+      if (groupActive) groupEl.addClass("is-active");
+      groupEl.createEl("span", { cls: "lmsa-settings-rail-group-label", text: group.label });
+      for (const item of group.items) {
+        const button = groupEl.createEl("button", {
+          cls: "lmsa-settings-rail-item",
+          attr: { type: "button" },
+        });
+        const iconEl = button.createSpan({ cls: "lmsa-settings-rail-icon" });
+        setIcon(iconEl, item.icon);
+        button.createEl("span", { cls: "lmsa-settings-rail-label", text: item.rail });
+        if (item.tab === this.activeTab) {
+          button.addClass("is-active");
+        }
+        button.addEventListener("click", () => {
+          this.activeTab = item.tab;
+          this.display();
+        });
+      }
+    }
 
     const stage = shell.createDiv({ cls: "lmsa-settings-stage" });
     const panel = stage.createDiv({ cls: "lmsa-settings-panel lmsa-ui-panel" });

@@ -2,46 +2,119 @@
   .lmsa-settings-root {
     @apply lmsa-pb-8;
     scrollbar-gutter: stable;
+    padding-left: 0 !important;
   }
 
   .lmsa-settings-shell {
-    @apply lmsa-flex lmsa-flex-col lmsa-gap-5;
+    @apply lmsa-flex lmsa-gap-5;
   }
 
-  /* ── Topbar ────────────────────────────────────────────────────────────── */
+  /* ── Rail ──────────────────────────────────────────────────────────────── */
 
-  .lmsa-settings-topbar {
-    @apply lmsa-relative lmsa-flex lmsa-flex-col lmsa-items-stretch lmsa-justify-start lmsa-gap-2 lmsa-overflow-visible lmsa-px-5 lmsa-py-3;
+  .lmsa-settings-rail {
+    @apply lmsa-relative lmsa-flex lmsa-flex-shrink-0 lmsa-flex-col lmsa-gap-4 lmsa-self-start lmsa-overflow-hidden lmsa-border lmsa-border-obsidian-border;
+    position: sticky;
+    top: 0;
+    width: 110px;
+    padding: 14px 8px;
+    border-radius: 0 20px 20px 0;
+    border-left: none;
+    margin-left: 0;
+    padding-left: 14px;
     background:
-      radial-gradient(circle at top left, color-mix(in srgb, var(--lmsa-section-accent) 14%, transparent), transparent 44%),
+      radial-gradient(circle at top left, color-mix(in srgb, var(--lmsa-section-accent) 10%, transparent), transparent 42%),
       linear-gradient(180deg, var(--lmsa-surface-overlay), var(--lmsa-surface-raised));
     backdrop-filter: blur(18px);
     -webkit-backdrop-filter: blur(18px);
     box-shadow:
-      0 20px 48px rgba(0, 0, 0, 0.08),
+      0 24px 56px rgba(0, 0, 0, 0.1),
       inset 0 1px 0 rgba(255, 255, 255, 0.06);
   }
 
-  .lmsa-settings-topbar::before {
+  .lmsa-settings-rail::before {
     content: "";
     @apply lmsa-pointer-events-none lmsa-absolute lmsa-inset-x-5 lmsa-top-0 lmsa-h-px;
     background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--lmsa-section-accent) 55%, white), transparent);
     opacity: var(--lmsa-shimmer-opacity);
   }
 
-  /* ── Brand ─────────────────────────────────────────────────────────────── */
-
-  .lmsa-settings-brand {
-    @apply lmsa-flex lmsa-min-w-0 lmsa-flex-col lmsa-gap-1;
+  .lmsa-settings-rail-group {
+    @apply lmsa-flex lmsa-flex-col lmsa-gap-1;
   }
 
-  .lmsa-settings-eyebrow {
+  .lmsa-settings-rail-group-label {
     @apply lmsa-font-semibold lmsa-uppercase lmsa-tracking-[0.18em];
-    color: var(--lmsa-accent-muted);
-    font-size: 0.68rem;
+    color: var(--lmsa-text-faint);
+    font-size: 0.65rem;
+    padding: 2px 0 4px;
+    text-align: center;
+    transition: color 180ms ease;
   }
 
-  /* Title row removed — Obsidian shows the plugin name in the sidebar */
+  .lmsa-settings-rail-group.is-active .lmsa-settings-rail-group-label {
+    color: var(--lmsa-section-accent);
+  }
+
+  .lmsa-settings-rail-item {
+    @apply lmsa-relative lmsa-flex lmsa-w-full lmsa-flex-col lmsa-items-center lmsa-justify-center lmsa-gap-1.5 lmsa-text-center;
+    border-radius: 10px;
+    background: transparent;
+    color: var(--lmsa-text-secondary);
+    cursor: pointer;
+    transition:
+      background 180ms ease,
+      color 180ms ease,
+      box-shadow 180ms ease;
+  }
+
+  .lmsa-settings-rail-item:hover {
+    color: var(--lmsa-text-primary);
+    background: color-mix(in srgb, var(--lmsa-surface-overlay) 80%, transparent);
+  }
+
+  .lmsa-settings-rail-item.is-active {
+    color: var(--lmsa-section-accent);
+    background:
+      radial-gradient(ellipse at 50% 30%, color-mix(in srgb, var(--lmsa-section-accent) 14%, transparent), transparent 70%),
+      color-mix(in srgb, var(--lmsa-section-accent) 8%, var(--lmsa-surface-raised));
+    box-shadow:
+      inset 0 0 0 1px color-mix(in srgb, var(--lmsa-section-accent) 18%, transparent),
+      0 0 12px color-mix(in srgb, var(--lmsa-section-accent) 10%, transparent);
+  }
+
+  .lmsa-settings-rail-item.is-active::before {
+    content: "";
+    @apply lmsa-pointer-events-none lmsa-absolute lmsa-top-0 lmsa-h-px;
+    inset-inline: 20%;
+    border-radius: 9999px;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      color-mix(in srgb, var(--lmsa-section-accent) 60%, rgba(255, 255, 255, 0.5)),
+      transparent
+    );
+    opacity: var(--lmsa-shimmer-opacity);
+  }
+
+  .lmsa-settings-rail-icon {
+    @apply lmsa-flex lmsa-flex-shrink-0 lmsa-items-center lmsa-justify-center;
+    width: 22px;
+    height: 22px;
+    color: inherit;
+  }
+
+  .lmsa-settings-rail-icon svg {
+    width: 20px;
+    height: 20px;
+  }
+
+  .lmsa-settings-rail-label {
+    @apply lmsa-font-medium;
+    font-size: 0.7rem;
+    line-height: 1.2;
+  }
+
+  /* ── Panel heading ─────────────────────────────────────────────────────── */
 
   .lmsa-settings-panel-heading.setting-item {
     border: none;
@@ -61,100 +134,10 @@
     line-height: 1.65;
   }
 
-  /* Version badge removed — available via manifest */
-
-  /* ── Tab navigation ────────────────────────────────────────────────────── */
-
-  .lmsa-settings-nav {
-    @apply lmsa-flex lmsa-w-full lmsa-min-w-0 lmsa-flex-wrap lmsa-items-center lmsa-gap-1.5;
-    scrollbar-width: thin;
-    padding-bottom: 0;
-  }
-
-  .lmsa-settings-tab-btn {
-    @apply lmsa-relative lmsa-inline-flex lmsa-min-w-max lmsa-flex-none lmsa-items-center lmsa-justify-center lmsa-border lmsa-px-4 lmsa-py-2 lmsa-text-center;
-    border-radius: 9999px;
-    border-color: color-mix(in srgb, var(--lmsa-border-subtle) 50%, transparent);
-    background: color-mix(in srgb, var(--lmsa-surface-overlay) 60%, transparent);
-    color: var(--lmsa-text-secondary);
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
-    box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.06),
-      0 1px 3px rgba(0, 0, 0, 0.04);
-    transition:
-      background 180ms ease,
-      color 180ms ease,
-      border-color 180ms ease,
-      box-shadow 180ms ease,
-      transform 100ms ease;
-  }
-
-  .lmsa-settings-tab-btn:hover {
-    color: var(--lmsa-text-primary);
-    background: color-mix(in srgb, var(--lmsa-surface-overlay) 80%, transparent);
-    border-color: color-mix(in srgb, var(--lmsa-border-default) 70%, transparent);
-    box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.08),
-      0 2px 8px rgba(0, 0, 0, 0.06);
-    transform: translateY(-0.5px);
-  }
-
-  .lmsa-settings-tab-btn.is-active {
-    color: var(--lmsa-section-accent);
-    background:
-      radial-gradient(ellipse at 50% 0%, color-mix(in srgb, var(--lmsa-section-accent) 12%, transparent), transparent 70%),
-      color-mix(in srgb, var(--lmsa-section-accent) 10%, var(--lmsa-surface-raised));
-    border-color: color-mix(in srgb, var(--lmsa-section-accent) 25%, var(--lmsa-border-subtle));
-    box-shadow:
-      inset 0 1px 0 color-mix(in srgb, var(--lmsa-section-accent) 15%, rgba(255, 255, 255, 0.1)),
-      0 0 12px color-mix(in srgb, var(--lmsa-section-accent) 14%, transparent),
-      0 2px 8px rgba(0, 0, 0, 0.06);
-  }
-
-  .lmsa-settings-tab-btn.is-active::after {
-    content: "";
-    @apply lmsa-pointer-events-none lmsa-absolute lmsa-top-0 lmsa-h-px;
-    inset-inline: 20%;
-    border-radius: 9999px;
-    background: linear-gradient(
-      90deg,
-      transparent,
-      color-mix(in srgb, var(--lmsa-section-accent) 60%, rgba(255, 255, 255, 0.5)),
-      transparent
-    );
-    opacity: var(--lmsa-shimmer-opacity);
-  }
-
-  .lmsa-settings-tab-label {
-    @apply lmsa-font-medium lmsa-whitespace-nowrap;
-    font-size: 0.8rem;
-  }
-
-  .lmsa-settings-nav--bench {
-    @apply lmsa-relative lmsa-pt-0;
-    border-top: none;
-    padding-top: 4px;
-    margin-top: 2px;
-  }
-
-  .lmsa-settings-nav--bench::before {
-    content: "";
-    @apply lmsa-pointer-events-none lmsa-absolute lmsa-top-0 lmsa-h-px;
-    left: 10%;
-    right: 10%;
-    background: linear-gradient(
-      90deg,
-      transparent,
-      var(--lmsa-border-subtle),
-      transparent
-    );
-  }
-
   /* ── Stage ─────────────────────────────────────────────────────────────── */
 
   .lmsa-settings-stage {
-    @apply lmsa-min-w-0;
+    @apply lmsa-min-w-0 lmsa-flex-1;
   }
 
   .lmsa-tab-desc,
@@ -164,34 +147,72 @@
 
   /* ── Responsive ────────────────────────────────────────────────────────── */
 
-  @media (max-width: 980px) {
-    .lmsa-settings-nav {
-      @apply lmsa-pb-1;
-    }
-  }
-
   @media (max-width: 700px) {
-    .lmsa-settings-topbar {
-      @apply lmsa-px-4 lmsa-py-4;
+    .lmsa-settings-shell {
+      @apply lmsa-flex-col;
     }
 
-    .lmsa-settings-tab-btn {
-      @apply lmsa-min-w-max lmsa-px-3 lmsa-py-1.5;
+    .lmsa-settings-rail {
+      @apply lmsa-flex-row lmsa-flex-wrap lmsa-gap-1 lmsa-self-auto lmsa-overflow-visible;
+      position: static;
+      width: auto;
+      padding: 8px 12px;
+      border-radius: 16px;
+      border-left: 1px solid var(--background-modifier-border);
+      margin-left: 0;
+      padding-left: 12px;
+      background:
+        radial-gradient(circle at top left, color-mix(in srgb, var(--lmsa-section-accent) 10%, transparent), transparent 42%),
+        linear-gradient(180deg, var(--lmsa-surface-overlay), var(--lmsa-surface-raised));
+    }
+
+    .lmsa-settings-rail-group {
+      @apply lmsa-flex-row lmsa-flex-wrap lmsa-items-center lmsa-gap-1;
+    }
+
+    .lmsa-settings-rail-group-label {
+      padding: 4px 6px;
+      font-size: 0.6rem;
+    }
+
+    .lmsa-settings-rail-item {
+      padding: 5px 8px;
+    }
+
+    .lmsa-settings-rail-label {
+      font-size: 0.75rem;
     }
   }
 }
 
-/* Override Obsidian's button background-color: var(--interactive-normal) */
-.lmsa-settings-tab-btn {
-  background: color-mix(in srgb, var(--lmsa-surface-overlay) 60%, transparent) !important;
+/* Override Obsidian's button resets (background, shadow, border, sizing) */
+.lmsa-settings-rail-item {
+  background: transparent !important;
+  box-shadow: none !important;
+  border: none !important;
+  padding: 10px 6px 8px !important;
+  height: auto !important;
+  min-height: 0 !important;
+  line-height: 1 !important;
+  font: inherit !important;
+  -webkit-appearance: none !important;
+  appearance: none !important;
 }
 
-.lmsa-settings-tab-btn.is-active {
+.lmsa-settings-rail-item.is-active {
   background:
-    radial-gradient(ellipse at 50% 0%, color-mix(in srgb, var(--lmsa-section-accent) 12%, transparent), transparent 70%),
-    color-mix(in srgb, var(--lmsa-section-accent) 10%, var(--lmsa-surface-raised)) !important;
+    radial-gradient(ellipse at 50% 30%, color-mix(in srgb, var(--lmsa-section-accent) 14%, transparent), transparent 70%),
+    color-mix(in srgb, var(--lmsa-section-accent) 8%, var(--lmsa-surface-raised)) !important;
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--lmsa-section-accent) 18%, transparent),
+    0 0 12px color-mix(in srgb, var(--lmsa-section-accent) 10%, transparent) !important;
 }
 
-.lmsa-settings-tab-btn:hover:not(.is-active) {
+.lmsa-settings-rail-item:hover:not(.is-active) {
   background: color-mix(in srgb, var(--lmsa-surface-overlay) 80%, transparent) !important;
+}
+
+/* Group label accent — must live outside @layer to beat Obsidian's cascade */
+.lmsa-settings-rail-group.is-active .lmsa-settings-rail-group-label {
+  color: var(--lmsa-section-accent) !important;
 }

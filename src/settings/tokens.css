@@ -61,6 +61,16 @@
   --lmsa-section-accent-secondary: var(--interactive-accent);
 }
 
+.lmsa-settings-root .lmsa-settings-shell[data-tab="retrieval"] {
+  --lmsa-section-accent: var(--color-blue, var(--interactive-accent));
+  --lmsa-section-accent-secondary: var(--color-blue, var(--interactive-accent));
+}
+
+.lmsa-settings-root .lmsa-settings-shell[data-tab="knowledge-graph"] {
+  --lmsa-section-accent: var(--color-red, var(--interactive-accent));
+  --lmsa-section-accent-secondary: var(--color-red, var(--interactive-accent));
+}
+
 .lmsa-settings-root .lmsa-settings-shell[data-tab="commands"] {
   --lmsa-section-accent: var(--color-orange, var(--interactive-accent));
   --lmsa-section-accent-secondary: var(--color-orange, var(--interactive-accent));

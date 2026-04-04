@@ -7,9 +7,10 @@ import { renderCompletionModelsTab } from "./CompletionModelsTab";
 import { renderEmbeddingModelsTab } from "./EmbeddingModelsTab";
 import { renderGeneralTab } from "./GeneralTab";
 import { renderRagTab } from "./RagTab";
+import { renderKnowledgeGraphTab } from "./KnowledgeGraphTab";
 import { renderBenchmarkTab } from "./BenchmarkTab";
 
-const MAIN_TABS = ["General", "Completion Models", "Embedding Models", "Retrieval", "Commands", "Advanced"] as const;
+const MAIN_TABS = ["General", "Completion Models", "Embedding Models", "Retrieval", "Knowledge Graph", "Commands", "Advanced"] as const;
 const BENCH_TABS = ["Benchmark"] as const;
 type TabName = (typeof MAIN_TABS)[number] | (typeof BENCH_TABS)[number];
 
@@ -23,6 +24,7 @@ const TAB_SLUGS: Record<TabName, string> = {
   "Completion Models": "completion",
   "Embedding Models": "embedding",
   "Retrieval": "retrieval",
+  "Knowledge Graph": "knowledge-graph",
   "Commands": "commands",
   "Advanced": "advanced",
   "Benchmark": "benchmark",
@@ -45,6 +47,10 @@ const TAB_META: Record<TabName, TabMeta> = {
     title: "Retrieval (RAG)",
     description: "Automatically find and inject relevant vault content into each chat request using embedding-based search.",
   },
+  "Knowledge Graph": {
+    title: "Knowledge Graph",
+    description: "Extract entities and relationships from your vault using an LLM to build a semantic knowledge graph.",
+  },
   "Commands": {
     title: "Quick Commands",
     description: "Create reusable prompt shortcuts that can pull from the current selection or the active note.",
@@ -63,6 +69,7 @@ export class LMStudioSettingTab extends PluginSettingTab {
   private activeTab: TabName = "General";
   private cleanupBenchmark: (() => void) | null = null;
   private cleanupRag: (() => void) | null = null;
+  private cleanupKg: (() => void) | null = null;
 
   constructor(
     app: App,
@@ -76,6 +83,8 @@ export class LMStudioSettingTab extends PluginSettingTab {
     this.cleanupBenchmark = null;
     this.cleanupRag?.();
     this.cleanupRag = null;
+    this.cleanupKg?.();
+    this.cleanupKg = null;
   }
 
   display(): void {
@@ -83,6 +92,8 @@ export class LMStudioSettingTab extends PluginSettingTab {
     this.cleanupBenchmark = null;
     this.cleanupRag?.();
     this.cleanupRag = null;
+    this.cleanupKg?.();
+    this.cleanupKg = null;
     const { containerEl } = this;
     const activeMeta = TAB_META[this.activeTab];
 
@@ -152,6 +163,9 @@ export class LMStudioSettingTab extends PluginSettingTab {
         break;
       case "Retrieval":
         this.cleanupRag = renderRagTab(content, this.plugin);
+        break;
+      case "Knowledge Graph":
+        this.cleanupKg = renderKnowledgeGraphTab(content, this.plugin);
         break;
       case "Commands":
         renderCommandsTab(content, this.plugin, refresh);

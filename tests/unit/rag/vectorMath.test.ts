@@ -1,6 +1,6 @@
 import { describe, test, expect } from "vitest";
-import { cosineSimilarity, topKSimilar, limitPerFile, boostLinkedFiles } from "../../../src/rag/vectorMath";
-import type { IndexedChunk, RetrievalResult } from "../../../src/rag/types";
+import { cosineSimilarity, topKSimilar, limitPerFile } from "../../../src/rag/vectorMath";
+import type { IndexedChunk } from "../../../src/rag/types";
 
 function makeChunk(id: string, filePath: string, vector: number[]): IndexedChunk {
   return {
@@ -122,51 +122,3 @@ describe("limitPerFile", () => {
   });
 });
 
-describe("boostLinkedFiles", () => {
-  function makeResult(filePath: string, score: number): RetrievalResult {
-    return {
-      chunk: { id: `${filePath}::0`, filePath, headingPath: "", content: "", startOffset: 0, chunkIndex: 0 },
-      score,
-    };
-  }
-
-  test("boosts scores for linked files and re-sorts", () => {
-    const results = [
-      makeResult("a.md", 0.8),
-      makeResult("b.md", 0.75),
-    ];
-    const linked = new Set(["b.md"]);
-    const boosted = boostLinkedFiles(results, linked, 0.15);
-
-    // b.md should now score higher than a.md due to boost.
-    expect(boosted[0].chunk.filePath).toBe("b.md");
-    expect(boosted[0].score).toBeGreaterThan(0.75);
-    expect(boosted[1].chunk.filePath).toBe("a.md");
-    expect(boosted[1].score).toBe(0.8); // Unchanged.
-  });
-
-  test("returns unchanged results when no linked files", () => {
-    const results = [makeResult("a.md", 0.9), makeResult("b.md", 0.8)];
-    const boosted = boostLinkedFiles(results, new Set(), 0.15);
-    expect(boosted).toEqual(results);
-  });
-
-  test("tapers boost as link count increases", () => {
-    const results = [makeResult("a.md", 0.5)];
-
-    // Few links — strong boost.
-    const fewLinks = new Set(["a.md", "x.md", "y.md"]);
-    const fewBoosted = boostLinkedFiles(results, fewLinks, 0.15);
-
-    // Many links — weak boost.
-    const manyLinks = new Set([
-      "a.md", ...Array.from({ length: 49 }, (_, i) => `link${i}.md`),
-    ]);
-    const manyBoosted = boostLinkedFiles(results, manyLinks, 0.15);
-
-    expect(fewBoosted[0].score).toBeGreaterThan(manyBoosted[0].score);
-    // Both should still be greater than the original.
-    expect(fewBoosted[0].score).toBeGreaterThan(0.5);
-    expect(manyBoosted[0].score).toBeGreaterThan(0.5);
-  });
-});

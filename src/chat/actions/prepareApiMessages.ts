@@ -77,9 +77,14 @@ export async function prepareApiMessages(
 
   // When RAG context is present, add a grounding instruction so the model
   // knows retrieved notes exist and should be consulted as reference material.
-  const finalSystemPrompt = ragContext && ragContext.length > 0
-    ? systemPrompt + "\n\nWhen retrieved notes are provided, use them as reference material. If the retrieved notes don't contain relevant information for the question, rely on your general knowledge instead."
-    : systemPrompt;
+  let groundingNote = "";
+  if (ragContext && ragContext.length > 0) {
+    const hasGraphAnnotations = ragContext.some((b) => b.graphContext);
+    groundingNote = hasGraphAnnotations
+      ? "\n\nWhen retrieved notes are provided, use them as reference material. Documents may include <graph_context> annotations showing entities and relationships from the vault's knowledge graph — use these to understand how topics connect across documents."
+      : "\n\nWhen retrieved notes are provided, use them as reference material. If the retrieved notes don't contain relevant information for the question, rely on your general knowledge instead.";
+  }
+  const finalSystemPrompt = systemPrompt + groundingNote;
 
   return { systemPrompt: finalSystemPrompt, documentContext, ragContext, messages };
 }

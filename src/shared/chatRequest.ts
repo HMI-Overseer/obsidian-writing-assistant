@@ -19,12 +19,19 @@ export interface ChatTurn {
   content: string;
 }
 
+/** Graph entities and relationships relevant to a retrieved document. */
+export interface GraphContextAnnotation {
+  entities: { name: string; type: string; description: string }[];
+  relationships: { source: string; target: string; type: string; description: string }[];
+}
+
 /** A block of RAG-retrieved context injected into the request. */
 export interface RagContextBlock {
   filePath: string;
   headingPath: string;
   content: string;
   score: number;
+  graphContext?: GraphContextAnnotation;
 }
 
 /**

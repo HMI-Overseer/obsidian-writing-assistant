@@ -54,6 +54,48 @@ describe("formatRagContext", () => {
     expect(bIdx).toBeLessThan(cIdx);
   });
 
+  test("renders graph_context when block has graphContext", () => {
+    const blocks: RagContextBlock[] = [{
+      filePath: "note.md",
+      headingPath: "Background",
+      content: "Alice is a knight.",
+      score: 0.9,
+      graphContext: {
+        entities: [{ name: "Alice", type: "character", description: "A wandering knight" }],
+        relationships: [{ source: "Alice", target: "Bob", type: "allies with", description: "Old friends" }],
+      },
+    }];
+    const result = formatRagContext(blocks);
+    expect(result).toContain("<graph_context>");
+    expect(result).toContain('</graph_context>');
+    expect(result).toContain('<entity name="Alice" type="character">A wandering knight</entity>');
+    expect(result).toContain('<rel source="Alice" target="Bob" type="allies with">Old friends</rel>');
+  });
+
+  test("does not render graph_context when graphContext is absent", () => {
+    const blocks = [makeBlock("note.md", "Section", "Content.", 0.9)];
+    const result = formatRagContext(blocks);
+    expect(result).not.toContain("<graph_context>");
+  });
+
+  test("renders mixed blocks — some with graphContext, some without", () => {
+    const blocks: RagContextBlock[] = [
+      { filePath: "a.md", headingPath: "", content: "No graph.", score: 0.9 },
+      {
+        filePath: "b.md", headingPath: "", content: "Has graph.", score: 0.8,
+        graphContext: {
+          entities: [{ name: "Bob", type: "character", description: "A wizard" }],
+          relationships: [],
+        },
+      },
+    ];
+    const result = formatRagContext(blocks);
+    // Only b.md should have graph_context.
+    const parts = result.split("<graph_context>");
+    expect(parts).toHaveLength(2); // one split = one occurrence
+    expect(result).toContain('source="b.md"');
+  });
+
   test("applies sandwich ordering for more than 3 blocks", () => {
     const blocks = [
       makeBlock("1.md", "", "first", 0.9),

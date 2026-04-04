@@ -42,7 +42,20 @@ export function formatRagContext(blocks: RagContextBlock[]): string {
 
   const entries = ordered.map((b) => {
     const section = b.headingPath ? ` section="${b.headingPath}"` : "";
-    return `<document source="${b.filePath}"${section}>\n${b.content}\n</document>`;
+    let inner = b.content;
+
+    if (b.graphContext && (b.graphContext.entities.length > 0 || b.graphContext.relationships.length > 0)) {
+      const parts: string[] = [];
+      for (const e of b.graphContext.entities) {
+        parts.push(`<entity name="${e.name}" type="${e.type}">${e.description}</entity>`);
+      }
+      for (const r of b.graphContext.relationships) {
+        parts.push(`<rel source="${r.source}" target="${r.target}" type="${r.type}">${r.description}</rel>`);
+      }
+      inner += `\n<graph_context>\n${parts.join("\n")}\n</graph_context>`;
+    }
+
+    return `<document source="${b.filePath}"${section}>\n${inner}\n</document>`;
   });
 
   return `<retrieved_context>\n${entries.join("\n\n")}\n</retrieved_context>`;

@@ -8,6 +8,8 @@ import { VaultIndexer } from "./indexer";
 import { Retriever } from "./retriever";
 import { LMStudioEmbeddingClient } from "./lmStudioEmbedding";
 import type { EmbeddingClient } from "./embeddingClient";
+import type { GraphService } from "./graph";
+import { boostByGraphRelevance, annotateBlockWithGraph } from "./graph/retrieval";
 
 const INDEX_FILE = "rag-index.json";
 
@@ -33,8 +35,7 @@ export class RagService {
   /** Tracks the settings used by the currently configured pipeline. */
   private configuredModelId: string | null = null;
   private maxContextChars = 6000;
-  private graphBoostEnabled = true;
-  private graphBoostStrength = 0.15;
+  private graphService: GraphService | null = null;
 
   constructor(app: App) {
     this.app = app;
@@ -113,22 +114,17 @@ export class RagService {
     this.embeddingClient = client;
     this.configuredModelId = model.modelId;
     this.maxContextChars = ragSettings.maxContextChars;
-    this.graphBoostEnabled = ragSettings.graphBoostEnabled;
-    this.graphBoostStrength = ragSettings.graphBoostStrength;
     this.store = new VectorStore(model.modelId, 0, ragSettings.chunkSize, ragSettings.chunkOverlap);
 
     // Load persisted index from disk (no API calls).
     await this.loadIndex();
 
     this.retriever = new Retriever({
-      app: this.app,
       store: this.store,
       embeddingClient: client,
       embeddingModelId: model.modelId,
       topK: ragSettings.topK,
       minScore: ragSettings.minScore,
-      graphBoostEnabled: this.graphBoostEnabled,
-      graphBoostStrength: this.graphBoostStrength,
     });
   }
 
@@ -169,14 +165,11 @@ export class RagService {
 
     // Update retriever to point at the new store.
     this.retriever = new Retriever({
-      app: this.app,
       store: this.store,
       embeddingClient: this.embeddingClient,
       embeddingModelId: this.configuredModelId,
       topK: ragSettings.topK,
       minScore: ragSettings.minScore,
-      graphBoostEnabled: this.graphBoostEnabled,
-      graphBoostStrength: this.graphBoostStrength,
     });
 
     this.indexer = new VaultIndexer({
@@ -232,7 +225,17 @@ export class RagService {
       const results = await this.retriever.retrieve(query, activeFilePath);
       if (results.length === 0) return null;
 
-      let filtered = results;
+      // Graph boost: re-rank results using knowledge graph entity relevance.
+      let boosted = results;
+      let graphContext: ReturnType<GraphService["buildGraphContext"]> = null;
+      if (this.graphService?.isReady()) {
+        graphContext = this.graphService.buildGraphContext(query);
+        if (graphContext && graphContext.relevantFiles.size > 0) {
+          boosted = boostByGraphRelevance(boosted, graphContext.relevantFiles);
+        }
+      }
+
+      let filtered = boosted;
 
       // Relative threshold: exclude results below 60% of the best score.
       const bestScore = filtered[0].score;
@@ -256,12 +259,22 @@ export class RagService {
         budgeted.push(r);
       }
 
-      return budgeted.map((r) => ({
+      let blocks = budgeted.map((r) => ({
         filePath: r.chunk.filePath,
         headingPath: r.chunk.headingPath,
         content: r.chunk.content,
         score: r.score,
       }));
+
+      // Annotate blocks with graph entity/relationship context.
+      if (graphContext?.matchedEntities.length && this.graphService?.isReady()) {
+        const graph = this.graphService.getGraph()!;
+        blocks = blocks.map((block) =>
+          annotateBlockWithGraph(block, graph, graphContext!.matchedEntities),
+        );
+      }
+
+      return blocks;
     } catch {
       if (!this.embeddingErrorShown) {
         new Notice("Could not reach embedding model. Skipping retrieval.");
@@ -281,6 +294,11 @@ export class RagService {
     this.store = null;
     this.indexingState = { status: "idle" };
     this.embeddingErrorShown = false;
+  }
+
+  /** Wire the graph service for graph-enhanced retrieval. */
+  setGraphService(graphService: GraphService): void {
+    this.graphService = graphService;
   }
 
   /** Clean shutdown — call from plugin `onunload()`. */

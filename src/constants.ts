@@ -1,4 +1,4 @@
-import type { ChatHistory, PluginSettings, RagSettings } from "./shared/types";
+import type { ChatHistory, KnowledgeGraphSettings, PluginSettings, RagSettings } from "./shared/types";
 
 export const VIEW_TYPE_CHAT = "lm-studio-chat";
 
@@ -27,8 +27,12 @@ export const DEFAULT_RAG_SETTINGS: RagSettings = {
   minScore: 0.3,
   excludePatterns: ["templates/**"],
   maxContextChars: 6000,
-  graphBoostEnabled: true,
-  graphBoostStrength: 0.15,
+};
+
+export const DEFAULT_KNOWLEDGE_GRAPH_SETTINGS: KnowledgeGraphSettings = {
+  enabled: false,
+  activeCompletionModelId: null,
+  excludePatterns: ["templates/**"],
 };
 
 export const DEFAULT_SETTINGS: PluginSettings = {
@@ -56,4 +60,5 @@ export const DEFAULT_SETTINGS: PluginSettings = {
   diffContextLines: 3,
   diffMinMatchConfidence: 0.7,
   rag: { ...DEFAULT_RAG_SETTINGS },
+  knowledgeGraph: { ...DEFAULT_KNOWLEDGE_GRAPH_SETTINGS },
 };

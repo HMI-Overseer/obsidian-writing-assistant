@@ -1,4 +1,5 @@
 export { RagService } from "./ragService";
+export { GraphService } from "./graph";
 export type { EmbeddingClient, EmbeddingResult } from "./embeddingClient";
 export type {
   DocumentChunk,
@@ -8,3 +9,10 @@ export type {
   RagSettings,
   IndexingState,
 } from "./types";
+export type {
+  GraphEntity,
+  GraphRelation,
+  GraphBuildState,
+  KnowledgeGraphSettings,
+  EntityType,
+} from "./graph";

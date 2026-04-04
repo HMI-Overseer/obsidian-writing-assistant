@@ -162,10 +162,15 @@ export interface RagSettings {
   excludePatterns: string[];
   /** Maximum total characters of RAG context to inject into a prompt. */
   maxContextChars: number;
-  /** Whether to boost retrieval scores for notes linked from the active note. */
-  graphBoostEnabled: boolean;
-  /** Base strength of the graph boost (0–1). Tapers with link count. */
-  graphBoostStrength: number;
+}
+
+/** Knowledge graph settings. */
+export interface KnowledgeGraphSettings {
+  enabled: boolean;
+  /** CompletionModel.id — the chat model used for entity extraction. */
+  activeCompletionModelId: string | null;
+  /** Glob patterns to exclude from graph extraction. */
+  excludePatterns: string[];
 }
 
 export interface PluginSettings {
@@ -202,4 +207,6 @@ export interface PluginSettings {
   diffMinMatchConfidence: number;
   /** RAG (retrieval-augmented generation) settings. */
   rag: RagSettings;
+  /** Knowledge graph settings. */
+  knowledgeGraph: KnowledgeGraphSettings;
 }

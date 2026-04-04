@@ -74,39 +74,3 @@ export function limitPerFile(
 
   return filtered;
 }
-
-/**
- * Apply an adaptive score boost to results from files linked by the active note.
- *
- * Only outgoing links are used (not backlinks) — outgoing links are intentional
- * references the author made, encoding genuine semantic relationships.
- *
- * The boost tapers as link count increases to prevent hub notes (MOCs, indexes)
- * from inflating everything they touch:
- *   boostFactor = 1 + (strength / (1 + linkCount / 10))
- *   At  5 links: ~1.10 boost (with default strength 0.15)
- *   At 20 links: ~1.05 boost
- *   At 50 links: ~1.02 boost (negligible)
- *
- * Results are re-sorted by boosted score after application.
- */
-export function boostLinkedFiles(
-  results: RetrievalResult[],
-  linkedFilePaths: Set<string>,
-  strength: number = 0.15,
-): RetrievalResult[] {
-  if (linkedFilePaths.size === 0) return results;
-
-  const linkCount = linkedFilePaths.size;
-  const boostFactor = 1 + (strength / (1 + linkCount / 10));
-
-  const boosted = results.map((r) => {
-    if (linkedFilePaths.has(r.chunk.filePath)) {
-      return { ...r, score: r.score * boostFactor };
-    }
-    return r;
-  });
-
-  boosted.sort((a, b) => b.score - a.score);
-  return boosted;
-}

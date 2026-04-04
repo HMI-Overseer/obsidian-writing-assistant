@@ -5,17 +5,39 @@ import type {
   CompletionModel,
   CustomCommand,
   EmbeddingModel,
+  KnowledgeGraphSettings,
   PluginSettings,
   ProviderSettingsMap,
   RagSettings,
 } from "./shared/types";
-import { DEFAULT_CHAT_HISTORY, DEFAULT_RAG_SETTINGS, DEFAULT_SETTINGS, VIEW_TYPE_CHAT } from "./constants";
+import {
+  DEFAULT_CHAT_HISTORY,
+  DEFAULT_KNOWLEDGE_GRAPH_SETTINGS,
+  DEFAULT_RAG_SETTINGS,
+  DEFAULT_SETTINGS,
+  VIEW_TYPE_CHAT,
+} from "./constants";
 import { normalizeLMStudioBaseUrl, ModelAvailabilityService } from "./api";
 import { ChatView } from "./chat";
 import { normalizeChatHistory } from "./chat/conversation/conversationUtils";
 import { normalizeCompletionModel, normalizeEmbeddingModel } from "./shared/normalizeModels";
 import { LMStudioSettingTab } from "./settings/SettingsTab";
 import { RagService } from "./rag";
+import { GraphService } from "./rag/graph";
+
+function normalizeKnowledgeGraphSettings(raw: unknown): KnowledgeGraphSettings {
+  const data = (typeof raw === "object" && raw !== null ? raw : {}) as Partial<KnowledgeGraphSettings>;
+  return {
+    enabled: typeof data.enabled === "boolean" ? data.enabled : DEFAULT_KNOWLEDGE_GRAPH_SETTINGS.enabled,
+    activeCompletionModelId:
+      typeof data.activeCompletionModelId === "string"
+        ? data.activeCompletionModelId
+        : DEFAULT_KNOWLEDGE_GRAPH_SETTINGS.activeCompletionModelId,
+    excludePatterns: Array.isArray(data.excludePatterns)
+      ? data.excludePatterns.filter((p): p is string => typeof p === "string")
+      : [...DEFAULT_KNOWLEDGE_GRAPH_SETTINGS.excludePatterns],
+  };
+}
 
 function normalizeRagSettings(raw: unknown): RagSettings {
   const data = (typeof raw === "object" && raw !== null ? raw : {}) as Partial<RagSettings>;
@@ -38,14 +60,6 @@ function normalizeRagSettings(raw: unknown): RagSettings {
       typeof data.maxContextChars === "number"
         ? data.maxContextChars
         : DEFAULT_RAG_SETTINGS.maxContextChars,
-    graphBoostEnabled:
-      typeof data.graphBoostEnabled === "boolean"
-        ? data.graphBoostEnabled
-        : DEFAULT_RAG_SETTINGS.graphBoostEnabled,
-    graphBoostStrength:
-      typeof data.graphBoostStrength === "number"
-        ? data.graphBoostStrength
-        : DEFAULT_RAG_SETTINGS.graphBoostStrength,
   };
 }
 
@@ -82,6 +96,7 @@ export default class LMStudioWritingAssistant extends Plugin {
   settings!: PluginSettings;
   modelAvailability!: ModelAvailabilityService;
   ragService!: RagService;
+  graphService!: GraphService;
 
   async onload(): Promise<void> {
     await this.loadSettings();
@@ -92,6 +107,14 @@ export default class LMStudioWritingAssistant extends Plugin {
       this.settings.embeddingModels,
       this.settings.providerSettings,
     );
+
+    this.graphService = new GraphService(this.app);
+    await this.graphService.configure(
+      this.settings.knowledgeGraph,
+      this.settings.completionModels,
+      this.settings.providerSettings,
+    );
+    this.ragService.setGraphService(this.graphService);
 
     this.registerView(VIEW_TYPE_CHAT, (leaf: WorkspaceLeaf) => new ChatView(leaf, this));
 
@@ -151,6 +174,7 @@ export default class LMStudioWritingAssistant extends Plugin {
 
   onunload(): void {
     this.ragService.destroy();
+    this.graphService.destroy();
     // Obsidian handles view cleanup automatically on plugin unload.
     // Detaching leaves here would reset their position on reload.
   }
@@ -243,6 +267,7 @@ export default class LMStudioWritingAssistant extends Plugin {
           ? data.diffMinMatchConfidence
           : DEFAULT_SETTINGS.diffMinMatchConfidence,
       rag: normalizeRagSettings(data?.rag),
+      knowledgeGraph: normalizeKnowledgeGraphSettings(data?.knowledgeGraph),
     };
   }
 

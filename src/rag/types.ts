@@ -53,10 +53,6 @@ export interface RagSettings {
   excludePatterns: string[];
   /** Maximum total characters of RAG context to inject into a prompt. */
   maxContextChars: number;
-  /** Whether to boost retrieval scores for notes linked from the active note. */
-  graphBoostEnabled: boolean;
-  /** Base strength of the graph boost (0–1). Tapers with link count. */
-  graphBoostStrength: number;
 }
 
 /** Serialized index format written to disk. */

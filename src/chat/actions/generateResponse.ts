@@ -108,6 +108,7 @@ export async function generateResponse(options: GenerateResponseOptions): Promis
     sessionContextEnabled: composer.isSessionContextEnabled(),
     maxContextChars: plugin.settings.maxContextChars,
     editMode,
+    ragService: plugin.ragService,
   });
 
   if (activeModel.anthropicCacheSettings?.enabled) {

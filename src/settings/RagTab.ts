@@ -1,7 +1,8 @@
 import { Notice } from "obsidian";
 import type LMStudioWritingAssistant from "../main";
 import type { IndexingState } from "../rag/types";
-import { createSettingsSection, Button, SettingItem } from "./ui";
+import { getProviderDescriptor } from "../providers/registry";
+import { createSettingsSection, createModelSelector, Button, SettingItem } from "./ui";
 import { DEFAULT_RAG_SETTINGS } from "../constants";
 
 /**
@@ -43,26 +44,32 @@ export function renderRagTab(
 
   // ── Embedding Model ───────────────────────────────────────────────
   const models = plugin.settings.embeddingModels;
+  const currentModel = models.find((m) => m.id === rag.activeEmbeddingModelId) ?? null;
 
-  new SettingItem(general.bodyEl)
-    .setName("Embedding model")
-    .setDesc("Select which embedding model to use. Configure models in the embedding models tab.")
-    .addDropdown((dropdown) => {
-      dropdown.addOption("", "None selected");
-      for (const model of models) {
-        dropdown.addOption(model.id, model.name);
+  const modelSelector = createModelSelector(general.bodyEl, models, {
+    getAvailability: (modelId, provider) =>
+      plugin.modelAvailability.getAvailability(modelId, provider).state,
+    refreshLocalModels: async () => {
+      if (currentModel) {
+        const desc = getProviderDescriptor(currentModel.provider);
+        if (desc.kind !== "cloud") {
+          await plugin.modelAvailability.refreshLocalModels({ forceRefresh: true });
+        }
       }
-      dropdown.setValue(rag.activeEmbeddingModelId ?? "");
-      dropdown.onChange(async (value) => {
-        rag.activeEmbeddingModelId = value || null;
-        await plugin.saveSettings();
-        await plugin.ragService.configure(
-          rag,
-          plugin.settings.embeddingModels,
-          plugin.settings.providerSettings,
-        );
-      });
-    });
+    },
+  }, {
+    initial: currentModel,
+    placeholder: "None selected",
+    onSelect: async (model) => {
+      rag.activeEmbeddingModelId = model?.id ?? null;
+      await plugin.saveSettings();
+      await plugin.ragService.configure(
+        rag,
+        plugin.settings.embeddingModels,
+        plugin.settings.providerSettings,
+      );
+    },
+  });
 
   // Move the conditional wrapper after the general section in the DOM.
   container.appendChild(conditionalWrapper);
@@ -272,6 +279,7 @@ export function renderRagTab(
 
   // Return cleanup function.
   return () => {
+    modelSelector.destroy();
     plugin.ragService.onIndexingStateChange(null);
   };
 }

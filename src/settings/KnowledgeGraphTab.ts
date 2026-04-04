@@ -1,7 +1,8 @@
 import { Notice } from "obsidian";
 import type LMStudioWritingAssistant from "../main";
 import type { GraphBuildState } from "../rag/graph";
-import { createSettingsSection, Button, SettingItem } from "./ui";
+import { getProviderDescriptor } from "../providers/registry";
+import { createSettingsSection, createModelSelector, Button, SettingItem } from "./ui";
 
 /**
  * Renders the Knowledge Graph settings tab.
@@ -41,26 +42,32 @@ export function renderKnowledgeGraphTab(
 
   // ── Completion Model ──────────────────────────────────────────────
   const models = plugin.settings.completionModels;
+  const currentModel = models.find((m) => m.id === kg.activeCompletionModelId) ?? null;
 
-  new SettingItem(general.bodyEl)
-    .setName("Extraction model")
-    .setDesc("Select which completion model to use for entity extraction. Local models (LM Studio) are free to run.")
-    .addDropdown((dropdown) => {
-      dropdown.addOption("", "None selected");
-      for (const model of models) {
-        dropdown.addOption(model.id, model.name);
+  const modelSelector = createModelSelector(general.bodyEl, models, {
+    getAvailability: (modelId, provider) =>
+      plugin.modelAvailability.getAvailability(modelId, provider).state,
+    refreshLocalModels: async () => {
+      if (currentModel) {
+        const desc = getProviderDescriptor(currentModel.provider);
+        if (desc.kind !== "cloud") {
+          await plugin.modelAvailability.refreshLocalModels({ forceRefresh: true });
+        }
       }
-      dropdown.setValue(kg.activeCompletionModelId ?? "");
-      dropdown.onChange(async (value) => {
-        kg.activeCompletionModelId = value || null;
-        await plugin.saveSettings();
-        await plugin.graphService.configure(
-          kg,
-          plugin.settings.completionModels,
-          plugin.settings.providerSettings,
-        );
-      });
-    });
+    },
+  }, {
+    initial: currentModel,
+    placeholder: "None selected",
+    onSelect: async (model) => {
+      kg.activeCompletionModelId = model?.id ?? null;
+      await plugin.saveSettings();
+      await plugin.graphService.configure(
+        kg,
+        plugin.settings.completionModels,
+        plugin.settings.providerSettings,
+      );
+    },
+  });
 
   // Move the conditional wrapper after the general section in the DOM.
   container.appendChild(conditionalWrapper);
@@ -199,6 +206,7 @@ export function renderKnowledgeGraphTab(
 
   // Return cleanup function.
   return () => {
+    modelSelector.destroy();
     plugin.graphService.onBuildStateChange(null);
   };
 }

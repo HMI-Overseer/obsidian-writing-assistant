@@ -1,4 +1,5 @@
 import { setIcon } from "obsidian";
+import type { ModelAvailabilityState, ProviderOption } from "../shared/types";
 
 /* ════════════════════════════════════════════════════════════════════════════
  *  Sub-components — lightweight wrappers around native HTML elements
@@ -202,6 +203,146 @@ export class SettingItem {
     cb(new Dropdown(this.controlEl));
     return this;
   }
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+ *  Model selector — custom dropdown with availability status indicators
+ * ════════════════════════════════════════════════════════════════════════ */
+
+export interface ModelSelectorItem {
+  id: string;
+  name: string;
+  modelId: string;
+  provider: ProviderOption;
+}
+
+export interface ModelSelectorDeps {
+  getAvailability: (modelId: string, provider: ProviderOption) => ModelAvailabilityState;
+  refreshLocalModels: () => Promise<void>;
+}
+
+export interface ModelSelectorRefs {
+  wrapEl: HTMLElement;
+  /** Programmatically update the selected model and refresh the UI. */
+  setSelected: (model: ModelSelectorItem | null) => void;
+  /** Cleanup function — removes the document click listener. */
+  destroy: () => void;
+}
+
+/**
+ * Creates a custom model selector with a status dot, dropdown list, and
+ * per-item availability indicators. Mirrors the Benchmark tab's selector
+ * without the profile-settings popover.
+ */
+export function createModelSelector(
+  containerEl: HTMLElement,
+  models: ModelSelectorItem[],
+  deps: ModelSelectorDeps,
+  opts: {
+    initial: ModelSelectorItem | null;
+    placeholder?: string;
+    onSelect: (model: ModelSelectorItem | null) => void;
+  },
+): ModelSelectorRefs {
+  let selected = opts.initial;
+  let isOpen = false;
+
+  const wrapEl = containerEl.createDiv({ cls: "lmsa-header-meta-wrap lmsa-settings-model-selector-wrap" });
+  const btn = wrapEl.createDiv({ cls: "lmsa-header-meta lmsa-settings-model-selector" });
+  const statusEl = btn.createEl("span", { cls: "lmsa-model-selector-status is-unknown" });
+  const labelEl = btn.createEl("span", {
+    cls: "lmsa-header-meta-label",
+    text: selected?.name ?? (opts.placeholder ?? "Select model..."),
+  });
+  const chevronEl = btn.createEl("span", { cls: "lmsa-header-meta-chevron" });
+  setIcon(chevronEl, "chevron-down");
+
+  const dropdownEl = wrapEl.createDiv({ cls: "lmsa-model-dropdown lmsa-hidden" });
+
+  // ── Status helpers ──
+
+  function updateStatus(): void {
+    statusEl.removeClass("is-loaded", "is-unloaded", "is-unknown", "is-cloud", "is-hidden");
+    if (!selected?.modelId) {
+      statusEl.addClass("is-hidden");
+      return;
+    }
+    const state = deps.getAvailability(selected.modelId, selected.provider);
+    statusEl.addClass(`is-${state}`);
+  }
+
+  async function refreshAvailability(): Promise<void> {
+    try { await deps.refreshLocalModels(); } catch { /* handled by service */ }
+    updateStatus();
+  }
+
+  // ── Open / close ──
+
+  function close(): void {
+    dropdownEl.addClass("lmsa-hidden");
+    isOpen = false;
+    btn.removeClass("is-active");
+    chevronEl.empty();
+    setIcon(chevronEl, "chevron-down");
+  }
+
+  function open(): void {
+    dropdownEl.empty();
+    dropdownEl.removeClass("lmsa-hidden");
+    isOpen = true;
+    btn.addClass("is-active");
+    chevronEl.empty();
+    setIcon(chevronEl, "chevron-up");
+
+    const listEl = dropdownEl.createDiv({ cls: "lmsa-model-dropdown-list" });
+
+    for (const m of models) {
+      const item = listEl.createDiv({ cls: "lmsa-model-dropdown-item" });
+      const checkSpan = item.createEl("span", { cls: "lmsa-model-dropdown-check" });
+      if (selected && m.id === selected.id) {
+        item.addClass("is-active");
+        setIcon(checkSpan, "check");
+      }
+      const copy = item.createDiv({ cls: "lmsa-model-dropdown-copy" });
+      copy.createEl("span", { cls: "lmsa-model-dropdown-name", text: m.name });
+      const itemState = deps.getAvailability(m.modelId, m.provider);
+      item.createEl("span", { cls: `lmsa-model-dropdown-state is-${itemState}` });
+
+      item.addEventListener("click", (e) => {
+        e.stopPropagation();
+        selected = m;
+        labelEl.setText(m.name);
+        updateStatus();
+        close();
+        opts.onSelect(m);
+      });
+    }
+  }
+
+  // ── Events ──
+
+  btn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    if (isOpen) close(); else open();
+  });
+
+  const onDocClick = (): void => { if (isOpen) close(); };
+  document.addEventListener("click", onDocClick);
+
+  // ── Init ──
+  void refreshAvailability();
+
+  return {
+    wrapEl,
+    setSelected(model) {
+      selected = model;
+      labelEl.setText(model?.name ?? (opts.placeholder ?? "Select model..."));
+      updateStatus();
+    },
+    destroy() {
+      document.removeEventListener("click", onDocClick);
+    },
+  };
 }
 
 /* ════════════════════════════════════════════════════════════════════════════

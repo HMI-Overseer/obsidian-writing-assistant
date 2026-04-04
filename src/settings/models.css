@@ -117,6 +117,17 @@
     background: color-mix(in srgb, var(--lmsa-status-error-bg) 14%, var(--lmsa-surface-base));
   }
 
+  /* ── Settings model selector ────────────────────────────────────────── */
+
+  .lmsa-settings-model-selector-wrap {
+    @apply lmsa-flex lmsa-items-center lmsa-gap-2;
+  }
+
+  .lmsa-settings-model-selector-wrap .lmsa-model-dropdown {
+    left: 0;
+    right: auto;
+  }
+
   /* ── Provider selector ────────────────────────────────────────────── */
 
   .lmsa-provider-selector-row {

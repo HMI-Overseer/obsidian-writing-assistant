@@ -1,8 +1,8 @@
 import { setIcon } from "obsidian";
 import type LMStudioWritingAssistant from "../main";
-import type { CompletionModel, ModelAvailabilityState, ProviderOption } from "../shared/types";
+import type { CompletionModel } from "../shared/types";
 import { getProviderDescriptor, createChatClient } from "../providers/registry";
-import { createSettingsSection } from "./ui";
+import { createSettingsSection, createModelSelector } from "./ui";
 import { getTestSuites } from "./benchmark/testSuites";
 import { runBenchmarkTest, runAllBenchmarks } from "./benchmark/benchmarkRunner";
 import type { BenchmarkRunResult, BenchmarkTestCase, BenchmarkTestSuite } from "./benchmark/types";
@@ -43,25 +43,35 @@ export function renderBenchmarkTab(
     return;
   }
 
-  const selectorWrap = modelSection.bodyEl.createDiv({ cls: "lmsa-header-meta-wrap lmsa-benchmark-model-wrap" });
-  const selectorBtn = selectorWrap.createDiv({ cls: "lmsa-header-meta lmsa-benchmark-model-selector" });
-  const selectorStatusEl = selectorBtn.createEl("span", {
-    cls: "lmsa-model-selector-status is-unknown",
+  const selector = createModelSelector(modelSection.bodyEl, models, {
+    getAvailability: (modelId, provider) =>
+      plugin.modelAvailability.getAvailability(modelId, provider).state,
+    refreshLocalModels: async () => {
+      if (selectedModel) {
+        const descriptor = getProviderDescriptor(selectedModel.provider);
+        if (descriptor.kind !== "cloud") {
+          await plugin.modelAvailability.refreshLocalModels({ forceRefresh: true });
+        }
+      }
+    },
+  }, {
+    initial: selectedModel,
+    onSelect: (model) => {
+      selectedModel = model as CompletionModel | null;
+      profilePopover.syncVisibility();
+    },
   });
-  const selectorLabel = selectorBtn.createEl("span", {
-    cls: "lmsa-header-meta-label",
-    text: selectedModel?.name ?? "Select model...",
-  });
-  const selectorChevron = selectorBtn.createEl("span", { cls: "lmsa-header-meta-chevron" });
-  setIcon(selectorChevron, "chevron-down");
 
-  const profileSettingsBtn = selectorWrap.createEl("button", {
+  // Add benchmark-specific class for right-aligned layout
+  selector.wrapEl.addClass("lmsa-benchmark-model-wrap");
+
+  const profileSettingsBtn = selector.wrapEl.createEl("button", {
     cls: "lmsa-profile-settings-btn",
     attr: { "aria-label": "Profile settings" },
   }) as HTMLButtonElement;
   setIcon(profileSettingsBtn, "settings");
 
-  const profileSettingsPopoverEl = selectorWrap.createDiv({
+  const profileSettingsPopoverEl = selector.wrapEl.createDiv({
     cls: "lmsa-profile-popover lmsa-hidden",
   });
 
@@ -121,88 +131,6 @@ export function renderBenchmarkTab(
     }
   );
   profilePopover.syncVisibility();
-
-  const selectorDropdown = selectorWrap.createDiv({ cls: "lmsa-model-dropdown lmsa-hidden" });
-  let selectorOpen = false;
-
-  function getModelState(modelId: string, provider: ProviderOption): ModelAvailabilityState {
-    return plugin.modelAvailability.getAvailability(modelId, provider).state;
-  }
-
-  async function refreshModelAvailability(): Promise<void> {
-    if (selectedModel) {
-      const descriptor = getProviderDescriptor(selectedModel.provider);
-      if (descriptor.kind !== "cloud") {
-        try {
-          await plugin.modelAvailability.refreshLocalModels({ forceRefresh: true });
-        } catch { /* handled by service */ }
-      }
-    }
-    updateSelectorStatus();
-  }
-
-  function updateSelectorStatus(): void {
-    selectorStatusEl.removeClass("is-loaded", "is-unloaded", "is-unknown", "is-cloud", "is-hidden");
-    if (!selectedModel?.modelId) {
-      selectorStatusEl.addClass("is-hidden");
-      return;
-    }
-    const state = getModelState(selectedModel.modelId, selectedModel.provider);
-    selectorStatusEl.addClass(`is-${state}`);
-  }
-
-  function closeBenchmarkDropdown(): void {
-    selectorDropdown.addClass("lmsa-hidden");
-    selectorOpen = false;
-    selectorBtn.removeClass("is-active");
-    selectorChevron.empty();
-    setIcon(selectorChevron, "chevron-down");
-  }
-
-  function openBenchmarkDropdown(): void {
-    selectorDropdown.empty();
-    selectorDropdown.removeClass("lmsa-hidden");
-    selectorOpen = true;
-    selectorBtn.addClass("is-active");
-    selectorChevron.empty();
-    setIcon(selectorChevron, "chevron-up");
-
-    const listEl = selectorDropdown.createDiv({ cls: "lmsa-model-dropdown-list" });
-    for (const m of models) {
-      const item = listEl.createDiv({ cls: "lmsa-model-dropdown-item" });
-      const checkSpan = item.createEl("span", { cls: "lmsa-model-dropdown-check" });
-      if (selectedModel && m.id === selectedModel.id) {
-        item.addClass("is-active");
-        setIcon(checkSpan, "check");
-      }
-      const copy = item.createDiv({ cls: "lmsa-model-dropdown-copy" });
-      copy.createEl("span", { cls: "lmsa-model-dropdown-name", text: m.name });
-      const itemState = getModelState(m.modelId, m.provider);
-      item.createEl("span", { cls: `lmsa-model-dropdown-state is-${itemState}` });
-      item.addEventListener("click", (event) => {
-        event.stopPropagation();
-        selectedModel = m;
-        selectorLabel.setText(m.name);
-        updateSelectorStatus();
-        profilePopover.syncVisibility();
-        closeBenchmarkDropdown();
-      });
-    }
-  }
-
-  void refreshModelAvailability();
-
-  selectorBtn.addEventListener("click", (event) => {
-    event.stopPropagation();
-    if (profilePopover.isOpen()) profilePopover.close();
-    if (selectorOpen) closeBenchmarkDropdown();
-    else openBenchmarkDropdown();
-  });
-
-  const onDocumentClick = (): void => {
-    if (selectorOpen) closeBenchmarkDropdown();
-  };
-  document.addEventListener("click", onDocumentClick);
 
   // -----------------------------------------------------------------------
   // Test suites section
@@ -825,7 +753,7 @@ export function renderBenchmarkTab(
   });
 
   return () => {
-    document.removeEventListener("click", onDocumentClick);
+    selector.destroy();
     profilePopover.destroy();
     abortController?.abort();
   };

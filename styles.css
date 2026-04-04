@@ -2575,6 +2575,16 @@
 .lmsa-btn-danger:hover:not(:disabled) {
     background: color-mix(in srgb, var(--lmsa-status-error-bg) 14%, var(--lmsa-surface-base));
   }
+/* ── Settings model selector ────────────────────────────────────────── */
+.lmsa-settings-model-selector-wrap {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+.lmsa-settings-model-selector-wrap .lmsa-model-dropdown {
+    left: 0;
+    right: auto;
+  }
 /* ── Provider selector ────────────────────────────────────────────── */
 .lmsa-provider-selector-row {
     display: flex;

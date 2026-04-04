@@ -93,8 +93,10 @@ export class ChatTranscript {
     // In-place content swap
     await this.renderBubbleContent(bubble, message.content);
 
-    // Replace toolbar with updated version nav state
+    // Replace toolbar, usage badge, and rag sources with updated state
     oldToolbarEl?.remove();
+    bubble.rowEl.querySelector(".lmsa-usage-badge")?.remove();
+    bubble.bodyEl.querySelector(".lmsa-rag-sources")?.remove();
     this.attachBubbleActions(bubble, message, isLastAssistant, callbacks);
 
     // Restore scroll anchor so version nav stays at the same screen position

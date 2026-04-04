@@ -54,7 +54,7 @@
     background: var(--lmsa-surface-inset);
     padding: 8px 12px;
     color: var(--lmsa-text-primary);
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+    box-shadow: inset 0 1px 0 var(--lmsa-inset-highlight-subtle);
     transition: border-color 140ms ease, box-shadow 140ms ease;
     text-align: center;
   }
@@ -96,12 +96,12 @@
   }
 
   .lmsa-benchmark-btn--abort {
-    color: var(--text-error);
-    border-color: var(--text-error);
+    color: var(--lmsa-status-error);
+    border-color: var(--lmsa-status-error);
   }
 
   .lmsa-benchmark-btn--abort:hover {
-    background: color-mix(in srgb, var(--text-error) 12%, var(--lmsa-surface-base));
+    background: color-mix(in srgb, var(--lmsa-status-error) 12%, var(--lmsa-surface-base));
   }
 
   .lmsa-benchmark-btn-icon {
@@ -141,6 +141,7 @@
     box-shadow: inset 0 2px 0 var(--lmsa-section-accent);
   }
 
+
   .lmsa-benchmark-tab-icon {
     @apply lmsa-inline-flex lmsa-items-center;
   }
@@ -170,7 +171,6 @@
   .lmsa-benchmark-btn--run-suite:hover {
     background: color-mix(in srgb, var(--lmsa-section-accent) 12%, var(--lmsa-surface-base));
   }
-
   .lmsa-benchmark-cards {
     @apply lmsa-mt-0;
   }
@@ -223,15 +223,15 @@
   }
 
   .lmsa-benchmark-card-status.is-passed {
-    color: var(--color-green, var(--text-success, #4ade80));
+    color: var(--lmsa-status-success);
   }
 
   .lmsa-benchmark-card-status.is-failed {
-    color: var(--text-error);
+    color: var(--lmsa-status-error);
   }
 
   .lmsa-benchmark-card-status.is-mixed {
-    color: var(--color-yellow, var(--text-warning, #f59e0b));
+    color: var(--lmsa-status-warning);
   }
 
   .lmsa-benchmark-card-status.is-running {
@@ -295,11 +295,11 @@
   }
 
   .lmsa-benchmark-iteration-status.is-passed {
-    color: var(--color-green, var(--text-success, #4ade80));
+    color: var(--lmsa-status-success);
   }
 
   .lmsa-benchmark-iteration-status.is-failed {
-    color: var(--text-error);
+    color: var(--lmsa-status-error);
   }
 
   .lmsa-benchmark-detail-section {
@@ -349,12 +349,12 @@
   }
 
   .lmsa-benchmark-summary--pass {
-    color: var(--color-green, var(--text-success, #4ade80));
+    color: var(--lmsa-status-success);
     font-weight: 600;
   }
 
   .lmsa-benchmark-summary--mixed {
-    color: var(--color-yellow, var(--text-warning, #f59e0b));
+    color: var(--lmsa-status-warning);
     font-weight: 600;
   }
 

@@ -1870,13 +1870,13 @@
     margin-left: 0;
     padding-left: 14px;
     background:
-      radial-gradient(circle at top left, color-mix(in srgb, var(--lmsa-section-accent) 10%, transparent), transparent 42%),
+      radial-gradient(circle at top left, var(--lmsa-tint-5), transparent 42%),
       linear-gradient(180deg, var(--lmsa-surface-overlay), var(--lmsa-surface-raised));
     backdrop-filter: blur(18px);
     -webkit-backdrop-filter: blur(18px);
     box-shadow:
-      0 24px 56px rgba(0, 0, 0, 0.1),
-      inset 0 1px 0 rgba(255, 255, 255, 0.06);
+      0 24px 56px var(--lmsa-shadow-medium),
+      inset 0 1px 0 var(--lmsa-inset-highlight);
 }
 .lmsa-settings-rail::before {
     content: "";
@@ -1932,11 +1932,11 @@
 .lmsa-settings-rail-item.is-active {
     color: var(--lmsa-section-accent);
     background:
-      radial-gradient(ellipse at 50% 30%, color-mix(in srgb, var(--lmsa-section-accent) 14%, transparent), transparent 70%),
+      radial-gradient(ellipse at 50% 30%, var(--lmsa-tint-10), transparent 70%),
       color-mix(in srgb, var(--lmsa-section-accent) 8%, var(--lmsa-surface-raised));
     box-shadow:
-      inset 0 0 0 1px color-mix(in srgb, var(--lmsa-section-accent) 18%, transparent),
-      0 0 12px color-mix(in srgb, var(--lmsa-section-accent) 10%, transparent);
+      inset 0 0 0 1px var(--lmsa-tint-15),
+      0 0 12px var(--lmsa-tint-5);
   }
 .lmsa-settings-rail-item.is-active::before {
     content: "";
@@ -2017,7 +2017,7 @@
       margin-left: 0;
       padding-left: 12px;
       background:
-        radial-gradient(circle at top left, color-mix(in srgb, var(--lmsa-section-accent) 10%, transparent), transparent 42%),
+        radial-gradient(circle at top left, var(--lmsa-tint-5), transparent 42%),
         linear-gradient(180deg, var(--lmsa-surface-overlay), var(--lmsa-surface-raised));
     }
 
@@ -2046,13 +2046,13 @@
     position: relative;
     overflow: hidden;
     background:
-      radial-gradient(circle at top left, color-mix(in srgb, var(--lmsa-section-accent) 10%, transparent), transparent 42%),
+      radial-gradient(circle at top left, var(--lmsa-tint-5), transparent 42%),
       linear-gradient(180deg, var(--lmsa-surface-overlay), var(--lmsa-surface-raised));
     backdrop-filter: blur(18px);
     -webkit-backdrop-filter: blur(18px);
     box-shadow:
-      0 24px 56px rgba(0, 0, 0, 0.1),
-      inset 0 1px 0 rgba(255, 255, 255, 0.06);
+      0 24px 56px var(--lmsa-shadow-medium),
+      inset 0 1px 0 var(--lmsa-inset-highlight);
 }
 .lmsa-settings-panel::before {
     content: "";
@@ -2099,17 +2099,17 @@
     background:
       linear-gradient(180deg, color-mix(in srgb, var(--lmsa-surface-base) 88%, transparent), var(--lmsa-surface-raised));
     box-shadow:
-      0 14px 34px rgba(0, 0, 0, 0.06),
-      inset 0 1px 0 rgba(255, 255, 255, 0.05);
+      0 14px 34px var(--lmsa-shadow-subtle),
+      inset 0 1px 0 var(--lmsa-inset-highlight);
     border-color: var(--lmsa-border-subtle);
     transition: border-color 200ms ease, box-shadow 200ms ease;
 }
 .lmsa-settings-section:hover {
     border-color: var(--lmsa-border-emphasis);
     box-shadow:
-      0 14px 34px rgba(0, 0, 0, 0.06),
-      inset 0 1px 0 rgba(255, 255, 255, 0.05),
-      0 0 0 1px color-mix(in srgb, var(--lmsa-section-accent) 22%, transparent);
+      0 14px 34px var(--lmsa-shadow-subtle),
+      inset 0 1px 0 var(--lmsa-inset-highlight),
+      0 0 0 1px var(--lmsa-tint-20);
   }
 /* Card glow — soft accent-colored aura behind each section */
 .lmsa-settings-section::after {
@@ -2291,11 +2291,11 @@
     transition: transform 150ms ease;
   }
 .lmsa-toggle.is-enabled {
-    background: var(--interactive-accent, var(--lmsa-section-accent));
+    background: var(--lmsa-section-accent);
   }
 .lmsa-toggle.is-enabled::after {
     transform: translateX(18px);
-    background: #fff;
+    background: var(--lmsa-surface-contrast);
   }
 .lmsa-toggle:focus-visible {
     box-shadow: 0 0 0 2px var(--lmsa-accent-glow);
@@ -2311,7 +2311,7 @@
     background: var(--lmsa-surface-inset);
     padding: 8px 12px;
     color: var(--lmsa-text-primary);
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+    box-shadow: inset 0 1px 0 var(--lmsa-inset-highlight-subtle);
     transition: border-color 140ms ease, box-shadow 140ms ease;
   }
 .lmsa-settings-root input[type="text"]:focus,
@@ -2341,13 +2341,13 @@
     border-radius: 50%;
     background: linear-gradient(135deg, var(--lmsa-section-accent), var(--lmsa-section-accent-secondary));
     border: 2px solid var(--lmsa-surface-base);
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+    box-shadow: 0 2px 6px var(--lmsa-shadow-strong);
     cursor: pointer;
     -webkit-transition: box-shadow 0.15s ease, transform 0.15s ease;
     transition: box-shadow 0.15s ease, transform 0.15s ease;
   }
 .lmsa-settings-root input[type="range"]::-webkit-slider-thumb:hover {
-    box-shadow: 0 0 0 4px color-mix(in srgb, var(--lmsa-section-accent) 25%, transparent);
+    box-shadow: 0 0 0 4px var(--lmsa-tint-25);
     transform: scale(1.1);
   }
 .lmsa-settings-root input[type="range"]::-moz-range-thumb {
@@ -2356,13 +2356,13 @@
     border-radius: 50%;
     background: linear-gradient(135deg, var(--lmsa-section-accent), var(--lmsa-section-accent-secondary));
     border: 2px solid var(--lmsa-surface-base);
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+    box-shadow: 0 2px 6px var(--lmsa-shadow-strong);
     cursor: pointer;
     -moz-transition: box-shadow 0.15s ease, transform 0.15s ease;
     transition: box-shadow 0.15s ease, transform 0.15s ease;
   }
 .lmsa-settings-root input[type="range"]::-moz-range-thumb:hover {
-    box-shadow: 0 0 0 4px color-mix(in srgb, var(--lmsa-section-accent) 25%, transparent);
+    box-shadow: 0 0 0 4px var(--lmsa-tint-25);
     transform: scale(1.1);
   }
 /* ── Info boxes ────────────────────────────────────────────────────────── */
@@ -2462,12 +2462,12 @@
     border-color: color-mix(in srgb, var(--lmsa-section-accent) 20%, var(--lmsa-border-default));
   }
 .lmsa-connection-status.is-connected {
-    border-color: color-mix(in srgb, var(--color-green) 42%, var(--lmsa-border-default));
-    background: color-mix(in srgb, var(--color-green) 8%, var(--background-secondary));
+    border-color: color-mix(in srgb, var(--lmsa-status-success) 42%, var(--lmsa-border-default));
+    background: color-mix(in srgb, var(--lmsa-status-success) 8%, var(--background-secondary));
   }
 .lmsa-connection-status.is-error {
-    border-color: color-mix(in srgb, var(--background-modifier-error) 72%, var(--lmsa-border-default));
-    background: color-mix(in srgb, var(--background-modifier-error) 8%, var(--background-secondary));
+    border-color: color-mix(in srgb, var(--lmsa-status-error-bg) 72%, var(--lmsa-border-default));
+    background: color-mix(in srgb, var(--lmsa-status-error-bg) 8%, var(--background-secondary));
   }
 .lmsa-connection-status-summary {
     display: flex;
@@ -2492,13 +2492,13 @@
 }
 .lmsa-connection-status.is-connected .lmsa-connection-status-badge,
   .lmsa-model-state-badge.is-loaded {
-    background: color-mix(in srgb, var(--color-green) 18%, transparent);
-    color: color-mix(in srgb, var(--color-green) 74%, var(--lmsa-text-primary));
+    background: color-mix(in srgb, var(--lmsa-status-success) 18%, transparent);
+    color: color-mix(in srgb, var(--lmsa-status-success) 74%, var(--lmsa-text-primary));
   }
 .lmsa-connection-status.is-error .lmsa-connection-status-badge,
   .lmsa-model-state-badge.is-unloaded {
-    background: color-mix(in srgb, var(--background-modifier-error) 18%, transparent);
-    color: color-mix(in srgb, var(--background-modifier-error) 88%, var(--lmsa-text-primary));
+    background: color-mix(in srgb, var(--lmsa-status-error-bg) 18%, transparent);
+    color: color-mix(in srgb, var(--lmsa-status-error-bg) 88%, var(--lmsa-text-primary));
   }
 .lmsa-connection-status-text {
     font-weight: 600;
@@ -2524,7 +2524,7 @@
     padding: 1rem;
     border-color: var(--lmsa-border-default);
     background: var(--lmsa-surface-raised);
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+    box-shadow: inset 0 1px 0 var(--lmsa-inset-highlight-subtle);
 }
 .lmsa-item-info {
     display: flex;
@@ -2568,12 +2568,12 @@
 }
 .lmsa-btn-danger {
     border-width: 1px;
-    border-color: color-mix(in srgb, var(--background-modifier-error) 72%, var(--lmsa-border-default));
+    border-color: color-mix(in srgb, var(--lmsa-status-error-bg) 72%, var(--lmsa-border-default));
     background: color-mix(in srgb, var(--lmsa-surface-base) 92%, transparent);
-    color: var(--text-error);
+    color: var(--lmsa-status-error);
 }
 .lmsa-btn-danger:hover:not(:disabled) {
-    background: color-mix(in srgb, var(--background-modifier-error) 14%, var(--lmsa-surface-base));
+    background: color-mix(in srgb, var(--lmsa-status-error-bg) 14%, var(--lmsa-surface-base));
   }
 /* ── Provider selector ────────────────────────────────────────────── */
 .lmsa-provider-selector-row {
@@ -2611,7 +2611,7 @@
 }
 .lmsa-settings-root select.lmsa-provider-selector-select:focus {
     border-color: var(--lmsa-section-accent);
-    box-shadow: 0 0 0 2px color-mix(in srgb, var(--lmsa-section-accent) 25%, transparent);
+    box-shadow: 0 0 0 2px var(--lmsa-tint-25);
   }
 .lmsa-provider-content {
     display: flex;
@@ -2727,7 +2727,7 @@
     background: var(--lmsa-surface-inset);
     padding: 8px 12px;
     color: var(--lmsa-text-primary);
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+    box-shadow: inset 0 1px 0 var(--lmsa-inset-highlight-subtle);
     transition: border-color 140ms ease, box-shadow 140ms ease;
     text-align: center;
 }
@@ -2770,11 +2770,11 @@
     background: color-mix(in srgb, var(--lmsa-section-accent) 12%, var(--lmsa-surface-base));
   }
 .lmsa-benchmark-btn--abort {
-    color: var(--text-error);
-    border-color: var(--text-error);
+    color: var(--lmsa-status-error);
+    border-color: var(--lmsa-status-error);
   }
 .lmsa-benchmark-btn--abort:hover {
-    background: color-mix(in srgb, var(--text-error) 12%, var(--lmsa-surface-base));
+    background: color-mix(in srgb, var(--lmsa-status-error) 12%, var(--lmsa-surface-base));
   }
 .lmsa-benchmark-btn-icon {
     display: inline-flex;
@@ -2906,13 +2906,13 @@
     white-space: nowrap;
   }
 .lmsa-benchmark-card-status.is-passed {
-    color: var(--color-green, var(--text-success, #4ade80));
+    color: var(--lmsa-status-success);
   }
 .lmsa-benchmark-card-status.is-failed {
-    color: var(--text-error);
+    color: var(--lmsa-status-error);
   }
 .lmsa-benchmark-card-status.is-mixed {
-    color: var(--color-yellow, var(--text-warning, #f59e0b));
+    color: var(--lmsa-status-warning);
   }
 .lmsa-benchmark-card-status.is-running {
     color: var(--lmsa-section-accent);
@@ -2978,10 +2978,10 @@
     font-weight: 500;
   }
 .lmsa-benchmark-iteration-status.is-passed {
-    color: var(--color-green, var(--text-success, #4ade80));
+    color: var(--lmsa-status-success);
   }
 .lmsa-benchmark-iteration-status.is-failed {
-    color: var(--text-error);
+    color: var(--lmsa-status-error);
   }
 .lmsa-benchmark-detail-section {
     font-size: var(--font-ui-smaller);
@@ -3031,11 +3031,11 @@
     font-size: var(--font-ui-small);
   }
 .lmsa-benchmark-summary--pass {
-    color: var(--color-green, var(--text-success, #4ade80));
+    color: var(--lmsa-status-success);
     font-weight: 600;
   }
 .lmsa-benchmark-summary--mixed {
-    color: var(--color-yellow, var(--text-warning, #f59e0b));
+    color: var(--lmsa-status-warning);
     font-weight: 600;
   }
 .lmsa-benchmark-summary-detail {
@@ -3089,12 +3089,12 @@
     line-height: 1.5;
 }
 .lmsa-index-status-text.mod-error {
-    color: var(--text-error);
+    color: var(--lmsa-status-error);
   }
 .lmsa-index-drift-notice {
     margin: 0px;
     display: none;
-    color: var(--text-warning, var(--lmsa-accent-muted));
+    color: var(--lmsa-status-warning);
     font-size: var(--font-ui-smaller);
     line-height: 1.5;
 }
@@ -4150,14 +4150,6 @@
   /* ── Border hierarchy ──────────────────────────────────────────────────── */
   --lmsa-border-subtle: color-mix(in srgb, var(--background-modifier-border) 60%, transparent);
   --lmsa-border-default: var(--background-modifier-border);
-  --lmsa-border-emphasis: color-mix(in srgb, var(--interactive-accent) 30%, var(--background-modifier-border));
-
-  /* ── Accent ────────────────────────────────────────────────────────────── */
-  --lmsa-accent: var(--interactive-accent);
-  --lmsa-accent-hover: var(--interactive-accent-hover);
-  --lmsa-accent-muted: color-mix(in srgb, var(--interactive-accent) 55%, var(--text-muted));
-  --lmsa-accent-subtle: color-mix(in srgb, var(--interactive-accent) 14%, transparent);
-  --lmsa-accent-glow: color-mix(in srgb, var(--interactive-accent) 18%, transparent);
 
   /* ── Text ──────────────────────────────────────────────────────────────── */
   --lmsa-text-primary: var(--text-normal);
@@ -4168,9 +4160,52 @@
   --lmsa-glow-opacity: 0.12;
   --lmsa-shimmer-opacity: 0.85;
 
-  /* ── Section accent (defaults — overridden per-tab via data-tab) ────── */
+  /* ── Status colors ────────────────────────────────────────────────────── */
+  --lmsa-status-success:  var(--color-green,  var(--text-success, #4ade80));
+  --lmsa-status-warning:  var(--color-yellow, var(--text-warning, #f59e0b));
+  --lmsa-status-error:    var(--text-error);
+  --lmsa-status-error-bg: var(--background-modifier-error);
+
+  /* ── Shadow primitives ────────────────────────────────────────────────── */
+  --lmsa-shadow-subtle:          rgba(0, 0, 0, 0.06);
+  --lmsa-shadow-medium:          rgba(0, 0, 0, 0.1);
+  --lmsa-shadow-strong:          rgba(0, 0, 0, 0.15);
+  --lmsa-inset-highlight:        rgba(255, 255, 255, 0.05);
+  --lmsa-inset-highlight-subtle: rgba(255, 255, 255, 0.03);
+
+  /* ── Contrast surface (toggle knob, etc.) ─────────────────────────────── */
+  --lmsa-surface-contrast: #fff;
+}
+/* ── Section-accent–derived tokens ──────────────────────────────────────
+ * These MUST live on .lmsa-settings-shell (not .lmsa-settings-root)
+ * so they resolve against the per-tab --lmsa-section-accent override
+ * set via data-tab selectors below.
+ * --------------------------------------------------------------------- */
+.lmsa-settings-root .lmsa-settings-shell {
+  /* ── Section accent defaults (overridden per-tab via data-tab) ──────── */
   --lmsa-section-accent: var(--interactive-accent);
   --lmsa-section-accent-secondary: var(--interactive-accent);
+
+  /* ── Accent ────────────────────────────────────────────────────────────── */
+  --lmsa-accent: var(--lmsa-section-accent);
+  --lmsa-accent-hover: var(--interactive-accent-hover);
+  --lmsa-accent-muted: color-mix(in srgb, var(--lmsa-section-accent) 55%, var(--text-muted));
+
+  /* ── Border emphasis (accent-aware) ────────────────────────────────────── */
+  --lmsa-border-emphasis: color-mix(in srgb, var(--lmsa-section-accent) 30%, var(--background-modifier-border));
+
+  /* ── Accent tint scale (section-accent at fixed opacities) ─────────── */
+  --lmsa-tint-2:  color-mix(in srgb, var(--lmsa-section-accent)  8%, transparent);
+  --lmsa-tint-5:  color-mix(in srgb, var(--lmsa-section-accent) 10%, transparent);
+  --lmsa-tint-10: color-mix(in srgb, var(--lmsa-section-accent) 14%, transparent);
+  --lmsa-tint-15: color-mix(in srgb, var(--lmsa-section-accent) 18%, transparent);
+  --lmsa-tint-20: color-mix(in srgb, var(--lmsa-section-accent) 22%, transparent);
+  --lmsa-tint-25: color-mix(in srgb, var(--lmsa-section-accent) 25%, transparent);
+  --lmsa-tint-40: color-mix(in srgb, var(--lmsa-section-accent) 40%, transparent);
+  --lmsa-tint-50: color-mix(in srgb, var(--lmsa-section-accent) 55%, transparent);
+
+  --lmsa-accent-subtle: var(--lmsa-tint-10);
+  --lmsa-accent-glow: var(--lmsa-tint-15);
 }
 /* ── Per-tab accent overrides ─────────────────────────────────────────────
  * Obsidian exposes --color-red, --color-blue, --color-purple, etc. as
@@ -4225,11 +4260,11 @@
 }
 .lmsa-settings-rail-item.is-active {
   background:
-    radial-gradient(ellipse at 50% 30%, color-mix(in srgb, var(--lmsa-section-accent) 14%, transparent), transparent 70%),
+    radial-gradient(ellipse at 50% 30%, var(--lmsa-tint-10), transparent 70%),
     color-mix(in srgb, var(--lmsa-section-accent) 8%, var(--lmsa-surface-raised)) !important;
   box-shadow:
-    inset 0 0 0 1px color-mix(in srgb, var(--lmsa-section-accent) 18%, transparent),
-    0 0 12px color-mix(in srgb, var(--lmsa-section-accent) 10%, transparent) !important;
+    inset 0 0 0 1px var(--lmsa-tint-15),
+    0 0 12px var(--lmsa-tint-5) !important;
 }
 .lmsa-settings-rail-item:hover:not(.is-active) {
   background: color-mix(in srgb, var(--lmsa-surface-overlay) 80%, transparent) !important;

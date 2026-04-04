@@ -14,13 +14,13 @@
   }
 
   .lmsa-connection-status.is-connected {
-    border-color: color-mix(in srgb, var(--color-green) 42%, var(--lmsa-border-default));
-    background: color-mix(in srgb, var(--color-green) 8%, var(--background-secondary));
+    border-color: color-mix(in srgb, var(--lmsa-status-success) 42%, var(--lmsa-border-default));
+    background: color-mix(in srgb, var(--lmsa-status-success) 8%, var(--background-secondary));
   }
 
   .lmsa-connection-status.is-error {
-    border-color: color-mix(in srgb, var(--background-modifier-error) 72%, var(--lmsa-border-default));
-    background: color-mix(in srgb, var(--background-modifier-error) 8%, var(--background-secondary));
+    border-color: color-mix(in srgb, var(--lmsa-status-error-bg) 72%, var(--lmsa-border-default));
+    background: color-mix(in srgb, var(--lmsa-status-error-bg) 8%, var(--background-secondary));
   }
 
   .lmsa-connection-status-summary {
@@ -36,14 +36,14 @@
 
   .lmsa-connection-status.is-connected .lmsa-connection-status-badge,
   .lmsa-model-state-badge.is-loaded {
-    background: color-mix(in srgb, var(--color-green) 18%, transparent);
-    color: color-mix(in srgb, var(--color-green) 74%, var(--lmsa-text-primary));
+    background: color-mix(in srgb, var(--lmsa-status-success) 18%, transparent);
+    color: color-mix(in srgb, var(--lmsa-status-success) 74%, var(--lmsa-text-primary));
   }
 
   .lmsa-connection-status.is-error .lmsa-connection-status-badge,
   .lmsa-model-state-badge.is-unloaded {
-    background: color-mix(in srgb, var(--background-modifier-error) 18%, transparent);
-    color: color-mix(in srgb, var(--background-modifier-error) 88%, var(--lmsa-text-primary));
+    background: color-mix(in srgb, var(--lmsa-status-error-bg) 18%, transparent);
+    color: color-mix(in srgb, var(--lmsa-status-error-bg) 88%, var(--lmsa-text-primary));
   }
 
   .lmsa-connection-status-text {
@@ -65,7 +65,7 @@
     @apply lmsa-flex lmsa-items-start lmsa-justify-between lmsa-gap-4 lmsa-rounded-[18px] lmsa-border lmsa-p-4;
     border-color: var(--lmsa-border-default);
     background: var(--lmsa-surface-raised);
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+    box-shadow: inset 0 1px 0 var(--lmsa-inset-highlight-subtle);
   }
 
   .lmsa-item-info {
@@ -108,13 +108,13 @@
 
   .lmsa-btn-danger {
     @apply lmsa-border;
-    border-color: color-mix(in srgb, var(--background-modifier-error) 72%, var(--lmsa-border-default));
+    border-color: color-mix(in srgb, var(--lmsa-status-error-bg) 72%, var(--lmsa-border-default));
     background: color-mix(in srgb, var(--lmsa-surface-base) 92%, transparent);
-    color: var(--text-error);
+    color: var(--lmsa-status-error);
   }
 
   .lmsa-btn-danger:hover:not(:disabled) {
-    background: color-mix(in srgb, var(--background-modifier-error) 14%, var(--lmsa-surface-base));
+    background: color-mix(in srgb, var(--lmsa-status-error-bg) 14%, var(--lmsa-surface-base));
   }
 
   /* ── Provider selector ────────────────────────────────────────────── */
@@ -151,7 +151,7 @@
 
   .lmsa-settings-root select.lmsa-provider-selector-select:focus {
     border-color: var(--lmsa-section-accent);
-    box-shadow: 0 0 0 2px color-mix(in srgb, var(--lmsa-section-accent) 25%, transparent);
+    box-shadow: 0 0 0 2px var(--lmsa-tint-25);
   }
 
   .lmsa-provider-content {

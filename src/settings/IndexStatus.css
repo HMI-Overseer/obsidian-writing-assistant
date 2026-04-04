@@ -25,13 +25,13 @@
   }
 
   .lmsa-index-status-text.mod-error {
-    color: var(--text-error);
+    color: var(--lmsa-status-error);
   }
 
   .lmsa-index-drift-notice {
     @apply lmsa-m-0;
     display: none;
-    color: var(--text-warning, var(--lmsa-accent-muted));
+    color: var(--lmsa-status-warning);
     font-size: var(--font-ui-smaller);
     line-height: 1.5;
   }

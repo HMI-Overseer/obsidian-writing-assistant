@@ -17,14 +17,6 @@
   /* ── Border hierarchy ──────────────────────────────────────────────────── */
   --lmsa-border-subtle: color-mix(in srgb, var(--background-modifier-border) 60%, transparent);
   --lmsa-border-default: var(--background-modifier-border);
-  --lmsa-border-emphasis: color-mix(in srgb, var(--interactive-accent) 30%, var(--background-modifier-border));
-
-  /* ── Accent ────────────────────────────────────────────────────────────── */
-  --lmsa-accent: var(--interactive-accent);
-  --lmsa-accent-hover: var(--interactive-accent-hover);
-  --lmsa-accent-muted: color-mix(in srgb, var(--interactive-accent) 55%, var(--text-muted));
-  --lmsa-accent-subtle: color-mix(in srgb, var(--interactive-accent) 14%, transparent);
-  --lmsa-accent-glow: color-mix(in srgb, var(--interactive-accent) 18%, transparent);
 
   /* ── Text ──────────────────────────────────────────────────────────────── */
   --lmsa-text-primary: var(--text-normal);
@@ -35,9 +27,54 @@
   --lmsa-glow-opacity: 0.12;
   --lmsa-shimmer-opacity: 0.85;
 
-  /* ── Section accent (defaults — overridden per-tab via data-tab) ────── */
+  /* ── Status colors ────────────────────────────────────────────────────── */
+  --lmsa-status-success:  var(--color-green,  var(--text-success, #4ade80));
+  --lmsa-status-warning:  var(--color-yellow, var(--text-warning, #f59e0b));
+  --lmsa-status-error:    var(--text-error);
+  --lmsa-status-error-bg: var(--background-modifier-error);
+
+  /* ── Shadow primitives ────────────────────────────────────────────────── */
+  --lmsa-shadow-subtle:          rgba(0, 0, 0, 0.06);
+  --lmsa-shadow-medium:          rgba(0, 0, 0, 0.1);
+  --lmsa-shadow-strong:          rgba(0, 0, 0, 0.15);
+  --lmsa-inset-highlight:        rgba(255, 255, 255, 0.05);
+  --lmsa-inset-highlight-subtle: rgba(255, 255, 255, 0.03);
+
+  /* ── Contrast surface (toggle knob, etc.) ─────────────────────────────── */
+  --lmsa-surface-contrast: #fff;
+}
+
+/* ── Section-accent–derived tokens ──────────────────────────────────────
+ * These MUST live on .lmsa-settings-shell (not .lmsa-settings-root)
+ * so they resolve against the per-tab --lmsa-section-accent override
+ * set via data-tab selectors below.
+ * --------------------------------------------------------------------- */
+
+.lmsa-settings-root .lmsa-settings-shell {
+  /* ── Section accent defaults (overridden per-tab via data-tab) ──────── */
   --lmsa-section-accent: var(--interactive-accent);
   --lmsa-section-accent-secondary: var(--interactive-accent);
+
+  /* ── Accent ────────────────────────────────────────────────────────────── */
+  --lmsa-accent: var(--lmsa-section-accent);
+  --lmsa-accent-hover: var(--interactive-accent-hover);
+  --lmsa-accent-muted: color-mix(in srgb, var(--lmsa-section-accent) 55%, var(--text-muted));
+
+  /* ── Border emphasis (accent-aware) ────────────────────────────────────── */
+  --lmsa-border-emphasis: color-mix(in srgb, var(--lmsa-section-accent) 30%, var(--background-modifier-border));
+
+  /* ── Accent tint scale (section-accent at fixed opacities) ─────────── */
+  --lmsa-tint-2:  color-mix(in srgb, var(--lmsa-section-accent)  8%, transparent);
+  --lmsa-tint-5:  color-mix(in srgb, var(--lmsa-section-accent) 10%, transparent);
+  --lmsa-tint-10: color-mix(in srgb, var(--lmsa-section-accent) 14%, transparent);
+  --lmsa-tint-15: color-mix(in srgb, var(--lmsa-section-accent) 18%, transparent);
+  --lmsa-tint-20: color-mix(in srgb, var(--lmsa-section-accent) 22%, transparent);
+  --lmsa-tint-25: color-mix(in srgb, var(--lmsa-section-accent) 25%, transparent);
+  --lmsa-tint-40: color-mix(in srgb, var(--lmsa-section-accent) 40%, transparent);
+  --lmsa-tint-50: color-mix(in srgb, var(--lmsa-section-accent) 55%, transparent);
+
+  --lmsa-accent-subtle: var(--lmsa-tint-10);
+  --lmsa-accent-glow: var(--lmsa-tint-15);
 }
 
 /* ── Per-tab accent overrides ─────────────────────────────────────────────

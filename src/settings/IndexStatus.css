@@ -1,0 +1,102 @@
+@layer components {
+  /* ── Index status block ───────────────────────────────────────────────────
+   * Shared layout for RAG index and Knowledge Graph build status.
+   * Structure: status header row (text + buttons) → progress bar.
+   * ─────────────────────────────────────────────────────────────────────── */
+
+  .lmsa-index-status {
+    @apply lmsa-flex lmsa-flex-col lmsa-gap-3;
+  }
+
+  /* ── Header: status text left, action buttons right ───────────────────── */
+
+  .lmsa-index-status-header {
+    @apply lmsa-flex lmsa-items-center lmsa-justify-between lmsa-gap-4;
+  }
+
+  .lmsa-index-status-info {
+    @apply lmsa-flex lmsa-min-w-0 lmsa-flex-1 lmsa-flex-col lmsa-gap-1;
+  }
+
+  .lmsa-index-status-text {
+    @apply lmsa-m-0;
+    color: var(--lmsa-text-secondary);
+    line-height: 1.5;
+  }
+
+  .lmsa-index-status-text.mod-error {
+    color: var(--text-error);
+  }
+
+  .lmsa-index-drift-notice {
+    @apply lmsa-m-0;
+    display: none;
+    color: var(--text-warning, var(--lmsa-accent-muted));
+    font-size: var(--font-ui-smaller);
+    line-height: 1.5;
+  }
+
+  .lmsa-index-drift-notice.is-visible {
+    display: block;
+  }
+
+  /* ── Action button group ──────────────────────────────────────────────── */
+
+  .lmsa-index-actions {
+    @apply lmsa-flex lmsa-flex-shrink-0 lmsa-items-center lmsa-gap-2;
+  }
+
+  .lmsa-index-actions > .lmsa-ui-btn {
+    display: none;
+  }
+
+  .lmsa-index-actions > .lmsa-ui-btn.is-visible {
+    @apply lmsa-inline-flex;
+  }
+
+  /* ── Progress bar ─────────────────────────────────────────────────────── */
+
+  .lmsa-index-progress {
+    display: none;
+  }
+
+  .lmsa-index-progress.is-visible {
+    @apply lmsa-flex lmsa-flex-col lmsa-gap-1.5;
+  }
+
+  .lmsa-index-progress-bar {
+    @apply lmsa-relative lmsa-overflow-hidden;
+    height: 6px;
+    border-radius: 9999px;
+    background: var(--lmsa-border-default);
+  }
+
+  .lmsa-index-progress-fill {
+    @apply lmsa-absolute lmsa-inset-y-0 lmsa-left-0;
+    border-radius: 9999px;
+    background: linear-gradient(
+      90deg,
+      var(--lmsa-section-accent, var(--interactive-accent)),
+      var(--lmsa-section-accent-secondary, var(--interactive-accent))
+    );
+    transition: width 300ms ease;
+  }
+
+  .lmsa-index-progress-text {
+    color: var(--lmsa-text-secondary);
+    font-size: var(--font-ui-smaller);
+    line-height: 1.4;
+  }
+
+  /* ── Responsive ───────────────────────────────────────────────────────── */
+
+  @media (max-width: 700px) {
+    .lmsa-index-status-header {
+      @apply lmsa-flex-col lmsa-items-stretch;
+    }
+
+    .lmsa-index-actions {
+      @apply lmsa-justify-start;
+    }
+  }
+}

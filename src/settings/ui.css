@@ -36,6 +36,13 @@
     @apply lmsa-flex lmsa-flex-col lmsa-gap-5 lmsa-p-5;
   }
 
+  /* Conditional wrappers inside content inherit the same flex gap layout
+     so that section cards inside them don't collapse together. */
+  .lmsa-settings-content > .lmsa-rag-conditional,
+  .lmsa-settings-content > .lmsa-kg-conditional {
+    @apply lmsa-flex lmsa-flex-col lmsa-gap-5;
+  }
+
   /* ── Section (card) ────────────────────────────────────────────────────── */
 
   .lmsa-settings-section {

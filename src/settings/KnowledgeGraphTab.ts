@@ -1,7 +1,7 @@
 import { Notice } from "obsidian";
 import type LMStudioWritingAssistant from "../main";
 import type { GraphBuildState } from "../rag/graph";
-import { createSettingsSection, SettingItem } from "./ui";
+import { createSettingsSection, Button, SettingItem } from "./ui";
 
 /**
  * Renders the Knowledge Graph settings tab.
@@ -79,51 +79,44 @@ export function renderKnowledgeGraphTab(
       { icon: "database" },
     );
 
-    const statusRow = status.bodyEl.createDiv({ cls: "lmsa-kg-status" });
-    const statusTextEl = statusRow.createEl("p", { cls: "lmsa-kg-status-text" });
-    const progressRow = statusRow.createDiv({ cls: "lmsa-kg-progress" });
-    const progressTextEl = progressRow.createEl("span", { cls: "lmsa-kg-progress-text" });
+    // ── Graph status block ──
+    const statusBlock = status.bodyEl.createDiv({ cls: "lmsa-index-status" });
 
-    // ── Action buttons ──
-    const buildItem = new SettingItem(status.bodyEl);
-    buildItem.settingEl.addClass("lmsa-kg-action-row");
-    buildItem.addButton((button) =>
-      button.setButtonText("Build graph").setCta().onClick(async () => {
-        if (!kg.enabled || !kg.activeCompletionModelId) {
-          new Notice("Enable knowledge graph and select a completion model first.");
-          return;
-        }
-        await plugin.graphService.startBuild(
-          kg,
-          plugin.settings.completionModels,
-          plugin.settings.providerSettings,
-        );
-      }),
-    );
+    const headerRow = statusBlock.createDiv({ cls: "lmsa-index-status-header" });
+    const infoEl = headerRow.createDiv({ cls: "lmsa-index-status-info" });
+    const statusTextEl = infoEl.createEl("p", { cls: "lmsa-index-status-text" });
 
-    const rebuildItem = new SettingItem(status.bodyEl);
-    rebuildItem.settingEl.addClass("lmsa-kg-action-row");
-    rebuildItem.addButton((button) =>
-      button.setButtonText("Rebuild graph").onClick(async () => {
-        if (!kg.enabled || !kg.activeCompletionModelId) {
-          new Notice("Enable knowledge graph and select a completion model first.");
-          return;
-        }
-        await plugin.graphService.rebuild(
-          kg,
-          plugin.settings.completionModels,
-          plugin.settings.providerSettings,
-        );
-      }),
-    );
+    const actionsEl = headerRow.createDiv({ cls: "lmsa-index-actions" });
+    const buildBtn = new Button(actionsEl).setButtonText("Build graph").setCta().onClick(async () => {
+      if (!kg.enabled || !kg.activeCompletionModelId) {
+        new Notice("Enable knowledge graph and select a completion model first.");
+        return;
+      }
+      await plugin.graphService.startBuild(
+        kg,
+        plugin.settings.completionModels,
+        plugin.settings.providerSettings,
+      );
+    });
+    const rebuildBtn = new Button(actionsEl).setButtonText("Rebuild graph").onClick(async () => {
+      if (!kg.enabled || !kg.activeCompletionModelId) {
+        new Notice("Enable knowledge graph and select a completion model first.");
+        return;
+      }
+      await plugin.graphService.rebuild(
+        kg,
+        plugin.settings.completionModels,
+        plugin.settings.providerSettings,
+      );
+    });
+    const stopBtn = new Button(actionsEl).setButtonText("Stop").onClick(() => {
+      plugin.graphService.stopBuild();
+    });
 
-    const stopItem = new SettingItem(status.bodyEl);
-    stopItem.settingEl.addClass("lmsa-kg-action-row");
-    stopItem.addButton((button) =>
-      button.setButtonText("Stop").onClick(() => {
-        plugin.graphService.stopBuild();
-      }),
-    );
+    const progressRow = statusBlock.createDiv({ cls: "lmsa-index-progress" });
+    const progressBarEl = progressRow.createDiv({ cls: "lmsa-index-progress-bar" });
+    const progressFillEl = progressBarEl.createDiv({ cls: "lmsa-index-progress-fill" });
+    const progressTextEl = progressRow.createEl("span", { cls: "lmsa-index-progress-text" });
 
     // ── State rendering function ──
     function updateDisplay(state: GraphBuildState): void {
@@ -156,17 +149,19 @@ export function renderKnowledgeGraphTab(
         const pct = state.filesTotal > 0
           ? Math.round((state.filesProcessed / state.filesTotal) * 100)
           : 0;
+        progressFillEl.setCssStyles({ width: `${pct}%` });
         progressTextEl.textContent = `${state.filesProcessed} / ${state.filesTotal} files (${pct}%)`;
       } else {
+        progressFillEl.setCssStyles({ width: "0%" });
         progressTextEl.textContent = "";
       }
       progressRow.toggleClass("is-visible", isExtracting);
 
       // Button visibility
       const canAct = !!kg.activeCompletionModelId;
-      buildItem.settingEl.toggleClass("is-visible", canAct && !hasGraph && !isExtracting);
-      rebuildItem.settingEl.toggleClass("is-visible", canAct && hasGraph && !isExtracting);
-      stopItem.settingEl.toggleClass("is-visible", isExtracting);
+      buildBtn.buttonEl.toggleClass("is-visible", canAct && !hasGraph && !isExtracting);
+      rebuildBtn.buttonEl.toggleClass("is-visible", canAct && hasGraph && !isExtracting);
+      stopBtn.buttonEl.toggleClass("is-visible", isExtracting);
     }
 
     // Initial render.

@@ -2019,6 +2019,14 @@
     gap: 1.25rem;
     padding: 1.25rem;
 }
+/* Conditional wrappers inside content inherit the same flex gap layout
+     so that section cards inside them don't collapse together. */
+.lmsa-settings-content > .lmsa-rag-conditional,
+  .lmsa-settings-content > .lmsa-kg-conditional {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+}
 /* ── Section (card) ────────────────────────────────────────────────────── */
 .lmsa-settings-section {
     position: relative;
@@ -2986,6 +2994,105 @@
     background: var(--lmsa-section-accent);
     transition: width 0.2s ease;
   }
+/* ── Index status block ───────────────────────────────────────────────────
+   * Shared layout for RAG index and Knowledge Graph build status.
+   * Structure: status header row (text + buttons) → progress bar.
+   * ─────────────────────────────────────────────────────────────────────── */
+.lmsa-index-status {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+/* ── Header: status text left, action buttons right ───────────────────── */
+.lmsa-index-status-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+}
+.lmsa-index-status-info {
+    display: flex;
+    min-width: 0px;
+    flex: 1 1 0%;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+.lmsa-index-status-text {
+    margin: 0px;
+    color: var(--lmsa-text-secondary);
+    line-height: 1.5;
+}
+.lmsa-index-status-text.mod-error {
+    color: var(--text-error);
+  }
+.lmsa-index-drift-notice {
+    margin: 0px;
+    display: none;
+    color: var(--text-warning, var(--lmsa-accent-muted));
+    font-size: var(--font-ui-smaller);
+    line-height: 1.5;
+}
+.lmsa-index-drift-notice.is-visible {
+    display: block;
+  }
+/* ── Action button group ──────────────────────────────────────────────── */
+.lmsa-index-actions {
+    display: flex;
+    flex-shrink: 0;
+    align-items: center;
+    gap: 0.5rem;
+}
+.lmsa-index-actions > .lmsa-ui-btn {
+    display: none;
+  }
+.lmsa-index-actions > .lmsa-ui-btn.is-visible {
+    display: inline-flex;
+}
+/* ── Progress bar ─────────────────────────────────────────────────────── */
+.lmsa-index-progress {
+    display: none;
+  }
+.lmsa-index-progress.is-visible {
+    display: flex;
+    flex-direction: column;
+    gap: 0.375rem;
+}
+.lmsa-index-progress-bar {
+    position: relative;
+    overflow: hidden;
+    height: 6px;
+    border-radius: 9999px;
+    background: var(--lmsa-border-default);
+}
+.lmsa-index-progress-fill {
+    position: absolute;
+    top: 0px;
+    bottom: 0px;
+    left: 0px;
+    border-radius: 9999px;
+    background: linear-gradient(
+      90deg,
+      var(--lmsa-section-accent, var(--interactive-accent)),
+      var(--lmsa-section-accent-secondary, var(--interactive-accent))
+    );
+    transition: width 300ms ease;
+}
+.lmsa-index-progress-text {
+    color: var(--lmsa-text-secondary);
+    font-size: var(--font-ui-smaller);
+    line-height: 1.4;
+  }
+/* ── Responsive ───────────────────────────────────────────────────────── */
+@media (max-width: 700px) {
+    .lmsa-index-status-header {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .lmsa-index-actions {
+        justify-content: flex-start;
+    }
+  }
 .lmsa-pointer-events-none {
     pointer-events: none;
 }
@@ -3016,6 +3123,10 @@
 .lmsa-inset-x-8 {
     left: 2rem;
     right: 2rem;
+}
+.lmsa-inset-y-0 {
+    top: 0px;
+    bottom: 0px;
 }
 .lmsa-left-0 {
     left: 0px;

@@ -1,7 +1,7 @@
 import { Notice } from "obsidian";
 import type LMStudioWritingAssistant from "../main";
 import type { IndexingState } from "../rag/types";
-import { createSettingsSection, SettingItem } from "./ui";
+import { createSettingsSection, Button, SettingItem } from "./ui";
 import { DEFAULT_RAG_SETTINGS } from "../constants";
 
 /**
@@ -81,52 +81,45 @@ export function renderRagTab(
       { icon: "database" },
     );
 
-    const statusRow = status.bodyEl.createDiv({ cls: "lmsa-rag-status" });
-    const statusTextEl = statusRow.createEl("p", { cls: "lmsa-rag-status-text" });
-    const driftNoticeEl = statusRow.createEl("p", { cls: "lmsa-rag-drift-notice" });
-    const progressRow = statusRow.createDiv({ cls: "lmsa-rag-progress" });
-    const progressTextEl = progressRow.createEl("span", { cls: "lmsa-rag-progress-text" });
+    // ── Index status block ──
+    const statusBlock = status.bodyEl.createDiv({ cls: "lmsa-index-status" });
 
-    // ── Action buttons via SettingItem ──
-    const buildItem = new SettingItem(status.bodyEl);
-    buildItem.settingEl.addClass("lmsa-rag-action-row");
-    buildItem.addButton((button) =>
-      button.setButtonText("Build index").setCta().onClick(async () => {
-        if (!rag.enabled || !rag.activeEmbeddingModelId) {
-          new Notice("Enable retrieval and select an embedding model first.");
-          return;
-        }
-        await plugin.ragService.startIndexing(
-          rag,
-          plugin.settings.embeddingModels,
-          plugin.settings.providerSettings,
-        );
-      }),
-    );
+    const headerRow = statusBlock.createDiv({ cls: "lmsa-index-status-header" });
+    const infoEl = headerRow.createDiv({ cls: "lmsa-index-status-info" });
+    const statusTextEl = infoEl.createEl("p", { cls: "lmsa-index-status-text" });
+    const driftNoticeEl = infoEl.createEl("p", { cls: "lmsa-index-drift-notice" });
 
-    const rebuildItem = new SettingItem(status.bodyEl);
-    rebuildItem.settingEl.addClass("lmsa-rag-action-row");
-    rebuildItem.addButton((button) =>
-      button.setButtonText("Rebuild index").onClick(async () => {
-        if (!rag.enabled || !rag.activeEmbeddingModelId) {
-          new Notice("Enable retrieval and select an embedding model first.");
-          return;
-        }
-        await plugin.ragService.rebuild(
-          rag,
-          plugin.settings.embeddingModels,
-          plugin.settings.providerSettings,
-        );
-      }),
-    );
+    const actionsEl = headerRow.createDiv({ cls: "lmsa-index-actions" });
+    const buildBtn = new Button(actionsEl).setButtonText("Build index").setCta().onClick(async () => {
+      if (!rag.enabled || !rag.activeEmbeddingModelId) {
+        new Notice("Enable retrieval and select an embedding model first.");
+        return;
+      }
+      await plugin.ragService.startIndexing(
+        rag,
+        plugin.settings.embeddingModels,
+        plugin.settings.providerSettings,
+      );
+    });
+    const rebuildBtn = new Button(actionsEl).setButtonText("Rebuild index").onClick(async () => {
+      if (!rag.enabled || !rag.activeEmbeddingModelId) {
+        new Notice("Enable retrieval and select an embedding model first.");
+        return;
+      }
+      await plugin.ragService.rebuild(
+        rag,
+        plugin.settings.embeddingModels,
+        plugin.settings.providerSettings,
+      );
+    });
+    const stopBtn = new Button(actionsEl).setButtonText("Stop").onClick(() => {
+      plugin.ragService.stopIndexing();
+    });
 
-    const stopItem = new SettingItem(status.bodyEl);
-    stopItem.settingEl.addClass("lmsa-rag-action-row");
-    stopItem.addButton((button) =>
-      button.setButtonText("Stop").onClick(() => {
-        plugin.ragService.stopIndexing();
-      }),
-    );
+    const progressRow = statusBlock.createDiv({ cls: "lmsa-index-progress" });
+    const progressBarEl = progressRow.createDiv({ cls: "lmsa-index-progress-bar" });
+    const progressFillEl = progressBarEl.createDiv({ cls: "lmsa-index-progress-fill" });
+    const progressTextEl = progressRow.createEl("span", { cls: "lmsa-index-progress-text" });
 
     // ── State rendering function ──
     function updateDisplay(state: IndexingState): void {
@@ -165,17 +158,19 @@ export function renderRagTab(
         const pct = state.filesTotal > 0
           ? Math.round((state.filesProcessed / state.filesTotal) * 100)
           : 0;
+        progressFillEl.setCssStyles({ width: `${pct}%` });
         progressTextEl.textContent = `${state.filesProcessed} / ${state.filesTotal} files (${pct}%)`;
       } else {
+        progressFillEl.setCssStyles({ width: "0%" });
         progressTextEl.textContent = "";
       }
       progressRow.toggleClass("is-visible", isIndexing);
 
       // Button visibility
       const canAct = !!rag.activeEmbeddingModelId;
-      buildItem.settingEl.toggleClass("is-visible", canAct && !hasIndex && !isIndexing);
-      rebuildItem.settingEl.toggleClass("is-visible", canAct && hasIndex && !isIndexing);
-      stopItem.settingEl.toggleClass("is-visible", isIndexing);
+      buildBtn.buttonEl.toggleClass("is-visible", canAct && !hasIndex && !isIndexing);
+      rebuildBtn.buttonEl.toggleClass("is-visible", canAct && hasIndex && !isIndexing);
+      stopBtn.buttonEl.toggleClass("is-visible", isIndexing);
     }
 
     // Initial render.

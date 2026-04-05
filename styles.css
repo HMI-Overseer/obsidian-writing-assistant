@@ -1354,6 +1354,58 @@
 .lmsa-rag-source-tooltip.is-visible {
     display: block;
   }
+/* Graph context section */
+.lmsa-graph-context {
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid var(--background-modifier-border);
+  }
+.lmsa-graph-context-label {
+    font-size: var(--font-ui-smaller);
+    opacity: 0.5;
+    margin-bottom: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+.lmsa-graph-entity-pills {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-bottom: 4px;
+  }
+.lmsa-graph-entity-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: var(--font-ui-smaller);
+    background: var(--background-secondary);
+    border: 1px solid var(--background-modifier-border);
+    border-radius: var(--radius-s);
+    padding: 1px 6px;
+    line-height: 1.6;
+  }
+.lmsa-graph-entity-type {
+    opacity: 0.65;
+    font-weight: 500;
+  }
+.lmsa-graph-entity-type--character { color: var(--color-blue); }
+.lmsa-graph-entity-type--location  { color: var(--color-green); }
+.lmsa-graph-entity-type--object    { color: var(--color-orange); }
+.lmsa-graph-entity-type--concept   { color: var(--color-purple); }
+.lmsa-graph-entity-type--event     { color: var(--color-red); }
+.lmsa-graph-entity-name {
+    color: var(--text-normal);
+  }
+.lmsa-graph-relations {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+.lmsa-graph-relation {
+    font-size: var(--font-ui-smaller);
+    opacity: 0.6;
+    line-height: 1.4;
+  }
 .lmsa-message.is-editing .lmsa-message-body {
     border-style: dashed;
     border-color: color-mix(in srgb, var(--lmsa-mode-accent) 50%, var(--background-modifier-border));

@@ -40,10 +40,17 @@ export class KnowledgeGraph {
 
     const results: GraphEntity[] = [];
     for (const entity of this.entities.values()) {
-      const nameMatch = normalizeEntityName(entity.name).includes(normalized);
-      const aliasMatch = entity.aliases.some((a) =>
-        normalizeEntityName(a).includes(normalized),
-      );
+      const entityNorm = normalizeEntityName(entity.name);
+      // Forward: query mentions the entity (require min 4 chars to avoid matching
+      // common short words like "it", "he", "at" that appear in any sentence).
+      // Reverse: short query is a substring of the entity name (e.g. "iron" finds "Iron Castle").
+      const nameMatch =
+        (entityNorm.length >= 4 && normalized.includes(entityNorm)) ||
+        entityNorm.includes(normalized);
+      const aliasMatch = entity.aliases.some((a) => {
+        const aliasNorm = normalizeEntityName(a);
+        return (aliasNorm.length >= 4 && normalized.includes(aliasNorm)) || aliasNorm.includes(normalized);
+      });
       if (nameMatch || aliasMatch) {
         results.push(entity);
       }

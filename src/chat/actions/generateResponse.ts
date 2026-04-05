@@ -118,8 +118,8 @@ export async function generateResponse(options: GenerateResponseOptions): Promis
     },
   });
 
-  const ragSources = apiMessages.ragContext?.map(({ filePath, headingPath, score, content }) =>
-    ({ filePath, headingPath, score, content })
+  const ragSources = apiMessages.ragContext?.map(({ filePath, headingPath, score, content, graphContext }) =>
+    ({ filePath, headingPath, score, content, graphContext })
   );
 
   if (activeModel.anthropicCacheSettings?.enabled) {

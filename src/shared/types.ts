@@ -63,6 +63,11 @@ export interface RagSourceRef {
   score: number;
   /** Chunk text — populated in memory for hover preview, stripped on persist. */
   content?: string;
+  /** Graph entity/relationship annotations — in-memory only, stripped on persist. */
+  graphContext?: {
+    entities: { name: string; type: string; description: string }[];
+    relationships: { source: string; target: string; type: string; description: string }[];
+  };
 }
 
 export interface MessageVersion {

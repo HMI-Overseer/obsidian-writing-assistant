@@ -1,6 +1,54 @@
 import type { App } from "obsidian";
 import type { RagSourceRef } from "../../shared/types";
 
+const ENTITY_TYPES = ["character", "location", "object", "concept", "event"] as const;
+
+function renderGraphContext(containerEl: HTMLElement, sources: RagSourceRef[]): void {
+  // Deduplicate entities and relationships across all annotated sources.
+  const entityMap = new Map<string, { name: string; type: string; description: string }>();
+  const relSet = new Set<string>();
+  const relationships: { source: string; target: string; type: string }[] = [];
+
+  for (const source of sources) {
+    if (!source.graphContext) continue;
+    for (const e of source.graphContext.entities) {
+      if (!entityMap.has(e.name.toLowerCase())) entityMap.set(e.name.toLowerCase(), e);
+    }
+    for (const r of source.graphContext.relationships) {
+      const key = `${r.source}|${r.target}|${r.type}`;
+      if (!relSet.has(key)) {
+        relSet.add(key);
+        relationships.push(r);
+      }
+    }
+  }
+
+  if (entityMap.size === 0 && relationships.length === 0) return;
+
+  const sectionEl = containerEl.createDiv({ cls: "lmsa-graph-context" });
+  sectionEl.createDiv({ cls: "lmsa-graph-context-label", text: "Graph" });
+
+  if (entityMap.size > 0) {
+    const pillsEl = sectionEl.createDiv({ cls: "lmsa-graph-entity-pills" });
+    for (const e of entityMap.values()) {
+      const typeClass = ENTITY_TYPES.includes(e.type as (typeof ENTITY_TYPES)[number])
+        ? `lmsa-graph-entity-type--${e.type}`
+        : "lmsa-graph-entity-type--concept";
+      const pill = pillsEl.createDiv({ cls: "lmsa-graph-entity-pill" });
+      pill.createSpan({ cls: `lmsa-graph-entity-type ${typeClass}`, text: e.type });
+      pill.createSpan({ cls: "lmsa-graph-entity-name", text: e.name });
+      if (e.description) pill.setAttr("title", e.description);
+    }
+  }
+
+  if (relationships.length > 0) {
+    const relsEl = sectionEl.createDiv({ cls: "lmsa-graph-relations" });
+    for (const r of relationships) {
+      relsEl.createDiv({ cls: "lmsa-graph-relation", text: `${r.source} → ${r.type} → ${r.target}` });
+    }
+  }
+}
+
 function formatScore(score: number): string {
   return `${Math.round(score * 100)}%`;
 }
@@ -85,5 +133,6 @@ export function renderRagSources(
     }
   }
 
+  renderGraphContext(detailsEl, sources);
   return detailsEl;
 }

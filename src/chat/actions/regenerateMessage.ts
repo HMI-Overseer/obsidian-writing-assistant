@@ -125,8 +125,8 @@ export async function regenerateMessage(options: RegenerateOptions): Promise<voi
     preferToolUse: plugin.settings.preferToolUse,
   });
 
-  const ragSources = apiMessages.ragContext?.map(({ filePath, headingPath, score, content }) =>
-    ({ filePath, headingPath, score, content })
+  const ragSources = apiMessages.ragContext?.map(({ filePath, headingPath, score, content, graphContext }) =>
+    ({ filePath, headingPath, score, content, graphContext })
   );
 
   // Attach Anthropic cache settings if enabled on the active model.

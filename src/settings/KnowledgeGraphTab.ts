@@ -154,14 +154,16 @@ export function renderKnowledgeGraphTab(
         plugin.settings.providerSettings,
       );
     });
-    const stopBtn = new Button(actionsEl).setButtonText("Stop").onClick(() => {
-      plugin.graphService.stopBuild();
+    const stopBtn = new Button(actionsEl).setButtonText("Stop").onClick(async () => {
+      await plugin.graphService.stopBuild();
     });
 
     const progressRow = statusBlock.createDiv({ cls: "lmsa-index-progress" });
     const progressBarEl = progressRow.createDiv({ cls: "lmsa-index-progress-bar" });
     const progressFillEl = progressBarEl.createDiv({ cls: "lmsa-index-progress-fill" });
     const progressTextEl = progressRow.createEl("span", { cls: "lmsa-index-progress-text" });
+
+    const folderSectionEl = statusBlock.createDiv({ cls: "lmsa-kg-folder-section" });
 
     // ── State rendering function ──
     function updateDisplay(state: GraphBuildState): void {
@@ -171,6 +173,7 @@ export function renderKnowledgeGraphTab(
       const hasGraph = entityCount > 0;
       const isExtracting = state.status === "extracting";
       const isError = state.status === "error";
+      const activeFolder = isExtracting ? state.targetFolder : undefined;
 
       // Status text
       if (!kg.activeCompletionModelId) {
@@ -189,7 +192,7 @@ export function renderKnowledgeGraphTab(
         statusTextEl.removeClass("mod-error");
       }
 
-      // Progress
+      // Overall extraction progress bar (shown during any active build)
       if (isExtracting) {
         const pct = state.filesTotal > 0
           ? Math.round((state.filesProcessed / state.filesTotal) * 100)
@@ -202,11 +205,78 @@ export function renderKnowledgeGraphTab(
       }
       progressRow.toggleClass("is-visible", isExtracting);
 
-      // Button visibility
+      // Button visibility — Stop only shown for full-vault builds, not folder builds
       const canAct = !!kg.activeCompletionModelId;
       buildBtn.buttonEl.toggleClass("is-visible", canAct && !hasGraph && !isExtracting);
       rebuildBtn.buttonEl.toggleClass("is-visible", canAct && hasGraph && !isExtracting);
-      stopBtn.buttonEl.toggleClass("is-visible", isExtracting);
+      stopBtn.buttonEl.toggleClass("is-visible", isExtracting && activeFolder === undefined);
+
+      // ── Folder coverage section ──
+      folderSectionEl.empty();
+      if (!kg.activeCompletionModelId) return;
+
+      const folderStats = plugin.graphService.getFolderStats(kg.excludePatterns);
+      if (folderStats.size === 0) return;
+
+      const folders = [...folderStats.keys()].sort((a, b) => {
+        if (a === "(root)") return 1;
+        if (b === "(root)") return -1;
+        return a.localeCompare(b);
+      });
+
+      for (const folder of folders) {
+        const { processed, total } = folderStats.get(folder)!;
+        const isComplete = processed === total && total > 0;
+        const isBuildingThisFolder = isExtracting && activeFolder === folder;
+
+        // Use live extraction progress for the active folder's bar; persisted stats otherwise.
+        const pct = isBuildingThisFolder && state.status === "extracting"
+          ? (state.filesTotal > 0 ? Math.round((state.filesProcessed / state.filesTotal) * 100) : 0)
+          : (total > 0 ? Math.round((processed / total) * 100) : 0);
+
+        const row = folderSectionEl.createDiv({ cls: "lmsa-kg-folder-row" });
+
+        row.createEl("span", {
+          cls: `lmsa-kg-folder-name${folder === "(root)" ? " is-root" : ""}`,
+          text: folder,
+        });
+
+        const barWrap = row.createDiv({ cls: "lmsa-kg-folder-bar" });
+        const barFill = barWrap.createDiv({ cls: "lmsa-kg-folder-bar-fill" });
+        barFill.setCssStyles({ width: `${pct}%` });
+        if (isComplete) barFill.addClass("is-complete");
+        if (isBuildingThisFolder) barFill.addClass("is-active");
+
+        row.createEl("span", { cls: "lmsa-kg-folder-count", text: `${processed} / ${total}` });
+
+        const actionEl = row.createDiv({ cls: "lmsa-kg-folder-action" });
+
+        if (isBuildingThisFolder) {
+          const stopFolderBtn = actionEl.createEl("button", {
+            cls: "lmsa-ui-btn lmsa-kg-folder-btn lmsa-kg-folder-stop-btn",
+            text: "Stop",
+          });
+          stopFolderBtn.addEventListener("click", async () => {
+            await plugin.graphService.stopBuild();
+          });
+        } else if (!isComplete && canAct && !isExtracting) {
+          const btn = actionEl.createEl("button", {
+            cls: "lmsa-ui-btn lmsa-ui-btn-secondary lmsa-kg-folder-btn",
+            text: processed > 0 ? "Resume" : "Build",
+          });
+          btn.addEventListener("click", async () => {
+            await plugin.graphService.startBuildFolder(
+              folder,
+              kg,
+              plugin.settings.completionModels,
+              plugin.settings.embeddingModels,
+              plugin.settings.providerSettings,
+            );
+          });
+        }
+        // isComplete → no button needed
+        // isExtracting + not this folder → no button (prevents concurrent builds)
+      }
     }
 
     // Initial render.

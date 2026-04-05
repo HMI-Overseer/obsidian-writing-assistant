@@ -58,7 +58,7 @@ export interface SerializedKnowledgeGraph {
 /** Knowledge graph build state, mirroring IndexingState. */
 export type GraphBuildState =
   | { status: "idle" }
-  | { status: "extracting"; filesProcessed: number; filesTotal: number }
+  | { status: "extracting"; filesProcessed: number; filesTotal: number; targetFolder?: string }
   | { status: "error"; message: string };
 
 /** Knowledge graph settings. */

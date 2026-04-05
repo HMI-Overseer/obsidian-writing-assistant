@@ -3,7 +3,7 @@ import { Notice } from "obsidian";
 import type { KnowledgeGraphSettings, GraphBuildState } from "./types";
 import type { CompletionModel, EmbeddingModel, ProviderSettingsMap } from "../../shared/types";
 import { KnowledgeGraph } from "./knowledgeGraph";
-import { GraphExtractor } from "./extractor";
+import { GraphExtractor, matchGlob, getTopLevelFolder } from "./extractor";
 import { createChatClient } from "../../providers/registry";
 import type { ChatClient } from "../../api/chatClient";
 import type { EmbeddingClient } from "../embeddingClient";
@@ -66,6 +66,28 @@ export class GraphService {
 
   getBuiltAt(): number {
     return this.graph?.getBuiltAt() ?? 0;
+  }
+
+  /**
+   * Returns per-top-level-folder stats for the settings UI.
+   * "processed" = file has a graph entry with a matching mtime (not just any entry).
+   * "total" = vault markdown files in that folder (after exclude filter).
+   */
+  getFolderStats(excludePatterns: string[]): Map<string, { processed: number; total: number }> {
+    const stats = new Map<string, { processed: number; total: number }>();
+    if (!this.graph) return stats;
+
+    for (const file of this.app.vault.getMarkdownFiles()) {
+      if (excludePatterns.some((p) => matchGlob(p, file.path))) continue;
+      const folder = getTopLevelFolder(file.path);
+      if (!stats.has(folder)) stats.set(folder, { processed: 0, total: 0 });
+      const entry = stats.get(folder)!;
+      entry.total++;
+      const meta = this.graph.getFileMeta(file.path);
+      if (meta && meta.mtime === file.stat.mtime) entry.processed++;
+    }
+
+    return stats;
   }
 
   /** Get the in-memory graph for query-time use. Returns null if not built. */
@@ -176,11 +198,56 @@ export class GraphService {
     await this.extractor.start();
   }
 
-  /** Cancel in-progress extraction. */
-  stopBuild(): void {
+  /** Cancel in-progress extraction. Saves any files extracted since the last debounced save. */
+  async stopBuild(): Promise<void> {
     this.extractor?.destroy();
     this.extractor = null;
+    await this.saveGraph();
     this.setBuildState({ status: "idle" });
+  }
+
+  /**
+   * Start extraction restricted to a single top-level folder.
+   * Merges results into the existing graph without touching other folders.
+   * If a build is already in progress, saves its state before switching.
+   */
+  async startBuildFolder(
+    folder: string,
+    settings: KnowledgeGraphSettings,
+    completionModels: CompletionModel[],
+    embeddingModels: EmbeddingModel[],
+    providerSettings: ProviderSettingsMap,
+  ): Promise<void> {
+    if (!this.graph || !this.chatClient) {
+      await this.configure(settings, completionModels, embeddingModels, providerSettings);
+    }
+
+    if (!this.graph || !this.chatClient || !this.configuredModelId) {
+      this.setBuildState({ status: "error", message: "Select a completion model first." });
+      return;
+    }
+
+    // If a build is in progress, save its progress before switching to this folder.
+    if (this.extractor) {
+      this.extractor.destroy();
+      await this.saveGraph();
+      this.extractor = null;
+    }
+
+    this.extractor = new GraphExtractor({
+      app: this.app,
+      graph: this.graph,
+      chatClient: this.chatClient,
+      modelId: this.configuredModelId,
+      excludePatterns: settings.excludePatterns,
+      onStateChange: (state) => this.setBuildState(state),
+      onSave: () => this.saveGraph(),
+      embeddingClient: this.embeddingClient ?? undefined,
+      embeddingModelId: this.configuredEmbeddingModelId ?? undefined,
+      folderFilter: folder,
+    });
+
+    await this.extractor.start();
   }
 
   /** Force a full rebuild: clear graph, then re-extract. */

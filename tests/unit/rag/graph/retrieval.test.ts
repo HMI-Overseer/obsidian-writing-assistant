@@ -250,21 +250,19 @@ describe("annotateBlockWithGraph", () => {
     const block = makeBlock("file1.md");
     const result = annotateBlockWithGraph(block, graph, matchedEntities);
 
-    // Alice and Bob are both in file1.md and in Alice's 1-hop neighborhood.
+    // Alice is directly matched and is in file1.md. The "allies with Bob"
+    // relationship is included because Alice is one of its endpoints.
     expect(result.graphContext!.relationships).toHaveLength(1);
     expect(result.graphContext!.relationships[0].type).toBe("allies with");
   });
 
-  test("filters entities to those in the relevant set", () => {
-    // file2.md has Bob and Charlie. Alice's 1-hop neighbors are Alice + Bob.
-    // So only Bob should appear, not Charlie.
+  test("returns block unchanged when file has no directly matched entities", () => {
+    // file2.md has Bob and Charlie, but neither is a direct query match.
+    // Alice (the matched entity) is not in file2.md, so no annotation.
     const block = makeBlock("file2.md");
     const result = annotateBlockWithGraph(block, graph, matchedEntities);
 
-    expect(result.graphContext).toBeDefined();
-    const names = result.graphContext!.entities.map((e) => e.name);
-    expect(names).toContain("Bob");
-    expect(names).not.toContain("Charlie");
+    expect(result.graphContext).toBeUndefined();
   });
 
   test("returns block unchanged when file has no relevant entities", () => {
@@ -298,12 +296,12 @@ describe("annotateBlockWithGraph", () => {
     expect(block.graphContext).toBeUndefined();
   });
 
-  test("excludes relationships where one endpoint is outside the relevant set", () => {
-    // Bob → Charlie relationship: Charlie is NOT in Alice's 1-hop neighborhood.
+  test("excludes relationships from files with no directly matched entities", () => {
+    // file2.md has Bob and Charlie, but neither is a direct query match.
+    // The Bob → Charlie "mentors" relationship should not appear.
     const block = makeBlock("file2.md");
     const result = annotateBlockWithGraph(block, graph, matchedEntities);
 
-    const relTypes = result.graphContext!.relationships.map((r) => r.type);
-    expect(relTypes).not.toContain("mentors");
+    expect(result.graphContext).toBeUndefined();
   });
 });

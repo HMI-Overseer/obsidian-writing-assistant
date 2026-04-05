@@ -99,4 +99,89 @@
       @apply lmsa-justify-start;
     }
   }
+
+  /* ── Per-folder graph coverage section ──────────────────────────────────── */
+
+  .lmsa-kg-folder-section {
+    @apply lmsa-flex lmsa-flex-col lmsa-gap-1.5;
+    margin-top: 4px;
+  }
+
+  .lmsa-kg-folder-row {
+    @apply lmsa-flex lmsa-items-center lmsa-gap-2;
+    min-height: 24px;
+  }
+
+  .lmsa-kg-folder-name {
+    @apply lmsa-truncate;
+    flex: 0 0 140px;
+    font-size: var(--font-ui-smaller);
+    color: var(--lmsa-text-primary);
+  }
+
+  .lmsa-kg-folder-name.is-root {
+    color: var(--lmsa-text-secondary);
+    font-style: italic;
+  }
+
+  .lmsa-kg-folder-bar {
+    @apply lmsa-relative lmsa-flex-1 lmsa-overflow-hidden;
+    height: 4px;
+    border-radius: 9999px;
+    background: var(--lmsa-border-default);
+    min-width: 40px;
+  }
+
+  .lmsa-kg-folder-bar-fill {
+    @apply lmsa-absolute lmsa-inset-y-0 lmsa-left-0;
+    border-radius: 9999px;
+    background: var(--lmsa-section-accent, var(--interactive-accent));
+    transition: width 300ms ease;
+    opacity: 0.5;
+  }
+
+  .lmsa-kg-folder-bar-fill.is-complete {
+    opacity: 1;
+  }
+
+  .lmsa-kg-folder-bar-fill.is-active {
+    opacity: 0.85;
+    background: linear-gradient(
+      90deg,
+      var(--lmsa-section-accent, var(--interactive-accent)),
+      var(--lmsa-section-accent-secondary, var(--interactive-accent))
+    );
+  }
+
+  .lmsa-kg-folder-count {
+    flex: 0 0 52px;
+    text-align: right;
+    font-size: var(--font-ui-smaller);
+    color: var(--lmsa-text-secondary);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .lmsa-kg-folder-action {
+    flex: 0 0 72px;
+    display: flex;
+    justify-content: flex-end;
+  }
+
+  .lmsa-kg-folder-btn {
+    font-size: var(--font-ui-smaller) !important;
+    padding: 2px 8px !important;
+    height: auto !important;
+    min-height: 0 !important;
+    line-height: 1.4 !important;
+  }
+
+  .lmsa-kg-folder-stop-btn {
+    border-color: var(--lmsa-status-error, var(--color-red)) !important;
+    color: var(--lmsa-status-error, var(--color-red)) !important;
+  }
+
+  .lmsa-kg-folder-stop-btn:hover {
+    background: var(--lmsa-status-error, var(--color-red)) !important;
+    color: var(--text-on-accent) !important;
+  }
 }

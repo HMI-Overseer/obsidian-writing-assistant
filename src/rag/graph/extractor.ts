@@ -62,6 +62,8 @@ export interface GraphExtractorOptions {
   embeddingClient?: EmbeddingClient;
   /** The modelId to pass to the embedding client. */
   embeddingModelId?: string;
+  /** When set, restrict extraction to files in this top-level folder only. */
+  folderFilter?: string;
 }
 
 /**
@@ -80,6 +82,7 @@ export class GraphExtractor {
   private readonly onSave: () => void;
   private readonly embeddingClient: EmbeddingClient | undefined;
   private readonly embeddingModelId: string | undefined;
+  private readonly folderFilter: string | undefined;
 
   private saveTimer: ReturnType<typeof setTimeout> | null = null;
   private abortController: AbortController | null = null;
@@ -95,6 +98,7 @@ export class GraphExtractor {
     this.onSave = options.onSave;
     this.embeddingClient = options.embeddingClient;
     this.embeddingModelId = options.embeddingModelId;
+    this.folderFilter = options.folderFilter;
   }
 
   /** Scan vault and extract entities/relations from all markdown files. */
@@ -117,23 +121,31 @@ export class GraphExtractor {
     this.abortController = new AbortController();
     const signal = this.abortController.signal;
 
-    const files = this.app.vault
+    // All vault markdown files minus excluded ones.
+    const allFiles = this.app.vault
       .getMarkdownFiles()
       .filter((f) => !this.isExcluded(f.path));
 
-    // Find files that need (re-)extraction.
+    // When folder-scoped, restrict to that top-level folder only.
+    const scopedFiles = this.folderFilter
+      ? allFiles.filter((f) => getTopLevelFolder(f.path) === this.folderFilter)
+      : allFiles;
+
+    // Find files within scope that need (re-)extraction.
     const staleFiles: TFile[] = [];
-    for (const file of files) {
+    for (const file of scopedFiles) {
       const meta = this.graph.getFileMeta(file.path);
       if (!meta || meta.mtime !== file.stat.mtime) {
         staleFiles.push(file);
       }
     }
 
-    // Remove files from the graph that no longer exist in the vault.
-    const vaultPaths = new Set(files.map((f) => f.path));
+    // Remove graph entries for files that no longer exist IN SCOPE ONLY.
+    // When folderFilter is set, entries from other folders are left untouched.
+    const scopedVaultPaths = new Set(scopedFiles.map((f) => f.path));
     for (const meta of this.graph.getAllFileMeta()) {
-      if (!vaultPaths.has(meta.filePath)) {
+      if (this.folderFilter && getTopLevelFolder(meta.filePath) !== this.folderFilter) continue;
+      if (!scopedVaultPaths.has(meta.filePath)) {
         this.graph.removeFile(meta.filePath);
       }
     }
@@ -147,6 +159,7 @@ export class GraphExtractor {
       status: "extracting",
       filesProcessed: 0,
       filesTotal: staleFiles.length,
+      targetFolder: this.folderFilter,
     });
 
     try {
@@ -160,6 +173,7 @@ export class GraphExtractor {
           status: "extracting",
           filesProcessed: Math.min(i + BATCH_SIZE, staleFiles.length),
           filesTotal: staleFiles.length,
+          targetFolder: this.folderFilter,
         });
 
         // Yield to the UI thread between batches.
@@ -190,7 +204,7 @@ export class GraphExtractor {
       // Skip if content hasn't actually changed.
       const existingMeta = this.graph.getFileMeta(file.path);
       if (existingMeta && existingMeta.contentHash === contentHash) {
-        return;
+        continue;
       }
 
       const cleaned = preprocessMarkdown(content);
@@ -349,11 +363,23 @@ function yieldToMain(): Promise<void> {
 }
 
 /** Simple glob matching supporting `*` and `**` patterns. */
-function matchGlob(pattern: string, path: string): boolean {
+export function matchGlob(pattern: string, path: string): boolean {
   const regex = pattern
     .replace(/[.+^${}()|[\]\\]/g, "\\$&")
     .replace(/\*\*/g, "{{GLOBSTAR}}")
     .replace(/\*/g, "[^/]*")
     .replace(/\{\{GLOBSTAR\}\}/g, ".*");
   return new RegExp(`^${regex}$`).test(path);
+}
+
+/**
+ * Returns the top-level folder name for a vault path.
+ * Files at the vault root (no slash) return "(root)".
+ *   "Characters/Alice.md"      → "Characters"
+ *   "Lore/Places/Rivendell.md" → "Lore"
+ *   "Opening.md"               → "(root)"
+ */
+export function getTopLevelFolder(filePath: string): string {
+  const slash = filePath.indexOf("/");
+  return slash === -1 ? "(root)" : filePath.slice(0, slash);
 }

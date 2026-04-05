@@ -1,7 +1,7 @@
 import type { KnowledgeGraph } from "./knowledgeGraph";
-import type { GraphEntity } from "./types";
+import type { GraphEntity, GraphRelation } from "./types";
 import type { RetrievalResult } from "../types";
-import type { RagContextBlock, GraphContextAnnotation } from "../../shared/chatRequest";
+import type { RagContextBlock } from "../../shared/chatRequest";
 
 /** Entities matched from the query, with their graph file relevance. */
 export interface GraphRetrievalContext {
@@ -13,6 +13,10 @@ export interface GraphRetrievalContext {
 
 const ENTITY_TOP_K = 10;
 const ENTITY_MIN_SCORE = 0.5;
+
+/** Max entities/relationships injected per RAG block to prevent context explosion. */
+const MAX_ANNOTATED_ENTITIES = 5;
+const MAX_ANNOTATED_RELATIONS = 10;
 
 /**
  * Match entities from the knowledge graph against a user query.
@@ -81,43 +85,42 @@ export function annotateBlockWithGraph(
   const fileEntities = graph.getEntitiesInFile(block.filePath);
   if (fileEntities.length === 0) return block;
 
-  // Build the set of relevant entity names (normalized): matched entities + their 1-hop neighbors.
-  const relevantNames = new Set<string>();
-  for (const entity of matchedEntities) {
-    const neighborhood = graph.getNeighborhood(entity.name, 1);
-    for (const name of neighborhood.keys()) {
-      relevantNames.add(name);
-    }
-  }
+  // Only annotate entities that directly matched the query in this file.
+  // The 1-hop neighborhood expansion is already used in buildGraphContext for
+  // file relevance boosting — re-expanding here is what causes context explosion.
+  const matchedNames = new Set(matchedEntities.map((e) => e.name.trim().toLowerCase()));
+  const filtered = fileEntities
+    .filter((e) => matchedNames.has(e.name.trim().toLowerCase()))
+    .slice(0, MAX_ANNOTATED_ENTITIES);
 
-  // Intersect file entities with the relevant set.
-  const filtered = fileEntities.filter((e) =>
-    relevantNames.has(e.name.trim().toLowerCase()),
-  );
   if (filtered.length === 0) return block;
 
-  // Collect relationships where both endpoints are in the relevant set.
+  // Collect relationships between the annotated entities only.
+  // Sort by weight so the most-referenced relationships survive the cap.
+  const filteredNames = new Set(filtered.map((e) => e.name.trim().toLowerCase()));
   const seenRelations = new Set<string>();
-  const relationships: GraphContextAnnotation["relationships"] = [];
+  const candidateRels: GraphRelation[] = [];
 
   for (const entity of filtered) {
     for (const rel of graph.getRelations(entity.name)) {
       const key = `${rel.source}|${rel.target}|${rel.type}`;
       if (seenRelations.has(key)) continue;
-
       const sourceNorm = rel.source.trim().toLowerCase();
       const targetNorm = rel.target.trim().toLowerCase();
-      if (relevantNames.has(sourceNorm) && relevantNames.has(targetNorm)) {
+      if (filteredNames.has(sourceNorm) || filteredNames.has(targetNorm)) {
         seenRelations.add(key);
-        relationships.push({
-          source: rel.source,
-          target: rel.target,
-          type: rel.type,
-          description: rel.description,
-        });
+        candidateRels.push(rel);
       }
     }
   }
+
+  candidateRels.sort((a, b) => b.weight - a.weight);
+  const relationships = candidateRels.slice(0, MAX_ANNOTATED_RELATIONS).map((r) => ({
+    source: r.source,
+    target: r.target,
+    type: r.type,
+    description: r.description,
+  }));
 
   const entities = filtered.map((e) => ({
     name: e.name,

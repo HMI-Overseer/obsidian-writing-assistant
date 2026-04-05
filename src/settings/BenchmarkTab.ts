@@ -451,11 +451,23 @@ export function renderBenchmarkTab(
         }
       }
 
+      // Show tool calls if present
+      if (iter.toolCalls && iter.toolCalls.length > 0) {
+        const toolsEl = iterEl.createDiv({ cls: "lmsa-benchmark-detail-section" });
+        toolsEl.createEl("strong", { text: `Tool calls (${iter.toolCalls.length}):` });
+        const toolsList = toolsEl.createEl("ul", { cls: "lmsa-benchmark-evidence-list" });
+        for (const tc of iter.toolCalls) {
+          const argsStr = JSON.stringify(tc.arguments, null, 2);
+          const preview = argsStr.length > 150 ? argsStr.slice(0, 150) + "..." : argsStr;
+          toolsList.createEl("li", { text: `${tc.name}(${preview})` });
+        }
+      }
+
       const responseEl = iterEl.createDiv({ cls: "lmsa-benchmark-detail-section" });
       responseEl.createEl("strong", { text: "Model response:" });
       responseEl.createEl("pre", {
         cls: "lmsa-benchmark-response-block",
-        text: iter.rawResponse,
+        text: iter.rawResponse || "(no text content — tool calls only)",
       });
     }
   }

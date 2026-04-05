@@ -1,7 +1,7 @@
 import type { SamplingParams } from "../shared/types";
 import type { ChatRequest } from "../shared/chatRequest";
 import type { ChatClient } from "./chatClient";
-import type { UsageResult, StreamResult, CompletionResult } from "./usageTypes";
+import type { UsageResult, StreamResult, CompletionResult, StopReason } from "./usageTypes";
 import type { ToolCall } from "../tools/types";
 import { formatAnthropicTools } from "../tools/formatters/anthropic";
 import { nodeRequestWithHeaders } from "./httpTransport";
@@ -102,11 +102,13 @@ export class AnthropicClient implements ChatClient {
 
     const text = textParts.join("");
     const usage = extractUsageFromJson(json);
+    const stopReason = mapAnthropicStopReason(json.stop_reason as string | undefined);
 
     return {
       text,
       usage,
       toolCalls: toolCalls.length > 0 ? toolCalls : null,
+      stopReason,
     };
   }
 
@@ -129,12 +131,15 @@ export class AnthropicClient implements ChatClient {
     let outputTokens = 0;
     let cacheCreationInputTokens: number | undefined;
     let cacheReadInputTokens: number | undefined;
+    let streamStopReason: StopReason = "unknown";
     let resolved = false;
     let resolveUsage: (value: UsageResult | null) => void;
     let resolveToolCalls: (value: ToolCall[] | null) => void;
+    let resolveStopReason: (value: StopReason) => void;
 
     const usagePromise = new Promise<UsageResult | null>((r) => { resolveUsage = r; });
     const toolCallsPromise = new Promise<ToolCall[] | null>((r) => { resolveToolCalls = r; });
+    const stopReasonPromise = new Promise<StopReason>((r) => { resolveStopReason = r; });
 
     // Tool call accumulation state.
     const pendingToolCalls = new Map<number, { id: string; name: string; jsonChunks: string[] }>();
@@ -159,6 +164,10 @@ export class AnthropicClient implements ChatClient {
         const usage = record.usage as Record<string, unknown> | undefined;
         if (usage && typeof usage.output_tokens === "number") {
           outputTokens = usage.output_tokens;
+        }
+        const delta = record.delta as Record<string, unknown> | undefined;
+        if (delta?.stop_reason) {
+          streamStopReason = mapAnthropicStopReason(delta.stop_reason as string);
         }
       } else if (record.type === "content_block_start") {
         const block = record.content_block as Record<string, unknown> | undefined;
@@ -205,6 +214,7 @@ export class AnthropicClient implements ChatClient {
       }
 
       resolveToolCalls(completedToolCalls.length > 0 ? completedToolCalls : null);
+      resolveStopReason(streamStopReason);
     };
 
     // Wrap the raw generator so we can resolve usage + tool calls when it ends.
@@ -220,7 +230,16 @@ export class AnthropicClient implements ChatClient {
       }
     }
 
-    return { deltas: wrappedDeltas(), usage: usagePromise, toolCalls: toolCallsPromise };
+    return { deltas: wrappedDeltas(), usage: usagePromise, toolCalls: toolCallsPromise, stopReason: stopReasonPromise };
   }
 
+}
+
+function mapAnthropicStopReason(raw: string | undefined): StopReason {
+  switch (raw) {
+    case "end_turn": return "end_turn";
+    case "tool_use": return "tool_use";
+    case "max_tokens": return "max_tokens";
+    default: return "unknown";
+  }
 }

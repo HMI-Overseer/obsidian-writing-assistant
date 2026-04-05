@@ -16,8 +16,13 @@ export interface DocumentContext {
  * Excludes "system" — system instructions are top-level in ChatRequest.
  */
 export interface ChatTurn {
-  role: "user" | "assistant";
-  content: string;
+  role: "user" | "assistant" | "tool";
+  /** Message content. null for assistant-only-tool-calls turns (OpenAI spec). */
+  content: string | null;
+  /** For tool result turns: the ID of the tool call this responds to. */
+  toolCallId?: string;
+  /** For assistant turns that contain tool calls: the tool calls made. */
+  toolCalls?: Array<{ id: string; name: string; arguments: Record<string, unknown> }>;
 }
 
 /** Graph entities and relationships relevant to a retrieved document. */

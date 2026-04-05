@@ -2,7 +2,7 @@ import type { ConversationMessage, PluginSettings, ProviderOption } from "../../
 import type { ChatRequest, ChatTurn, DocumentContext, RagContextBlock } from "../../shared/chatRequest";
 import { getActiveNoteText, getFullNoteContent } from "../../context/noteContext";
 import { shouldUseToolCall } from "../../tools/registry";
-import { APPLY_EDIT_TOOL } from "../../tools/editing/definition";
+import { ALL_EDIT_TOOLS } from "../../tools/editing/definition";
 import type { ChatMode } from "../types";
 import type { App } from "obsidian";
 import type { ChatSessionStore } from "../conversation/ChatSessionStore";
@@ -97,7 +97,7 @@ export async function prepareApiMessages(
   }
   const finalSystemPrompt = systemPrompt + groundingNote;
 
-  const tools = useToolUse ? [APPLY_EDIT_TOOL] : undefined;
+  const tools = useToolUse ? ALL_EDIT_TOOLS : undefined;
 
   return { systemPrompt: finalSystemPrompt, documentContext, ragContext, messages, tools };
 }

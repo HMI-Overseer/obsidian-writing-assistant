@@ -25,3 +25,13 @@ export interface ToolCall {
   name: string;
   arguments: Record<string, unknown>;
 }
+
+/** Result returned by a tool handler. */
+export interface ToolResult {
+  /** Text content returned to the model. */
+  content: string;
+  /** Whether this tool only reads data (true) or proposes document changes (false). */
+  isReadOnly: boolean;
+  /** Whether the tool execution failed. */
+  isError?: boolean;
+}

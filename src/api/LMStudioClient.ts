@@ -1,7 +1,7 @@
 import type { Message, SamplingParams } from "../shared/types";
 import type { ChatRequest } from "../shared/chatRequest";
 import type { ChatClient } from "./chatClient";
-import type { CompletionResult, StreamResult, UsageResult } from "./usageTypes";
+import type { CompletionResult, StreamResult, UsageResult, StopReason } from "./usageTypes";
 import type { ToolCall } from "../tools/types";
 import type { LMStudioModel, LMStudioModelListResult } from "./types";
 import { formatOpenAITools } from "../tools/formatters/openai";
@@ -137,7 +137,9 @@ export class LMStudioClient implements ChatClient {
       }
     }
 
-    return { text, usage, toolCalls };
+    const stopReason = mapOpenAIStopReason(choice?.finish_reason as string | undefined);
+
+    return { text, usage, toolCalls, stopReason };
   }
 
   stream(
@@ -156,14 +158,23 @@ export class LMStudioClient implements ChatClient {
     // Tool call accumulation state.
     const pendingToolCalls = new Map<number, { id: string; name: string; argChunks: string[] }>();
     const completedToolCalls: ToolCall[] = [];
+    let streamStopReason: StopReason = "unknown";
     let resolveToolCalls: (value: ToolCall[] | null) => void;
+    let resolveStopReason: (value: StopReason) => void;
     const toolCallsPromise = new Promise<ToolCall[] | null>((r) => { resolveToolCalls = r; });
+    const stopReasonPromise = new Promise<StopReason>((r) => { resolveStopReason = r; });
 
     const onEvent = openAITools ? (json: unknown): void => {
       const record = json as Record<string, unknown>;
       const choices = record.choices as Array<Record<string, unknown>> | undefined;
-      const delta = choices?.[0]?.delta as Record<string, unknown> | undefined;
+      const choice = choices?.[0];
+      const delta = choice?.delta as Record<string, unknown> | undefined;
       const toolCallDeltas = delta?.tool_calls as Array<Record<string, unknown>> | undefined;
+
+      // Track finish_reason from streaming chunks.
+      if (choice?.finish_reason && typeof choice.finish_reason === "string") {
+        streamStopReason = mapOpenAIStopReason(choice.finish_reason);
+      }
 
       if (toolCallDeltas) {
         for (const tc of toolCallDeltas) {
@@ -207,10 +218,11 @@ export class LMStudioClient implements ChatClient {
         }
         pendingToolCalls.clear();
         resolveToolCalls(completedToolCalls.length > 0 ? completedToolCalls : null);
+        resolveStopReason(streamStopReason);
       }
     }
 
-    return { deltas: wrappedDeltas(), usage: Promise.resolve(null), toolCalls: toolCallsPromise };
+    return { deltas: wrappedDeltas(), usage: Promise.resolve(null), toolCalls: toolCallsPromise, stopReason: stopReasonPromise };
   }
 
   private buildMessages(request: ChatRequest): Message[] {
@@ -231,7 +243,25 @@ export class LMStudioClient implements ChatClient {
     }
 
     for (const turn of request.messages) {
-      messages.push({ role: turn.role, content: turn.content });
+      if (turn.role === "assistant" && turn.toolCalls && turn.toolCalls.length > 0) {
+        messages.push({
+          role: "assistant",
+          content: turn.content || null,
+          tool_calls: turn.toolCalls.map((tc) => ({
+            id: tc.id,
+            type: "function" as const,
+            function: { name: tc.name, arguments: JSON.stringify(tc.arguments) },
+          })),
+        });
+      } else if (turn.role === "tool") {
+        messages.push({
+          role: "tool",
+          content: turn.content ?? "",
+          tool_call_id: turn.toolCallId,
+        });
+      } else {
+        messages.push({ role: turn.role as "system" | "user" | "assistant", content: turn.content ?? "" });
+      }
     }
 
     // RAG context is appended to the last user message (not a system message)
@@ -247,5 +277,14 @@ export class LMStudioClient implements ChatClient {
     }
 
     return messages;
+  }
+}
+
+function mapOpenAIStopReason(raw: string | undefined): StopReason {
+  switch (raw) {
+    case "stop": return "end_turn";
+    case "tool_calls": return "tool_use";
+    case "length": return "max_tokens";
+    default: return "unknown";
   }
 }

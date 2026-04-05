@@ -1,6 +1,7 @@
 import { type App, type Component, Notice } from "obsidian";
 import { parseEditBlocks } from "../../editing/parseEditBlocks";
 import { toolCallsToEditBlocks } from "../../tools/editing/definition";
+import { resolveStructuralEditBlocks } from "../../tools/editing/handlers";
 import { resolveEdits, buildHunks } from "../../editing/diffEngine";
 import type { EditBlock, EditProposal, AppliedEditRecord } from "../../editing/editTypes";
 import { generateId } from "../../utils";
@@ -72,6 +73,13 @@ export async function finalizeEditResponse(options: FinalizeEditOptions): Promis
     }
     await renderAsNormalMessage(store, transcript, bubble, fullResponse, modelId, provider, usage);
     return;
+  }
+
+  // Resolve structural edit blocks (replace_section, insert_at_position, update_frontmatter)
+  // that need MetadataCache or document content to populate searchText/replaceText.
+  const hasStructuralBlocks = blocks.some((b) => b.toolName);
+  if (hasStructuralBlocks) {
+    blocks = await resolveStructuralEditBlocks(blocks, { app, filePath: file.path });
   }
 
   // Read the full document for resolution.

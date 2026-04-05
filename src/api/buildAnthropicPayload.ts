@@ -5,9 +5,15 @@ import { formatRagContext } from "../rag/formatContext";
 
 const DEFAULT_MAX_TOKENS = 4096;
 
+/** Content block types used in Anthropic messages. */
+export type AnthropicContentBlock =
+  | { type: "text"; text: string }
+  | { type: "tool_use"; id: string; name: string; input: Record<string, unknown> }
+  | { type: "tool_result"; tool_use_id: string; content: string };
+
 export interface AnthropicMessage {
   role: "user" | "assistant";
-  content: string;
+  content: string | AnthropicContentBlock[];
 }
 
 export interface AnthropicSystemBlock {
@@ -42,10 +48,36 @@ export function buildAnthropicMessages(
 
   const systemText = systemParts.join("\n\n");
 
-  const messages: AnthropicMessage[] = request.messages.map((turn) => ({
-    role: turn.role,
-    content: turn.content,
-  }));
+  const messages: AnthropicMessage[] = [];
+  for (const turn of request.messages) {
+    if (turn.role === "assistant" && turn.toolCalls && turn.toolCalls.length > 0) {
+      // Assistant turn with tool calls: use content block array.
+      const blocks: AnthropicContentBlock[] = [];
+      if (turn.content) {
+        blocks.push({ type: "text", text: turn.content });
+      }
+      for (const tc of turn.toolCalls) {
+        blocks.push({ type: "tool_use", id: tc.id, name: tc.name, input: tc.arguments });
+      }
+      messages.push({ role: "assistant", content: blocks });
+    } else if (turn.role === "tool") {
+      // Tool result: Anthropic requires these as user-role messages with tool_result blocks.
+      // If the previous message is already a user-role with tool_result blocks, merge.
+      const block: AnthropicContentBlock = {
+        type: "tool_result",
+        tool_use_id: turn.toolCallId ?? "",
+        content: turn.content ?? "",
+      };
+      const prev = messages[messages.length - 1];
+      if (prev?.role === "user" && Array.isArray(prev.content)) {
+        (prev.content as AnthropicContentBlock[]).push(block);
+      } else {
+        messages.push({ role: "user", content: [block] });
+      }
+    } else {
+      messages.push({ role: turn.role as "user" | "assistant", content: turn.content ?? "" });
+    }
+  }
 
   // Inject RAG context after conversation history to preserve cache prefix.
   // Appended to the last user message so earlier messages remain cache-stable.

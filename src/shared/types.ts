@@ -2,8 +2,12 @@ import type { EditProposal, AppliedEditRecord } from "../editing/editTypes";
 import type { ToolCall } from "../tools/types";
 
 export interface Message {
-  role: "system" | "user" | "assistant";
-  content: string;
+  role: "system" | "user" | "assistant" | "tool";
+  content: string | null;
+  /** For tool result messages (OpenAI format). */
+  tool_call_id?: string;
+  /** For assistant messages with tool calls (OpenAI format). */
+  tool_calls?: Array<{ id: string; type: "function"; function: { name: string; arguments: string } }>;
 }
 
 export type ProviderOption = "lmstudio" | "openai" | "anthropic";

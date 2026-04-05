@@ -14,6 +14,14 @@ import { StreamingRenderer } from "./StreamingRenderer";
 import { EditStreamingRenderer } from "./EditStreamingRenderer";
 import { finalizeResponse, finalizeAbortedResponse } from "./finalizeResponse";
 import { finalizeEditResponse } from "./finalizeEditResponse";
+import { READ_ONLY_TOOL_NAMES } from "../../tools/editing/definition";
+import { executeReadOnlyTool } from "../../tools/editing/handlers";
+import type { ToolCall } from "../../tools/types";
+import type { ChatTurn } from "../../shared/chatRequest";
+import type { UsageResult } from "../../api/usageTypes";
+
+/** Maximum number of read-only tool rounds before forcing finalization. */
+const MAX_TOOL_ROUNDS = 5;
 
 function isAbortError(error: unknown): boolean {
   return error instanceof Error && error.name === "AbortError";
@@ -138,23 +146,126 @@ export async function generateResponse(options: GenerateResponseOptions): Promis
   setActiveAbortController(abortController);
 
   try {
-    const streamResult = client.stream(
-      apiMessages,
-      activeModel.modelId,
-      buildSamplingParams(plugin.settings),
-      abortController.signal
-    );
+    // Ephemeral tool-loop turns (not persisted to conversation history).
+    const toolLoopTurns: ChatTurn[] = [];
+    let allWriteToolCalls: ToolCall[] = [];
+    let previousRoundsText = "";
+    let finalUsage: UsageResult | null = null;
+    let calibrated = false;
 
-    for await (const delta of streamResult.deltas) {
-      renderer.appendDelta(delta);
+    for (let round = 0; round <= MAX_TOOL_ROUNDS; round++) {
+      // Build request: base messages + ephemeral tool loop turns.
+      const requestMessages = [...apiMessages.messages, ...toolLoopTurns];
+      const roundRequest = { ...apiMessages, messages: requestMessages };
+
+      const streamResult = client.stream(
+        roundRequest,
+        activeModel.modelId,
+        buildSamplingParams(plugin.settings),
+        abortController.signal
+      );
+
+      for await (const delta of streamResult.deltas) {
+        renderer.appendDelta(delta);
+      }
+
+      const usage = await streamResult.usage;
+      const toolCalls = await streamResult.toolCalls;
+      const stopReason = await streamResult.stopReason;
+
+      if (usage && onCalibrate && !calibrated) {
+        const estimated = estimateTokenCount(roundRequest);
+        onCalibrate(estimated, usage.inputTokens);
+        calibrated = true;
+      }
+      if (usage) finalUsage = usage;
+
+      // Capture the text generated in this round only.
+      const totalText = renderer instanceof EditStreamingRenderer
+        ? renderer.getFullResponse()
+        : (renderer as StreamingRenderer).getFullResponse();
+      const roundText = totalText.slice(previousRoundsText.length);
+
+      // Defensive: check tool_calls array directly, not just stopReason.
+      // LM Studio can return finish_reason: "stop" with tool_calls populated.
+      const hasToolCalls = toolCalls !== null && toolCalls.length > 0;
+
+      // Detect failed tool calls: model stopped but produced nothing useful.
+      // This catches: malformed JSON, truncated output, and raw tool-call text
+      // that wasn't parsed into structured tool calls.
+      const textContent = roundText.trim();
+      const looksLikeFailedToolCall = !hasToolCalls && (
+        !textContent
+        || textContent.startsWith("[TOOL_CALLS]")
+        || textContent.startsWith("[TOOL_REQUEST]")
+        || (stopReason === "tool_use")
+      );
+
+      if (looksLikeFailedToolCall) {
+        throw new Error(
+          "The model attempted a tool call but failed to generate valid output. " +
+          "Try regenerating or switching to a more capable model."
+        );
+      }
+
+      // No tool calls — break and finalize with whatever text was generated.
+      if (!hasToolCalls) break;
+
+      // Separate read-only vs write tool calls.
+      const readOnlyCalls = toolCalls!.filter((tc) => READ_ONLY_TOOL_NAMES.has(tc.name));
+      const writeCalls = toolCalls!.filter((tc) => !READ_ONLY_TOOL_NAMES.has(tc.name));
+      allWriteToolCalls = [...allWriteToolCalls, ...writeCalls];
+
+      // If ALL tool calls are read-only, execute them and loop for another round.
+      if (readOnlyCalls.length > 0 && writeCalls.length === 0 && round < MAX_TOOL_ROUNDS) {
+        // Get the file path for tool execution context.
+        const filePath = apiMessages.documentContext?.filePath;
+        if (!filePath) break;
+
+        // Add the assistant turn with tool calls to the ephemeral loop.
+        // Content must be null (not "") per OpenAI spec when only tool calls are present.
+        const assistantTurn: ChatTurn = {
+          role: "assistant",
+          content: roundText || null,
+          toolCalls: readOnlyCalls.map((tc) => ({
+            id: tc.id,
+            name: tc.name,
+            arguments: tc.arguments,
+          })),
+        };
+        toolLoopTurns.push(assistantTurn);
+
+        // Execute each read-only tool and append results.
+        for (const tc of readOnlyCalls) {
+          if (renderer instanceof EditStreamingRenderer) {
+            renderer.showToolStatus(tc.name);
+          }
+
+          const result = await executeReadOnlyTool(tc, { app: plugin.app, filePath });
+          toolLoopTurns.push({
+            role: "tool",
+            content: result.content,
+            toolCallId: tc.id,
+          });
+        }
+
+        // Track accumulated text before resetting for the next round.
+        previousRoundsText = totalText;
+
+        // Reset the renderer for the next round's streaming output.
+        if (renderer instanceof EditStreamingRenderer) {
+          renderer.beginNewRound();
+        }
+
+        continue;
+      }
+
+      // Has write tool calls (or mixed) — break and finalize.
+      break;
     }
 
-    const usage = await streamResult.usage;
-    const toolCalls = await streamResult.toolCalls;
-    if (usage && onCalibrate) {
-      const estimated = estimateTokenCount(apiMessages);
-      onCalibrate(estimated, usage.inputTokens);
-    }
+    // Combine any tool calls from all rounds.
+    const finalToolCalls = allWriteToolCalls.length > 0 ? allWriteToolCalls : null;
 
     await renderer.flush();
     assistantBubble.bodyEl.removeClass("is-streaming");
@@ -170,8 +281,8 @@ export async function generateResponse(options: GenerateResponseOptions): Promis
         plugin,
         modelId: activeModel.modelId,
         provider: activeModel.provider,
-        usage,
-        toolCalls,
+        usage: finalUsage,
+        toolCalls: finalToolCalls,
       });
     } else {
       await finalizeResponse(
@@ -183,7 +294,7 @@ export async function generateResponse(options: GenerateResponseOptions): Promis
         plugin,
         activeModel.modelId,
         activeModel.provider,
-        usage,
+        finalUsage,
         ragSources
       );
     }

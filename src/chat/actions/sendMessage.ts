@@ -14,8 +14,16 @@ import { StreamingRenderer } from "./StreamingRenderer";
 import { EditStreamingRenderer } from "./EditStreamingRenderer";
 import { finalizeResponse, finalizeAbortedResponse } from "./finalizeResponse";
 import { finalizeEditResponse } from "./finalizeEditResponse";
+import { READ_ONLY_TOOL_NAMES } from "../../tools/editing/definition";
+import { executeReadOnlyTool } from "../../tools/editing/handlers";
+import type { ToolCall } from "../../tools/types";
+import type { ChatTurn } from "../../shared/chatRequest";
 import { estimateTokenCount } from "../../shared/tokenEstimation";
 import { CONTEXT_DANGER_THRESHOLD } from "../../constants";
+import type { UsageResult } from "../../api/usageTypes";
+
+/** Maximum number of read-only tool rounds before forcing finalization. */
+const MAX_TOOL_ROUNDS = 5;
 
 function isAbortError(error: unknown): boolean {
   return error instanceof Error && error.name === "AbortError";
@@ -157,23 +165,107 @@ export async function sendMessage(options: SendMessageOptions): Promise<void> {
   setActiveAbortController(abortController);
 
   try {
-    const streamResult = client.stream(
-      apiMessages,
-      activeModel.modelId,
-      buildSamplingParams(plugin.settings),
-      abortController.signal
-    );
+    const toolLoopTurns: ChatTurn[] = [];
+    let allWriteToolCalls: ToolCall[] = [];
+    let previousRoundsText = "";
+    let finalUsage: UsageResult | null = null;
+    let calibrated = false;
 
-    for await (const delta of streamResult.deltas) {
-      renderer.appendDelta(delta);
+    for (let round = 0; round <= MAX_TOOL_ROUNDS; round++) {
+      const requestMessages = [...apiMessages.messages, ...toolLoopTurns];
+      const roundRequest = { ...apiMessages, messages: requestMessages };
+
+      const streamResult = client.stream(
+        roundRequest,
+        activeModel.modelId,
+        buildSamplingParams(plugin.settings),
+        abortController.signal
+      );
+
+      for await (const delta of streamResult.deltas) {
+        renderer.appendDelta(delta);
+      }
+
+      const usage = await streamResult.usage;
+      const toolCalls = await streamResult.toolCalls;
+      const stopReason = await streamResult.stopReason;
+
+      if (usage && onCalibrate && !calibrated) {
+        const estimated = estimateTokenCount(roundRequest);
+        onCalibrate(estimated, usage.inputTokens);
+        calibrated = true;
+      }
+      if (usage) finalUsage = usage;
+
+      const totalText = renderer instanceof EditStreamingRenderer
+        ? renderer.getFullResponse()
+        : (renderer as StreamingRenderer).getFullResponse();
+      const roundText = totalText.slice(previousRoundsText.length);
+
+      const hasToolCalls = toolCalls !== null && toolCalls.length > 0;
+
+      const textContent = roundText.trim();
+      const looksLikeFailedToolCall = !hasToolCalls && (
+        !textContent
+        || textContent.startsWith("[TOOL_CALLS]")
+        || textContent.startsWith("[TOOL_REQUEST]")
+        || (stopReason === "tool_use")
+      );
+
+      if (looksLikeFailedToolCall) {
+        throw new Error(
+          "The model attempted a tool call but failed to generate valid output. " +
+          "Try regenerating or switching to a more capable model."
+        );
+      }
+
+      if (!hasToolCalls) break;
+
+      const readOnlyCalls = toolCalls!.filter((tc) => READ_ONLY_TOOL_NAMES.has(tc.name));
+      const writeCalls = toolCalls!.filter((tc) => !READ_ONLY_TOOL_NAMES.has(tc.name));
+      allWriteToolCalls = [...allWriteToolCalls, ...writeCalls];
+
+      if (readOnlyCalls.length > 0 && writeCalls.length === 0 && round < MAX_TOOL_ROUNDS) {
+        const filePath = apiMessages.documentContext?.filePath;
+        if (!filePath) break;
+
+        const assistantTurn: ChatTurn = {
+          role: "assistant",
+          content: roundText || null,
+          toolCalls: readOnlyCalls.map((tc) => ({
+            id: tc.id,
+            name: tc.name,
+            arguments: tc.arguments,
+          })),
+        };
+        toolLoopTurns.push(assistantTurn);
+
+        for (const tc of readOnlyCalls) {
+          if (renderer instanceof EditStreamingRenderer) {
+            renderer.showToolStatus(tc.name);
+          }
+
+          const result = await executeReadOnlyTool(tc, { app: plugin.app, filePath });
+          toolLoopTurns.push({
+            role: "tool",
+            content: result.content,
+            toolCallId: tc.id,
+          });
+        }
+
+        previousRoundsText = totalText;
+
+        if (renderer instanceof EditStreamingRenderer) {
+          renderer.beginNewRound();
+        }
+
+        continue;
+      }
+
+      break;
     }
 
-    const usage = await streamResult.usage;
-    const toolCalls = await streamResult.toolCalls;
-    if (usage && onCalibrate) {
-      const estimated = estimateTokenCount(apiMessages);
-      onCalibrate(estimated, usage.inputTokens);
-    }
+    const finalToolCalls = allWriteToolCalls.length > 0 ? allWriteToolCalls : null;
 
     await renderer.flush();
     assistantBubble.bodyEl.removeClass("is-streaming");
@@ -189,8 +281,8 @@ export async function sendMessage(options: SendMessageOptions): Promise<void> {
         plugin,
         modelId: activeModel.modelId,
         provider: activeModel.provider,
-        usage,
-        toolCalls,
+        usage: finalUsage,
+        toolCalls: finalToolCalls,
       });
     } else {
       await finalizeResponse(
@@ -202,7 +294,7 @@ export async function sendMessage(options: SendMessageOptions): Promise<void> {
         plugin,
         activeModel.modelId,
         activeModel.provider,
-        usage,
+        finalUsage,
         ragSources
       );
     }

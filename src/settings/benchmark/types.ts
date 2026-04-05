@@ -1,3 +1,5 @@
+import type { CanonicalToolDefinition, ToolCall } from "../../tools/types";
+
 /** Declarative description of what the evaluator checks. */
 export interface EvaluationCriteria {
   /** What a passing response looks like, in plain English. */
@@ -26,8 +28,10 @@ export interface BenchmarkTestCase {
   systemPromptSuffix: string;
   /** Synthetic conversation history leading up to the model's response. */
   messages: BenchmarkMessage[];
+  /** Tool definitions to include in the API request. When set, the model can respond with tool calls. */
+  tools?: CanonicalToolDefinition[];
   /** Evaluates the model's response and returns a pass/fail result. */
-  evaluate: (response: string, testCase: BenchmarkTestCase) => BenchmarkResult;
+  evaluate: (response: string, testCase: BenchmarkTestCase, toolCalls?: ToolCall[] | null) => BenchmarkResult;
   /** Declarative evaluation criteria displayed in the UI. */
   criteria?: EvaluationCriteria;
   /** If true, this test is a control — expected to fail or be unreliable. */
@@ -51,6 +55,8 @@ export interface BenchmarkIterationResult {
   iteration: number;
   result: BenchmarkResult;
   rawResponse: string;
+  /** Tool calls returned by the model, if any. */
+  toolCalls?: ToolCall[] | null;
   durationMs: number;
 }
 

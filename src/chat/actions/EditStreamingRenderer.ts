@@ -15,12 +15,21 @@ const STREAMING_RENDER_DEBOUNCE_MS = 100;
  * entirely — tool calls are accumulated separately by the client. Only
  * prose text and a static "Composing edits..." indicator are shown.
  */
+/** Human-readable labels for tool status display. */
+const TOOL_STATUS_LABELS: Record<string, string> = {
+  get_document_outline: "Reading document outline...",
+  get_line_range: "Inspecting lines...",
+};
+
 export class EditStreamingRenderer {
   private fullResponse = "";
+  /** Accumulated response across all agentic rounds. */
+  private accumulatedProse = "";
   private lastRenderedText = "";
   private renderTimer: number | null = null;
   private renderChain = Promise.resolve();
   private readonly useToolMode: boolean;
+  private toolStatusText = "";
 
   constructor(
     private readonly bubble: BubbleRefs,
@@ -31,13 +40,27 @@ export class EditStreamingRenderer {
   }
 
   getFullResponse(): string {
-    return this.fullResponse;
+    return this.accumulatedProse + this.fullResponse;
   }
 
   appendDelta(delta: string): void {
     this.fullResponse += delta;
     this.queueRender();
     this.transcript.scrollToBottom();
+  }
+
+  /** Show a status message while a read-only tool is being executed. */
+  showToolStatus(toolName: string): void {
+    this.toolStatusText = TOOL_STATUS_LABELS[toolName] ?? `Running ${toolName}...`;
+    this.queueRender();
+  }
+
+  /** Prepare for a new streaming round after read-only tool execution. */
+  beginNewRound(): void {
+    this.accumulatedProse += this.fullResponse;
+    this.fullResponse = "";
+    this.toolStatusText = "";
+    this.lastRenderedText = "";
   }
 
   private queueRender(): void {
@@ -61,10 +84,11 @@ export class EditStreamingRenderer {
 
     if (this.useToolMode) {
       // Tool mode: prose text only — tool calls are accumulated by the client.
-      const trimmed = text.trim();
-      displayText = trimmed
-        ? trimmed + "\n\n*Composing edits...*"
-        : "*Composing edits...*";
+      const allProse = (this.accumulatedProse + text).trim();
+      const statusLine = this.toolStatusText || "*Composing edits...*";
+      displayText = allProse
+        ? allProse + "\n\n" + statusLine
+        : statusLine;
     } else {
       const { completeBlocks, hasIncompleteBlock } = findPartialBlock(text);
 

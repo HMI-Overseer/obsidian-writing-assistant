@@ -10,6 +10,9 @@ export interface UsageResult {
   cacheReadInputTokens?: number;
 }
 
+/** Why the model stopped generating. */
+export type StopReason = "end_turn" | "tool_use" | "max_tokens" | "unknown";
+
 /** Wrapper returned by ChatClient.stream(). */
 export interface StreamResult {
   /** Async generator yielding text deltas. */
@@ -18,6 +21,8 @@ export interface StreamResult {
   usage: Promise<UsageResult | null>;
   /** Resolves when the stream ends. null if the model returned no tool calls. */
   toolCalls: Promise<ToolCall[] | null>;
+  /** Resolves when the stream ends with the reason the model stopped. */
+  stopReason: Promise<StopReason>;
 }
 
 /** Wrapper returned by ChatClient.complete(). */
@@ -25,4 +30,5 @@ export interface CompletionResult {
   text: string;
   usage: UsageResult | null;
   toolCalls?: ToolCall[] | null;
+  stopReason?: StopReason;
 }

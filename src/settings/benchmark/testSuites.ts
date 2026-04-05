@@ -1,5 +1,6 @@
 import type { BenchmarkTestSuite } from "./types";
 import { getTestCases } from "./testCases";
+import { getToolTestCases } from "./toolTestCases";
 
 /**
  * Returns all registered benchmark test suites.
@@ -16,17 +17,18 @@ export function getTestSuites(): BenchmarkTestSuite[] {
       testCases: getTestCases(),
     },
     {
+      id: "edit-tools",
+      name: "Edit tools",
+      description:
+        "Tests whether the model can correctly invoke editing tools — calling the right tool, with valid arguments, in the expected order.",
+      icon: "wrench",
+      testCases: getToolTestCases(),
+    },
+    {
       id: "memory",
       name: "Memory",
       description: "Tests for conversation memory retention and recall accuracy.",
       icon: "brain",
-      testCases: [],
-    },
-    {
-      id: "tools",
-      name: "Tools",
-      description: "Tests for tool invocation, parameter handling, and result interpretation.",
-      icon: "wrench",
       testCases: [],
     },
   ];

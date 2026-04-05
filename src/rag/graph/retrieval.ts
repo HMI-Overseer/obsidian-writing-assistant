@@ -11,17 +11,24 @@ export interface GraphRetrievalContext {
   relevantFiles: Map<string, number>;
 }
 
+const ENTITY_TOP_K = 10;
+const ENTITY_MIN_SCORE = 0.5;
+
 /**
  * Match entities from the knowledge graph against a user query.
- * Uses the graph's built-in substring search (case-insensitive).
- * Then traverses up to `maxHops` from each match to build a file relevance map.
+ * Accepts either a pre-computed query vector (for embedding-based search) or a raw
+ * string (for substring fallback). Then traverses up to `maxHops` from each match
+ * to build a file relevance map.
  */
 export function buildGraphContext(
-  query: string,
+  query: string | number[],
   graph: KnowledgeGraph,
   maxHops = 2,
 ): GraphRetrievalContext {
-  const matchedEntities = graph.findEntities(query);
+  const matchedEntities = Array.isArray(query)
+    ? graph.findEntitiesByEmbedding(query, ENTITY_TOP_K, ENTITY_MIN_SCORE)
+    : graph.findEntities(query);
+
   if (matchedEntities.length === 0) {
     return { matchedEntities: [], relevantFiles: new Map() };
   }

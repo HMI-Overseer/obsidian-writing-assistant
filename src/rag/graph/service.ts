@@ -1,11 +1,13 @@
 import type { App } from "obsidian";
 import { Notice } from "obsidian";
 import type { KnowledgeGraphSettings, GraphBuildState } from "./types";
-import type { CompletionModel, ProviderSettingsMap } from "../../shared/types";
+import type { CompletionModel, EmbeddingModel, ProviderSettingsMap } from "../../shared/types";
 import { KnowledgeGraph } from "./knowledgeGraph";
 import { GraphExtractor } from "./extractor";
 import { createChatClient } from "../../providers/registry";
 import type { ChatClient } from "../../api/chatClient";
+import type { EmbeddingClient } from "../embeddingClient";
+import { createEmbeddingClient } from "../ragService";
 import { buildGraphContext as buildContext } from "./retrieval";
 import type { GraphRetrievalContext } from "./retrieval";
 
@@ -25,10 +27,12 @@ export class GraphService {
   private graph: KnowledgeGraph | null = null;
   private extractor: GraphExtractor | null = null;
   private chatClient: ChatClient | null = null;
+  private embeddingClient: EmbeddingClient | null = null;
   private buildState: GraphBuildState = { status: "idle" };
   private onStateChangeCallback: ((state: GraphBuildState) => void) | null = null;
 
   private configuredModelId: string | null = null;
+  private configuredEmbeddingModelId: string | null = null;
 
   constructor(app: App) {
     this.app = app;
@@ -69,9 +73,27 @@ export class GraphService {
     return this.graph;
   }
 
-  /** Build graph context for a query. Returns null if graph not ready. */
-  buildGraphContext(query: string): GraphRetrievalContext | null {
+  /**
+   * Build graph context for a query. Returns null if graph not ready.
+   *
+   * If an embedding model is configured and the graph has entity embeddings,
+   * embeds the query and uses cosine similarity to find matching entities.
+   * Falls back to substring matching otherwise.
+   */
+  async buildGraphContext(query: string): Promise<GraphRetrievalContext | null> {
     if (!this.isReady() || !this.graph) return null;
+
+    if (this.embeddingClient && this.configuredEmbeddingModelId && this.graph.hasEmbeddings()) {
+      try {
+        const result = await this.embeddingClient.embed([query], this.configuredEmbeddingModelId);
+        if (result.vectors.length > 0) {
+          return buildContext(result.vectors[0], this.graph, 2);
+        }
+      } catch {
+        // Fall through to substring matching.
+      }
+    }
+
     return buildContext(query, this.graph, 2);
   }
 
@@ -89,6 +111,7 @@ export class GraphService {
   async configure(
     settings: KnowledgeGraphSettings,
     completionModels: CompletionModel[],
+    embeddingModels: EmbeddingModel[],
     providerSettings: ProviderSettingsMap,
   ): Promise<void> {
     this.shutdown();
@@ -102,8 +125,16 @@ export class GraphService {
 
     this.chatClient = createChatClient(model.provider, providerSettings);
     this.configuredModelId = model.modelId;
-    this.graph = new KnowledgeGraph();
 
+    if (settings.activeEmbeddingModelId) {
+      const embModel = embeddingModels.find((m) => m.id === settings.activeEmbeddingModelId);
+      if (embModel) {
+        this.embeddingClient = createEmbeddingClient(embModel, providerSettings);
+        this.configuredEmbeddingModelId = embModel.modelId;
+      }
+    }
+
+    this.graph = new KnowledgeGraph();
     await this.loadGraph();
   }
 
@@ -115,10 +146,11 @@ export class GraphService {
   async startBuild(
     settings: KnowledgeGraphSettings,
     completionModels: CompletionModel[],
+    embeddingModels: EmbeddingModel[],
     providerSettings: ProviderSettingsMap,
   ): Promise<void> {
     if (!this.graph || !this.chatClient) {
-      await this.configure(settings, completionModels, providerSettings);
+      await this.configure(settings, completionModels, embeddingModels, providerSettings);
     }
 
     if (!this.graph || !this.chatClient || !this.configuredModelId) {
@@ -137,6 +169,8 @@ export class GraphService {
       excludePatterns: settings.excludePatterns,
       onStateChange: (state) => this.setBuildState(state),
       onSave: () => this.saveGraph(),
+      embeddingClient: this.embeddingClient ?? undefined,
+      embeddingModelId: this.configuredEmbeddingModelId ?? undefined,
     });
 
     await this.extractor.start();
@@ -153,13 +187,14 @@ export class GraphService {
   async rebuild(
     settings: KnowledgeGraphSettings,
     completionModels: CompletionModel[],
+    embeddingModels: EmbeddingModel[],
     providerSettings: ProviderSettingsMap,
   ): Promise<void> {
     this.extractor?.destroy();
     this.extractor = null;
     this.graph?.clear();
     await this.deleteGraph();
-    await this.startBuild(settings, completionModels, providerSettings);
+    await this.startBuild(settings, completionModels, embeddingModels, providerSettings);
   }
 
   /** Shut down the extractor and release resources. */
@@ -167,7 +202,9 @@ export class GraphService {
     this.extractor?.destroy();
     this.extractor = null;
     this.chatClient = null;
+    this.embeddingClient = null;
     this.configuredModelId = null;
+    this.configuredEmbeddingModelId = null;
     this.graph = null;
     this.buildState = { status: "idle" };
   }
@@ -199,7 +236,7 @@ export class GraphService {
       const raw = await this.app.vault.adapter.read(path);
       const data = JSON.parse(raw);
 
-      if (!this.graph.deserialize(data, this.configuredModelId)) {
+      if (!this.graph.deserialize(data, this.configuredModelId, this.configuredEmbeddingModelId ?? undefined)) {
         // Model mismatch — graph was built with a different model.
         this.graph.clear();
       }
@@ -213,7 +250,10 @@ export class GraphService {
     if (!this.graph || !this.configuredModelId) return;
 
     try {
-      const data = this.graph.serialize(this.configuredModelId);
+      const data = this.graph.serialize(
+        this.configuredModelId,
+        this.configuredEmbeddingModelId ?? undefined,
+      );
       const path = this.getGraphPath();
       await this.app.vault.adapter.write(path, JSON.stringify(data));
     } catch {

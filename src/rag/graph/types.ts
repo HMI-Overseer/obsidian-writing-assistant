@@ -12,6 +12,8 @@ export interface GraphEntity {
   sourceFiles: string[];
   /** Alternate names found across documents. */
   aliases: string[];
+  /** Embedding of "name: description" — in-memory and persisted. Absent when no embedding model was configured at build time. */
+  embedding?: number[];
 }
 
 /** A relationship between two entities. */
@@ -44,6 +46,8 @@ export interface SerializedKnowledgeGraph {
   version: 1;
   /** Which completion model built this graph. */
   modelId: string;
+  /** Which embedding model was used to generate entity vectors. Used to detect stale embeddings on load. */
+  embeddingModelId?: string;
   /** Timestamp when the graph was last built. */
   builtAt: number;
   files: GraphFileMeta[];
@@ -62,6 +66,8 @@ export interface KnowledgeGraphSettings {
   enabled: boolean;
   /** CompletionModel.id — the chat model used for entity extraction. */
   activeCompletionModelId: string | null;
+  /** EmbeddingModel.id — used to generate entity vectors at build time. When null, falls back to substring matching. */
+  activeEmbeddingModelId: string | null;
   /** Glob patterns to exclude from graph extraction. */
   excludePatterns: string[];
 }

@@ -4,6 +4,7 @@ import type { ChatRequest } from "../../shared/chatRequest";
 import type { SamplingParams } from "../../shared/types";
 import type { GraphBuildState, GraphFileMeta, ExtractionResult } from "./types";
 import type { KnowledgeGraph } from "./knowledgeGraph";
+import type { EmbeddingClient } from "../embeddingClient";
 import { chunkDocument, fnv1aHash, preprocessMarkdown } from "../chunker";
 
 /** Number of files to process per batch before yielding to the UI thread. */
@@ -57,6 +58,10 @@ export interface GraphExtractorOptions {
   excludePatterns: string[];
   onStateChange: (state: GraphBuildState) => void;
   onSave: () => void;
+  /** Optional embedding client for generating entity vectors at build time. */
+  embeddingClient?: EmbeddingClient;
+  /** The modelId to pass to the embedding client. */
+  embeddingModelId?: string;
 }
 
 /**
@@ -73,6 +78,8 @@ export class GraphExtractor {
   private readonly excludePatterns: string[];
   private readonly onStateChange: (state: GraphBuildState) => void;
   private readonly onSave: () => void;
+  private readonly embeddingClient: EmbeddingClient | undefined;
+  private readonly embeddingModelId: string | undefined;
 
   private saveTimer: ReturnType<typeof setTimeout> | null = null;
   private abortController: AbortController | null = null;
@@ -86,6 +93,8 @@ export class GraphExtractor {
     this.excludePatterns = options.excludePatterns;
     this.onStateChange = options.onStateChange;
     this.onSave = options.onSave;
+    this.embeddingClient = options.embeddingClient;
+    this.embeddingModelId = options.embeddingModelId;
   }
 
   /** Scan vault and extract entities/relations from all markdown files. */
@@ -217,7 +226,31 @@ export class GraphExtractor {
       };
 
       this.graph.addExtractions(file.path, mergedResult, meta);
+
+      if (this.embeddingClient && this.embeddingModelId) {
+        await this.embedNewEntities(file.path);
+      }
+
       this.scheduleSave();
+    }
+  }
+
+  /** Embed any entities from this file that don't yet have a vector. */
+  private async embedNewEntities(filePath: string): Promise<void> {
+    if (!this.embeddingClient || !this.embeddingModelId) return;
+
+    const entities = this.graph.getEntitiesInFile(filePath).filter((e) => !e.embedding);
+    if (entities.length === 0) return;
+
+    try {
+      const texts = entities.map((e) => `${e.name}: ${e.description}`);
+      const result = await this.embeddingClient.embed(texts, this.embeddingModelId);
+
+      for (let i = 0; i < entities.length; i++) {
+        if (result.vectors[i]) entities[i].embedding = result.vectors[i];
+      }
+    } catch {
+      // Non-fatal — entity will be embedded on next build.
     }
   }
 

@@ -1,4 +1,4 @@
-import { Notice } from "obsidian";
+import { Notice, Setting } from "obsidian";
 import type LMStudioWritingAssistant from "../main";
 import type { GraphBuildState } from "../rag/graph";
 import { getProviderDescriptor } from "../providers/registry";
@@ -34,13 +34,16 @@ export function renderKnowledgeGraphTab(
         await plugin.graphService.configure(
           kg,
           plugin.settings.completionModels,
+          plugin.settings.embeddingModels,
           plugin.settings.providerSettings,
         );
         renderConditionalSections();
       }),
     );
 
-  // ── Completion Model ──────────────────────────────────────────────
+  // ── Extraction model ──────────────────────────────────────────────
+  new Setting(general.bodyEl).setHeading().setName("Extraction");
+
   const models = plugin.settings.completionModels;
   const currentModel = models.find((m) => m.id === kg.activeCompletionModelId) ?? null;
 
@@ -64,6 +67,39 @@ export function renderKnowledgeGraphTab(
       await plugin.graphService.configure(
         kg,
         plugin.settings.completionModels,
+        plugin.settings.embeddingModels,
+        plugin.settings.providerSettings,
+      );
+    },
+  });
+
+  // ── Embedding model ───────────────────────────────────────────────
+  new Setting(general.bodyEl).setHeading().setName("Embeddings");
+
+  const embModels = plugin.settings.embeddingModels;
+  const currentEmbModel = embModels.find((m) => m.id === kg.activeEmbeddingModelId) ?? null;
+
+  const embModelSelector = createModelSelector(general.bodyEl, embModels, {
+    getAvailability: (modelId, provider) =>
+      plugin.modelAvailability.getAvailability(modelId, provider).state,
+    refreshLocalModels: async () => {
+      if (currentEmbModel) {
+        const desc = getProviderDescriptor(currentEmbModel.provider);
+        if (desc.kind !== "cloud") {
+          await plugin.modelAvailability.refreshLocalModels({ forceRefresh: true });
+        }
+      }
+    },
+  }, {
+    initial: currentEmbModel,
+    placeholder: "None selected (uses substring matching)",
+    onSelect: async (model) => {
+      kg.activeEmbeddingModelId = model?.id ?? null;
+      await plugin.saveSettings();
+      await plugin.graphService.configure(
+        kg,
+        plugin.settings.completionModels,
+        plugin.settings.embeddingModels,
         plugin.settings.providerSettings,
       );
     },
@@ -102,6 +138,7 @@ export function renderKnowledgeGraphTab(
       await plugin.graphService.startBuild(
         kg,
         plugin.settings.completionModels,
+        plugin.settings.embeddingModels,
         plugin.settings.providerSettings,
       );
     });
@@ -113,6 +150,7 @@ export function renderKnowledgeGraphTab(
       await plugin.graphService.rebuild(
         kg,
         plugin.settings.completionModels,
+        plugin.settings.embeddingModels,
         plugin.settings.providerSettings,
       );
     });
@@ -207,6 +245,7 @@ export function renderKnowledgeGraphTab(
   // Return cleanup function.
   return () => {
     modelSelector.destroy();
+    embModelSelector.destroy();
     plugin.graphService.onBuildStateChange(null);
   };
 }

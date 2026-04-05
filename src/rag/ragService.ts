@@ -13,6 +13,28 @@ import { boostByGraphRelevance, annotateBlockWithGraph } from "./graph/retrieval
 
 const INDEX_FILE = "rag-index.json";
 
+/** Create an EmbeddingClient for the given model. Shared by RagService and GraphService. */
+export function createEmbeddingClient(
+  model: EmbeddingModel,
+  providerSettings: ProviderSettingsMap,
+): EmbeddingClient | null {
+  switch (model.provider) {
+    case "lmstudio":
+      return new LMStudioEmbeddingClient(
+        providerSettings.lmstudio.baseUrl,
+        providerSettings.lmstudio.bypassCors,
+      );
+    case "openai":
+      return new LMStudioEmbeddingClient(
+        providerSettings.openai.baseUrl,
+        false,
+        { Authorization: `Bearer ${providerSettings.openai.apiKey}` },
+      );
+    default:
+      return null;
+  }
+}
+
 /**
  * Top-level facade for RAG functionality.
  *
@@ -227,9 +249,9 @@ export class RagService {
 
       // Graph boost: re-rank results using knowledge graph entity relevance.
       let boosted = results;
-      let graphContext: ReturnType<GraphService["buildGraphContext"]> = null;
+      let graphContext: Awaited<ReturnType<GraphService["buildGraphContext"]>> = null;
       if (this.graphService?.isReady()) {
-        graphContext = this.graphService.buildGraphContext(query);
+        graphContext = await this.graphService.buildGraphContext(query);
         if (graphContext && graphContext.relevantFiles.size > 0) {
           boosted = boostByGraphRelevance(boosted, graphContext.relevantFiles);
         }
@@ -316,21 +338,7 @@ export class RagService {
     model: EmbeddingModel,
     providerSettings: ProviderSettingsMap,
   ): EmbeddingClient | null {
-    switch (model.provider) {
-      case "lmstudio":
-        return new LMStudioEmbeddingClient(
-          providerSettings.lmstudio.baseUrl,
-          providerSettings.lmstudio.bypassCors,
-        );
-      case "openai":
-        return new LMStudioEmbeddingClient(
-          providerSettings.openai.baseUrl,
-          false,
-          { Authorization: `Bearer ${providerSettings.openai.apiKey}` },
-        );
-      default:
-        return null;
-    }
+    return createEmbeddingClient(model, providerSettings);
   }
 
   private getIndexPath(): string {

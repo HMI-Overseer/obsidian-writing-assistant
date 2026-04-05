@@ -34,6 +34,7 @@ export const DEFAULT_RAG_SETTINGS: RagSettings = {
 export const DEFAULT_KNOWLEDGE_GRAPH_SETTINGS: KnowledgeGraphSettings = {
   enabled: false,
   activeCompletionModelId: null,
+  activeEmbeddingModelId: null,
   excludePatterns: ["templates/**"],
 };
 

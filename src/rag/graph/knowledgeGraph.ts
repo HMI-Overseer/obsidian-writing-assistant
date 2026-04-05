@@ -6,6 +6,7 @@ import type {
   EntityType,
   ExtractionResult,
 } from "./types";
+import { cosineSimilarity } from "../vectorMath";
 
 /** Normalize entity names for deduplication: lowercase and trim. */
 function normalizeEntityName(name: string): string {
@@ -56,6 +57,31 @@ export class KnowledgeGraph {
       }
     }
     return results;
+  }
+
+  /** Whether any entity in the graph has a pre-computed embedding. */
+  hasEmbeddings(): boolean {
+    for (const entity of this.entities.values()) {
+      if (entity.embedding) return true;
+    }
+    return false;
+  }
+
+  /**
+   * Find entities by cosine similarity to a query vector.
+   * Returns up to `topK` entities with similarity >= `minScore`, sorted descending.
+   */
+  findEntitiesByEmbedding(queryVector: number[], topK: number, minScore: number): GraphEntity[] {
+    const scored: { entity: GraphEntity; score: number }[] = [];
+
+    for (const entity of this.entities.values()) {
+      if (!entity.embedding) continue;
+      const score = cosineSimilarity(queryVector, entity.embedding);
+      if (score >= minScore) scored.push({ entity, score });
+    }
+
+    scored.sort((a, b) => b.score - a.score);
+    return scored.slice(0, topK).map((s) => s.entity);
   }
 
   /** Get all relations involving a given entity (by canonical name). */
@@ -279,10 +305,11 @@ export class KnowledgeGraph {
 
   // ── Serialization ──────────────────────────────────────────────────
 
-  serialize(modelId: string): SerializedKnowledgeGraph {
+  serialize(modelId: string, embeddingModelId?: string): SerializedKnowledgeGraph {
     return {
       version: 1,
       modelId,
+      ...(embeddingModelId && { embeddingModelId }),
       builtAt: this.builtAt || Date.now(),
       files: [...this.fileMeta],
       entities: [...this.entities.values()],
@@ -292,8 +319,14 @@ export class KnowledgeGraph {
 
   /**
    * Load from serialized data. Returns false on version or model mismatch.
+   * If `expectedEmbeddingModelId` is provided and differs from what the graph was built with,
+   * entity embeddings are stripped so stale vectors aren't used for similarity search.
    */
-  deserialize(data: SerializedKnowledgeGraph, expectedModelId: string): boolean {
+  deserialize(
+    data: SerializedKnowledgeGraph,
+    expectedModelId: string,
+    expectedEmbeddingModelId?: string,
+  ): boolean {
     if (data.version !== 1 || data.modelId !== expectedModelId) {
       return false;
     }
@@ -303,10 +336,16 @@ export class KnowledgeGraph {
     this.builtAt = data.builtAt;
     this.fileMeta = [...data.files];
 
+    const embeddingModelMismatch =
+      expectedEmbeddingModelId !== undefined &&
+      data.embeddingModelId !== expectedEmbeddingModelId;
+
     // Rebuild entity map and file index.
     for (const entity of data.entities) {
       const key = normalizeEntityName(entity.name);
-      this.entities.set(key, { ...entity, aliases: entity.aliases ?? [] });
+      const loaded: GraphEntity = { ...entity, aliases: entity.aliases ?? [] };
+      if (embeddingModelMismatch) delete loaded.embedding;
+      this.entities.set(key, loaded);
 
       for (const file of entity.sourceFiles) {
         const existing = this.fileEntityIndex.get(file) ?? new Set();

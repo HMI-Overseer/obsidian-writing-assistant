@@ -33,6 +33,10 @@ function normalizeKnowledgeGraphSettings(raw: unknown): KnowledgeGraphSettings {
       typeof data.activeCompletionModelId === "string"
         ? data.activeCompletionModelId
         : DEFAULT_KNOWLEDGE_GRAPH_SETTINGS.activeCompletionModelId,
+    activeEmbeddingModelId:
+      typeof data.activeEmbeddingModelId === "string"
+        ? data.activeEmbeddingModelId
+        : DEFAULT_KNOWLEDGE_GRAPH_SETTINGS.activeEmbeddingModelId,
     excludePatterns: Array.isArray(data.excludePatterns)
       ? data.excludePatterns.filter((p): p is string => typeof p === "string")
       : [...DEFAULT_KNOWLEDGE_GRAPH_SETTINGS.excludePatterns],
@@ -112,6 +116,7 @@ export default class LMStudioWritingAssistant extends Plugin {
     await this.graphService.configure(
       this.settings.knowledgeGraph,
       this.settings.completionModels,
+      this.settings.embeddingModels,
       this.settings.providerSettings,
     );
     this.ragService.setGraphService(this.graphService);

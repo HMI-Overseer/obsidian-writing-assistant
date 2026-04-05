@@ -2,16 +2,18 @@ import { generateId } from "../utils";
 import type { EditBlock } from "./editTypes";
 
 /**
- * Regex matching complete <<<SEARCH ... === ... REPLACE>>> blocks.
- * Uses non-greedy quantifiers so adjacent blocks are matched individually.
+ * Regex matching complete <<<<<<< SEARCH ... ======= ... >>>>>>> REPLACE blocks.
+ * Uses git-conflict-style markers for maximum LLM familiarity (the pattern
+ * appears in millions of training examples from merge-conflict files).
+ * Non-greedy quantifiers ensure adjacent blocks are matched individually.
  */
-const BLOCK_REGEX = /<<<SEARCH\n([\s\S]*?)\n===\n([\s\S]*?)\nREPLACE>>>/g;
+const BLOCK_REGEX = /<<<<<<< SEARCH\n([\s\S]*?)\n=======\n([\s\S]*?)\n>>>>>>> REPLACE/g;
 
 /**
  * Detects an incomplete block that has started but not yet closed.
- * Matches an opening <<<SEARCH that is not followed by a closing REPLACE>>>.
+ * Matches an opening <<<<<<< SEARCH that is not followed by a closing >>>>>>> REPLACE.
  */
-const PARTIAL_OPEN_REGEX = /<<<SEARCH\n(?![\s\S]*?\nREPLACE>>>)/;
+const PARTIAL_OPEN_REGEX = /<<<<<<< SEARCH\n(?![\s\S]*?\n>>>>>>> REPLACE)/;
 
 export interface ParseResult {
   /** Fully parsed edit blocks. */
@@ -28,7 +30,7 @@ export interface PartialParseResult {
 }
 
 /**
- * Parse all complete <<<SEARCH...REPLACE>>> blocks from the model's full response.
+ * Parse all complete <<<<<<< SEARCH...>>>>>>> REPLACE blocks from the model's full response.
  * Returns the extracted blocks and the remaining prose with blocks stripped out.
  */
 export function parseEditBlocks(text: string): ParseResult {
@@ -77,7 +79,7 @@ export function findPartialBlock(text: string): PartialParseResult {
     });
   }
 
-  // Strip all complete blocks, then check if a partial <<<SEARCH remains
+  // Strip all complete blocks, then check if a partial <<<<<<< SEARCH remains
   let remaining = text;
   for (const block of completeBlocks) {
     remaining = remaining.replace(block.rawBlock, "");

@@ -162,7 +162,11 @@ export class ChatComposer {
 
     const trainedForToolUse = activeModel.trainedForToolUse
       ?? this.plugin.modelAvailability.getTrainedForToolUse(activeModel.modelId);
-    const supportsTools = shouldUseToolCall(activeModel.provider, { trainedForToolUse });
+    const supportsTools = shouldUseToolCall(
+      activeModel.provider,
+      { trainedForToolUse },
+      this.plugin.settings.preferToolUse,
+    );
 
     el.toggleClass("is-active", supportsTools);
     el.setAttribute("aria-label", supportsTools

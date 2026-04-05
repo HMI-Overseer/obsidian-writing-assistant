@@ -239,4 +239,6 @@ export interface PluginSettings {
   editToolSystemPromptPrefix: string;
   /** System prompt prefix for Edit mode (fallback SEARCH/REPLACE variant). Prepended before user's custom prompt. */
   editFallbackSystemPromptPrefix: string;
+  /** Use structured tool calls in edit mode when the model supports them. */
+  preferToolUse: boolean;
 }

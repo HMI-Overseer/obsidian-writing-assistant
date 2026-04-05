@@ -17,9 +17,9 @@ import type { BenchmarkTestCase } from "./types";
 export const ANNOTATION_RULE =
   "\n- When reviewing previous edits in this conversation, blocks marked [ACCEPTED] were applied to the document, while [REJECTED] blocks were not. The current document content reflects all accepted changes.";
 
-// =========================================================================
+// =============================================================================
 // Fixture: SHORT document (3 paragraphs) — original tests
-// =========================================================================
+// =============================================================================
 
 const SHORT_DOC_PARTIAL = `Dawn broke golden over the village square, stretching long shadows between the cobblestones. A baker stepped out from the stone building on the corner, balancing a tray of fresh bread on one arm. The warm aroma wound through the narrow streets like a whispered invitation.
 
@@ -33,9 +33,9 @@ A handful of children crowded around the old stone fountain, skipping pebbles ac
 
 The church bell rang twice, marking the hour. Merchants began setting up their stalls along the eastern wall, unfurling colorful fabrics and arranging jars of preserved fruit. It was market day, and the square would soon be alive with voices.`;
 
-// =========================================================================
+// =============================================================================
 // Fixture: LONG document (8 paragraphs) — stresses context window
-// =========================================================================
+// =============================================================================
 
 /** Full original document before any edits. Referenced by SEARCH blocks. */
 export const LONG_DOC_ORIGINAL = `# Chapter 3: The Cartographer's Apprentice
@@ -75,9 +75,9 @@ In the afternoons Elara ground pigments and mixed inks according to Theron's pre
 
 The atlas was due by midsummer. They had completed eighteen sheets and begun the nineteenth, which covered the contested borderlands between Marrenthia and its eastern neighbor. This sheet was politically sensitive, and Theron had warned Elara that the Duke's secretary would inspect it personally before it joined the collection. Every line had to be defensible, every name spelled according to Marrenthian convention, every border drawn to match the treaty of Ashford exactly.`;
 
-// =========================================================================
+// =============================================================================
 // Fixture: LONG document after two rounds of edits
-// =========================================================================
+// =============================================================================
 
 /** After round 2: paragraph 7 (inks) was also rewritten and accepted. */
 const LONG_DOC_AFTER_ROUND2 = `# Chapter 3: The Cartographer's Apprentice
@@ -98,21 +98,21 @@ Each afternoon began with the ritual of ink-making. Elara measured lampblack on 
 
 The atlas was due by midsummer. They had completed eighteen sheets and begun the nineteenth, which covered the contested borderlands between Marrenthia and its eastern neighbor. This sheet was politically sensitive, and Theron had warned Elara that the Duke's secretary would inspect it personally before it joined the collection. Every line had to be defensible, every name spelled according to Marrenthian convention, every border drawn to match the treaty of Ashford exactly.`;
 
-// =========================================================================
+// =============================================================================
 // Edit blocks — short doc
-// =========================================================================
+// =============================================================================
 
-const SHORT_BLOCK_1 = `<<<SEARCH
+const SHORT_BLOCK_1 = `<<<<<<< SEARCH
 The morning sun cast long shadows across the village square. A baker emerged from the stone building on the corner, carrying a tray of fresh bread. The aroma drifted lazily through the narrow streets.
-===
+=======
 Dawn broke golden over the village square, stretching long shadows between the cobblestones. A baker stepped out from the stone building on the corner, balancing a tray of fresh bread on one arm. The warm aroma wound through the narrow streets like a whispered invitation.
-REPLACE>>>`;
+>>>>>>> REPLACE`;
 
-const SHORT_BLOCK_2 = `<<<SEARCH
+const SHORT_BLOCK_2 = `<<<<<<< SEARCH
 Children gathered near the fountain, tossing pebbles into the water. An old woman sat on a wooden bench, watching them with quiet amusement. Her cat dozed in a patch of warm light beside her.
-===
+=======
 A handful of children crowded around the old stone fountain, skipping pebbles across its surface. An elderly woman watched from a nearby bench, a faint smile playing on her lips. Her tabby cat lay curled in a patch of sunlight beside her.
-REPLACE>>>`;
+>>>>>>> REPLACE`;
 
 const SHORT_PROSE = "I've rewritten two paragraphs to add more vivid imagery and sensory detail:\n\n";
 
@@ -132,27 +132,27 @@ const SHORT_EDIT_ALL_ACCEPTED =
   SHORT_BLOCK_2 + "\n[ACCEPTED — applied to document]" +
   "\n\n[Edit outcome: 2 accepted, 0 rejected out of 2 proposed changes]";
 
-// =========================================================================
+// =============================================================================
 // Edit blocks — long doc, round 1 (paragraphs 2, 4, 5)
-// =========================================================================
+// =============================================================================
 
-const LONG_R1_BLOCK_P2 = `<<<SEARCH
+const LONG_R1_BLOCK_P2 = `<<<<<<< SEARCH
 Master Theron was a meticulous man, small and wiry, with ink stains that never quite washed from his knuckles. He spoke rarely and always in clipped, measured sentences, as though words were precious commodities that should not be wasted. When he did offer instruction, Elara listened with her whole body, afraid that blinking might cause her to miss something essential.
-===
+=======
 Master Theron was a precise, wiry man whose ink-stained knuckles told the story of decades at the drafting table. He rationed his words the way a miser rationed coin — each one deliberate, considered, stripped of excess. When he did speak, Elara held herself still, afraid that even blinking might cost her something irreplaceable.
-REPLACE>>>`;
+>>>>>>> REPLACE`;
 
-const LONG_R1_BLOCK_P4 = `<<<SEARCH
+const LONG_R1_BLOCK_P4 = `<<<<<<< SEARCH
 By midmorning the workshop filled with the smell of fresh ink and the quiet scratching of steel nibs on vellum. Theron worked at the large drafting table by the window, where the north light fell cleanly across his work. Elara sat at the smaller table near the shelves, surrounded by reference volumes and sheets of practice lettering that she would later burn in the fireplace to keep the workshop tidy.
-===
+=======
 By mid-morning the air grew thick with the mineral scent of fresh ink and the rhythmic scratching of steel on vellum. Theron claimed the large table by the north-facing window, where the light was cool and even. Elara worked at the smaller station near the bookshelves, hemmed in by reference atlases and sheets of practice script destined for the fireplace.
-REPLACE>>>`;
+>>>>>>> REPLACE`;
 
-const LONG_R1_BLOCK_P5 = `<<<SEARCH
+const LONG_R1_BLOCK_P5 = `<<<<<<< SEARCH
 They rarely spoke during work hours. The silence was not uncomfortable — it was the silence of two people engaged in the same exacting labor, each trusting the other to maintain the standard without supervision. Occasionally Theron would hold up a sheet for Elara to inspect, and she would nod or point to a hairline wobble that needed correction. He never argued with her observations.
-===
+=======
 The silence between them was a living thing — not empty, but dense with shared purpose. It was the quiet of two craftspeople who had learned to read each other's rhythms: the pause before a difficult line, the soft exhale after a passage came out clean. When Theron held up a sheet, Elara's eye found the flaw before he could ask. He never once questioned her judgment.
-REPLACE>>>`;
+>>>>>>> REPLACE`;
 
 const LONG_R1_PROSE = "I've reworked three paragraphs to sharpen the characterization and deepen the atmosphere:\n\n";
 
@@ -165,15 +165,15 @@ const LONG_R1_ANNOTATED =
   LONG_R1_BLOCK_P5 + "\n[ACCEPTED — applied to document]" +
   "\n\n[Edit outcome: 2 accepted, 1 rejected out of 3 proposed changes]";
 
-// =========================================================================
+// =============================================================================
 // Edit blocks — long doc, round 2 (paragraph 7: inks)
-// =========================================================================
+// =============================================================================
 
-const LONG_R2_BLOCK_P7 = `<<<SEARCH
+const LONG_R2_BLOCK_P7 = `<<<<<<< SEARCH
 In the afternoons Elara ground pigments and mixed inks according to Theron's precise formulas: lampblack and gum arabic for the main script, iron gall for borders, vermilion for capitals and compass roses. The formulas were written in a leather-bound notebook that Theron kept locked in his desk, though Elara had long since memorized them. She enjoyed the ritual of preparation — the measured weighing, the slow grinding, the moment when the ink reached exactly the right consistency and sheen.
-===
+=======
 Each afternoon began with the ritual of ink-making. Elara measured lampblack on the brass scale, ground it smooth in the marble mortar, then folded it into warmed gum arabic until the mixture turned glossy. Iron gall went into a separate pot for borders; vermilion — expensive and slow to prepare — was reserved for capitals and the compass roses that crowned each sheet. She no longer needed Theron's locked notebook. The formulas lived in her hands.
-REPLACE>>>`;
+>>>>>>> REPLACE`;
 
 const LONG_R2_PROSE = "Here's a reworked version of the ink-preparation paragraph with more sensory detail:\n\n";
 
@@ -182,9 +182,9 @@ const LONG_R2_ANNOTATED =
   LONG_R2_BLOCK_P7 + "\n[ACCEPTED — applied to document]" +
   "\n\n[Edit outcome: 1 accepted, 0 rejected out of 1 proposed changes]";
 
-// =========================================================================
+// =============================================================================
 // Exported constants for evaluators
-// =========================================================================
+// =============================================================================
 
 /** Short doc: the rejected hunk's original text — still in the document. */
 export const REJECTED_REGION_TEXT =
@@ -225,9 +225,9 @@ export const LONG_ATLAS_KEYWORDS = [
   "treaty of ashford",
 ];
 
-// =========================================================================
+// =============================================================================
 // Test cases
-// =========================================================================
+// =============================================================================
 
 export function getTestCases(): BenchmarkTestCase[] {
   return [

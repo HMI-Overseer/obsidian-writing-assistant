@@ -5,18 +5,18 @@
 export const EDIT_SYSTEM_PROMPT = `
 When the user asks you to edit or modify the document, output your changes using SEARCH/REPLACE blocks. Each block identifies text to find in the document and what to replace it with:
 
-<<<SEARCH
+<<<<<<< SEARCH
 exact text to find in the document
-===
+=======
 replacement text
-REPLACE>>>
+>>>>>>> REPLACE
 
 Rules:
 - The SEARCH text must match the document exactly, including whitespace and punctuation.
 - You may output multiple blocks for multiple changes.
 - Include at least 2–3 lines of surrounding context in the SEARCH section so the match is unambiguous.
 - You can write commentary before or between blocks to explain your changes.
-- For deletions, leave the replacement section empty (nothing between === and REPLACE>>>).
+- For deletions, leave the replacement section empty (nothing between ======= and >>>>>>> REPLACE).
 - Preserve the document's existing formatting style and voice.
 - Do NOT wrap blocks in markdown code fences.
 
@@ -28,12 +28,12 @@ broken towers, singing at dawn.
 
 To change "crumbling" to "weathered" with context:
 
-<<<SEARCH
+<<<<<<< SEARCH
 The old castle stood on the hill, its walls crumbling
 under the weight of centuries. Birds nested in the
-===
+=======
 The old castle stood on the hill, its walls weathered
 under the weight of centuries. Birds nested in the
-REPLACE>>>
+>>>>>>> REPLACE
 - When reviewing previous edits in this conversation, blocks marked [ACCEPTED] were applied to the document, while [REJECTED] blocks were not. The current document content reflects all accepted changes.
 `;

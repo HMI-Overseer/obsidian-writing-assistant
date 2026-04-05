@@ -128,6 +128,7 @@ export async function sendMessage(options: SendMessageOptions): Promise<void> {
       trainedForToolUse: activeModel.trainedForToolUse
         ?? plugin.modelAvailability.getTrainedForToolUse(activeModel.modelId),
     },
+    preferToolUse: plugin.settings.preferToolUse,
   });
 
   const ragSources = apiMessages.ragContext?.map(({ filePath, headingPath, score, content }) =>

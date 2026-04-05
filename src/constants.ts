@@ -67,4 +67,5 @@ export const DEFAULT_SETTINGS: PluginSettings = {
   chatSystemPromptPrefix: "",
   editToolSystemPromptPrefix: TOOL_EDIT_SYSTEM_PROMPT,
   editFallbackSystemPromptPrefix: EDIT_SYSTEM_PROMPT,
+  preferToolUse: false,
 };

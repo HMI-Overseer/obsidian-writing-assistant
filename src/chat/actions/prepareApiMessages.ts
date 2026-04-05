@@ -21,6 +21,8 @@ export interface PrepareMessagesOptions {
   activeProvider?: ProviderOption;
   /** Per-model capabilities (LM Studio). */
   modelCapabilities?: { trainedForToolUse?: boolean };
+  /** Global preference for tool calling in edit mode. */
+  preferToolUse?: boolean;
 }
 
 export async function prepareApiMessages(
@@ -37,11 +39,12 @@ export async function prepareApiMessages(
     ragService,
     activeProvider,
     modelCapabilities,
+    preferToolUse,
   } = options;
 
   const editMode = mode === "edit";
   const useToolUse = editMode && !!activeProvider
-    && shouldUseToolCall(activeProvider, modelCapabilities);
+    && shouldUseToolCall(activeProvider, modelCapabilities, preferToolUse);
   const systemPrompt = composeSystemPrompt(mode, useToolUse, settings);
 
   let documentContext: DocumentContext | null = null;

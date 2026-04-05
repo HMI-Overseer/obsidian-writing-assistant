@@ -284,6 +284,10 @@ export default class LMStudioWritingAssistant extends Plugin {
         typeof data?.editFallbackSystemPromptPrefix === "string"
           ? data.editFallbackSystemPromptPrefix
           : DEFAULT_SETTINGS.editFallbackSystemPromptPrefix,
+      preferToolUse:
+        typeof data?.preferToolUse === "boolean"
+          ? data.preferToolUse
+          : DEFAULT_SETTINGS.preferToolUse,
     };
   }
 

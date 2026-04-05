@@ -4,13 +4,15 @@ import { SettingItem } from "../ui";
 import type LMStudioWritingAssistant from "../../main";
 import type { LMStudioModelsService } from "../../api";
 import type { AnthropicModelsService } from "../../api/AnthropicModelsService";
-import type { ModelCandidateResult } from "../../api/types";
+import type { ModelCandidateResult, ModelDigest } from "../../api/types";
 import type { ProviderOption } from "../../shared/types";
 
 type BaseModel = { id: string; name: string; modelId: string; provider: ProviderOption };
 
 export abstract class ModelProfileModal<T extends BaseModel> extends Modal {
   protected model: T;
+  /** Candidates from model discovery, keyed by targetModelId. Populated async. */
+  protected candidatesByModelId = new Map<string, ModelDigest>();
 
   constructor(
     app: App,
@@ -78,7 +80,11 @@ export abstract class ModelProfileModal<T extends BaseModel> extends Modal {
         text
           .setPlaceholder(modelIdPlaceholder)
           .setValue(this.model.modelId)
-          .onChange((value) => (this.model.modelId = value));
+          .onChange((value) => {
+            this.model.modelId = value;
+            const candidate = this.candidatesByModelId.get(value);
+            if (candidate) this.onCandidateMatched(candidate);
+          });
       });
 
     this.populateDatalist(datalist);
@@ -108,6 +114,7 @@ export abstract class ModelProfileModal<T extends BaseModel> extends Modal {
   private populateDatalist(datalist: HTMLDataListElement): void {
     const fillOptions = (result: ModelCandidateResult) => {
       for (const model of result.candidates) {
+        this.candidatesByModelId.set(model.targetModelId, model);
         const option = document.createElement("option");
         option.value = model.targetModelId;
         option.label = `${model.displayName || model.targetModelId} (${model.targetModelId})`;
@@ -130,6 +137,11 @@ export abstract class ModelProfileModal<T extends BaseModel> extends Modal {
         /* Provider may be offline or key invalid — fail silently for autocomplete. */
       }
     })();
+  }
+
+  /** Called when the user's model ID input matches a discovered candidate. Override to auto-fill fields. */
+  protected onCandidateMatched(_candidate: ModelDigest): void {
+    // No-op by default. Subclasses can override.
   }
 
   onClose(): void {

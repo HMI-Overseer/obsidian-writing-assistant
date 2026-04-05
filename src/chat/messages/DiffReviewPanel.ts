@@ -208,9 +208,11 @@ export class DiffReviewPanel {
         return;
       }
 
-      // Reverse the hunk: search for replaceText, put back searchText
+      // Reverse the hunk: search for replaceText, restore the original matchedText.
+      // Use matchedText (what was actually in the document) rather than searchText
+      // (what the model provided) — these can differ on whitespace-normalized matches.
       const replaceText = hunk.resolvedEdit.editBlock.replaceText;
-      const searchText = hunk.resolvedEdit.editBlock.searchText;
+      const originalText = hunk.resolvedEdit.matchedText;
 
       let undoFailed = false;
       let restored = "";
@@ -232,7 +234,7 @@ export class DiffReviewPanel {
           return currentContent;
         }
 
-        restored = currentContent.slice(0, idx) + searchText + currentContent.slice(idx + replaceText.length);
+        restored = currentContent.slice(0, idx) + originalText + currentContent.slice(idx + replaceText.length);
         return restored;
       });
 

@@ -268,6 +268,22 @@ export default class LMStudioWritingAssistant extends Plugin {
           : DEFAULT_SETTINGS.diffMinMatchConfidence,
       rag: normalizeRagSettings(data?.rag),
       knowledgeGraph: normalizeKnowledgeGraphSettings(data?.knowledgeGraph),
+      planSystemPromptPrefix:
+        typeof data?.planSystemPromptPrefix === "string"
+          ? data.planSystemPromptPrefix
+          : DEFAULT_SETTINGS.planSystemPromptPrefix,
+      chatSystemPromptPrefix:
+        typeof data?.chatSystemPromptPrefix === "string"
+          ? data.chatSystemPromptPrefix
+          : DEFAULT_SETTINGS.chatSystemPromptPrefix,
+      editToolSystemPromptPrefix:
+        typeof data?.editToolSystemPromptPrefix === "string"
+          ? data.editToolSystemPromptPrefix
+          : DEFAULT_SETTINGS.editToolSystemPromptPrefix,
+      editFallbackSystemPromptPrefix:
+        typeof data?.editFallbackSystemPromptPrefix === "string"
+          ? data.editFallbackSystemPromptPrefix
+          : DEFAULT_SETTINGS.editFallbackSystemPromptPrefix,
     };
   }
 

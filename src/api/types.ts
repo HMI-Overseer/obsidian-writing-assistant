@@ -17,6 +17,8 @@ export interface ModelDigest {
   maxContextLength?: number;
   /** Free-form summary line shown below the model ID. */
   summary?: string;
+  /** Whether the model was trained for tool/function calling. */
+  trainedForToolUse?: boolean;
 }
 
 export interface ModelCandidateResult {

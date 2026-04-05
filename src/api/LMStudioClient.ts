@@ -2,7 +2,9 @@ import type { Message, SamplingParams } from "../shared/types";
 import type { ChatRequest } from "../shared/chatRequest";
 import type { ChatClient } from "./chatClient";
 import type { CompletionResult, StreamResult, UsageResult } from "./usageTypes";
+import type { ToolCall } from "../tools/types";
 import type { LMStudioModel, LMStudioModelListResult } from "./types";
+import { formatOpenAITools } from "../tools/formatters/openai";
 import { resolveLMStudioBaseUrls } from "./urlResolution";
 import { normalizeModelList } from "./modelNormalization";
 import { requestJson, createModelListError } from "./httpTransport";
@@ -81,7 +83,10 @@ export class LMStudioClient implements ChatClient {
     signal?: AbortSignal
   ): Promise<CompletionResult> {
     const messages = this.buildMessages(request);
-    const payload = buildCompletionPayload(model, messages, params, false);
+    const openAITools = request.tools?.length
+      ? formatOpenAITools(request.tools)
+      : undefined;
+    const payload = buildCompletionPayload(model, messages, params, false, openAITools);
 
     const json = await requestJson(
       "POST",
@@ -95,7 +100,31 @@ export class LMStudioClient implements ChatClient {
       throw new Error("LM Studio returned an invalid chat completion response.");
     }
 
-    const text = (json.choices as Array<{ message?: { content?: string } }>)[0]?.message?.content ?? "";
+    const choice = (json.choices as Array<Record<string, unknown>>)?.[0];
+    const message = choice?.message as Record<string, unknown> | undefined;
+    const text = (typeof message?.content === "string" ? message.content : "") ?? "";
+
+    // Extract tool calls from the response message.
+    let toolCalls: ToolCall[] | null = null;
+    const rawToolCalls = message?.tool_calls as Array<Record<string, unknown>> | undefined;
+    if (rawToolCalls && rawToolCalls.length > 0) {
+      toolCalls = [];
+      for (const tc of rawToolCalls) {
+        const fn = tc.function as Record<string, unknown> | undefined;
+        if (fn) {
+          try {
+            toolCalls.push({
+              id: (tc.id as string) ?? "",
+              name: (fn.name as string) ?? "",
+              arguments: JSON.parse(fn.arguments as string),
+            });
+          } catch {
+            // Malformed tool call JSON — skip.
+          }
+        }
+      }
+      if (toolCalls.length === 0) toolCalls = null;
+    }
 
     // Extract usage from OpenAI-compatible response.
     let usage: UsageResult | null = null;
@@ -108,7 +137,7 @@ export class LMStudioClient implements ChatClient {
       }
     }
 
-    return { text, usage };
+    return { text, usage, toolCalls };
   }
 
   stream(
@@ -118,15 +147,70 @@ export class LMStudioClient implements ChatClient {
     signal?: AbortSignal
   ): StreamResult {
     const messages = this.buildMessages(request);
+    const openAITools = request.tools?.length
+      ? formatOpenAITools(request.tools)
+      : undefined;
     const url = `${this.openAIBaseUrl}/chat/completions`;
-    const body = buildCompletionPayload(model, messages, params, true);
+    const body = buildCompletionPayload(model, messages, params, true, openAITools);
 
-    const deltas = this.bypassCors
-      ? streamNode(url, body, signal)
-      : streamFetch(url, body, signal);
+    // Tool call accumulation state.
+    const pendingToolCalls = new Map<number, { id: string; name: string; argChunks: string[] }>();
+    const completedToolCalls: ToolCall[] = [];
+    let resolveToolCalls: (value: ToolCall[] | null) => void;
+    const toolCallsPromise = new Promise<ToolCall[] | null>((r) => { resolveToolCalls = r; });
 
-    // OpenAI-compatible streaming doesn't include usage in SSE deltas.
-    return { deltas, usage: Promise.resolve(null) };
+    const onEvent = openAITools ? (json: unknown): void => {
+      const record = json as Record<string, unknown>;
+      const choices = record.choices as Array<Record<string, unknown>> | undefined;
+      const delta = choices?.[0]?.delta as Record<string, unknown> | undefined;
+      const toolCallDeltas = delta?.tool_calls as Array<Record<string, unknown>> | undefined;
+
+      if (toolCallDeltas) {
+        for (const tc of toolCallDeltas) {
+          const idx = tc.index as number;
+          if (tc.id) {
+            const fn = tc.function as Record<string, unknown> | undefined;
+            pendingToolCalls.set(idx, {
+              id: tc.id as string,
+              name: (fn?.name as string) ?? "",
+              argChunks: [],
+            });
+          }
+          const fn = tc.function as Record<string, unknown> | undefined;
+          if (fn?.arguments && typeof fn.arguments === "string") {
+            pendingToolCalls.get(idx)?.argChunks.push(fn.arguments);
+          }
+        }
+      }
+    } : undefined;
+
+    const rawDeltas = this.bypassCors
+      ? streamNode(url, body, signal, undefined, undefined, onEvent)
+      : streamFetch(url, body, signal, undefined, undefined, onEvent);
+
+    // Wrap so we can resolve tool calls when the stream ends.
+    async function* wrappedDeltas(): AsyncGenerator<string> {
+      try {
+        yield* rawDeltas;
+      } finally {
+        // Finalize any pending tool calls.
+        for (const [, pending] of pendingToolCalls) {
+          try {
+            completedToolCalls.push({
+              id: pending.id,
+              name: pending.name,
+              arguments: JSON.parse(pending.argChunks.join("")),
+            });
+          } catch {
+            // Malformed tool call JSON — skip.
+          }
+        }
+        pendingToolCalls.clear();
+        resolveToolCalls(completedToolCalls.length > 0 ? completedToolCalls : null);
+      }
+    }
+
+    return { deltas: wrappedDeltas(), usage: Promise.resolve(null), toolCalls: toolCallsPromise };
   }
 
   private buildMessages(request: ChatRequest): Message[] {

@@ -1,7 +1,8 @@
 import { type App, type Component, Notice } from "obsidian";
 import { parseEditBlocks } from "../../editing/parseEditBlocks";
+import { toolCallsToEditBlocks } from "../../tools/editing/definition";
 import { resolveEdits, buildHunks } from "../../editing/diffEngine";
-import type { EditProposal, AppliedEditRecord } from "../../editing/editTypes";
+import type { EditBlock, EditProposal, AppliedEditRecord } from "../../editing/editTypes";
 import { generateId } from "../../utils";
 import { makeMessage } from "../conversation/conversationUtils";
 import type { ChatSessionStore } from "../conversation/ChatSessionStore";
@@ -11,6 +12,7 @@ import type { BubbleRefs } from "../types";
 import type { EditStreamingRenderer } from "./EditStreamingRenderer";
 import type LMStudioWritingAssistant from "../../main";
 import type { ProviderOption } from "../../shared/types";
+import type { ToolCall } from "../../tools/types";
 import type { UsageResult } from "../../api/usageTypes";
 import { attachUsageToMessage } from "./finalizeResponse";
 
@@ -25,6 +27,8 @@ export interface FinalizeEditOptions {
   modelId?: string;
   provider?: ProviderOption;
   usage?: UsageResult | null;
+  /** Tool calls from the stream result. When present, uses tool-call extraction instead of regex parsing. */
+  toolCalls?: ToolCall[] | null;
 }
 
 /**
@@ -35,22 +39,32 @@ export interface FinalizeEditOptions {
  * are found. Falls back to normal message rendering if no blocks are present.
  */
 export async function finalizeEditResponse(options: FinalizeEditOptions): Promise<void> {
-  const { app, owner, store, transcript, bubble, renderer, plugin, modelId, provider, usage } = options;
+  const { app, owner, store, transcript, bubble, renderer, plugin, modelId, provider, usage, toolCalls } = options;
 
   const fullResponse = renderer.getFullResponse();
-  if (!fullResponse) {
+  if (!fullResponse && (!toolCalls || toolCalls.length === 0)) {
     transcript.renderPlainTextContent(bubble, "(no response)");
     return;
   }
 
   const file = app.workspace.getActiveFile();
   if (!file) {
-    // No active file — fall back to normal rendering
-    await renderAsNormalMessage(store, transcript, bubble, fullResponse, modelId, provider, usage);
+    await renderAsNormalMessage(store, transcript, bubble, fullResponse || "", modelId, provider, usage);
     return;
   }
 
-  const { blocks, prose } = parseEditBlocks(fullResponse);
+  // Dual path: tool calls vs regex parsing.
+  let blocks: EditBlock[];
+  let prose: string;
+
+  if (toolCalls && toolCalls.length > 0) {
+    blocks = toolCallsToEditBlocks(toolCalls);
+    prose = fullResponse;  // Text content IS the prose (no blocks embedded).
+  } else {
+    const parsed = parseEditBlocks(fullResponse);
+    blocks = parsed.blocks;
+    prose = parsed.prose;
+  }
 
   if (blocks.length === 0) {
     if (fullResponse.includes("<<<SEARCH")) {
@@ -60,7 +74,7 @@ export async function finalizeEditResponse(options: FinalizeEditOptions): Promis
     return;
   }
 
-  // Read the full document for resolution
+  // Read the full document for resolution.
   const documentText = await app.vault.read(file);
 
   const resolvedEdits = resolveEdits(blocks, documentText, {
@@ -78,14 +92,17 @@ export async function finalizeEditResponse(options: FinalizeEditOptions): Promis
     prose,
   };
 
-  // Save message with the proposal attached
+  // Save message with the proposal attached.
   const assistantMessage = makeMessage("assistant", fullResponse);
   assistantMessage.editProposal = proposal;
+  if (toolCalls && toolCalls.length > 0) {
+    assistantMessage.toolCalls = toolCalls;
+  }
   attachUsageToMessage(assistantMessage, modelId, provider, usage);
   store.appendMessage(assistantMessage);
   store.setLastAssistantResponse(fullResponse);
 
-  // Render the DiffReviewPanel in the bubble
+  // Render the DiffReviewPanel in the bubble.
   renderDiffPanel(app, owner, store, bubble, proposal);
 }
 

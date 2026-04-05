@@ -2,6 +2,8 @@ import type { SamplingParams } from "../shared/types";
 import type { ChatRequest } from "../shared/chatRequest";
 import type { ChatClient } from "./chatClient";
 import type { UsageResult, StreamResult, CompletionResult } from "./usageTypes";
+import type { ToolCall } from "../tools/types";
+import { formatAnthropicTools } from "../tools/formatters/anthropic";
 import { nodeRequestWithHeaders } from "./httpTransport";
 import { streamNode } from "./streamingTransport";
 import type { DeltaExtractor } from "./streamingTransport";
@@ -60,7 +62,10 @@ export class AnthropicClient implements ChatClient {
   ): Promise<CompletionResult> {
     const cacheSettings = request.anthropicCacheSettings;
     const { system, messages } = buildAnthropicMessages(request, cacheSettings);
-    const payload = buildAnthropicPayload(model, system, messages, params, false);
+    const anthropicTools = request.tools?.length
+      ? formatAnthropicTools(request.tools)
+      : undefined;
+    const payload = buildAnthropicPayload(model, system, messages, params, false, anthropicTools);
 
     const { body } = await nodeRequestWithHeaders(
       "POST",
@@ -77,11 +82,32 @@ export class AnthropicClient implements ChatClient {
       throw new Error(err?.message as string ?? "Anthropic API error");
     }
 
-    const content = json.content as Array<{ type: string; text?: string }> | undefined;
-    const text = content?.[0]?.text ?? "";
+    const content = json.content as Array<Record<string, unknown>> | undefined;
+    const textParts: string[] = [];
+    const toolCalls: ToolCall[] = [];
+
+    if (content) {
+      for (const block of content) {
+        if (block.type === "text" && typeof block.text === "string") {
+          textParts.push(block.text);
+        } else if (block.type === "tool_use") {
+          toolCalls.push({
+            id: block.id as string,
+            name: block.name as string,
+            arguments: block.input as Record<string, unknown>,
+          });
+        }
+      }
+    }
+
+    const text = textParts.join("");
     const usage = extractUsageFromJson(json);
 
-    return { text, usage };
+    return {
+      text,
+      usage,
+      toolCalls: toolCalls.length > 0 ? toolCalls : null,
+    };
   }
 
   stream(
@@ -92,7 +118,10 @@ export class AnthropicClient implements ChatClient {
   ): StreamResult {
     const cacheSettings = request.anthropicCacheSettings;
     const { system, messages } = buildAnthropicMessages(request, cacheSettings);
-    const payload = buildAnthropicPayload(model, system, messages, params, true);
+    const anthropicTools = request.tools?.length
+      ? formatAnthropicTools(request.tools)
+      : undefined;
+    const payload = buildAnthropicPayload(model, system, messages, params, true, anthropicTools);
     const url = `${ANTHROPIC_BASE_URL}/v1/messages`;
 
     // Accumulate usage from SSE metadata events.
@@ -100,18 +129,21 @@ export class AnthropicClient implements ChatClient {
     let outputTokens = 0;
     let cacheCreationInputTokens: number | undefined;
     let cacheReadInputTokens: number | undefined;
-    let usageResolved = false;
+    let resolved = false;
     let resolveUsage: (value: UsageResult | null) => void;
+    let resolveToolCalls: (value: ToolCall[] | null) => void;
 
-    const usagePromise = new Promise<UsageResult | null>((resolve) => {
-      resolveUsage = resolve;
-    });
+    const usagePromise = new Promise<UsageResult | null>((r) => { resolveUsage = r; });
+    const toolCallsPromise = new Promise<ToolCall[] | null>((r) => { resolveToolCalls = r; });
+
+    // Tool call accumulation state.
+    const pendingToolCalls = new Map<number, { id: string; name: string; jsonChunks: string[] }>();
+    const completedToolCalls: ToolCall[] = [];
 
     const onEvent = (json: unknown): void => {
       const record = json as Record<string, unknown>;
 
       if (record.type === "message_start") {
-        // message_start carries initial usage with input_tokens.
         const message = record.message as Record<string, unknown> | undefined;
         const usage = message?.usage as Record<string, unknown> | undefined;
         if (usage) {
@@ -124,17 +156,44 @@ export class AnthropicClient implements ChatClient {
           }
         }
       } else if (record.type === "message_delta") {
-        // message_delta carries final usage with output_tokens.
         const usage = record.usage as Record<string, unknown> | undefined;
         if (usage && typeof usage.output_tokens === "number") {
           outputTokens = usage.output_tokens;
+        }
+      } else if (record.type === "content_block_start") {
+        const block = record.content_block as Record<string, unknown> | undefined;
+        if (block?.type === "tool_use") {
+          pendingToolCalls.set(record.index as number, {
+            id: block.id as string,
+            name: block.name as string,
+            jsonChunks: [],
+          });
+        }
+      } else if (record.type === "content_block_delta") {
+        const delta = record.delta as Record<string, unknown> | undefined;
+        if (delta?.type === "input_json_delta") {
+          pendingToolCalls.get(record.index as number)?.jsonChunks.push(delta.partial_json as string);
+        }
+      } else if (record.type === "content_block_stop") {
+        const pending = pendingToolCalls.get(record.index as number);
+        if (pending) {
+          try {
+            completedToolCalls.push({
+              id: pending.id,
+              name: pending.name,
+              arguments: JSON.parse(pending.jsonChunks.join("")),
+            });
+          } catch {
+            // Malformed tool call JSON — skip this tool call.
+          }
+          pendingToolCalls.delete(record.index as number);
         }
       }
     };
 
     const resolveAndFinish = (): void => {
-      if (usageResolved) return;
-      usageResolved = true;
+      if (resolved) return;
+      resolved = true;
 
       if (inputTokens > 0 || outputTokens > 0) {
         const result: UsageResult = { inputTokens, outputTokens };
@@ -144,9 +203,11 @@ export class AnthropicClient implements ChatClient {
       } else {
         resolveUsage(null);
       }
+
+      resolveToolCalls(completedToolCalls.length > 0 ? completedToolCalls : null);
     };
 
-    // Wrap the raw generator so we can resolve usage when it ends.
+    // Wrap the raw generator so we can resolve usage + tool calls when it ends.
     const rawGenerator = streamNode(
       url, payload, signal, buildAnthropicHeaders(this.apiKey, ANTHROPIC_VERSION, cacheSettings), anthropicDeltaExtractor, onEvent
     );
@@ -159,7 +220,7 @@ export class AnthropicClient implements ChatClient {
       }
     }
 
-    return { deltas: wrappedDeltas(), usage: usagePromise };
+    return { deltas: wrappedDeltas(), usage: usagePromise, toolCalls: toolCallsPromise };
   }
 
 }

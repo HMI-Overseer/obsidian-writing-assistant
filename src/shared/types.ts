@@ -1,4 +1,5 @@
 import type { EditProposal, AppliedEditRecord } from "../editing/editTypes";
+import type { ToolCall } from "../tools/types";
 
 export interface Message {
   role: "system" | "user" | "assistant";
@@ -25,6 +26,8 @@ export interface CompletionModel {
   contextWindowSize?: number;
   /** Anthropic prompt caching configuration. Only relevant when provider is "anthropic". */
   anthropicCacheSettings?: AnthropicCacheSettings;
+  /** Whether the model was trained for tool/function calling. Only relevant for LM Studio models. */
+  trainedForToolUse?: boolean;
 }
 
 export interface EmbeddingModel {
@@ -94,6 +97,8 @@ export interface ConversationMessage {
   isError?: boolean;
   /** RAG sources used for the active version of this response. */
   ragSources?: RagSourceRef[];
+  /** Raw tool calls from the model response (edit mode with tool use). */
+  toolCalls?: ToolCall[];
 }
 
 /**
@@ -222,4 +227,12 @@ export interface PluginSettings {
   rag: RagSettings;
   /** Knowledge graph settings. */
   knowledgeGraph: KnowledgeGraphSettings;
+  /** System prompt prefix for Plan mode. Prepended before user's custom prompt. */
+  planSystemPromptPrefix: string;
+  /** System prompt prefix for Chat mode. Prepended before user's custom prompt. */
+  chatSystemPromptPrefix: string;
+  /** System prompt prefix for Edit mode (tool use variant). Prepended before user's custom prompt. */
+  editToolSystemPromptPrefix: string;
+  /** System prompt prefix for Edit mode (fallback SEARCH/REPLACE variant). Prepended before user's custom prompt. */
+  editFallbackSystemPromptPrefix: string;
 }

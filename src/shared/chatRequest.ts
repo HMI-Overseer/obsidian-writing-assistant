@@ -1,4 +1,5 @@
 import type { AnthropicCacheSettings } from "./types";
+import type { CanonicalToolDefinition } from "../tools/types";
 
 /** Document context attached to the request. */
 export interface DocumentContext {
@@ -49,4 +50,6 @@ export interface ChatRequest {
   messages: ChatTurn[];
   /** Anthropic prompt caching settings. Attached when the active model has caching enabled. */
   anthropicCacheSettings?: AnthropicCacheSettings;
+  /** Tool definitions to include in the request. null/undefined = no tools. */
+  tools?: CanonicalToolDefinition[] | null;
 }

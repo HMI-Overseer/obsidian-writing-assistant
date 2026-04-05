@@ -1,7 +1,8 @@
 import { setIcon } from "obsidian";
 import type { App } from "obsidian";
-import type { CustomCommand } from "../../shared/types";
+import type { CompletionModel, CustomCommand } from "../../shared/types";
 import type LMStudioWritingAssistant from "../../main";
+import { shouldUseToolCall } from "../../tools/registry";
 import { getActiveFileName } from "../../context/noteContext";
 import type { ChatLayoutRefs, ChatMode } from "../types";
 
@@ -37,7 +38,7 @@ export class ChatComposer {
     private readonly plugin: LMStudioWritingAssistant,
     private readonly refs: Pick<
       ChatLayoutRefs,
-      "commandBarEl" | "contextChipsEl" | "textareaEl" | "modeToggleEl" | "actionBtn"
+      "commandBarEl" | "contextChipsEl" | "textareaEl" | "modeToggleEl" | "toolUseIndicatorEl" | "actionBtn"
     >,
     private readonly callbacks: ChatComposerCallbacks
   ) {
@@ -143,6 +144,30 @@ export class ChatComposer {
       this.updateContextChips();
       this.callbacks.onContextToggle();
     });
+  }
+
+  /**
+   * Updates the tool-use indicator state based on the active model.
+   * Orange when the model supports tool use, gray when it doesn't.
+   */
+  refreshToolUseIndicator(activeModel: CompletionModel | null): void {
+    const el = this.refs.toolUseIndicatorEl;
+    el.removeClass("lmsa-hidden");
+
+    if (!activeModel) {
+      el.removeClass("is-active");
+      el.setAttribute("aria-label", "No model selected");
+      return;
+    }
+
+    const trainedForToolUse = activeModel.trainedForToolUse
+      ?? this.plugin.modelAvailability.getTrainedForToolUse(activeModel.modelId);
+    const supportsTools = shouldUseToolCall(activeModel.provider, { trainedForToolUse });
+
+    el.toggleClass("is-active", supportsTools);
+    el.setAttribute("aria-label", supportsTools
+      ? "Tool use supported — edit mode uses structured tool calls"
+      : "Tool use not available — edit mode uses text fallback");
   }
 
   renderCommandBar(): void {

@@ -1,7 +1,7 @@
 import { SettingItem } from "../ui";
 import type { LMStudioModelsService } from "../../api";
 import type { AnthropicModelsService } from "../../api/AnthropicModelsService";
-import type { ModelCandidateResult } from "../../api/types";
+import type { ModelCandidateResult, ModelDigest } from "../../api/types";
 import type { CompletionModel, CacheTtl } from "../../shared/types";
 import { generateId } from "../../utils";
 import { getProviderDescriptor } from "../../providers/registry";
@@ -16,7 +16,18 @@ export class CompletionModelModal extends ModelProfileModal<CompletionModel> {
       provider: prefill?.provider ?? "lmstudio",
       ...(prefill?.contextWindowSize && { contextWindowSize: prefill.contextWindowSize }),
       ...(prefill?.anthropicCacheSettings && { anthropicCacheSettings: prefill.anthropicCacheSettings }),
+      ...(prefill?.trainedForToolUse !== undefined && { trainedForToolUse: prefill.trainedForToolUse }),
     };
+  }
+
+  protected onCandidateMatched(candidate: ModelDigest): void {
+    if (candidate.trainedForToolUse !== undefined) {
+      this.model.trainedForToolUse = candidate.trainedForToolUse;
+    }
+    const contextLength = candidate.activeContextLength ?? candidate.maxContextLength;
+    if (contextLength) {
+      this.model.contextWindowSize = contextLength;
+    }
   }
 
   protected getDatalistId(): string {

@@ -206,4 +206,30 @@ describe("buildAnthropicPayload", () => {
     const result = buildAnthropicPayload("claude-3", "sys", [], makeParams(), true);
     expect(() => JSON.parse(result)).not.toThrow();
   });
+
+  test("includes tools when provided", () => {
+    const tools = [{
+      name: "apply_edit",
+      description: "Edit.",
+      input_schema: { type: "object" as const, properties: {}, required: [] },
+    }];
+    const json = JSON.parse(
+      buildAnthropicPayload("claude-3", "sys", [], makeParams(), false, tools)
+    );
+    expect(json.tools).toEqual(tools);
+  });
+
+  test("omits tools when undefined", () => {
+    const json = JSON.parse(
+      buildAnthropicPayload("claude-3", "sys", [], makeParams(), false)
+    );
+    expect(json).not.toHaveProperty("tools");
+  });
+
+  test("omits tools when empty array", () => {
+    const json = JSON.parse(
+      buildAnthropicPayload("claude-3", "sys", [], makeParams(), false, [])
+    );
+    expect(json).not.toHaveProperty("tools");
+  });
 });

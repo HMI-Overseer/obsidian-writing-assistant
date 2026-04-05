@@ -5,7 +5,7 @@ import { getProviderDescriptor, createChatClient } from "../providers/registry";
 import { createSettingsSection, createModelSelector } from "./ui";
 import { getTestSuites } from "./benchmark/testSuites";
 import { runBenchmarkTest, runAllBenchmarks } from "./benchmark/benchmarkRunner";
-import type { BenchmarkRunResult, BenchmarkTestCase, BenchmarkTestSuite } from "./benchmark/types";
+import type { BenchmarkRunResult, BenchmarkTestCase, BenchmarkTestSuite, EvaluationCriteria, BenchmarkMessage } from "./benchmark/types";
 import { ProfileSettingsPopover } from "../chat/models/ProfileSettingsPopover";
 import { buildSamplingParams } from "../chat/actions/buildSamplingParams";
 
@@ -181,6 +181,7 @@ export function renderBenchmarkTab(
     statusEl: HTMLElement;
     progressEl: HTMLElement;
     detailsEl: HTMLElement;
+    resultsContainerEl: HTMLElement;
     runBtn: HTMLElement;
     toggleBtn: HTMLElement;
   }
@@ -280,10 +281,17 @@ export function renderBenchmarkTab(
       toggleBtn.createSpan({ text: "Details" });
 
       const detailsEl = card.createDiv({ cls: "lmsa-benchmark-card-details lmsa-hidden" });
-      toggleBtn.addClass("is-disabled");
+
+      // Static details — always visible when expanded
+      if (tc.criteria) {
+        renderCriteria(detailsEl, tc.criteria);
+      }
+      renderConversationPreview(detailsEl, tc.messages);
+
+      // Results container — populated after run
+      const resultsContainerEl = detailsEl.createDiv({ cls: "lmsa-benchmark-results-container" });
 
       toggleBtn.addEventListener("click", () => {
-        if (toggleBtn.hasClass("is-disabled")) return;
         const visible = !detailsEl.hasClass("lmsa-hidden");
         detailsEl.toggleClass("lmsa-hidden", visible);
         toggleIcon.empty();
@@ -295,7 +303,7 @@ export function renderBenchmarkTab(
         runSingleTest(tc);
       });
 
-      cardEls.set(tc.id, { statusEl, progressEl, detailsEl, runBtn, toggleBtn });
+      cardEls.set(tc.id, { statusEl, progressEl, detailsEl, resultsContainerEl, runBtn, toggleBtn });
     }
 
     // Suite summary (hidden for empty suites)
@@ -392,11 +400,10 @@ export function renderBenchmarkTab(
     if (!refs) return;
     results.set(testId, result);
 
-    const { statusEl, progressEl, detailsEl, toggleBtn } = refs;
+    const { statusEl, progressEl, resultsContainerEl } = refs;
     progressEl.addClass("lmsa-hidden");
     statusEl.empty();
     statusEl.removeClass("is-passed", "is-failed", "is-running", "is-mixed");
-    toggleBtn.removeClass("is-disabled");
 
     const tc = allTestCases.find((t) => t.id === testId);
     const { passCount, totalCount, avgDurationMs } = result;
@@ -414,11 +421,13 @@ export function renderBenchmarkTab(
       statusEl.setText(`${passCount}/${totalCount} passed (avg ${avgStr}s)`);
     }
 
-    // Populate details with per-iteration results
-    detailsEl.empty();
+    // Populate results container with per-iteration results (preserves static criteria/conversation)
+    resultsContainerEl.empty();
+    resultsContainerEl.createDiv({ cls: "lmsa-benchmark-section-header" })
+      .createEl("strong", { text: "Results" });
 
     for (const iter of result.iterations) {
-      const iterEl = detailsEl.createDiv({ cls: "lmsa-benchmark-iteration" });
+      const iterEl = resultsContainerEl.createDiv({ cls: "lmsa-benchmark-iteration" });
 
       const iterHeader = iterEl.createDiv({ cls: "lmsa-benchmark-iteration-header" });
       const iterLabel = iterHeader.createSpan({ cls: "lmsa-benchmark-iteration-label" });
@@ -757,4 +766,78 @@ export function renderBenchmarkTab(
     profilePopover.destroy();
     abortController?.abort();
   };
+}
+
+// ---------------------------------------------------------------------------
+// Static detail renderers
+// ---------------------------------------------------------------------------
+
+function renderCriteria(container: HTMLElement, criteria: EvaluationCriteria): void {
+  const wrapper = container.createDiv({ cls: "lmsa-benchmark-criteria" });
+  wrapper.createDiv({ cls: "lmsa-benchmark-section-header" })
+    .createEl("strong", { text: "Evaluation criteria" });
+
+  const expectedEl = wrapper.createDiv({ cls: "lmsa-benchmark-criteria-row" });
+  expectedEl.createEl("strong", { text: "Expected: " });
+  expectedEl.createSpan({ text: criteria.expectedOutcome });
+
+  if (criteria.targetKeywords?.length) {
+    const targetEl = wrapper.createDiv({ cls: "lmsa-benchmark-criteria-row" });
+    targetEl.createEl("strong", { text: `Must target (${criteria.targetLabel ?? "target"}): ` });
+    targetEl.createSpan({ text: criteria.targetKeywords.join(", ") });
+  }
+
+  if (criteria.forbiddenKeywords?.length) {
+    const forbidEl = wrapper.createDiv({ cls: "lmsa-benchmark-criteria-row" });
+    forbidEl.createEl("strong", { text: `Must avoid (${criteria.forbiddenLabel ?? "forbidden"}): ` });
+    forbidEl.createSpan({ text: criteria.forbiddenKeywords.join(", ") });
+  }
+
+  if (criteria.requiredMentions?.length) {
+    const mentionsEl = wrapper.createDiv({ cls: "lmsa-benchmark-criteria-row" });
+    mentionsEl.createEl("strong", { text: "Response must mention: " });
+    mentionsEl.createSpan({ text: criteria.requiredMentions.join(", ") });
+  }
+
+  if (criteria.notes) {
+    const notesEl = wrapper.createDiv({ cls: "lmsa-benchmark-criteria-row lmsa-benchmark-criteria-notes" });
+    notesEl.createEl("em", { text: criteria.notes });
+  }
+}
+
+function renderConversationPreview(container: HTMLElement, messages: BenchmarkMessage[]): void {
+  const wrapper = container.createDiv({ cls: "lmsa-benchmark-conversation" });
+  wrapper.createDiv({ cls: "lmsa-benchmark-section-header" })
+    .createEl("strong", { text: `Conversation (${messages.length} messages)` });
+
+  for (const msg of messages) {
+    const msgEl = wrapper.createDiv({ cls: "lmsa-benchmark-msg" });
+    msgEl.createSpan({
+      cls: `lmsa-benchmark-msg-role lmsa-benchmark-msg-role--${msg.role}`,
+      text: msg.role,
+    });
+
+    const contentText = msg.content;
+    if (contentText.length > 200) {
+      const preview = msgEl.createSpan({ cls: "lmsa-benchmark-msg-content" });
+      preview.setText(contentText.slice(0, 200) + "...");
+      const fullContent = msgEl.createDiv({ cls: "lmsa-benchmark-msg-full lmsa-hidden" });
+      fullContent.createEl("pre", {
+        cls: "lmsa-benchmark-response-block",
+        text: contentText,
+      });
+      const showBtn = msgEl.createEl("button", {
+        cls: "lmsa-benchmark-btn lmsa-benchmark-btn--inline",
+        text: "Show full",
+      });
+      showBtn.addEventListener("click", () => {
+        const hidden = fullContent.hasClass("lmsa-hidden");
+        fullContent.toggleClass("lmsa-hidden", !hidden);
+        preview.toggleClass("lmsa-hidden", hidden);
+        showBtn.setText(hidden ? "Show less" : "Show full");
+      });
+    } else {
+      msgEl.createSpan({ cls: "lmsa-benchmark-msg-content", text: contentText });
+    }
+  }
 }

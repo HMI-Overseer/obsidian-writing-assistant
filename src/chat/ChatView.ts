@@ -106,6 +106,9 @@ export class ChatView extends ItemView {
         if (this.layout) {
           this.layout.rootEl.dataset.mode = mode;
         }
+        this.composer?.refreshToolUseIndicator(
+          this.sessionStore?.getResolvedConversationModel() ?? null
+        );
       },
       onContextToggle: () => {
         this.cachedDocumentContext = null;
@@ -346,6 +349,9 @@ export class ChatView extends ItemView {
     );
     this.updateHeader();
     this.composer.updateContextChips();
+    this.composer.refreshToolUseIndicator(
+      this.sessionStore.getResolvedConversationModel()
+    );
     this.composer.renderCommandBar();
     this.modelSelector?.syncActiveModel();
 

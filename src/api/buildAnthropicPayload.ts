@@ -1,5 +1,6 @@
 import type { SamplingParams, AnthropicCacheSettings } from "../shared/types";
 import type { ChatRequest } from "../shared/chatRequest";
+import type { AnthropicTool } from "../tools/formatters/anthropic";
 import { formatRagContext } from "../rag/formatContext";
 
 const DEFAULT_MAX_TOKENS = 4096;
@@ -93,7 +94,8 @@ export function buildAnthropicPayload(
   system: AnthropicSystem,
   messages: AnthropicMessage[],
   params: SamplingParams,
-  stream: boolean
+  stream: boolean,
+  tools?: AnthropicTool[],
 ): string {
   const body: Record<string, unknown> = {
     model,
@@ -105,6 +107,10 @@ export function buildAnthropicPayload(
   // system can be a string or an array of content blocks (when caching is enabled).
   if (Array.isArray(system) ? system.length > 0 : system) {
     body.system = system;
+  }
+
+  if (tools && tools.length > 0) {
+    body.tools = tools;
   }
 
   if (params.temperature !== undefined) body.temperature = params.temperature;

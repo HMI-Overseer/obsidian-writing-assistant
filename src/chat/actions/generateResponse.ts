@@ -96,19 +96,25 @@ export async function generateResponse(options: GenerateResponseOptions): Promis
   // After removing errors, verify we still have messages.
   if (store.getSnapshot().messageHistory.length === 0) return;
 
-  const editMode = composer.getMode() === "edit";
+  const mode = composer.getMode();
+  const editMode = mode === "edit";
 
   setIsGenerating(true);
 
   const apiMessages = await prepareApiMessages({
     app: plugin.app,
     store,
-    globalSystemPrompt: plugin.settings.globalSystemPrompt,
+    settings: plugin.settings,
     includeNoteContext: plugin.settings.includeNoteContext,
     sessionContextEnabled: composer.isSessionContextEnabled(),
     maxContextChars: plugin.settings.maxContextChars,
-    editMode,
+    mode,
     ragService: plugin.ragService,
+    activeProvider: activeModel.provider,
+    modelCapabilities: {
+      trainedForToolUse: activeModel.trainedForToolUse
+        ?? plugin.modelAvailability.getTrainedForToolUse(activeModel.modelId),
+    },
   });
 
   const ragSources = apiMessages.ragContext?.map(({ filePath, headingPath, score, content }) =>
@@ -122,8 +128,9 @@ export async function generateResponse(options: GenerateResponseOptions): Promis
   const assistantBubble = transcript.createBubble("assistant");
   assistantBubble.bodyEl.addClass("is-streaming");
 
+  const useToolMode = editMode && !!apiMessages.tools?.length;
   const renderer = editMode
-    ? new EditStreamingRenderer(assistantBubble, transcript)
+    ? new EditStreamingRenderer(assistantBubble, transcript, { useToolMode })
     : new StreamingRenderer(assistantBubble, transcript);
 
   const client = createChatClient(activeModel.provider, plugin.settings.providerSettings);
@@ -143,6 +150,7 @@ export async function generateResponse(options: GenerateResponseOptions): Promis
     }
 
     const usage = await streamResult.usage;
+    const toolCalls = await streamResult.toolCalls;
     if (usage && onCalibrate) {
       const estimated = estimateTokenCount(apiMessages);
       onCalibrate(estimated, usage.inputTokens);
@@ -163,6 +171,7 @@ export async function generateResponse(options: GenerateResponseOptions): Promis
         modelId: activeModel.modelId,
         provider: activeModel.provider,
         usage,
+        toolCalls,
       });
     } else {
       await finalizeResponse(

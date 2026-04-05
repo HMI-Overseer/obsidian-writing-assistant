@@ -10,6 +10,7 @@ const AVAILABILITY_CACHE_TTL_MS = 30_000;
 export interface ModelAvailabilityInfo {
   state: ModelAvailabilityState;
   activeContextLength?: number;
+  trainedForToolUse?: boolean;
 }
 
 export class ModelAvailabilityService {
@@ -52,6 +53,7 @@ export class ModelAvailabilityService {
       this.availabilityMap.set(candidate.targetModelId, {
         state: candidate.isLoaded ? "loaded" : "unloaded",
         activeContextLength: candidate.activeContextLength,
+        trainedForToolUse: candidate.trainedForToolUse,
       });
     }
 
@@ -60,6 +62,10 @@ export class ModelAvailabilityService {
 
   getActiveContextLength(modelId: string): number | undefined {
     return this.availabilityMap.get(modelId)?.activeContextLength;
+  }
+
+  getTrainedForToolUse(modelId: string): boolean | undefined {
+    return this.availabilityMap.get(modelId)?.trainedForToolUse;
   }
 
   getLMStudioService(): LMStudioModelsService {

@@ -246,6 +246,13 @@ export function getTestCases(): BenchmarkTestCase[] {
         { role: "user", content: "I liked the first change but not the second. Can you try rewriting the fountain paragraph again with a different approach?" },
       ],
       evaluate: evaluateRejectedRework,
+      criteria: {
+        expectedOutcome: "Model produces SEARCH/REPLACE blocks targeting the rejected fountain paragraph and does not touch the accepted opening.",
+        targetKeywords: ["children", "fountain", "pebbles", "old woman", "bench"],
+        targetLabel: "Rejected fountain paragraph",
+        forbiddenKeywords: ["dawn broke golden", "cobblestones", "whispered invitation"],
+        forbiddenLabel: "Accepted opening paragraph",
+      },
     },
     {
       id: "no-repropose-accepted",
@@ -260,6 +267,13 @@ export function getTestCases(): BenchmarkTestCase[] {
         { role: "user", content: "Great, those look good. Can you also improve the final paragraph about market day?" },
       ],
       evaluate: evaluateNoRepropose,
+      criteria: {
+        expectedOutcome: "Model produces SEARCH/REPLACE blocks targeting the market-day paragraph without re-proposing already-accepted content.",
+        targetKeywords: ["church bell", "merchants", "market day", "stalls", "eastern wall"],
+        targetLabel: "Untouched market-day paragraph",
+        forbiddenKeywords: [ACCEPTED_REPLACEMENT_TEXT],
+        forbiddenLabel: "Accepted content",
+      },
     },
     {
       id: "state-awareness",
@@ -274,6 +288,11 @@ export function getTestCases(): BenchmarkTestCase[] {
         { role: "user", content: "Before we continue, can you briefly summarize the current state of the document — which of your changes are reflected and which are not?" },
       ],
       evaluate: evaluateStateAwareness,
+      criteria: {
+        expectedOutcome: "Model's prose response distinguishes between accepted (applied) and rejected (not applied) edits.",
+        requiredMentions: ["accepted/applied", "rejected/unchanged"],
+        notes: "Evaluates prose output, not edit blocks. The model should mention both accepted and rejected states.",
+      },
     },
 
     // ----- Long doc scenarios -----
@@ -291,6 +310,13 @@ export function getTestCases(): BenchmarkTestCase[] {
         { role: "user", content: "The first and third changes are great. The midmorning paragraph rewrite didn't feel right — can you try a different take on it?" },
       ],
       evaluate: evaluateLongDocPrecision,
+      criteria: {
+        expectedOutcome: "Model produces SEARCH/REPLACE blocks targeting only the rejected midmorning paragraph (P4) without touching accepted or untouched paragraphs.",
+        targetKeywords: LONG_REJECTED_KEYWORDS,
+        targetLabel: "Rejected midmorning paragraph (P4)",
+        forbiddenKeywords: [...LONG_ACCEPTED_P2_KEYWORDS, ...LONG_ATLAS_KEYWORDS],
+        forbiddenLabel: "Accepted P2 + untouched atlas (P8)",
+      },
     },
     {
       id: "multi-round-continuity",
@@ -308,6 +334,13 @@ export function getTestCases(): BenchmarkTestCase[] {
         { role: "user", content: "Perfect. Now let's revisit that midmorning paragraph — the original version is still there. Can you try improving it?" },
       ],
       evaluate: evaluateMultiRoundContinuity,
+      criteria: {
+        expectedOutcome: "Model produces SEARCH/REPLACE blocks targeting the still-rejected midmorning paragraph (P4) without revisiting any accepted edits from either round.",
+        targetKeywords: LONG_REJECTED_KEYWORDS,
+        targetLabel: "Still-rejected midmorning paragraph (P4)",
+        forbiddenKeywords: [...LONG_ACCEPTED_P2_KEYWORDS, ...LONG_R2_INK_KEYWORDS],
+        forbiddenLabel: "Accepted P2 (round 1) + accepted ink paragraph (round 2)",
+      },
     },
     {
       id: "long-conversation-context",
@@ -327,6 +360,13 @@ export function getTestCases(): BenchmarkTestCase[] {
         { role: "user", content: "Great summary. Now can you improve the final paragraph about the atlas deadline? Make it feel more tense and high-stakes." },
       ],
       evaluate: evaluateConversationContext,
+      criteria: {
+        expectedOutcome: "Model produces SEARCH/REPLACE blocks targeting the atlas/deadline paragraph (P8) without revisiting previously accepted edits.",
+        targetKeywords: LONG_ATLAS_KEYWORDS,
+        targetLabel: "Atlas/deadline paragraph (P8)",
+        forbiddenKeywords: [...LONG_ACCEPTED_P2_KEYWORDS, ...LONG_R2_INK_KEYWORDS],
+        forbiddenLabel: "Accepted P2 (round 1) + accepted ink paragraph (round 2)",
+      },
     },
 
     // ----- Control -----
@@ -343,6 +383,14 @@ export function getTestCases(): BenchmarkTestCase[] {
         { role: "user", content: "I liked the first change but not the second. Can you try rewriting the fountain paragraph again with a different approach?" },
       ],
       evaluate: evaluateControlNoAnnotations,
+      criteria: {
+        expectedOutcome: "Model infers rejected edit from user message alone and targets the fountain paragraph.",
+        targetKeywords: ["children", "fountain", "pebbles", "old woman"],
+        targetLabel: "Rejected fountain paragraph",
+        forbiddenKeywords: ["dawn broke golden", "cobblestones"],
+        forbiddenLabel: "Accepted opening paragraph",
+        notes: "No [ACCEPTED]/[REJECTED] annotations present. Model must infer from user feedback alone. Expected to be less reliable.",
+      },
       isControl: true,
     },
   ];

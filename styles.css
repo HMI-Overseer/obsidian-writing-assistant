@@ -685,6 +685,27 @@
     box-shadow: 0 0 0 3px color-mix(in srgb, var(--lmsa-mode-accent) 20%, transparent);
     z-index: 2;
   }
+.lmsa-tool-use-indicator {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 7px;
+    border: 1px solid var(--background-modifier-border);
+    color: var(--text-faint);
+    opacity: 0.4;
+    transition: color 0.15s ease, opacity 0.15s ease, border-color 0.15s ease;
+}
+.lmsa-tool-use-indicator svg {
+    width: 14px;
+    height: 14px;
+  }
+.lmsa-tool-use-indicator.is-active {
+    color: var(--color-orange, #e8a84b);
+    border-color: color-mix(in srgb, var(--color-orange, #e8a84b) 45%, var(--background-modifier-border));
+    opacity: 1;
+  }
 .lmsa-action-btn {
     display: flex;
     align-items: center;
@@ -2323,6 +2344,9 @@
     box-shadow: 0 0 0 2px var(--lmsa-accent-glow);
     outline: none;
   }
+.lmsa-monospace {
+    font-family: var(--font-monospace);
+  }
 /* ── Range inputs ──────────────────────────────────────────────────────── */
 .lmsa-settings-root input[type="range"] {
     -webkit-appearance: none;
@@ -2956,10 +2980,89 @@
     border-top: 1px solid var(--lmsa-border-default);
     background: var(--lmsa-surface-raised);
 }
-/* ------- Disabled toggle button ------- */
-.lmsa-benchmark-btn--toggle.is-disabled {
-    opacity: 0.35;
-    pointer-events: none;
+/* ------- Inline toggle button (Show full / Show less) ------- */
+.lmsa-benchmark-btn--inline {
+    border-width: 0px;
+    padding: 0px;
+    background: none;
+    color: var(--lmsa-section-accent);
+    font-size: var(--font-ui-smaller);
+    cursor: pointer;
+    text-decoration: underline;
+}
+.lmsa-benchmark-btn--inline:hover {
+    color: var(--lmsa-text-primary);
+  }
+/* ------- Section headers within details ------- */
+.lmsa-benchmark-section-header {
+    font-size: var(--font-ui-smaller);
+    color: var(--lmsa-text-primary);
+    margin-bottom: 6px;
+    padding-bottom: 4px;
+    border-bottom: 1px solid var(--lmsa-border-default);
+  }
+/* ------- Evaluation criteria ------- */
+.lmsa-benchmark-criteria {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+.lmsa-benchmark-criteria-row {
+    font-size: var(--font-ui-smaller);
+    color: var(--lmsa-text-secondary);
+    line-height: 1.5;
+  }
+.lmsa-benchmark-criteria-notes {
+    color: var(--lmsa-text-faint);
+  }
+/* ------- Conversation preview ------- */
+.lmsa-benchmark-conversation {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+.lmsa-benchmark-msg {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    border-radius: 0.5rem;
+    padding: 0.5rem;
+    background: var(--lmsa-surface-inset);
+    font-size: var(--font-ui-smaller);
+}
+.lmsa-benchmark-msg-role {
+    border-radius: 0.375rem;
+    padding-left: 0.375rem;
+    padding-right: 0.375rem;
+    padding-top: 0.125rem;
+    padding-bottom: 0.125rem;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    width: -moz-fit-content;
+    width: fit-content;
+}
+.lmsa-benchmark-msg-role--user {
+    background: color-mix(in srgb, var(--lmsa-section-accent) 15%, var(--lmsa-surface-base));
+    color: var(--lmsa-section-accent);
+  }
+.lmsa-benchmark-msg-role--assistant {
+    background: color-mix(in srgb, var(--lmsa-status-success) 15%, var(--lmsa-surface-base));
+    color: var(--lmsa-status-success);
+  }
+.lmsa-benchmark-msg-content {
+    color: var(--lmsa-text-secondary);
+    line-height: 1.5;
+    word-break: break-word;
+  }
+.lmsa-benchmark-msg-full {
+    margin-top: 4px;
+  }
+/* ------- Results container ------- */
+.lmsa-benchmark-results-container:not(:empty) {
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid var(--lmsa-border-default);
   }
 /* ------- Per-iteration blocks ------- */
 .lmsa-benchmark-iteration {

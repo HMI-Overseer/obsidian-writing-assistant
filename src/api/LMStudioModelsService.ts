@@ -87,6 +87,7 @@ function toDigest(model: LMStudioModel, kind: ModelKind): ModelDigest {
     activeContextLength: getActiveContextLength(model),
     maxContextLength: model.maxContextLength,
     summary: buildSummary(model, kind),
+    trainedForToolUse: model.capabilities?.trainedForToolUse,
   };
 }
 

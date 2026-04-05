@@ -402,6 +402,28 @@
     z-index: 2;
   }
 
+  .lmsa-tool-use-indicator {
+    @apply lmsa-inline-flex lmsa-items-center lmsa-justify-center;
+    width: 28px;
+    height: 28px;
+    border-radius: 7px;
+    border: 1px solid var(--background-modifier-border);
+    color: var(--text-faint);
+    opacity: 0.4;
+    transition: color 0.15s ease, opacity 0.15s ease, border-color 0.15s ease;
+  }
+
+  .lmsa-tool-use-indicator svg {
+    width: 14px;
+    height: 14px;
+  }
+
+  .lmsa-tool-use-indicator.is-active {
+    color: var(--color-orange, #e8a84b);
+    border-color: color-mix(in srgb, var(--color-orange, #e8a84b) 45%, var(--background-modifier-border));
+    opacity: 1;
+  }
+
   .lmsa-action-btn {
     @apply lmsa-flex lmsa-items-center lmsa-justify-center;
     width: 36px;

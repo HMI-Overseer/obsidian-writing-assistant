@@ -264,11 +264,93 @@
     background: var(--lmsa-surface-raised);
   }
 
-  /* ------- Disabled toggle button ------- */
+  /* ------- Inline toggle button (Show full / Show less) ------- */
 
-  .lmsa-benchmark-btn--toggle.is-disabled {
-    opacity: 0.35;
-    pointer-events: none;
+  .lmsa-benchmark-btn--inline {
+    @apply lmsa-border-0 lmsa-p-0;
+    background: none;
+    color: var(--lmsa-section-accent);
+    font-size: var(--font-ui-smaller);
+    cursor: pointer;
+    text-decoration: underline;
+  }
+
+  .lmsa-benchmark-btn--inline:hover {
+    color: var(--lmsa-text-primary);
+  }
+
+  /* ------- Section headers within details ------- */
+
+  .lmsa-benchmark-section-header {
+    font-size: var(--font-ui-smaller);
+    color: var(--lmsa-text-primary);
+    margin-bottom: 6px;
+    padding-bottom: 4px;
+    border-bottom: 1px solid var(--lmsa-border-default);
+  }
+
+  /* ------- Evaluation criteria ------- */
+
+  .lmsa-benchmark-criteria {
+    @apply lmsa-flex lmsa-flex-col lmsa-gap-1;
+  }
+
+  .lmsa-benchmark-criteria-row {
+    font-size: var(--font-ui-smaller);
+    color: var(--lmsa-text-secondary);
+    line-height: 1.5;
+  }
+
+  .lmsa-benchmark-criteria-notes {
+    color: var(--lmsa-text-faint);
+  }
+
+  /* ------- Conversation preview ------- */
+
+  .lmsa-benchmark-conversation {
+    @apply lmsa-flex lmsa-flex-col lmsa-gap-2;
+  }
+
+  .lmsa-benchmark-msg {
+    @apply lmsa-flex lmsa-flex-col lmsa-gap-1 lmsa-rounded-lg lmsa-p-2;
+    background: var(--lmsa-surface-inset);
+    font-size: var(--font-ui-smaller);
+  }
+
+  .lmsa-benchmark-msg-role {
+    @apply lmsa-rounded-md lmsa-px-1.5 lmsa-py-0.5;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    width: fit-content;
+  }
+
+  .lmsa-benchmark-msg-role--user {
+    background: color-mix(in srgb, var(--lmsa-section-accent) 15%, var(--lmsa-surface-base));
+    color: var(--lmsa-section-accent);
+  }
+
+  .lmsa-benchmark-msg-role--assistant {
+    background: color-mix(in srgb, var(--lmsa-status-success) 15%, var(--lmsa-surface-base));
+    color: var(--lmsa-status-success);
+  }
+
+  .lmsa-benchmark-msg-content {
+    color: var(--lmsa-text-secondary);
+    line-height: 1.5;
+    word-break: break-word;
+  }
+
+  .lmsa-benchmark-msg-full {
+    margin-top: 4px;
+  }
+
+  /* ------- Results container ------- */
+
+  .lmsa-benchmark-results-container:not(:empty) {
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid var(--lmsa-border-default);
   }
 
   /* ------- Per-iteration blocks ------- */

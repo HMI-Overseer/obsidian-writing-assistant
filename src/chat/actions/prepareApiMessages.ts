@@ -1,7 +1,9 @@
-import type { ConversationMessage } from "../../shared/types";
+import type { ConversationMessage, PluginSettings, ProviderOption } from "../../shared/types";
 import type { ChatRequest, ChatTurn, DocumentContext, RagContextBlock } from "../../shared/chatRequest";
 import { getActiveNoteText, getFullNoteContent } from "../../context/noteContext";
-import { EDIT_SYSTEM_PROMPT } from "../../editing/editSystemPrompt";
+import { shouldUseToolCall } from "../../tools/registry";
+import { APPLY_EDIT_TOOL } from "../../tools/editing/definition";
+import type { ChatMode } from "../types";
 import type { App } from "obsidian";
 import type { ChatSessionStore } from "../conversation/ChatSessionStore";
 import type { RagService } from "../../rag";
@@ -9,12 +11,16 @@ import type { RagService } from "../../rag";
 export interface PrepareMessagesOptions {
   app: App;
   store: ChatSessionStore;
-  globalSystemPrompt: string;
+  settings: PluginSettings;
   includeNoteContext: boolean;
   sessionContextEnabled: boolean;
   maxContextChars: number;
-  editMode?: boolean;
+  mode: ChatMode;
   ragService?: RagService;
+  /** Active provider — needed to decide tool use in edit mode. */
+  activeProvider?: ProviderOption;
+  /** Per-model capabilities (LM Studio). */
+  modelCapabilities?: { trainedForToolUse?: boolean };
 }
 
 export async function prepareApiMessages(
@@ -23,15 +29,20 @@ export async function prepareApiMessages(
   const {
     app,
     store,
-    globalSystemPrompt,
+    settings,
     includeNoteContext,
     sessionContextEnabled,
     maxContextChars,
-    editMode = false,
+    mode,
     ragService,
+    activeProvider,
+    modelCapabilities,
   } = options;
 
-  const systemPrompt = editMode ? EDIT_SYSTEM_PROMPT : globalSystemPrompt;
+  const editMode = mode === "edit";
+  const useToolUse = editMode && !!activeProvider
+    && shouldUseToolCall(activeProvider, modelCapabilities);
+  const systemPrompt = composeSystemPrompt(mode, useToolUse, settings);
 
   let documentContext: DocumentContext | null = null;
 
@@ -86,17 +97,57 @@ export async function prepareApiMessages(
   }
   const finalSystemPrompt = systemPrompt + groundingNote;
 
-  return { systemPrompt: finalSystemPrompt, documentContext, ragContext, messages };
+  const tools = useToolUse ? [APPLY_EDIT_TOOL] : undefined;
+
+  return { systemPrompt: finalSystemPrompt, documentContext, ragContext, messages, tools };
 }
 
 /**
- * Annotates an assistant message's SEARCH/REPLACE blocks with their
- * accept/reject outcomes so the model knows which edits were applied.
+ * Combines a mode-specific prefix with the user's custom prompt.
+ * `useToolUse` selects between the tool vs fallback edit prefix.
+ */
+export function composeSystemPrompt(
+  mode: ChatMode,
+  useToolUse: boolean,
+  settings: PluginSettings,
+): string {
+  let prefix: string;
+  switch (mode) {
+    case "plan":
+      prefix = settings.planSystemPromptPrefix;
+      break;
+    case "conversation":
+      prefix = settings.chatSystemPromptPrefix;
+      break;
+    case "edit":
+      prefix = useToolUse
+        ? settings.editToolSystemPromptPrefix
+        : settings.editFallbackSystemPromptPrefix;
+      break;
+  }
+
+  const userPrompt = settings.globalSystemPrompt;
+  return [prefix, userPrompt].filter(Boolean).join("\n\n");
+}
+
+/**
+ * Annotates an assistant message's edit blocks with their accept/reject
+ * outcomes so the model knows which edits were applied.
+ *
+ * For regex-parsed messages: rawBlocks are found in the content string and
+ * annotated inline. For tool-call messages: a summary is appended since the
+ * content is pure prose with no embedded blocks.
  */
 function formatEditMessageContent(message: ConversationMessage): string {
   const { editProposal } = message;
   if (!editProposal) return message.content;
 
+  // Tool-call messages: content is pure prose — annotate with a summary.
+  if (message.toolCalls && message.toolCalls.length > 0) {
+    return formatToolCallEditHistory(message.content, editProposal);
+  }
+
+  // Regex-parsed messages: annotate inline SEARCH/REPLACE rawBlocks.
   let content = message.content;
   let acceptedCount = 0;
   let rejectedCount = 0;
@@ -129,4 +180,33 @@ function formatEditMessageContent(message: ConversationMessage): string {
   }
 
   return content;
+}
+
+/**
+ * Builds history text for a tool-call-based edit message.
+ * Appends a per-hunk summary so the model knows what was accepted/rejected.
+ */
+function formatToolCallEditHistory(prose: string, proposal: EditProposal): string {
+  const parts: string[] = [];
+  if (prose) parts.push(prose);
+
+  let acceptedCount = 0;
+  let rejectedCount = 0;
+
+  for (const hunk of proposal.hunks) {
+    const status = hunk.status === "accepted" ? "ACCEPTED" : "REJECTED";
+    const search = hunk.resolvedEdit.editBlock.searchText;
+    const preview = search.length > 80 ? search.slice(0, 80) + "..." : search;
+    parts.push(`[Edit: "${preview}" — ${status}]`);
+
+    if (hunk.status === "accepted") acceptedCount++;
+    else rejectedCount++;
+  }
+
+  const total = acceptedCount + rejectedCount;
+  if (total > 0) {
+    parts.push(`[Edit outcome: ${acceptedCount} accepted, ${rejectedCount} rejected out of ${total} proposed changes]`);
+  }
+
+  return parts.join("\n\n");
 }

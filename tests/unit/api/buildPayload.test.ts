@@ -117,4 +117,29 @@ describe("buildCompletionPayload", () => {
 
     expect(() => JSON.parse(result)).not.toThrow();
   });
+
+  test("includes tools when provided", () => {
+    const tools = [{
+      type: "function" as const,
+      function: { name: "apply_edit", description: "Edit.", parameters: {} },
+    }];
+    const json = JSON.parse(
+      buildCompletionPayload("m", MESSAGES, makeParams(), false, tools)
+    );
+    expect(json.tools).toEqual(tools);
+  });
+
+  test("omits tools when undefined", () => {
+    const json = JSON.parse(
+      buildCompletionPayload("m", MESSAGES, makeParams(), false)
+    );
+    expect(json).not.toHaveProperty("tools");
+  });
+
+  test("omits tools when empty array", () => {
+    const json = JSON.parse(
+      buildCompletionPayload("m", MESSAGES, makeParams(), false, [])
+    );
+    expect(json).not.toHaveProperty("tools");
+  });
 });

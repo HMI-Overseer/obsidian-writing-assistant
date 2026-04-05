@@ -1,3 +1,21 @@
+/** Declarative description of what the evaluator checks. */
+export interface EvaluationCriteria {
+  /** What a passing response looks like, in plain English. */
+  expectedOutcome: string;
+  /** Keywords/phrases the model's SEARCH blocks SHOULD target. */
+  targetKeywords?: string[];
+  /** Label for the target region (e.g., "rejected fountain paragraph"). */
+  targetLabel?: string;
+  /** Keywords/phrases the model's SEARCH blocks must NOT target. */
+  forbiddenKeywords?: string[];
+  /** Label for the forbidden region (e.g., "accepted opening paragraph"). */
+  forbiddenLabel?: string;
+  /** For non-edit-block tests: keywords the prose response should contain. */
+  requiredMentions?: string[];
+  /** Additional notes about evaluation logic. */
+  notes?: string;
+}
+
 export interface BenchmarkTestCase {
   id: string;
   name: string;
@@ -10,6 +28,8 @@ export interface BenchmarkTestCase {
   messages: BenchmarkMessage[];
   /** Evaluates the model's response and returns a pass/fail result. */
   evaluate: (response: string, testCase: BenchmarkTestCase) => BenchmarkResult;
+  /** Declarative evaluation criteria displayed in the UI. */
+  criteria?: EvaluationCriteria;
   /** If true, this test is a control — expected to fail or be unreliable. */
   isControl?: boolean;
 }

@@ -45,9 +45,12 @@ export async function applyHunksLive(
     let result = currentContent;
 
     for (const hunk of sortedHunks) {
-      const searchText = hunk.resolvedEdit.editBlock.searchText;
+      // Use matchedText (the actual text found in the document) rather than
+      // searchText (what the model provided) — these can differ when the match
+      // was whitespace-normalized or fuzzy.
+      const matchedText = hunk.resolvedEdit.matchedText;
       const replaceText = hunk.resolvedEdit.editBlock.replaceText;
-      const idx = result.indexOf(searchText);
+      const idx = result.indexOf(matchedText);
 
       if (idx !== -1) {
         // Guard against applying to the wrong location if the document drifted significantly
@@ -56,7 +59,7 @@ export async function applyHunksLive(
           continue;
         }
 
-        result = result.slice(0, idx) + replaceText + result.slice(idx + searchText.length);
+        result = result.slice(0, idx) + replaceText + result.slice(idx + matchedText.length);
         appliedIds.push(hunk.id);
         appliedOffsets.set(hunk.id, idx);
       }

@@ -1,4 +1,6 @@
 import type { ChatHistory, KnowledgeGraphSettings, PluginSettings, RagSettings } from "./shared/types";
+import { EDIT_SYSTEM_PROMPT } from "./editing/editSystemPrompt";
+import { TOOL_EDIT_SYSTEM_PROMPT } from "./tools/editing/systemPrompt";
 
 export const VIEW_TYPE_CHAT = "lm-studio-chat";
 
@@ -61,4 +63,8 @@ export const DEFAULT_SETTINGS: PluginSettings = {
   diffMinMatchConfidence: 0.7,
   rag: { ...DEFAULT_RAG_SETTINGS },
   knowledgeGraph: { ...DEFAULT_KNOWLEDGE_GRAPH_SETTINGS },
+  planSystemPromptPrefix: "",
+  chatSystemPromptPrefix: "",
+  editToolSystemPromptPrefix: TOOL_EDIT_SYSTEM_PROMPT,
+  editFallbackSystemPromptPrefix: EDIT_SYSTEM_PROMPT,
 };

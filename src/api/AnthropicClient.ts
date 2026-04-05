@@ -94,7 +94,7 @@ export class AnthropicClient implements ChatClient {
           toolCalls.push({
             id: block.id as string,
             name: block.name as string,
-            arguments: block.input as Record<string, unknown>,
+            arguments: (block.input as Record<string, unknown>) ?? {},
           });
         }
       }
@@ -187,13 +187,14 @@ export class AnthropicClient implements ChatClient {
         const pending = pendingToolCalls.get(record.index as number);
         if (pending) {
           try {
+            const raw = pending.jsonChunks.join("");
             completedToolCalls.push({
               id: pending.id,
               name: pending.name,
-              arguments: JSON.parse(pending.jsonChunks.join("")),
+              arguments: raw ? JSON.parse(raw) : {},
             });
-          } catch {
-            // Malformed tool call JSON — skip this tool call.
+          } catch (e) {
+            console.error(`[tool] Failed to parse tool call "${pending.name}" (${pending.id}):`, e);
           }
           pendingToolCalls.delete(record.index as number);
         }

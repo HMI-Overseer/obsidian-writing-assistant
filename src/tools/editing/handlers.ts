@@ -2,6 +2,8 @@ import type { App, HeadingCache, TFile } from "obsidian";
 import type { ToolCall, ToolResult } from "../types";
 import type { EditBlock } from "../../editing/editTypes";
 import { READ_ONLY_TOOL_NAMES } from "./definition";
+import { validateGetLineRange } from "./validation";
+import type { FrontmatterOperation } from "./validation";
 
 // ---------------------------------------------------------------------------
 // Public API
@@ -104,7 +106,8 @@ async function executeGetDocumentOutline(
   if (hasFrontmatter && cache?.frontmatterPosition) {
     const fmStart = cache.frontmatterPosition.start.line + 1;
     const fmEnd = cache.frontmatterPosition.end.line + 1;
-    parts.push(`Frontmatter: yes (lines ${fmStart}-${fmEnd})`);
+    const keys = Object.keys(cache.frontmatter).filter((k) => k !== "position");
+    parts.push(`Frontmatter: yes (lines ${fmStart}-${fmEnd}), keys: ${keys.join(", ")}`);
   } else {
     parts.push("Frontmatter: none");
   }
@@ -131,20 +134,18 @@ async function executeGetLineRange(
   file: TFile,
   args: Record<string, unknown>,
 ): Promise<ToolResult> {
-  const startLine = args.start_line as number;
-  if (!startLine || startLine < 1) {
-    return {
-      content: "Error: start_line must be a positive integer (1-indexed).",
-      isReadOnly: true,
-      isError: true,
-    };
+  const validation = validateGetLineRange(args);
+  if (!validation.ok) {
+    return { content: `Error: ${validation.error}`, isReadOnly: true, isError: true };
   }
+
+  const { start_line: startLine } = validation.args;
 
   const content = await app.vault.read(file);
   const lines = content.split("\n");
 
-  let endLine = args.end_line as number | undefined;
-  if (!endLine || endLine === -1) {
+  let endLine = validation.args.end_line;
+  if (endLine === undefined || endLine === -1) {
     endLine = lines.length;
   }
 
@@ -267,7 +268,7 @@ async function resolveUpdateFrontmatter(
   block: EditBlock,
 ): Promise<EditBlock> {
   const operations = block.toolArgs?.operations as
-    | Array<{ key: string; value?: string; action: string }>
+    | FrontmatterOperation[]
     | undefined;
   if (!operations || operations.length === 0) return block;
 
@@ -286,39 +287,24 @@ async function resolveUpdateFrontmatter(
     const fmLines = lines.slice(fmStart, fmEnd + 1);
     const searchText = fmLines.join("\n");
 
-    // Parse inner lines (between the --- delimiters)
+    // Apply operations to the inner lines, preserving complex YAML
+    // structures (lists, nested objects) for keys that aren't modified.
     const innerLines = fmLines.slice(1, -1);
-    const properties = parseFrontmatterLines(innerLines);
-
-    // Apply operations
-    for (const op of operations) {
-      if (op.action === "set") {
-        properties.set(op.key, op.value ?? "");
-      } else if (op.action === "remove") {
-        properties.delete(op.key);
-      }
-    }
-
-    // Rebuild frontmatter
-    const newInner = buildFrontmatterLines(properties);
+    const newInner = applyFrontmatterOperations(innerLines, operations);
     const replaceText = "---\n" + newInner.join("\n") + "\n---";
 
     return { ...block, searchText, replaceText };
   } else {
-    // No existing frontmatter — insert at top
-    const properties = new Map<string, string>();
-    for (const op of operations) {
-      if (op.action === "set") {
-        properties.set(op.key, op.value ?? "");
-      }
-    }
+    // No existing frontmatter — build a new block from set operations.
+    const setOps = operations.filter((op) => op.action === "set");
+    if (setOps.length === 0) return block;
 
-    if (properties.size === 0) return block;
-
-    const newInner = buildFrontmatterLines(properties);
+    const newInner = setOps.map((op) =>
+      op.value ? `${op.key}: ${op.value}` : `${op.key}:`
+    );
     const fmBlock = "---\n" + newInner.join("\n") + "\n---";
 
-    // Anchor on the first line to insert before it
+    // Anchor on the first line to insert before it.
     const lines = content.split("\n");
     if (lines.length === 0) {
       return { ...block, searchText: "", replaceText: fmBlock };
@@ -385,26 +371,79 @@ function getHeadingBoundaries(
   return { headingLine, bodyStartLine, endLine };
 }
 
-/** Parse simple YAML key: value lines into an ordered Map. */
-function parseFrontmatterLines(lines: string[]): Map<string, string> {
-  const map = new Map<string, string>();
-  for (const line of lines) {
-    const colonIdx = line.indexOf(":");
-    if (colonIdx === -1) continue;
-    const key = line.slice(0, colonIdx).trim();
-    const value = line.slice(colonIdx + 1).trim();
-    if (key) map.set(key, value);
-  }
-  return map;
-}
+/**
+ * Apply frontmatter operations to raw YAML lines, preserving complex
+ * values (lists, nested objects, multi-line strings) for keys that
+ * are not being modified.
+ *
+ * This replaces the naive parseFrontmatterLines + buildFrontmatterLines
+ * approach which dropped non-scalar YAML values.
+ */
+function applyFrontmatterOperations(
+  innerLines: string[],
+  operations: FrontmatterOperation[],
+): string[] {
+  const result = [...innerLines];
 
-/** Build YAML lines from a key-value Map. */
-function buildFrontmatterLines(properties: Map<string, string>): string[] {
-  const lines: string[] = [];
-  for (const [key, value] of properties) {
-    lines.push(value ? `${key}: ${value}` : `${key}:`);
+  // Build a map of operations by key for efficient lookup.
+  const opsByKey = new Map<string, FrontmatterOperation>();
+  for (const op of operations) {
+    opsByKey.set(op.key, op);
   }
-  return lines;
+
+  // Identify which lines belong to which top-level key.
+  // A top-level key starts at column 0 with `key:`. Continuation lines
+  // (indented, or list items) belong to the preceding key.
+  const keyRanges: Array<{ key: string; start: number; end: number }> = [];
+  for (let i = 0; i < result.length; i++) {
+    const line = result[i];
+    // Top-level key: starts at column 0, has a colon not inside a quote.
+    const colonIdx = line.indexOf(":");
+    if (colonIdx > 0 && !line.startsWith(" ") && !line.startsWith("\t")) {
+      const key = line.slice(0, colonIdx).trim();
+      if (key) {
+        keyRanges.push({ key, start: i, end: i + 1 });
+      }
+    }
+  }
+
+  // Extend each key range to include continuation lines (indented lines
+  // and list items that belong to the previous key's value).
+  for (let i = 0; i < keyRanges.length; i++) {
+    const nextStart = i + 1 < keyRanges.length
+      ? keyRanges[i + 1].start
+      : result.length;
+    keyRanges[i].end = nextStart;
+  }
+
+  // Process operations in reverse order so splicing doesn't shift indices.
+  const keysProcessed = new Set<string>();
+
+  for (let i = keyRanges.length - 1; i >= 0; i--) {
+    const { key, start, end } = keyRanges[i];
+    const op = opsByKey.get(key);
+    if (!op) continue;
+
+    keysProcessed.add(key);
+
+    if (op.action === "remove") {
+      result.splice(start, end - start);
+    } else if (op.action === "set") {
+      // Replace the entire key block with a simple key: value line.
+      const newLine = op.value ? `${key}: ${op.value}` : `${key}:`;
+      result.splice(start, end - start, newLine);
+    }
+  }
+
+  // Append any "set" operations for keys not already in the frontmatter.
+  for (const op of operations) {
+    if (op.action === "set" && !keysProcessed.has(op.key)) {
+      const newLine = op.value ? `${op.key}: ${op.value}` : `${op.key}:`;
+      result.push(newLine);
+    }
+  }
+
+  return result;
 }
 
 export { getHeadingBoundaries };

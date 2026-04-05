@@ -373,6 +373,46 @@ describe("resolveStructuralEditBlocks", () => {
     expect(resolved[0].replaceText).not.toContain("tags");
   });
 
+  test("preserves complex YAML values in frontmatter when modifying other keys", async () => {
+    const content = "---\ntitle: My Title\ntags:\n  - fiction\n  - draft\naliases:\n  - alt-name\nstatus: wip\n---\n# Content";
+    const app = mockApp({
+      fileContent: content,
+      headings: [{ heading: "Content", level: 1, line: 9 }],
+      hasFrontmatter: true,
+      frontmatterLines: [0, 8],
+    });
+
+    const blocks: EditBlock[] = [
+      {
+        id: "1",
+        searchText: "",
+        replaceText: "",
+        rawBlock: "[tc:1]",
+        toolName: "update_frontmatter",
+        toolArgs: {
+          operations: [
+            { key: "status", value: "published", action: "set" },
+            { key: "title", action: "remove" },
+          ],
+        },
+      },
+    ];
+
+    const resolved = await resolveStructuralEditBlocks(blocks, { app, filePath: CTX_PATH });
+
+    expect(resolved).toHaveLength(1);
+    // Complex YAML values (lists) should be preserved
+    expect(resolved[0].replaceText).toContain("tags:");
+    expect(resolved[0].replaceText).toContain("  - fiction");
+    expect(resolved[0].replaceText).toContain("  - draft");
+    expect(resolved[0].replaceText).toContain("aliases:");
+    expect(resolved[0].replaceText).toContain("  - alt-name");
+    // Modified key should be updated
+    expect(resolved[0].replaceText).toContain("status: published");
+    // Removed key should be gone
+    expect(resolved[0].replaceText).not.toContain("title:");
+  });
+
   test("resolves update_frontmatter when no frontmatter exists", async () => {
     const content = "# My Note\n\nSome content.";
     const app = mockApp({

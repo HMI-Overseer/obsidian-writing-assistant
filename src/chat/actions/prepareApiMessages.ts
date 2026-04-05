@@ -2,7 +2,7 @@ import type { ConversationMessage, PluginSettings, ProviderOption } from "../../
 import type { ChatRequest, ChatTurn, DocumentContext, RagContextBlock } from "../../shared/chatRequest";
 import { getActiveNoteText, getFullNoteContent } from "../../context/noteContext";
 import { shouldUseToolCall } from "../../tools/registry";
-import { ALL_EDIT_TOOLS } from "../../tools/editing/definition";
+import { ALL_EDIT_TOOLS, CORE_EDIT_TOOLS } from "../../tools/editing/definition";
 import type { ChatMode } from "../types";
 import type { App } from "obsidian";
 import type { ChatSessionStore } from "../conversation/ChatSessionStore";
@@ -97,7 +97,11 @@ export async function prepareApiMessages(
   }
   const finalSystemPrompt = systemPrompt + groundingNote;
 
-  const tools = useToolUse ? ALL_EDIT_TOOLS : undefined;
+  // Cloud providers get the full tool set; local models (LM Studio) get a
+  // reduced set to avoid overwhelming models with limited tool-calling capacity.
+  const tools = useToolUse
+    ? (activeProvider === "lmstudio" ? CORE_EDIT_TOOLS : ALL_EDIT_TOOLS)
+    : undefined;
 
   return { systemPrompt: finalSystemPrompt, documentContext, ragContext, messages, tools };
 }

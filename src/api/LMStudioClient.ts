@@ -118,8 +118,8 @@ export class LMStudioClient implements ChatClient {
               name: (fn.name as string) ?? "",
               arguments: JSON.parse(fn.arguments as string),
             });
-          } catch {
-            // Malformed tool call JSON — skip.
+          } catch (e) {
+            console.error(`[tool] Failed to parse tool call "${fn.name}" (${tc.id}):`, e);
           }
         }
       }
@@ -212,8 +212,8 @@ export class LMStudioClient implements ChatClient {
               name: pending.name,
               arguments: JSON.parse(pending.argChunks.join("")),
             });
-          } catch {
-            // Malformed tool call JSON — skip.
+          } catch (e) {
+            console.error(`[tool] Failed to parse tool call "${pending.name}" (${pending.id}):`, e);
           }
         }
         pendingToolCalls.clear();

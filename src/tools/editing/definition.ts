@@ -1,5 +1,12 @@
 import type { CanonicalToolDefinition, ToolCall } from "../types";
 import type { EditBlock } from "../../editing/editTypes";
+import {
+  validateApplyEdit,
+  validateReplaceSection,
+  validateInsertAtPosition,
+  validateUpdateFrontmatter,
+} from "./validation";
+import type { FrontmatterOperation } from "./validation";
 
 // ---------------------------------------------------------------------------
 // Read-only tools — model calls these, gets results back, continues
@@ -9,8 +16,8 @@ export const GET_DOCUMENT_OUTLINE_TOOL: CanonicalToolDefinition = {
   name: "get_document_outline",
   description:
     "Get the heading structure and section boundaries of the current document. " +
-    "Returns heading text, level (1-6), and line numbers, plus frontmatter presence and total line count. " +
-    "Use this to understand document structure before making edits.",
+    "Returns heading text, level (1-6), line numbers, frontmatter keys and line range, and total line count. " +
+    "Always call this first before editing — it tells you what the document contains and where.",
   parameters: {
     type: "object",
     properties: {},
@@ -22,7 +29,7 @@ export const GET_LINE_RANGE_TOOL: CanonicalToolDefinition = {
   name: "get_line_range",
   description:
     "Read a specific range of lines from the current document. Line numbers are 1-indexed. " +
-    "Use this to inspect a section before editing it.",
+    "Use this to verify exact text before using apply_edit — ensures your search text matches precisely.",
   parameters: {
     type: "object",
     properties: {
@@ -133,14 +140,16 @@ export const INSERT_AT_POSITION_TOOL: CanonicalToolDefinition = {
 export const UPDATE_FRONTMATTER_TOOL: CanonicalToolDefinition = {
   name: "update_frontmatter",
   description:
-    "Add, update, or remove YAML frontmatter properties. Each operation specifies a key and an action. " +
+    "Add, update, or remove YAML frontmatter properties. Put ALL frontmatter changes into a single call " +
+    "with multiple operations — do not make separate calls per property. " +
+    "To keep only specific properties, remove all the others by name. " +
     "If the document has no frontmatter, a new block will be created.",
   parameters: {
     type: "object",
     properties: {
       operations: {
         type: "array",
-        description: "List of frontmatter changes to apply.",
+        description: "List of frontmatter changes to apply. Include ALL changes in one call.",
         items: {
           type: "object",
           properties: {
@@ -182,11 +191,16 @@ export const ALL_EDIT_TOOLS: CanonicalToolDefinition[] = [
 
 /**
  * Core tools for local models with limited tool-calling capacity.
- * Smaller models struggle with many tool schemas — keep it to the essentials.
+ * Includes read-only inspection tools (essential for accurate edits) and the
+ * most commonly needed write tools. Omits replace_section to keep the schema
+ * count manageable — models can use apply_edit for section rewrites instead.
  */
 export const CORE_EDIT_TOOLS: CanonicalToolDefinition[] = [
+  GET_DOCUMENT_OUTLINE_TOOL,
+  GET_LINE_RANGE_TOOL,
   APPLY_EDIT_TOOL,
   INSERT_AT_POSITION_TOOL,
+  UPDATE_FRONTMATTER_TOOL,
 ];
 
 // ---------------------------------------------------------------------------
@@ -207,61 +221,154 @@ function normalizeEscapes(value: unknown): string {
     .replace(/\\\\/g, "\\");
 }
 
-/** Convert parsed tool calls into EditBlocks for the existing review pipeline. */
+/**
+ * Convert parsed tool calls into EditBlocks for the existing review pipeline.
+ *
+ * Each tool call's arguments are validated before conversion. Invalid tool
+ * calls are skipped with a console.error — the model may have produced
+ * malformed arguments that can't be converted to a meaningful EditBlock.
+ *
+ * Multiple `update_frontmatter` calls are merged into a single EditBlock
+ * to prevent overlapping diffs when the model makes separate calls per
+ * property instead of batching operations.
+ */
 export function toolCallsToEditBlocks(toolCalls: ToolCall[]): EditBlock[] {
   const writeCalls = toolCalls.filter(
     (tc) => !READ_ONLY_TOOL_NAMES.has(tc.name),
   );
 
-  return writeCalls.map((tc) => {
-    switch (tc.name) {
-      case "apply_edit":
-        return {
-          id: tc.id,
-          searchText: normalizeEscapes(tc.arguments.search),
-          replaceText: normalizeEscapes(tc.arguments.replace),
-          rawBlock: `[tool_call:${tc.id}]`,
-        };
-      case "replace_section":
-        return {
-          id: tc.id,
-          searchText: "", // Resolved later via MetadataCache in handlers
-          replaceText: normalizeEscapes(tc.arguments.new_content),
-          rawBlock: `[tool_call:${tc.id}]`,
-          toolName: "replace_section" as const,
-          toolArgs: { heading: normalizeEscapes(tc.arguments.heading) },
-        };
-      case "insert_at_position":
-        return {
-          id: tc.id,
-          searchText: "", // Resolved later via heading/line lookup in handlers
-          replaceText: normalizeEscapes(tc.arguments.text),
-          rawBlock: `[tool_call:${tc.id}]`,
-          toolName: "insert_at_position" as const,
-          toolArgs: {
-            after_heading: tc.arguments.after_heading
-              ? normalizeEscapes(tc.arguments.after_heading) : undefined,
-            line_number: tc.arguments.line_number as number | undefined,
-          },
-        };
-      case "update_frontmatter":
-        return {
-          id: tc.id,
-          searchText: "", // Resolved later via current frontmatter extraction
-          replaceText: "", // Resolved later via applying operations
-          rawBlock: `[tool_call:${tc.id}]`,
-          toolName: "update_frontmatter" as const,
-          toolArgs: {
-            operations: tc.arguments.operations as Array<{ key: string; value?: string; action: string }>,
-          },
-        };
-      default:
-        return {
-          id: tc.id,
-          searchText: normalizeEscapes(tc.arguments.search),
-          replaceText: normalizeEscapes(tc.arguments.replace),
-          rawBlock: `[tool_call:${tc.id}]`,
-        };
+  const blocks: EditBlock[] = [];
+  const fmCalls: ToolCall[] = [];
+
+  for (const tc of writeCalls) {
+    if (tc.name === "update_frontmatter") {
+      fmCalls.push(tc);
+    } else {
+      const block = convertToolCallToEditBlock(tc);
+      if (block) blocks.push(block);
     }
-  });
+  }
+
+  // Merge all update_frontmatter calls into a single EditBlock.
+  if (fmCalls.length > 0) {
+    const merged = mergeUpdateFrontmatterCalls(fmCalls);
+    if (merged) blocks.push(merged);
+  }
+
+  return blocks;
+}
+
+/**
+ * Merge multiple update_frontmatter tool calls into a single EditBlock.
+ * Models often make separate calls per property (e.g., one to remove "aliases",
+ * another to remove "level") instead of batching. Merging prevents overlapping
+ * diffs on the same frontmatter block.
+ *
+ * Later operations for the same key win (last-write-wins).
+ */
+function mergeUpdateFrontmatterCalls(calls: ToolCall[]): EditBlock | null {
+  const allOperations: FrontmatterOperation[] = [];
+
+  for (const tc of calls) {
+    const v = validateUpdateFrontmatter(tc.arguments);
+    if (!v.ok) {
+      console.error(`[tool] Skipping update_frontmatter (${tc.id}): ${v.error}`);
+      continue;
+    }
+    allOperations.push(...v.args.operations);
+  }
+
+  if (allOperations.length === 0) return null;
+
+  // Deduplicate: last operation per key wins.
+  const byKey = new Map<string, FrontmatterOperation>();
+  for (const op of allOperations) {
+    byKey.set(op.key, op);
+  }
+  const dedupedOperations = [...byKey.values()];
+
+  // Use the first call's ID as the block ID.
+  return {
+    id: calls[0].id,
+    searchText: "",
+    replaceText: "",
+    rawBlock: `[tool_call:${calls[0].id}]`,
+    toolName: "update_frontmatter" as const,
+    toolArgs: { operations: dedupedOperations },
+  };
+}
+
+function convertToolCallToEditBlock(tc: ToolCall): EditBlock | null {
+  switch (tc.name) {
+    case "apply_edit": {
+      const v = validateApplyEdit(tc.arguments);
+      if (!v.ok) {
+        console.error(`[tool] Skipping apply_edit (${tc.id}): ${v.error}`);
+        return null;
+      }
+      return {
+        id: tc.id,
+        searchText: normalizeEscapes(v.args.search),
+        replaceText: normalizeEscapes(v.args.replace),
+        rawBlock: `[tool_call:${tc.id}]`,
+      };
+    }
+    case "replace_section": {
+      const v = validateReplaceSection(tc.arguments);
+      if (!v.ok) {
+        console.error(`[tool] Skipping replace_section (${tc.id}): ${v.error}`);
+        return null;
+      }
+      return {
+        id: tc.id,
+        searchText: "", // Resolved later via MetadataCache in handlers
+        replaceText: normalizeEscapes(v.args.new_content),
+        rawBlock: `[tool_call:${tc.id}]`,
+        toolName: "replace_section" as const,
+        toolArgs: { heading: normalizeEscapes(v.args.heading) },
+      };
+    }
+    case "insert_at_position": {
+      const v = validateInsertAtPosition(tc.arguments);
+      if (!v.ok) {
+        console.error(`[tool] Skipping insert_at_position (${tc.id}): ${v.error}`);
+        return null;
+      }
+      return {
+        id: tc.id,
+        searchText: "", // Resolved later via heading/line lookup in handlers
+        replaceText: normalizeEscapes(v.args.text),
+        rawBlock: `[tool_call:${tc.id}]`,
+        toolName: "insert_at_position" as const,
+        toolArgs: {
+          after_heading: v.args.after_heading
+            ? normalizeEscapes(v.args.after_heading) : undefined,
+          line_number: v.args.line_number,
+        },
+      };
+    }
+    case "update_frontmatter": {
+      const v = validateUpdateFrontmatter(tc.arguments);
+      if (!v.ok) {
+        console.error(`[tool] Skipping update_frontmatter (${tc.id}): ${v.error}`);
+        return null;
+      }
+      return {
+        id: tc.id,
+        searchText: "", // Resolved later via current frontmatter extraction
+        replaceText: "", // Resolved later via applying operations
+        rawBlock: `[tool_call:${tc.id}]`,
+        toolName: "update_frontmatter" as const,
+        toolArgs: { operations: v.args.operations },
+      };
+    }
+    default:
+      // Unknown write tool — attempt generic search/replace extraction.
+      return {
+        id: tc.id,
+        searchText: normalizeEscapes(tc.arguments.search),
+        replaceText: normalizeEscapes(tc.arguments.replace),
+        rawBlock: `[tool_call:${tc.id}]`,
+      };
+  }
 }

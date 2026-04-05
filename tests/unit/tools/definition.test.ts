@@ -272,6 +272,38 @@ describe("toolCallsToEditBlocks", () => {
     expect(blocks[0].replaceText).toBe("col1\tcol2\\end");
   });
 
+  test("skips tool calls with invalid arguments", () => {
+    const toolCalls: ToolCall[] = [
+      {
+        id: "tc_1",
+        name: "apply_edit",
+        arguments: { search: 123, replace: "new" }, // search is not a string
+      },
+      {
+        id: "tc_2",
+        name: "apply_edit",
+        arguments: { search: "valid", replace: "also valid" },
+      },
+    ];
+
+    const blocks = toolCallsToEditBlocks(toolCalls);
+    expect(blocks).toHaveLength(1);
+    expect(blocks[0].id).toBe("tc_2");
+  });
+
+  test("skips insert_at_position with neither locator", () => {
+    const toolCalls: ToolCall[] = [
+      {
+        id: "tc_1",
+        name: "insert_at_position",
+        arguments: { text: "new text" }, // No after_heading or line_number
+      },
+    ];
+
+    const blocks = toolCallsToEditBlocks(toolCalls);
+    expect(blocks).toHaveLength(0);
+  });
+
   test("does not double-normalize actual newlines", () => {
     const toolCalls: ToolCall[] = [
       {
@@ -285,5 +317,93 @@ describe("toolCallsToEditBlocks", () => {
     // Actual newlines should pass through unchanged
     expect(blocks[0].searchText).toBe("line 1\nline 2");
     expect(blocks[0].replaceText).toBe("new\ntext");
+  });
+
+  test("merges multiple update_frontmatter calls into a single EditBlock", () => {
+    const toolCalls: ToolCall[] = [
+      {
+        id: "tc_1",
+        name: "update_frontmatter",
+        arguments: { operations: [{ key: "aliases", action: "remove" }] },
+      },
+      {
+        id: "tc_2",
+        name: "update_frontmatter",
+        arguments: { operations: [{ key: "level", action: "remove" }] },
+      },
+      {
+        id: "tc_3",
+        name: "update_frontmatter",
+        arguments: { operations: [{ key: "karma", action: "remove" }] },
+      },
+    ];
+
+    const blocks = toolCallsToEditBlocks(toolCalls);
+    expect(blocks).toHaveLength(1);
+    expect(blocks[0].toolName).toBe("update_frontmatter");
+    expect(blocks[0].toolArgs?.operations).toHaveLength(3);
+    expect(blocks[0].id).toBe("tc_1"); // Uses first call's ID
+  });
+
+  test("deduplicates operations by key (last-write-wins) when merging", () => {
+    const toolCalls: ToolCall[] = [
+      {
+        id: "tc_1",
+        name: "update_frontmatter",
+        arguments: { operations: [{ key: "status", value: "draft", action: "set" }] },
+      },
+      {
+        id: "tc_2",
+        name: "update_frontmatter",
+        arguments: { operations: [{ key: "status", value: "published", action: "set" }] },
+      },
+    ];
+
+    const blocks = toolCallsToEditBlocks(toolCalls);
+    expect(blocks).toHaveLength(1);
+    const ops = blocks[0].toolArgs?.operations as Array<{ key: string; value?: string; action: string }>;
+    expect(ops).toHaveLength(1);
+    expect(ops[0].value).toBe("published"); // Last write wins
+  });
+
+  test("merges update_frontmatter alongside other tool types", () => {
+    const toolCalls: ToolCall[] = [
+      { id: "tc_1", name: "apply_edit", arguments: { search: "a", replace: "b" } },
+      {
+        id: "tc_2",
+        name: "update_frontmatter",
+        arguments: { operations: [{ key: "tags", value: "test", action: "set" }] },
+      },
+      {
+        id: "tc_3",
+        name: "update_frontmatter",
+        arguments: { operations: [{ key: "draft", action: "remove" }] },
+      },
+    ];
+
+    const blocks = toolCallsToEditBlocks(toolCalls);
+    expect(blocks).toHaveLength(2);
+    expect(blocks[0].id).toBe("tc_1"); // apply_edit first
+    expect(blocks[1].toolName).toBe("update_frontmatter"); // merged FM block last
+    expect(blocks[1].toolArgs?.operations).toHaveLength(2);
+  });
+
+  test("merges flat update_frontmatter calls (auto-wrapped by validator)", () => {
+    const toolCalls: ToolCall[] = [
+      {
+        id: "tc_1",
+        name: "update_frontmatter",
+        arguments: { key: "status", value: "published", action: "set" },
+      },
+      {
+        id: "tc_2",
+        name: "update_frontmatter",
+        arguments: { key: "draft", action: "remove" },
+      },
+    ];
+
+    const blocks = toolCallsToEditBlocks(toolCalls);
+    expect(blocks).toHaveLength(1);
+    expect(blocks[0].toolArgs?.operations).toHaveLength(2);
   });
 });

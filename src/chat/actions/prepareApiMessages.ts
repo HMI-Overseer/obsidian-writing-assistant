@@ -84,8 +84,7 @@ export async function prepareApiMessages(
   if (!editMode && ragService?.isReady()) {
     const lastUserMessage = messages.findLast((m) => m.role === "user");
     if (lastUserMessage) {
-      const activeFile = app.workspace.getActiveFile();
-      ragContext = await ragService.retrieve(lastUserMessage.content, activeFile?.path);
+      ragContext = await ragService.retrieve(lastUserMessage.content, documentContext?.filePath);
     }
   }
 

@@ -33,7 +33,7 @@ export class Retriever {
    * Retrieve the most relevant chunks for a query string.
    * Returns an empty array if the store is empty or embedding fails.
    */
-  async retrieve(query: string, _activeFilePath?: string, signal?: AbortSignal): Promise<RetrievalResult[]> {
+  async retrieve(query: string, activeFilePath?: string, signal?: AbortSignal): Promise<RetrievalResult[]> {
     if (this.store.getChunkCount() === 0 || !query.trim()) {
       return [];
     }
@@ -46,7 +46,10 @@ export class Retriever {
 
     const queryVector = result.vectors[0];
     const allChunks = this.store.getAllChunks();
-    const topResults = topKSimilar(queryVector, allChunks, this.topK * 3, this.minScore);
+    const searchableChunks = activeFilePath
+      ? allChunks.filter((c) => c.filePath !== activeFilePath)
+      : allChunks;
+    const topResults = topKSimilar(queryVector, searchableChunks, this.topK * 3, this.minScore);
 
     return limitPerFile(topResults).slice(0, this.topK);
   }

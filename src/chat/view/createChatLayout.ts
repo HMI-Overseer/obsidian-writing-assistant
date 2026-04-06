@@ -95,43 +95,43 @@ export function createChatLayout(contentEl: HTMLElement): ChatLayoutRefs {
   });
   const messagesEl = messagesPaneEl.createDiv({ cls: "lmsa-messages" });
 
-  const composer = shell.createDiv({ cls: "lmsa-composer" });
+  const composer = shell.createDiv({ cls: "lmsa-chat-composer" });
 
   const generateResponseBtn = composer.createEl("button", {
-    cls: "lmsa-generate-response-btn lmsa-ui-pill-button lmsa-hidden",
+    cls: "lmsa-chat-composer-generate-btn lmsa-hidden",
     attr: { "aria-label": "Generate response" },
   }) as HTMLButtonElement;
-  const genBtnIcon = generateResponseBtn.createEl("span", { cls: "lmsa-generate-response-icon" });
+  const genBtnIcon = generateResponseBtn.createEl("span", { cls: "lmsa-chat-composer-generate-icon" });
   setIcon(genBtnIcon, "sparkles");
   generateResponseBtn.createEl("span", { text: "Generate response" });
   generateResponseBtn.createEl("span", {
-    cls: "lmsa-generate-response-loading",
+    cls: "lmsa-chat-composer-generate-loading",
     text: "Loading...",
   });
 
-  const commandBarEl = composer.createDiv({ cls: "lmsa-command-bar" });
-  const composerPanel = composer.createDiv({ cls: "lmsa-composer-panel lmsa-ui-panel" });
-  const contextChipsEl = composerPanel.createDiv({ cls: "lmsa-composer-chips" });
+  const commandBarEl = composer.createDiv({ cls: "lmsa-chat-composer-command-bar" });
+  const composerPanel = composer.createDiv({ cls: "lmsa-chat-composer-panel" });
+  const contextChipsEl = composerPanel.createDiv({ cls: "lmsa-chat-composer-chips" });
 
   const textareaEl = composerPanel.createEl("textarea", {
-    cls: "lmsa-textarea",
+    cls: "lmsa-chat-composer-textarea",
     attr: { placeholder: "Send a message to the model...", rows: "2" },
   }) as HTMLTextAreaElement;
 
-  const composerFooter = composerPanel.createDiv({ cls: "lmsa-composer-footer" });
+  const composerFooter = composerPanel.createDiv({ cls: "lmsa-chat-composer-footer" });
 
-  const contextCapacityEl = composerFooter.createDiv({ cls: "lmsa-context-capacity lmsa-hidden" });
-  contextCapacityEl.createEl("span", { cls: "lmsa-context-capacity-label" });
+  const contextCapacityEl = composerFooter.createDiv({ cls: "lmsa-chat-composer-context-capacity lmsa-hidden" });
+  contextCapacityEl.createEl("span", { cls: "lmsa-chat-composer-context-capacity-label" });
 
-  const usageSummaryEl = composerFooter.createDiv({ cls: "lmsa-usage-summary lmsa-hidden" });
+  const usageSummaryEl = composerFooter.createDiv({ cls: "lmsa-chat-composer-usage-summary lmsa-hidden" });
 
-  const composerFooterActions = composerFooter.createDiv({ cls: "lmsa-composer-footer-actions" });
-  const toolUseIndicatorEl = composerFooterActions.createDiv({ cls: "lmsa-tool-use-indicator" });
+  const composerFooterActions = composerFooter.createDiv({ cls: "lmsa-chat-composer-footer-actions" });
+  const toolUseIndicatorEl = composerFooterActions.createDiv({ cls: "lmsa-chat-composer-tool-indicator" });
   setIcon(toolUseIndicatorEl, "wrench");
-  const modeToggleEl = composerFooterActions.createDiv({ cls: "lmsa-mode-toggle" });
+  const modeToggleEl = composerFooterActions.createDiv({ cls: "lmsa-chat-composer-mode-toggle" });
 
   const actionBtn = composerFooterActions.createEl("button", {
-    cls: "lmsa-action-btn lmsa-ui-btn-primary",
+    cls: "lmsa-chat-composer-send-btn",
   }) as HTMLButtonElement;
   setIcon(actionBtn, "arrow-up");
 

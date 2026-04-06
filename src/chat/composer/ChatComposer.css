@@ -1,48 +1,348 @@
 @layer components {
-  .lmsa-command-bar {
+  /* ── Command bar ─────────────────────────────────────────────────────────── */
+
+  .lmsa-chat-composer-command-bar {
     @apply lmsa-relative lmsa-z-[1] lmsa-flex lmsa-flex-col lmsa-gap-2;
   }
 
-  .lmsa-command-label {
+  .lmsa-chat-composer-command-bar-label {
     @apply lmsa-pl-1 lmsa-text-obsidian-muted;
     font-size: var(--font-ui-smaller);
     letter-spacing: 0.02em;
   }
 
-  .lmsa-command-chips {
+  .lmsa-chat-composer-command-chips {
     @apply lmsa-flex lmsa-flex-wrap lmsa-gap-2;
   }
 
-  .lmsa-composer-chips {
+  .lmsa-chat-composer-command-chip {
+    @apply lmsa-cursor-pointer lmsa-whitespace-nowrap lmsa-rounded-full lmsa-border lmsa-border-obsidian-border lmsa-px-3 lmsa-py-[7px] lmsa-text-obsidian-text;
+    font-size: var(--font-ui-small);
+    background: color-mix(in srgb, var(--background-secondary) 88%, transparent);
+  }
+
+  .lmsa-chat-composer-command-chip:hover {
+    @apply lmsa-bg-[var(--background-modifier-hover)];
+  }
+
+  /* ── Context chips ───────────────────────────────────────────────────────── */
+
+  .lmsa-chat-composer-chips {
     @apply lmsa-flex lmsa-flex-wrap lmsa-gap-1.5 lmsa-px-1 lmsa-pb-2.5;
   }
 
-  .lmsa-composer-chips:empty {
+  .lmsa-chat-composer-chips:empty {
     @apply lmsa-hidden;
   }
 
-  .lmsa-chip-icon {
+  .lmsa-chat-composer-chip {
+    @apply lmsa-inline-flex lmsa-max-w-[220px] lmsa-items-center lmsa-gap-[5px] lmsa-rounded-full lmsa-pb-1 lmsa-pl-2 lmsa-pr-1.5 lmsa-pt-1 lmsa-text-obsidian-muted;
+    font-size: var(--font-ui-smaller);
+    border: 1px solid color-mix(in srgb, var(--lmsa-mode-accent) 40%, var(--background-modifier-border));
+    background: color-mix(in srgb, var(--lmsa-mode-accent) 10%, var(--background-secondary));
+  }
+
+  .lmsa-chat-composer-chip-icon {
     @apply lmsa-inline-flex lmsa-flex-none lmsa-items-center;
     color: var(--lmsa-mode-accent);
   }
 
-  .lmsa-chip-icon svg {
+  .lmsa-chat-composer-chip-icon svg {
     width: 11px;
     height: 11px;
   }
 
-  .lmsa-chip-label {
+  .lmsa-chat-composer-chip-label {
     @apply lmsa-min-w-0 lmsa-flex-1 lmsa-truncate lmsa-whitespace-nowrap;
   }
 
-  .lmsa-chip-remove svg {
+  .lmsa-chat-composer-chip-remove {
+    @apply lmsa-inline-flex lmsa-h-4 lmsa-w-4 lmsa-flex-none lmsa-cursor-pointer lmsa-items-center lmsa-justify-center lmsa-rounded-full lmsa-border-none lmsa-p-0 lmsa-text-obsidian-muted;
+    background: transparent;
+    box-shadow: none;
+    outline: none;
+    appearance: none;
+    min-height: unset;
+    font: inherit;
+    line-height: 1;
+    transition: color 120ms ease;
+  }
+
+  .lmsa-chat-composer-chip-remove:hover {
+    @apply lmsa-text-obsidian-text;
+    background: var(--background-modifier-hover);
+  }
+
+  .lmsa-chat-composer-chip-remove svg {
     width: 10px;
     height: 10px;
   }
 
-  .lmsa-chip--edit {
-    border-color: var(--lmsa-mode-accent);
-    background: color-mix(in srgb, var(--lmsa-mode-accent) 8%, var(--background-primary));
+  /* ── Composer panel ──────────────────────────────────────────────────────── */
+
+  .lmsa-chat-composer-panel {
+    @apply lmsa-relative lmsa-z-[1] lmsa-overflow-visible lmsa-rounded-[20px] lmsa-border lmsa-border-obsidian-border lmsa-px-[14px] lmsa-pb-3 lmsa-pt-[14px];
+    background: linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--background-primary) 92%, transparent),
+      color-mix(in srgb, var(--background-secondary) 86%, transparent)
+    );
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+    box-shadow:
+      0 18px 48px rgba(0, 0, 0, 0.12),
+      inset 0 1px 0 rgba(255, 255, 255, 0.06);
+    transition: border-color 200ms ease, box-shadow 200ms ease;
   }
 
+  .lmsa-chat-composer-panel:hover {
+    border-color: var(--lmsa-chat-border-emphasis);
+    box-shadow:
+      0 18px 48px rgba(0, 0, 0, 0.12),
+      inset 0 1px 0 rgba(255, 255, 255, 0.06),
+      0 0 0 1px var(--lmsa-chat-glow-ring);
+  }
+
+  /* Shimmer line along the top edge */
+  .lmsa-chat-composer-panel::before {
+    content: "";
+    @apply lmsa-pointer-events-none lmsa-absolute lmsa-inset-x-4 lmsa-top-0 lmsa-h-px;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      color-mix(in srgb, var(--lmsa-mode-accent) 55%, white),
+      transparent
+    );
+    opacity: 0.8;
+    transition: opacity 200ms ease;
+  }
+
+  .lmsa-chat-composer-panel:hover::before,
+  .lmsa-chat-composer-panel:focus-within::before {
+    opacity: 1;
+  }
+
+  /* Glow aura behind the panel */
+  .lmsa-chat-composer-panel::after {
+    content: "";
+    @apply lmsa-pointer-events-none lmsa-absolute;
+    inset: -2px;
+    border-radius: inherit;
+    background: linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--lmsa-chat-accent) 12%, transparent),
+      transparent 60%,
+      color-mix(in srgb, var(--lmsa-chat-accent) 8%, transparent)
+    );
+    z-index: -1;
+    filter: blur(20px);
+    opacity: 0;
+    transition: opacity 300ms ease;
+  }
+
+  .lmsa-chat-composer-panel:hover::after,
+  .lmsa-chat-composer-panel:focus-within::after {
+    opacity: 0.85;
+  }
+
+  .lmsa-chat-composer-panel:focus-within {
+    border-color: color-mix(in srgb, var(--lmsa-mode-accent) 45%, var(--background-modifier-border));
+    box-shadow:
+      0 24px 60px rgba(0, 0, 0, 0.14),
+      0 0 0 1px color-mix(in srgb, var(--lmsa-mode-accent) 24%, transparent),
+      inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  }
+
+  /* ── Textarea ────────────────────────────────────────────────────────────── */
+
+  .lmsa-chat-composer-textarea {
+    @apply lmsa-box-border lmsa-w-full lmsa-resize-none lmsa-border-none lmsa-bg-transparent lmsa-px-2 lmsa-pb-2 lmsa-pt-2 lmsa-text-obsidian-text;
+    font-family: var(--font-interface);
+    font-size: 1rem;
+    line-height: 1.7;
+    min-height: 84px;
+    max-height: 260px;
+    overflow-y: auto;
+  }
+
+  .lmsa-chat-composer-textarea::placeholder {
+    color: color-mix(in srgb, var(--text-muted) 82%, transparent);
+  }
+
+  .lmsa-chat-composer-textarea:hover,
+  .lmsa-chat-composer-textarea:focus,
+  .lmsa-chat-composer-textarea:focus-visible {
+    outline: none;
+    border: none;
+    box-shadow: none;
+    background: transparent;
+  }
+
+  /* ── Footer ──────────────────────────────────────────────────────────────── */
+
+  .lmsa-chat-composer-footer {
+    @apply lmsa-mt-1 lmsa-flex lmsa-items-center lmsa-justify-between lmsa-gap-3 lmsa-pt-3;
+    border-top: 1px solid color-mix(in srgb, var(--background-modifier-border) 78%, transparent);
+  }
+
+  .lmsa-chat-composer-footer-actions {
+    @apply lmsa-ml-auto lmsa-flex lmsa-items-center lmsa-gap-3;
+  }
+
+  /* ── Context capacity ────────────────────────────────────────────────────── */
+
+  .lmsa-chat-composer-context-capacity {
+    padding: 2px 4px;
+    font-size: var(--font-ui-small);
+    color: var(--text-muted);
+  }
+
+  .lmsa-chat-composer-context-capacity-label {
+    line-height: 1;
+  }
+
+  .lmsa-chat-composer-context-capacity.is-warning .lmsa-chat-composer-context-capacity-label {
+    color: var(--text-warning, #e6a700);
+  }
+
+  .lmsa-chat-composer-context-capacity.is-danger .lmsa-chat-composer-context-capacity-label {
+    color: var(--text-error, #e93147);
+  }
+
+  /* ── Usage summary ───────────────────────────────────────────────────────── */
+
+  .lmsa-chat-composer-usage-summary {
+    @apply lmsa-flex lmsa-items-center;
+    font-size: var(--font-smallest);
+    color: var(--text-muted);
+    padding: 0 4px;
+    min-height: 20px;
+  }
+
+  /* ── Mode toggle ─────────────────────────────────────────────────────────── */
+
+  .lmsa-chat-composer-mode-toggle {
+    @apply lmsa-inline-flex;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  }
+
+  .lmsa-chat-composer-mode-toggle-btn {
+    @apply lmsa-relative lmsa-inline-flex lmsa-cursor-pointer lmsa-items-center lmsa-gap-1.5 lmsa-px-3 lmsa-py-1.5;
+    font-size: var(--font-ui-smaller);
+    font-weight: 500;
+    line-height: 1.25;
+    color: var(--text-muted);
+    background: color-mix(in srgb, var(--background-primary) 90%, var(--background-secondary));
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 0;
+    transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease;
+  }
+
+  .lmsa-chat-composer-mode-toggle-icon {
+    @apply lmsa-inline-flex lmsa-items-center;
+  }
+
+  .lmsa-chat-composer-mode-toggle-icon svg {
+    width: 12px;
+    height: 12px;
+  }
+
+  .lmsa-chat-composer-mode-toggle-btn + .lmsa-chat-composer-mode-toggle-btn {
+    margin-left: -1px;
+  }
+
+  .lmsa-chat-composer-mode-toggle-btn:first-child {
+    border-radius: 6px 0 0 6px;
+  }
+
+  .lmsa-chat-composer-mode-toggle-btn:last-child {
+    border-radius: 0 6px 6px 0;
+  }
+
+  .lmsa-chat-composer-mode-toggle-btn:hover {
+    background: var(--background-modifier-hover);
+    color: var(--text-normal);
+    z-index: 1;
+  }
+
+  /* Active state inherits --lmsa-mode-accent from .lmsa-root[data-mode] */
+  .lmsa-chat-composer-mode-toggle-btn.is-active {
+    background: color-mix(in srgb, var(--lmsa-mode-accent) 15%, var(--background-primary));
+    border-color: color-mix(in srgb, var(--lmsa-mode-accent) 45%, var(--background-modifier-border));
+    color: var(--lmsa-mode-accent);
+    z-index: 1;
+  }
+
+  .lmsa-chat-composer-mode-toggle-btn:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--lmsa-mode-accent) 20%, transparent);
+    z-index: 2;
+  }
+
+  /* ── Tool indicator ──────────────────────────────────────────────────────── */
+
+  .lmsa-chat-composer-tool-indicator {
+    @apply lmsa-inline-flex lmsa-items-center lmsa-justify-center;
+    width: 28px;
+    height: 28px;
+    border-radius: 7px;
+    border: 1px solid var(--background-modifier-border);
+    color: var(--text-faint);
+    opacity: 0.4;
+    transition: color 0.15s ease, opacity 0.15s ease, border-color 0.15s ease;
+  }
+
+  .lmsa-chat-composer-tool-indicator svg {
+    width: 14px;
+    height: 14px;
+  }
+
+  .lmsa-chat-composer-tool-indicator.is-active {
+    color: var(--color-orange, #e8a84b);
+    border-color: color-mix(in srgb, var(--color-orange, #e8a84b) 45%, var(--background-modifier-border));
+    opacity: 1;
+  }
+
+  /* ── Send button ─────────────────────────────────────────────────────────── */
+
+  .lmsa-chat-composer-send-btn {
+    @apply lmsa-flex lmsa-items-center lmsa-justify-center lmsa-border-none lmsa-font-semibold;
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    border-radius: 50%;
+    background: var(--interactive-accent);
+    color: var(--text-on-accent);
+  }
+
+  .lmsa-chat-composer-send-btn:hover:not(:disabled) {
+    background: var(--interactive-accent-hover);
+  }
+
+  .lmsa-chat-composer-send-btn svg {
+    width: 18px;
+    height: 18px;
+  }
+
+  .lmsa-chat-composer-send-btn.is-stop {
+    background: transparent;
+    color: var(--text-error);
+    border: 1px solid color-mix(in srgb, var(--text-error) 40%, var(--background-modifier-border));
+  }
+
+  .lmsa-chat-composer-send-btn.is-stop:hover {
+    background: color-mix(in srgb, var(--text-error) 12%, transparent);
+  }
+
+  /* ── Responsive ──────────────────────────────────────────────────────────── */
+
+  @media (max-width: 700px) {
+    .lmsa-chat-composer-footer {
+      @apply lmsa-flex-col lmsa-items-stretch;
+    }
+
+    .lmsa-chat-composer-footer-actions {
+      @apply lmsa-w-full lmsa-justify-between;
+    }
+  }
 }

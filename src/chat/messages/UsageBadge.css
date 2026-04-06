@@ -27,31 +27,4 @@
     font-size: var(--font-smallest);
     opacity: 0.6;
   }
-
-  .lmsa-usage-summary {
-    @apply lmsa-flex lmsa-items-center;
-    font-size: var(--font-smallest);
-    color: var(--text-muted);
-    padding: 0 4px;
-    min-height: 20px;
-  }
-
-  /* Context capacity bar */
-  .lmsa-context-capacity {
-    padding: 2px 4px;
-    font-size: var(--font-ui-small);
-    color: var(--text-muted);
-  }
-
-  .lmsa-context-capacity.is-warning .lmsa-context-capacity-label {
-    color: var(--text-warning, #e6a700);
-  }
-
-  .lmsa-context-capacity.is-danger .lmsa-context-capacity-label {
-    color: var(--text-error, #e93147);
-  }
-
-  .lmsa-context-capacity-label {
-    line-height: 1;
-  }
 }

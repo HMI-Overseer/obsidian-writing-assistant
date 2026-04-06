@@ -102,7 +102,7 @@ export class ContextCapacityUpdater {
     }
 
     const labelEl = this.capacityEl.querySelector(
-      ".lmsa-context-capacity-label"
+      ".lmsa-chat-composer-context-capacity-label"
     ) as HTMLElement | null;
     if (labelEl) {
       labelEl.setText(

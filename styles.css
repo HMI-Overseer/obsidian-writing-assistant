@@ -183,8 +183,8 @@
     padding-top: 0.25rem;
     color: var(--text-muted);
     font-size: var(--font-ui-smaller);
-    border: 1px solid color-mix(in srgb, var(--interactive-accent) 40%, var(--background-modifier-border));
-    background: color-mix(in srgb, var(--interactive-accent) 10%, var(--background-secondary));
+    border: 1px solid color-mix(in srgb, var(--lmsa-mode-accent) 40%, var(--background-modifier-border));
+    background: color-mix(in srgb, var(--lmsa-mode-accent) 10%, var(--background-secondary));
 }
 .lmsa-ui-chip-dismiss {
     display: inline-flex;
@@ -232,6 +232,7 @@
 .lmsa-ui-muted {
     color: var(--text-muted);
   }
+/* ── Root ────────────────────────────────────────────────────────────────── */
 .lmsa-root {
     position: relative;
     overflow: hidden;
@@ -257,6 +258,7 @@
 .lmsa-root[data-mode="edit"] {
     --lmsa-mode-accent: var(--color-orange, #e8a84b);
   }
+/* ── Shell ───────────────────────────────────────────────────────────────── */
 .lmsa-shell {
     margin-left: auto;
     margin-right: auto;
@@ -265,6 +267,7 @@
     max-width: 980px;
     flex-direction: column;
 }
+/* ── Header ──────────────────────────────────────────────────────────────── */
 .lmsa-header {
     display: flex;
     align-items: center;
@@ -326,10 +329,8 @@
     opacity: 0.4;
     transition: opacity 140ms ease;
 }
-.lmsa-header-meta:hover .lmsa-header-meta-chevron {
-    opacity: 0.75;
-  }
-.lmsa-header-meta.is-active .lmsa-header-meta-chevron {
+.lmsa-header-meta:hover .lmsa-header-meta-chevron,
+  .lmsa-header-meta.is-active .lmsa-header-meta-chevron {
     opacity: 0.75;
   }
 .lmsa-header-meta-chevron svg {
@@ -368,6 +369,7 @@
     width: 20px;
     height: 20px;
   }
+/* ── Messages pane ───────────────────────────────────────────────────────── */
 .lmsa-messages-pane {
     position: relative;
     min-height: 0px;
@@ -399,6 +401,11 @@
     pointer-events: auto;
     opacity: 1;
 }
+.lmsa-messages-pane.is-history-open .lmsa-messages,
+  .lmsa-messages-pane.is-history-open .lmsa-empty-view {
+    opacity: 0;
+  }
+/* ── Empty state ─────────────────────────────────────────────────────────── */
 .lmsa-empty-view {
     pointer-events: none;
     position: absolute;
@@ -416,10 +423,6 @@
 .lmsa-empty-view--hidden {
     display: none;
 }
-.lmsa-messages-pane.is-history-open .lmsa-messages,
-  .lmsa-messages-pane.is-history-open .lmsa-empty-view {
-    opacity: 0;
-  }
 .lmsa-empty-title {
     font-weight: 700;
     color: var(--text-normal);
@@ -429,12 +432,22 @@
     max-width: 42ch;
     line-height: 1.6;
 }
-.lmsa-generate-response-btn {
+/* ── Generate response button ────────────────────────────────────────────── */
+.lmsa-chat-composer-generate-btn {
     position: absolute;
     z-index: 10;
     display: inline-flex;
+    cursor: pointer;
     align-items: center;
     gap: 0.375rem;
+    white-space: nowrap;
+    border-radius: 9999px;
+    padding-left: 0.75rem;
+    padding-right: 0.75rem;
+    padding-top: 7px;
+    padding-bottom: 7px;
+    color: var(--text-normal);
+    font-size: var(--font-ui-small);
     left: 50%;
     top: 0;
     transform: translate(-50%, calc(-100% - 10px));
@@ -449,28 +462,28 @@
     -webkit-backdrop-filter: url(#lmsa-glass);
     transition: all 0.8s cubic-bezier(0.175, 0.885, 0.32, 2.2);
 }
-.lmsa-generate-response-btn:hover {
+.lmsa-chat-composer-generate-btn:hover {
     transform: translate(-50%, calc(-100% - 10px)) scale(1.05);
   }
-.lmsa-generate-response-icon {
+.lmsa-chat-composer-generate-icon {
     display: inline-flex;
     align-items: center;
     color: var(--lmsa-mode-accent);
 }
-.lmsa-generate-response-icon svg {
+.lmsa-chat-composer-generate-icon svg {
     width: 14px;
     height: 14px;
   }
 /* Loading text — hidden by default */
-.lmsa-generate-response-loading {
+.lmsa-chat-composer-generate-loading {
     display: none;
   }
 /* Generating state: swap content */
-.lmsa-generate-response-btn.is-generating .lmsa-generate-response-icon,
-  .lmsa-generate-response-btn.is-generating > span:not(.lmsa-generate-response-loading) {
+.lmsa-chat-composer-generate-btn.is-generating .lmsa-chat-composer-generate-icon,
+  .lmsa-chat-composer-generate-btn.is-generating > span:not(.lmsa-chat-composer-generate-loading) {
     display: none;
   }
-.lmsa-generate-response-btn.is-generating .lmsa-generate-response-loading {
+.lmsa-chat-composer-generate-btn.is-generating .lmsa-chat-composer-generate-loading {
     display: inline-block;
     font-weight: 500;
     font-size: var(--font-ui-small);
@@ -488,11 +501,12 @@
     -webkit-text-fill-color: transparent;
     animation: lmsa-shimmer-sweep 2s ease-in-out infinite;
   }
-.lmsa-generate-response-btn.is-generating {
+.lmsa-chat-composer-generate-btn.is-generating {
     pointer-events: none;
     cursor: default;
   }
-.lmsa-composer {
+/* ── Composer wrapper ────────────────────────────────────────────────────── */
+.lmsa-chat-composer {
     position: relative;
     display: flex;
     flex-direction: column;
@@ -501,232 +515,7 @@
     padding-right: 18px;
     padding-bottom: 18px;
 }
-.lmsa-composer-panel {
-    position: relative;
-    z-index: 1;
-    overflow: visible;
-    padding-left: 14px;
-    padding-right: 14px;
-    padding-bottom: 0.75rem;
-    padding-top: 14px;
-    background: linear-gradient(180deg, color-mix(in srgb, var(--background-primary) 92%, transparent), color-mix(in srgb, var(--background-secondary) 86%, transparent));
-    backdrop-filter: blur(18px);
-    -webkit-backdrop-filter: blur(18px);
-    box-shadow:
-      0 18px 48px rgba(0, 0, 0, 0.12),
-      inset 0 1px 0 rgba(255, 255, 255, 0.06);
-    transition: border-color 200ms ease, box-shadow 200ms ease;
-}
-.lmsa-composer-panel:hover {
-    border-color: var(--lmsa-chat-border-emphasis);
-    box-shadow:
-      0 18px 48px rgba(0, 0, 0, 0.12),
-      inset 0 1px 0 rgba(255, 255, 255, 0.06),
-      0 0 0 1px var(--lmsa-chat-glow-ring);
-  }
-.lmsa-composer-panel::before {
-    content: "";
-    pointer-events: none;
-    position: absolute;
-    left: 1rem;
-    right: 1rem;
-    top: 0px;
-    height: 1px;
-    background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--lmsa-mode-accent) 55%, white), transparent);
-    opacity: 0.8;
-    transition: opacity 200ms ease;
-  }
-.lmsa-composer-panel:hover::before,
-  .lmsa-composer-panel:focus-within::before {
-    opacity: 1;
-  }
-/* Glow aura — uses ::after since ::before is the shimmer line */
-.lmsa-composer-panel::after {
-    content: "";
-    pointer-events: none;
-    position: absolute;
-    inset: -2px;
-    border-radius: inherit;
-    background: linear-gradient(
-      135deg,
-      color-mix(in srgb, var(--lmsa-chat-accent) 12%, transparent),
-      transparent 60%,
-      color-mix(in srgb, var(--lmsa-chat-accent) 8%, transparent)
-    );
-    z-index: -1;
-    filter: blur(20px);
-    opacity: 0;
-    transition: opacity 300ms ease;
-  }
-.lmsa-composer-panel:hover::after,
-  .lmsa-composer-panel:focus-within::after {
-    opacity: 0.85;
-  }
-.lmsa-composer-panel:focus-within {
-    border-color: color-mix(in srgb, var(--lmsa-mode-accent) 45%, var(--background-modifier-border));
-    box-shadow:
-      0 24px 60px rgba(0, 0, 0, 0.14),
-      0 0 0 1px color-mix(in srgb, var(--lmsa-mode-accent) 24%, transparent),
-      inset 0 1px 0 rgba(255, 255, 255, 0.08);
-  }
-.lmsa-textarea {
-    box-sizing: border-box;
-    width: 100%;
-    resize: none;
-    border-style: none;
-    background-color: transparent;
-    padding-left: 0.5rem;
-    padding-right: 0.5rem;
-    padding-bottom: 0.5rem;
-    padding-top: 0.5rem;
-    color: var(--text-normal);
-    font-family: var(--font-interface);
-    font-size: 1rem;
-    line-height: 1.7;
-    min-height: 84px;
-    max-height: 260px;
-    overflow-y: auto;
-}
-.lmsa-textarea::-moz-placeholder {
-    color: color-mix(in srgb, var(--text-muted) 82%, transparent);
-  }
-.lmsa-textarea::placeholder {
-    color: color-mix(in srgb, var(--text-muted) 82%, transparent);
-  }
-.lmsa-textarea:hover,
-  .lmsa-textarea:focus,
-  .lmsa-textarea:focus-visible {
-    outline: none;
-    border: none;
-    box-shadow: none;
-    background: transparent;
-  }
-.lmsa-composer-footer {
-    margin-top: 0.25rem;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.75rem;
-    padding-top: 0.75rem;
-    border-top: 1px solid color-mix(in srgb, var(--background-modifier-border) 78%, transparent);
-}
-.lmsa-composer-footer-actions {
-    margin-left: auto;
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-}
-.lmsa-mode-toggle {
-    display: inline-flex;
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
-}
-.lmsa-mode-toggle-btn {
-    position: relative;
-    display: inline-flex;
-    cursor: pointer;
-    align-items: center;
-    gap: 0.375rem;
-    padding-left: 0.75rem;
-    padding-right: 0.75rem;
-    padding-top: 0.375rem;
-    padding-bottom: 0.375rem;
-    font-size: var(--font-ui-smaller);
-    font-weight: 500;
-    line-height: 1.25;
-    color: var(--text-muted);
-    background: color-mix(in srgb, var(--background-primary) 90%, var(--background-secondary));
-    border: 1px solid var(--background-modifier-border);
-    border-radius: 0;
-    transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease;
-}
-.lmsa-mode-toggle-icon {
-    display: inline-flex;
-    align-items: center;
-}
-.lmsa-mode-toggle-icon svg {
-    width: 12px;
-    height: 12px;
-  }
-.lmsa-mode-toggle-btn + .lmsa-mode-toggle-btn {
-    margin-left: -1px;
-  }
-.lmsa-mode-toggle-btn:first-child {
-    border-radius: 6px 0 0 6px;
-  }
-.lmsa-mode-toggle-btn:last-child {
-    border-radius: 0 6px 6px 0;
-  }
-.lmsa-mode-toggle-btn:hover {
-    background: var(--background-modifier-hover);
-    color: var(--text-normal);
-    z-index: 1;
-  }
-.lmsa-mode-toggle-btn.is-active {
-    color: var(--text-normal);
-    z-index: 1;
-  }
-.lmsa-mode-toggle-btn.is-active[data-mode="plan"] {
-    background: color-mix(in srgb, var(--color-blue, #4a90d9) 15%, var(--background-primary));
-    border-color: color-mix(in srgb, var(--color-blue, #4a90d9) 45%, var(--background-modifier-border));
-    color: var(--color-blue, #4a90d9);
-  }
-.lmsa-mode-toggle-btn.is-active[data-mode="conversation"] {
-    background: color-mix(in srgb, var(--interactive-accent) 15%, var(--background-primary));
-    border-color: color-mix(in srgb, var(--interactive-accent) 45%, var(--background-modifier-border));
-    color: var(--interactive-accent);
-  }
-.lmsa-mode-toggle-btn.is-active[data-mode="edit"] {
-    background: color-mix(in srgb, var(--color-orange, #e8a84b) 15%, var(--background-primary));
-    border-color: color-mix(in srgb, var(--color-orange, #e8a84b) 45%, var(--background-modifier-border));
-    color: var(--color-orange, #e8a84b);
-  }
-.lmsa-mode-toggle-btn:focus-visible {
-    outline: none;
-    box-shadow: 0 0 0 3px color-mix(in srgb, var(--lmsa-mode-accent) 20%, transparent);
-    z-index: 2;
-  }
-.lmsa-tool-use-indicator {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 28px;
-    height: 28px;
-    border-radius: 7px;
-    border: 1px solid var(--background-modifier-border);
-    color: var(--text-faint);
-    opacity: 0.4;
-    transition: color 0.15s ease, opacity 0.15s ease, border-color 0.15s ease;
-}
-.lmsa-tool-use-indicator svg {
-    width: 14px;
-    height: 14px;
-  }
-.lmsa-tool-use-indicator.is-active {
-    color: var(--color-orange, #e8a84b);
-    border-color: color-mix(in srgb, var(--color-orange, #e8a84b) 45%, var(--background-modifier-border));
-    opacity: 1;
-  }
-.lmsa-action-btn {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 36px;
-    height: 36px;
-    padding: 0;
-    border-radius: 50%;
-}
-.lmsa-action-btn svg {
-    width: 18px;
-    height: 18px;
-  }
-.lmsa-action-btn.is-stop {
-    background: transparent;
-    color: var(--text-error);
-    border: 1px solid color-mix(in srgb, var(--text-error) 40%, var(--background-modifier-border));
-  }
-.lmsa-action-btn.is-stop:hover {
-    background: color-mix(in srgb, var(--text-error) 12%, transparent);
-  }
+/* ── Collapsed overlay ───────────────────────────────────────────────────── */
 .lmsa-collapsed-overlay {
     display: none;
     align-items: center;
@@ -746,6 +535,18 @@
 .lmsa-root.is-collapsed .lmsa-collapsed-overlay {
     display: flex;
 }
+/* ── Responsive ──────────────────────────────────────────────────────────── */
+@media (max-width: 700px) {
+    .lmsa-header {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .lmsa-header-actions {
+        width: 100%;
+        justify-content: flex-start;
+    }
+  }
 .lmsa-history-drawer {
     position: absolute;
     z-index: 10;
@@ -1259,29 +1060,6 @@
     font-size: var(--font-smallest);
     opacity: 0.6;
 }
-.lmsa-usage-summary {
-    display: flex;
-    align-items: center;
-    font-size: var(--font-smallest);
-    color: var(--text-muted);
-    padding: 0 4px;
-    min-height: 20px;
-}
-/* Context capacity bar */
-.lmsa-context-capacity {
-    padding: 2px 4px;
-    font-size: var(--font-ui-small);
-    color: var(--text-muted);
-  }
-.lmsa-context-capacity.is-warning .lmsa-context-capacity-label {
-    color: var(--text-warning, #e6a700);
-  }
-.lmsa-context-capacity.is-danger .lmsa-context-capacity-label {
-    color: var(--text-error, #e93147);
-  }
-.lmsa-context-capacity-label {
-    line-height: 1;
-  }
 .lmsa-rag-sources {
     margin-top: 8px;
     padding-top: 8px;
@@ -1866,25 +1644,44 @@
     opacity: 0.4;
     pointer-events: none;
   }
-.lmsa-command-bar {
+/* ── Command bar ─────────────────────────────────────────────────────────── */
+.lmsa-chat-composer-command-bar {
     position: relative;
     z-index: 1;
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
 }
-.lmsa-command-label {
+.lmsa-chat-composer-command-bar-label {
     padding-left: 0.25rem;
     color: var(--text-muted);
     font-size: var(--font-ui-smaller);
     letter-spacing: 0.02em;
 }
-.lmsa-command-chips {
+.lmsa-chat-composer-command-chips {
     display: flex;
     flex-wrap: wrap;
     gap: 0.5rem;
 }
-.lmsa-composer-chips {
+.lmsa-chat-composer-command-chip {
+    cursor: pointer;
+    white-space: nowrap;
+    border-radius: 9999px;
+    border-width: 1px;
+    border-color: var(--background-modifier-border);
+    padding-left: 0.75rem;
+    padding-right: 0.75rem;
+    padding-top: 7px;
+    padding-bottom: 7px;
+    color: var(--text-normal);
+    font-size: var(--font-ui-small);
+    background: color-mix(in srgb, var(--background-secondary) 88%, transparent);
+}
+.lmsa-chat-composer-command-chip:hover {
+    background-color: var(--background-modifier-hover);
+}
+/* ── Context chips ───────────────────────────────────────────────────────── */
+.lmsa-chat-composer-chips {
     display: flex;
     flex-wrap: wrap;
     gap: 0.375rem;
@@ -1892,33 +1689,347 @@
     padding-right: 0.25rem;
     padding-bottom: 0.625rem;
 }
-.lmsa-composer-chips:empty {
+.lmsa-chat-composer-chips:empty {
     display: none;
 }
-.lmsa-chip-icon {
+.lmsa-chat-composer-chip {
+    display: inline-flex;
+    max-width: 220px;
+    align-items: center;
+    gap: 5px;
+    border-radius: 9999px;
+    padding-bottom: 0.25rem;
+    padding-left: 0.5rem;
+    padding-right: 0.375rem;
+    padding-top: 0.25rem;
+    color: var(--text-muted);
+    font-size: var(--font-ui-smaller);
+    border: 1px solid color-mix(in srgb, var(--lmsa-mode-accent) 40%, var(--background-modifier-border));
+    background: color-mix(in srgb, var(--lmsa-mode-accent) 10%, var(--background-secondary));
+}
+.lmsa-chat-composer-chip-icon {
     display: inline-flex;
     flex: none;
     align-items: center;
     color: var(--lmsa-mode-accent);
 }
-.lmsa-chip-icon svg {
+.lmsa-chat-composer-chip-icon svg {
     width: 11px;
     height: 11px;
   }
-.lmsa-chip-label {
+.lmsa-chat-composer-chip-label {
     min-width: 0px;
     flex: 1 1 0%;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
-.lmsa-chip-remove svg {
+.lmsa-chat-composer-chip-remove {
+    display: inline-flex;
+    height: 1rem;
+    width: 1rem;
+    flex: none;
+    cursor: pointer;
+    align-items: center;
+    justify-content: center;
+    border-radius: 9999px;
+    border-style: none;
+    padding: 0px;
+    color: var(--text-muted);
+    background: transparent;
+    box-shadow: none;
+    outline: none;
+    -webkit-appearance: none;
+       -moz-appearance: none;
+            appearance: none;
+    min-height: unset;
+    font: inherit;
+    line-height: 1;
+    transition: color 120ms ease;
+}
+.lmsa-chat-composer-chip-remove:hover {
+    color: var(--text-normal);
+    background: var(--background-modifier-hover);
+}
+.lmsa-chat-composer-chip-remove svg {
     width: 10px;
     height: 10px;
   }
-.lmsa-chip--edit {
-    border-color: var(--lmsa-mode-accent);
-    background: color-mix(in srgb, var(--lmsa-mode-accent) 8%, var(--background-primary));
+/* ── Composer panel ──────────────────────────────────────────────────────── */
+.lmsa-chat-composer-panel {
+    position: relative;
+    z-index: 1;
+    overflow: visible;
+    border-radius: 20px;
+    border-width: 1px;
+    border-color: var(--background-modifier-border);
+    padding-left: 14px;
+    padding-right: 14px;
+    padding-bottom: 0.75rem;
+    padding-top: 14px;
+    background: linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--background-primary) 92%, transparent),
+      color-mix(in srgb, var(--background-secondary) 86%, transparent)
+    );
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+    box-shadow:
+      0 18px 48px rgba(0, 0, 0, 0.12),
+      inset 0 1px 0 rgba(255, 255, 255, 0.06);
+    transition: border-color 200ms ease, box-shadow 200ms ease;
+}
+.lmsa-chat-composer-panel:hover {
+    border-color: var(--lmsa-chat-border-emphasis);
+    box-shadow:
+      0 18px 48px rgba(0, 0, 0, 0.12),
+      inset 0 1px 0 rgba(255, 255, 255, 0.06),
+      0 0 0 1px var(--lmsa-chat-glow-ring);
+  }
+/* Shimmer line along the top edge */
+.lmsa-chat-composer-panel::before {
+    content: "";
+    pointer-events: none;
+    position: absolute;
+    left: 1rem;
+    right: 1rem;
+    top: 0px;
+    height: 1px;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      color-mix(in srgb, var(--lmsa-mode-accent) 55%, white),
+      transparent
+    );
+    opacity: 0.8;
+    transition: opacity 200ms ease;
+  }
+.lmsa-chat-composer-panel:hover::before,
+  .lmsa-chat-composer-panel:focus-within::before {
+    opacity: 1;
+  }
+/* Glow aura behind the panel */
+.lmsa-chat-composer-panel::after {
+    content: "";
+    pointer-events: none;
+    position: absolute;
+    inset: -2px;
+    border-radius: inherit;
+    background: linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--lmsa-chat-accent) 12%, transparent),
+      transparent 60%,
+      color-mix(in srgb, var(--lmsa-chat-accent) 8%, transparent)
+    );
+    z-index: -1;
+    filter: blur(20px);
+    opacity: 0;
+    transition: opacity 300ms ease;
+  }
+.lmsa-chat-composer-panel:hover::after,
+  .lmsa-chat-composer-panel:focus-within::after {
+    opacity: 0.85;
+  }
+.lmsa-chat-composer-panel:focus-within {
+    border-color: color-mix(in srgb, var(--lmsa-mode-accent) 45%, var(--background-modifier-border));
+    box-shadow:
+      0 24px 60px rgba(0, 0, 0, 0.14),
+      0 0 0 1px color-mix(in srgb, var(--lmsa-mode-accent) 24%, transparent),
+      inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  }
+/* ── Textarea ────────────────────────────────────────────────────────────── */
+.lmsa-chat-composer-textarea {
+    box-sizing: border-box;
+    width: 100%;
+    resize: none;
+    border-style: none;
+    background-color: transparent;
+    padding-left: 0.5rem;
+    padding-right: 0.5rem;
+    padding-bottom: 0.5rem;
+    padding-top: 0.5rem;
+    color: var(--text-normal);
+    font-family: var(--font-interface);
+    font-size: 1rem;
+    line-height: 1.7;
+    min-height: 84px;
+    max-height: 260px;
+    overflow-y: auto;
+}
+.lmsa-chat-composer-textarea::-moz-placeholder {
+    color: color-mix(in srgb, var(--text-muted) 82%, transparent);
+  }
+.lmsa-chat-composer-textarea::placeholder {
+    color: color-mix(in srgb, var(--text-muted) 82%, transparent);
+  }
+.lmsa-chat-composer-textarea:hover,
+  .lmsa-chat-composer-textarea:focus,
+  .lmsa-chat-composer-textarea:focus-visible {
+    outline: none;
+    border: none;
+    box-shadow: none;
+    background: transparent;
+  }
+/* ── Footer ──────────────────────────────────────────────────────────────── */
+.lmsa-chat-composer-footer {
+    margin-top: 0.25rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid color-mix(in srgb, var(--background-modifier-border) 78%, transparent);
+}
+.lmsa-chat-composer-footer-actions {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+/* ── Context capacity ────────────────────────────────────────────────────── */
+.lmsa-chat-composer-context-capacity {
+    padding: 2px 4px;
+    font-size: var(--font-ui-small);
+    color: var(--text-muted);
+  }
+.lmsa-chat-composer-context-capacity-label {
+    line-height: 1;
+  }
+.lmsa-chat-composer-context-capacity.is-warning .lmsa-chat-composer-context-capacity-label {
+    color: var(--text-warning, #e6a700);
+  }
+.lmsa-chat-composer-context-capacity.is-danger .lmsa-chat-composer-context-capacity-label {
+    color: var(--text-error, #e93147);
+  }
+/* ── Usage summary ───────────────────────────────────────────────────────── */
+.lmsa-chat-composer-usage-summary {
+    display: flex;
+    align-items: center;
+    font-size: var(--font-smallest);
+    color: var(--text-muted);
+    padding: 0 4px;
+    min-height: 20px;
+}
+/* ── Mode toggle ─────────────────────────────────────────────────────────── */
+.lmsa-chat-composer-mode-toggle {
+    display: inline-flex;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+.lmsa-chat-composer-mode-toggle-btn {
+    position: relative;
+    display: inline-flex;
+    cursor: pointer;
+    align-items: center;
+    gap: 0.375rem;
+    padding-left: 0.75rem;
+    padding-right: 0.75rem;
+    padding-top: 0.375rem;
+    padding-bottom: 0.375rem;
+    font-size: var(--font-ui-smaller);
+    font-weight: 500;
+    line-height: 1.25;
+    color: var(--text-muted);
+    background: color-mix(in srgb, var(--background-primary) 90%, var(--background-secondary));
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 0;
+    transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease;
+}
+.lmsa-chat-composer-mode-toggle-icon {
+    display: inline-flex;
+    align-items: center;
+}
+.lmsa-chat-composer-mode-toggle-icon svg {
+    width: 12px;
+    height: 12px;
+  }
+.lmsa-chat-composer-mode-toggle-btn + .lmsa-chat-composer-mode-toggle-btn {
+    margin-left: -1px;
+  }
+.lmsa-chat-composer-mode-toggle-btn:first-child {
+    border-radius: 6px 0 0 6px;
+  }
+.lmsa-chat-composer-mode-toggle-btn:last-child {
+    border-radius: 0 6px 6px 0;
+  }
+.lmsa-chat-composer-mode-toggle-btn:hover {
+    background: var(--background-modifier-hover);
+    color: var(--text-normal);
+    z-index: 1;
+  }
+/* Active state inherits --lmsa-mode-accent from .lmsa-root[data-mode] */
+.lmsa-chat-composer-mode-toggle-btn.is-active {
+    background: color-mix(in srgb, var(--lmsa-mode-accent) 15%, var(--background-primary));
+    border-color: color-mix(in srgb, var(--lmsa-mode-accent) 45%, var(--background-modifier-border));
+    color: var(--lmsa-mode-accent);
+    z-index: 1;
+  }
+.lmsa-chat-composer-mode-toggle-btn:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--lmsa-mode-accent) 20%, transparent);
+    z-index: 2;
+  }
+/* ── Tool indicator ──────────────────────────────────────────────────────── */
+.lmsa-chat-composer-tool-indicator {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 7px;
+    border: 1px solid var(--background-modifier-border);
+    color: var(--text-faint);
+    opacity: 0.4;
+    transition: color 0.15s ease, opacity 0.15s ease, border-color 0.15s ease;
+}
+.lmsa-chat-composer-tool-indicator svg {
+    width: 14px;
+    height: 14px;
+  }
+.lmsa-chat-composer-tool-indicator.is-active {
+    color: var(--color-orange, #e8a84b);
+    border-color: color-mix(in srgb, var(--color-orange, #e8a84b) 45%, var(--background-modifier-border));
+    opacity: 1;
+  }
+/* ── Send button ─────────────────────────────────────────────────────────── */
+.lmsa-chat-composer-send-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-style: none;
+    font-weight: 600;
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    border-radius: 50%;
+    background: var(--interactive-accent);
+    color: var(--text-on-accent);
+}
+.lmsa-chat-composer-send-btn:hover:not(:disabled) {
+    background: var(--interactive-accent-hover);
+  }
+.lmsa-chat-composer-send-btn svg {
+    width: 18px;
+    height: 18px;
+  }
+.lmsa-chat-composer-send-btn.is-stop {
+    background: transparent;
+    color: var(--text-error);
+    border: 1px solid color-mix(in srgb, var(--text-error) 40%, var(--background-modifier-border));
+  }
+.lmsa-chat-composer-send-btn.is-stop:hover {
+    background: color-mix(in srgb, var(--text-error) 12%, transparent);
+  }
+/* ── Responsive ──────────────────────────────────────────────────────────── */
+@media (max-width: 700px) {
+    .lmsa-chat-composer-footer {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .lmsa-chat-composer-footer-actions {
+        width: 100%;
+        justify-content: space-between;
+    }
   }
 .lmsa-settings-root {
     padding-bottom: 2rem;
@@ -3970,31 +4081,7 @@
     transition-duration: 140ms;
 }
 /* Chat */
-/* Override lmsa-ui-pill-button base + Obsidian button background */
-.lmsa-generate-response-btn {
-  background: linear-gradient(
-    135deg,
-    rgba(255, 255, 255, 0.2) 0%,
-    rgba(255, 255, 255, 0.08) 50%,
-    rgba(255, 255, 255, 0.03) 100%
-  ) !important;
-}
 @media (max-width: 700px) {
-  .lmsa-header,
-  .lmsa-composer-footer {
-        flex-direction: column;
-        align-items: stretch;
-    }
-
-  .lmsa-header-actions {
-        width: 100%;
-        justify-content: flex-start;
-    }
-
-  .lmsa-composer-footer-actions {
-        width: 100%;
-        justify-content: space-between;
-    }
   .lmsa-history-drawer {
     inset: 8px 8px 8px;
     border-radius: 20px;

@@ -127,14 +127,12 @@ export class ChatComposer {
     }
 
     const isEditMode = this.currentMode === "edit";
-    const chip = this.refs.contextChipsEl.createDiv({
-      cls: `lmsa-chip lmsa-ui-chip${isEditMode ? " lmsa-chip--edit" : ""}`,
-    });
-    const fileIcon = chip.createEl("span", { cls: "lmsa-chip-icon" });
+    const chip = this.refs.contextChipsEl.createDiv({ cls: "lmsa-chat-composer-chip" });
+    const fileIcon = chip.createEl("span", { cls: "lmsa-chat-composer-chip-icon" });
     setIcon(fileIcon, isEditMode ? "file-pen-line" : "file-text");
-    chip.createEl("span", { cls: "lmsa-chip-label", text: fileName });
+    chip.createEl("span", { cls: "lmsa-chat-composer-chip-label", text: fileName });
     const removeBtn = chip.createEl("button", {
-      cls: "lmsa-chip-remove lmsa-ui-chip-dismiss",
+      cls: "lmsa-chat-composer-chip-remove",
       attr: { "aria-label": "Remove context" },
     });
     setIcon(removeBtn.createEl("span"), "x");
@@ -181,14 +179,14 @@ export class ChatComposer {
     if (!hasCustomCommands) return;
 
     this.refs.commandBarEl.createEl("div", {
-      cls: "lmsa-command-label",
+      cls: "lmsa-chat-composer-command-bar-label",
       text: "Quick commands",
     });
-    const chips = this.refs.commandBarEl.createDiv({ cls: "lmsa-command-chips" });
+    const chips = this.refs.commandBarEl.createDiv({ cls: "lmsa-chat-composer-command-chips" });
 
     for (const command of this.plugin.settings.commands) {
       const chip = chips.createEl("button", {
-        cls: "lmsa-command-chip lmsa-ui-pill-button",
+        cls: "lmsa-chat-composer-command-chip",
         text: command.name,
       });
       chip.addEventListener("click", () => {
@@ -207,10 +205,10 @@ export class ChatComposer {
 
     for (const { mode, label, icon } of MODE_OPTIONS) {
       const btn = this.refs.modeToggleEl.createEl("button", {
-        cls: "lmsa-mode-toggle-btn",
+        cls: "lmsa-chat-composer-mode-toggle-btn",
         attr: { "aria-label": `${label} mode`, "data-mode": mode },
       });
-      const iconEl = btn.createEl("span", { cls: "lmsa-mode-toggle-icon" });
+      const iconEl = btn.createEl("span", { cls: "lmsa-chat-composer-mode-toggle-icon" });
       setIcon(iconEl, icon);
       btn.createEl("span", { text: label });
       if (mode === this.currentMode) {

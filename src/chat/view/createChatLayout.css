@@ -1,4 +1,6 @@
 @layer components {
+  /* ── Root ────────────────────────────────────────────────────────────────── */
+
   .lmsa-root {
     @apply lmsa-relative lmsa-overflow-hidden;
     height: 100%;
@@ -26,9 +28,13 @@
     --lmsa-mode-accent: var(--color-orange, #e8a84b);
   }
 
+  /* ── Shell ───────────────────────────────────────────────────────────────── */
+
   .lmsa-shell {
     @apply lmsa-mx-auto lmsa-flex lmsa-h-full lmsa-max-w-[980px] lmsa-flex-col;
   }
+
+  /* ── Header ──────────────────────────────────────────────────────────────── */
 
   .lmsa-header {
     @apply lmsa-flex lmsa-items-center lmsa-justify-between lmsa-gap-4 lmsa-px-[18px] lmsa-pb-3 lmsa-pt-[18px];
@@ -80,10 +86,7 @@
     transition: opacity 140ms ease;
   }
 
-  .lmsa-header-meta:hover .lmsa-header-meta-chevron {
-    opacity: 0.75;
-  }
-
+  .lmsa-header-meta:hover .lmsa-header-meta-chevron,
   .lmsa-header-meta.is-active .lmsa-header-meta-chevron {
     opacity: 0.75;
   }
@@ -120,6 +123,8 @@
     height: 20px;
   }
 
+  /* ── Messages pane ───────────────────────────────────────────────────────── */
+
   .lmsa-messages-pane {
     @apply lmsa-relative lmsa-min-h-0 lmsa-flex-1 lmsa-overflow-visible;
   }
@@ -139,6 +144,13 @@
     @apply lmsa-pointer-events-auto lmsa-opacity-100;
   }
 
+  .lmsa-messages-pane.is-history-open .lmsa-messages,
+  .lmsa-messages-pane.is-history-open .lmsa-empty-view {
+    opacity: 0;
+  }
+
+  /* ── Empty state ─────────────────────────────────────────────────────────── */
+
   .lmsa-empty-view {
     @apply lmsa-pointer-events-none lmsa-absolute lmsa-inset-0 lmsa-flex lmsa-flex-col lmsa-items-center lmsa-justify-center lmsa-gap-2.5 lmsa-p-8 lmsa-text-center lmsa-text-obsidian-muted;
     transition: opacity 180ms ease;
@@ -146,11 +158,6 @@
 
   .lmsa-empty-view--hidden {
     @apply lmsa-hidden;
-  }
-
-  .lmsa-messages-pane.is-history-open .lmsa-messages,
-  .lmsa-messages-pane.is-history-open .lmsa-empty-view {
-    opacity: 0;
   }
 
   .lmsa-empty-title {
@@ -163,8 +170,11 @@
     line-height: 1.6;
   }
 
-  .lmsa-generate-response-btn {
-    @apply lmsa-absolute lmsa-z-10 lmsa-inline-flex lmsa-items-center lmsa-gap-1.5;
+  /* ── Generate response button ────────────────────────────────────────────── */
+
+  .lmsa-chat-composer-generate-btn {
+    @apply lmsa-absolute lmsa-z-10 lmsa-inline-flex lmsa-cursor-pointer lmsa-items-center lmsa-gap-1.5 lmsa-whitespace-nowrap lmsa-rounded-full lmsa-px-3 lmsa-py-[7px] lmsa-text-obsidian-text;
+    font-size: var(--font-ui-small);
     left: 50%;
     top: 0;
     transform: translate(-50%, calc(-100% - 10px));
@@ -180,32 +190,32 @@
     transition: all 0.8s cubic-bezier(0.175, 0.885, 0.32, 2.2);
   }
 
-  .lmsa-generate-response-btn:hover {
+  .lmsa-chat-composer-generate-btn:hover {
     transform: translate(-50%, calc(-100% - 10px)) scale(1.05);
   }
 
-  .lmsa-generate-response-icon {
+  .lmsa-chat-composer-generate-icon {
     @apply lmsa-inline-flex lmsa-items-center;
     color: var(--lmsa-mode-accent);
   }
 
-  .lmsa-generate-response-icon svg {
+  .lmsa-chat-composer-generate-icon svg {
     width: 14px;
     height: 14px;
   }
 
   /* Loading text — hidden by default */
-  .lmsa-generate-response-loading {
+  .lmsa-chat-composer-generate-loading {
     display: none;
   }
 
   /* Generating state: swap content */
-  .lmsa-generate-response-btn.is-generating .lmsa-generate-response-icon,
-  .lmsa-generate-response-btn.is-generating > span:not(.lmsa-generate-response-loading) {
+  .lmsa-chat-composer-generate-btn.is-generating .lmsa-chat-composer-generate-icon,
+  .lmsa-chat-composer-generate-btn.is-generating > span:not(.lmsa-chat-composer-generate-loading) {
     display: none;
   }
 
-  .lmsa-generate-response-btn.is-generating .lmsa-generate-response-loading {
+  .lmsa-chat-composer-generate-btn.is-generating .lmsa-chat-composer-generate-loading {
     display: inline-block;
     font-weight: 500;
     font-size: var(--font-ui-small);
@@ -224,228 +234,18 @@
     animation: lmsa-shimmer-sweep 2s ease-in-out infinite;
   }
 
-  .lmsa-generate-response-btn.is-generating {
+  .lmsa-chat-composer-generate-btn.is-generating {
     pointer-events: none;
     cursor: default;
   }
 
-  .lmsa-composer {
+  /* ── Composer wrapper ────────────────────────────────────────────────────── */
+
+  .lmsa-chat-composer {
     @apply lmsa-relative lmsa-flex lmsa-flex-col lmsa-gap-2.5 lmsa-px-[18px] lmsa-pb-[18px];
   }
 
-  .lmsa-composer-panel {
-    @apply lmsa-relative lmsa-z-[1] lmsa-overflow-visible lmsa-px-[14px] lmsa-pb-3 lmsa-pt-[14px];
-    background: linear-gradient(180deg, color-mix(in srgb, var(--background-primary) 92%, transparent), color-mix(in srgb, var(--background-secondary) 86%, transparent));
-    backdrop-filter: blur(18px);
-    -webkit-backdrop-filter: blur(18px);
-    box-shadow:
-      0 18px 48px rgba(0, 0, 0, 0.12),
-      inset 0 1px 0 rgba(255, 255, 255, 0.06);
-    transition: border-color 200ms ease, box-shadow 200ms ease;
-  }
-
-  .lmsa-composer-panel:hover {
-    border-color: var(--lmsa-chat-border-emphasis);
-    box-shadow:
-      0 18px 48px rgba(0, 0, 0, 0.12),
-      inset 0 1px 0 rgba(255, 255, 255, 0.06),
-      0 0 0 1px var(--lmsa-chat-glow-ring);
-  }
-
-  .lmsa-composer-panel::before {
-    content: "";
-    @apply lmsa-pointer-events-none lmsa-absolute lmsa-inset-x-4 lmsa-top-0 lmsa-h-px;
-    background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--lmsa-mode-accent) 55%, white), transparent);
-    opacity: 0.8;
-    transition: opacity 200ms ease;
-  }
-
-  .lmsa-composer-panel:hover::before,
-  .lmsa-composer-panel:focus-within::before {
-    opacity: 1;
-  }
-
-  /* Glow aura — uses ::after since ::before is the shimmer line */
-  .lmsa-composer-panel::after {
-    content: "";
-    @apply lmsa-pointer-events-none lmsa-absolute;
-    inset: -2px;
-    border-radius: inherit;
-    background: linear-gradient(
-      135deg,
-      color-mix(in srgb, var(--lmsa-chat-accent) 12%, transparent),
-      transparent 60%,
-      color-mix(in srgb, var(--lmsa-chat-accent) 8%, transparent)
-    );
-    z-index: -1;
-    filter: blur(20px);
-    opacity: 0;
-    transition: opacity 300ms ease;
-  }
-
-  .lmsa-composer-panel:hover::after,
-  .lmsa-composer-panel:focus-within::after {
-    opacity: 0.85;
-  }
-
-  .lmsa-composer-panel:focus-within {
-    border-color: color-mix(in srgb, var(--lmsa-mode-accent) 45%, var(--background-modifier-border));
-    box-shadow:
-      0 24px 60px rgba(0, 0, 0, 0.14),
-      0 0 0 1px color-mix(in srgb, var(--lmsa-mode-accent) 24%, transparent),
-      inset 0 1px 0 rgba(255, 255, 255, 0.08);
-  }
-
-  .lmsa-textarea {
-    @apply lmsa-box-border lmsa-w-full lmsa-resize-none lmsa-border-none lmsa-bg-transparent lmsa-px-2 lmsa-pb-2 lmsa-pt-2 lmsa-text-obsidian-text;
-    font-family: var(--font-interface);
-    font-size: 1rem;
-    line-height: 1.7;
-    min-height: 84px;
-    max-height: 260px;
-    overflow-y: auto;
-  }
-
-  .lmsa-textarea::placeholder {
-    color: color-mix(in srgb, var(--text-muted) 82%, transparent);
-  }
-
-  .lmsa-textarea:hover,
-  .lmsa-textarea:focus,
-  .lmsa-textarea:focus-visible {
-    outline: none;
-    border: none;
-    box-shadow: none;
-    background: transparent;
-  }
-
-  .lmsa-composer-footer {
-    @apply lmsa-mt-1 lmsa-flex lmsa-items-center lmsa-justify-between lmsa-gap-3 lmsa-pt-3;
-    border-top: 1px solid color-mix(in srgb, var(--background-modifier-border) 78%, transparent);
-  }
-
-
-  .lmsa-composer-footer-actions {
-    @apply lmsa-ml-auto lmsa-flex lmsa-items-center lmsa-gap-3;
-  }
-
-  .lmsa-mode-toggle {
-    @apply lmsa-inline-flex;
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
-  }
-
-  .lmsa-mode-toggle-btn {
-    @apply lmsa-relative lmsa-inline-flex lmsa-cursor-pointer lmsa-items-center lmsa-gap-1.5 lmsa-px-3 lmsa-py-1.5;
-    font-size: var(--font-ui-smaller);
-    font-weight: 500;
-    line-height: 1.25;
-    color: var(--text-muted);
-    background: color-mix(in srgb, var(--background-primary) 90%, var(--background-secondary));
-    border: 1px solid var(--background-modifier-border);
-    border-radius: 0;
-    transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease;
-  }
-
-  .lmsa-mode-toggle-icon {
-    @apply lmsa-inline-flex lmsa-items-center;
-  }
-
-  .lmsa-mode-toggle-icon svg {
-    width: 12px;
-    height: 12px;
-  }
-
-  .lmsa-mode-toggle-btn + .lmsa-mode-toggle-btn {
-    margin-left: -1px;
-  }
-
-  .lmsa-mode-toggle-btn:first-child {
-    border-radius: 6px 0 0 6px;
-  }
-
-  .lmsa-mode-toggle-btn:last-child {
-    border-radius: 0 6px 6px 0;
-  }
-
-  .lmsa-mode-toggle-btn:hover {
-    background: var(--background-modifier-hover);
-    color: var(--text-normal);
-    z-index: 1;
-  }
-
-  .lmsa-mode-toggle-btn.is-active {
-    color: var(--text-normal);
-    z-index: 1;
-  }
-
-  .lmsa-mode-toggle-btn.is-active[data-mode="plan"] {
-    background: color-mix(in srgb, var(--color-blue, #4a90d9) 15%, var(--background-primary));
-    border-color: color-mix(in srgb, var(--color-blue, #4a90d9) 45%, var(--background-modifier-border));
-    color: var(--color-blue, #4a90d9);
-  }
-
-  .lmsa-mode-toggle-btn.is-active[data-mode="conversation"] {
-    background: color-mix(in srgb, var(--interactive-accent) 15%, var(--background-primary));
-    border-color: color-mix(in srgb, var(--interactive-accent) 45%, var(--background-modifier-border));
-    color: var(--interactive-accent);
-  }
-
-  .lmsa-mode-toggle-btn.is-active[data-mode="edit"] {
-    background: color-mix(in srgb, var(--color-orange, #e8a84b) 15%, var(--background-primary));
-    border-color: color-mix(in srgb, var(--color-orange, #e8a84b) 45%, var(--background-modifier-border));
-    color: var(--color-orange, #e8a84b);
-  }
-
-  .lmsa-mode-toggle-btn:focus-visible {
-    outline: none;
-    box-shadow: 0 0 0 3px color-mix(in srgb, var(--lmsa-mode-accent) 20%, transparent);
-    z-index: 2;
-  }
-
-  .lmsa-tool-use-indicator {
-    @apply lmsa-inline-flex lmsa-items-center lmsa-justify-center;
-    width: 28px;
-    height: 28px;
-    border-radius: 7px;
-    border: 1px solid var(--background-modifier-border);
-    color: var(--text-faint);
-    opacity: 0.4;
-    transition: color 0.15s ease, opacity 0.15s ease, border-color 0.15s ease;
-  }
-
-  .lmsa-tool-use-indicator svg {
-    width: 14px;
-    height: 14px;
-  }
-
-  .lmsa-tool-use-indicator.is-active {
-    color: var(--color-orange, #e8a84b);
-    border-color: color-mix(in srgb, var(--color-orange, #e8a84b) 45%, var(--background-modifier-border));
-    opacity: 1;
-  }
-
-  .lmsa-action-btn {
-    @apply lmsa-flex lmsa-items-center lmsa-justify-center;
-    width: 36px;
-    height: 36px;
-    padding: 0;
-    border-radius: 50%;
-  }
-
-  .lmsa-action-btn svg {
-    width: 18px;
-    height: 18px;
-  }
-
-  .lmsa-action-btn.is-stop {
-    background: transparent;
-    color: var(--text-error);
-    border: 1px solid color-mix(in srgb, var(--text-error) 40%, var(--background-modifier-border));
-  }
-
-  .lmsa-action-btn.is-stop:hover {
-    background: color-mix(in srgb, var(--text-error) 12%, transparent);
-  }
+  /* ── Collapsed overlay ───────────────────────────────────────────────────── */
 
   .lmsa-collapsed-overlay {
     @apply lmsa-hidden lmsa-items-center lmsa-justify-center lmsa-p-8 lmsa-text-center lmsa-text-obsidian-muted;
@@ -464,29 +264,16 @@
   .lmsa-root.is-collapsed .lmsa-collapsed-overlay {
     @apply lmsa-flex;
   }
-}
 
-/* Override lmsa-ui-pill-button base + Obsidian button background */
-.lmsa-generate-response-btn {
-  background: linear-gradient(
-    135deg,
-    rgba(255, 255, 255, 0.2) 0%,
-    rgba(255, 255, 255, 0.08) 50%,
-    rgba(255, 255, 255, 0.03) 100%
-  ) !important;
-}
+  /* ── Responsive ──────────────────────────────────────────────────────────── */
 
-@media (max-width: 700px) {
-  .lmsa-header,
-  .lmsa-composer-footer {
-    @apply lmsa-flex-col lmsa-items-stretch;
-  }
+  @media (max-width: 700px) {
+    .lmsa-header {
+      @apply lmsa-flex-col lmsa-items-stretch;
+    }
 
-  .lmsa-header-actions {
-    @apply lmsa-w-full lmsa-justify-start;
-  }
-
-  .lmsa-composer-footer-actions {
-    @apply lmsa-w-full lmsa-justify-between;
+    .lmsa-header-actions {
+      @apply lmsa-w-full lmsa-justify-start;
+    }
   }
 }

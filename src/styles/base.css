@@ -117,8 +117,8 @@
   .lmsa-ui-chip {
     @apply lmsa-inline-flex lmsa-max-w-[220px] lmsa-items-center lmsa-gap-[5px] lmsa-rounded-full lmsa-pb-1 lmsa-pl-2 lmsa-pr-1.5 lmsa-pt-1 lmsa-text-obsidian-muted;
     font-size: var(--font-ui-smaller);
-    border: 1px solid color-mix(in srgb, var(--interactive-accent) 40%, var(--background-modifier-border));
-    background: color-mix(in srgb, var(--interactive-accent) 10%, var(--background-secondary));
+    border: 1px solid color-mix(in srgb, var(--lmsa-mode-accent) 40%, var(--background-modifier-border));
+    background: color-mix(in srgb, var(--lmsa-mode-accent) 10%, var(--background-secondary));
   }
 
   .lmsa-ui-chip-dismiss {

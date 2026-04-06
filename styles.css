@@ -1784,15 +1784,45 @@
       inset 0 1px 0 rgba(255, 255, 255, 0.06);
     transition: border-color 200ms ease, box-shadow 200ms ease;
 }
-.lmsa-chat-composer-panel:hover {
-    border-color: var(--lmsa-chat-border-emphasis);
+.lmsa-chat-composer-panel:hover,
+  .lmsa-chat-composer-panel:focus-within {
+    border-color: color-mix(in srgb, var(--lmsa-mode-accent) 45%, var(--background-modifier-border));
     box-shadow:
-      0 18px 48px rgba(0, 0, 0, 0.12),
-      inset 0 1px 0 rgba(255, 255, 255, 0.06),
-      0 0 0 1px var(--lmsa-chat-glow-ring);
+      0 24px 60px rgba(0, 0, 0, 0.14),
+      0 0 0 1px color-mix(in srgb, var(--lmsa-mode-accent) 24%, transparent),
+      inset 0 1px 0 rgba(255, 255, 255, 0.08);
   }
-/* Two accent spots orbiting the outline */
-.lmsa-chat-composer-panel::before {
+/* Idle ring — wide shimmer sweep, fades out on interaction */
+.lmsa-root .lmsa-chat-composer-panel::before {
+    content: "";
+    pointer-events: none;
+    position: absolute;
+    inset: -1px;
+    border-radius: inherit;
+    padding: 1.5px;
+    background: conic-gradient(
+      from var(--lmsa-border-angle),
+      color-mix(in srgb, var(--lmsa-mode-accent) 30%, transparent) 0deg,
+      color-mix(in srgb, var(--lmsa-mode-accent) 85%, white) 115deg,
+      color-mix(in srgb, var(--lmsa-mode-accent) 30%, transparent) 230deg,
+      color-mix(in srgb, var(--lmsa-mode-accent) 30%, transparent) 360deg
+    );
+    -webkit-mask:
+      linear-gradient(#fff 0 0) content-box,
+      linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    animation: lmsa-border-spin 15s linear infinite;
+    opacity: 0.55;
+    transition: opacity 900ms ease;
+    z-index: 0;
+  }
+.lmsa-root .lmsa-chat-composer-panel:hover::before,
+  .lmsa-root .lmsa-chat-composer-panel:focus-within::before {
+    opacity: 0;
+  }
+/* Spinning neutron-star beam — always running, invisible at idle */
+.lmsa-root .lmsa-chat-composer-panel::after {
     content: "";
     pointer-events: none;
     position: absolute;
@@ -1815,42 +1845,13 @@
     -webkit-mask-composite: xor;
     mask-composite: exclude;
     animation: lmsa-border-spin 5s linear infinite;
-    opacity: 0.65;
-    transition: opacity 200ms ease;
+    opacity: 0;
+    transition: opacity 900ms ease;
     z-index: 0;
   }
-.lmsa-chat-composer-panel:hover::before,
-  .lmsa-chat-composer-panel:focus-within::before {
+.lmsa-root .lmsa-chat-composer-panel:hover::after,
+  .lmsa-root .lmsa-chat-composer-panel:focus-within::after {
     opacity: 1;
-  }
-/* Glow aura behind the panel */
-.lmsa-chat-composer-panel::after {
-    content: "";
-    pointer-events: none;
-    position: absolute;
-    inset: -2px;
-    border-radius: inherit;
-    background: linear-gradient(
-      135deg,
-      color-mix(in srgb, var(--lmsa-chat-accent) 12%, transparent),
-      transparent 60%,
-      color-mix(in srgb, var(--lmsa-chat-accent) 8%, transparent)
-    );
-    z-index: -1;
-    filter: blur(20px);
-    opacity: 0;
-    transition: opacity 300ms ease;
-  }
-.lmsa-chat-composer-panel:hover::after,
-  .lmsa-chat-composer-panel:focus-within::after {
-    opacity: 0.85;
-  }
-.lmsa-chat-composer-panel:focus-within {
-    border-color: color-mix(in srgb, var(--lmsa-mode-accent) 45%, var(--background-modifier-border));
-    box-shadow:
-      0 24px 60px rgba(0, 0, 0, 0.14),
-      0 0 0 1px color-mix(in srgb, var(--lmsa-mode-accent) 24%, transparent),
-      inset 0 1px 0 rgba(255, 255, 255, 0.08);
   }
 /* ── Textarea ────────────────────────────────────────────────────────────── */
 .lmsa-chat-composer-textarea {

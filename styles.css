@@ -1360,18 +1360,23 @@
     padding-top: 8px;
     border-top: 1px solid var(--background-modifier-border);
   }
-.lmsa-graph-context-label {
-    font-size: var(--font-ui-smaller);
-    opacity: 0.5;
-    margin-bottom: 4px;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
+.lmsa-graph-context-summary {
+    cursor: pointer;
+    -webkit-user-select: none;
+       -moz-user-select: none;
+            user-select: none;
+    opacity: 0.7;
+  }
+.lmsa-graph-context-summary:hover {
+    opacity: 1;
   }
 .lmsa-graph-entity-pills {
     display: flex;
     flex-wrap: wrap;
     gap: 4px;
+    margin-top: 4px;
     margin-bottom: 4px;
+    padding-left: 8px;
   }
 .lmsa-graph-entity-pill {
     display: inline-flex;
@@ -1400,6 +1405,7 @@
     display: flex;
     flex-direction: column;
     gap: 2px;
+    padding-left: 8px;
   }
 .lmsa-graph-relation {
     font-size: var(--font-ui-smaller);

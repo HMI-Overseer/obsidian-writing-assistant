@@ -25,8 +25,12 @@ function renderGraphContext(containerEl: HTMLElement, sources: RagSourceRef[]): 
 
   if (entityMap.size === 0 && relationships.length === 0) return;
 
-  const sectionEl = containerEl.createDiv({ cls: "lmsa-graph-context" });
-  sectionEl.createDiv({ cls: "lmsa-graph-context-label", text: "Graph" });
+  const parts: string[] = [];
+  if (entityMap.size > 0) parts.push(`${entityMap.size} ${entityMap.size === 1 ? "entity" : "entities"}`);
+  if (relationships.length > 0) parts.push(`${relationships.length} ${relationships.length === 1 ? "relationship" : "relationships"}`);
+
+  const sectionEl = containerEl.createEl("details", { cls: "lmsa-graph-context" });
+  sectionEl.createEl("summary", { cls: "lmsa-graph-context-summary", text: `Graph: ${parts.join(", ")}` });
 
   if (entityMap.size > 0) {
     const pillsEl = sectionEl.createDiv({ cls: "lmsa-graph-entity-pills" });

@@ -1,4 +1,17 @@
+/* Animatable angle for the orbiting border beam */
+@property --lmsa-border-angle {
+  syntax: "<angle>";
+  initial-value: 0deg;
+  inherits: false;
+}
+
 @layer components {
+  @keyframes lmsa-border-spin {
+    to {
+      --lmsa-border-angle: 360deg;
+    }
+  }
+
   /* ── Command bar ─────────────────────────────────────────────────────────── */
 
   .lmsa-chat-composer-command-bar {
@@ -103,18 +116,32 @@
       0 0 0 1px var(--lmsa-chat-glow-ring);
   }
 
-  /* Shimmer line along the top edge */
+  /* Two accent spots orbiting the outline */
   .lmsa-chat-composer-panel::before {
     content: "";
-    @apply lmsa-pointer-events-none lmsa-absolute lmsa-inset-x-4 lmsa-top-0 lmsa-h-px;
-    background: linear-gradient(
-      90deg,
-      transparent,
-      color-mix(in srgb, var(--lmsa-mode-accent) 55%, white),
-      transparent
+    @apply lmsa-pointer-events-none lmsa-absolute;
+    inset: -1px;
+    border-radius: inherit;
+    padding: 1.5px;
+    background: conic-gradient(
+      from var(--lmsa-border-angle),
+      transparent 0deg,
+      color-mix(in srgb, var(--lmsa-mode-accent) 90%, white) 40deg,
+      transparent 80deg,
+      transparent 180deg,
+      color-mix(in srgb, var(--lmsa-mode-accent) 90%, white) 220deg,
+      transparent 260deg,
+      transparent 360deg
     );
-    opacity: 0.8;
+    -webkit-mask:
+      linear-gradient(#fff 0 0) content-box,
+      linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    animation: lmsa-border-spin 5s linear infinite;
+    opacity: 0.65;
     transition: opacity 200ms ease;
+    z-index: 0;
   }
 
   .lmsa-chat-composer-panel:hover::before,

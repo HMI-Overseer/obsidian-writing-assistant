@@ -93,7 +93,7 @@ export function createChatLayout(contentEl: HTMLElement): ChatLayoutRefs {
     cls: "lmsa-empty-copy",
     text: "Ask a question, paste a passage, or use a quick command to rewrite, expand, or tighten your draft.",
   });
-  const messagesEl = messagesPaneEl.createDiv({ cls: "lmsa-messages" });
+  const messagesEl = messagesPaneEl.createDiv({ cls: "lmsa-chat-window-messages" });
 
   const composer = shell.createDiv({ cls: "lmsa-chat-composer" });
 

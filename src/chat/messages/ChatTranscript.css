@@ -1,52 +1,52 @@
 @layer components {
-  .lmsa-message {
+  .lmsa-chat-window-message {
     @apply lmsa-flex lmsa-w-full lmsa-flex-wrap;
     gap: 0 0.75rem;
   }
 
-  .lmsa-message--user {
+  .lmsa-chat-window-message--user {
     @apply lmsa-justify-end;
   }
 
-  .lmsa-message-avatar {
+  .lmsa-chat-window-message-avatar {
     @apply lmsa-inline-flex lmsa-h-[34px] lmsa-w-[34px] lmsa-flex-[0_0_34px] lmsa-items-center lmsa-justify-center lmsa-rounded-[10px] lmsa-border lmsa-border-obsidian-border lmsa-bg-obsidian-surface-secondary lmsa-text-obsidian-muted;
   }
 
-  .lmsa-message--assistant .lmsa-message-avatar {
+  .lmsa-chat-window-message--assistant .lmsa-chat-window-message-avatar {
     color: var(--lmsa-mode-accent);
     background: color-mix(in srgb, var(--lmsa-mode-accent) 8%, var(--background-secondary));
     border-color: color-mix(in srgb, var(--lmsa-mode-accent) 30%, var(--background-modifier-border));
   }
 
-  .lmsa-message--user .lmsa-message-avatar {
+  .lmsa-chat-window-message--user .lmsa-chat-window-message-avatar {
     @apply lmsa-order-2 lmsa-border-transparent lmsa-text-white;
     background: linear-gradient(135deg, var(--color-blue, #4a90d9), var(--interactive-accent) 50%, var(--color-orange, #e8a84b));
     color: var(--text-on-accent);
     box-shadow: 0 0px 14px color-mix(in srgb, var(--interactive-accent) 40%, transparent);
   }
 
-  .lmsa-message-column {
+  .lmsa-chat-window-message-column {
     @apply lmsa-flex lmsa-min-w-0 lmsa-flex-1 lmsa-max-w-[780px] lmsa-flex-col lmsa-gap-1.5;
   }
 
-  .lmsa-message--user .lmsa-message-column {
+  .lmsa-chat-window-message--user .lmsa-chat-window-message-column {
     @apply lmsa-items-end;
   }
 
-  .lmsa-message--user .lmsa-message-chrome {
+  .lmsa-chat-window-message--user .lmsa-chat-window-message-chrome {
     @apply lmsa-justify-end;
   }
 
-  .lmsa-message-chrome {
+  .lmsa-chat-window-message-chrome {
     @apply lmsa-flex lmsa-w-full lmsa-items-center lmsa-justify-between lmsa-gap-3;
   }
 
-  .lmsa-message-role {
+  .lmsa-chat-window-message-role {
     @apply lmsa-font-semibold lmsa-text-obsidian-muted;
     font-size: var(--font-ui-smaller);
   }
 
-  .lmsa-message-body {
+  .lmsa-chat-window-message-body {
     @apply lmsa-relative lmsa-w-full lmsa-px-[15px] lmsa-py-[14px];
     user-select: text;
     -webkit-user-select: text;
@@ -54,7 +54,7 @@
     transition: border-color 200ms ease, box-shadow 200ms ease;
   }
 
-  .lmsa-message-body:hover {
+  .lmsa-chat-window-message-body:hover {
     border-color: var(--lmsa-chat-border-emphasis);
     box-shadow:
       0 10px 30px rgba(0, 0, 0, 0.04),
@@ -62,7 +62,7 @@
   }
 
   /* Glow aura — uses ::before since ::after is reserved for streaming dot */
-  .lmsa-message-body::before {
+  .lmsa-chat-window-message-body::before {
     content: "";
     @apply lmsa-pointer-events-none lmsa-absolute;
     inset: -2px;
@@ -79,15 +79,15 @@
     transition: opacity 300ms ease;
   }
 
-  .lmsa-message-body:hover::before {
+  .lmsa-chat-window-message-body:hover::before {
     opacity: 0.85;
   }
 
-  .lmsa-message--assistant .lmsa-message-body {
+  .lmsa-chat-window-message--assistant .lmsa-chat-window-message-body {
     border-color: color-mix(in srgb, var(--lmsa-mode-accent) 35%, var(--background-modifier-border));
   }
 
-  .lmsa-message--user .lmsa-message-body {
+  .lmsa-chat-window-message--user .lmsa-chat-window-message-body {
     background: linear-gradient(
       135deg,
       color-mix(in srgb, var(--lmsa-mode-accent) 18%, var(--background-primary)),
@@ -96,29 +96,29 @@
     border-color: color-mix(in srgb, var(--lmsa-mode-accent) 45%, var(--background-modifier-border));
   }
 
-  .lmsa-message--user .lmsa-message-body:hover {
+  .lmsa-chat-window-message--user .lmsa-chat-window-message-body:hover {
     border-color: color-mix(in srgb, var(--lmsa-mode-accent) 60%, var(--background-modifier-border));
     box-shadow:
       0 10px 30px rgba(0, 0, 0, 0.04),
       0 0 0 1px var(--lmsa-chat-glow-ring);
   }
 
-  .lmsa-message-body.is-error:hover {
+  .lmsa-chat-window-message-body.is-error:hover {
     border-color: color-mix(in srgb, var(--text-error) 50%, var(--background-modifier-border));
     box-shadow:
       0 10px 30px rgba(0, 0, 0, 0.04),
       0 0 0 1px color-mix(in srgb, var(--text-error) 22%, transparent);
   }
 
-  .lmsa-message-body.is-error::before {
+  .lmsa-chat-window-message-body.is-error::before {
     display: none;
   }
 
-  .lmsa-message-body.is-streaming {
+  .lmsa-chat-window-message-body.is-streaming {
     @apply lmsa-relative;
   }
 
-  .lmsa-message-body.is-streaming::after {
+  .lmsa-chat-window-message-body.is-streaming::after {
     content: "";
     display: inline-block;
     width: 8px;
@@ -129,63 +129,63 @@
     animation: lmsa-pulse 0.9s ease-in-out infinite;
   }
 
-  .lmsa-message-body.is-error {
+  .lmsa-chat-window-message-body.is-error {
     background: color-mix(in srgb, var(--background-modifier-error) 65%, transparent);
     border-color: color-mix(in srgb, var(--text-error) 40%, var(--background-modifier-border));
   }
 
-  .lmsa-message-body.is-muted {
+  .lmsa-chat-window-message-body.is-muted {
     @apply lmsa-opacity-80;
   }
 
-  .lmsa-message-content {
+  .lmsa-chat-window-message-content {
     @apply lmsa-break-words;
     line-height: 1.65;
     user-select: text;
     -webkit-user-select: text;
   }
 
-  .lmsa-message-content--plain {
+  .lmsa-chat-window-message-content--plain {
     @apply lmsa-whitespace-pre-wrap;
   }
 
-  .lmsa-message-content--markdown {
+  .lmsa-chat-window-message-content--markdown {
     white-space: normal;
   }
 
-  .lmsa-message-content--markdown > :first-child {
+  .lmsa-chat-window-message-content--markdown > :first-child {
     margin-top: 0;
   }
 
-  .lmsa-message-content--markdown > :last-child {
+  .lmsa-chat-window-message-content--markdown > :last-child {
     margin-bottom: 0;
   }
 
-  .lmsa-message-content--markdown :is(p, ul, ol, blockquote, pre, table) {
+  .lmsa-chat-window-message-content--markdown :is(p, ul, ol, blockquote, pre, table) {
     margin-block: 0.75em;
   }
 
-  .lmsa-message-content--markdown :is(h1, h2, h3, h4, h5, h6) {
+  .lmsa-chat-window-message-content--markdown :is(h1, h2, h3, h4, h5, h6) {
     margin: 1.1em 0 0.55em;
     line-height: 1.3;
   }
 
-  .lmsa-message-content--markdown li + li {
+  .lmsa-chat-window-message-content--markdown li + li {
     margin-top: 0.2em;
   }
 
-  .lmsa-message-content--markdown pre,
-  .lmsa-message-content--markdown code {
+  .lmsa-chat-window-message-content--markdown pre,
+  .lmsa-chat-window-message-content--markdown code {
     white-space: pre;
     word-break: normal;
   }
 
-  .lmsa-message-content--markdown pre {
+  .lmsa-chat-window-message-content--markdown pre {
     max-width: 100%;
     overflow-x: auto;
   }
 
-  .lmsa-message-content--markdown table {
+  .lmsa-chat-window-message-content--markdown table {
     display: block;
     max-width: 100%;
     overflow-x: auto;
@@ -193,11 +193,11 @@
 }
 
 @media (max-width: 700px) {
-  .lmsa-message {
+  .lmsa-chat-window-message {
     gap: 0 0.625rem;
   }
 
-  .lmsa-message-avatar {
+  .lmsa-chat-window-message-avatar {
     @apply lmsa-h-[30px] lmsa-w-[30px] lmsa-flex-[0_0_30px];
   }
 }

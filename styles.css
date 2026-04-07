@@ -376,7 +376,7 @@
     flex: 1 1 0%;
     overflow: visible;
 }
-.lmsa-messages {
+.lmsa-chat-window-messages {
     display: flex;
     height: 100%;
     flex-direction: column;
@@ -386,6 +386,7 @@
     padding-right: 18px;
     padding-bottom: 1.5rem;
     padding-top: 0.625rem;
+    scrollbar-gutter: stable;
     transition: opacity 180ms ease;
 }
 .lmsa-history-backdrop {
@@ -401,7 +402,7 @@
     pointer-events: auto;
     opacity: 1;
 }
-.lmsa-messages-pane.is-history-open .lmsa-messages,
+.lmsa-messages-pane.is-history-open .lmsa-chat-window-messages,
   .lmsa-messages-pane.is-history-open .lmsa-empty-view {
     opacity: 0;
   }
@@ -731,16 +732,16 @@
     background: var(--background-modifier-hover) !important;
     box-shadow: none !important;
   }
-.lmsa-message {
+.lmsa-chat-window-message {
     display: flex;
     width: 100%;
     flex-wrap: wrap;
     gap: 0 0.75rem;
 }
-.lmsa-message--user {
+.lmsa-chat-window-message--user {
     justify-content: flex-end;
 }
-.lmsa-message-avatar {
+.lmsa-chat-window-message-avatar {
     display: inline-flex;
     height: 34px;
     width: 34px;
@@ -753,12 +754,12 @@
     background-color: var(--background-secondary);
     color: var(--text-muted);
 }
-.lmsa-message--assistant .lmsa-message-avatar {
+.lmsa-chat-window-message--assistant .lmsa-chat-window-message-avatar {
     color: var(--lmsa-mode-accent);
     background: color-mix(in srgb, var(--lmsa-mode-accent) 8%, var(--background-secondary));
     border-color: color-mix(in srgb, var(--lmsa-mode-accent) 30%, var(--background-modifier-border));
   }
-.lmsa-message--user .lmsa-message-avatar {
+.lmsa-chat-window-message--user .lmsa-chat-window-message-avatar {
     order: 2;
     border-color: transparent;
     --tw-text-opacity: 1;
@@ -767,7 +768,7 @@
     color: var(--text-on-accent);
     box-shadow: 0 0px 14px color-mix(in srgb, var(--interactive-accent) 40%, transparent);
 }
-.lmsa-message-column {
+.lmsa-chat-window-message-column {
     display: flex;
     min-width: 0px;
     max-width: 780px;
@@ -775,25 +776,25 @@
     flex-direction: column;
     gap: 0.375rem;
 }
-.lmsa-message--user .lmsa-message-column {
+.lmsa-chat-window-message--user .lmsa-chat-window-message-column {
     align-items: flex-end;
 }
-.lmsa-message--user .lmsa-message-chrome {
+.lmsa-chat-window-message--user .lmsa-chat-window-message-chrome {
     justify-content: flex-end;
 }
-.lmsa-message-chrome {
+.lmsa-chat-window-message-chrome {
     display: flex;
     width: 100%;
     align-items: center;
     justify-content: space-between;
     gap: 0.75rem;
 }
-.lmsa-message-role {
+.lmsa-chat-window-message-role {
     font-weight: 600;
     color: var(--text-muted);
     font-size: var(--font-ui-smaller);
 }
-.lmsa-message-body {
+.lmsa-chat-window-message-body {
     position: relative;
     width: 100%;
     padding-left: 15px;
@@ -806,14 +807,14 @@
     cursor: text;
     transition: border-color 200ms ease, box-shadow 200ms ease;
 }
-.lmsa-message-body:hover {
+.lmsa-chat-window-message-body:hover {
     border-color: var(--lmsa-chat-border-emphasis);
     box-shadow:
       0 10px 30px rgba(0, 0, 0, 0.04),
       0 0 0 1px var(--lmsa-chat-glow-ring);
   }
 /* Glow aura — uses ::before since ::after is reserved for streaming dot */
-.lmsa-message-body::before {
+.lmsa-chat-window-message-body::before {
     content: "";
     pointer-events: none;
     position: absolute;
@@ -830,13 +831,13 @@
     opacity: 0;
     transition: opacity 300ms ease;
   }
-.lmsa-message-body:hover::before {
+.lmsa-chat-window-message-body:hover::before {
     opacity: 0.85;
   }
-.lmsa-message--assistant .lmsa-message-body {
+.lmsa-chat-window-message--assistant .lmsa-chat-window-message-body {
     border-color: color-mix(in srgb, var(--lmsa-mode-accent) 35%, var(--background-modifier-border));
   }
-.lmsa-message--user .lmsa-message-body {
+.lmsa-chat-window-message--user .lmsa-chat-window-message-body {
     background: linear-gradient(
       135deg,
       color-mix(in srgb, var(--lmsa-mode-accent) 18%, var(--background-primary)),
@@ -844,25 +845,25 @@
     );
     border-color: color-mix(in srgb, var(--lmsa-mode-accent) 45%, var(--background-modifier-border));
   }
-.lmsa-message--user .lmsa-message-body:hover {
+.lmsa-chat-window-message--user .lmsa-chat-window-message-body:hover {
     border-color: color-mix(in srgb, var(--lmsa-mode-accent) 60%, var(--background-modifier-border));
     box-shadow:
       0 10px 30px rgba(0, 0, 0, 0.04),
       0 0 0 1px var(--lmsa-chat-glow-ring);
   }
-.lmsa-message-body.is-error:hover {
+.lmsa-chat-window-message-body.is-error:hover {
     border-color: color-mix(in srgb, var(--text-error) 50%, var(--background-modifier-border));
     box-shadow:
       0 10px 30px rgba(0, 0, 0, 0.04),
       0 0 0 1px color-mix(in srgb, var(--text-error) 22%, transparent);
   }
-.lmsa-message-body.is-error::before {
+.lmsa-chat-window-message-body.is-error::before {
     display: none;
   }
-.lmsa-message-body.is-streaming {
+.lmsa-chat-window-message-body.is-streaming {
     position: relative;
 }
-.lmsa-message-body.is-streaming::after {
+.lmsa-chat-window-message-body.is-streaming::after {
     content: "";
     display: inline-block;
     width: 8px;
@@ -872,57 +873,57 @@
     background: var(--lmsa-mode-accent);
     animation: lmsa-pulse 0.9s ease-in-out infinite;
   }
-.lmsa-message-body.is-error {
+.lmsa-chat-window-message-body.is-error {
     background: color-mix(in srgb, var(--background-modifier-error) 65%, transparent);
     border-color: color-mix(in srgb, var(--text-error) 40%, var(--background-modifier-border));
   }
-.lmsa-message-body.is-muted {
+.lmsa-chat-window-message-body.is-muted {
     opacity: 0.8;
 }
-.lmsa-message-content {
+.lmsa-chat-window-message-content {
     overflow-wrap: break-word;
     line-height: 1.65;
     -moz-user-select: text;
          user-select: text;
     -webkit-user-select: text;
 }
-.lmsa-message-content--plain {
+.lmsa-chat-window-message-content--plain {
     white-space: pre-wrap;
 }
-.lmsa-message-content--markdown {
+.lmsa-chat-window-message-content--markdown {
     white-space: normal;
   }
-.lmsa-message-content--markdown > :first-child {
+.lmsa-chat-window-message-content--markdown > :first-child {
     margin-top: 0;
   }
-.lmsa-message-content--markdown > :last-child {
+.lmsa-chat-window-message-content--markdown > :last-child {
     margin-bottom: 0;
   }
-.lmsa-message-content--markdown :is(p, ul, ol, blockquote, pre, table) {
+.lmsa-chat-window-message-content--markdown :is(p, ul, ol, blockquote, pre, table) {
     margin-block: 0.75em;
   }
-.lmsa-message-content--markdown :is(h1, h2, h3, h4, h5, h6) {
+.lmsa-chat-window-message-content--markdown :is(h1, h2, h3, h4, h5, h6) {
     margin: 1.1em 0 0.55em;
     line-height: 1.3;
   }
-.lmsa-message-content--markdown li + li {
+.lmsa-chat-window-message-content--markdown li + li {
     margin-top: 0.2em;
   }
-.lmsa-message-content--markdown pre,
-  .lmsa-message-content--markdown code {
+.lmsa-chat-window-message-content--markdown pre,
+  .lmsa-chat-window-message-content--markdown code {
     white-space: pre;
     word-break: normal;
   }
-.lmsa-message-content--markdown pre {
+.lmsa-chat-window-message-content--markdown pre {
     max-width: 100%;
     overflow-x: auto;
   }
-.lmsa-message-content--markdown table {
+.lmsa-chat-window-message-content--markdown table {
     display: block;
     max-width: 100%;
     overflow-x: auto;
   }
-.lmsa-bubble-toolbar {
+.lmsa-chat-window-bubble-toolbar {
     display: flex;
     align-items: center;
     justify-content: flex-end;
@@ -933,22 +934,22 @@
     opacity: 0;
     transition: opacity 120ms ease;
 }
-.lmsa-message:hover .lmsa-bubble-toolbar,
-  .lmsa-bubble-toolbar:hover {
+.lmsa-chat-window-message:hover .lmsa-chat-window-bubble-toolbar,
+  .lmsa-chat-window-bubble-toolbar:hover {
     opacity: 1;
   }
-.lmsa-message.is-editing .lmsa-bubble-toolbar,
-  .lmsa-message:has(.lmsa-message-body.is-streaming) > .lmsa-bubble-toolbar {
+.lmsa-chat-window-message.is-editing .lmsa-chat-window-bubble-toolbar,
+  .lmsa-chat-window-message:has(.lmsa-chat-window-message-body.is-streaming) > .lmsa-chat-window-bubble-toolbar {
     display: none;
   }
-.lmsa-message-actions {
+.lmsa-chat-window-message-actions {
     display: flex;
     align-items: center;
     gap: 0.125rem;
     padding-right: 35px;
     padding-top: 5px;
 }
-.lmsa-message-actions .lmsa-action-btn {
+.lmsa-chat-window-message-actions .lmsa-chat-window-action-btn {
     display: inline-flex;
     height: 1.5rem;
     width: 1.5rem;
@@ -971,31 +972,31 @@
     line-height: 1;
     transition: background 120ms ease, color 120ms ease;
 }
-.lmsa-message-actions .lmsa-action-btn:hover {
+.lmsa-chat-window-message-actions .lmsa-chat-window-action-btn:hover {
     background-color: var(--background-modifier-hover);
     color: var(--text-normal);
     box-shadow: none;
 }
-.lmsa-message-actions .lmsa-action-btn:focus-visible {
+.lmsa-chat-window-message-actions .lmsa-chat-window-action-btn:focus-visible {
     box-shadow: 0 0 0 2px var(--lmsa-mode-accent);
   }
-.lmsa-message-actions .lmsa-action-btn svg {
+.lmsa-chat-window-message-actions .lmsa-chat-window-action-btn svg {
     width: 14px;
     height: 14px;
   }
-.lmsa-message-actions .lmsa-action-btn.is-confirmed {
+.lmsa-chat-window-message-actions .lmsa-chat-window-action-btn.is-confirmed {
     color: var(--lmsa-mode-accent);
   }
-.lmsa-message-actions .lmsa-action-btn[data-action="delete"]:hover {
+.lmsa-chat-window-message-actions .lmsa-chat-window-action-btn[data-action="delete"]:hover {
     color: var(--text-error);
   }
-.lmsa-version-nav {
+.lmsa-chat-window-version-nav {
     display: flex;
     align-items: center;
     gap: 0.125rem;
 }
-.lmsa-version-prev,
-  .lmsa-version-next {
+.lmsa-chat-window-version-prev,
+  .lmsa-chat-window-version-next {
     display: inline-flex;
     height: 1.25rem;
     width: 1.25rem;
@@ -1009,28 +1010,28 @@
     color: var(--text-muted);
     transition: background 120ms ease, color 120ms ease;
 }
-.lmsa-version-prev:hover:not(:disabled),
-  .lmsa-version-next:hover:not(:disabled) {
+.lmsa-chat-window-version-prev:hover:not(:disabled),
+  .lmsa-chat-window-version-next:hover:not(:disabled) {
     background-color: var(--background-modifier-hover);
     color: var(--text-normal);
 }
-.lmsa-version-prev:disabled,
-  .lmsa-version-next:disabled {
+.lmsa-chat-window-version-prev:disabled,
+  .lmsa-chat-window-version-next:disabled {
     cursor: default;
     opacity: 0.3;
 }
-.lmsa-version-prev svg,
-  .lmsa-version-next svg {
+.lmsa-chat-window-version-prev svg,
+  .lmsa-chat-window-version-next svg {
     width: 14px;
     height: 14px;
   }
-.lmsa-version-indicator {
+.lmsa-chat-window-version-indicator {
     color: var(--text-muted);
     font-size: var(--font-ui-smaller);
     min-width: 28px;
     text-align: center;
 }
-.lmsa-usage-badge {
+.lmsa-chat-window-usage-badge {
     display: flex;
     align-items: center;
     justify-content: flex-end;
@@ -1042,56 +1043,56 @@
     color: var(--text-muted);
     opacity: 0.7;
 }
-.lmsa-message:hover .lmsa-usage-badge {
+.lmsa-chat-window-message:hover .lmsa-chat-window-usage-badge {
     opacity: 1;
   }
-.lmsa-usage-tokens {
+.lmsa-chat-window-usage-tokens {
     display: inline-flex;
     align-items: center;
 }
-.lmsa-usage-cost {
+.lmsa-chat-window-usage-cost {
     display: inline-flex;
     align-items: center;
     color: var(--lmsa-mode-accent);
 }
-.lmsa-usage-model {
+.lmsa-chat-window-usage-model {
     display: inline-flex;
     align-items: center;
     font-size: var(--font-smallest);
     opacity: 0.6;
 }
-.lmsa-rag-sources {
+.lmsa-chat-window-rag-sources {
     margin-top: 8px;
     padding-top: 8px;
     border-top: 1px solid var(--background-modifier-border);
     font-size: var(--font-ui-small);
     color: var(--text-muted);
   }
-.lmsa-rag-sources-summary {
+.lmsa-chat-window-rag-sources-summary {
     cursor: pointer;
     -webkit-user-select: none;
        -moz-user-select: none;
             user-select: none;
     opacity: 0.7;
   }
-.lmsa-rag-sources-summary:hover {
+.lmsa-chat-window-rag-sources-summary:hover {
     opacity: 1;
   }
-.lmsa-rag-sources-list {
+.lmsa-chat-window-rag-sources-list {
     display: flex;
     flex-direction: column;
     gap: 0.25rem;
     margin-top: 4px;
     padding-left: 8px;
 }
-.lmsa-rag-source-row {
+.lmsa-chat-window-rag-source-row {
     position: relative;
     display: flex;
     align-items: center;
     gap: 0.5rem;
     line-height: 1.4;
 }
-.lmsa-rag-source-link {
+.lmsa-chat-window-rag-source-link {
     position: relative;
     color: var(--text-accent);
     text-decoration: none;
@@ -1100,16 +1101,16 @@
     text-overflow: ellipsis;
     white-space: nowrap;
 }
-.lmsa-rag-source-link:hover {
+.lmsa-chat-window-rag-source-link:hover {
     text-decoration: underline;
     overflow: visible;
   }
-.lmsa-rag-source-score {
+.lmsa-chat-window-rag-source-score {
     flex-shrink: 0;
     opacity: 0.6;
 }
 /* Hover tooltip for chunk content preview — fixed so it never affects scroll */
-.lmsa-rag-source-tooltip {
+.lmsa-chat-window-rag-source-tooltip {
     display: none;
     position: fixed;
     top: var(--tooltip-top, 0);
@@ -1129,26 +1130,26 @@
     word-break: break-word;
     box-shadow: var(--shadow-s);
   }
-.lmsa-rag-source-tooltip.is-visible {
+.lmsa-chat-window-rag-source-tooltip.is-visible {
     display: block;
   }
 /* Graph context section */
-.lmsa-graph-context {
+.lmsa-chat-window-graph-context {
     margin-top: 8px;
     padding-top: 8px;
     border-top: 1px solid var(--background-modifier-border);
   }
-.lmsa-graph-context-summary {
+.lmsa-chat-window-graph-context-summary {
     cursor: pointer;
     -webkit-user-select: none;
        -moz-user-select: none;
             user-select: none;
     opacity: 0.7;
   }
-.lmsa-graph-context-summary:hover {
+.lmsa-chat-window-graph-context-summary:hover {
     opacity: 1;
   }
-.lmsa-graph-entity-pills {
+.lmsa-chat-window-graph-entity-pills {
     display: flex;
     flex-wrap: wrap;
     gap: 4px;
@@ -1156,7 +1157,7 @@
     margin-bottom: 4px;
     padding-left: 8px;
   }
-.lmsa-graph-entity-pill {
+.lmsa-chat-window-graph-entity-pill {
     display: inline-flex;
     align-items: center;
     gap: 4px;
@@ -1167,40 +1168,40 @@
     padding: 1px 6px;
     line-height: 1.6;
   }
-.lmsa-graph-entity-type {
+.lmsa-chat-window-graph-entity-type {
     opacity: 0.65;
     font-weight: 500;
   }
-.lmsa-graph-entity-type--character { color: var(--color-blue); }
-.lmsa-graph-entity-type--location  { color: var(--color-green); }
-.lmsa-graph-entity-type--object    { color: var(--color-orange); }
-.lmsa-graph-entity-type--concept   { color: var(--color-purple); }
-.lmsa-graph-entity-type--event     { color: var(--color-red); }
-.lmsa-graph-entity-name {
+.lmsa-chat-window-graph-entity-type--character { color: var(--color-blue); }
+.lmsa-chat-window-graph-entity-type--location  { color: var(--color-green); }
+.lmsa-chat-window-graph-entity-type--object    { color: var(--color-orange); }
+.lmsa-chat-window-graph-entity-type--concept   { color: var(--color-purple); }
+.lmsa-chat-window-graph-entity-type--event     { color: var(--color-red); }
+.lmsa-chat-window-graph-entity-name {
     color: var(--text-normal);
   }
-.lmsa-graph-relations {
+.lmsa-chat-window-graph-relations {
     display: flex;
     flex-direction: column;
     gap: 2px;
     padding-left: 8px;
   }
-.lmsa-graph-relation {
+.lmsa-chat-window-graph-relation {
     font-size: var(--font-ui-smaller);
     opacity: 0.6;
     line-height: 1.4;
   }
-.lmsa-message.is-editing .lmsa-message-body {
+.lmsa-chat-window-message.is-editing .lmsa-chat-window-message-body {
     border-style: dashed;
     border-color: color-mix(in srgb, var(--lmsa-mode-accent) 50%, var(--background-modifier-border));
     background: color-mix(in srgb, var(--lmsa-mode-accent) 6%, var(--background-primary));
   }
-.lmsa-inline-editor {
+.lmsa-chat-window-inline-editor {
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
 }
-.lmsa-inline-editor-textarea {
+.lmsa-chat-window-inline-editor-textarea {
     width: 100%;
     resize: none;
     border-radius: 0.5rem;
@@ -1218,21 +1219,21 @@
     outline: none;
     transition: border-color 120ms ease;
 }
-.lmsa-inline-editor-textarea:focus {
+.lmsa-chat-window-inline-editor-textarea:focus {
     border-color: var(--lmsa-mode-accent);
   }
-.lmsa-inline-editor-actions {
+.lmsa-chat-window-inline-editor-actions {
     display: flex;
     justify-content: flex-end;
     gap: 0.5rem;
 }
-.lmsa-inline-editor-save {
+.lmsa-chat-window-inline-editor-save {
     border-style: none;
     background-color: var(--interactive-accent);
     font-weight: 600;
     color: var(--text-on-accent);
 }
-.lmsa-inline-editor-save:hover {
+.lmsa-chat-window-inline-editor-save:hover {
     background: var(--interactive-accent-hover);
   }
 .lmsa-model-selector-status {
@@ -4107,11 +4108,11 @@
   .lmsa-history-list {
         padding: 0.5rem;
     }
-  .lmsa-message {
+  .lmsa-chat-window-message {
     gap: 0 0.625rem;
   }
 
-  .lmsa-message-avatar {
+  .lmsa-chat-window-message-avatar {
         height: 30px;
         width: 30px;
         flex: 0 0 30px;
@@ -4179,7 +4180,7 @@
 /* -----------------------------------------------------------------------
  * DiffHunkView — individual diff hunk with unified / side-by-side display
  * ----------------------------------------------------------------------- */
-.lmsa-diff-hunk {
+.lmsa-chat-window-diff-hunk {
     overflow: hidden;
     border-radius: 0.75rem;
     border-width: 1px;
@@ -4188,23 +4189,23 @@
   transition: border-color 0.15s ease;
 }
 /* Status-based left border accent */
-.lmsa-diff-hunk[data-status="accepted"] {
+.lmsa-chat-window-diff-hunk[data-status="accepted"] {
   border-color: var(--lmsa-mode-accent);
 }
-.lmsa-diff-hunk[data-status="rejected"] {
+.lmsa-chat-window-diff-hunk[data-status="rejected"] {
   border-color: var(--text-error);
   opacity: 0.65;
 }
-.lmsa-diff-hunk[data-status="applied"] {
+.lmsa-chat-window-diff-hunk[data-status="applied"] {
   border-color: var(--text-success, #4ade80);
   opacity: 0.8;
 }
-.lmsa-diff-hunk[data-status="skipped"] {
+.lmsa-chat-window-diff-hunk[data-status="skipped"] {
   border-color: var(--text-faint);
   opacity: 0.5;
 }
 /* ------- Header ------- */
-.lmsa-diff-hunk-header {
+.lmsa-chat-window-diff-hunk-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -4216,48 +4217,48 @@
   border-bottom: 1px solid var(--background-modifier-border);
   background: var(--background-secondary);
 }
-.lmsa-diff-hunk-meta {
+.lmsa-chat-window-diff-hunk-meta {
     display: flex;
     align-items: center;
     gap: 0.5rem;
   font-size: var(--font-ui-smaller);
 }
-.lmsa-diff-hunk-location {
+.lmsa-chat-window-diff-hunk-location {
   color: var(--text-muted);
   font-weight: 500;
 }
-.lmsa-diff-hunk-confidence {
+.lmsa-chat-window-diff-hunk-confidence {
   color: var(--text-faint);
 }
-.lmsa-diff-hunk-confidence.is-low-confidence {
+.lmsa-chat-window-diff-hunk-confidence.is-low-confidence {
   color: var(--text-warning, #f59e0b);
 }
-.lmsa-diff-hunk-confidence.is-no-match {
+.lmsa-chat-window-diff-hunk-confidence.is-no-match {
     display: flex;
     align-items: center;
     gap: 0.25rem;
   color: var(--text-error);
 }
-.lmsa-diff-hunk-warn-icon {
+.lmsa-chat-window-diff-hunk-warn-icon {
     display: inline-flex;
     align-items: center;
 }
-.lmsa-diff-hunk-warn-icon svg {
+.lmsa-chat-window-diff-hunk-warn-icon svg {
   width: 12px;
   height: 12px;
 }
-.lmsa-diff-hunk-actions {
+.lmsa-chat-window-diff-hunk-actions {
     display: flex;
     align-items: center;
     gap: 0.5rem;
 }
 /* ------- Grouped buttons (shared pattern) ------- */
-.lmsa-btn-group {
+.lmsa-chat-window-btn-group {
     display: inline-flex;
   border-radius: 8px;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
 }
-.lmsa-btn-group .lmsa-btn-group-item {
+.lmsa-chat-window-btn-group .lmsa-chat-window-btn-group-item {
     display: inline-flex;
     cursor: pointer;
     align-items: center;
@@ -4275,43 +4276,43 @@
   border-radius: 0;
   margin-left: -1px;
 }
-.lmsa-btn-group .lmsa-btn-group-item:first-child {
+.lmsa-chat-window-btn-group .lmsa-chat-window-btn-group-item:first-child {
   border-radius: 8px 0 0 8px;
   margin-left: 0;
 }
-.lmsa-btn-group .lmsa-btn-group-item:last-child {
+.lmsa-chat-window-btn-group .lmsa-chat-window-btn-group-item:last-child {
   border-radius: 0 8px 8px 0;
 }
-.lmsa-btn-group .lmsa-btn-group-item:only-child {
+.lmsa-chat-window-btn-group .lmsa-chat-window-btn-group-item:only-child {
   border-radius: 8px;
 }
-.lmsa-btn-group-item svg {
+.lmsa-chat-window-btn-group-item svg {
   width: 12px;
   height: 12px;
 }
-.lmsa-btn-group-item:hover {
+.lmsa-chat-window-btn-group-item:hover {
   background: var(--background-modifier-hover);
   color: var(--text-normal);
   z-index: 1;
 }
-.lmsa-btn-group-item.is-active {
+.lmsa-chat-window-btn-group-item.is-active {
   background: var(--background-primary);
   color: var(--lmsa-mode-accent);
   border-color: var(--lmsa-mode-accent);
   z-index: 2;
 }
-.lmsa-btn-group-item--accept.is-active {
+.lmsa-chat-window-btn-group-item--accept.is-active {
   background: color-mix(in srgb, var(--lmsa-mode-accent) 18%, var(--background-primary));
   border-color: var(--lmsa-mode-accent);
   color: var(--lmsa-mode-accent);
 }
-.lmsa-btn-group-item--reject.is-active {
+.lmsa-chat-window-btn-group-item--reject.is-active {
   background: color-mix(in srgb, var(--text-error) 15%, var(--background-primary));
   border-color: var(--text-error);
   color: var(--text-error);
 }
 /* ------- Standalone buttons (undo) ------- */
-.lmsa-diff-hunk-btn {
+.lmsa-chat-window-diff-hunk-btn {
     display: inline-flex;
     cursor: pointer;
     align-items: center;
@@ -4328,20 +4329,20 @@
   color: var(--text-muted);
   transition: all 0.1s ease;
 }
-.lmsa-diff-hunk-btn svg {
+.lmsa-chat-window-diff-hunk-btn svg {
   width: 12px;
   height: 12px;
 }
-.lmsa-diff-hunk-btn:hover {
+.lmsa-chat-window-diff-hunk-btn:hover {
   background: var(--background-modifier-hover);
   color: var(--text-normal);
 }
-.lmsa-diff-hunk-btn--undo:hover {
+.lmsa-chat-window-diff-hunk-btn--undo:hover {
   border-color: var(--text-warning, #f59e0b);
   color: var(--text-warning, #f59e0b);
 }
 /* ------- Post-apply badges ------- */
-.lmsa-diff-hunk-badge {
+.lmsa-chat-window-diff-hunk-badge {
     border-radius: 0.375rem;
     padding-left: 0.375rem;
     padding-right: 0.375rem;
@@ -4350,22 +4351,22 @@
   font-size: var(--font-ui-smaller);
   font-weight: 500;
 }
-.lmsa-diff-hunk-badge--applied {
+.lmsa-chat-window-diff-hunk-badge--applied {
   background: color-mix(in srgb, var(--text-success, #4ade80) 15%, var(--background-primary));
   color: var(--text-success, #4ade80);
 }
-.lmsa-diff-hunk-badge--skipped {
+.lmsa-chat-window-diff-hunk-badge--skipped {
   background: color-mix(in srgb, var(--text-faint) 15%, var(--background-primary));
   color: var(--text-faint);
 }
 /* ------- Body: shared line styles ------- */
-.lmsa-diff-hunk-body {
+.lmsa-chat-window-diff-hunk-body {
     overflow-x: auto;
   font-family: var(--font-monospace);
   font-size: var(--font-ui-smaller);
   line-height: 1.55;
 }
-.lmsa-diff-gutter {
+.lmsa-chat-window-diff-gutter {
     flex: none;
     -webkit-user-select: none;
        -moz-user-select: none;
@@ -4376,7 +4377,7 @@
   color: var(--text-faint);
   opacity: 0.6;
 }
-.lmsa-diff-prefix {
+.lmsa-chat-window-diff-prefix {
     flex: none;
     -webkit-user-select: none;
        -moz-user-select: none;
@@ -4384,77 +4385,77 @@
   width: 16px;
   text-align: center;
 }
-.lmsa-diff-text {
+.lmsa-chat-window-diff-text {
     flex: 1 1 0%;
   white-space: pre-wrap;
   word-break: break-word;
 }
 /* Line type styling */
-.lmsa-diff-line--context {
+.lmsa-chat-window-diff-line--context {
   color: var(--text-faint);
 }
-.lmsa-diff-line--removed {
+.lmsa-chat-window-diff-line--removed {
   background: color-mix(in srgb, var(--text-error) 10%, var(--background-primary));
   color: var(--text-normal);
 }
-.lmsa-diff-line--removed .lmsa-diff-prefix {
+.lmsa-chat-window-diff-line--removed .lmsa-chat-window-diff-prefix {
   color: var(--text-error);
 }
-.lmsa-diff-line--added {
+.lmsa-chat-window-diff-line--added {
   background: color-mix(in srgb, var(--text-success, #4ade80) 10%, var(--background-primary));
   color: var(--text-normal);
 }
-.lmsa-diff-line--added .lmsa-diff-prefix {
+.lmsa-chat-window-diff-line--added .lmsa-chat-window-diff-prefix {
   color: var(--text-success, #4ade80);
 }
 /* Word-level change highlighting within paired lines */
-.lmsa-diff-line--removed .lmsa-diff-highlight {
+.lmsa-chat-window-diff-line--removed .lmsa-chat-window-diff-highlight {
   background: color-mix(in srgb, var(--text-error) 25%, transparent);
   border-radius: 2px;
 }
-.lmsa-diff-line--added .lmsa-diff-highlight {
+.lmsa-chat-window-diff-line--added .lmsa-chat-window-diff-highlight {
   background: color-mix(in srgb, var(--text-success, #4ade80) 25%, transparent);
   border-radius: 2px;
 }
 /* ------- Unified mode ------- */
-.lmsa-diff-hunk-body--unified .lmsa-diff-line {
+.lmsa-chat-window-diff-hunk-body--unified .lmsa-chat-window-diff-line {
     display: flex;
     min-height: 22px;
   padding: 0 8px 0 0;
 }
 /* ------- Side-by-side mode ------- */
-.lmsa-diff-row {
+.lmsa-chat-window-diff-row {
     display: flex;
 }
-.lmsa-diff-side {
+.lmsa-chat-window-diff-side {
     display: flex;
     min-height: 22px;
   width: 50%;
   padding: 0 4px 0 0;
   box-sizing: border-box;
 }
-.lmsa-diff-side--left {
+.lmsa-chat-window-diff-side--left {
   border-right: 1px solid var(--background-modifier-border);
 }
-.lmsa-diff-side--empty {
+.lmsa-chat-window-diff-side--empty {
   background: color-mix(in srgb, var(--text-faint) 4%, var(--background-primary));
 }
 /* -----------------------------------------------------------------------
  * DiffReviewPanel — container for the full edit proposal diff UI
  * ----------------------------------------------------------------------- */
-.lmsa-diff-panel {
+.lmsa-chat-window-diff-panel {
     display: flex;
     flex-direction: column;
     gap: 0.75rem;
 }
 /* ------- Header ------- */
-.lmsa-diff-header {
+.lmsa-chat-window-diff-header {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
     gap: 0.5rem;
 }
-.lmsa-diff-target-file {
+.lmsa-chat-window-diff-target-file {
     display: flex;
     align-items: center;
     gap: 0.375rem;
@@ -4462,29 +4463,29 @@
   font-weight: 600;
   color: var(--text-normal);
 }
-.lmsa-diff-file-icon {
+.lmsa-chat-window-diff-file-icon {
     display: inline-flex;
     align-items: center;
   color: var(--text-muted);
 }
-.lmsa-diff-file-icon svg {
+.lmsa-chat-window-diff-file-icon svg {
   width: 14px;
   height: 14px;
 }
 /* ------- Prose ------- */
-.lmsa-diff-prose {
+.lmsa-chat-window-diff-prose {
   font-size: var(--font-ui-small);
   color: var(--text-muted);
   line-height: 1.5;
 }
-.lmsa-diff-prose p:first-child {
+.lmsa-chat-window-diff-prose p:first-child {
   margin-top: 0;
 }
-.lmsa-diff-prose p:last-child {
+.lmsa-chat-window-diff-prose p:last-child {
   margin-bottom: 0;
 }
 /* ------- Hunks container ------- */
-.lmsa-diff-hunks {
+.lmsa-chat-window-diff-hunks {
     display: flex;
     flex-direction: column;
     gap: 0.625rem;

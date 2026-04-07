@@ -46,7 +46,7 @@ export class DiffReviewPanel {
 
   private render(): void {
     this.containerEl.empty();
-    this.containerEl.addClass("lmsa-diff-panel");
+    this.containerEl.addClass("lmsa-chat-window-diff-panel");
 
     this.renderHeader();
     this.renderProse();
@@ -59,10 +59,10 @@ export class DiffReviewPanel {
   }
 
   private renderHeader(): void {
-    const headerEl = this.containerEl.createDiv({ cls: "lmsa-diff-header" });
+    const headerEl = this.containerEl.createDiv({ cls: "lmsa-chat-window-diff-header" });
 
-    const fileEl = headerEl.createDiv({ cls: "lmsa-diff-target-file" });
-    const fileIcon = fileEl.createSpan({ cls: "lmsa-diff-file-icon" });
+    const fileEl = headerEl.createDiv({ cls: "lmsa-chat-window-diff-target-file" });
+    const fileIcon = fileEl.createSpan({ cls: "lmsa-chat-window-diff-file-icon" });
     setIcon(fileIcon, "file-text");
     const fileName = this.proposal.targetFilePath.split("/").pop() ?? this.proposal.targetFilePath;
     fileEl.createSpan({ text: fileName });
@@ -79,7 +79,7 @@ export class DiffReviewPanel {
   private renderProse(): void {
     if (!this.proposal.prose) return;
 
-    const proseEl = this.containerEl.createDiv({ cls: "lmsa-diff-prose" });
+    const proseEl = this.containerEl.createDiv({ cls: "lmsa-chat-window-diff-prose" });
     const renderChild = new Component();
     this.owner.addChild(renderChild);
 
@@ -91,7 +91,7 @@ export class DiffReviewPanel {
   }
 
   private renderHunks(): void {
-    const hunksContainer = this.containerEl.createDiv({ cls: "lmsa-diff-hunks" });
+    const hunksContainer = this.containerEl.createDiv({ cls: "lmsa-chat-window-diff-hunks" });
 
     for (const hunk of this.proposal.hunks) {
       const view = new DiffHunkView(hunksContainer, hunk, {

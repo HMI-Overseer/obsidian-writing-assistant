@@ -1,5 +1,5 @@
 @layer components {
-  .lmsa-bubble-toolbar {
+  .lmsa-chat-window-bubble-toolbar {
     @apply lmsa-flex lmsa-items-center lmsa-justify-end lmsa-gap-1;
     flex-basis: 100%;
     order: 3;
@@ -8,23 +8,23 @@
     transition: opacity 120ms ease;
   }
 
-  .lmsa-message:hover .lmsa-bubble-toolbar,
-  .lmsa-bubble-toolbar:hover {
+  .lmsa-chat-window-message:hover .lmsa-chat-window-bubble-toolbar,
+  .lmsa-chat-window-bubble-toolbar:hover {
     opacity: 1;
   }
 
-  .lmsa-message.is-editing .lmsa-bubble-toolbar,
-  .lmsa-message:has(.lmsa-message-body.is-streaming) > .lmsa-bubble-toolbar {
+  .lmsa-chat-window-message.is-editing .lmsa-chat-window-bubble-toolbar,
+  .lmsa-chat-window-message:has(.lmsa-chat-window-message-body.is-streaming) > .lmsa-chat-window-bubble-toolbar {
     display: none;
   }
 
-  .lmsa-message-actions {
+  .lmsa-chat-window-message-actions {
     @apply lmsa-flex lmsa-items-center lmsa-gap-0.5;
     padding-right: 35px;
     padding-top: 5px;
   }
 
-  .lmsa-message-actions .lmsa-action-btn {
+  .lmsa-chat-window-message-actions .lmsa-chat-window-action-btn {
     @apply lmsa-inline-flex lmsa-h-6 lmsa-w-6 lmsa-cursor-pointer lmsa-items-center lmsa-justify-center lmsa-rounded-md lmsa-border-none lmsa-bg-transparent lmsa-p-0 lmsa-text-obsidian-muted;
     /* Override Obsidian default button chrome */
     box-shadow: none;
@@ -36,25 +36,25 @@
     transition: background 120ms ease, color 120ms ease;
   }
 
-  .lmsa-message-actions .lmsa-action-btn:hover {
+  .lmsa-chat-window-message-actions .lmsa-chat-window-action-btn:hover {
     @apply lmsa-bg-[var(--background-modifier-hover)] lmsa-text-obsidian-text;
     box-shadow: none;
   }
 
-  .lmsa-message-actions .lmsa-action-btn:focus-visible {
+  .lmsa-chat-window-message-actions .lmsa-chat-window-action-btn:focus-visible {
     box-shadow: 0 0 0 2px var(--lmsa-mode-accent);
   }
 
-  .lmsa-message-actions .lmsa-action-btn svg {
+  .lmsa-chat-window-message-actions .lmsa-chat-window-action-btn svg {
     width: 14px;
     height: 14px;
   }
 
-  .lmsa-message-actions .lmsa-action-btn.is-confirmed {
+  .lmsa-chat-window-message-actions .lmsa-chat-window-action-btn.is-confirmed {
     color: var(--lmsa-mode-accent);
   }
 
-  .lmsa-message-actions .lmsa-action-btn[data-action="delete"]:hover {
+  .lmsa-chat-window-message-actions .lmsa-chat-window-action-btn[data-action="delete"]:hover {
     color: var(--text-error);
   }
 }

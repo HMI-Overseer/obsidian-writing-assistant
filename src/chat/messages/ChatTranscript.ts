@@ -86,7 +86,7 @@ export class ChatTranscript {
 
     // Scroll anchor: capture toolbar position before content swap
     const oldToolbarEl = bubble.rowEl.querySelector(
-      ".lmsa-bubble-toolbar"
+      ".lmsa-chat-window-bubble-toolbar"
     ) as HTMLElement | null;
     const anchorY = oldToolbarEl?.getBoundingClientRect().top ?? null;
 
@@ -95,14 +95,14 @@ export class ChatTranscript {
 
     // Replace toolbar, usage badge, and rag sources with updated state
     oldToolbarEl?.remove();
-    bubble.rowEl.querySelector(".lmsa-usage-badge")?.remove();
-    bubble.bodyEl.querySelector(".lmsa-rag-sources")?.remove();
+    bubble.rowEl.querySelector(".lmsa-chat-window-usage-badge")?.remove();
+    bubble.bodyEl.querySelector(".lmsa-chat-window-rag-sources")?.remove();
     this.attachBubbleActions(bubble, message, isLastAssistant, callbacks);
 
     // Restore scroll anchor so version nav stays at the same screen position
     if (anchorY !== null) {
       const newToolbarEl = bubble.rowEl.querySelector(
-        ".lmsa-bubble-toolbar"
+        ".lmsa-chat-window-bubble-toolbar"
       ) as HTMLElement | null;
       if (newToolbarEl) {
         const delta = newToolbarEl.getBoundingClientRect().top - anchorY;
@@ -113,24 +113,24 @@ export class ChatTranscript {
 
   createBubble(role: "user" | "assistant", messageId?: string): BubbleRefs {
     const rowEl = this.refs.messagesEl.createDiv({
-      cls: `lmsa-message lmsa-message--${role}`,
+      cls: `lmsa-chat-window-message lmsa-chat-window-message--${role}`,
     });
     if (messageId) {
       rowEl.dataset.messageId = messageId;
     }
 
-    const avatarEl = rowEl.createDiv({ cls: "lmsa-message-avatar" });
+    const avatarEl = rowEl.createDiv({ cls: "lmsa-chat-window-message-avatar" });
     setIcon(avatarEl, role === "user" ? "user-round" : "bot");
 
-    const columnEl = rowEl.createDiv({ cls: "lmsa-message-column" });
-    const chromeEl = columnEl.createDiv({ cls: "lmsa-message-chrome" });
+    const columnEl = rowEl.createDiv({ cls: "lmsa-chat-window-message-column" });
+    const chromeEl = columnEl.createDiv({ cls: "lmsa-chat-window-message-chrome" });
     chromeEl.createDiv({
-      cls: "lmsa-message-role",
+      cls: "lmsa-chat-window-message-role",
       text: role === "user" ? "You" : "Assistant",
     });
 
-    const bodyEl = columnEl.createDiv({ cls: "lmsa-message-body lmsa-ui-card" });
-    const contentEl = bodyEl.createDiv({ cls: "lmsa-message-content" });
+    const bodyEl = columnEl.createDiv({ cls: "lmsa-chat-window-message-body lmsa-ui-card" });
+    const contentEl = bodyEl.createDiv({ cls: "lmsa-chat-window-message-content" });
 
     this.scrollToBottom();
     return { role, rowEl, columnEl, chromeEl, bodyEl, contentEl };
@@ -161,8 +161,8 @@ export class ChatTranscript {
   renderPlainTextContent(bubble: BubbleRefs, text: string): void {
     this.clearBubbleMarkdownRender(bubble.contentEl);
     bubble.contentEl.empty();
-    bubble.contentEl.removeClass("lmsa-message-content--markdown");
-    bubble.contentEl.addClass("lmsa-message-content--plain");
+    bubble.contentEl.removeClass("lmsa-chat-window-message-content--markdown");
+    bubble.contentEl.addClass("lmsa-chat-window-message-content--plain");
     bubble.contentEl.setText(text);
   }
 
@@ -227,8 +227,8 @@ export class ChatTranscript {
       bubble.bodyEl.removeClass("is-streaming");
     }
     bubble.contentEl.empty();
-    bubble.contentEl.removeClass("lmsa-message-content--plain");
-    bubble.contentEl.addClass("lmsa-message-content--markdown");
+    bubble.contentEl.removeClass("lmsa-chat-window-message-content--plain");
+    bubble.contentEl.addClass("lmsa-chat-window-message-content--markdown");
 
     const renderChild = new Component();
     this.owner.addChild(renderChild);
@@ -285,7 +285,7 @@ export class ChatTranscript {
       }
     }
 
-    const toolbarEl = bubble.rowEl.createDiv({ cls: "lmsa-bubble-toolbar" });
+    const toolbarEl = bubble.rowEl.createDiv({ cls: "lmsa-chat-window-bubble-toolbar" });
 
     if (message.role === "assistant" && message.versions && message.versions.length > 1) {
       BubbleVersionNav.render(toolbarEl, message, callbacks.onVersionChange);

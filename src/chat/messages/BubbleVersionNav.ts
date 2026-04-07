@@ -12,22 +12,22 @@ export class BubbleVersionNav {
     const activeIndex = message.activeVersionIndex ?? message.versions.length - 1;
     const total = message.versions.length;
 
-    const navEl = chromeEl.createDiv({ cls: "lmsa-version-nav" });
+    const navEl = chromeEl.createDiv({ cls: "lmsa-chat-window-version-nav" });
 
     const prevBtn = navEl.createEl("button", {
-      cls: "lmsa-version-prev",
+      cls: "lmsa-chat-window-version-prev",
       attr: { "aria-label": "Previous version", type: "button" },
     });
     setIcon(prevBtn, "chevron-left");
     if (activeIndex <= 0) prevBtn.disabled = true;
 
     navEl.createSpan({
-      cls: "lmsa-version-indicator",
+      cls: "lmsa-chat-window-version-indicator",
       text: `${activeIndex + 1}/${total}`,
     });
 
     const nextBtn = navEl.createEl("button", {
-      cls: "lmsa-version-next",
+      cls: "lmsa-chat-window-version-next",
       attr: { "aria-label": "Next version", type: "button" },
     });
     setIcon(nextBtn, "chevron-right");

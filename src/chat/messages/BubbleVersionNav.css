@@ -1,31 +1,31 @@
 @layer components {
-  .lmsa-version-nav {
+  .lmsa-chat-window-version-nav {
     @apply lmsa-flex lmsa-items-center lmsa-gap-0.5;
   }
 
-  .lmsa-version-prev,
-  .lmsa-version-next {
+  .lmsa-chat-window-version-prev,
+  .lmsa-chat-window-version-next {
     @apply lmsa-inline-flex lmsa-h-5 lmsa-w-5 lmsa-cursor-pointer lmsa-items-center lmsa-justify-center lmsa-rounded-md lmsa-border-none lmsa-bg-transparent lmsa-p-0 lmsa-text-obsidian-muted;
     transition: background 120ms ease, color 120ms ease;
   }
 
-  .lmsa-version-prev:hover:not(:disabled),
-  .lmsa-version-next:hover:not(:disabled) {
+  .lmsa-chat-window-version-prev:hover:not(:disabled),
+  .lmsa-chat-window-version-next:hover:not(:disabled) {
     @apply lmsa-bg-[var(--background-modifier-hover)] lmsa-text-obsidian-text;
   }
 
-  .lmsa-version-prev:disabled,
-  .lmsa-version-next:disabled {
+  .lmsa-chat-window-version-prev:disabled,
+  .lmsa-chat-window-version-next:disabled {
     @apply lmsa-cursor-default lmsa-opacity-30;
   }
 
-  .lmsa-version-prev svg,
-  .lmsa-version-next svg {
+  .lmsa-chat-window-version-prev svg,
+  .lmsa-chat-window-version-next svg {
     width: 14px;
     height: 14px;
   }
 
-  .lmsa-version-indicator {
+  .lmsa-chat-window-version-indicator {
     @apply lmsa-text-obsidian-muted;
     font-size: var(--font-ui-smaller);
     min-width: 28px;

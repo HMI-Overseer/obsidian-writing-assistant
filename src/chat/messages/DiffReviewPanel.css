@@ -2,51 +2,51 @@
  * DiffReviewPanel — container for the full edit proposal diff UI
  * ----------------------------------------------------------------------- */
 
-.lmsa-diff-panel {
+.lmsa-chat-window-diff-panel {
   @apply lmsa-flex lmsa-flex-col lmsa-gap-3;
 }
 
 /* ------- Header ------- */
 
-.lmsa-diff-header {
+.lmsa-chat-window-diff-header {
   @apply lmsa-flex lmsa-flex-wrap lmsa-items-center lmsa-gap-2;
 }
 
-.lmsa-diff-target-file {
+.lmsa-chat-window-diff-target-file {
   @apply lmsa-flex lmsa-items-center lmsa-gap-1.5;
   font-size: var(--font-ui-small);
   font-weight: 600;
   color: var(--text-normal);
 }
 
-.lmsa-diff-file-icon {
+.lmsa-chat-window-diff-file-icon {
   @apply lmsa-inline-flex lmsa-items-center;
   color: var(--text-muted);
 }
 
-.lmsa-diff-file-icon svg {
+.lmsa-chat-window-diff-file-icon svg {
   width: 14px;
   height: 14px;
 }
 
 /* ------- Prose ------- */
 
-.lmsa-diff-prose {
+.lmsa-chat-window-diff-prose {
   font-size: var(--font-ui-small);
   color: var(--text-muted);
   line-height: 1.5;
 }
 
-.lmsa-diff-prose p:first-child {
+.lmsa-chat-window-diff-prose p:first-child {
   margin-top: 0;
 }
 
-.lmsa-diff-prose p:last-child {
+.lmsa-chat-window-diff-prose p:last-child {
   margin-bottom: 0;
 }
 
 /* ------- Hunks container ------- */
 
-.lmsa-diff-hunks {
+.lmsa-chat-window-diff-hunks {
   @apply lmsa-flex lmsa-flex-col lmsa-gap-2.5;
 }

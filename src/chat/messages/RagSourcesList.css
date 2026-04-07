@@ -1,5 +1,5 @@
 @layer components {
-  .lmsa-rag-sources {
+  .lmsa-chat-window-rag-sources {
     margin-top: 8px;
     padding-top: 8px;
     border-top: 1px solid var(--background-modifier-border);
@@ -7,28 +7,28 @@
     color: var(--text-muted);
   }
 
-  .lmsa-rag-sources-summary {
+  .lmsa-chat-window-rag-sources-summary {
     cursor: pointer;
     user-select: none;
     opacity: 0.7;
   }
 
-  .lmsa-rag-sources-summary:hover {
+  .lmsa-chat-window-rag-sources-summary:hover {
     opacity: 1;
   }
 
-  .lmsa-rag-sources-list {
+  .lmsa-chat-window-rag-sources-list {
     @apply lmsa-flex lmsa-flex-col lmsa-gap-1;
     margin-top: 4px;
     padding-left: 8px;
   }
 
-  .lmsa-rag-source-row {
+  .lmsa-chat-window-rag-source-row {
     @apply lmsa-relative lmsa-flex lmsa-items-center lmsa-gap-2;
     line-height: 1.4;
   }
 
-  .lmsa-rag-source-link {
+  .lmsa-chat-window-rag-source-link {
     @apply lmsa-relative;
     color: var(--text-accent);
     text-decoration: none;
@@ -38,18 +38,18 @@
     white-space: nowrap;
   }
 
-  .lmsa-rag-source-link:hover {
+  .lmsa-chat-window-rag-source-link:hover {
     text-decoration: underline;
     overflow: visible;
   }
 
-  .lmsa-rag-source-score {
+  .lmsa-chat-window-rag-source-score {
     @apply lmsa-flex-shrink-0;
     opacity: 0.6;
   }
 
   /* Hover tooltip for chunk content preview — fixed so it never affects scroll */
-  .lmsa-rag-source-tooltip {
+  .lmsa-chat-window-rag-source-tooltip {
     display: none;
     position: fixed;
     top: var(--tooltip-top, 0);
@@ -70,28 +70,28 @@
     box-shadow: var(--shadow-s);
   }
 
-  .lmsa-rag-source-tooltip.is-visible {
+  .lmsa-chat-window-rag-source-tooltip.is-visible {
     display: block;
   }
 
   /* Graph context section */
-  .lmsa-graph-context {
+  .lmsa-chat-window-graph-context {
     margin-top: 8px;
     padding-top: 8px;
     border-top: 1px solid var(--background-modifier-border);
   }
 
-  .lmsa-graph-context-summary {
+  .lmsa-chat-window-graph-context-summary {
     cursor: pointer;
     user-select: none;
     opacity: 0.7;
   }
 
-  .lmsa-graph-context-summary:hover {
+  .lmsa-chat-window-graph-context-summary:hover {
     opacity: 1;
   }
 
-  .lmsa-graph-entity-pills {
+  .lmsa-chat-window-graph-entity-pills {
     display: flex;
     flex-wrap: wrap;
     gap: 4px;
@@ -100,7 +100,7 @@
     padding-left: 8px;
   }
 
-  .lmsa-graph-entity-pill {
+  .lmsa-chat-window-graph-entity-pill {
     display: inline-flex;
     align-items: center;
     gap: 4px;
@@ -112,29 +112,29 @@
     line-height: 1.6;
   }
 
-  .lmsa-graph-entity-type {
+  .lmsa-chat-window-graph-entity-type {
     opacity: 0.65;
     font-weight: 500;
   }
 
-  .lmsa-graph-entity-type--character { color: var(--color-blue); }
-  .lmsa-graph-entity-type--location  { color: var(--color-green); }
-  .lmsa-graph-entity-type--object    { color: var(--color-orange); }
-  .lmsa-graph-entity-type--concept   { color: var(--color-purple); }
-  .lmsa-graph-entity-type--event     { color: var(--color-red); }
+  .lmsa-chat-window-graph-entity-type--character { color: var(--color-blue); }
+  .lmsa-chat-window-graph-entity-type--location  { color: var(--color-green); }
+  .lmsa-chat-window-graph-entity-type--object    { color: var(--color-orange); }
+  .lmsa-chat-window-graph-entity-type--concept   { color: var(--color-purple); }
+  .lmsa-chat-window-graph-entity-type--event     { color: var(--color-red); }
 
-  .lmsa-graph-entity-name {
+  .lmsa-chat-window-graph-entity-name {
     color: var(--text-normal);
   }
 
-  .lmsa-graph-relations {
+  .lmsa-chat-window-graph-relations {
     display: flex;
     flex-direction: column;
     gap: 2px;
     padding-left: 8px;
   }
 
-  .lmsa-graph-relation {
+  .lmsa-chat-window-graph-relation {
     font-size: var(--font-ui-smaller);
     opacity: 0.6;
     line-height: 1.4;

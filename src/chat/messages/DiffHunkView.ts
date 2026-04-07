@@ -33,7 +33,7 @@ export class DiffHunkView {
     initialMode: DiffMode = "split"
   ) {
     this.diffMode = initialMode;
-    this.containerEl = parent.createDiv({ cls: "lmsa-diff-hunk" });
+    this.containerEl = parent.createDiv({ cls: "lmsa-chat-window-diff-hunk" });
     this.containerEl.dataset.status = hunk.status;
     this.containerEl.dataset.hunkId = hunk.id;
 
@@ -87,7 +87,7 @@ export class DiffHunkView {
     this.statusEl.setText("Applied");
 
     // Keep mode toggle visible
-    const modeGroup = this.actionsEl.createDiv({ cls: "lmsa-btn-group" });
+    const modeGroup = this.actionsEl.createDiv({ cls: "lmsa-chat-window-btn-group" });
 
     this.splitBtn = modeGroup.createEl("button", {
       cls: "lmsa-btn-group-item",
@@ -126,7 +126,7 @@ export class DiffHunkView {
     this.actionsEl.empty();
 
     // Re-render mode toggle group
-    const modeGroup = this.actionsEl.createDiv({ cls: "lmsa-btn-group" });
+    const modeGroup = this.actionsEl.createDiv({ cls: "lmsa-chat-window-btn-group" });
 
     this.splitBtn = modeGroup.createEl("button", {
       cls: "lmsa-btn-group-item",
@@ -145,7 +145,7 @@ export class DiffHunkView {
     this.unifiedBtn.addEventListener("click", () => this.callbacks.onModeChange("unified"));
 
     // Re-render review group
-    const reviewGroup = this.actionsEl.createDiv({ cls: "lmsa-btn-group" });
+    const reviewGroup = this.actionsEl.createDiv({ cls: "lmsa-chat-window-btn-group" });
 
     this.acceptBtn = reviewGroup.createEl("button", {
       cls: "lmsa-btn-group-item lmsa-btn-group-item--accept",
@@ -189,7 +189,7 @@ export class DiffHunkView {
     const actionsEl = headerEl.createDiv({ cls: "lmsa-diff-hunk-actions" });
 
     // Button group 1: diff mode toggle
-    const modeGroup = actionsEl.createDiv({ cls: "lmsa-btn-group" });
+    const modeGroup = actionsEl.createDiv({ cls: "lmsa-chat-window-btn-group" });
 
     const splitBtn = modeGroup.createEl("button", {
       cls: "lmsa-btn-group-item",
@@ -214,7 +214,7 @@ export class DiffHunkView {
     this.unifiedBtn = unifiedBtn;
 
     // Button group 2: accept / reject
-    const reviewGroup = actionsEl.createDiv({ cls: "lmsa-btn-group" });
+    const reviewGroup = actionsEl.createDiv({ cls: "lmsa-chat-window-btn-group" });
 
     const acceptBtn = reviewGroup.createEl("button", {
       cls: "lmsa-btn-group-item lmsa-btn-group-item--accept",
@@ -322,17 +322,17 @@ export class DiffHunkView {
     const prefix = type === "removed" ? "−" : type === "added" ? "+" : " ";
 
     for (let i = 0; i < lines.length; i++) {
-      const lineEl = parent.createDiv({ cls: `lmsa-diff-line lmsa-diff-line--${type}` });
+      const lineEl = parent.createDiv({ cls: `lmsa-chat-window-diff-line lmsa-chat-window-diff-line--${type}` });
 
-      const gutterEl = lineEl.createSpan({ cls: "lmsa-diff-gutter" });
+      const gutterEl = lineEl.createSpan({ cls: "lmsa-chat-window-diff-gutter" });
       if (startLineNumber !== undefined) {
         gutterEl.setText(String(startLineNumber + i));
       }
 
-      const prefixEl = lineEl.createSpan({ cls: "lmsa-diff-prefix" });
+      const prefixEl = lineEl.createSpan({ cls: "lmsa-chat-window-diff-prefix" });
       prefixEl.setText(prefix);
 
-      const textEl = lineEl.createSpan({ cls: "lmsa-diff-text" });
+      const textEl = lineEl.createSpan({ cls: "lmsa-chat-window-diff-text" });
       textEl.setText(lines[i] || " ");
     }
   }
@@ -344,17 +344,17 @@ export class DiffHunkView {
     lineNumber?: number
   ): void {
     const prefix = type === "removed" ? "−" : "+";
-    const lineEl = parent.createDiv({ cls: `lmsa-diff-line lmsa-diff-line--${type}` });
+    const lineEl = parent.createDiv({ cls: `lmsa-chat-window-diff-line lmsa-chat-window-diff-line--${type}` });
 
-    const gutterEl = lineEl.createSpan({ cls: "lmsa-diff-gutter" });
+    const gutterEl = lineEl.createSpan({ cls: "lmsa-chat-window-diff-gutter" });
     if (lineNumber !== undefined) {
       gutterEl.setText(String(lineNumber));
     }
 
-    const prefixEl = lineEl.createSpan({ cls: "lmsa-diff-prefix" });
+    const prefixEl = lineEl.createSpan({ cls: "lmsa-chat-window-diff-prefix" });
     prefixEl.setText(prefix);
 
-    const textEl = lineEl.createSpan({ cls: "lmsa-diff-text" });
+    const textEl = lineEl.createSpan({ cls: "lmsa-chat-window-diff-text" });
     renderSegments(textEl, segments);
   }
 
@@ -423,7 +423,7 @@ export class DiffHunkView {
     parent: HTMLElement,
     sides: { left: SideCellData | null; right: SideCellData | null }
   ): void {
-    const rowEl = parent.createDiv({ cls: "lmsa-diff-row" });
+    const rowEl = parent.createDiv({ cls: "lmsa-chat-window-diff-row" });
     this.renderSideCell(rowEl, sides.left, "left");
     this.renderSideCell(rowEl, sides.right, "right");
   }
@@ -434,20 +434,20 @@ export class DiffHunkView {
     side: "left" | "right"
   ): void {
     if (!data) {
-      row.createDiv({ cls: `lmsa-diff-side lmsa-diff-side--${side} lmsa-diff-side--empty` });
+      row.createDiv({ cls: `lmsa-chat-window-diff-side lmsa-chat-window-diff-side--${side} lmsa-chat-window-diff-side--empty` });
       return;
     }
 
     const cellEl = row.createDiv({
-      cls: `lmsa-diff-side lmsa-diff-side--${side} lmsa-diff-line--${data.type}`,
+      cls: `lmsa-chat-window-diff-side lmsa-chat-window-diff-side--${side} lmsa-chat-window-diff-line--${data.type}`,
     });
 
-    const gutterEl = cellEl.createSpan({ cls: "lmsa-diff-gutter" });
+    const gutterEl = cellEl.createSpan({ cls: "lmsa-chat-window-diff-gutter" });
     if (data.lineNumber !== undefined) {
       gutterEl.setText(String(data.lineNumber));
     }
 
-    const textEl = cellEl.createSpan({ cls: "lmsa-diff-text" });
+    const textEl = cellEl.createSpan({ cls: "lmsa-chat-window-diff-text" });
 
     if (data.segments && data.segments.length > 0) {
       renderSegments(textEl, data.segments);
@@ -488,7 +488,7 @@ function renderSegments(textEl: HTMLElement, segments: DiffSegment[]): void {
   for (const segment of segments) {
     if (segment.text.length === 0) continue;
     if (segment.highlighted) {
-      const span = textEl.createSpan({ cls: "lmsa-diff-highlight" });
+      const span = textEl.createSpan({ cls: "lmsa-chat-window-diff-highlight" });
       span.setText(segment.text);
     } else {
       textEl.appendText(segment.text);

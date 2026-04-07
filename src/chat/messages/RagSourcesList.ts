@@ -29,26 +29,26 @@ function renderGraphContext(containerEl: HTMLElement, sources: RagSourceRef[]): 
   if (entityMap.size > 0) parts.push(`${entityMap.size} ${entityMap.size === 1 ? "entity" : "entities"}`);
   if (relationships.length > 0) parts.push(`${relationships.length} ${relationships.length === 1 ? "relationship" : "relationships"}`);
 
-  const sectionEl = containerEl.createEl("details", { cls: "lmsa-graph-context" });
-  sectionEl.createEl("summary", { cls: "lmsa-graph-context-summary", text: `Graph: ${parts.join(", ")}` });
+  const sectionEl = containerEl.createEl("details", { cls: "lmsa-chat-window-graph-context" });
+  sectionEl.createEl("summary", { cls: "lmsa-chat-window-graph-context-summary", text: `Graph: ${parts.join(", ")}` });
 
   if (entityMap.size > 0) {
-    const pillsEl = sectionEl.createDiv({ cls: "lmsa-graph-entity-pills" });
+    const pillsEl = sectionEl.createDiv({ cls: "lmsa-chat-window-graph-entity-pills" });
     for (const e of entityMap.values()) {
       const typeClass = ENTITY_TYPES.includes(e.type as (typeof ENTITY_TYPES)[number])
-        ? `lmsa-graph-entity-type--${e.type}`
-        : "lmsa-graph-entity-type--concept";
-      const pill = pillsEl.createDiv({ cls: "lmsa-graph-entity-pill" });
-      pill.createSpan({ cls: `lmsa-graph-entity-type ${typeClass}`, text: e.type });
-      pill.createSpan({ cls: "lmsa-graph-entity-name", text: e.name });
+        ? `lmsa-chat-window-graph-entity-type--${e.type}`
+        : "lmsa-chat-window-graph-entity-type--concept";
+      const pill = pillsEl.createDiv({ cls: "lmsa-chat-window-graph-entity-pill" });
+      pill.createSpan({ cls: `lmsa-chat-window-graph-entity-type ${typeClass}`, text: e.type });
+      pill.createSpan({ cls: "lmsa-chat-window-graph-entity-name", text: e.name });
       if (e.description) pill.setAttr("title", e.description);
     }
   }
 
   if (relationships.length > 0) {
-    const relsEl = sectionEl.createDiv({ cls: "lmsa-graph-relations" });
+    const relsEl = sectionEl.createDiv({ cls: "lmsa-chat-window-graph-relations" });
     for (const r of relationships) {
-      relsEl.createDiv({ cls: "lmsa-graph-relation", text: `${r.source} → ${r.type} → ${r.target}` });
+      relsEl.createDiv({ cls: "lmsa-chat-window-graph-relation", text: `${r.source} → ${r.type} → ${r.target}` });
     }
   }
 }
@@ -63,7 +63,7 @@ function formatSourceLabel(source: RagSourceRef): string {
 }
 
 function positionTooltip(linkEl: HTMLElement, tooltipEl: HTMLElement): void {
-  const scrollParent = linkEl.closest(".lmsa-messages");
+  const scrollParent = linkEl.closest(".lmsa-chat-window-messages");
   if (!scrollParent) return;
 
   const containerRect = scrollParent.getBoundingClientRect();
@@ -94,19 +94,19 @@ export function renderRagSources(
 ): HTMLElement | null {
   if (sources.length === 0) return null;
 
-  const detailsEl = parentEl.createEl("details", { cls: "lmsa-rag-sources" });
+  const detailsEl = parentEl.createEl("details", { cls: "lmsa-chat-window-rag-sources" });
   detailsEl.createEl("summary", {
-    cls: "lmsa-rag-sources-summary",
+    cls: "lmsa-chat-window-rag-sources-summary",
     text: `${sources.length} vault source${sources.length === 1 ? "" : "s"}`,
   });
 
-  const listEl = detailsEl.createDiv({ cls: "lmsa-rag-sources-list" });
+  const listEl = detailsEl.createDiv({ cls: "lmsa-chat-window-rag-sources-list" });
 
   for (const source of sources) {
-    const rowEl = listEl.createDiv({ cls: "lmsa-rag-source-row" });
+    const rowEl = listEl.createDiv({ cls: "lmsa-chat-window-rag-source-row" });
 
     const linkEl = rowEl.createEl("a", {
-      cls: "lmsa-rag-source-link",
+      cls: "lmsa-chat-window-rag-source-link",
       text: formatSourceLabel(source),
     });
     linkEl.addEventListener("click", (e) => {
@@ -117,13 +117,13 @@ export function renderRagSources(
     });
 
     rowEl.createSpan({
-      cls: "lmsa-rag-source-score",
+      cls: "lmsa-chat-window-rag-source-score",
       text: formatScore(source.score),
     });
 
     if (source.content) {
       const tooltipEl = linkEl.createDiv({
-        cls: "lmsa-rag-source-tooltip",
+        cls: "lmsa-chat-window-rag-source-tooltip",
         text: source.content,
       });
 

@@ -19,17 +19,17 @@ export class InlineMessageEditor {
     this.bubble.rowEl.addClass("is-editing");
     this.bubble.contentEl.addClass("lmsa-hidden");
 
-    this.editorEl = this.bubble.bodyEl.createDiv({ cls: "lmsa-inline-editor" });
+    this.editorEl = this.bubble.bodyEl.createDiv({ cls: "lmsa-chat-window-inline-editor" });
 
     this.textareaEl = this.editorEl.createEl("textarea", {
-      cls: "lmsa-inline-editor-textarea",
+      cls: "lmsa-chat-window-inline-editor-textarea",
       attr: { rows: "1" },
     });
     this.textareaEl.value = this.originalContent;
     this.textareaEl.style.minHeight = `${contentHeight}px`;
 
     const actionsEl = this.editorEl.createDiv({
-      cls: "lmsa-inline-editor-actions",
+      cls: "lmsa-chat-window-inline-editor-actions",
     });
 
     const cancelBtn = actionsEl.createEl("button", {
@@ -39,7 +39,7 @@ export class InlineMessageEditor {
     });
 
     const saveBtn = actionsEl.createEl("button", {
-      cls: "lmsa-ui-compact-btn lmsa-inline-editor-save",
+      cls: "lmsa-ui-compact-btn lmsa-chat-window-inline-editor-save",
       text: "Save",
       attr: { type: "button" },
     });

@@ -21,17 +21,17 @@ export function renderUsageBadge(
   // Nothing to show for messages without usage or model info.
   if (!usage && !modelId) return null;
 
-  const badgeEl = parentEl.createDiv({ cls: "lmsa-usage-badge" });
+  const badgeEl = parentEl.createDiv({ cls: "lmsa-chat-window-usage-badge" });
 
   if (usage) {
     badgeEl.createSpan({
-      cls: "lmsa-usage-tokens",
+      cls: "lmsa-chat-window-usage-tokens",
       text: `${formatTokenCount(usage.inputTokens)} in \u00b7 ${formatTokenCount(usage.outputTokens)} out`,
     });
 
     if (usage.estimatedCostUsd !== null && usage.estimatedCostUsd !== undefined && usage.estimatedCostUsd > 0) {
       badgeEl.createSpan({
-        cls: "lmsa-usage-cost",
+        cls: "lmsa-chat-window-usage-cost",
         text: formatCost(usage.estimatedCostUsd),
       });
     }
@@ -40,7 +40,7 @@ export function renderUsageBadge(
   // Show model tag in mixed-provider conversations for clarity.
   if (modelId && provider && provider !== "lmstudio") {
     badgeEl.createSpan({
-      cls: "lmsa-usage-model",
+      cls: "lmsa-chat-window-usage-model",
       text: modelId,
     });
   }

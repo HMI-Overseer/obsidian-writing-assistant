@@ -1,5 +1,5 @@
 @layer components {
-  .lmsa-usage-badge {
+  .lmsa-chat-window-usage-badge {
     @apply lmsa-flex lmsa-items-center lmsa-justify-end lmsa-gap-2;
     flex-basis: 100%;
     order: 2;
@@ -9,20 +9,20 @@
     opacity: 0.7;
   }
 
-  .lmsa-message:hover .lmsa-usage-badge {
+  .lmsa-chat-window-message:hover .lmsa-chat-window-usage-badge {
     opacity: 1;
   }
 
-  .lmsa-usage-tokens {
+  .lmsa-chat-window-usage-tokens {
     @apply lmsa-inline-flex lmsa-items-center;
   }
 
-  .lmsa-usage-cost {
+  .lmsa-chat-window-usage-cost {
     @apply lmsa-inline-flex lmsa-items-center;
     color: var(--lmsa-mode-accent);
   }
 
-  .lmsa-usage-model {
+  .lmsa-chat-window-usage-model {
     @apply lmsa-inline-flex lmsa-items-center;
     font-size: var(--font-smallest);
     opacity: 0.6;

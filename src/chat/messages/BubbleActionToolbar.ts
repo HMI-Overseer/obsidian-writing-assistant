@@ -39,7 +39,7 @@ export class BubbleActionToolbar {
   ): HTMLElement {
     const { isLastAssistant, callbacks } = options;
 
-    const actionsEl = chromeEl.createDiv({ cls: "lmsa-message-actions" });
+    const actionsEl = chromeEl.createDiv({ cls: "lmsa-chat-window-message-actions" });
     const actions = message.role === "user" ? USER_ACTIONS : [...ASSISTANT_ACTIONS];
 
     if (message.role === "assistant" && isLastAssistant) {
@@ -48,7 +48,7 @@ export class BubbleActionToolbar {
 
     for (const def of actions) {
       const btn = actionsEl.createEl("button", {
-        cls: "lmsa-action-btn",
+        cls: "lmsa-chat-window-action-btn",
         attr: {
           "data-action": def.action,
           "aria-label": def.label,

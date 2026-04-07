@@ -129,8 +129,9 @@
     @apply lmsa-relative lmsa-min-h-0 lmsa-flex-1 lmsa-overflow-visible;
   }
 
-  .lmsa-messages {
+  .lmsa-chat-window-messages {
     @apply lmsa-flex lmsa-h-full lmsa-flex-col lmsa-gap-[18px] lmsa-overflow-y-auto lmsa-px-[18px] lmsa-pb-6 lmsa-pt-2.5;
+    scrollbar-gutter: stable;
     transition: opacity 180ms ease;
   }
 
@@ -144,7 +145,7 @@
     @apply lmsa-pointer-events-auto lmsa-opacity-100;
   }
 
-  .lmsa-messages-pane.is-history-open .lmsa-messages,
+  .lmsa-messages-pane.is-history-open .lmsa-chat-window-messages,
   .lmsa-messages-pane.is-history-open .lmsa-empty-view {
     opacity: 0;
   }

@@ -1,15 +1,15 @@
 @layer components {
-  .lmsa-message.is-editing .lmsa-message-body {
+  .lmsa-chat-window-message.is-editing .lmsa-chat-window-message-body {
     border-style: dashed;
     border-color: color-mix(in srgb, var(--lmsa-mode-accent) 50%, var(--background-modifier-border));
     background: color-mix(in srgb, var(--lmsa-mode-accent) 6%, var(--background-primary));
   }
 
-  .lmsa-inline-editor {
+  .lmsa-chat-window-inline-editor {
     @apply lmsa-flex lmsa-flex-col lmsa-gap-2;
   }
 
-  .lmsa-inline-editor-textarea {
+  .lmsa-chat-window-inline-editor-textarea {
     @apply lmsa-w-full lmsa-resize-none lmsa-rounded-lg lmsa-border lmsa-border-obsidian-border lmsa-p-2.5;
     background: var(--background-primary);
     color: var(--text-normal);
@@ -23,20 +23,20 @@
     transition: border-color 120ms ease;
   }
 
-  .lmsa-inline-editor-textarea:focus {
+  .lmsa-chat-window-inline-editor-textarea:focus {
     border-color: var(--lmsa-mode-accent);
   }
 
-  .lmsa-inline-editor-actions {
+  .lmsa-chat-window-inline-editor-actions {
     @apply lmsa-flex lmsa-justify-end lmsa-gap-2;
   }
 
-  .lmsa-inline-editor-save {
+  .lmsa-chat-window-inline-editor-save {
     @apply lmsa-border-none lmsa-bg-obsidian-accent lmsa-font-semibold;
     color: var(--text-on-accent);
   }
 
-  .lmsa-inline-editor-save:hover {
+  .lmsa-chat-window-inline-editor-save:hover {
     background: var(--interactive-accent-hover);
   }
 }

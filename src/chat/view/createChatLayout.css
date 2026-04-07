@@ -36,24 +36,24 @@
 
   /* ── Header ──────────────────────────────────────────────────────────────── */
 
-  .lmsa-header {
+  .lmsa-chat-header {
     @apply lmsa-flex lmsa-items-center lmsa-justify-between lmsa-gap-4 lmsa-px-[18px] lmsa-pb-3 lmsa-pt-[18px];
   }
 
-  .lmsa-header-copy {
+  .lmsa-chat-header-copy {
     @apply lmsa-flex lmsa-min-w-0 lmsa-flex-col lmsa-gap-1;
   }
 
-  .lmsa-header-title {
+  .lmsa-chat-header-title {
     @apply lmsa-font-bold lmsa-text-obsidian-text;
     font-size: 1.05rem;
   }
 
-  .lmsa-header-meta-wrap {
+  .lmsa-chat-header-meta-wrap {
     @apply lmsa-relative;
   }
 
-  .lmsa-header-meta {
+  .lmsa-chat-header-meta {
     @apply lmsa-inline-flex lmsa-min-w-0 lmsa-cursor-pointer lmsa-items-center lmsa-gap-1.5 lmsa-text-obsidian-muted;
     font-size: var(--font-ui-small);
     line-height: 1.45;
@@ -63,44 +63,44 @@
     transition: background-color 140ms ease, color 140ms ease;
   }
 
-  .lmsa-header-meta:hover {
+  .lmsa-chat-header-meta:hover {
     background: color-mix(in srgb, var(--background-modifier-hover) 60%, transparent);
     color: var(--text-normal);
   }
 
-  .lmsa-header-meta.is-active {
+  .lmsa-chat-header-meta.is-active {
     color: var(--text-normal);
   }
 
-  .lmsa-header-meta.is-attention {
-    animation: lmsa-header-meta-attention 0.7s ease;
+  .lmsa-chat-header-meta.is-attention {
+    animation: lmsa-chat-header-meta-attention 0.7s ease;
   }
 
-  .lmsa-header-meta-label {
+  .lmsa-chat-header-meta-label {
     @apply lmsa-min-w-0 lmsa-truncate lmsa-whitespace-nowrap;
   }
 
-  .lmsa-header-meta-chevron {
+  .lmsa-chat-header-meta-chevron {
     @apply lmsa-inline-flex lmsa-flex-none lmsa-items-center;
     opacity: 0.4;
     transition: opacity 140ms ease;
   }
 
-  .lmsa-header-meta:hover .lmsa-header-meta-chevron,
-  .lmsa-header-meta.is-active .lmsa-header-meta-chevron {
+  .lmsa-chat-header-meta:hover .lmsa-chat-header-meta-chevron,
+  .lmsa-chat-header-meta.is-active .lmsa-chat-header-meta-chevron {
     opacity: 0.75;
   }
 
-  .lmsa-header-meta-chevron svg {
+  .lmsa-chat-header-meta-chevron svg {
     width: 12px;
     height: 12px;
   }
 
-  .lmsa-header-actions {
+  .lmsa-chat-header-actions {
     @apply lmsa-flex lmsa-items-center lmsa-gap-2.5;
   }
 
-  .lmsa-header-actions .lmsa-ui-icon-btn {
+  .lmsa-chat-header-actions .lmsa-ui-icon-btn {
     @apply lmsa-h-auto lmsa-w-auto lmsa-rounded-md lmsa-border-none lmsa-bg-transparent lmsa-p-1.5;
     box-shadow: none;
     outline: none;
@@ -109,16 +109,16 @@
     transition: background 120ms ease, color 120ms ease;
   }
 
-  .lmsa-header-actions .lmsa-ui-icon-btn:hover {
+  .lmsa-chat-header-actions .lmsa-ui-icon-btn:hover {
     @apply lmsa-bg-[var(--background-modifier-hover)] lmsa-text-obsidian-text;
     box-shadow: none;
   }
 
-  .lmsa-header-actions .lmsa-ui-icon-btn:focus-visible {
+  .lmsa-chat-header-actions .lmsa-ui-icon-btn:focus-visible {
     box-shadow: 0 0 0 2px var(--lmsa-mode-accent);
   }
 
-  .lmsa-header-btn svg {
+  .lmsa-chat-header-btn svg {
     width: 20px;
     height: 20px;
   }
@@ -269,11 +269,11 @@
   /* ── Responsive ──────────────────────────────────────────────────────────── */
 
   @media (max-width: 700px) {
-    .lmsa-header {
+    .lmsa-chat-header {
       @apply lmsa-flex-col lmsa-items-stretch;
     }
 
-    .lmsa-header-actions {
+    .lmsa-chat-header-actions {
       @apply lmsa-w-full lmsa-justify-start;
     }
   }

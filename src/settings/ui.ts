@@ -247,14 +247,14 @@ export function createModelSelector(
   let selected = opts.initial;
   let isOpen = false;
 
-  const wrapEl = containerEl.createDiv({ cls: "lmsa-header-meta-wrap lmsa-settings-model-selector-wrap" });
-  const btn = wrapEl.createDiv({ cls: "lmsa-header-meta lmsa-settings-model-selector" });
+  const wrapEl = containerEl.createDiv({ cls: "lmsa-settings-model-selector-wrap" });
+  const btn = wrapEl.createDiv({ cls: "lmsa-settings-model-selector" });
   const statusEl = btn.createEl("span", { cls: "lmsa-model-selector-status is-unknown" });
   const labelEl = btn.createEl("span", {
-    cls: "lmsa-header-meta-label",
+    cls: "lmsa-settings-model-selector-label",
     text: selected?.name ?? (opts.placeholder ?? "Select model..."),
   });
-  const chevronEl = btn.createEl("span", { cls: "lmsa-header-meta-chevron" });
+  const chevronEl = btn.createEl("span", { cls: "lmsa-settings-model-selector-chevron" });
   setIcon(chevronEl, "chevron-down");
 
   const dropdownEl = wrapEl.createDiv({ cls: "lmsa-model-dropdown lmsa-hidden" });

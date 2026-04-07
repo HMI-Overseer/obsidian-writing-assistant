@@ -347,6 +347,51 @@
     width: 100%;
   }
 
+  /* ── Settings model selector ────────────────────────────────────────────── */
+
+  .lmsa-settings-model-selector-wrap {
+    @apply lmsa-relative;
+  }
+
+  .lmsa-settings-model-selector {
+    @apply lmsa-inline-flex lmsa-min-w-0 lmsa-cursor-pointer lmsa-items-center lmsa-gap-1.5 lmsa-text-obsidian-muted;
+    font-size: var(--font-ui-small);
+    line-height: 1.45;
+    padding: 2px 6px;
+    margin: -2px -6px;
+    border-radius: 6px;
+    transition: background-color 140ms ease, color 140ms ease;
+  }
+
+  .lmsa-settings-model-selector:hover {
+    background: color-mix(in srgb, var(--background-modifier-hover) 60%, transparent);
+    color: var(--text-normal);
+  }
+
+  .lmsa-settings-model-selector.is-active {
+    color: var(--text-normal);
+  }
+
+  .lmsa-settings-model-selector-label {
+    @apply lmsa-min-w-0 lmsa-truncate lmsa-whitespace-nowrap;
+  }
+
+  .lmsa-settings-model-selector-chevron {
+    @apply lmsa-inline-flex lmsa-flex-none lmsa-items-center;
+    opacity: 0.4;
+    transition: opacity 140ms ease;
+  }
+
+  .lmsa-settings-model-selector:hover .lmsa-settings-model-selector-chevron,
+  .lmsa-settings-model-selector.is-active .lmsa-settings-model-selector-chevron {
+    opacity: 0.75;
+  }
+
+  .lmsa-settings-model-selector-chevron svg {
+    width: 12px;
+    height: 12px;
+  }
+
   /* ── Responsive ────────────────────────────────────────────────────────── */
 
   @media (max-width: 700px) {

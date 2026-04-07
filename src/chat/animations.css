@@ -33,7 +33,7 @@
   }
 }
 
-@keyframes lmsa-header-meta-attention {
+@keyframes lmsa-chat-header-meta-attention {
   0%,
   100% {
     color: var(--text-muted);

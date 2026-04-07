@@ -70,7 +70,7 @@ export class ChatHistoryDrawer {
     const actions = header.createDiv({ cls: "lmsa-history-header-actions" });
 
     const newBtn = actions.createEl("button", {
-      cls: "lmsa-header-btn lmsa-ui-icon-btn",
+      cls: "lmsa-history-btn lmsa-ui-icon-btn",
       attr: { "aria-label": "New conversation" },
     });
     setIcon(newBtn, "plus");
@@ -152,7 +152,7 @@ export class ChatHistoryDrawer {
     }
 
     const trashBtn = container.createEl("button", {
-      cls: "lmsa-header-btn lmsa-history-trash-btn lmsa-ui-icon-btn",
+      cls: "lmsa-history-btn lmsa-history-trash-btn lmsa-ui-icon-btn",
       attr: { "aria-label": "Delete conversation" },
     });
     setIcon(trashBtn, "trash-2");

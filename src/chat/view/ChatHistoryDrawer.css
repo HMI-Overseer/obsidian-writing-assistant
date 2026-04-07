@@ -56,7 +56,7 @@
     background: var(--background-modifier-hover) !important;
   }
 
-  .lmsa-history-header-actions .lmsa-header-btn svg {
+  .lmsa-history-header-actions .lmsa-history-btn svg {
     width: 20px;
     height: 20px;
   }

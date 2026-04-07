@@ -56,17 +56,17 @@ export function createChatLayout(contentEl: HTMLElement): ChatLayoutRefs {
     text: "Widen the panel to use the chat",
   });
 
-  const header = shell.createDiv({ cls: "lmsa-header" });
-  const titleGroup = header.createDiv({ cls: "lmsa-header-copy" });
-  titleGroup.createEl("div", { cls: "lmsa-header-title", text: "Obsidian writing assistant chat" });
+  const header = shell.createDiv({ cls: "lmsa-chat-header" });
+  const titleGroup = header.createDiv({ cls: "lmsa-chat-header-copy" });
+  titleGroup.createEl("div", { cls: "lmsa-chat-header-title", text: "Obsidian writing assistant chat" });
 
-  const headerMetaWrap = titleGroup.createDiv({ cls: "lmsa-header-meta-wrap" });
-  const headerMetaBtn = headerMetaWrap.createDiv({ cls: "lmsa-header-meta" });
-  const headerMetaLabel = headerMetaBtn.createEl("span", { cls: "lmsa-header-meta-label" });
+  const headerMetaWrap = titleGroup.createDiv({ cls: "lmsa-chat-header-meta-wrap" });
+  const headerMetaBtn = headerMetaWrap.createDiv({ cls: "lmsa-chat-header-meta" });
+  const headerMetaLabel = headerMetaBtn.createEl("span", { cls: "lmsa-chat-header-meta-label" });
   const modelSelectorStatusEl = headerMetaBtn.createEl("span", {
     cls: "lmsa-model-selector-status is-hidden",
   });
-  const headerMetaChevron = headerMetaBtn.createEl("span", { cls: "lmsa-header-meta-chevron" });
+  const headerMetaChevron = headerMetaBtn.createEl("span", { cls: "lmsa-chat-header-meta-chevron" });
   setIcon(headerMetaChevron, "chevron-down");
 
   const modelDropdownEl = headerMetaWrap.createDiv({ cls: "lmsa-model-dropdown lmsa-hidden" });
@@ -79,9 +79,9 @@ export function createChatLayout(contentEl: HTMLElement): ChatLayoutRefs {
 
   const profileSettingsPopoverEl = headerMetaWrap.createDiv({ cls: "lmsa-profile-popover lmsa-hidden" });
 
-  const headerActions = header.createDiv({ cls: "lmsa-header-actions" });
+  const headerActions = header.createDiv({ cls: "lmsa-chat-header-actions" });
   const historyBtn = headerActions.createEl("button", {
-    cls: "lmsa-header-btn lmsa-ui-icon-btn",
+    cls: "lmsa-chat-header-btn lmsa-ui-icon-btn",
     attr: { "aria-label": "Chat history" },
   }) as HTMLButtonElement;
   setIcon(historyBtn, "clock");

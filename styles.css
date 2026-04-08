@@ -1896,6 +1896,8 @@
     gap: 0.75rem;
     padding-top: 0.75rem;
     border-top: 1px solid color-mix(in srgb, var(--background-modifier-border) 78%, transparent);
+    container-type: inline-size;
+    container-name: lmsa-composer-footer;
 }
 .lmsa-chat-composer-footer-actions {
     margin-left: auto;
@@ -1907,6 +1909,7 @@
 .lmsa-chat-composer-context-capacity {
     position: relative;
     display: inline-flex;
+    flex: none;
     align-items: center;
     justify-content: center;
     cursor: default;
@@ -1952,6 +1955,7 @@
 /* ── Mode toggle ─────────────────────────────────────────────────────────── */
 .lmsa-chat-composer-mode-toggle {
     display: inline-flex;
+    flex: none;
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
 }
 .lmsa-chat-composer-mode-toggle-btn {
@@ -2076,6 +2080,7 @@
 /* ── Send button ─────────────────────────────────────────────────────────── */
 .lmsa-chat-composer-send-btn {
     display: flex;
+    flex: none;
     align-items: center;
     justify-content: center;
     border-style: none;
@@ -2102,16 +2107,20 @@
 .lmsa-chat-composer-send-btn.is-stop:hover {
     background: color-mix(in srgb, var(--text-error) 12%, transparent);
   }
-/* ── Responsive ──────────────────────────────────────────────────────────── */
-@media (max-width: 700px) {
-    .lmsa-chat-composer-footer {
-        flex-direction: column;
-        align-items: stretch;
+/* ── Responsive (container query — reacts to panel width, not viewport) ── */
+@container lmsa-composer-footer (max-width: 420px) {
+    .lmsa-chat-composer-vision-indicator {
+      display: none;
     }
-
-    .lmsa-chat-composer-footer-actions {
-        width: 100%;
-        justify-content: space-between;
+  }
+@container lmsa-composer-footer (max-width: 400px) {
+    .lmsa-chat-composer-knowledge-wrap {
+      display: none;
+    }
+  }
+@container lmsa-composer-footer (max-width: 360px) {
+    .lmsa-chat-composer-tool-wrap {
+      display: none;
     }
   }
 /* ── Wrapper for positioning ──────────────────────────────────────── */

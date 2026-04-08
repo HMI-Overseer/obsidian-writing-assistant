@@ -210,6 +210,8 @@
   .lmsa-chat-composer-footer {
     @apply lmsa-mt-1 lmsa-flex lmsa-items-center lmsa-justify-between lmsa-gap-3 lmsa-pt-3;
     border-top: 1px solid color-mix(in srgb, var(--background-modifier-border) 78%, transparent);
+    container-type: inline-size;
+    container-name: lmsa-composer-footer;
   }
 
   .lmsa-chat-composer-footer-actions {
@@ -219,7 +221,7 @@
   /* ── Context capacity ring ────────────────────────────────────────────────── */
 
   .lmsa-chat-composer-context-capacity {
-    @apply lmsa-relative lmsa-inline-flex lmsa-items-center lmsa-justify-center;
+    @apply lmsa-relative lmsa-inline-flex lmsa-flex-none lmsa-items-center lmsa-justify-center;
     cursor: default;
   }
 
@@ -271,7 +273,7 @@
   /* ── Mode toggle ─────────────────────────────────────────────────────────── */
 
   .lmsa-chat-composer-mode-toggle {
-    @apply lmsa-inline-flex;
+    @apply lmsa-inline-flex lmsa-flex-none;
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
   }
 
@@ -403,7 +405,7 @@
   /* ── Send button ─────────────────────────────────────────────────────────── */
 
   .lmsa-chat-composer-send-btn {
-    @apply lmsa-flex lmsa-items-center lmsa-justify-center lmsa-border-none lmsa-font-semibold;
+    @apply lmsa-flex lmsa-flex-none lmsa-items-center lmsa-justify-center lmsa-border-none lmsa-font-semibold;
     width: 36px;
     height: 36px;
     padding: 0;
@@ -431,15 +433,23 @@
     background: color-mix(in srgb, var(--text-error) 12%, transparent);
   }
 
-  /* ── Responsive ──────────────────────────────────────────────────────────── */
+  /* ── Responsive (container query — reacts to panel width, not viewport) ── */
 
-  @media (max-width: 700px) {
-    .lmsa-chat-composer-footer {
-      @apply lmsa-flex-col lmsa-items-stretch;
+  @container lmsa-composer-footer (max-width: 420px) {
+    .lmsa-chat-composer-vision-indicator {
+      display: none;
     }
+  }
 
-    .lmsa-chat-composer-footer-actions {
-      @apply lmsa-w-full lmsa-justify-between;
+  @container lmsa-composer-footer (max-width: 400px) {
+    .lmsa-chat-composer-knowledge-wrap {
+      display: none;
+    }
+  }
+
+  @container lmsa-composer-footer (max-width: 360px) {
+    .lmsa-chat-composer-tool-wrap {
+      display: none;
     }
   }
 }

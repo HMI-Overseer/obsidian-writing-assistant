@@ -1,6 +1,7 @@
 import type { ConversationMessage } from "../shared/types";
 import type { DocumentContext } from "../shared/chatRequest";
 import { estimateTokenCount } from "../shared/tokenEstimation";
+import { sumConversationUsage } from "./usageSummary";
 import { CONTEXT_WARNING_THRESHOLD, CONTEXT_DANGER_THRESHOLD } from "../constants";
 
 const DEBOUNCE_MS = 150;
@@ -19,12 +20,31 @@ function formatTokens(n: number): string {
   return String(n);
 }
 
+const RING_CIRCUMFERENCE = 2 * Math.PI * 12;
+
 export class ContextCapacityUpdater {
   /** Correction ratio learned from real API token counts. */
   private correctionRatio = 1.0;
   private debounceTimer: number | null = null;
 
-  constructor(private readonly capacityEl: HTMLElement) {}
+  private readonly fillCircle: SVGCircleElement | null;
+  private readonly tooltipEl: HTMLElement;
+  private readonly tooltipContextEl: HTMLElement;
+  private readonly tooltipUsageEl: HTMLElement;
+
+  private readonly onEnter = (): void => this.positionTooltip();
+  private readonly onLeave = (): void => this.tooltipEl.removeClass("is-visible");
+
+  constructor(private readonly capacityEl: HTMLElement) {
+    this.fillCircle = capacityEl.querySelector(".lmsa-context-ring-fill");
+
+    this.tooltipEl = document.body.createDiv({ cls: "lmsa-context-ring-tooltip" });
+    this.tooltipContextEl = this.tooltipEl.createEl("span", { cls: "lmsa-context-ring-tooltip-context" });
+    this.tooltipUsageEl = this.tooltipEl.createEl("span", { cls: "lmsa-context-ring-tooltip-usage lmsa-hidden" });
+
+    capacityEl.addEventListener("mouseenter", this.onEnter);
+    capacityEl.addEventListener("mouseleave", this.onLeave);
+  }
 
   /**
    * Schedule a debounced recalculation.
@@ -64,6 +84,9 @@ export class ContextCapacityUpdater {
 
   destroy(): void {
     this.clearPendingUpdate();
+    this.capacityEl.removeEventListener("mouseenter", this.onEnter);
+    this.capacityEl.removeEventListener("mouseleave", this.onLeave);
+    this.tooltipEl.remove();
   }
 
   private clearPendingUpdate(): void {
@@ -71,6 +94,36 @@ export class ContextCapacityUpdater {
       window.clearTimeout(this.debounceTimer);
       this.debounceTimer = null;
     }
+  }
+
+  /** Update the tooltip's usage line from conversation messages. */
+  refreshUsage(messages: ConversationMessage[]): void {
+    if (!this.tooltipUsageEl) return;
+
+    const totals = sumConversationUsage(messages);
+    if (!totals.hasUsage) {
+      this.tooltipUsageEl.addClass("lmsa-hidden");
+      return;
+    }
+
+    const totalTokens = totals.totalInputTokens + totals.totalOutputTokens;
+    const tokenText = totalTokens >= 1_000
+      ? `${(totalTokens / 1_000).toFixed(1)}k tokens`
+      : `${totalTokens} tokens`;
+
+    const parts: string[] = [];
+    if (totals.totalCost > 0) {
+      const costStr = totals.totalCost < 0.01
+        ? `$${totals.totalCost.toFixed(4)}`
+        : totals.totalCost < 1
+          ? `$${totals.totalCost.toFixed(3)}`
+          : `$${totals.totalCost.toFixed(2)}`;
+      parts.push(costStr);
+    }
+    parts.push(tokenText);
+
+    this.tooltipUsageEl.setText(parts.join(" \u00b7 "));
+    this.tooltipUsageEl.removeClass("lmsa-hidden");
   }
 
   private recalculate(inputs: ContextInputs): void {
@@ -101,13 +154,29 @@ export class ContextCapacityUpdater {
       this.capacityEl.addClass("is-warning");
     }
 
-    const labelEl = this.capacityEl.querySelector(
-      ".lmsa-chat-composer-context-capacity-label"
-    ) as HTMLElement | null;
-    if (labelEl) {
-      labelEl.setText(
-        `~${formatTokens(correctedEstimate)} / ${formatTokens(contextWindowSize)} tokens (${percent}%)`
+    if (this.fillCircle) {
+      const offset = RING_CIRCUMFERENCE * (1 - ratio);
+      this.fillCircle.setAttribute("stroke-dashoffset", String(Math.max(offset, 0)));
+    }
+
+    if (this.tooltipContextEl) {
+      this.tooltipContextEl.setText(
+        `Context: ~${formatTokens(correctedEstimate)} / ${formatTokens(contextWindowSize)} (${percent}%)`
       );
     }
+
+    this.refreshUsage(messages);
+  }
+
+  private positionTooltip(): void {
+    if (!this.tooltipEl) return;
+    const rect = this.capacityEl.getBoundingClientRect();
+    const gap = 6;
+
+    this.tooltipEl.setCssStyles({
+      top: `${rect.top - gap}px`,
+      left: `${rect.left + rect.width / 2}px`,
+    });
+    this.tooltipEl.addClass("is-visible");
   }
 }

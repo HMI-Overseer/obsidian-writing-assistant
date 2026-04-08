@@ -27,7 +27,6 @@ import { ProfileSettingsPopover } from "./models/ProfileSettingsPopover";
 import type { ChatLayoutRefs } from "./types";
 import { ChatHistoryDrawer } from "./view/ChatHistoryDrawer";
 import { createChatLayout } from "./view/createChatLayout";
-import { sumConversationUsage } from "./usageSummary";
 
 const NO_MODEL_SELECTED_LABEL = "No model selected";
 const MIN_VIEW_WIDTH_PX = 300;
@@ -516,7 +515,7 @@ export class ChatView extends ItemView {
       );
     }
 
-    this.updateUsageSummary(snapshot.messageHistory);
+    this.contextUpdater?.refreshUsage(snapshot.messageHistory);
     await this.refreshDocumentContext();
     this.contextUpdater?.immediateUpdate(this.buildContextInputs());
     this.updateGenerateResponseButton(snapshot.messageHistory);
@@ -691,38 +690,6 @@ export class ChatView extends ItemView {
     }
   }
 
-  private updateUsageSummary(messages: ConversationMessage[]): void {
-    const el = this.layout?.usageSummaryEl;
-    if (!el) return;
-
-    const totals = sumConversationUsage(messages);
-
-    if (!totals.hasUsage) {
-      el.addClass("lmsa-hidden");
-      return;
-    }
-
-    el.removeClass("lmsa-hidden");
-    el.empty();
-
-    const totalTokens = totals.totalInputTokens + totals.totalOutputTokens;
-    const tokenText = totalTokens >= 1_000
-      ? `${(totalTokens / 1_000).toFixed(1)}k tokens`
-      : `${totalTokens} tokens`;
-
-    const parts: string[] = [];
-    if (totals.totalCost > 0) {
-      const costStr = totals.totalCost < 0.01
-        ? `$${totals.totalCost.toFixed(4)}`
-        : totals.totalCost < 1
-          ? `$${totals.totalCost.toFixed(3)}`
-          : `$${totals.totalCost.toFixed(2)}`;
-      parts.push(`Session: ${costStr}`);
-    }
-    parts.push(tokenText);
-
-    el.setText(parts.join(" \u00b7 "));
-  }
 
   private async refreshDocumentContext(): Promise<void> {
     if (

@@ -1903,30 +1903,52 @@
     align-items: center;
     gap: 0.75rem;
 }
-/* ── Context capacity ────────────────────────────────────────────────────── */
+/* ── Context capacity ring ────────────────────────────────────────────────── */
 .lmsa-chat-composer-context-capacity {
-    padding: 2px 4px;
-    font-size: var(--font-ui-small);
-    color: var(--text-muted);
-  }
-.lmsa-chat-composer-context-capacity-label {
-    line-height: 1;
-  }
-.lmsa-chat-composer-context-capacity.is-warning .lmsa-chat-composer-context-capacity-label {
-    color: var(--text-warning, #e6a700);
-  }
-.lmsa-chat-composer-context-capacity.is-danger .lmsa-chat-composer-context-capacity-label {
-    color: var(--text-error, #e93147);
-  }
-/* ── Usage summary ───────────────────────────────────────────────────────── */
-.lmsa-chat-composer-usage-summary {
-    display: flex;
+    position: relative;
+    display: inline-flex;
     align-items: center;
-    font-size: var(--font-smallest);
-    color: var(--text-muted);
-    padding: 0 4px;
-    min-height: 20px;
+    justify-content: center;
+    cursor: default;
 }
+.lmsa-context-ring-svg {
+    width: 28px;
+    height: 28px;
+  }
+.lmsa-context-ring-track {
+    stroke: var(--background-modifier-border);
+  }
+.lmsa-context-ring-fill {
+    stroke: var(--interactive-accent);
+    transition: stroke-dashoffset 0.4s ease, stroke 0.2s ease;
+  }
+.lmsa-chat-composer-context-capacity.is-warning .lmsa-context-ring-fill {
+    stroke: var(--text-warning, #e6a700);
+  }
+.lmsa-chat-composer-context-capacity.is-danger .lmsa-context-ring-fill {
+    stroke: var(--text-error, #e93147);
+  }
+/* Tooltip — fixed positioning to escape overflow:hidden ancestors */
+.lmsa-context-ring-tooltip {
+    display: none;
+    position: fixed;
+    flex-direction: column;
+    gap: 2px;
+    transform: translate(-50%, -100%);
+    padding: 6px 10px;
+    border-radius: 6px;
+    background: var(--background-secondary);
+    border: 1px solid var(--background-modifier-border);
+    white-space: nowrap;
+    font-size: var(--font-ui-smaller);
+    color: var(--text-muted);
+    pointer-events: none;
+    z-index: 1000;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+  }
+.lmsa-context-ring-tooltip.is-visible {
+    display: flex;
+  }
 /* ── Mode toggle ─────────────────────────────────────────────────────────── */
 .lmsa-chat-composer-mode-toggle {
     display: inline-flex;

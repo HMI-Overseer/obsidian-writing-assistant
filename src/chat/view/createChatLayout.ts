@@ -121,9 +121,35 @@ export function createChatLayout(contentEl: HTMLElement): ChatLayoutRefs {
   const composerFooter = composerPanel.createDiv({ cls: "lmsa-chat-composer-footer" });
 
   const contextCapacityEl = composerFooter.createDiv({ cls: "lmsa-chat-composer-context-capacity lmsa-hidden" });
-  contextCapacityEl.createEl("span", { cls: "lmsa-chat-composer-context-capacity-label" });
 
-  const usageSummaryEl = composerFooter.createDiv({ cls: "lmsa-chat-composer-usage-summary lmsa-hidden" });
+  const ringSvg = document.createElementNS(SVG_NS, "svg");
+  ringSvg.classList.add("lmsa-context-ring-svg");
+  ringSvg.setAttribute("viewBox", "0 0 32 32");
+  ringSvg.setAttribute("role", "presentation");
+
+  const trackCircle = document.createElementNS(SVG_NS, "circle");
+  trackCircle.classList.add("lmsa-context-ring-track");
+  trackCircle.setAttribute("cx", "16");
+  trackCircle.setAttribute("cy", "16");
+  trackCircle.setAttribute("r", "12");
+  trackCircle.setAttribute("fill", "none");
+  trackCircle.setAttribute("stroke-width", "3");
+
+  const fillCircle = document.createElementNS(SVG_NS, "circle");
+  fillCircle.classList.add("lmsa-context-ring-fill");
+  fillCircle.setAttribute("cx", "16");
+  fillCircle.setAttribute("cy", "16");
+  fillCircle.setAttribute("r", "12");
+  fillCircle.setAttribute("fill", "none");
+  fillCircle.setAttribute("stroke-width", "3");
+  fillCircle.setAttribute("stroke-linecap", "round");
+  fillCircle.setAttribute("transform", "rotate(-90 16 16)");
+  const circumference = 2 * Math.PI * 12;
+  fillCircle.setAttribute("stroke-dasharray", String(circumference));
+  fillCircle.setAttribute("stroke-dashoffset", String(circumference));
+
+  ringSvg.append(trackCircle, fillCircle);
+  contextCapacityEl.appendChild(ringSvg);
 
   const composerFooterActions = composerFooter.createDiv({ cls: "lmsa-chat-composer-footer-actions" });
   const toolWrap = composerFooterActions.createDiv({ cls: "lmsa-chat-composer-tool-wrap" });
@@ -168,7 +194,6 @@ export function createChatLayout(contentEl: HTMLElement): ChatLayoutRefs {
     modelDropdownEl,
     profileSettingsBtn,
     profileSettingsPopoverEl,
-    usageSummaryEl,
     contextCapacityEl,
     generateResponseBtn,
   };

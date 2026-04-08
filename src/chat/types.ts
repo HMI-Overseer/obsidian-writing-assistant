@@ -43,7 +43,6 @@ export type ChatLayoutRefs = {
   modelDropdownEl: HTMLElement;
   profileSettingsBtn: HTMLButtonElement;
   profileSettingsPopoverEl: HTMLElement;
-  usageSummaryEl: HTMLElement;
   contextCapacityEl: HTMLElement;
   generateResponseBtn: HTMLButtonElement;
 };

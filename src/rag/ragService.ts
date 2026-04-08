@@ -290,10 +290,12 @@ export class RagService {
 
       // Annotate blocks with graph entity/relationship context.
       if (graphContext?.matchedEntities.length && this.graphService?.isReady()) {
-        const graph = this.graphService.getGraph()!;
-        blocks = blocks.map((block) =>
-          annotateBlockWithGraph(block, graph, graphContext!.matchedEntities),
-        );
+        const graph = this.graphService.getGraph();
+        if (graph && graphContext) {
+          blocks = blocks.map((block) =>
+            annotateBlockWithGraph(block, graph, graphContext.matchedEntities),
+          );
+        }
       }
 
       return blocks;

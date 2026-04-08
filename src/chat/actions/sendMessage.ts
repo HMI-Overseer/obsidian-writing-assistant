@@ -220,10 +220,10 @@ export async function sendMessage(options: SendMessageOptions): Promise<void> {
         );
       }
 
-      if (!hasToolCalls) break;
+      if (!toolCalls || toolCalls.length === 0) break;
 
-      const readOnlyCalls = toolCalls!.filter((tc) => READ_ONLY_TOOL_NAMES.has(tc.name));
-      const writeCalls = toolCalls!.filter((tc) => !READ_ONLY_TOOL_NAMES.has(tc.name));
+      const readOnlyCalls = toolCalls.filter((tc) => READ_ONLY_TOOL_NAMES.has(tc.name));
+      const writeCalls = toolCalls.filter((tc) => !READ_ONLY_TOOL_NAMES.has(tc.name));
       allWriteToolCalls = [...allWriteToolCalls, ...writeCalls];
 
       if (readOnlyCalls.length > 0 && writeCalls.length === 0 && round < MAX_TOOL_ROUNDS) {

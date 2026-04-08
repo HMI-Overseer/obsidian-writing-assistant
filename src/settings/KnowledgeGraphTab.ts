@@ -225,7 +225,9 @@ export function renderKnowledgeGraphTab(
       });
 
       for (const folder of folders) {
-        const { processed, total } = folderStats.get(folder)!;
+        const entry = folderStats.get(folder);
+        if (!entry) continue;
+        const { processed, total } = entry;
         const isComplete = processed === total && total > 0;
         const isBuildingThisFolder = isExtracting && activeFolder === folder;
 

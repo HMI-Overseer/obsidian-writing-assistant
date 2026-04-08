@@ -26,7 +26,7 @@ export default tseslint.config(
       "@typescript-eslint/consistent-type-imports": ["error", { prefer: "type-imports" }],
 
       // General
-      "no-console": "warn",
+      "no-console": ["warn", { allow: ["error", "warn"] }],
       eqeqeq: ["error", "always"],
 
       // Obsidian

@@ -147,12 +147,11 @@ async function runWithToolLoop(
     const result = await client.complete(request, modelId, params, signal);
     fullText += result.text;
     const toolCalls = result.toolCalls ?? null;
-    const hasToolCalls = toolCalls !== null && toolCalls.length > 0;
 
-    if (!hasToolCalls) break;
+    if (!toolCalls || toolCalls.length === 0) break;
 
-    const readOnlyCalls = toolCalls!.filter((tc) => READ_ONLY_TOOL_NAMES.has(tc.name));
-    const writeCalls = toolCalls!.filter((tc) => !READ_ONLY_TOOL_NAMES.has(tc.name));
+    const readOnlyCalls = toolCalls.filter((tc) => READ_ONLY_TOOL_NAMES.has(tc.name));
+    const writeCalls = toolCalls.filter((tc) => !READ_ONLY_TOOL_NAMES.has(tc.name));
     allWriteToolCalls = [...allWriteToolCalls, ...writeCalls];
 
     // All read-only — simulate responses and continue.

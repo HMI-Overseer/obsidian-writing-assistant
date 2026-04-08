@@ -80,8 +80,11 @@ export class GraphService {
     for (const file of this.app.vault.getMarkdownFiles()) {
       if (excludePatterns.some((p) => matchGlob(p, file.path))) continue;
       const folder = getTopLevelFolder(file.path);
-      if (!stats.has(folder)) stats.set(folder, { processed: 0, total: 0 });
-      const entry = stats.get(folder)!;
+      let entry = stats.get(folder);
+      if (!entry) {
+        entry = { processed: 0, total: 0 };
+        stats.set(folder, entry);
+      }
       entry.total++;
       const meta = this.graph.getFileMeta(file.path);
       if (meta && meta.mtime === file.stat.mtime) entry.processed++;

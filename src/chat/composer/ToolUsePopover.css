@@ -2,7 +2,7 @@
   /* ── Wrapper for positioning ──────────────────────────────────────── */
 
   .lmsa-chat-composer-tool-wrap {
-    @apply lmsa-relative;
+    @apply lmsa-flex;
   }
 
   .lmsa-chat-composer-tool-indicator {
@@ -14,8 +14,8 @@
   .lmsa-tool-popover {
     @apply lmsa-absolute lmsa-z-[120] lmsa-flex-col lmsa-rounded-2xl lmsa-border lmsa-border-obsidian-border lmsa-p-4;
     bottom: calc(100% + 8px);
-    right: 0;
-    width: min(280px, calc(100vw - 48px));
+    right: 50px;
+    width: min(280px, calc(100% - 28px));
     background:
       linear-gradient(
         180deg,
@@ -90,7 +90,7 @@
   }
 }
 
-@media (max-width: 700px) {
+@container lmsa-composer-footer (max-width: 320px) {
   .lmsa-tool-popover {
     @apply lmsa-left-0 lmsa-right-0;
     width: auto;

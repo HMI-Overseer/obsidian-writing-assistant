@@ -36,6 +36,7 @@ export type KnowledgePopoverCallbacks = {
   onRagStop: () => void;
   onSubscribe: (onUpdate: () => void) => void;
   onUnsubscribe: () => void;
+  onBeforeOpen?: () => void;
 };
 
 interface RagSectionRefs {
@@ -89,6 +90,7 @@ export class KnowledgePopover {
   }
 
   open(): void {
+    this.callbacks.onBeforeOpen?.();
     this.popoverOpen = true;
     this.refs.knowledgePopoverEl.removeClass("lmsa-hidden");
     this.renderContent();

@@ -1889,6 +1889,7 @@
   }
 /* ── Footer ──────────────────────────────────────────────────────────────── */
 .lmsa-chat-composer-footer {
+    position: relative;
     margin-top: 0.25rem;
     display: flex;
     align-items: center;
@@ -2125,7 +2126,7 @@
   }
 /* ── Wrapper for positioning ──────────────────────────────────────── */
 .lmsa-chat-composer-knowledge-wrap {
-    position: relative;
+    display: flex;
 }
 .lmsa-chat-composer-knowledge-indicator {
     cursor: pointer;
@@ -2140,8 +2141,8 @@
     border-color: var(--background-modifier-border);
     padding: 1rem;
     bottom: calc(100% + 8px);
-    right: 0;
-    width: min(300px, calc(100vw - 48px));
+    right: 25px;
+    width: min(300px, calc(100% - 28px));
     background:
       linear-gradient(
         180deg,
@@ -2325,7 +2326,7 @@
   }
 /* ── Wrapper for positioning ──────────────────────────────────────── */
 .lmsa-chat-composer-tool-wrap {
-    position: relative;
+    display: flex;
 }
 .lmsa-chat-composer-tool-indicator {
     cursor: pointer;
@@ -2340,8 +2341,8 @@
     border-color: var(--background-modifier-border);
     padding: 1rem;
     bottom: calc(100% + 8px);
-    right: 0;
-    width: min(280px, calc(100vw - 48px));
+    right: 50px;
+    width: min(280px, calc(100% - 28px));
     background:
       linear-gradient(
         180deg,
@@ -4553,7 +4554,7 @@
   initial-value: 0deg;
   inherits: false;
 }
-@media (max-width: 700px) {
+@container lmsa-composer-footer (max-width: 320px) {
   .lmsa-knowledge-popover {
         left: 0px;
         right: 0px;

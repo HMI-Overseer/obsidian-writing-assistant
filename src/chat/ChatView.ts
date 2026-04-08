@@ -293,6 +293,10 @@ export class ChatView extends ItemView {
         this.plugin.ragService.onIndexingStateChange(null);
         this.plugin.graphService.onBuildStateChange(null);
       },
+      onBeforeOpen: () => {
+        if (this.toolUsePopover?.isOpen()) this.toolUsePopover.close();
+        if (this.profilePopover?.isOpen()) this.profilePopover.close();
+      },
     });
 
     this.toolUsePopover = new ToolUsePopover(this.layout, {
@@ -306,6 +310,10 @@ export class ChatView extends ItemView {
         this.composer?.refreshToolUseIndicator(
           this.sessionStore?.getResolvedConversationModel() ?? null,
         );
+      },
+      onBeforeOpen: () => {
+        if (this.knowledgePopover?.isOpen()) this.knowledgePopover.close();
+        if (this.profilePopover?.isOpen()) this.profilePopover.close();
       },
     });
 

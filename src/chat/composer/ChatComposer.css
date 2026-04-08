@@ -208,7 +208,7 @@
   /* ── Footer ──────────────────────────────────────────────────────────────── */
 
   .lmsa-chat-composer-footer {
-    @apply lmsa-mt-1 lmsa-flex lmsa-items-center lmsa-justify-between lmsa-gap-3 lmsa-pt-3;
+    @apply lmsa-relative lmsa-mt-1 lmsa-flex lmsa-items-center lmsa-justify-between lmsa-gap-3 lmsa-pt-3;
     border-top: 1px solid color-mix(in srgb, var(--background-modifier-border) 78%, transparent);
     container-type: inline-size;
     container-name: lmsa-composer-footer;

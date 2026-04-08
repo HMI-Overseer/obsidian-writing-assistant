@@ -8,6 +8,7 @@ export type ToolUsePopoverCallbacks = {
   getActiveModel: () => CompletionModel | null;
   getTrainedForToolUse: (modelId: string) => boolean | undefined;
   onToggle: (enabled: boolean) => Promise<void>;
+  onBeforeOpen?: () => void;
 };
 
 interface SectionRefs {
@@ -77,6 +78,7 @@ export class ToolUsePopover {
   }
 
   open(): void {
+    this.callbacks.onBeforeOpen?.();
     this.popoverOpen = true;
     this.refs.toolUsePopoverEl.removeClass("lmsa-hidden");
     this.renderContent();

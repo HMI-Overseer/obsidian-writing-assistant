@@ -37,3 +37,4 @@ CLAUDE.md
 data.json
 rag-index.json
 rag-knowledge-graph.json
+conversations/

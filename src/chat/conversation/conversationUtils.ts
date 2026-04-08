@@ -2,6 +2,7 @@ import { MAX_CONVERSATIONS } from "../../constants";
 import type {
   ChatHistory,
   Conversation,
+  ConversationMeta,
   ConversationMessage,
   MessageVersion,
 } from "../../shared/types";
@@ -18,6 +19,18 @@ export function generateConversationTitle(firstUserMessage: string): string {
 
 export function makeMessage(role: "user" | "assistant", content: string): ConversationMessage {
   return { id: generateId(), role, content };
+}
+
+export function toConversationMeta(conversation: Conversation): ConversationMeta {
+  return {
+    id: conversation.id,
+    title: conversation.title,
+    createdAt: conversation.createdAt,
+    updatedAt: conversation.updatedAt,
+    modelId: conversation.modelId,
+    modelName: conversation.modelName,
+    messageCount: conversation.messages.length,
+  };
 }
 
 export function createConversation(modelId: string, modelName: string): Conversation {
@@ -41,25 +54,37 @@ export function normalizeChatHistory(raw: unknown): ChatHistory {
 
   const obj = raw as Record<string, unknown>;
 
-  const conversations: Conversation[] = Array.isArray(obj.conversations)
+  const conversations: ConversationMeta[] = Array.isArray(obj.conversations)
     ? obj.conversations
-        .filter((conversation): conversation is Record<string, unknown> => {
-          return !!conversation && typeof conversation === "object";
+        .filter((entry): entry is Record<string, unknown> => {
+          return !!entry && typeof entry === "object" && typeof (entry as Record<string, unknown>).id === "string";
         })
-        .map(normalizeConversation)
-        .filter((conversation): conversation is Conversation => conversation !== null)
+        .map(normalizeConversationMeta)
     : [];
 
   const activeConversationId =
     typeof obj.activeConversationId === "string" &&
-    conversations.some((conversation) => conversation.id === obj.activeConversationId)
+    conversations.some((meta) => meta.id === obj.activeConversationId)
       ? obj.activeConversationId
       : (conversations[0]?.id ?? null);
 
   return { conversations, activeConversationId };
 }
 
-function normalizeConversation(raw: Record<string, unknown>): Conversation | null {
+function normalizeConversationMeta(raw: Record<string, unknown>): ConversationMeta {
+  const now = Date.now();
+  return {
+    id: typeof raw.id === "string" && raw.id ? raw.id : generateId(),
+    title: typeof raw.title === "string" ? raw.title : "",
+    createdAt: typeof raw.createdAt === "number" ? raw.createdAt : now,
+    updatedAt: typeof raw.updatedAt === "number" ? raw.updatedAt : now,
+    modelId: typeof raw.modelId === "string" ? raw.modelId : "",
+    modelName: typeof raw.modelName === "string" ? raw.modelName : "Unknown",
+    messageCount: typeof raw.messageCount === "number" ? raw.messageCount : 0,
+  };
+}
+
+export function normalizeConversation(raw: Record<string, unknown>): Conversation | null {
   const id = typeof raw.id === "string" && raw.id ? raw.id : generateId();
   const title = typeof raw.title === "string" ? raw.title : "";
   const now = Date.now();
@@ -127,8 +152,9 @@ function normalizeConversation(raw: Record<string, unknown>): Conversation | nul
   return { id, title, createdAt, updatedAt, modelId, modelName, messages, draft };
 }
 
-export function pruneHistory(history: ChatHistory): boolean {
-  if (history.conversations.length <= MAX_CONVERSATIONS) return false;
+/** Prune oldest conversations beyond the cap. Returns IDs of removed entries. */
+export function pruneHistory(history: ChatHistory): string[] {
+  if (history.conversations.length <= MAX_CONVERSATIONS) return [];
 
   const sorted = [...history.conversations].sort((left, right) => left.updatedAt - right.updatedAt);
   const toRemove = new Set<string>();
@@ -143,11 +169,11 @@ export function pruneHistory(history: ChatHistory): boolean {
   history.conversations = history.conversations.filter(
     (conversation) => !toRemove.has(conversation.id)
   );
-  return toRemove.size > 0;
+  return [...toRemove];
 }
 
 export function createBranchConversation(
-  source: Conversation,
+  source: ConversationMeta,
   messagesUpTo: ConversationMessage[],
   branchMessageId: string
 ): Conversation {

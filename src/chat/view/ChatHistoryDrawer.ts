@@ -1,6 +1,6 @@
 import { setIcon } from "obsidian";
 import { MAX_CONVERSATIONS } from "../../constants";
-import type { Conversation } from "../../shared/types";
+import type { ConversationMeta } from "../../shared/types";
 import { formatRelativeDate } from "../conversation/conversationUtils";
 
 export type DrawerCallbacks = {
@@ -29,7 +29,7 @@ export class ChatHistoryDrawer {
     this.buildShell();
   }
 
-  open(conversations: Conversation[], activeId: string | null): void {
+  open(conversations: ConversationMeta[], activeId: string | null): void {
     this.pendingDeleteId = null;
     this.render(conversations, activeId);
     this.hostEl.addClass("is-history-open");
@@ -48,7 +48,7 @@ export class ChatHistoryDrawer {
     return this.drawerEl.hasClass("is-open");
   }
 
-  refresh(conversations: Conversation[], activeId: string | null): void {
+  refresh(conversations: ConversationMeta[], activeId: string | null): void {
     if (!this.isOpen()) return;
     this.render(conversations, activeId);
   }
@@ -79,7 +79,7 @@ export class ChatHistoryDrawer {
     this.listEl = this.drawerEl.createDiv({ cls: "lmsa-history-list" });
   }
 
-  private render(conversations: Conversation[], activeId: string | null): void {
+  private render(conversations: ConversationMeta[], activeId: string | null): void {
     this.listEl.empty();
     this.countEl.setText(`${conversations.length} / ${MAX_CONVERSATIONS}`);
 
@@ -96,7 +96,7 @@ export class ChatHistoryDrawer {
     }
   }
 
-  private renderItem(conversation: Conversation, isActive: boolean): void {
+  private renderItem(conversation: ConversationMeta, isActive: boolean): void {
     const item = this.listEl.createDiv({
       cls: "lmsa-history-item lmsa-ui-list-item" + (isActive ? " is-active" : ""),
       attr: { "data-conv-id": conversation.id },
@@ -105,11 +105,10 @@ export class ChatHistoryDrawer {
     const body = item.createDiv({ cls: "lmsa-history-item-body" });
     const displayTitle =
       conversation.title ||
-      (conversation.messages.length === 0 ? "New conversation" : "Untitled");
+      (conversation.messageCount === 0 ? "New conversation" : "Untitled");
     body.createDiv({ cls: "lmsa-history-item-title", text: displayTitle });
 
-    const messageCount = conversation.messages.length;
-    const messageLabel = messageCount === 1 ? "1 msg" : `${messageCount} msgs`;
+    const messageLabel = conversation.messageCount === 1 ? "1 msg" : `${conversation.messageCount} msgs`;
     const dateLabel = formatRelativeDate(conversation.updatedAt);
     const meta = [dateLabel, messageLabel, conversation.modelName]
       .filter(Boolean)

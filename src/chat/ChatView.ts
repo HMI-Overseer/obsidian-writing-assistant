@@ -66,7 +66,7 @@ export class ChatView extends ItemView {
 
   async onOpen(): Promise<void> {
     this.layout = createChatLayout(this.contentEl);
-    this.sessionStore = new ChatSessionStore(this.plugin);
+    this.sessionStore = new ChatSessionStore(this.plugin, this.plugin.conversationStorage);
     this.transcript = new ChatTranscript(this, this.app, this.layout);
 
     this.generation = new ChatGenerationController(
@@ -122,7 +122,7 @@ export class ChatView extends ItemView {
 
     this.modelSelector = new ChatModelSelector(this.plugin, this.layout, {
       getActiveModel: () => this.sessionStore?.getResolvedConversationModel() ?? null,
-      getActiveProfileId: () => this.sessionStore?.getActiveConversation()?.modelId ?? "",
+      getActiveProfileId: () => this.sessionStore?.getActiveConversationMeta()?.modelId ?? "",
       getModels: () => this.plugin.settings.completionModels,
       onSelectModel: async (model) => {
         if (!this.sessionStore) return;

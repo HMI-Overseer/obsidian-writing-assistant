@@ -1,5 +1,9 @@
 import { describe, test, expect } from "vitest";
-import { normalizeChatHistory } from "../../../src/chat/conversation/conversationUtils";
+import {
+  normalizeChatHistory,
+  normalizeConversation,
+  toConversationMeta,
+} from "../../../src/chat/conversation/conversationUtils";
 import type { Conversation, ConversationMessage, MessageUsage } from "../../../src/shared/types";
 
 /**
@@ -32,7 +36,7 @@ function makeConversation(messages: ConversationMessage[]): Conversation {
   };
 }
 
-describe("normalizeChatHistory — usage field preservation", () => {
+describe("normalizeConversation — usage field preservation", () => {
   test("preserves modelId, provider, and usage on assistant messages", () => {
     const msg: ConversationMessage = {
       id: "msg-1",
@@ -43,9 +47,9 @@ describe("normalizeChatHistory — usage field preservation", () => {
       usage: makeUsage(),
     };
 
-    const raw = jsonRoundTrip({ conversations: [makeConversation([msg])], activeConversationId: "conv-1" });
-    const result = normalizeChatHistory(raw);
-    const normalized = result.conversations[0].messages[0];
+    const raw = jsonRoundTrip(makeConversation([msg])) as Record<string, unknown>;
+    const result = normalizeConversation(raw);
+    const normalized = result!.messages[0];
 
     expect(normalized.modelId).toBe("claude-3-haiku-20240307");
     expect(normalized.provider).toBe("anthropic");
@@ -62,9 +66,9 @@ describe("normalizeChatHistory — usage field preservation", () => {
       provider: "anthropic",
     };
 
-    const raw = jsonRoundTrip({ conversations: [makeConversation([msg])], activeConversationId: "conv-1" });
-    const result = normalizeChatHistory(raw);
-    const normalized = result.conversations[0].messages[0];
+    const raw = jsonRoundTrip(makeConversation([msg])) as Record<string, unknown>;
+    const result = normalizeConversation(raw);
+    const normalized = result!.messages[0];
 
     expect(normalized.isError).toBe(true);
     expect(normalized.modelId).toBe("claude-3-haiku-20240307");
@@ -78,9 +82,9 @@ describe("normalizeChatHistory — usage field preservation", () => {
       content: "Hello!",
     };
 
-    const raw = jsonRoundTrip({ conversations: [makeConversation([msg])], activeConversationId: "conv-1" });
-    const result = normalizeChatHistory(raw);
-    const normalized = result.conversations[0].messages[0];
+    const raw = jsonRoundTrip(makeConversation([msg])) as Record<string, unknown>;
+    const result = normalizeConversation(raw);
+    const normalized = result!.messages[0];
 
     expect(normalized.isError).toBeUndefined();
   });
@@ -100,9 +104,9 @@ describe("normalizeChatHistory — usage field preservation", () => {
       usage: makeUsage({ inputTokens: 200, outputTokens: 80, estimatedCostUsd: 0.003 }),
     };
 
-    const raw = jsonRoundTrip({ conversations: [makeConversation([msg])], activeConversationId: "conv-1" });
-    const result = normalizeChatHistory(raw);
-    const normalized = result.conversations[0].messages[0];
+    const raw = jsonRoundTrip(makeConversation([msg])) as Record<string, unknown>;
+    const result = normalizeConversation(raw);
+    const normalized = result!.messages[0];
 
     expect(normalized.versions).toHaveLength(2);
     expect(normalized.versions![0].usage).toEqual(
@@ -125,9 +129,9 @@ describe("normalizeChatHistory — usage field preservation", () => {
       activeVersionIndex: 1,
     };
 
-    const raw = jsonRoundTrip({ conversations: [makeConversation([msg])], activeConversationId: "conv-1" });
-    const result = normalizeChatHistory(raw);
-    const normalized = result.conversations[0].messages[0];
+    const raw = jsonRoundTrip(makeConversation([msg])) as Record<string, unknown>;
+    const result = normalizeConversation(raw);
+    const normalized = result!.messages[0];
 
     expect(normalized.versions).toHaveLength(2);
     expect(normalized.versions![0].usage).toBeUndefined();
@@ -141,12 +145,65 @@ describe("normalizeChatHistory — usage field preservation", () => {
       content: "Hello from LM Studio",
     };
 
-    const raw = jsonRoundTrip({ conversations: [makeConversation([msg])], activeConversationId: "conv-1" });
-    const result = normalizeChatHistory(raw);
-    const normalized = result.conversations[0].messages[0];
+    const raw = jsonRoundTrip(makeConversation([msg])) as Record<string, unknown>;
+    const result = normalizeConversation(raw);
+    const normalized = result!.messages[0];
 
     expect(normalized.modelId).toBeUndefined();
     expect(normalized.provider).toBeUndefined();
     expect(normalized.usage).toBeUndefined();
+  });
+});
+
+describe("normalizeChatHistory — metadata index", () => {
+  test("normalizes conversation metadata entries", () => {
+    const raw = jsonRoundTrip({
+      conversations: [
+        { id: "conv-1", title: "Test", createdAt: 1000, updatedAt: 2000, modelId: "p1", modelName: "Claude", messageCount: 5 },
+      ],
+      activeConversationId: "conv-1",
+    });
+
+    const result = normalizeChatHistory(raw);
+    expect(result.conversations).toHaveLength(1);
+    expect(result.conversations[0].id).toBe("conv-1");
+    expect(result.conversations[0].messageCount).toBe(5);
+    expect(result.activeConversationId).toBe("conv-1");
+  });
+
+  test("falls back to first conversation when activeConversationId is invalid", () => {
+    const raw = jsonRoundTrip({
+      conversations: [
+        { id: "conv-1", title: "Test", createdAt: 1000, updatedAt: 2000, modelId: "p1", modelName: "Claude", messageCount: 0 },
+      ],
+      activeConversationId: "nonexistent",
+    });
+
+    const result = normalizeChatHistory(raw);
+    expect(result.activeConversationId).toBe("conv-1");
+  });
+
+  test("returns empty history for invalid input", () => {
+    const result = normalizeChatHistory(null);
+    expect(result.conversations).toHaveLength(0);
+    expect(result.activeConversationId).toBeNull();
+  });
+});
+
+describe("toConversationMeta", () => {
+  test("extracts metadata from full conversation", () => {
+    const conv = makeConversation([
+      { id: "m1", role: "user", content: "Hi" },
+      { id: "m2", role: "assistant", content: "Hello" },
+    ]);
+
+    const meta = toConversationMeta(conv);
+
+    expect(meta.id).toBe("conv-1");
+    expect(meta.title).toBe("Test");
+    expect(meta.messageCount).toBe(2);
+    expect(meta.modelId).toBe("profile-1");
+    expect(meta.modelName).toBe("Claude Haiku 3");
+    expect((meta as Record<string, unknown>)["messages"]).toBeUndefined();
   });
 });

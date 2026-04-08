@@ -134,8 +134,19 @@ export interface Conversation {
   branchFromMessageId?: string;
 }
 
+/** Lightweight metadata stored in the settings index (no message content). */
+export interface ConversationMeta {
+  id: string;
+  title: string;
+  createdAt: number;
+  updatedAt: number;
+  modelId: string;
+  modelName: string;
+  messageCount: number;
+}
+
 export interface ChatHistory {
-  conversations: Conversation[];
+  conversations: ConversationMeta[];
   activeConversationId: string | null;
 }
 

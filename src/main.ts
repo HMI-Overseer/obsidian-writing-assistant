@@ -10,6 +10,7 @@ import type {
   ProviderSettingsMap,
   RagSettings,
 } from "./shared/types";
+import { ConversationStorage } from "./chat/conversation/ConversationStorage";
 import {
   DEFAULT_CHAT_HISTORY,
   DEFAULT_KNOWLEDGE_GRAPH_SETTINGS,
@@ -101,10 +102,12 @@ export default class LMStudioWritingAssistant extends Plugin {
   modelAvailability!: ModelAvailabilityService;
   ragService!: RagService;
   graphService!: GraphService;
+  conversationStorage!: ConversationStorage;
 
   async onload(): Promise<void> {
     await this.loadSettings();
     this.modelAvailability = new ModelAvailabilityService(() => this.settings.providerSettings);
+    this.conversationStorage = new ConversationStorage(this.app);
     this.ragService = new RagService(this.app);
     await this.ragService.configure(
       this.settings.rag,

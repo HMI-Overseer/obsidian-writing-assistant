@@ -19,6 +19,8 @@ export interface ModelDigest {
   summary?: string;
   /** Whether the model was trained for tool/function calling. */
   trainedForToolUse?: boolean;
+  /** Whether the model supports vision (image input). */
+  vision?: boolean;
 }
 
 export interface ModelCandidateResult {

@@ -32,6 +32,8 @@ export interface CompletionModel {
   anthropicCacheSettings?: AnthropicCacheSettings;
   /** Whether the model was trained for tool/function calling. Only relevant for LM Studio models. */
   trainedForToolUse?: boolean;
+  /** Whether the model supports vision (image input). */
+  vision?: boolean;
 }
 
 export interface EmbeddingModel {

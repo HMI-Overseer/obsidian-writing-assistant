@@ -11,6 +11,7 @@ export interface ModelAvailabilityInfo {
   state: ModelAvailabilityState;
   activeContextLength?: number;
   trainedForToolUse?: boolean;
+  vision?: boolean;
 }
 
 export class ModelAvailabilityService {
@@ -54,6 +55,7 @@ export class ModelAvailabilityService {
         state: candidate.isLoaded ? "loaded" : "unloaded",
         activeContextLength: candidate.activeContextLength,
         trainedForToolUse: candidate.trainedForToolUse,
+        vision: candidate.vision,
       });
     }
 
@@ -66,6 +68,10 @@ export class ModelAvailabilityService {
 
   getTrainedForToolUse(modelId: string): boolean | undefined {
     return this.availabilityMap.get(modelId)?.trainedForToolUse;
+  }
+
+  getVision(modelId: string): boolean | undefined {
+    return this.availabilityMap.get(modelId)?.vision;
   }
 
   getLMStudioService(): LMStudioModelsService {

@@ -38,7 +38,7 @@ export class ChatComposer {
     private readonly plugin: LMStudioWritingAssistant,
     private readonly refs: Pick<
       ChatLayoutRefs,
-      "commandBarEl" | "contextChipsEl" | "textareaEl" | "modeToggleEl" | "toolUseIndicatorEl" | "actionBtn"
+      "commandBarEl" | "contextChipsEl" | "textareaEl" | "modeToggleEl" | "toolUseIndicatorEl" | "knowledgeIndicatorEl" | "visionIndicatorEl" | "actionBtn"
     >,
     private readonly callbacks: ChatComposerCallbacks
   ) {
@@ -170,6 +170,50 @@ export class ChatComposer {
     el.setAttribute("aria-label", supportsTools
       ? "Tool use supported — edit mode uses structured tool calls"
       : "Tool use not available — edit mode uses text fallback");
+  }
+
+  /**
+   * Updates the knowledge indicator based on RAG and knowledge graph readiness.
+   * Cyan when at least one knowledge source is active, gray otherwise.
+   */
+  refreshKnowledgeIndicator(ragReady: boolean, graphReady: boolean): void {
+    const el = this.refs.knowledgeIndicatorEl;
+    const active = ragReady || graphReady;
+
+    el.toggleClass("is-active", active);
+
+    if (ragReady && graphReady) {
+      el.setAttribute("aria-label", "Knowledge active \u2014 retrieval + graph");
+    } else if (ragReady) {
+      el.setAttribute("aria-label", "Knowledge active \u2014 retrieval");
+    } else if (graphReady) {
+      el.setAttribute("aria-label", "Knowledge active \u2014 graph");
+    } else {
+      el.setAttribute("aria-label", "No knowledge sources active");
+    }
+  }
+
+  /**
+   * Updates the vision indicator based on the active model's vision capability.
+   * Purple when the model supports vision, gray otherwise.
+   */
+  refreshVisionIndicator(activeModel: CompletionModel | null): void {
+    const el = this.refs.visionIndicatorEl;
+
+    if (!activeModel) {
+      el.removeClass("is-active");
+      el.setAttribute("aria-label", "No model selected");
+      return;
+    }
+
+    const supportsVision = activeModel.vision
+      ?? this.plugin.modelAvailability.getVision(activeModel.modelId)
+      ?? false;
+
+    el.toggleClass("is-active", supportsVision);
+    el.setAttribute("aria-label", supportsVision
+      ? "Vision supported — model can process images"
+      : "Vision not available");
   }
 
   renderCommandBar(): void {

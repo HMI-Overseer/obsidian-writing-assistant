@@ -17,12 +17,16 @@ export class CompletionModelModal extends ModelProfileModal<CompletionModel> {
       ...(prefill?.contextWindowSize && { contextWindowSize: prefill.contextWindowSize }),
       ...(prefill?.anthropicCacheSettings && { anthropicCacheSettings: prefill.anthropicCacheSettings }),
       ...(prefill?.trainedForToolUse !== undefined && { trainedForToolUse: prefill.trainedForToolUse }),
+      ...(prefill?.vision !== undefined && { vision: prefill.vision }),
     };
   }
 
   protected onCandidateMatched(candidate: ModelDigest): void {
     if (candidate.trainedForToolUse !== undefined) {
       this.model.trainedForToolUse = candidate.trainedForToolUse;
+    }
+    if (candidate.vision !== undefined) {
+      this.model.vision = candidate.vision;
     }
     const contextLength = candidate.activeContextLength ?? candidate.maxContextLength;
     if (contextLength) {

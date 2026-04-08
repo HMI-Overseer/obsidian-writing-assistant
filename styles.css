@@ -2007,6 +2007,50 @@
     border-color: color-mix(in srgb, var(--color-orange, #e8a84b) 45%, var(--background-modifier-border));
     opacity: 1;
   }
+/* ── Knowledge indicator ─────────────────────────────────────────────────── */
+.lmsa-chat-composer-knowledge-indicator {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 7px;
+    border: 1px solid var(--background-modifier-border);
+    color: var(--text-faint);
+    opacity: 0.4;
+    transition: color 0.15s ease, opacity 0.15s ease, border-color 0.15s ease;
+}
+.lmsa-chat-composer-knowledge-indicator svg {
+    width: 14px;
+    height: 14px;
+  }
+.lmsa-chat-composer-knowledge-indicator.is-active {
+    color: var(--color-cyan, #58a6ff);
+    border-color: color-mix(in srgb, var(--color-cyan, #58a6ff) 45%, var(--background-modifier-border));
+    opacity: 1;
+  }
+/* ── Vision indicator ────────────────────────────────────────────────────── */
+.lmsa-chat-composer-vision-indicator {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 7px;
+    border: 1px solid var(--background-modifier-border);
+    color: var(--text-faint);
+    opacity: 0.4;
+    transition: color 0.15s ease, opacity 0.15s ease, border-color 0.15s ease;
+}
+.lmsa-chat-composer-vision-indicator svg {
+    width: 14px;
+    height: 14px;
+  }
+.lmsa-chat-composer-vision-indicator.is-active {
+    color: var(--color-purple, #a78bfa);
+    border-color: color-mix(in srgb, var(--color-purple, #a78bfa) 45%, var(--background-modifier-border));
+    opacity: 1;
+  }
 /* ── Send button ─────────────────────────────────────────────────────────── */
 .lmsa-chat-composer-send-btn {
     display: flex;

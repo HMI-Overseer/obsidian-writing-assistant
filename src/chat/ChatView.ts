@@ -109,6 +109,13 @@ export class ChatView extends ItemView {
         this.composer?.refreshToolUseIndicator(
           this.sessionStore?.getResolvedConversationModel() ?? null
         );
+        this.composer?.refreshKnowledgeIndicator(
+          this.plugin.ragService.isReady(),
+          this.plugin.graphService.isReady(),
+        );
+        this.composer?.refreshVisionIndicator(
+          this.sessionStore?.getResolvedConversationModel() ?? null
+        );
       },
       onContextToggle: () => {
         this.cachedDocumentContext = null;
@@ -350,6 +357,13 @@ export class ChatView extends ItemView {
     this.updateHeader();
     this.composer.updateContextChips();
     this.composer.refreshToolUseIndicator(
+      this.sessionStore.getResolvedConversationModel()
+    );
+    this.composer.refreshKnowledgeIndicator(
+      this.plugin.ragService.isReady(),
+      this.plugin.graphService.isReady(),
+    );
+    this.composer.refreshVisionIndicator(
       this.sessionStore.getResolvedConversationModel()
     );
     this.composer.renderCommandBar();

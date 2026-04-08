@@ -86,6 +86,7 @@ function toDigest(model: AnthropicRawModel): ModelDigest {
     provider: "anthropic",
     maxContextLength: model.max_input_tokens,
     summary: buildSummary(model),
+    vision: model.capabilities?.["image_input"]?.supported,
   };
 }
 

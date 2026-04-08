@@ -13,6 +13,7 @@
 @import "../chat/models/ChatModelSelector.css";
 @import "../chat/models/ProfileSettingsPopover.css";
 @import "../chat/composer/ChatComposer.css";
+@import "../chat/composer/KnowledgePopover.css";
 @import "../chat/animations.css";
 
 /* Diff / Editing */

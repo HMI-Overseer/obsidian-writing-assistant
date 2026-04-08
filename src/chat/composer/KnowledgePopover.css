@@ -1,0 +1,187 @@
+@layer components {
+  /* ── Wrapper for positioning ──────────────────────────────────────── */
+
+  .lmsa-chat-composer-knowledge-wrap {
+    @apply lmsa-relative;
+  }
+
+  .lmsa-chat-composer-knowledge-indicator {
+    cursor: pointer;
+  }
+
+  /* ── Popover shell ────────────────────────────────────────────────── */
+
+  .lmsa-knowledge-popover {
+    @apply lmsa-absolute lmsa-z-[120] lmsa-flex-col lmsa-rounded-2xl lmsa-border lmsa-border-obsidian-border lmsa-p-4;
+    bottom: calc(100% + 8px);
+    right: 0;
+    width: min(300px, calc(100vw - 48px));
+    background:
+      linear-gradient(
+        180deg,
+        color-mix(in srgb, var(--background-primary) 97%, transparent),
+        color-mix(in srgb, var(--background-secondary) 94%, transparent)
+      );
+    backdrop-filter: blur(22px);
+    -webkit-backdrop-filter: blur(22px);
+    box-shadow:
+      0 -12px 48px rgba(0, 0, 0, 0.18),
+      inset 0 -1px 0 rgba(255, 255, 255, 0.04);
+    transform-origin: bottom right;
+  }
+
+  .lmsa-knowledge-popover-title {
+    @apply lmsa-font-bold lmsa-text-obsidian-text;
+    font-size: var(--font-ui-small);
+    margin-bottom: 0.75rem;
+  }
+
+  .lmsa-knowledge-popover-body {
+    @apply lmsa-flex lmsa-flex-col lmsa-gap-4;
+  }
+
+  /* ── Section ──────────────────────────────────────────────────────── */
+
+  .lmsa-knowledge-popover-section {
+    @apply lmsa-flex lmsa-flex-col lmsa-gap-2;
+  }
+
+  .lmsa-knowledge-popover-section + .lmsa-knowledge-popover-section {
+    @apply lmsa-pt-3;
+    border-top: 1px solid color-mix(in srgb, var(--background-modifier-border) 60%, transparent);
+  }
+
+  /* Header row: label + toggle */
+  .lmsa-knowledge-popover-row {
+    @apply lmsa-flex lmsa-items-center lmsa-justify-between lmsa-gap-3;
+  }
+
+  .lmsa-knowledge-popover-label {
+    font-weight: 600;
+    font-size: var(--font-ui-small);
+    color: var(--text-normal);
+  }
+
+  .lmsa-knowledge-popover-control {
+    @apply lmsa-flex;
+  }
+
+  /* Provide token values the settings Toggle expects (normally scoped to .lmsa-settings-root) */
+  .lmsa-knowledge-popover .lmsa-toggle {
+    --lmsa-border-default: var(--background-modifier-border);
+    --lmsa-text-primary: var(--text-normal);
+    --lmsa-section-accent: var(--color-cyan, #58a6ff);
+    --lmsa-surface-contrast: #fff;
+    --lmsa-accent-glow: color-mix(in srgb, var(--color-cyan, #58a6ff) 30%, transparent);
+  }
+
+  /* Status text */
+  .lmsa-knowledge-popover-status {
+    font-size: var(--font-ui-smaller);
+    color: var(--text-muted);
+    line-height: 1.4;
+  }
+
+  /* Status row: status text + action button */
+  .lmsa-knowledge-popover-status-row {
+    @apply lmsa-flex lmsa-items-center lmsa-justify-between lmsa-gap-3;
+    min-height: 24px;
+  }
+
+  /* Hint text (e.g. "configure in settings") */
+  .lmsa-knowledge-popover-hint {
+    font-size: var(--font-ui-smaller);
+    color: var(--text-faint);
+    font-style: italic;
+    line-height: 1.4;
+  }
+
+  /* ── Model selector ───────────────────────────────────────────────── */
+
+  .lmsa-knowledge-popover-model-wrap {
+    @apply lmsa-relative;
+  }
+
+  .lmsa-knowledge-popover-model-selector {
+    @apply lmsa-flex lmsa-w-full lmsa-cursor-pointer lmsa-items-center lmsa-gap-2 lmsa-rounded-lg lmsa-border lmsa-border-obsidian-border lmsa-px-3 lmsa-py-2;
+    font-size: var(--font-ui-smaller);
+    color: var(--text-normal);
+    background: var(--background-secondary);
+    transition: border-color 120ms ease;
+  }
+
+  .lmsa-knowledge-popover-model-selector:hover {
+    border-color: color-mix(in srgb, var(--interactive-accent) 40%, var(--background-modifier-border));
+  }
+
+  .lmsa-knowledge-popover-model-label {
+    @apply lmsa-min-w-0 lmsa-flex-1 lmsa-truncate;
+  }
+
+  .lmsa-knowledge-popover-model-chevron {
+    @apply lmsa-inline-flex lmsa-flex-none lmsa-items-center;
+    color: var(--text-muted);
+  }
+
+  .lmsa-knowledge-popover-model-chevron svg {
+    width: 12px;
+    height: 12px;
+  }
+
+  /* Dropdown (reuses the shared lmsa-model-dropdown-* classes) */
+  .lmsa-knowledge-popover-model-dropdown {
+    @apply lmsa-absolute lmsa-left-0 lmsa-right-0 lmsa-z-[130] lmsa-overflow-hidden lmsa-rounded-lg lmsa-border lmsa-border-obsidian-border;
+    top: calc(100% + 4px);
+    max-height: 180px;
+    overflow-y: auto;
+    background: var(--background-primary);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+  }
+
+  .lmsa-knowledge-popover-model-empty {
+    @apply lmsa-py-3 lmsa-text-center;
+    font-size: var(--font-ui-smaller);
+    color: var(--text-faint);
+  }
+
+  /* ── Action button ────────────────────────────────────────────────── */
+
+  .lmsa-knowledge-popover-action-btn {
+    @apply lmsa-inline-flex lmsa-flex-none lmsa-cursor-pointer lmsa-items-center lmsa-justify-center lmsa-rounded-md lmsa-border lmsa-border-obsidian-border lmsa-p-1;
+    min-height: unset;
+    width: 24px;
+    height: 24px;
+    color: var(--text-muted);
+    background: transparent;
+    box-shadow: none;
+    outline: none;
+    appearance: none;
+    transition: background 120ms ease, color 120ms ease, border-color 120ms ease;
+  }
+
+  .lmsa-knowledge-popover-action-btn:hover {
+    background: color-mix(in srgb, var(--background-modifier-hover) 60%, transparent);
+    color: var(--text-normal);
+  }
+
+  .lmsa-knowledge-popover-action-btn svg {
+    width: 12px;
+    height: 12px;
+  }
+
+  .lmsa-knowledge-popover-action-btn.is-stop {
+    color: var(--text-error);
+    border-color: color-mix(in srgb, var(--text-error) 40%, var(--background-modifier-border));
+  }
+
+  .lmsa-knowledge-popover-action-btn.is-stop:hover {
+    background: color-mix(in srgb, var(--text-error) 12%, transparent);
+  }
+}
+
+@media (max-width: 700px) {
+  .lmsa-knowledge-popover {
+    @apply lmsa-left-0 lmsa-right-0;
+    width: auto;
+  }
+}

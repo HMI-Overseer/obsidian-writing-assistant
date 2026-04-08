@@ -128,8 +128,10 @@ export function createChatLayout(contentEl: HTMLElement): ChatLayoutRefs {
   const composerFooterActions = composerFooter.createDiv({ cls: "lmsa-chat-composer-footer-actions" });
   const toolUseIndicatorEl = composerFooterActions.createDiv({ cls: "lmsa-chat-composer-tool-indicator" });
   setIcon(toolUseIndicatorEl, "wrench");
-  const knowledgeIndicatorEl = composerFooterActions.createDiv({ cls: "lmsa-chat-composer-knowledge-indicator" });
+  const knowledgeWrap = composerFooterActions.createDiv({ cls: "lmsa-chat-composer-knowledge-wrap" });
+  const knowledgeIndicatorEl = knowledgeWrap.createDiv({ cls: "lmsa-chat-composer-knowledge-indicator" });
   setIcon(knowledgeIndicatorEl, "database");
+  const knowledgePopoverEl = knowledgeWrap.createDiv({ cls: "lmsa-knowledge-popover lmsa-hidden" });
   const visionIndicatorEl = composerFooterActions.createDiv({ cls: "lmsa-chat-composer-vision-indicator" });
   setIcon(visionIndicatorEl, "eye");
   const modeToggleEl = composerFooterActions.createDiv({ cls: "lmsa-chat-composer-mode-toggle" });
@@ -153,6 +155,7 @@ export function createChatLayout(contentEl: HTMLElement): ChatLayoutRefs {
     modeToggleEl,
     toolUseIndicatorEl,
     knowledgeIndicatorEl,
+    knowledgePopoverEl,
     visionIndicatorEl,
     actionBtn,
     modelSelectorBtn: headerMetaBtn,

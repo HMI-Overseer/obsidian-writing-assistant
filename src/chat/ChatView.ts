@@ -16,6 +16,7 @@ import { branchConversation } from "./actions/branchConversation";
 import { generateResponse } from "./actions/generateResponse";
 import { regenerateMessage } from "./actions/regenerateMessage";
 import { ChatComposer } from "./composer/ChatComposer";
+import { KnowledgePopover } from "./composer/KnowledgePopover";
 import { ChatSessionStore } from "./conversation/ChatSessionStore";
 import type { BubbleActionCallbacks } from "./messages/ChatTranscript";
 import { ChatTranscript } from "./messages/ChatTranscript";
@@ -39,6 +40,7 @@ export class ChatView extends ItemView {
   private composer: ChatComposer | null = null;
   private modelSelector: ChatModelSelector | null = null;
   private profilePopover: ProfileSettingsPopover | null = null;
+  private knowledgePopover: KnowledgePopover | null = null;
   private historyDrawer: ChatHistoryDrawer | null = null;
   private contextUpdater: ContextCapacityUpdater | null = null;
   private generation!: ChatGenerationController;
@@ -193,6 +195,105 @@ export class ChatView extends ItemView {
       },
     });
 
+    this.knowledgePopover = new KnowledgePopover(this.layout, {
+      getRagSnapshot: () => {
+        const rag = this.plugin.settings.rag;
+        return {
+          enabled: rag.enabled,
+          hasModel: !!rag.activeEmbeddingModelId,
+          ready: this.plugin.ragService.isReady(),
+          fileCount: this.plugin.ragService.getFileCount(),
+          chunkCount: this.plugin.ragService.getChunkCount(),
+          indexingState: this.plugin.ragService.getIndexingState(),
+        };
+      },
+      getGraphSnapshot: () => {
+        const kg = this.plugin.settings.knowledgeGraph;
+        return {
+          enabled: kg.enabled,
+          ready: this.plugin.graphService.isReady(),
+          entityCount: this.plugin.graphService.getEntityCount(),
+          relationCount: this.plugin.graphService.getRelationCount(),
+          buildState: this.plugin.graphService.getBuildState(),
+        };
+      },
+      getEmbeddingModels: () => this.plugin.settings.embeddingModels,
+      getActiveEmbeddingModelId: () => this.plugin.settings.rag.activeEmbeddingModelId,
+      getAvailability: (modelId, provider) =>
+        this.plugin.modelAvailability.getAvailability(modelId, provider).state,
+      onRagToggle: async (enabled) => {
+        this.plugin.settings.rag.enabled = enabled;
+        await this.plugin.saveSettings();
+        await this.plugin.ragService.configure(
+          this.plugin.settings.rag,
+          this.plugin.settings.embeddingModels,
+          this.plugin.settings.providerSettings,
+        );
+        this.composer?.refreshKnowledgeIndicator(
+          this.plugin.ragService.isReady(),
+          this.plugin.graphService.isReady(),
+        );
+      },
+      onGraphToggle: async (enabled) => {
+        this.plugin.settings.knowledgeGraph.enabled = enabled;
+        await this.plugin.saveSettings();
+        await this.plugin.graphService.configure(
+          this.plugin.settings.knowledgeGraph,
+          this.plugin.settings.completionModels,
+          this.plugin.settings.embeddingModels,
+          this.plugin.settings.providerSettings,
+        );
+        this.composer?.refreshKnowledgeIndicator(
+          this.plugin.ragService.isReady(),
+          this.plugin.graphService.isReady(),
+        );
+      },
+      onEmbeddingModelSelect: async (modelId) => {
+        this.plugin.settings.rag.activeEmbeddingModelId = modelId;
+        await this.plugin.saveSettings();
+        await this.plugin.ragService.configure(
+          this.plugin.settings.rag,
+          this.plugin.settings.embeddingModels,
+          this.plugin.settings.providerSettings,
+        );
+      },
+      onRagBuild: async () => {
+        const rag = this.plugin.settings.rag;
+        if (!rag.enabled || !rag.activeEmbeddingModelId) {
+          new Notice("Enable retrieval and select an embedding model first.");
+          return;
+        }
+        await this.plugin.ragService.startIndexing(
+          rag,
+          this.plugin.settings.embeddingModels,
+          this.plugin.settings.providerSettings,
+        );
+      },
+      onRagRebuild: async () => {
+        const rag = this.plugin.settings.rag;
+        if (!rag.enabled || !rag.activeEmbeddingModelId) {
+          new Notice("Enable retrieval and select an embedding model first.");
+          return;
+        }
+        await this.plugin.ragService.rebuild(
+          rag,
+          this.plugin.settings.embeddingModels,
+          this.plugin.settings.providerSettings,
+        );
+      },
+      onRagStop: () => {
+        this.plugin.ragService.stopIndexing();
+      },
+      onSubscribe: (onUpdate) => {
+        this.plugin.ragService.onIndexingStateChange(() => onUpdate());
+        this.plugin.graphService.onBuildStateChange(() => onUpdate());
+      },
+      onUnsubscribe: () => {
+        this.plugin.ragService.onIndexingStateChange(null);
+        this.plugin.graphService.onBuildStateChange(null);
+      },
+    });
+
     this.historyDrawer = new ChatHistoryDrawer(this.layout.messagesPaneEl, {
       onSelect: (id) => void this.conversation.switchConversation(id),
       onNew: () => void this.conversation.startNewConversation(),
@@ -205,6 +306,9 @@ export class ChatView extends ItemView {
       if (this.profilePopover?.isOpen()) {
         this.profilePopover.close();
       }
+      if (this.knowledgePopover?.isOpen()) {
+        this.knowledgePopover.close();
+      }
       this.conversation.toggleHistoryDrawer();
     });
 
@@ -212,12 +316,18 @@ export class ChatView extends ItemView {
       if (this.profilePopover?.isOpen()) {
         this.profilePopover.close();
       }
+      if (this.knowledgePopover?.isOpen()) {
+        this.knowledgePopover.close();
+      }
     });
 
     this.registerDomEvent(document, "click", () => {
       this.modelSelector?.close();
       if (this.profilePopover?.isOpen()) {
         this.profilePopover.close();
+      }
+      if (this.knowledgePopover?.isOpen()) {
+        this.knowledgePopover.close();
       }
       if (this.historyDrawer?.isOpen()) {
         this.historyDrawer.close();
@@ -262,6 +372,7 @@ export class ChatView extends ItemView {
     this.transcript?.destroy();
     this.modelSelector?.destroy();
     this.profilePopover?.destroy();
+    this.knowledgePopover?.destroy();
   }
 
   seedPrompt(text: string): void {

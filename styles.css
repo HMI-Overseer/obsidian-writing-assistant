@@ -2292,6 +2292,94 @@
 .lmsa-knowledge-popover-action-btn.is-stop:hover {
     background: color-mix(in srgb, var(--text-error) 12%, transparent);
   }
+/* ── Wrapper for positioning ──────────────────────────────────────── */
+.lmsa-chat-composer-tool-wrap {
+    position: relative;
+}
+.lmsa-chat-composer-tool-indicator {
+    cursor: pointer;
+  }
+/* ── Popover shell ────────────────────────────────────────────────── */
+.lmsa-tool-popover {
+    position: absolute;
+    z-index: 120;
+    flex-direction: column;
+    border-radius: 1rem;
+    border-width: 1px;
+    border-color: var(--background-modifier-border);
+    padding: 1rem;
+    bottom: calc(100% + 8px);
+    right: 0;
+    width: min(280px, calc(100vw - 48px));
+    background:
+      linear-gradient(
+        180deg,
+        color-mix(in srgb, var(--background-primary) 97%, transparent),
+        color-mix(in srgb, var(--background-secondary) 94%, transparent)
+      );
+    backdrop-filter: blur(22px);
+    -webkit-backdrop-filter: blur(22px);
+    box-shadow:
+      0 -12px 48px rgba(0, 0, 0, 0.18),
+      inset 0 -1px 0 rgba(255, 255, 255, 0.04);
+    transform-origin: bottom right;
+}
+.lmsa-tool-popover-title {
+    font-weight: 700;
+    color: var(--text-normal);
+    font-size: var(--font-ui-small);
+    margin-bottom: 0.75rem;
+}
+.lmsa-tool-popover-body {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+/* ── Section ──────────────────────────────────────────────────────── */
+.lmsa-tool-popover-section {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+/* Header row: label + toggle */
+.lmsa-tool-popover-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+}
+.lmsa-tool-popover-label {
+    font-weight: 600;
+    font-size: var(--font-ui-small);
+    color: var(--text-normal);
+  }
+.lmsa-tool-popover-control {
+    display: flex;
+}
+/* Provide token values the settings Toggle expects (normally scoped to .lmsa-settings-root) */
+.lmsa-tool-popover .lmsa-toggle {
+    --lmsa-border-default: var(--background-modifier-border);
+    --lmsa-text-primary: var(--text-normal);
+    --lmsa-section-accent: var(--color-orange, #e8a84b);
+    --lmsa-surface-contrast: #fff;
+    --lmsa-accent-glow: color-mix(in srgb, var(--color-orange, #e8a84b) 30%, transparent);
+  }
+/* Status text */
+.lmsa-tool-popover-status {
+    font-size: var(--font-ui-smaller);
+    color: var(--text-muted);
+    line-height: 1.4;
+  }
+.lmsa-tool-popover-status.is-warning {
+    color: var(--text-warning, #e6a700);
+  }
+/* Hint text */
+.lmsa-tool-popover-hint {
+    font-size: var(--font-ui-smaller);
+    color: var(--text-faint);
+    font-style: italic;
+    line-height: 1.4;
+  }
 .lmsa-settings-root {
     padding-bottom: 2rem;
     scrollbar-gutter: stable;
@@ -4436,6 +4524,11 @@
 }
 @media (max-width: 700px) {
   .lmsa-knowledge-popover {
+        left: 0px;
+        right: 0px;
+    width: auto;
+    }
+  .lmsa-tool-popover {
         left: 0px;
         right: 0px;
     width: auto;

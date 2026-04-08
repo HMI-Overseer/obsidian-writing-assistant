@@ -17,6 +17,7 @@ import { generateResponse } from "./actions/generateResponse";
 import { regenerateMessage } from "./actions/regenerateMessage";
 import { ChatComposer } from "./composer/ChatComposer";
 import { KnowledgePopover } from "./composer/KnowledgePopover";
+import { ToolUsePopover } from "./composer/ToolUsePopover";
 import { ChatSessionStore } from "./conversation/ChatSessionStore";
 import type { BubbleActionCallbacks } from "./messages/ChatTranscript";
 import { ChatTranscript } from "./messages/ChatTranscript";
@@ -41,6 +42,7 @@ export class ChatView extends ItemView {
   private modelSelector: ChatModelSelector | null = null;
   private profilePopover: ProfileSettingsPopover | null = null;
   private knowledgePopover: KnowledgePopover | null = null;
+  private toolUsePopover: ToolUsePopover | null = null;
   private historyDrawer: ChatHistoryDrawer | null = null;
   private contextUpdater: ContextCapacityUpdater | null = null;
   private generation!: ChatGenerationController;
@@ -294,6 +296,20 @@ export class ChatView extends ItemView {
       },
     });
 
+    this.toolUsePopover = new ToolUsePopover(this.layout, {
+      getPreferToolUse: () => this.plugin.settings.preferToolUse,
+      getActiveModel: () => this.sessionStore?.getResolvedConversationModel() ?? null,
+      getTrainedForToolUse: (modelId) =>
+        this.plugin.modelAvailability.getTrainedForToolUse(modelId),
+      onToggle: async (enabled) => {
+        this.plugin.settings.preferToolUse = enabled;
+        await this.plugin.saveSettings();
+        this.composer?.refreshToolUseIndicator(
+          this.sessionStore?.getResolvedConversationModel() ?? null,
+        );
+      },
+    });
+
     this.historyDrawer = new ChatHistoryDrawer(this.layout.messagesPaneEl, {
       onSelect: (id) => void this.conversation.switchConversation(id),
       onNew: () => void this.conversation.startNewConversation(),
@@ -309,6 +325,9 @@ export class ChatView extends ItemView {
       if (this.knowledgePopover?.isOpen()) {
         this.knowledgePopover.close();
       }
+      if (this.toolUsePopover?.isOpen()) {
+        this.toolUsePopover.close();
+      }
       this.conversation.toggleHistoryDrawer();
     });
 
@@ -319,6 +338,9 @@ export class ChatView extends ItemView {
       if (this.knowledgePopover?.isOpen()) {
         this.knowledgePopover.close();
       }
+      if (this.toolUsePopover?.isOpen()) {
+        this.toolUsePopover.close();
+      }
     });
 
     this.registerDomEvent(document, "click", () => {
@@ -328,6 +350,9 @@ export class ChatView extends ItemView {
       }
       if (this.knowledgePopover?.isOpen()) {
         this.knowledgePopover.close();
+      }
+      if (this.toolUsePopover?.isOpen()) {
+        this.toolUsePopover.close();
       }
       if (this.historyDrawer?.isOpen()) {
         this.historyDrawer.close();
@@ -373,6 +398,7 @@ export class ChatView extends ItemView {
     this.modelSelector?.destroy();
     this.profilePopover?.destroy();
     this.knowledgePopover?.destroy();
+    this.toolUsePopover?.destroy();
   }
 
   seedPrompt(text: string): void {
@@ -470,6 +496,7 @@ export class ChatView extends ItemView {
     this.composer.refreshToolUseIndicator(
       this.sessionStore.getResolvedConversationModel()
     );
+    this.toolUsePopover?.refresh();
     this.composer.refreshKnowledgeIndicator(
       this.plugin.ragService.isReady(),
       this.plugin.graphService.isReady(),

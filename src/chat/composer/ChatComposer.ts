@@ -38,7 +38,7 @@ export class ChatComposer {
     private readonly plugin: LMStudioWritingAssistant,
     private readonly refs: Pick<
       ChatLayoutRefs,
-      "commandBarEl" | "contextChipsEl" | "textareaEl" | "modeToggleEl" | "toolUseIndicatorEl" | "knowledgeIndicatorEl" | "visionIndicatorEl" | "actionBtn"
+      "commandBarEl" | "contextChipsEl" | "textareaEl" | "modeToggleEl" | "toolUseIndicatorEl" | "toolUsePopoverEl" | "knowledgeIndicatorEl" | "visionIndicatorEl" | "actionBtn"
     >,
     private readonly callbacks: ChatComposerCallbacks
   ) {

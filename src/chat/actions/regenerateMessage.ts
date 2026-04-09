@@ -108,6 +108,8 @@ export async function regenerateMessage(options: RegenerateOptions): Promise<voi
   await store.persistActiveConversation();
   await syncConversationUi();
 
+  const client = createChatClient(activeModel.provider, plugin.settings.providerSettings);
+
   const apiMessages = await prepareApiMessages({
     app: plugin.app,
     store,
@@ -123,6 +125,8 @@ export async function regenerateMessage(options: RegenerateOptions): Promise<voi
         ?? plugin.modelAvailability.getTrainedForToolUse(activeModel.modelId),
     },
     preferToolUse: plugin.settings.preferToolUse,
+    chatClient: client,
+    completionModelId: activeModel.modelId,
   });
 
   const ragSources = apiMessages.ragContext?.map(({ filePath, headingPath, score, content, graphContext }) =>
@@ -143,7 +147,6 @@ export async function regenerateMessage(options: RegenerateOptions): Promise<voi
     ? new EditStreamingRenderer(assistantBubble, transcript, { useToolMode })
     : new StreamingRenderer(assistantBubble, transcript);
 
-  const client = createChatClient(activeModel.provider, plugin.settings.providerSettings);
   const abortController = new AbortController();
   setActiveAbortController(abortController);
 

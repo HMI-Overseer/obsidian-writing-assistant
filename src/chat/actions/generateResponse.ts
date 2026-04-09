@@ -102,6 +102,8 @@ export async function generateResponse(options: GenerateResponseOptions): Promis
 
   setIsGenerating(true);
 
+  const client = createChatClient(activeModel.provider, plugin.settings.providerSettings);
+
   const apiMessages = await prepareApiMessages({
     app: plugin.app,
     store,
@@ -116,6 +118,8 @@ export async function generateResponse(options: GenerateResponseOptions): Promis
       trainedForToolUse: activeModel.trainedForToolUse
         ?? plugin.modelAvailability.getTrainedForToolUse(activeModel.modelId),
     },
+    chatClient: client,
+    completionModelId: activeModel.modelId,
   });
 
   const ragSources = apiMessages.ragContext?.map(({ filePath, headingPath, score, content, graphContext }) =>
@@ -134,7 +138,7 @@ export async function generateResponse(options: GenerateResponseOptions): Promis
     ? new EditStreamingRenderer(assistantBubble, transcript, { useToolMode })
     : new StreamingRenderer(assistantBubble, transcript);
 
-  const client = createChatClient(activeModel.provider, plugin.settings.providerSettings);
+  const { rewrittenQuery } = apiMessages;
   const abortController = new AbortController();
   setActiveAbortController(abortController);
 
@@ -199,7 +203,8 @@ export async function generateResponse(options: GenerateResponseOptions): Promis
         activeModel.modelId,
         activeModel.provider,
         finalUsage,
-        ragSources
+        ragSources,
+        rewrittenQuery
       );
     }
   } catch (error) {
@@ -227,7 +232,8 @@ export async function generateResponse(options: GenerateResponseOptions): Promis
           renderer as StreamingRenderer,
           activeModel.modelId,
           activeModel.provider,
-          ragSources
+          ragSources,
+          rewrittenQuery
         );
       }
     } else {

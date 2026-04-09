@@ -13,7 +13,8 @@ import { ContextCapacityUpdater } from "./ContextCapacityUpdater";
 import { sendMessage } from "./actions/sendMessage";
 import { renderDiffPanel } from "./actions/finalizeEditResponse";
 import { branchConversation } from "./actions/branchConversation";
-import { generateResponse } from "./actions/generateResponse";
+import { generateLlmResponse } from "./actions/generateLlmResponse";
+import { createChatClient } from "../providers/registry";
 import { regenerateMessage } from "./actions/regenerateMessage";
 import { ChatComposer } from "./composer/ChatComposer";
 import { KnowledgePopover } from "./composer/KnowledgePopover";
@@ -632,21 +633,63 @@ export class ChatView extends ItemView {
 
 
   private async handleGenerateResponse(): Promise<void> {
-    if (!this.sessionStore || !this.transcript || !this.composer || !this.modelSelector) {
+    if (!this.sessionStore || !this.transcript || !this.composer || !this.modelSelector) return;
+    if (this.generation.getIsGenerating()) return;
+
+    const snapshot = this.sessionStore.getSnapshot();
+    if (snapshot.messageHistory.length === 0) return;
+
+    const lastMessage = snapshot.messageHistory[snapshot.messageHistory.length - 1];
+    if (lastMessage.role !== "user" && !lastMessage.isError) return;
+
+    const activeModel = this.sessionStore.getResolvedConversationModel();
+    if (!activeModel?.modelId) {
+      new Notice("No model selected.");
       return;
     }
 
-    await generateResponse({
+    const availabilityState = await this.modelSelector.refreshAvailability();
+    if (availabilityState !== "loaded" && availabilityState !== "cloud") {
+      this.modelSelector.retriggerAttention();
+      return;
+    }
+
+    // Remove trailing error messages before generating.
+    let removed = false;
+    while (this.sessionStore.getSnapshot().messageHistory.length > 0) {
+      const msgs = this.sessionStore.getSnapshot().messageHistory;
+      const tail = msgs[msgs.length - 1];
+      if (tail.isError) {
+        this.sessionStore.removeLastMessage();
+        removed = true;
+      } else {
+        break;
+      }
+    }
+    if (removed) {
+      await this.sessionStore.persistActiveConversation();
+      await this.syncConversationUi();
+    }
+
+    if (this.sessionStore.getSnapshot().messageHistory.length === 0) return;
+
+    const editMode = this.composer.getMode() === "edit";
+    const client = createChatClient(activeModel.provider, this.plugin.settings.providerSettings);
+
+    this.setIsGeneratingAndSync(true);
+
+    await generateLlmResponse({
       plugin: this.plugin,
       owner: this,
       store: this.sessionStore,
       transcript: this.transcript,
       composer: this.composer,
-      modelSelector: this.modelSelector,
-      getIsGenerating: () => this.generation.getIsGenerating(),
-      setIsGenerating: (generating) => this.setIsGeneratingAndSync(generating),
-      setActiveAbortController: (controller) =>
-        this.generation.setActiveAbortController(controller),
+      activeModel,
+      client,
+      editMode,
+      finalization: { kind: "append" },
+      setIsGenerating: (v) => this.setIsGeneratingAndSync(v),
+      setActiveAbortController: (c) => this.generation.setActiveAbortController(c),
       syncConversationUi: () => this.syncConversationUi(),
       onCalibrate: (est, actual) => this.contextUpdater?.calibrate(est, actual),
     });

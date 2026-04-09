@@ -225,6 +225,10 @@ export interface ModelSelectorRefs {
   wrapEl: HTMLElement;
   /** Programmatically update the selected model and refresh the UI. */
   setSelected: (model: ModelSelectorItem | null) => void;
+  /** Refresh availability from the service and return the current state. */
+  refreshAvailability: () => Promise<ModelAvailabilityState>;
+  /** Flash the selector to draw user attention (e.g. model not loaded). */
+  retriggerAttention: () => void;
   /** Cleanup function — removes the document click listener. */
   destroy: () => void;
 }
@@ -329,6 +333,18 @@ export function createModelSelector(
   const onDocClick = (): void => { if (isOpen) close(); };
   document.addEventListener("click", onDocClick);
 
+  // ── Attention effect ──
+
+  let attentionTimer: number | null = null;
+
+  function clearAttention(): void {
+    if (attentionTimer !== null) {
+      window.clearTimeout(attentionTimer);
+      attentionTimer = null;
+    }
+    btn.removeClass("is-attention");
+  }
+
   // ── Init ──
   void refreshAvailability();
 
@@ -339,7 +355,24 @@ export function createModelSelector(
       labelEl.setText(model?.name ?? (opts.placeholder ?? "Select model..."));
       updateStatus();
     },
+    async refreshAvailability(): Promise<ModelAvailabilityState> {
+      try { await deps.refreshLocalModels(); } catch { /* handled by service */ }
+      updateStatus();
+      if (!selected?.modelId) return "unknown";
+      return deps.getAvailability(selected.modelId, selected.provider);
+    },
+    retriggerAttention(): void {
+      clearAttention();
+      btn.removeClass("is-attention");
+      void btn.offsetWidth;
+      btn.addClass("is-attention");
+      attentionTimer = window.setTimeout(() => {
+        attentionTimer = null;
+        btn.removeClass("is-attention");
+      }, 700);
+    },
     destroy() {
+      clearAttention();
       document.removeEventListener("click", onDocClick);
     },
   };

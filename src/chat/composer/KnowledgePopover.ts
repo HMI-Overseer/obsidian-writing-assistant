@@ -2,7 +2,8 @@ import { setIcon } from "obsidian";
 import type { IndexingState } from "../../rag/types";
 import type { GraphBuildState } from "../../rag/graph/types";
 import type { EmbeddingModel, ModelAvailabilityState, ProviderOption } from "../../shared/types";
-import { Toggle } from "../../settings/ui";
+import { Toggle, createModelSelector } from "../../settings/ui";
+import type { ModelSelectorRefs } from "../../settings/ui";
 import type { ChatLayoutRefs } from "../types";
 
 export type RagSnapshot = {
@@ -28,6 +29,7 @@ export type KnowledgePopoverCallbacks = {
   getEmbeddingModels: () => EmbeddingModel[];
   getActiveEmbeddingModelId: () => string | null;
   getAvailability: (modelId: string, provider: ProviderOption) => ModelAvailabilityState;
+  refreshLocalModels: () => Promise<void>;
   onRagToggle: (enabled: boolean) => Promise<void>;
   onGraphToggle: (enabled: boolean) => Promise<void>;
   onEmbeddingModelSelect: (modelId: string | null) => Promise<void>;
@@ -43,10 +45,8 @@ interface RagSectionRefs {
   toggle: Toggle;
   statusEl: HTMLElement;
   actionBtn: HTMLButtonElement;
-  modelSelectorBtn: HTMLElement;
-  modelSelectorLabelEl: HTMLElement;
-  modelSelectorStatusEl: HTMLElement;
-  modelSelectorDropdownEl: HTMLElement;
+  modelSelector: ModelSelectorRefs;
+  statusRowEl: HTMLElement;
 }
 
 interface GraphSectionRefs {
@@ -56,7 +56,6 @@ interface GraphSectionRefs {
 
 export class KnowledgePopover {
   private popoverOpen = false;
-  private modelDropdownOpen = false;
   private ragRefs: RagSectionRefs | null = null;
   private graphRefs: GraphSectionRefs | null = null;
   private readonly onIndicatorClick: (event: MouseEvent) => void;
@@ -80,9 +79,6 @@ export class KnowledgePopover {
 
     this.onPopoverClick = (event: MouseEvent) => {
       event.stopPropagation();
-      if (this.modelDropdownOpen) {
-        this.closeModelDropdown();
-      }
     };
 
     this.refs.knowledgeIndicatorEl.addEventListener("click", this.onIndicatorClick);
@@ -99,7 +95,7 @@ export class KnowledgePopover {
 
   close(): void {
     this.popoverOpen = false;
-    this.closeModelDropdown();
+    this.ragRefs?.modelSelector.destroy();
     this.refs.knowledgePopoverEl.addClass("lmsa-hidden");
     this.callbacks.onUnsubscribe();
     this.ragRefs = null;
@@ -142,52 +138,47 @@ export class KnowledgePopover {
     const toggle = new Toggle(toggleWrap);
     toggle.onChange((value) => void this.callbacks.onRagToggle(value));
 
-    // Model selector
-    const selectorWrap = section.createDiv({ cls: "lmsa-knowledge-popover-model-wrap" });
-    const modelSelectorBtn = selectorWrap.createDiv({ cls: "lmsa-knowledge-popover-model-selector" });
-    const modelSelectorStatusEl = modelSelectorBtn.createEl("span", { cls: "lmsa-model-selector-status is-unknown" });
-    const modelSelectorLabelEl = modelSelectorBtn.createEl("span", { cls: "lmsa-knowledge-popover-model-label" });
-    const chevronEl = modelSelectorBtn.createEl("span", { cls: "lmsa-knowledge-popover-model-chevron" });
-    setIcon(chevronEl, "chevron-down");
+    // Model selector — reuses the shared settings model selector component
+    const selectorContainer = section.createDiv({ cls: "lmsa-knowledge-popover-model-wrap" });
+    const models = this.callbacks.getEmbeddingModels();
+    const activeId = this.callbacks.getActiveEmbeddingModelId();
+    const activeModel = models.find((m) => m.id === activeId) ?? null;
 
-    const modelSelectorDropdownEl = selectorWrap.createDiv({ cls: "lmsa-knowledge-popover-model-dropdown lmsa-hidden" });
-
-    modelSelectorBtn.addEventListener("click", (event) => {
-      event.stopPropagation();
-      if (this.modelDropdownOpen) {
-        this.closeModelDropdown();
-      } else {
-        this.openModelDropdown();
-      }
+    const modelSelector = createModelSelector(selectorContainer, models, {
+      getAvailability: (modelId, provider) =>
+        this.callbacks.getAvailability(modelId, provider),
+      refreshLocalModels: () => this.callbacks.refreshLocalModels(),
+    }, {
+      initial: activeModel,
+      placeholder: "Select model...",
+      onSelect: (model) => {
+        void this.callbacks.onEmbeddingModelSelect(model?.id ?? null);
+        this.refresh();
+      },
     });
 
     // Status + action row
-    const statusRow = section.createDiv({ cls: "lmsa-knowledge-popover-status-row" });
-    const statusEl = statusRow.createEl("span", { cls: "lmsa-knowledge-popover-status" });
-    const actionBtn = statusRow.createEl("button", {
+    const statusRowEl = section.createDiv({ cls: "lmsa-knowledge-popover-status-row" });
+    const statusEl = statusRowEl.createEl("span", { cls: "lmsa-knowledge-popover-status" });
+    const actionBtn = statusRowEl.createEl("button", {
       cls: "lmsa-knowledge-popover-action-btn",
     }) as HTMLButtonElement;
 
-    actionBtn.addEventListener("click", () => {
+    actionBtn.addEventListener("click", async () => {
       const snap = this.callbacks.getRagSnapshot();
       if (snap.indexingState.status === "indexing") {
         this.callbacks.onRagStop();
-      } else if (snap.ready) {
-        void this.callbacks.onRagRebuild();
       } else {
-        void this.callbacks.onRagBuild();
+        if (!await this.validateModelReady()) return;
+        if (snap.ready) {
+          await this.callbacks.onRagRebuild();
+        } else {
+          await this.callbacks.onRagBuild();
+        }
       }
     });
 
-    return {
-      toggle,
-      statusEl,
-      actionBtn,
-      modelSelectorBtn,
-      modelSelectorLabelEl,
-      modelSelectorStatusEl,
-      modelSelectorDropdownEl,
-    };
+    return { toggle, statusEl, actionBtn, modelSelector, statusRowEl };
   }
 
   private renderGraphSection(container: HTMLElement): GraphSectionRefs {
@@ -213,55 +204,22 @@ export class KnowledgePopover {
   }
 
   // ---------------------------------------------------------------------------
-  // Model dropdown
+  // Model availability validation
   // ---------------------------------------------------------------------------
 
-  private openModelDropdown(): void {
-    if (!this.ragRefs) return;
-    const { modelSelectorDropdownEl } = this.ragRefs;
-    modelSelectorDropdownEl.empty();
-    modelSelectorDropdownEl.removeClass("lmsa-hidden");
-    this.modelDropdownOpen = true;
+  /**
+   * Checks that the embedding model is selected and available (loaded or cloud).
+   * Flashes the selector red if validation fails.
+   */
+  private async validateModelReady(): Promise<boolean> {
+    if (!this.ragRefs) return false;
 
-    const models = this.callbacks.getEmbeddingModels();
-    const activeId = this.callbacks.getActiveEmbeddingModelId();
-
-    if (models.length === 0) {
-      modelSelectorDropdownEl.createDiv({
-        cls: "lmsa-knowledge-popover-model-empty",
-        text: "No embedding models configured.",
-      });
-      return;
+    const state = await this.ragRefs.modelSelector.refreshAvailability();
+    if (state !== "loaded" && state !== "cloud") {
+      this.ragRefs.modelSelector.retriggerAttention();
+      return false;
     }
-
-    const listEl = modelSelectorDropdownEl.createDiv({ cls: "lmsa-model-dropdown-list" });
-
-    for (const model of models) {
-      const item = listEl.createDiv({ cls: "lmsa-model-dropdown-item" });
-      const checkSpan = item.createEl("span", { cls: "lmsa-model-dropdown-check" });
-      if (model.id === activeId) {
-        item.addClass("is-active");
-        setIcon(checkSpan, "check");
-      }
-      const copy = item.createDiv({ cls: "lmsa-model-dropdown-copy" });
-      copy.createEl("span", { cls: "lmsa-model-dropdown-name", text: model.name });
-
-      const state = this.callbacks.getAvailability(model.modelId, model.provider);
-      item.createEl("span", { cls: `lmsa-model-dropdown-state is-${state}` });
-
-      item.addEventListener("click", (event) => {
-        event.stopPropagation();
-        void this.callbacks.onEmbeddingModelSelect(model.id);
-        this.closeModelDropdown();
-        this.refresh();
-      });
-    }
-  }
-
-  private closeModelDropdown(): void {
-    if (!this.ragRefs) return;
-    this.ragRefs.modelSelectorDropdownEl.addClass("lmsa-hidden");
-    this.modelDropdownOpen = false;
+    return true;
   }
 
   // ---------------------------------------------------------------------------
@@ -281,25 +239,9 @@ export class KnowledgePopover {
   private syncRagSection(refs: RagSectionRefs, snap: RagSnapshot): void {
     refs.toggle.setValue(snap.enabled);
 
-    // Model selector
-    const models = this.callbacks.getEmbeddingModels();
-    const activeId = this.callbacks.getActiveEmbeddingModelId();
-    const activeModel = models.find((m) => m.id === activeId);
-
-    refs.modelSelectorLabelEl.textContent = activeModel?.name ?? "Select model...";
-    refs.modelSelectorStatusEl.className = "lmsa-model-selector-status";
-    if (activeModel) {
-      const state = this.callbacks.getAvailability(activeModel.modelId, activeModel.provider);
-      refs.modelSelectorStatusEl.addClass(`is-${state}`);
-    } else {
-      refs.modelSelectorStatusEl.addClass("is-hidden");
-    }
-
     // Conditional visibility — hide selector and action row when disabled
-    const selectorWrap = refs.modelSelectorBtn.parentElement;
-    const statusRow = refs.statusEl.parentElement;
-    if (selectorWrap) selectorWrap.toggleClass("lmsa-hidden", !snap.enabled);
-    if (statusRow) statusRow.toggleClass("lmsa-hidden", !snap.enabled);
+    refs.modelSelector.wrapEl.toggleClass("lmsa-hidden", !snap.enabled);
+    refs.statusRowEl.toggleClass("lmsa-hidden", !snap.enabled);
 
     // Status text
     const isBuilding = snap.indexingState.status === "indexing";

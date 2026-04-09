@@ -1,6 +1,7 @@
-import { Notice, Setting } from "obsidian";
+import { Setting } from "obsidian";
 import type LMStudioWritingAssistant from "../main";
 import type { GraphBuildState } from "../rag/graph";
+import type { ModelAvailabilityState } from "../shared/types";
 import { getProviderDescriptor } from "../providers/registry";
 import { createSettingsSection, createModelSelector, Button, SettingItem } from "./ui";
 
@@ -92,7 +93,7 @@ export function renderKnowledgeGraphTab(
     },
   }, {
     initial: currentEmbModel,
-    placeholder: "None selected (uses substring matching)",
+    placeholder: "None selected",
     onSelect: async (model) => {
       kg.activeEmbeddingModelId = model?.id ?? null;
       await plugin.saveSettings();
@@ -107,6 +108,29 @@ export function renderKnowledgeGraphTab(
 
   // Move the conditional wrapper after the general section in the DOM.
   container.appendChild(conditionalWrapper);
+
+  /**
+   * Checks that both models are selected and available (loaded or cloud).
+   * Triggers the attention effect on any selector that fails validation.
+   */
+  async function validateModelsReady(): Promise<boolean> {
+    if (!kg.activeCompletionModelId || !kg.activeEmbeddingModelId) {
+      if (!kg.activeCompletionModelId) modelSelector.retriggerAttention();
+      if (!kg.activeEmbeddingModelId) embModelSelector.retriggerAttention();
+      return false;
+    }
+
+    const [compState, embState] = await Promise.all([
+      modelSelector.refreshAvailability(),
+      embModelSelector.refreshAvailability(),
+    ]);
+
+    const isReady = (s: ModelAvailabilityState) => s === "loaded" || s === "cloud";
+    let ok = true;
+    if (!isReady(compState))  { modelSelector.retriggerAttention(); ok = false; }
+    if (!isReady(embState))   { embModelSelector.retriggerAttention(); ok = false; }
+    return ok;
+  }
 
   /** Renders or clears the conditional sections based on kg.enabled. */
   function renderConditionalSections(): void {
@@ -131,10 +155,7 @@ export function renderKnowledgeGraphTab(
 
     const actionsEl = headerRow.createDiv({ cls: "lmsa-index-actions" });
     const buildBtn = new Button(actionsEl).setButtonText("Build graph").setCta().onClick(async () => {
-      if (!kg.enabled || !kg.activeCompletionModelId) {
-        new Notice("Enable knowledge graph and select a completion model first.");
-        return;
-      }
+      if (!await validateModelsReady()) return;
       await plugin.graphService.startBuild(
         kg,
         plugin.settings.completionModels,
@@ -143,10 +164,7 @@ export function renderKnowledgeGraphTab(
       );
     });
     const rebuildBtn = new Button(actionsEl).setButtonText("Rebuild graph").onClick(async () => {
-      if (!kg.enabled || !kg.activeCompletionModelId) {
-        new Notice("Enable knowledge graph and select a completion model first.");
-        return;
-      }
+      if (!await validateModelsReady()) return;
       await plugin.graphService.rebuild(
         kg,
         plugin.settings.completionModels,
@@ -176,8 +194,13 @@ export function renderKnowledgeGraphTab(
       const activeFolder = isExtracting ? state.targetFolder : undefined;
 
       // Status text
-      if (!kg.activeCompletionModelId) {
-        statusTextEl.textContent = "No completion model selected.";
+      if (!kg.activeCompletionModelId || !kg.activeEmbeddingModelId) {
+        const missing = !kg.activeCompletionModelId && !kg.activeEmbeddingModelId
+          ? "No completion or embedding model selected."
+          : !kg.activeCompletionModelId
+            ? "No completion model selected."
+            : "No embedding model selected.";
+        statusTextEl.textContent = missing;
       } else if (isError) {
         statusTextEl.textContent = `Error: ${state.message}`;
         statusTextEl.addClass("mod-error");
@@ -206,14 +229,14 @@ export function renderKnowledgeGraphTab(
       progressRow.toggleClass("is-visible", isExtracting);
 
       // Button visibility — Stop only shown for full-vault builds, not folder builds
-      const canAct = !!kg.activeCompletionModelId;
+      const canAct = !!kg.activeCompletionModelId && !!kg.activeEmbeddingModelId;
       buildBtn.buttonEl.toggleClass("is-visible", canAct && !hasGraph && !isExtracting);
       rebuildBtn.buttonEl.toggleClass("is-visible", canAct && hasGraph && !isExtracting);
       stopBtn.buttonEl.toggleClass("is-visible", isExtracting && activeFolder === undefined);
 
       // ── Folder coverage section ──
       folderSectionEl.empty();
-      if (!kg.activeCompletionModelId) return;
+      if (!canAct) return;
 
       const folderStats = plugin.graphService.getFolderStats(kg.excludePatterns);
       if (folderStats.size === 0) return;
@@ -267,6 +290,7 @@ export function renderKnowledgeGraphTab(
             text: processed > 0 ? "Resume" : "Build",
           });
           btn.addEventListener("click", async () => {
+            if (!await validateModelsReady()) return;
             await plugin.graphService.startBuildFolder(
               folder,
               kg,

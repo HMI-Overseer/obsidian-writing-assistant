@@ -392,6 +392,10 @@
     height: 12px;
   }
 
+  .lmsa-settings-model-selector.is-attention {
+    animation: lmsa-settings-model-selector-attention 0.7s ease;
+  }
+
   /* ── Responsive ────────────────────────────────────────────────────────── */
 
   @media (max-width: 700px) {
@@ -422,5 +426,16 @@
     .lmsa-setting-item {
       @apply lmsa-flex-col lmsa-items-stretch;
     }
+  }
+}
+
+@keyframes lmsa-settings-model-selector-attention {
+  0%,
+  100% {
+    color: var(--text-muted);
+  }
+
+  30% {
+    color: var(--text-error);
   }
 }

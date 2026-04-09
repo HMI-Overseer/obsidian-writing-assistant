@@ -96,52 +96,37 @@
     line-height: 1.4;
   }
 
-  /* ── Model selector ───────────────────────────────────────────────── */
+  /* ── Model selector (shared component overrides) ─────────────────── */
 
   .lmsa-knowledge-popover-model-wrap {
     @apply lmsa-relative;
   }
 
-  .lmsa-knowledge-popover-model-selector {
-    @apply lmsa-flex lmsa-w-full lmsa-cursor-pointer lmsa-items-center lmsa-gap-2 lmsa-rounded-lg lmsa-border lmsa-border-obsidian-border lmsa-px-3 lmsa-py-2;
+  .lmsa-knowledge-popover-model-wrap .lmsa-settings-model-selector-wrap {
+    @apply lmsa-relative;
+  }
+
+  .lmsa-knowledge-popover-model-wrap .lmsa-settings-model-selector {
+    @apply lmsa-flex lmsa-w-full lmsa-items-center lmsa-gap-2 lmsa-rounded-lg lmsa-border lmsa-border-obsidian-border lmsa-px-3 lmsa-py-2;
     font-size: var(--font-ui-smaller);
     color: var(--text-normal);
     background: var(--background-secondary);
-    transition: border-color 120ms ease;
+    margin: 0;
+    padding: 8px 12px;
+    transition: border-color 120ms ease, color 120ms ease;
   }
 
-  .lmsa-knowledge-popover-model-selector:hover {
+  .lmsa-knowledge-popover-model-wrap .lmsa-settings-model-selector:hover {
     border-color: color-mix(in srgb, var(--interactive-accent) 40%, var(--background-modifier-border));
   }
 
-  .lmsa-knowledge-popover-model-label {
-    @apply lmsa-min-w-0 lmsa-flex-1 lmsa-truncate;
-  }
-
-  .lmsa-knowledge-popover-model-chevron {
-    @apply lmsa-inline-flex lmsa-flex-none lmsa-items-center;
-    color: var(--text-muted);
-  }
-
-  .lmsa-knowledge-popover-model-chevron svg {
-    width: 12px;
-    height: 12px;
-  }
-
-  /* Dropdown (reuses the shared lmsa-model-dropdown-* classes) */
-  .lmsa-knowledge-popover-model-dropdown {
-    @apply lmsa-absolute lmsa-left-0 lmsa-right-0 lmsa-z-[130] lmsa-overflow-hidden lmsa-rounded-lg lmsa-border lmsa-border-obsidian-border;
+  .lmsa-knowledge-popover-model-wrap .lmsa-model-dropdown {
+    @apply lmsa-left-0 lmsa-rounded-lg;
     top: calc(100% + 4px);
+    width: max-content;
+    max-width: min(372px, calc(100vw - 48px));
     max-height: 180px;
-    overflow-y: auto;
-    background: var(--background-primary);
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
-  }
-
-  .lmsa-knowledge-popover-model-empty {
-    @apply lmsa-py-3 lmsa-text-center;
-    font-size: var(--font-ui-smaller);
-    color: var(--text-faint);
+    right: auto;
   }
 
   /* ── Action button ────────────────────────────────────────────────── */

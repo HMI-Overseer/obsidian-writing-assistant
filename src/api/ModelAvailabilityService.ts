@@ -44,13 +44,14 @@ export class ModelAvailabilityService {
     }
 
     const service = this.getLMStudioService();
-    const result = await service.getCompletionCandidates({
-      forceRefresh,
-      signal: options.signal,
-    });
+    const fetchOpts = { forceRefresh, signal: options.signal };
+    const [completionResult, embeddingResult] = await Promise.all([
+      service.getCompletionCandidates(fetchOpts),
+      service.getEmbeddingCandidates(fetchOpts),
+    ]);
 
     this.availabilityMap.clear();
-    for (const candidate of result.candidates) {
+    for (const candidate of [...completionResult.candidates, ...embeddingResult.candidates]) {
       this.availabilityMap.set(candidate.targetModelId, {
         state: candidate.isLoaded ? "loaded" : "unloaded",
         activeContextLength: candidate.activeContextLength,

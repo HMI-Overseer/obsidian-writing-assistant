@@ -222,6 +222,9 @@ export class ChatView extends ItemView {
       getActiveEmbeddingModelId: () => this.plugin.settings.rag.activeEmbeddingModelId,
       getAvailability: (modelId, provider) =>
         this.plugin.modelAvailability.getAvailability(modelId, provider).state,
+      refreshLocalModels: async () => {
+        await this.plugin.modelAvailability.refreshLocalModels({ forceRefresh: true });
+      },
       onRagToggle: async (enabled) => {
         this.plugin.settings.rag.enabled = enabled;
         await this.plugin.saveSettings();
@@ -260,10 +263,6 @@ export class ChatView extends ItemView {
       },
       onRagBuild: async () => {
         const rag = this.plugin.settings.rag;
-        if (!rag.enabled || !rag.activeEmbeddingModelId) {
-          new Notice("Enable retrieval and select an embedding model first.");
-          return;
-        }
         await this.plugin.ragService.startIndexing(
           rag,
           this.plugin.settings.embeddingModels,
@@ -272,10 +271,6 @@ export class ChatView extends ItemView {
       },
       onRagRebuild: async () => {
         const rag = this.plugin.settings.rag;
-        if (!rag.enabled || !rag.activeEmbeddingModelId) {
-          new Notice("Enable retrieval and select an embedding model first.");
-          return;
-        }
         await this.plugin.ragService.rebuild(
           rag,
           this.plugin.settings.embeddingModels,

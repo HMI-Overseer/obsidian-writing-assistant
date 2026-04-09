@@ -2221,14 +2221,16 @@
     font-style: italic;
     line-height: 1.4;
   }
-/* ── Model selector ───────────────────────────────────────────────── */
+/* ── Model selector (shared component overrides) ─────────────────── */
 .lmsa-knowledge-popover-model-wrap {
     position: relative;
 }
-.lmsa-knowledge-popover-model-selector {
+.lmsa-knowledge-popover-model-wrap .lmsa-settings-model-selector-wrap {
+    position: relative;
+}
+.lmsa-knowledge-popover-model-wrap .lmsa-settings-model-selector {
     display: flex;
     width: 100%;
-    cursor: pointer;
     align-items: center;
     gap: 0.5rem;
     border-radius: 0.5rem;
@@ -2241,50 +2243,22 @@
     font-size: var(--font-ui-smaller);
     color: var(--text-normal);
     background: var(--background-secondary);
-    transition: border-color 120ms ease;
+    margin: 0;
+    padding: 8px 12px;
+    transition: border-color 120ms ease, color 120ms ease;
 }
-.lmsa-knowledge-popover-model-selector:hover {
+.lmsa-knowledge-popover-model-wrap .lmsa-settings-model-selector:hover {
     border-color: color-mix(in srgb, var(--interactive-accent) 40%, var(--background-modifier-border));
   }
-.lmsa-knowledge-popover-model-label {
-    min-width: 0px;
-    flex: 1 1 0%;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-.lmsa-knowledge-popover-model-chevron {
-    display: inline-flex;
-    flex: none;
-    align-items: center;
-    color: var(--text-muted);
-}
-.lmsa-knowledge-popover-model-chevron svg {
-    width: 12px;
-    height: 12px;
-  }
-/* Dropdown (reuses the shared lmsa-model-dropdown-* classes) */
-.lmsa-knowledge-popover-model-dropdown {
-    position: absolute;
+.lmsa-knowledge-popover-model-wrap .lmsa-model-dropdown {
     left: 0px;
-    right: 0px;
-    z-index: 130;
-    overflow: hidden;
     border-radius: 0.5rem;
-    border-width: 1px;
-    border-color: var(--background-modifier-border);
     top: calc(100% + 4px);
+    width: -moz-max-content;
+    width: max-content;
+    max-width: min(372px, calc(100vw - 48px));
     max-height: 180px;
-    overflow-y: auto;
-    background: var(--background-primary);
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
-}
-.lmsa-knowledge-popover-model-empty {
-    padding-top: 0.75rem;
-    padding-bottom: 0.75rem;
-    text-align: center;
-    font-size: var(--font-ui-smaller);
-    color: var(--text-faint);
+    right: auto;
 }
 /* ── Action button ────────────────────────────────────────────────── */
 .lmsa-knowledge-popover-action-btn {
@@ -3019,6 +2993,9 @@
 .lmsa-settings-model-selector-chevron svg {
     width: 12px;
     height: 12px;
+  }
+.lmsa-settings-model-selector.is-attention {
+    animation: lmsa-settings-model-selector-attention 0.7s ease;
   }
 /* ── Responsive ────────────────────────────────────────────────────────── */
 @media (max-width: 700px) {
@@ -3984,9 +3961,6 @@
 .lmsa-left-0 {
     left: 0px;
 }
-.lmsa-right-0 {
-    right: 0px;
-}
 .lmsa-top-0 {
     top: 0px;
 }
@@ -3995,9 +3969,6 @@
 }
 .lmsa-z-\[120\] {
     z-index: 120;
-}
-.lmsa-z-\[130\] {
-    z-index: 130;
 }
 .lmsa-z-\[1\] {
     z-index: 1;
@@ -4389,10 +4360,6 @@
 .lmsa-py-2 {
     padding-top: 0.5rem;
     padding-bottom: 0.5rem;
-}
-.lmsa-py-3 {
-    padding-top: 0.75rem;
-    padding-bottom: 0.75rem;
 }
 .lmsa-py-4 {
     padding-top: 1rem;
@@ -5063,6 +5030,16 @@
 /* Group label accent — must live outside @layer to beat Obsidian's cascade */
 .lmsa-settings-rail-group.is-active .lmsa-settings-rail-group-label {
   color: var(--lmsa-section-accent) !important;
+}
+@keyframes lmsa-settings-model-selector-attention {
+  0%,
+  100% {
+    color: var(--text-muted);
+  }
+
+  30% {
+    color: var(--text-error);
+  }
 }
 /* -----------------------------------------------------------------------
  * BenchmarkTab — test card layout and result display

@@ -101,9 +101,9 @@ export class GraphService {
   /**
    * Build graph context for a query. Returns null if graph not ready.
    *
-   * If an embedding model is configured and the graph has entity embeddings,
-   * embeds the query and uses cosine similarity to find matching entities.
-   * Falls back to substring matching otherwise.
+   * Uses the configured embedding model to embed the query and find matching
+   * entities via cosine similarity. Falls back to substring matching if the
+   * embedding call fails or the graph has no embeddings yet.
    */
   async buildGraphContext(query: string): Promise<GraphRetrievalContext | null> {
     if (!this.isReady() || !this.graph) return null;
@@ -141,23 +141,20 @@ export class GraphService {
   ): Promise<void> {
     this.shutdown();
 
-    if (!settings.enabled || !settings.activeCompletionModelId) {
+    if (!settings.enabled || !settings.activeCompletionModelId || !settings.activeEmbeddingModelId) {
       return;
     }
 
     const model = completionModels.find((m) => m.id === settings.activeCompletionModelId);
     if (!model) return;
 
+    const embModel = embeddingModels.find((m) => m.id === settings.activeEmbeddingModelId);
+    if (!embModel) return;
+
     this.chatClient = createChatClient(model.provider, providerSettings);
     this.configuredModelId = model.modelId;
-
-    if (settings.activeEmbeddingModelId) {
-      const embModel = embeddingModels.find((m) => m.id === settings.activeEmbeddingModelId);
-      if (embModel) {
-        this.embeddingClient = createEmbeddingClient(embModel, providerSettings);
-        this.configuredEmbeddingModelId = embModel.modelId;
-      }
-    }
+    this.embeddingClient = createEmbeddingClient(embModel, providerSettings);
+    this.configuredEmbeddingModelId = embModel.modelId;
 
     this.graph = new KnowledgeGraph();
     await this.loadGraph();
@@ -178,8 +175,9 @@ export class GraphService {
       await this.configure(settings, completionModels, embeddingModels, providerSettings);
     }
 
-    if (!this.graph || !this.chatClient || !this.configuredModelId) {
-      this.setBuildState({ status: "error", message: "Select a completion model first." });
+    if (!this.graph || !this.chatClient || !this.configuredModelId
+      || !this.embeddingClient || !this.configuredEmbeddingModelId) {
+      this.setBuildState({ status: "error", message: "Select a completion model and an embedding model first." });
       return;
     }
 
@@ -194,8 +192,8 @@ export class GraphService {
       excludePatterns: settings.excludePatterns,
       onStateChange: (state) => this.setBuildState(state),
       onSave: () => this.saveGraph(),
-      embeddingClient: this.embeddingClient ?? undefined,
-      embeddingModelId: this.configuredEmbeddingModelId ?? undefined,
+      embeddingClient: this.embeddingClient,
+      embeddingModelId: this.configuredEmbeddingModelId,
     });
 
     await this.extractor.start();
@@ -225,8 +223,9 @@ export class GraphService {
       await this.configure(settings, completionModels, embeddingModels, providerSettings);
     }
 
-    if (!this.graph || !this.chatClient || !this.configuredModelId) {
-      this.setBuildState({ status: "error", message: "Select a completion model first." });
+    if (!this.graph || !this.chatClient || !this.configuredModelId
+      || !this.embeddingClient || !this.configuredEmbeddingModelId) {
+      this.setBuildState({ status: "error", message: "Select a completion model and an embedding model first." });
       return;
     }
 
@@ -245,8 +244,8 @@ export class GraphService {
       excludePatterns: settings.excludePatterns,
       onStateChange: (state) => this.setBuildState(state),
       onSave: () => this.saveGraph(),
-      embeddingClient: this.embeddingClient ?? undefined,
-      embeddingModelId: this.configuredEmbeddingModelId ?? undefined,
+      embeddingClient: this.embeddingClient,
+      embeddingModelId: this.configuredEmbeddingModelId,
       folderFilter: folder,
     });
 

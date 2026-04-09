@@ -66,7 +66,7 @@ export interface KnowledgeGraphSettings {
   enabled: boolean;
   /** CompletionModel.id — the chat model used for entity extraction. */
   activeCompletionModelId: string | null;
-  /** EmbeddingModel.id — used to generate entity vectors at build time. When null, falls back to substring matching. */
+  /** EmbeddingModel.id — required for generating entity vectors at build time. */
   activeEmbeddingModelId: string | null;
   /** Glob patterns to exclude from graph extraction. */
   excludePatterns: string[];

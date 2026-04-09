@@ -1,6 +1,6 @@
-import { Notice } from "obsidian";
 import type LMStudioWritingAssistant from "../main";
 import type { IndexingState } from "../rag/types";
+import type { ModelAvailabilityState } from "../shared/types";
 import { getProviderDescriptor } from "../providers/registry";
 import { createSettingsSection, createModelSelector, Button, SettingItem } from "./ui";
 import { DEFAULT_RAG_SETTINGS } from "../constants";
@@ -74,6 +74,25 @@ export function renderRagTab(
   // Move the conditional wrapper after the general section in the DOM.
   container.appendChild(conditionalWrapper);
 
+  /**
+   * Checks that the embedding model is selected and available (loaded or cloud).
+   * Triggers the attention effect on the selector if validation fails.
+   */
+  async function validateModelReady(): Promise<boolean> {
+    if (!rag.activeEmbeddingModelId) {
+      modelSelector.retriggerAttention();
+      return false;
+    }
+
+    const state = await modelSelector.refreshAvailability();
+    const isReady = (s: ModelAvailabilityState) => s === "loaded" || s === "cloud";
+    if (!isReady(state)) {
+      modelSelector.retriggerAttention();
+      return false;
+    }
+    return true;
+  }
+
   /** Renders or clears the conditional sections based on rag.enabled. */
   function renderConditionalSections(): void {
     conditionalWrapper.empty();
@@ -98,10 +117,7 @@ export function renderRagTab(
 
     const actionsEl = headerRow.createDiv({ cls: "lmsa-index-actions" });
     const buildBtn = new Button(actionsEl).setButtonText("Build index").setCta().onClick(async () => {
-      if (!rag.enabled || !rag.activeEmbeddingModelId) {
-        new Notice("Enable retrieval and select an embedding model first.");
-        return;
-      }
+      if (!await validateModelReady()) return;
       await plugin.ragService.startIndexing(
         rag,
         plugin.settings.embeddingModels,
@@ -109,10 +125,7 @@ export function renderRagTab(
       );
     });
     const rebuildBtn = new Button(actionsEl).setButtonText("Rebuild index").onClick(async () => {
-      if (!rag.enabled || !rag.activeEmbeddingModelId) {
-        new Notice("Enable retrieval and select an embedding model first.");
-        return;
-      }
+      if (!await validateModelReady()) return;
       await plugin.ragService.rebuild(
         rag,
         plugin.settings.embeddingModels,

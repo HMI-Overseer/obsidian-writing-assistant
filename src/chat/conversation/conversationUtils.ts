@@ -144,6 +144,12 @@ export function normalizeConversation(raw: Record<string, unknown>): Conversatio
             base.usage = message.usage as ConversationMessage["usage"];
           }
           if (message.isError === true) base.isError = true;
+          if (Array.isArray(message.ragSources)) {
+            base.ragSources = message.ragSources as ConversationMessage["ragSources"];
+          }
+          if (typeof message.rewrittenQuery === "string") {
+            base.rewrittenQuery = message.rewrittenQuery;
+          }
 
           return base;
         })

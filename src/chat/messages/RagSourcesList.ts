@@ -62,30 +62,6 @@ function formatSourceLabel(source: RagSourceRef): string {
   return source.headingPath ? `${file} > ${source.headingPath}` : file;
 }
 
-function positionTooltip(linkEl: HTMLElement, tooltipEl: HTMLElement): void {
-  const scrollParent = linkEl.closest(".lmsa-chat-window-messages");
-  if (!scrollParent) return;
-
-  const containerRect = scrollParent.getBoundingClientRect();
-  const linkRect = linkEl.getBoundingClientRect();
-  const tooltipHeight = tooltipEl.offsetHeight;
-  const tooltipWidth = tooltipEl.offsetWidth;
-
-  // Flip above if not enough space below within the scroll container
-  const spaceBelow = containerRect.bottom - linkRect.bottom;
-  const spaceAbove = linkRect.top - containerRect.top;
-  const top = spaceBelow >= tooltipHeight || spaceBelow >= spaceAbove
-    ? linkRect.bottom
-    : linkRect.top - tooltipHeight;
-
-  // Clamp horizontal position within the container
-  const left = Math.min(linkRect.left, containerRect.right - tooltipWidth);
-
-  tooltipEl.setCssProps({
-    "--tooltip-top": `${top}px`,
-    "--tooltip-left": `${Math.max(containerRect.left, left)}px`,
-  });
-}
 
 export function renderRagSources(
   parentEl: HTMLElement,
@@ -129,20 +105,7 @@ export function renderRagSources(
       text: formatScore(source.score),
     });
 
-    if (source.content) {
-      const tooltipEl = linkEl.createDiv({
-        cls: "lmsa-chat-window-rag-source-tooltip",
-        text: source.content,
-      });
 
-      linkEl.addEventListener("mouseenter", () => {
-        tooltipEl.classList.add("is-visible");
-        positionTooltip(linkEl, tooltipEl);
-      });
-      linkEl.addEventListener("mouseleave", () => {
-        tooltipEl.classList.remove("is-visible");
-      });
-    }
   }
 
   renderGraphContext(detailsEl, sources);

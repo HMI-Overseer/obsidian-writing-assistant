@@ -103,6 +103,9 @@ export class RagService {
     // If stored values are 0, the index was built before we tracked these — recommend rebuild.
     if (storedChunkSize === 0) return true;
 
+    // Enrichment setting doesn't match what the index was built with.
+    if (this.store.getMetadataEnriched() !== ragSettings.metadataEnrichment) return true;
+
     return (
       storedChunkSize !== ragSettings.chunkSize ||
       storedChunkOverlap !== ragSettings.chunkOverlap
@@ -180,6 +183,7 @@ export class RagService {
       this.store.getDimensions(),
       ragSettings.chunkSize,
       ragSettings.chunkOverlap,
+      ragSettings.metadataEnrichment,
     );
 
     // Re-load existing index so incremental indexing can detect stale files.
@@ -202,6 +206,7 @@ export class RagService {
       chunkSize: ragSettings.chunkSize,
       chunkOverlap: ragSettings.chunkOverlap,
       excludePatterns: ragSettings.excludePatterns,
+      metadataEnrichment: ragSettings.metadataEnrichment,
       onStateChange: (state) => this.setIndexingState(state),
       onSave: () => this.saveIndex(),
     });

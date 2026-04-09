@@ -3,7 +3,7 @@ import type { App, TAbstractFile } from "obsidian";
 import type { EmbeddingClient } from "./embeddingClient";
 import type { IndexedChunk, FileIndexMeta, IndexingState } from "./types";
 import type { VectorStore } from "./vectorStore";
-import { chunkDocument, fnv1aHash, buildEmbeddingText, preprocessMarkdown } from "./chunker";
+import { chunkDocument, fnv1aHash, buildEmbeddingText, preprocessMarkdown, extractWikilinks, extractFolder } from "./chunker";
 
 /** Number of files to process per batch before yielding to the UI thread. */
 const BATCH_SIZE = 5;
@@ -22,6 +22,7 @@ export interface IndexerOptions {
   chunkSize: number;
   chunkOverlap: number;
   excludePatterns: string[];
+  metadataEnrichment: boolean;
   onStateChange: (state: IndexingState) => void;
   onSave: () => void;
 }
@@ -40,6 +41,7 @@ export class VaultIndexer {
   private readonly chunkSize: number;
   private readonly chunkOverlap: number;
   private readonly excludePatterns: string[];
+  private readonly metadataEnrichment: boolean;
   private readonly onStateChange: (state: IndexingState) => void;
   private readonly onSave: () => void;
 
@@ -56,6 +58,7 @@ export class VaultIndexer {
     this.chunkSize = options.chunkSize;
     this.chunkOverlap = options.chunkOverlap;
     this.excludePatterns = options.excludePatterns;
+    this.metadataEnrichment = options.metadataEnrichment;
     this.onStateChange = options.onStateChange;
     this.onSave = options.onSave;
   }
@@ -220,6 +223,24 @@ export class VaultIndexer {
         continue;
       }
 
+      // Extract metadata from raw content before preprocessing strips it.
+      let embeddingMeta;
+      if (this.metadataEnrichment) {
+        const links = extractWikilinks(content);
+        const folder = extractFolder(file.path);
+        const cache = this.app.metadataCache.getFileCache(file);
+        const tags: string[] = [];
+        if (cache?.frontmatter?.tags) {
+          const raw = cache.frontmatter.tags;
+          if (Array.isArray(raw)) {
+            tags.push(...raw.map(String));
+          } else if (typeof raw === "string") {
+            tags.push(raw);
+          }
+        }
+        embeddingMeta = { tags, folder, links };
+      }
+
       const cleaned = preprocessMarkdown(content);
       const chunks = chunkDocument(file.path, cleaned, this.chunkSize, this.chunkOverlap);
 
@@ -234,7 +255,7 @@ export class VaultIndexer {
         if (signal?.aborted || this.destroyed) return;
 
         const batch = chunks.slice(i, i + EMBED_BATCH_SIZE);
-        const texts = batch.map((c) => buildEmbeddingText(c));
+        const texts = batch.map((c) => buildEmbeddingText(c, embeddingMeta));
         const result = await this.client.embed(texts, this.modelId, signal);
 
         for (let j = 0; j < batch.length; j++) {

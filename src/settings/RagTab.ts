@@ -208,6 +208,17 @@ export function renderRagTab(
     );
 
     new SettingItem(retrieval.bodyEl)
+      .setName("Metadata enrichment")
+      .setDesc("Prepend tags, folder path, and wikilink targets to each chunk before embedding. Improves entity disambiguation in creative writing vaults.")
+      .addToggle((toggle) =>
+        toggle.setValue(rag.metadataEnrichment).onChange(async (value) => {
+          rag.metadataEnrichment = value;
+          await plugin.saveSettings();
+          updateDisplay(plugin.ragService.getIndexingState());
+        }),
+      );
+
+    new SettingItem(retrieval.bodyEl)
       .setName("Results per query")
       .setDesc(`Number of relevant chunks to inject, 1–20 (default: ${DEFAULT_RAG_SETTINGS.topK}).`)
       .addText((text) => {

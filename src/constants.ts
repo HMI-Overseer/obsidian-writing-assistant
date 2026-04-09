@@ -29,6 +29,7 @@ export const DEFAULT_RAG_SETTINGS: RagSettings = {
   minScore: 0.3,
   excludePatterns: ["templates/**"],
   maxContextChars: 6000,
+  metadataEnrichment: true,
 };
 
 export const DEFAULT_KNOWLEDGE_GRAPH_SETTINGS: KnowledgeGraphSettings = {

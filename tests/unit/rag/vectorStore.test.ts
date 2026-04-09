@@ -124,6 +124,31 @@ describe("VectorStore", () => {
     store.setFileChunks("a.md", [makeChunk("a.md", 0, [1, 2, 3, 4])], makeMeta("a.md", 1));
     expect(store.getDimensions()).toBe(4);
   });
+
+  test("metadataEnriched flag round-trips through serialize/deserialize", () => {
+    const store = new VectorStore("model-1", 0, 1000, 200, true);
+    store.setFileChunks("a.md", [makeChunk("a.md", 0, [1, 2, 3])], makeMeta("a.md", 1));
+
+    const serialized = store.serialize();
+    expect(serialized.metadataEnriched).toBe(true);
+
+    const store2 = new VectorStore("model-1");
+    store2.deserialize(serialized);
+    expect(store2.getMetadataEnriched()).toBe(true);
+  });
+
+  test("metadataEnriched defaults to false for legacy indexes", () => {
+    const store = new VectorStore("model-1");
+    store.setFileChunks("a.md", [makeChunk("a.md", 0, [1, 2, 3])], makeMeta("a.md", 1));
+
+    const serialized = store.serialize();
+    // Simulate a legacy index by removing the field.
+    delete (serialized as Record<string, unknown>).metadataEnriched;
+
+    const store2 = new VectorStore("model-1");
+    store2.deserialize(serialized);
+    expect(store2.getMetadataEnriched()).toBe(false);
+  });
 });
 
 describe("base64 vector encoding", () => {

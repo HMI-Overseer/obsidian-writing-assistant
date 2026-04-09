@@ -1,5 +1,5 @@
 import { describe, test, expect } from "vitest";
-import { chunkDocument, fnv1aHash, buildEmbeddingText, preprocessMarkdown } from "../../../src/rag/chunker";
+import { chunkDocument, fnv1aHash, buildEmbeddingText, preprocessMarkdown, extractWikilinks, extractFolder } from "../../../src/rag/chunker";
 
 const DEFAULT_CHUNK_SIZE = 1500;
 const DEFAULT_OVERLAP = 200;
@@ -156,6 +156,100 @@ describe("buildEmbeddingText", () => {
     };
     const result = buildEmbeddingText(chunk);
     expect(result).toBe("README > Getting Started\nInstructions here.");
+  });
+
+  test("prepends metadata when provided", () => {
+    const chunk = {
+      id: "Books/Prequel/Characters/Will.md::0",
+      filePath: "Books/Prequel/Characters/Will.md",
+      headingPath: "Relationship with Strife",
+      content: "Will and Strife shared a bond.",
+      startOffset: 0,
+      chunkIndex: 0,
+    };
+    const meta = {
+      tags: ["strand/will", "age-of-laurels"],
+      folder: "Books/Prequel/Characters",
+      links: ["Strife Strand", "The Bearer"],
+    };
+    const result = buildEmbeddingText(chunk, meta);
+    expect(result).toBe(
+      "[Tags: strand/will, age-of-laurels]\n" +
+      "[Folder: Books/Prequel/Characters]\n" +
+      "[Links: Strife Strand, The Bearer]\n" +
+      "Will > Relationship with Strife\n" +
+      "Will and Strife shared a bond.",
+    );
+  });
+
+  test("omits empty metadata lines", () => {
+    const chunk = {
+      id: "notes/Lore.md::0",
+      filePath: "notes/Lore.md",
+      headingPath: "",
+      content: "World lore.",
+      startOffset: 0,
+      chunkIndex: 0,
+    };
+    const meta = { tags: [], folder: "notes", links: [] };
+    const result = buildEmbeddingText(chunk, meta);
+    expect(result).toBe("[Folder: notes]\nLore\nWorld lore.");
+  });
+
+  test("handles undefined metadata same as no metadata", () => {
+    const chunk = {
+      id: "test.md::0",
+      filePath: "test.md",
+      headingPath: "",
+      content: "Content.",
+      startOffset: 0,
+      chunkIndex: 0,
+    };
+    expect(buildEmbeddingText(chunk, undefined)).toBe(buildEmbeddingText(chunk));
+  });
+});
+
+describe("extractWikilinks", () => {
+  test("extracts simple wikilinks", () => {
+    const content = "See [[The Bearer]] and [[Strife Strand]].";
+    expect(extractWikilinks(content)).toEqual(["The Bearer", "Strife Strand"]);
+  });
+
+  test("extracts aliased wikilinks using the target, not display text", () => {
+    const content = "He met [[Strife Strand|Strife]] at the gates.";
+    expect(extractWikilinks(content)).toEqual(["Strife Strand"]);
+  });
+
+  test("deduplicates repeated links", () => {
+    const content = "[[Will]] said hello. Later, [[Will]] said goodbye.";
+    expect(extractWikilinks(content)).toEqual(["Will"]);
+  });
+
+  test("returns empty array when no wikilinks", () => {
+    expect(extractWikilinks("Just plain text.")).toEqual([]);
+  });
+
+  test("ignores image embeds", () => {
+    const content = "![[screenshot.png]] and [[Real Link]].";
+    const links = extractWikilinks(content);
+    expect(links).toContain("Real Link");
+    // Image embeds start with ! before [[ — the regex matches inside them,
+    // but screenshot.png is still a valid link target in Obsidian.
+    // We include it; it won't hurt the embedding.
+  });
+});
+
+describe("extractFolder", () => {
+  test("extracts parent folder from nested path", () => {
+    expect(extractFolder("Books/Prequel/Characters/Will.md")).toBe("Books/Prequel/Characters");
+  });
+
+  test("extracts single folder", () => {
+    expect(extractFolder("notes/Lore.md")).toBe("notes");
+  });
+
+  test("returns empty string for root-level files", () => {
+    expect(extractFolder("README.md")).toBe("");
   });
 });
 

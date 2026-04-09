@@ -30,6 +30,19 @@ export interface FileIndexMeta {
   chunkCount: number;
 }
 
+/**
+ * Ephemeral metadata used to enrich embedding text at index time.
+ * Not stored in the index — computed from vault state during indexing.
+ */
+export interface EmbeddingMetadata {
+  /** Frontmatter tags from the file. */
+  tags: string[];
+  /** Parent folder path (e.g. "Books/Prequel/Characters"). */
+  folder: string;
+  /** Wikilink targets extracted from the raw file content. */
+  links: string[];
+}
+
 /** A retrieval result returned to the caller. */
 export interface RetrievalResult {
   chunk: DocumentChunk;
@@ -53,6 +66,8 @@ export interface RagSettings {
   excludePatterns: string[];
   /** Maximum total characters of RAG context to inject into a prompt. */
   maxContextChars: number;
+  /** Enrich embedding text with tags, folder path, and wikilink targets for disambiguation. */
+  metadataEnrichment: boolean;
 }
 
 /** Serialized index format written to disk. */
@@ -64,6 +79,8 @@ export interface SerializedVectorIndex {
   chunkSize?: number;
   /** Chunk overlap used when the index was built. Used for settings drift detection. */
   chunkOverlap?: number;
+  /** Whether the index was built with metadata-enriched embedding text (tags, folder, links). */
+  metadataEnriched?: boolean;
   files: FileIndexMeta[];
   chunks: SerializedChunk[];
 }

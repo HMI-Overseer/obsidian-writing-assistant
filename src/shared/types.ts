@@ -202,6 +202,8 @@ export interface RagSettings {
   excludePatterns: string[];
   /** Maximum total characters of RAG context to inject into a prompt. */
   maxContextChars: number;
+  /** Enrich embedding text with tags, folder path, and wikilink targets for disambiguation. */
+  metadataEnrichment: boolean;
 }
 
 /** Knowledge graph settings. */

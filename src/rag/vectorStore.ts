@@ -18,12 +18,14 @@ export class VectorStore {
   private dimensions: number;
   private chunkSize: number;
   private chunkOverlap: number;
+  private metadataEnriched: boolean;
 
-  constructor(embeddingModelId: string, dimensions: number = 0, chunkSize: number = 0, chunkOverlap: number = 0) {
+  constructor(embeddingModelId: string, dimensions: number = 0, chunkSize: number = 0, chunkOverlap: number = 0, metadataEnriched: boolean = false) {
     this.embeddingModelId = embeddingModelId;
     this.dimensions = dimensions;
     this.chunkSize = chunkSize;
     this.chunkOverlap = chunkOverlap;
+    this.metadataEnriched = metadataEnriched;
   }
 
   getEmbeddingModelId(): string {
@@ -40,6 +42,10 @@ export class VectorStore {
 
   getChunkOverlap(): number {
     return this.chunkOverlap;
+  }
+
+  getMetadataEnriched(): boolean {
+    return this.metadataEnriched;
   }
 
   getAllChunks(): IndexedChunk[] {
@@ -125,6 +131,7 @@ export class VectorStore {
     this.dimensions = 0;
     this.chunkSize = 0;
     this.chunkOverlap = 0;
+    this.metadataEnriched = false;
   }
 
   /** Serialize the store to a JSON-compatible object. */
@@ -149,6 +156,7 @@ export class VectorStore {
       dimensions: this.dimensions,
       chunkSize: this.chunkSize,
       chunkOverlap: this.chunkOverlap,
+      metadataEnriched: this.metadataEnriched,
       files: [...this.fileMeta.values()],
       chunks,
     };
@@ -163,6 +171,7 @@ export class VectorStore {
     this.dimensions = data.dimensions;
     this.chunkSize = data.chunkSize ?? 0;
     this.chunkOverlap = data.chunkOverlap ?? 0;
+    this.metadataEnriched = data.metadataEnriched ?? false;
     this.chunks.clear();
     this.fileMeta.clear();
 

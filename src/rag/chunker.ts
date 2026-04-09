@@ -1,4 +1,4 @@
-import type { DocumentChunk } from "./types";
+import type { DocumentChunk, EmbeddingMetadata } from "./types";
 
 /**
  * Preprocess raw markdown content before chunking and embedding.
@@ -251,21 +251,57 @@ function mergeSmallChunks(chunks: DocumentChunk[]): DocumentChunk[] {
 }
 
 /**
+ * Extract wikilink targets from raw markdown content.
+ * Returns deduplicated link targets (the note name, not the display alias).
+ * Must be called BEFORE `preprocessMarkdown()` which strips wikilinks.
+ */
+export function extractWikilinks(rawContent: string): string[] {
+  const re = /\[\[([^\]|]+)(?:\|[^\]]+)?\]\]/g;
+  const links = new Set<string>();
+  let match;
+  while ((match = re.exec(rawContent)) !== null) {
+    const target = match[1].trim();
+    if (target) links.add(target);
+  }
+  return [...links];
+}
+
+/**
+ * Extract the parent folder path from a vault file path.
+ * Returns an empty string for root-level files.
+ */
+export function extractFolder(filePath: string): string {
+  const lastSlash = filePath.lastIndexOf("/");
+  return lastSlash > 0 ? filePath.slice(0, lastSlash) : "";
+}
+
+/**
  * Build the text sent to the embedding model for a chunk.
- * Prepends the note title and heading breadcrumb so the embedding vector
- * captures *where* in the vault this chunk lives — not just its content.
+ * Prepends metadata signals (tags, folder, links) and the note title / heading
+ * breadcrumb so the embedding vector captures *where* in the vault this chunk
+ * lives and *what entities it references* — not just its prose content.
  *
  * The stored `content` field is NOT modified; only the embedding input changes.
  */
-export function buildEmbeddingText(chunk: DocumentChunk): string {
-  // Derive a human-readable note title from the file path.
-  const fileName = chunk.filePath.replace(/\.md$/, "").split("/").pop() ?? "";
-  const parts: string[] = [];
-  if (fileName) parts.push(fileName);
-  if (chunk.headingPath) parts.push(chunk.headingPath);
+export function buildEmbeddingText(chunk: DocumentChunk, meta?: EmbeddingMetadata): string {
+  const lines: string[] = [];
 
-  const prefix = parts.length > 0 ? parts.join(" > ") + "\n" : "";
-  return prefix + chunk.content;
+  // Metadata prefix lines — only include non-empty signals.
+  if (meta?.tags?.length) lines.push(`[Tags: ${meta.tags.join(", ")}]`);
+  if (meta?.folder) lines.push(`[Folder: ${meta.folder}]`);
+  if (meta?.links?.length) lines.push(`[Links: ${meta.links.join(", ")}]`);
+
+  // Note title + heading breadcrumb.
+  const fileName = chunk.filePath.replace(/\.md$/, "").split("/").pop() ?? "";
+  const breadcrumbParts: string[] = [];
+  if (fileName) breadcrumbParts.push(fileName);
+  if (chunk.headingPath) breadcrumbParts.push(chunk.headingPath);
+  if (breadcrumbParts.length > 0) lines.push(breadcrumbParts.join(" > "));
+
+  // Chunk content.
+  lines.push(chunk.content);
+
+  return lines.join("\n");
 }
 
 /**

@@ -65,6 +65,10 @@ function normalizeRagSettings(raw: unknown): RagSettings {
       typeof data.maxContextChars === "number"
         ? data.maxContextChars
         : DEFAULT_RAG_SETTINGS.maxContextChars,
+    metadataEnrichment:
+      typeof data.metadataEnrichment === "boolean"
+        ? data.metadataEnrichment
+        : DEFAULT_RAG_SETTINGS.metadataEnrichment,
   };
 }
 

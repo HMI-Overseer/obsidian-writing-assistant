@@ -60,6 +60,8 @@ export interface RagSettings {
   chunkOverlap: number;
   /** Number of retrieval results to inject as context. */
   topK: number;
+  /** Maximum chunks from a single file in retrieval results. */
+  maxChunksPerFile: number;
   /** Minimum similarity score (0–1) to include a result. */
   minScore: number;
   /** File patterns to exclude from indexing (glob strings). */

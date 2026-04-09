@@ -26,6 +26,7 @@ export const DEFAULT_RAG_SETTINGS: RagSettings = {
   chunkSize: 1500,
   chunkOverlap: 200,
   topK: 5,
+  maxChunksPerFile: 5,
   minScore: 0.3,
   excludePatterns: ["templates/**"],
   maxContextChars: 6000,

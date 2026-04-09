@@ -233,6 +233,20 @@ export function renderRagTab(
       });
 
     new SettingItem(retrieval.bodyEl)
+      .setName("Max chunks per file")
+      .setDesc(`Limit how many chunks a single file can contribute, 1–20 (default: ${DEFAULT_RAG_SETTINGS.maxChunksPerFile}).`)
+      .addText((text) => {
+        text.setValue(String(rag.maxChunksPerFile));
+        text.onChange(async (value) => {
+          const num = parseInt(value, 10);
+          if (!isNaN(num) && num >= 1 && num <= 20) {
+            rag.maxChunksPerFile = num;
+            await plugin.saveSettings();
+          }
+        });
+      });
+
+    new SettingItem(retrieval.bodyEl)
       .setName("Minimum similarity")
       .setDesc(`Only include results above this score, 0–0.8 (default: ${DEFAULT_RAG_SETTINGS.minScore}).`)
       .addText((text) => {

@@ -1,4 +1,5 @@
 export { RagService } from "./ragService";
+export { rewriteQueryForRetrieval } from "./queryRewriter";
 export { GraphService } from "./graph";
 export type { EmbeddingClient, EmbeddingResult } from "./embeddingClient";
 export type {

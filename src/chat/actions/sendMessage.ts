@@ -114,6 +114,8 @@ export async function sendMessage(options: SendMessageOptions): Promise<void> {
   store.appendMessage(userMessage);
   transcript.setEmptyStateVisible(false);
 
+  const client = createChatClient(activeModel.provider, plugin.settings.providerSettings);
+
   const apiMessages = await prepareApiMessages({
     app: plugin.app,
     store,
@@ -129,11 +131,14 @@ export async function sendMessage(options: SendMessageOptions): Promise<void> {
         ?? plugin.modelAvailability.getTrainedForToolUse(activeModel.modelId),
     },
     preferToolUse: plugin.settings.preferToolUse,
+    chatClient: client,
+    completionModelId: activeModel.modelId,
   });
 
   const ragSources = apiMessages.ragContext?.map(({ filePath, headingPath, score, content, graphContext }) =>
     ({ filePath, headingPath, score, content, graphContext })
   );
+  const { rewrittenQuery } = apiMessages;
 
   // Attach Anthropic cache settings if enabled on the active model.
   if (activeModel.anthropicCacheSettings?.enabled) {
@@ -161,7 +166,6 @@ export async function sendMessage(options: SendMessageOptions): Promise<void> {
     }
   }
 
-  const client = createChatClient(activeModel.provider, plugin.settings.providerSettings);
   const abortController = new AbortController();
   setActiveAbortController(abortController);
 
@@ -296,7 +300,8 @@ export async function sendMessage(options: SendMessageOptions): Promise<void> {
         activeModel.modelId,
         activeModel.provider,
         finalUsage,
-        ragSources
+        ragSources,
+        rewrittenQuery
       );
     }
 
@@ -320,7 +325,7 @@ export async function sendMessage(options: SendMessageOptions): Promise<void> {
         });
       } else {
         await finalizeAbortedResponse(store, transcript, assistantBubble, renderer as StreamingRenderer,
-          activeModel.modelId, activeModel.provider, ragSources);
+          activeModel.modelId, activeModel.provider, ragSources, rewrittenQuery);
       }
     } else {
       const errorText = `Error: ${getErrorMessage(error)}`;

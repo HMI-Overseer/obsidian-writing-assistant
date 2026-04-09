@@ -51,6 +51,8 @@ export interface ChatRequest {
   documentContext: DocumentContext | null;
   /** RAG retrieval results. null = RAG disabled or no results. */
   ragContext: RagContextBlock[] | null;
+  /** Rewritten retrieval query, set when query rewriting changed the original user message. */
+  rewrittenQuery?: string;
   /** Conversation turns in chronological order. */
   messages: ChatTurn[];
   /** Anthropic prompt caching settings. Attached when the active model has caching enabled. */

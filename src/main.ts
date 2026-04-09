@@ -57,6 +57,10 @@ function normalizeRagSettings(raw: unknown): RagSettings {
     chunkOverlap:
       typeof data.chunkOverlap === "number" ? data.chunkOverlap : DEFAULT_RAG_SETTINGS.chunkOverlap,
     topK: typeof data.topK === "number" ? data.topK : DEFAULT_RAG_SETTINGS.topK,
+    maxChunksPerFile:
+      typeof data.maxChunksPerFile === "number"
+        ? data.maxChunksPerFile
+        : DEFAULT_RAG_SETTINGS.maxChunksPerFile,
     minScore: typeof data.minScore === "number" ? data.minScore : DEFAULT_RAG_SETTINGS.minScore,
     excludePatterns: Array.isArray(data.excludePatterns)
       ? data.excludePatterns.filter((p): p is string => typeof p === "string")

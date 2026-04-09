@@ -8,6 +8,7 @@ export interface RetrieverOptions {
   embeddingClient: EmbeddingClient;
   embeddingModelId: string;
   topK: number;
+  maxChunksPerFile: number;
   minScore: number;
 }
 
@@ -19,6 +20,7 @@ export class Retriever {
   private readonly client: EmbeddingClient;
   private readonly modelId: string;
   private readonly topK: number;
+  private readonly maxChunksPerFile: number;
   private readonly minScore: number;
 
   constructor(options: RetrieverOptions) {
@@ -26,6 +28,7 @@ export class Retriever {
     this.client = options.embeddingClient;
     this.modelId = options.embeddingModelId;
     this.topK = options.topK;
+    this.maxChunksPerFile = options.maxChunksPerFile;
     this.minScore = options.minScore;
   }
 
@@ -51,6 +54,6 @@ export class Retriever {
       : allChunks;
     const topResults = topKSimilar(queryVector, searchableChunks, this.topK * 3, this.minScore);
 
-    return limitPerFile(topResults).slice(0, this.topK);
+    return limitPerFile(topResults, this.maxChunksPerFile).slice(0, this.topK);
   }
 }

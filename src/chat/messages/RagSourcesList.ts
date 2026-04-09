@@ -90,7 +90,8 @@ function positionTooltip(linkEl: HTMLElement, tooltipEl: HTMLElement): void {
 export function renderRagSources(
   parentEl: HTMLElement,
   sources: RagSourceRef[],
-  app: App
+  app: App,
+  rewrittenQuery?: string
 ): HTMLElement | null {
   if (sources.length === 0) return null;
 
@@ -101,6 +102,13 @@ export function renderRagSources(
   });
 
   const listEl = detailsEl.createDiv({ cls: "lmsa-chat-window-rag-sources-list" });
+
+  if (rewrittenQuery) {
+    listEl.createDiv({
+      cls: "lmsa-chat-window-rag-rewritten-query",
+      text: `Retrieved as: "${rewrittenQuery}"`,
+    });
+  }
 
   for (const source of sources) {
     const rowEl = listEl.createDiv({ cls: "lmsa-chat-window-rag-source-row" });

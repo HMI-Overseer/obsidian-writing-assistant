@@ -108,6 +108,8 @@ export interface ConversationMessage {
   isError?: boolean;
   /** RAG sources used for the active version of this response. */
   ragSources?: RagSourceRef[];
+  /** Rewritten retrieval query, when query rewriting changed the original user message. */
+  rewrittenQuery?: string;
   /** Raw tool calls from the model response (edit mode with tool use). */
   toolCalls?: ToolCall[];
 }

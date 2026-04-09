@@ -128,6 +128,7 @@ export async function regenerateMessage(options: RegenerateOptions): Promise<voi
   const ragSources = apiMessages.ragContext?.map(({ filePath, headingPath, score, content, graphContext }) =>
     ({ filePath, headingPath, score, content, graphContext })
   );
+  const { rewrittenQuery } = apiMessages;
 
   // Attach Anthropic cache settings if enabled on the active model.
   if (activeModel.anthropicCacheSettings?.enabled) {
@@ -274,6 +275,7 @@ export async function regenerateMessage(options: RegenerateOptions): Promise<voi
           provider: activeModel.provider,
           ...(finalUsage && { usage: buildMessageUsage(activeModel.modelId, finalUsage) }),
           ragSources,
+          rewrittenQuery,
         });
       } else {
         transcript.renderPlainTextContent(assistantBubble, "(no response)");

@@ -149,6 +149,7 @@ export class RagService {
       embeddingClient: client,
       embeddingModelId: model.modelId,
       topK: ragSettings.topK,
+      maxChunksPerFile: ragSettings.maxChunksPerFile,
       minScore: ragSettings.minScore,
     });
   }
@@ -195,6 +196,7 @@ export class RagService {
       embeddingClient: this.embeddingClient,
       embeddingModelId: this.configuredModelId,
       topK: ragSettings.topK,
+      maxChunksPerFile: ragSettings.maxChunksPerFile,
       minScore: ragSettings.minScore,
     });
 

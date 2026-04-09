@@ -7,6 +7,8 @@ import type { ChatMode } from "../types";
 import type { App } from "obsidian";
 import type { ChatSessionStore } from "../conversation/ChatSessionStore";
 import type { RagService } from "../../rag";
+import type { ChatClient } from "../../api/chatClient";
+import { rewriteQueryForRetrieval } from "../../rag/queryRewriter";
 
 export interface PrepareMessagesOptions {
   app: App;
@@ -23,6 +25,10 @@ export interface PrepareMessagesOptions {
   modelCapabilities?: { trainedForToolUse?: boolean };
   /** Global preference for tool calling in edit mode. */
   preferToolUse?: boolean;
+  /** Chat client for internal LLM calls (query rewriting). */
+  chatClient?: ChatClient;
+  /** Completion model ID for internal LLM calls. */
+  completionModelId?: string;
 }
 
 export async function prepareApiMessages(
@@ -40,6 +46,8 @@ export async function prepareApiMessages(
     activeProvider,
     modelCapabilities,
     preferToolUse,
+    chatClient,
+    completionModelId,
   } = options;
 
   const editMode = mode === "edit";
@@ -80,11 +88,26 @@ export async function prepareApiMessages(
   }));
 
   // Retrieve RAG context based on the latest user message.
+  // When a chat client is available, rewrite the query first to resolve
+  // pronouns and implicit references from conversation history.
   let ragContext: RagContextBlock[] | null = null;
+  let rewrittenQuery: string | undefined;
   if (!editMode && ragService?.isReady()) {
     const lastUserMessage = messages.findLast((m) => m.role === "user");
     if (lastUserMessage) {
-      ragContext = await ragService.retrieve(lastUserMessage.content, documentContext?.filePath);
+      let retrievalQuery = lastUserMessage.content;
+      if (chatClient && completionModelId) {
+        retrievalQuery = await rewriteQueryForRetrieval(
+          lastUserMessage.content,
+          messages,
+          chatClient,
+          completionModelId,
+        );
+        if (retrievalQuery !== lastUserMessage.content) {
+          rewrittenQuery = retrievalQuery;
+        }
+      }
+      ragContext = await ragService.retrieve(retrievalQuery, documentContext?.filePath);
     }
   }
 
@@ -105,7 +128,7 @@ export async function prepareApiMessages(
     ? (activeProvider === "lmstudio" ? CORE_EDIT_TOOLS : ALL_EDIT_TOOLS)
     : undefined;
 
-  return { systemPrompt: finalSystemPrompt, documentContext, ragContext, messages, tools };
+  return { systemPrompt: finalSystemPrompt, documentContext, ragContext, rewrittenQuery, messages, tools };
 }
 
 /**

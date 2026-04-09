@@ -38,7 +38,8 @@ export async function finalizeResponse(
   modelId?: string,
   provider?: ProviderOption,
   usage?: UsageResult | null,
-  ragSources?: RagSourceRef[]
+  ragSources?: RagSourceRef[],
+  rewrittenQuery?: string
 ): Promise<void> {
   const fullResponse = renderer.getFullResponse();
 
@@ -46,6 +47,7 @@ export async function finalizeResponse(
     const assistantMessage = makeMessage("assistant", fullResponse);
     attachUsageToMessage(assistantMessage, modelId, provider, usage);
     if (ragSources) assistantMessage.ragSources = ragSources;
+    if (rewrittenQuery) assistantMessage.rewrittenQuery = rewrittenQuery;
     store.appendMessage(assistantMessage);
     store.setLastAssistantResponse(fullResponse);
 
@@ -71,7 +73,8 @@ export async function finalizeAbortedResponse(
   renderer: StreamingRenderer,
   modelId?: string,
   provider?: ProviderOption,
-  ragSources?: RagSourceRef[]
+  ragSources?: RagSourceRef[],
+  rewrittenQuery?: string
 ): Promise<void> {
   const fullResponse = renderer.getFullResponse();
 
@@ -79,6 +82,7 @@ export async function finalizeAbortedResponse(
     const assistantMessage = makeMessage("assistant", fullResponse);
     attachUsageToMessage(assistantMessage, modelId, provider);
     if (ragSources) assistantMessage.ragSources = ragSources;
+    if (rewrittenQuery) assistantMessage.rewrittenQuery = rewrittenQuery;
     store.appendMessage(assistantMessage);
     store.setLastAssistantResponse(fullResponse);
 

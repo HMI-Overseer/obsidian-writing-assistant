@@ -281,7 +281,7 @@ export class ChatTranscript {
     if (message.role === "assistant") {
       renderUsageBadge(bubble.rowEl, message.usage, message.modelId, message.provider);
       if (message.ragSources?.length) {
-        renderRagSources(bubble.bodyEl, message.ragSources, this.app);
+        renderRagSources(bubble.bodyEl, message.ragSources, this.app, message.rewrittenQuery);
       }
     }
 

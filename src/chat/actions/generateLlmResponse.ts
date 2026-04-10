@@ -18,6 +18,7 @@ import { estimateCost } from "../../api/pricing";
 import type { UsageResult } from "../../api/usageTypes";
 import type { MessageUsage } from "../../shared/types";
 import { runToolLoop } from "./toolLoop";
+import type { VaultToolContext } from "./toolLoop";
 import { CONTEXT_DANGER_THRESHOLD } from "../../constants";
 
 /**
@@ -104,7 +105,6 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
         activeModel.trainedForToolUse ??
         plugin.modelAvailability.getTrainedForToolUse(activeModel.modelId),
     },
-    preferToolUse: plugin.settings.preferToolUse,
     chatClient: client,
     completionModelId: activeModel.modelId,
   });
@@ -140,10 +140,17 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
   const assistantBubble = transcript.createBubble("assistant");
   assistantBubble.bodyEl.addClass("is-streaming");
 
+  // useToolMode: the edit renderer shows a tool-call UI overlay (not for vault-only tool use)
   const useToolMode = editMode && !!apiMessages.tools?.length;
   const renderer = editMode
     ? new EditStreamingRenderer(assistantBubble, transcript, { useToolMode })
     : new StreamingRenderer(assistantBubble, transcript);
+
+  const vaultToolContext: VaultToolContext = {
+    app: plugin.app,
+    ragService: plugin.ragService,
+    activeFilePath: apiMessages.documentContext?.filePath,
+  };
 
   const abortController = new AbortController();
   setActiveAbortController(abortController);
@@ -174,6 +181,7 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
             }
           : undefined,
       },
+      vaultToolContext,
     );
 
     await renderer.flush();

@@ -145,8 +145,8 @@ export class ChatComposer {
   }
 
   /**
-   * Updates the tool-use indicator state based on the active model.
-   * Orange when the model supports tool use, gray when it doesn't.
+   * Updates the tool-use indicator state based on agentic mode and model capability.
+   * Orange when agentic mode is on and the model supports tool use.
    */
   refreshToolUseIndicator(activeModel: CompletionModel | null): void {
     const el = this.refs.toolUseIndicatorEl;
@@ -160,16 +160,13 @@ export class ChatComposer {
 
     const trainedForToolUse = activeModel.trainedForToolUse
       ?? this.plugin.modelAvailability.getTrainedForToolUse(activeModel.modelId);
-    const supportsTools = shouldUseToolCall(
-      activeModel.provider,
-      { trainedForToolUse },
-      this.plugin.settings.preferToolUse,
-    );
+    const modelCapable = shouldUseToolCall(activeModel.provider, { trainedForToolUse });
+    const active = this.plugin.settings.agenticMode && modelCapable;
 
-    el.toggleClass("is-active", supportsTools);
-    el.setAttribute("aria-label", supportsTools
-      ? "Tool use supported — edit mode uses structured tool calls"
-      : "Tool use not available — edit mode uses text fallback");
+    el.toggleClass("is-active", active);
+    el.setAttribute("aria-label", active
+      ? "Agentic mode on — vault search and edit tools available"
+      : "Agentic mode off — no tools used");
   }
 
   /**

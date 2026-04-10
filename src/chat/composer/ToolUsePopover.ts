@@ -4,46 +4,55 @@ import { Toggle } from "../../settings/ui";
 import type { ChatLayoutRefs } from "../types";
 
 export type ToolUsePopoverCallbacks = {
-  getPreferToolUse: () => boolean;
+  getAgenticMode: () => boolean;
+  getPreferEditTools: () => boolean;
   getActiveModel: () => CompletionModel | null;
   getTrainedForToolUse: (modelId: string) => boolean | undefined;
-  onToggle: (enabled: boolean) => Promise<void>;
+  onAgenticToggle: (enabled: boolean) => Promise<void>;
+  onEditToolsToggle: (enabled: boolean) => Promise<void>;
   onBeforeOpen?: () => void;
 };
 
 interface SectionRefs {
-  toggle: Toggle;
-  statusEl: HTMLElement;
-  hintEl: HTMLElement;
+  agenticToggle: Toggle;
+  agenticStatusEl: HTMLElement;
+  editToolsToggle: Toggle;
+  editToolsStatusEl: HTMLElement;
 }
 
+type ToolUseReason = "active" | "disabled" | "model-unsupported" | "no-model";
+
 /**
- * Resolves whether tool use is effectively available for the given model,
- * mirroring the logic in `shouldUseToolCall` but returning granular info.
+ * Resolves whether the model technically supports tool/function calling.
  */
-function resolveToolUseStatus(
-  preferToolUse: boolean,
+function modelCanUseTools(
   model: CompletionModel | null,
   trainedForToolUse: boolean | undefined,
-): { effective: boolean; reason: "active" | "disabled" | "model-unsupported" | "no-model" } {
-  if (!model) return { effective: false, reason: "no-model" };
-  if (!preferToolUse) return { effective: false, reason: "disabled" };
+): { capable: boolean; reason: ToolUseReason } {
+  if (!model) return { capable: false, reason: "no-model" };
 
   if (model.provider === "lmstudio") {
     const trained = model.trainedForToolUse ?? trainedForToolUse;
-    if (trained !== true) return { effective: false, reason: "model-unsupported" };
-    return { effective: true, reason: "active" };
+    if (trained !== true) return { capable: false, reason: "model-unsupported" };
+    return { capable: true, reason: "active" };
   }
 
   const descriptor = PROVIDER_DESCRIPTORS[model.provider as ProviderOption];
-  if (!descriptor?.supportsToolUse) return { effective: false, reason: "model-unsupported" };
-  return { effective: true, reason: "active" };
+  if (!descriptor?.supportsToolUse) return { capable: false, reason: "model-unsupported" };
+  return { capable: true, reason: "active" };
 }
 
-const STATUS_TEXT: Record<string, string> = {
+const AGENTIC_STATUS_TEXT: Record<string, string> = {
+  active: "Vault search and edit tools available",
+  disabled: "Agentic mode off — no tools used",
+  "model-unsupported": "Current model does not support tool use",
+  "no-model": "No model selected",
+};
+
+const EDIT_TOOLS_STATUS_TEXT: Record<string, string> = {
   active: "Edit mode uses structured tool calls",
-  disabled: "All models use SEARCH/REPLACE text edits",
-  "model-unsupported": "Current model is not trained for tool use \u2014 falling back to text edits",
+  disabled: "Edit mode uses SEARCH/REPLACE text blocks",
+  "model-unsupported": "Model does not support tool use — using text fallback",
   "no-model": "No model selected",
 };
 
@@ -97,7 +106,7 @@ export class ToolUsePopover {
   /** Re-sync the popover UI with current state (e.g. after model change). */
   refresh(): void {
     if (!this.popoverOpen || !this.sectionRefs) return;
-    this.syncSection(this.sectionRefs);
+    this.syncContent(this.sectionRefs);
   }
 
   destroy(): void {
@@ -117,52 +126,88 @@ export class ToolUsePopover {
     el.createDiv({ cls: "lmsa-tool-popover-title", text: "Tool use" });
     const body = el.createDiv({ cls: "lmsa-tool-popover-body" });
 
-    this.sectionRefs = this.renderSection(body);
-    this.syncSection(this.sectionRefs);
+    this.sectionRefs = this.renderSections(body);
+    this.syncContent(this.sectionRefs);
   }
 
-  private renderSection(container: HTMLElement): SectionRefs {
-    const section = container.createDiv({ cls: "lmsa-tool-popover-section" });
+  private renderSections(container: HTMLElement): SectionRefs {
+    // --- Section 1: Agentic mode ---
+    const agenticSection = container.createDiv({ cls: "lmsa-tool-popover-section" });
 
-    // Toggle row
-    const headerRow = section.createDiv({ cls: "lmsa-tool-popover-row" });
-    headerRow.createEl("span", { cls: "lmsa-tool-popover-label", text: "Prefer tool calling" });
-    const toggleWrap = headerRow.createDiv({ cls: "lmsa-tool-popover-control" });
-    const toggle = new Toggle(toggleWrap);
-    toggle.onChange((value) => {
-      void this.callbacks.onToggle(value);
-      if (this.sectionRefs) this.syncSection(this.sectionRefs);
+    const agenticRow = agenticSection.createDiv({ cls: "lmsa-tool-popover-row" });
+    agenticRow.createEl("span", { cls: "lmsa-tool-popover-label", text: "Agentic mode" });
+    const agenticToggleWrap = agenticRow.createDiv({ cls: "lmsa-tool-popover-control" });
+    const agenticToggle = new Toggle(agenticToggleWrap);
+    agenticToggle.onChange((value) => {
+      void this.callbacks.onAgenticToggle(value);
+      if (this.sectionRefs) this.syncContent(this.sectionRefs);
     });
 
-    // Status text
-    const statusEl = section.createEl("span", { cls: "lmsa-tool-popover-status" });
+    const agenticStatusEl = agenticSection.createEl("span", { cls: "lmsa-tool-popover-status" });
 
-    // Hint
-    const hintEl = section.createEl("span", {
+    // --- Section 2: Edit tools ---
+    const editSection = container.createDiv({ cls: "lmsa-tool-popover-section" });
+
+    const editRow = editSection.createDiv({ cls: "lmsa-tool-popover-row" });
+    editRow.createEl("span", { cls: "lmsa-tool-popover-label", text: "Structured edit tools" });
+    const editToggleWrap = editRow.createDiv({ cls: "lmsa-tool-popover-control" });
+    const editToolsToggle = new Toggle(editToggleWrap);
+    editToolsToggle.onChange((value) => {
+      void this.callbacks.onEditToolsToggle(value);
+      if (this.sectionRefs) this.syncContent(this.sectionRefs);
+    });
+
+    const editToolsStatusEl = editSection.createEl("span", { cls: "lmsa-tool-popover-status" });
+
+    editSection.createEl("span", {
       cls: "lmsa-tool-popover-hint",
       text: "Configure edit mode prompts in plugin settings.",
     });
 
-    return { toggle, statusEl, hintEl };
+    return { agenticToggle, agenticStatusEl, editToolsToggle, editToolsStatusEl };
   }
 
   // ---------------------------------------------------------------------------
-  // Refresh
+  // Sync
   // ---------------------------------------------------------------------------
 
-  private syncSection(refs: SectionRefs): void {
-    const preferToolUse = this.callbacks.getPreferToolUse();
+  private syncContent(refs: SectionRefs): void {
+    const agenticMode = this.callbacks.getAgenticMode();
+    const preferEditTools = this.callbacks.getPreferEditTools();
     const model = this.callbacks.getActiveModel();
     const trained = model
       ? this.callbacks.getTrainedForToolUse(model.modelId)
       : undefined;
 
-    refs.toggle.setValue(preferToolUse);
+    const { capable, reason: capabilityReason } = modelCanUseTools(model, trained);
 
-    const { reason } = resolveToolUseStatus(preferToolUse, model, trained);
-    refs.statusEl.textContent = STATUS_TEXT[reason];
+    // --- Agentic section ---
+    refs.agenticToggle.setValue(agenticMode);
 
-    // Add warning styling when enabled but model can't use it
-    refs.statusEl.toggleClass("is-warning", reason === "model-unsupported");
+    let agenticReason: ToolUseReason;
+    if (!agenticMode) {
+      agenticReason = "disabled";
+    } else if (!capable) {
+      agenticReason = capabilityReason;
+    } else {
+      agenticReason = "active";
+    }
+    refs.agenticStatusEl.textContent = AGENTIC_STATUS_TEXT[agenticReason];
+    refs.agenticStatusEl.toggleClass("is-warning", agenticReason === "model-unsupported");
+
+    // --- Edit tools section ---
+    refs.editToolsToggle.setValue(preferEditTools);
+
+    // The edit tools section is only meaningful when agentic mode is on.
+    let editReason: ToolUseReason;
+    if (!agenticMode || !preferEditTools) {
+      editReason = "disabled";
+    } else if (!capable) {
+      editReason = capabilityReason;
+    } else {
+      editReason = "active";
+    }
+    refs.editToolsStatusEl.textContent = EDIT_TOOLS_STATUS_TEXT[editReason];
+    refs.editToolsStatusEl.toggleClass("is-warning", editReason === "model-unsupported");
   }
 }

@@ -300,6 +300,10 @@ export default class LMStudioWritingAssistant extends Plugin {
         typeof data?.editFallbackSystemPromptPrefix === "string"
           ? data.editFallbackSystemPromptPrefix
           : DEFAULT_SETTINGS.editFallbackSystemPromptPrefix,
+      agenticMode:
+        typeof data?.agenticMode === "boolean"
+          ? data.agenticMode
+          : DEFAULT_SETTINGS.agenticMode,
       preferToolUse:
         typeof data?.preferToolUse === "boolean"
           ? data.preferToolUse

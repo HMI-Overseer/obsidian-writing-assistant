@@ -296,16 +296,21 @@ export class ChatView extends ItemView {
     });
 
     this.toolUsePopover = new ToolUsePopover(this.layout, {
-      getPreferToolUse: () => this.plugin.settings.preferToolUse,
+      getAgenticMode: () => this.plugin.settings.agenticMode,
+      getPreferEditTools: () => this.plugin.settings.preferToolUse,
       getActiveModel: () => this.sessionStore?.getResolvedConversationModel() ?? null,
       getTrainedForToolUse: (modelId) =>
         this.plugin.modelAvailability.getTrainedForToolUse(modelId),
-      onToggle: async (enabled) => {
-        this.plugin.settings.preferToolUse = enabled;
+      onAgenticToggle: async (enabled) => {
+        this.plugin.settings.agenticMode = enabled;
         await this.plugin.saveSettings();
         this.composer?.refreshToolUseIndicator(
           this.sessionStore?.getResolvedConversationModel() ?? null,
         );
+      },
+      onEditToolsToggle: async (enabled) => {
+        this.plugin.settings.preferToolUse = enabled;
+        await this.plugin.saveSettings();
       },
       onBeforeOpen: () => {
         if (this.knowledgePopover?.isOpen()) this.knowledgePopover.close();

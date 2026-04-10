@@ -3,12 +3,15 @@ import type { ChatRequest, ChatTurn, DocumentContext, RagContextBlock } from "..
 import { getActiveNoteText, getFullNoteContent } from "../../context/noteContext";
 import { shouldUseToolCall } from "../../tools/registry";
 import { ALL_EDIT_TOOLS, CORE_EDIT_TOOLS } from "../../tools/editing/definition";
+import { ALL_VAULT_TOOLS } from "../../tools/vault/definition";
+import type { CanonicalToolDefinition } from "../../tools/types";
 import type { ChatMode } from "../types";
 import type { App } from "obsidian";
 import type { ChatSessionStore } from "../conversation/ChatSessionStore";
 import type { RagService } from "../../rag";
 import type { ChatClient } from "../../api/chatClient";
 import { rewriteQueryForRetrieval } from "../../rag/queryRewriter";
+import type { EditProposal } from "../../editing/editTypes";
 
 export interface PrepareMessagesOptions {
   app: App;
@@ -19,12 +22,10 @@ export interface PrepareMessagesOptions {
   maxContextChars: number;
   mode: ChatMode;
   ragService?: RagService;
-  /** Active provider — needed to decide tool use in edit mode. */
+  /** Active provider — needed to decide tool use. */
   activeProvider?: ProviderOption;
   /** Per-model capabilities (LM Studio). */
   modelCapabilities?: { trainedForToolUse?: boolean };
-  /** Global preference for tool calling in edit mode. */
-  preferToolUse?: boolean;
   /** Chat client for internal LLM calls (query rewriting). */
   chatClient?: ChatClient;
   /** Completion model ID for internal LLM calls. */
@@ -45,15 +46,16 @@ export async function prepareApiMessages(
     ragService,
     activeProvider,
     modelCapabilities,
-    preferToolUse,
     chatClient,
     completionModelId,
   } = options;
 
   const editMode = mode === "edit";
-  const useToolUse = editMode && !!activeProvider
-    && shouldUseToolCall(activeProvider, modelCapabilities, preferToolUse);
-  const systemPrompt = composeSystemPrompt(mode, useToolUse, settings);
+  const modelCanUseTools = !!activeProvider && shouldUseToolCall(activeProvider, modelCapabilities);
+  const useVaultTools = settings.agenticMode && modelCanUseTools;
+  const useEditTools = editMode && settings.agenticMode && modelCanUseTools && settings.preferToolUse;
+
+  const systemPrompt = composeSystemPrompt(mode, useEditTools, settings);
 
   let documentContext: DocumentContext | null = null;
 
@@ -88,11 +90,12 @@ export async function prepareApiMessages(
   }));
 
   // Retrieve RAG context based on the latest user message.
-  // When a chat client is available, rewrite the query first to resolve
-  // pronouns and implicit references from conversation history.
+  // Skipped when vault tools are active — in agentic mode the model controls
+  // retrieval itself via search_vault. Pre-injecting context causes the model
+  // to answer from the warm-start content and never call the tool.
   let ragContext: RagContextBlock[] | null = null;
   let rewrittenQuery: string | undefined;
-  if (!editMode && ragService?.isReady()) {
+  if (!editMode && !useVaultTools && ragService?.isReady()) {
     const lastUserMessage = messages.findLast((m) => m.role === "user");
     if (lastUserMessage) {
       let retrievalQuery = lastUserMessage.content;
@@ -122,22 +125,28 @@ export async function prepareApiMessages(
   }
   const finalSystemPrompt = systemPrompt + groundingNote;
 
-  // Cloud providers get the full tool set; local models (LM Studio) get a
-  // reduced set to avoid overwhelming models with limited tool-calling capacity.
-  const tools = useToolUse
-    ? (activeProvider === "lmstudio" ? CORE_EDIT_TOOLS : ALL_EDIT_TOOLS)
-    : undefined;
+  // Build the tool list based on mode and agentic settings.
+  // Vault tools are included whenever agentic mode is on and the model supports tools.
+  // Edit tools are added on top in edit mode when preferToolUse is also on.
+  // Cloud providers get the full edit tool set; local models get a reduced set.
+  let tools: CanonicalToolDefinition[] | undefined;
+  if (useEditTools) {
+    const editTools = activeProvider === "lmstudio" ? CORE_EDIT_TOOLS : ALL_EDIT_TOOLS;
+    tools = [...ALL_VAULT_TOOLS, ...editTools];
+  } else if (useVaultTools) {
+    tools = [...ALL_VAULT_TOOLS];
+  }
 
   return { systemPrompt: finalSystemPrompt, documentContext, ragContext, rewrittenQuery, messages, tools };
 }
 
 /**
  * Combines a mode-specific prefix with the user's custom prompt.
- * `useToolUse` selects between the tool vs fallback edit prefix.
+ * `useEditTools` selects between the tool vs fallback edit prefix.
  */
 export function composeSystemPrompt(
   mode: ChatMode,
-  useToolUse: boolean,
+  useEditTools: boolean,
   settings: PluginSettings,
 ): string {
   let prefix: string;
@@ -149,7 +158,7 @@ export function composeSystemPrompt(
       prefix = settings.chatSystemPromptPrefix;
       break;
     case "edit":
-      prefix = useToolUse
+      prefix = useEditTools
         ? settings.editToolSystemPromptPrefix
         : settings.editFallbackSystemPromptPrefix;
       break;

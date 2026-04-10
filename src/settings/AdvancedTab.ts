@@ -12,19 +12,6 @@ export function renderAdvancedTab(container: HTMLElement, plugin: LMStudioWritin
   );
 
   new SettingItem(editing.bodyEl)
-    .setName("Use tool calling in edit mode")
-    .setDesc(
-      "When enabled, models that support tool calling use structured edits. " +
-      "When disabled, all models use SEARCH/REPLACE blocks instead."
-    )
-    .addToggle((toggle) =>
-      toggle.setValue(plugin.settings.preferToolUse).onChange(async (value) => {
-        plugin.settings.preferToolUse = value;
-        await plugin.saveSettings();
-      })
-    );
-
-  new SettingItem(editing.bodyEl)
     .setName("Diff context lines")
     .setDesc(
       "Number of lines shown above and below each diff hunk for context."

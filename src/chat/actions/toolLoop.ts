@@ -6,9 +6,17 @@ import type { ToolCall } from "../../tools/types";
 import type { UsageResult, StopReason } from "../../api/usageTypes";
 import { READ_ONLY_TOOL_NAMES } from "../../tools/editing/definition";
 import { executeReadOnlyTool } from "../../tools/editing/handlers";
+import { VAULT_TOOL_NAMES } from "../../tools/vault/definition";
+import { executeVaultTool } from "../../tools/vault/handlers";
+import type { VaultToolContext } from "../../tools/vault/handlers";
+
+export type { VaultToolContext };
 
 /** Maximum number of read-only tool rounds before forcing finalization. */
 export const MAX_TOOL_ROUNDS = 5;
+
+/** All tool names that are read-only (results returned to the model to continue reasoning). */
+const ALL_READ_ONLY_TOOL_NAMES = new Set([...READ_ONLY_TOOL_NAMES, ...VAULT_TOOL_NAMES]);
 
 /** Callbacks the tool loop uses to interact with the streaming UI. */
 export interface ToolLoopCallbacks {
@@ -34,8 +42,9 @@ export interface ToolLoopResult {
 
 /**
  * Runs the read-only tool loop: streams a response, executes any read-only
- * tool calls, feeds results back to the model, and repeats until the model
- * produces write tool calls or a plain text response.
+ * tool calls (edit inspection tools + vault search tools), feeds results back
+ * to the model, and repeats until the model produces write tool calls or a
+ * plain text response.
  *
  * This function is pure orchestration — it doesn't know about UI components,
  * conversation persistence, or edit-mode specifics.
@@ -49,6 +58,7 @@ export async function runToolLoop(
   app: App,
   filePath: string | undefined,
   callbacks: ToolLoopCallbacks,
+  vaultToolContext?: VaultToolContext,
 ): Promise<ToolLoopResult> {
   const toolLoopTurns: ChatTurn[] = [];
   let allWriteToolCalls: ToolCall[] = [];
@@ -86,13 +96,17 @@ export async function runToolLoop(
 
     if (!hasToolCalls || !toolCalls) break;
 
-    const readOnlyCalls = toolCalls.filter((tc) => READ_ONLY_TOOL_NAMES.has(tc.name));
-    const writeCalls = toolCalls.filter((tc) => !READ_ONLY_TOOL_NAMES.has(tc.name));
+    const readOnlyCalls = toolCalls.filter((tc) => ALL_READ_ONLY_TOOL_NAMES.has(tc.name));
+    const writeCalls = toolCalls.filter((tc) => !ALL_READ_ONLY_TOOL_NAMES.has(tc.name));
     allWriteToolCalls = [...allWriteToolCalls, ...writeCalls];
 
     // Only continue looping if ALL calls are read-only.
     if (readOnlyCalls.length > 0 && writeCalls.length === 0 && round < MAX_TOOL_ROUNDS) {
-      if (!filePath) break;
+      const editReadOnlyCalls = readOnlyCalls.filter((tc) => READ_ONLY_TOOL_NAMES.has(tc.name));
+      const vaultCalls = readOnlyCalls.filter((tc) => VAULT_TOOL_NAMES.has(tc.name));
+
+      // Edit read-only tools require a filePath. If there are edit calls but no path, stop.
+      if (editReadOnlyCalls.length > 0 && !filePath) break;
 
       const assistantTurn: ChatTurn = {
         role: "assistant",
@@ -105,13 +119,26 @@ export async function runToolLoop(
       };
       toolLoopTurns.push(assistantTurn);
 
-      // Execute read-only tools in parallel.
-      const results = await Promise.all(
-        readOnlyCalls.map(async (tc) => {
+      // Execute all read-only tools in parallel.
+      // filePath is guaranteed non-empty here: we broke above if editReadOnlyCalls
+      // were present but filePath was undefined.
+      const safeFilePath = filePath ?? "";
+      const results = await Promise.all([
+        ...editReadOnlyCalls.map(async (tc) => {
           callbacks.onToolStatus?.(tc.name);
-          return { tc, result: await executeReadOnlyTool(tc, { app, filePath }) };
+          return { tc, result: await executeReadOnlyTool(tc, { app, filePath: safeFilePath }) };
         }),
-      );
+        ...vaultCalls.map(async (tc) => {
+          callbacks.onToolStatus?.(tc.name);
+          if (!vaultToolContext) {
+            return {
+              tc,
+              result: { content: "Vault tool context unavailable.", isReadOnly: true, isError: true },
+            };
+          }
+          return { tc, result: await executeVaultTool(tc, vaultToolContext) };
+        }),
+      ]);
 
       for (const { tc, result } of results) {
         toolLoopTurns.push({

@@ -131,7 +131,7 @@ export async function prepareApiMessages(
   // Build the tool list based on mode and agentic settings.
   //
   // Vault tool tiers:
-  //   CORE_VAULT_TOOLS  — list_folder, read_note, semantic_search
+  //   CORE_VAULT_TOOLS  — list_directory, read_file, semantic_search
   //                       Used in edit mode (focused task) and for local models.
   //   ALL_VAULT_TOOLS   — core + get_backlinks, find_notes_by_tag, get_frontmatter
   //                       Used in chat/plan mode with cloud providers (full exploration).

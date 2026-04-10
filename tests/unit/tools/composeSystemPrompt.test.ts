@@ -1,5 +1,5 @@
 import { describe, test, expect } from "vitest";
-import { composeSystemPrompt } from "../../../src/chat/actions/prepareApiMessages";
+import { composeSystemPrompt } from "../../../src/chat/finalization/prepareApiMessages";
 import type { PluginSettings } from "../../../src/shared/types";
 
 function makeSettings(overrides: Partial<PluginSettings> = {}): PluginSettings {

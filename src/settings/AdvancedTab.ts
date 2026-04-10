@@ -1,5 +1,5 @@
 import type LMStudioWritingAssistant from "../main";
-import { EDIT_SYSTEM_PROMPT } from "../editing/editSystemPrompt";
+import { EDIT_SYSTEM_PROMPT } from "../editing/regexEditSystemPrompt";
 import { TOOL_EDIT_SYSTEM_PROMPT } from "../tools/editing/systemPrompt";
 import {
   DEFAULT_CHAT_SYSTEM_PROMPT_PREFIX,

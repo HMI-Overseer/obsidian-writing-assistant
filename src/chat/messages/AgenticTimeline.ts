@@ -1,27 +1,6 @@
 import { setIcon } from "obsidian";
 import type { AgenticStep } from "../../shared/types";
-
-const TOOL_ICONS: Record<string, string> = {
-  semantic_search: "search",
-  read_file: "file-text",
-  list_directory: "folder",
-  directory_tree: "folder-tree",
-  search_files: "file-search",
-  get_document_outline: "list",
-  get_line_range: "scan-line",
-  think: "brain",
-};
-
-const TOOL_LABELS: Record<string, string> = {
-  semantic_search: "Searched vault",
-  read_file: "Read note",
-  list_directory: "Listed folder",
-  directory_tree: "Explored tree",
-  search_files: "Searched files",
-  get_document_outline: "Read document outline",
-  get_line_range: "Inspected",
-  think: "Thought",
-};
+import { TOOL_ICONS, TOOL_LABELS } from "../../tools/metadata";
 
 /**
  * A live-updating timeline of agentic tool calls and reasoning steps.

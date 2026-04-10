@@ -3,8 +3,8 @@ import {
   PROPOSE_EDIT_TOOL,
   UPDATE_FRONTMATTER_TOOL,
   ALL_EDIT_TOOLS,
-  toolCallsToEditBlocks,
 } from "../../../src/tools/editing/definition";
+import { toolCallsToEditBlocks } from "../../../src/tools/editing/conversion";
 import type { ToolCall } from "../../../src/tools/types";
 
 describe("PROPOSE_EDIT_TOOL", () => {

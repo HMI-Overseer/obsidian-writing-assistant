@@ -1,12 +1,8 @@
 import type { BubbleRefs } from "../types";
 import type { ChatTranscript } from "../messages/ChatTranscript";
+import { TOOL_STATUS_LABELS } from "../../tools/metadata";
 
 const STREAMING_MARKDOWN_RENDER_DEBOUNCE_MS = 80;
-
-const TOOL_STATUS_LABELS: Record<string, string> = {
-  semantic_search: "Searching vault...",
-  read_note: "Reading note...",
-};
 
 export class StreamingRenderer {
   private fullResponse = "";

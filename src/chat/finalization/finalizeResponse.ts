@@ -6,7 +6,7 @@ import type { BubbleRefs } from "../types";
 import { makeMessage } from "../conversation/conversationUtils";
 import type { ChatSessionStore } from "../conversation/ChatSessionStore";
 import type { ChatTranscript } from "../messages/ChatTranscript";
-import type { StreamingRenderer } from "./StreamingRenderer";
+import type { StreamingRenderer } from "../streaming/StreamingRenderer";
 import { estimateCost } from "../../api/pricing";
 
 export function attachUsageToMessage(

@@ -1296,6 +1296,14 @@
     white-space: nowrap;
     max-width: 280px;
   }
+/* Pending state: dot pulses while tool arguments are streaming in. */
+.lmsa-agentic-timeline-step--pending .lmsa-agentic-timeline-dot {
+    animation: lmsa-timeline-dot-pulse 1.2s ease-in-out infinite;
+  }
+@keyframes lmsa-timeline-dot-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.35; }
+  }
 .lmsa-chat-window-message.is-editing .lmsa-chat-window-message-body {
     border-style: dashed;
     border-color: color-mix(in srgb, var(--lmsa-mode-accent) 50%, var(--background-modifier-border));

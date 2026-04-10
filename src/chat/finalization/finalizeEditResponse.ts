@@ -1,6 +1,6 @@
 import { type App, type Component, Notice } from "obsidian";
 import { parseEditBlocks } from "../../editing/parseEditBlocks";
-import { toolCallsToEditBlocks } from "../../tools/editing/definition";
+import { toolCallsToEditBlocks } from "../../tools/editing/conversion";
 import { resolveStructuralEditBlocks } from "../../tools/editing/handlers";
 import { resolveEdits, buildHunks } from "../../editing/diffEngine";
 import type { EditBlock, EditProposal, AppliedEditRecord } from "../../editing/editTypes";
@@ -10,7 +10,7 @@ import type { ChatSessionStore } from "../conversation/ChatSessionStore";
 import type { ChatTranscript } from "../messages/ChatTranscript";
 import { DiffReviewPanel } from "../messages/DiffReviewPanel";
 import type { BubbleRefs } from "../types";
-import type { EditStreamingRenderer } from "./EditStreamingRenderer";
+import type { EditStreamingRenderer } from "../streaming/EditStreamingRenderer";
 import type LMStudioWritingAssistant from "../../main";
 import type { AgenticStep, ProviderOption } from "../../shared/types";
 import type { ToolCall } from "../../tools/types";

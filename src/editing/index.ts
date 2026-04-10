@@ -16,4 +16,4 @@ export type { ResolveOptions } from "./diffEngine";
 export { applyHunksLive } from "./documentApplicator";
 export type { LiveApplyResult } from "./documentApplicator";
 
-export { EDIT_SYSTEM_PROMPT } from "./editSystemPrompt";
+export { EDIT_SYSTEM_PROMPT } from "./regexEditSystemPrompt";

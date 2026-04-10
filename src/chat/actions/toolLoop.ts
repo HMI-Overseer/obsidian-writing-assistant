@@ -7,6 +7,7 @@ import { VAULT_TOOL_NAMES } from "../../tools/vault/definition";
 import { executeVaultTool } from "../../tools/vault/handlers";
 import type { VaultToolContext } from "../../tools/vault/handlers";
 import { THINK_TOOL_NAME } from "../../tools/think/definition";
+import { extractToolInput } from "../../tools/metadata";
 
 export type { VaultToolContext };
 
@@ -213,17 +214,6 @@ export async function runToolLoop(
     writeToolCalls: allWriteToolCalls.length > 0 ? allWriteToolCalls : null,
     usage: finalUsage,
   };
-}
-
-function extractToolInput(tc: ToolCall): string | undefined {
-  const args = tc.arguments;
-  if (tc.name === "semantic_search") return typeof args.query === "string" ? args.query : undefined;
-  if (tc.name === "read_file") return typeof args.path === "string" ? args.path : undefined;
-  if (tc.name === "list_directory") return typeof args.path === "string" ? args.path : undefined;
-  if (tc.name === "directory_tree") return typeof args.path === "string" ? args.path : undefined;
-  if (tc.name === "search_files") return typeof args.pattern === "string" ? args.pattern : undefined;
-  if (tc.name === THINK_TOOL_NAME) return typeof args.thought === "string" ? args.thought : undefined;
-  return undefined;
 }
 
 function checkForFailedToolCall(

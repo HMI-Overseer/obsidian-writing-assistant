@@ -1,5 +1,5 @@
 import { describe, test, expect } from "vitest";
-import { buildSamplingParams } from "../../../../src/chat/actions/buildSamplingParams";
+import { buildSamplingParams } from "../../../../src/chat/finalization/buildSamplingParams";
 import type { PluginSettings } from "../../../../src/shared/types";
 
 /** Minimal settings stub with only the fields buildSamplingParams reads. */

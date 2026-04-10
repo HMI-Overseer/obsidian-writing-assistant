@@ -7,7 +7,7 @@ import { getTestSuites } from "./benchmark/testSuites";
 import { runBenchmarkTest, runAllBenchmarks } from "./benchmark/benchmarkRunner";
 import type { BenchmarkRunResult, BenchmarkTestCase, BenchmarkTestSuite, EvaluationCriteria, BenchmarkMessage } from "./benchmark/types";
 import { ProfileSettingsPopover } from "../chat/models/ProfileSettingsPopover";
-import { buildSamplingParams } from "../chat/actions/buildSamplingParams";
+import { buildSamplingParams } from "../chat/finalization/buildSamplingParams";
 
 export function renderBenchmarkTab(
   container: HTMLElement,

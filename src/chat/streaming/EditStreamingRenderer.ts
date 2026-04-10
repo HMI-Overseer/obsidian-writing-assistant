@@ -1,6 +1,7 @@
 import { findPartialBlock } from "../../editing/parseEditBlocks";
 import type { BubbleRefs } from "../types";
 import type { ChatTranscript } from "../messages/ChatTranscript";
+import { TOOL_STATUS_LABELS } from "../../tools/metadata";
 
 const STREAMING_RENDER_DEBOUNCE_MS = 100;
 
@@ -15,13 +16,6 @@ const STREAMING_RENDER_DEBOUNCE_MS = 100;
  * entirely — tool calls are accumulated separately by the client. Only
  * prose text and a static "Composing edits..." indicator are shown.
  */
-/** Human-readable labels for tool status display. */
-const TOOL_STATUS_LABELS: Record<string, string> = {
-  get_document_outline: "Reading document outline...",
-  get_line_range: "Inspecting lines...",
-  semantic_search: "Searching vault...",
-  read_note: "Reading note...",
-};
 
 export class EditStreamingRenderer {
   private fullResponse = "";

@@ -1,5 +1,5 @@
 import type { ChatHistory, KnowledgeGraphSettings, PluginSettings, RagSettings } from "./shared/types";
-import { EDIT_SYSTEM_PROMPT } from "./editing/editSystemPrompt";
+import { EDIT_SYSTEM_PROMPT } from "./editing/regexEditSystemPrompt";
 import { TOOL_EDIT_SYSTEM_PROMPT } from "./tools/editing/systemPrompt";
 
 export const VIEW_TYPE_CHAT = "lm-studio-chat";

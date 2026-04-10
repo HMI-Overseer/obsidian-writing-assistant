@@ -11,7 +11,7 @@ import { ChatConversationController } from "./ChatConversationController";
 import type { ContextInputs } from "./ContextCapacityUpdater";
 import { ContextCapacityUpdater } from "./ContextCapacityUpdater";
 import { sendMessage } from "./actions/sendMessage";
-import { renderDiffPanel } from "./actions/finalizeEditResponse";
+import { renderDiffPanel } from "./finalization/finalizeEditResponse";
 import { branchConversation } from "./actions/branchConversation";
 import { generateLlmResponse } from "./actions/generateLlmResponse";
 import { createChatClient } from "../providers/registry";

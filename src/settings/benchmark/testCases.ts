@@ -1,4 +1,4 @@
-import { EDIT_SYSTEM_PROMPT } from "../../editing/editSystemPrompt";
+import { EDIT_SYSTEM_PROMPT } from "../../editing/regexEditSystemPrompt";
 import {
   evaluateRejectedRework,
   evaluateNoRepropose,

@@ -1,6 +1,12 @@
 import type LMStudioWritingAssistant from "../main";
 import { EDIT_SYSTEM_PROMPT } from "../editing/editSystemPrompt";
 import { TOOL_EDIT_SYSTEM_PROMPT } from "../tools/editing/systemPrompt";
+import {
+  DEFAULT_CHAT_SYSTEM_PROMPT_PREFIX,
+  DEFAULT_MAX_TOOL_ROUNDS_CHAT,
+  DEFAULT_MAX_TOOL_ROUNDS_EDIT,
+  DEFAULT_PLAN_SYSTEM_PROMPT_PREFIX,
+} from "../constants";
 import { createSettingsSection, SettingItem } from "./ui";
 
 export function renderAdvancedTab(container: HTMLElement, plugin: LMStudioWritingAssistant): void {
@@ -21,6 +27,42 @@ export function renderAdvancedTab(container: HTMLElement, plugin: LMStudioWritin
         plugin.settings.agenticMode = value;
         await plugin.saveSettings();
       })
+    );
+
+  new SettingItem(agentic.bodyEl)
+    .setName("Max tool rounds — edit mode")
+    .setDesc(
+      `Maximum read-only tool rounds when editing a document (outline inspection before writing). Default: ${DEFAULT_MAX_TOOL_ROUNDS_EDIT}.`
+    )
+    .addText((text) =>
+      text
+        .setPlaceholder(String(DEFAULT_MAX_TOOL_ROUNDS_EDIT))
+        .setValue(String(plugin.settings.maxToolRoundsEdit))
+        .onChange(async (value) => {
+          const parsed = parseInt(value, 10);
+          if (!Number.isNaN(parsed) && parsed >= 1 && parsed <= 50) {
+            plugin.settings.maxToolRoundsEdit = parsed;
+            await plugin.saveSettings();
+          }
+        })
+    );
+
+  new SettingItem(agentic.bodyEl)
+    .setName("Max tool rounds — chat/plan mode")
+    .setDesc(
+      `Maximum read-only tool rounds when searching the vault in chat or plan mode. Default: ${DEFAULT_MAX_TOOL_ROUNDS_CHAT}.`
+    )
+    .addText((text) =>
+      text
+        .setPlaceholder(String(DEFAULT_MAX_TOOL_ROUNDS_CHAT))
+        .setValue(String(plugin.settings.maxToolRoundsChat))
+        .onChange(async (value) => {
+          const parsed = parseInt(value, 10);
+          if (!Number.isNaN(parsed) && parsed >= 1 && parsed <= 50) {
+            plugin.settings.maxToolRoundsChat = parsed;
+            await plugin.saveSettings();
+          }
+        })
     );
 
   const editing = createSettingsSection(
@@ -78,13 +120,13 @@ export function renderAdvancedTab(container: HTMLElement, plugin: LMStudioWritin
   renderPromptPrefixSetting(
     prompts.bodyEl, plugin, "Plan mode prefix",
     "Prepended before your custom prompt in plan mode.",
-    "planSystemPromptPrefix", ""
+    "planSystemPromptPrefix", DEFAULT_PLAN_SYSTEM_PROMPT_PREFIX
   );
 
   renderPromptPrefixSetting(
     prompts.bodyEl, plugin, "Chat mode prefix",
     "Prepended before your custom prompt in chat mode.",
-    "chatSystemPromptPrefix", ""
+    "chatSystemPromptPrefix", DEFAULT_CHAT_SYSTEM_PROMPT_PREFIX
   );
 
   renderPromptPrefixSetting(

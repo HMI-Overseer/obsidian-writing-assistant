@@ -165,6 +165,10 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
     const editRenderer = renderer instanceof EditStreamingRenderer ? renderer : null;
     const chatRenderer = renderer instanceof StreamingRenderer ? renderer : null;
 
+    const maxRounds = apiMessages.documentContext?.filePath
+      ? plugin.settings.maxToolRoundsEdit
+      : plugin.settings.maxToolRoundsChat;
+
     const { writeToolCalls, usage: finalUsage } = await runToolLoop(
       client,
       apiMessages,
@@ -205,6 +209,7 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
             }
           : undefined,
       },
+      maxRounds,
       vaultToolContext,
     );
 

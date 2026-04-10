@@ -12,9 +12,6 @@ import type { VaultToolContext } from "../../tools/vault/handlers";
 
 export type { VaultToolContext };
 
-/** Maximum number of read-only tool rounds before forcing finalization. */
-export const MAX_TOOL_ROUNDS = 5;
-
 /** All tool names that are read-only (results returned to the model to continue reasoning). */
 const ALL_READ_ONLY_TOOL_NAMES = new Set([...READ_ONLY_TOOL_NAMES, ...VAULT_TOOL_NAMES]);
 
@@ -56,6 +53,11 @@ export interface ToolLoopResult {
  * to the model, and repeats until the model produces write tool calls or a
  * plain text response.
  *
+ * When maxRounds is reached the loop pushes terminal error tool results so the
+ * conversation history stays valid, then allows one synthesis pass for the
+ * model to summarise what it gathered. If the model calls tools again after
+ * that warning it is hard-stopped.
+ *
  * This function is pure orchestration — it doesn't know about UI components,
  * conversation persistence, or edit-mode specifics.
  */
@@ -68,6 +70,7 @@ export async function runToolLoop(
   app: App,
   filePath: string | undefined,
   callbacks: ToolLoopCallbacks,
+  maxRounds: number,
   vaultToolContext?: VaultToolContext,
 ): Promise<ToolLoopResult> {
   const toolLoopTurns: ChatTurn[] = [];
@@ -75,8 +78,10 @@ export async function runToolLoop(
   let previousRoundsText = "";
   let finalUsage: UsageResult | null = null;
   let calibrated = false;
+  // Set to true once a cap-hit synthesis pass has been injected.
+  let capHit = false;
 
-  for (let round = 0; round <= MAX_TOOL_ROUNDS; round++) {
+  for (let round = 0; ; round++) {
     const requestMessages = [...baseRequest.messages, ...toolLoopTurns];
     const roundRequest = { ...baseRequest, messages: requestMessages };
 
@@ -114,74 +119,95 @@ export async function runToolLoop(
     const writeCalls = toolCalls.filter((tc) => !ALL_READ_ONLY_TOOL_NAMES.has(tc.name));
     allWriteToolCalls = [...allWriteToolCalls, ...writeCalls];
 
-    // Only continue looping if ALL calls are read-only.
-    if (readOnlyCalls.length > 0 && writeCalls.length === 0 && round < MAX_TOOL_ROUNDS) {
-      const editReadOnlyCalls = readOnlyCalls.filter((tc) => READ_ONLY_TOOL_NAMES.has(tc.name));
-      const vaultCalls = readOnlyCalls.filter((tc) => VAULT_TOOL_NAMES.has(tc.name));
+    // Write tool calls (or a mix of read + write) — hand off to the edit pipeline.
+    if (writeCalls.length > 0) {
+      callbacks.onReasoningRoundFinished?.(true, round);
+      break;
+    }
 
-      // Edit read-only tools require a filePath. If there are edit calls but no path, stop.
-      if (editReadOnlyCalls.length > 0 && !filePath) {
+    // Edit read-only tools require a filePath. If present but no path, stop.
+    const editReadOnlyCalls = readOnlyCalls.filter((tc) => READ_ONLY_TOOL_NAMES.has(tc.name));
+    if (editReadOnlyCalls.length > 0 && !filePath) {
+      callbacks.onReasoningRoundFinished?.(false, round);
+      break;
+    }
+
+    // Cap reached: push terminal error results to keep history valid, then let
+    // the model produce one synthesis response. If it calls tools again after
+    // the warning, hard-stop.
+    if (capHit || round >= maxRounds) {
+      if (capHit) {
+        // Model ignored the cap warning and called tools again — hard stop.
         callbacks.onReasoningRoundFinished?.(false, round);
         break;
       }
-
-      // Commit the live reasoning entry — the model was thinking before these tool calls.
-      callbacks.onReasoningRoundFinished?.(true, round);
-
-      const assistantTurn: ChatTurn = {
+      capHit = true;
+      toolLoopTurns.push({
         role: "assistant",
         content: roundText || null,
-        toolCalls: readOnlyCalls.map((tc) => ({
-          id: tc.id,
-          name: tc.name,
-          arguments: tc.arguments,
-        })),
-      };
-      toolLoopTurns.push(assistantTurn);
-
-      // Execute all read-only tools in parallel.
-      // filePath is guaranteed non-empty here: we broke above if editReadOnlyCalls
-      // were present but filePath was undefined.
-      const safeFilePath = filePath ?? "";
-      const results = await Promise.all([
-        ...editReadOnlyCalls.map(async (tc) => {
-          callbacks.onToolStatus?.(tc.name);
-          return { tc, result: await executeReadOnlyTool(tc, { app, filePath: safeFilePath }) };
-        }),
-        ...vaultCalls.map(async (tc) => {
-          callbacks.onToolStatus?.(tc.name);
-          if (!vaultToolContext) {
-            return {
-              tc,
-              result: { content: "Vault tool context unavailable.", isReadOnly: true, isError: true },
-            };
-          }
-          return { tc, result: await executeVaultTool(tc, vaultToolContext) };
-        }),
-      ]);
-
-      for (const { tc, result } of results) {
+        toolCalls: readOnlyCalls.map((tc) => ({ id: tc.id, name: tc.name, arguments: tc.arguments })),
+      });
+      for (const tc of readOnlyCalls) {
         toolLoopTurns.push({
           role: "tool",
-          content: result.content,
+          content: "Retrieval limit reached. Synthesize an answer from the information gathered so far.",
           toolCallId: tc.id,
         });
-        callbacks.onStepRecorded?.({
-          type: "tool_call",
-          round,
-          toolName: tc.name,
-          toolInput: extractToolInput(tc),
-        });
       }
-
+      callbacks.onReasoningRoundFinished?.(true, round);
       previousRoundsText = totalText;
       callbacks.onNewRound?.();
       continue;
     }
 
-    // Has write tool calls (or mixed) — commit any reasoning before the writes and finalize.
+    // Normal tool execution round.
     callbacks.onReasoningRoundFinished?.(true, round);
-    break;
+
+    const vaultCalls = readOnlyCalls.filter((tc) => VAULT_TOOL_NAMES.has(tc.name));
+    const safeFilePath = filePath ?? "";
+
+    toolLoopTurns.push({
+      role: "assistant",
+      content: roundText || null,
+      toolCalls: readOnlyCalls.map((tc) => ({ id: tc.id, name: tc.name, arguments: tc.arguments })),
+    });
+
+    // Execute all read-only tools in parallel.
+    // filePath is guaranteed non-empty here: we broke above if editReadOnlyCalls
+    // were present but filePath was undefined.
+    const results = await Promise.all([
+      ...editReadOnlyCalls.map(async (tc) => {
+        callbacks.onToolStatus?.(tc.name);
+        return { tc, result: await executeReadOnlyTool(tc, { app, filePath: safeFilePath }) };
+      }),
+      ...vaultCalls.map(async (tc) => {
+        callbacks.onToolStatus?.(tc.name);
+        if (!vaultToolContext) {
+          return {
+            tc,
+            result: { content: "Vault tool context unavailable.", isReadOnly: true, isError: true },
+          };
+        }
+        return { tc, result: await executeVaultTool(tc, vaultToolContext) };
+      }),
+    ]);
+
+    for (const { tc, result } of results) {
+      toolLoopTurns.push({
+        role: "tool",
+        content: result.content,
+        toolCallId: tc.id,
+      });
+      callbacks.onStepRecorded?.({
+        type: "tool_call",
+        round,
+        toolName: tc.name,
+        toolInput: extractToolInput(tc),
+      });
+    }
+
+    previousRoundsText = totalText;
+    callbacks.onNewRound?.();
   }
 
   return {

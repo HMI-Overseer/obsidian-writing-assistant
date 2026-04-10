@@ -40,6 +40,15 @@ export const DEFAULT_KNOWLEDGE_GRAPH_SETTINGS: KnowledgeGraphSettings = {
   excludePatterns: ["templates/**"],
 };
 
+export const DEFAULT_CHAT_SYSTEM_PROMPT_PREFIX =
+  "When asked to research, explore, or find information, search exhaustively before answering. " +
+  "Use multiple rounds of tool calls if needed, and synthesize only after you have gathered enough context.";
+
+export const DEFAULT_PLAN_SYSTEM_PROMPT_PREFIX = DEFAULT_CHAT_SYSTEM_PROMPT_PREFIX;
+
+export const DEFAULT_MAX_TOOL_ROUNDS_EDIT = 5;
+export const DEFAULT_MAX_TOOL_ROUNDS_CHAT = 20;
+
 export const DEFAULT_SETTINGS: PluginSettings = {
   lmStudioUrl: "http://localhost:1234/v1",
   bypassCors: true,
@@ -66,10 +75,12 @@ export const DEFAULT_SETTINGS: PluginSettings = {
   diffMinMatchConfidence: 0.7,
   rag: { ...DEFAULT_RAG_SETTINGS },
   knowledgeGraph: { ...DEFAULT_KNOWLEDGE_GRAPH_SETTINGS },
-  planSystemPromptPrefix: "",
-  chatSystemPromptPrefix: "",
+  planSystemPromptPrefix: DEFAULT_PLAN_SYSTEM_PROMPT_PREFIX,
+  chatSystemPromptPrefix: DEFAULT_CHAT_SYSTEM_PROMPT_PREFIX,
   editToolSystemPromptPrefix: TOOL_EDIT_SYSTEM_PROMPT,
   editFallbackSystemPromptPrefix: EDIT_SYSTEM_PROMPT,
   agenticMode: false,
   preferToolUse: false,
+  maxToolRoundsEdit: DEFAULT_MAX_TOOL_ROUNDS_EDIT,
+  maxToolRoundsChat: DEFAULT_MAX_TOOL_ROUNDS_CHAT,
 };

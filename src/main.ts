@@ -308,6 +308,14 @@ export default class LMStudioWritingAssistant extends Plugin {
         typeof data?.preferToolUse === "boolean"
           ? data.preferToolUse
           : DEFAULT_SETTINGS.preferToolUse,
+      maxToolRoundsEdit:
+        typeof data?.maxToolRoundsEdit === "number"
+          ? data.maxToolRoundsEdit
+          : DEFAULT_SETTINGS.maxToolRoundsEdit,
+      maxToolRoundsChat:
+        typeof data?.maxToolRoundsChat === "number"
+          ? data.maxToolRoundsChat
+          : DEFAULT_SETTINGS.maxToolRoundsChat,
     };
   }
 

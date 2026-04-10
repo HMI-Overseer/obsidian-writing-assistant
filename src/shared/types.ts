@@ -279,4 +279,8 @@ export interface PluginSettings {
   agenticMode: boolean;
   /** Use structured edit tools in edit mode when agentic mode is on and model supports them. */
   preferToolUse: boolean;
+  /** Maximum read-only tool rounds in edit mode (outline inspect → write). */
+  maxToolRoundsEdit: number;
+  /** Maximum read-only tool rounds in chat/plan mode (multi-hop vault retrieval). */
+  maxToolRoundsChat: number;
 }

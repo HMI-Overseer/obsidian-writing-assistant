@@ -3,8 +3,8 @@ import type { ChatRequest, ChatTurn, DocumentContext, RagContextBlock } from "..
 import { getActiveNoteText, getFullNoteContent } from "../../context/noteContext";
 import { shouldUseToolCall } from "../../tools/registry";
 import { ALL_EDIT_TOOLS, CORE_EDIT_TOOLS } from "../../tools/editing/definition";
-import { ALL_VAULT_TOOLS } from "../../tools/vault/definition";
-import { VAULT_TOOL_SYSTEM_PROMPT } from "../../tools/vault/systemPrompt";
+import { ALL_VAULT_TOOLS, CORE_VAULT_TOOLS } from "../../tools/vault/definition";
+import { buildVaultToolSystemPrompt } from "../../tools/vault/systemPrompt";
 import type { CanonicalToolDefinition } from "../../tools/types";
 import type { ChatMode } from "../types";
 import type { App } from "obsidian";
@@ -92,13 +92,13 @@ export async function prepareApiMessages(
 
   // Retrieve RAG context based on the latest user message.
   // Skipped when vault tools are active — in agentic mode the model controls
-  // retrieval itself via search_vault. Pre-injecting context causes the model
+  // retrieval itself via semantic_search. Pre-injecting context causes the model
   // to answer from the warm-start content and never call the tool.
   let ragContext: RagContextBlock[] | null = null;
   let rewrittenQuery: string | undefined;
   if (!editMode && !useVaultTools && ragService?.isReady()) {
-    const lastUserMessage = messages.findLast((m) => m.role === "user");
-    if (lastUserMessage) {
+    const lastUserMessage = [...messages].reverse().find((m: ChatTurn) => m.role === "user");
+    if (lastUserMessage?.content) {
       let retrievalQuery = lastUserMessage.content;
       if (chatClient && completionModelId) {
         retrievalQuery = await rewriteQueryForRetrieval(
@@ -124,20 +124,38 @@ export async function prepareApiMessages(
       ? "\n\nWhen retrieved notes are provided, use them as reference material. Documents may include <graph_context> annotations showing entities and relationships from the vault's knowledge graph — use these to understand how topics connect across documents."
       : "\n\nWhen retrieved notes are provided, use them as reference material. If the retrieved notes don't contain relevant information for the question, rely on your general knowledge instead.";
   }
-  const vaultGuidance = useVaultTools ? "\n\n" + VAULT_TOOL_SYSTEM_PROMPT : "";
-  const finalSystemPrompt = systemPrompt + groundingNote + vaultGuidance;
-
   // Build the tool list based on mode and agentic settings.
-  // Vault tools are included whenever agentic mode is on and the model supports tools.
+  //
+  // Vault tool tiers:
+  //   CORE_VAULT_TOOLS  — list_folder, read_note, semantic_search
+  //                       Used in edit mode (focused task) and for local models.
+  //   ALL_VAULT_TOOLS   — core + get_backlinks, find_notes_by_tag, get_frontmatter
+  //                       Used in chat/plan mode with cloud providers (full exploration).
+  //
   // Edit tools are added on top in edit mode when preferToolUse is also on.
   // Cloud providers get the full edit tool set; local models get a reduced set.
   let tools: CanonicalToolDefinition[] | undefined;
   if (useEditTools) {
+    // Edit mode: focused document task — core vault tools for context lookup only.
     const editTools = activeProvider === "lmstudio" ? CORE_EDIT_TOOLS : ALL_EDIT_TOOLS;
-    tools = [...ALL_VAULT_TOOLS, ...editTools];
+    tools = [...CORE_VAULT_TOOLS, ...editTools];
   } else if (useVaultTools) {
-    tools = [...ALL_VAULT_TOOLS];
+    // Chat / Plan mode: full exploration suite for cloud, core for local models.
+    tools = activeProvider === "lmstudio" ? CORE_VAULT_TOOLS : ALL_VAULT_TOOLS;
   }
+
+  // semantic_search requires a built RAG index. Remove it when unavailable so
+  // the model is forced to use structural tools instead of burning rounds on
+  // guaranteed failures.
+  if (tools && !ragService?.isReady()) {
+    tools = tools.filter((t) => t.name !== "semantic_search");
+  }
+
+  // Build vault guidance after filtering so the system prompt accurately reflects
+  // which tools are available — in particular, whether semantic_search is present.
+  const hasSemanticSearch = tools?.some((t) => t.name === "semantic_search") ?? false;
+  const vaultGuidance = useVaultTools ? "\n\n" + buildVaultToolSystemPrompt(hasSemanticSearch) : "";
+  const finalSystemPrompt = systemPrompt + groundingNote + vaultGuidance;
 
   return { systemPrompt: finalSystemPrompt, documentContext, ragContext, rewrittenQuery, messages, tools };
 }

@@ -2,14 +2,14 @@ import { setIcon } from "obsidian";
 import type { AgenticStep } from "../../shared/types";
 
 const TOOL_ICONS: Record<string, string> = {
-  search_vault: "search",
+  semantic_search: "search",
   read_note: "file-text",
   get_document_outline: "list",
   get_line_range: "scan-line",
 };
 
 const TOOL_LABELS: Record<string, string> = {
-  search_vault: "Searched vault",
+  semantic_search: "Searched vault",
   read_note: "Read note",
   get_document_outline: "Read document outline",
   get_line_range: "Inspected",

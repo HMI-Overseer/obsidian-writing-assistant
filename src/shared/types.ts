@@ -85,7 +85,7 @@ export interface MessageVersion {
 export interface AgenticStep {
   type: "tool_call" | "reasoning";
   round: number;
-  /** For tool_call: the tool name identifier (e.g. "search_vault"). */
+  /** For tool_call: the tool name identifier (e.g. "semantic_search"). */
   toolName?: string;
   /** For tool_call: a human-readable display string of the key argument (e.g. the search query or file path). */
   toolInput?: string;

@@ -19,7 +19,7 @@ const STREAMING_RENDER_DEBOUNCE_MS = 100;
 const TOOL_STATUS_LABELS: Record<string, string> = {
   get_document_outline: "Reading document outline...",
   get_line_range: "Inspecting lines...",
-  search_vault: "Searching vault...",
+  semantic_search: "Searching vault...",
   read_note: "Reading note...",
 };
 

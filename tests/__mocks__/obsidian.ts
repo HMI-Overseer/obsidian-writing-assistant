@@ -47,10 +47,25 @@ export function setIcon() {}
 export function requestUrl() {
   return Promise.resolve({ json: {}, text: "", status: 200 });
 }
+export function normalizePath(path: string): string {
+  return path.replace(/\\/g, "/").replace(/\/+/g, "/").replace(/(^\/|\/$)/g, "");
+}
+
+export class TFile {
+  name = "";
+  path = "";
+  extension = "md";
+}
+
+export class TFolder {
+  name = "";
+  path = "";
+  children: (TFile | TFolder)[] = [];
+}
 
 // Type-only exports referenced via `import type` don't need runtime
 // values, but re-exporting empty interfaces keeps TypeScript happy
 // if someone accidentally uses a value import.
 export type App = Record<string, unknown>;
 export type WorkspaceLeaf = Record<string, unknown>;
-export type TFile = Record<string, unknown>;
+export type MetadataCache = Record<string, unknown>;

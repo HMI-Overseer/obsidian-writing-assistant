@@ -4,7 +4,7 @@ import type { ChatTranscript } from "../messages/ChatTranscript";
 const STREAMING_MARKDOWN_RENDER_DEBOUNCE_MS = 80;
 
 const TOOL_STATUS_LABELS: Record<string, string> = {
-  search_vault: "Searching vault...",
+  semantic_search: "Searching vault...",
   read_note: "Reading note...",
 };
 

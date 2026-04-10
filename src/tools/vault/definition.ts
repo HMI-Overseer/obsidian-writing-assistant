@@ -1,7 +1,7 @@
 import type { CanonicalToolDefinition } from "../types";
 
 export const SEARCH_VAULT_TOOL: CanonicalToolDefinition = {
-  name: "search_vault",
+  name: "semantic_search",
   description:
     "Search the vault index for notes relevant to a query. Returns the most relevant chunks " +
     "with their source file, heading path, similarity score, and content. " +
@@ -47,11 +47,117 @@ export const READ_NOTE_TOOL: CanonicalToolDefinition = {
   },
 };
 
-/** All vault tools available in agentic mode. */
-export const ALL_VAULT_TOOLS: CanonicalToolDefinition[] = [
-  SEARCH_VAULT_TOOL,
+export const LIST_FOLDER_TOOL: CanonicalToolDefinition = {
+  name: "list_folder",
+  description:
+    "List all notes and subfolders within a vault folder. " +
+    "Use this to discover what notes exist before reading or searching them. " +
+    "Start here when asked to explore or survey the vault — it gives you a map before you dive in. " +
+    "Omit path to list the vault root.",
+  parameters: {
+    type: "object",
+    properties: {
+      path: {
+        type: "string",
+        description:
+          "Vault-relative folder path (e.g., 'Characters' or 'Scenes/Act 1'). " +
+          "Omit to list the vault root.",
+      },
+    },
+    required: [],
+  },
+};
+
+export const GET_BACKLINKS_TOOL: CanonicalToolDefinition = {
+  name: "get_backlinks",
+  description:
+    "Find all notes that link to a given note via wikilinks or markdown links. " +
+    "Use this to answer 'which scenes feature this character?' or 'what references this concept?'. " +
+    "More reliable than semantic search for explicit wikilink connections — " +
+    "a scene may link [[Character Name]] without ever spelling out the name in prose.",
+  parameters: {
+    type: "object",
+    properties: {
+      path: {
+        type: "string",
+        description: "Vault-relative path of the target note (e.g., 'Characters/Will.md').",
+      },
+    },
+    required: ["path"],
+  },
+};
+
+export const FIND_NOTES_BY_TAG_TOOL: CanonicalToolDefinition = {
+  name: "find_notes_by_tag",
+  description:
+    "Return all notes that carry a specific tag (frontmatter or inline). " +
+    "Use this to enumerate notes by type or category " +
+    "(e.g., '#character', '#location', '#antagonist'). " +
+    "Call list_folder first if you are not sure which tags exist.",
+  parameters: {
+    type: "object",
+    properties: {
+      tag: {
+        type: "string",
+        description:
+          "Tag to search for, with or without # prefix (e.g., 'character' or '#character').",
+      },
+    },
+    required: ["tag"],
+  },
+};
+
+export const GET_FRONTMATTER_TOOL: CanonicalToolDefinition = {
+  name: "get_frontmatter",
+  description:
+    "Read the structured YAML metadata (frontmatter) from one or more notes without loading " +
+    "their full prose content. Use this to compare attributes across several notes efficiently " +
+    "(e.g., species, affiliation, status across all characters). " +
+    "Accepts multiple paths in one call to avoid multiple round trips.",
+  parameters: {
+    type: "object",
+    properties: {
+      paths: {
+        type: "array",
+        description: "One or more vault-relative note paths.",
+        items: { type: "string" },
+      },
+    },
+    required: ["paths"],
+  },
+};
+
+/**
+ * Core vault tools — suitable for all modes and local models.
+ * Covers the three fundamental operations: meaning-based search, direct note
+ * reading, and structural discovery.
+ */
+export const CORE_VAULT_TOOLS: CanonicalToolDefinition[] = [
+  LIST_FOLDER_TOOL,
   READ_NOTE_TOOL,
+  SEARCH_VAULT_TOOL,
 ];
 
-/** Names of vault tools — all are read-only (results returned to the model). */
-export const VAULT_TOOL_NAMES = new Set(["search_vault", "read_note"]);
+/**
+ * Full vault tool suite — for chat and plan modes with cloud providers.
+ * Adds Obsidian-native tools (backlinks, tags, frontmatter) on top of the
+ * core set for richer exploration.
+ */
+export const ALL_VAULT_TOOLS: CanonicalToolDefinition[] = [
+  LIST_FOLDER_TOOL,
+  FIND_NOTES_BY_TAG_TOOL,
+  GET_BACKLINKS_TOOL,
+  GET_FRONTMATTER_TOOL,
+  READ_NOTE_TOOL,
+  SEARCH_VAULT_TOOL,
+];
+
+/** Names of all vault tools — all are read-only (results returned to the model). */
+export const VAULT_TOOL_NAMES = new Set([
+  "semantic_search",
+  "read_note",
+  "list_folder",
+  "get_backlinks",
+  "find_notes_by_tag",
+  "get_frontmatter",
+]);

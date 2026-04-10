@@ -218,7 +218,7 @@ export async function runToolLoop(
 
 function extractToolInput(tc: ToolCall): string | undefined {
   const args = tc.arguments;
-  if (tc.name === "search_vault") return typeof args.query === "string" ? args.query : undefined;
+  if (tc.name === "semantic_search") return typeof args.query === "string" ? args.query : undefined;
   if (tc.name === "read_note") return typeof args.path === "string" ? args.path : undefined;
   if (tc.name === "get_line_range") {
     const start = args.start_line;

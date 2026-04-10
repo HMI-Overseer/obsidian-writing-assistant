@@ -121,4 +121,14 @@
     white-space: nowrap;
     max-width: 280px;
   }
+
+  /* Pending state: dot pulses while tool arguments are streaming in. */
+  .lmsa-agentic-timeline-step--pending .lmsa-agentic-timeline-dot {
+    animation: lmsa-timeline-dot-pulse 1.2s ease-in-out infinite;
+  }
+
+  @keyframes lmsa-timeline-dot-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.35; }
+  }
 }

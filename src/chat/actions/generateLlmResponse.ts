@@ -189,6 +189,7 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
           if (editRenderer) editRenderer.beginNewRound();
           else chatRenderer?.beginNewRound();
         },
+        onToolCallStreaming: timeline ? (name) => timeline.addPendingToolCall(name) : undefined,
         onStepRecorded: timeline ? (step) => timeline.addStep(step) : undefined,
         onReasoningDelta: timeline ? (delta) => timeline.addReasoningDelta(delta) : undefined,
         onReasoningRoundFinished: timeline

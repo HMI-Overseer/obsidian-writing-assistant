@@ -24,6 +24,8 @@ export interface ToolLoopCallbacks {
   getFullResponse: () => string;
   /** Called when a read-only tool is about to execute. */
   onToolStatus?: (toolName: string) => void;
+  /** Called as soon as a read-only tool call is identified by name during streaming, before execution. */
+  onToolCallStreaming?: (toolName: string) => void;
   /** Called to reset the renderer between tool-loop rounds. */
   onNewRound?: () => void;
   /** Called after each read-only tool call completes, with a record of what was done. */
@@ -84,7 +86,13 @@ export async function runToolLoop(
     const requestMessages = [...baseRequest.messages, ...toolLoopTurns];
     const roundRequest = { ...baseRequest, messages: requestMessages };
 
-    const streamResult = client.stream(roundRequest, model, params, signal);
+    const { onToolCallStreaming } = callbacks;
+    const streamResult = client.stream(
+      roundRequest, model, params, signal,
+      onToolCallStreaming
+        ? (_idx, name) => { if (ALL_READ_ONLY_TOOL_NAMES.has(name)) onToolCallStreaming(name); }
+        : undefined,
+    );
 
     for await (const delta of streamResult.deltas) {
       callbacks.onDelta(delta);

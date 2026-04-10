@@ -40,6 +40,9 @@ export class AgenticTimeline {
   private liveReasoningEl: HTMLElement | null = null;
   private liveReasoningNameEl: HTMLElement | null = null;
 
+  // Pending tool call elements waiting to be claimed by addStep (FIFO per tool name).
+  private readonly pendingToolCallEls = new Map<string, Array<{ stepEl: HTMLElement; detailEl: HTMLElement }>>();
+
   constructor(private readonly containerEl: HTMLElement) {
     const detailsEl = containerEl.createEl("details", {
       cls: "lmsa-agentic-timeline",
@@ -59,8 +62,51 @@ export class AgenticTimeline {
     this.listEl = detailsEl.createDiv({ cls: "lmsa-agentic-timeline-list" });
   }
 
+  /**
+   * Show a pending placeholder for a tool call that has been identified during
+   * streaming but hasn't executed yet. Claimed and finalized by `addStep()`.
+   */
+  addPendingToolCall(toolName: string): void {
+    const stepEl = this.listEl.createDiv({
+      cls: `lmsa-agentic-timeline-step lmsa-agentic-timeline-step--tool_call lmsa-agentic-timeline-step--pending`,
+    });
+    const dotEl = stepEl.createDiv({ cls: "lmsa-agentic-timeline-dot" });
+    setIcon(dotEl, TOOL_ICONS[toolName] ?? "wrench");
+    const bodyEl = stepEl.createDiv({ cls: "lmsa-agentic-timeline-step-body" });
+    bodyEl.createSpan({
+      cls: "lmsa-agentic-timeline-step-name",
+      text: TOOL_LABELS[toolName] ?? toolName,
+    });
+    const detailEl = bodyEl.createSpan({ cls: "lmsa-agentic-timeline-step-detail", text: "…" });
+
+    const queue = this.pendingToolCallEls.get(toolName) ?? [];
+    queue.push({ stepEl, detailEl });
+    this.pendingToolCallEls.set(toolName, queue);
+  }
+
   addStep(step: AgenticStep): void {
     this.steps.push(step);
+
+    // If a pending placeholder exists for this tool call, claim it instead of
+    // creating a new element (FIFO: first pending matches first completed).
+    if (step.type === "tool_call" && step.toolName) {
+      const queue = this.pendingToolCallEls.get(step.toolName);
+      if (queue && queue.length > 0) {
+        const pending = queue.shift();
+        if (!pending) { this.renderStep(step); this.updateSummary(); return; }
+        const { stepEl, detailEl } = pending;
+        if (queue.length === 0) this.pendingToolCallEls.delete(step.toolName);
+        stepEl.classList.remove("lmsa-agentic-timeline-step--pending");
+        if (step.toolInput) {
+          detailEl.textContent = step.toolInput;
+        } else {
+          detailEl.remove();
+        }
+        this.updateSummary();
+        return;
+      }
+    }
+
     this.renderStep(step);
     this.updateSummary();
   }

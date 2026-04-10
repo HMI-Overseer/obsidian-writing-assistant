@@ -146,7 +146,8 @@ export class LMStudioClient implements ChatClient {
     request: ChatRequest,
     model: string,
     params: SamplingParams,
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    onToolCallStreaming?: (index: number, name: string) => void,
   ): StreamResult {
     const messages = this.buildMessages(request);
     const openAITools = request.tools?.length
@@ -181,11 +182,9 @@ export class LMStudioClient implements ChatClient {
           const idx = tc.index as number;
           if (tc.id) {
             const fn = tc.function as Record<string, unknown> | undefined;
-            pendingToolCalls.set(idx, {
-              id: tc.id as string,
-              name: (fn?.name as string) ?? "",
-              argChunks: [],
-            });
+            const name = (fn?.name as string) ?? "";
+            pendingToolCalls.set(idx, { id: tc.id as string, name, argChunks: [] });
+            onToolCallStreaming?.(idx, name);
           }
           const fn = tc.function as Record<string, unknown> | undefined;
           if (fn?.arguments && typeof fn.arguments === "string") {

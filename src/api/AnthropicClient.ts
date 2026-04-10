@@ -116,7 +116,8 @@ export class AnthropicClient implements ChatClient {
     request: ChatRequest,
     model: string,
     params: SamplingParams,
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    onToolCallStreaming?: (index: number, name: string) => void,
   ): StreamResult {
     const cacheSettings = request.anthropicCacheSettings;
     const { system, messages } = buildAnthropicMessages(request, cacheSettings);
@@ -172,11 +173,10 @@ export class AnthropicClient implements ChatClient {
       } else if (record.type === "content_block_start") {
         const block = record.content_block as Record<string, unknown> | undefined;
         if (block?.type === "tool_use") {
-          pendingToolCalls.set(record.index as number, {
-            id: block.id as string,
-            name: block.name as string,
-            jsonChunks: [],
-          });
+          const idx = record.index as number;
+          const name = block.name as string;
+          pendingToolCalls.set(idx, { id: block.id as string, name, jsonChunks: [] });
+          onToolCallStreaming?.(idx, name);
         }
       } else if (record.type === "content_block_delta") {
         const delta = record.delta as Record<string, unknown> | undefined;

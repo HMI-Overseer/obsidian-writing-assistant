@@ -67,12 +67,12 @@ export class DiffHunkView {
     this.actionsEl.empty();
 
     this.statusEl.empty();
-    this.statusEl.addClass("lmsa-diff-hunk-badge");
+    this.statusEl.addClass("lmsa-chat-window-diff-hunk-badge");
     if (wasApplied) {
-      this.statusEl.addClass("lmsa-diff-hunk-badge--applied");
+      this.statusEl.addClass("lmsa-chat-window-diff-hunk-badge--applied");
       this.statusEl.setText("Applied");
     } else {
-      this.statusEl.addClass("lmsa-diff-hunk-badge--skipped");
+      this.statusEl.addClass("lmsa-chat-window-diff-hunk-badge--skipped");
       this.statusEl.setText("Skipped");
     }
   }
@@ -83,14 +83,14 @@ export class DiffHunkView {
     this.actionsEl.empty();
 
     this.statusEl.empty();
-    this.statusEl.addClass("lmsa-diff-hunk-badge", "lmsa-diff-hunk-badge--applied");
+    this.statusEl.addClass("lmsa-chat-window-diff-hunk-badge", "lmsa-chat-window-diff-hunk-badge--applied");
     this.statusEl.setText("Applied");
 
     // Keep mode toggle visible
     const modeGroup = this.actionsEl.createDiv({ cls: "lmsa-chat-window-btn-group" });
 
     this.splitBtn = modeGroup.createEl("button", {
-      cls: "lmsa-btn-group-item",
+      cls: "lmsa-chat-window-btn-group-item",
       attr: { "aria-label": "Side-by-side view" },
     });
     setIcon(this.splitBtn, "columns-2");
@@ -98,7 +98,7 @@ export class DiffHunkView {
     this.splitBtn.addEventListener("click", () => this.callbacks.onModeChange("split"));
 
     this.unifiedBtn = modeGroup.createEl("button", {
-      cls: "lmsa-btn-group-item",
+      cls: "lmsa-chat-window-btn-group-item",
       attr: { "aria-label": "Unified view" },
     });
     setIcon(this.unifiedBtn, "rows-2");
@@ -107,7 +107,7 @@ export class DiffHunkView {
 
     // Undo button
     const undoBtn = this.actionsEl.createEl("button", {
-      cls: "lmsa-diff-hunk-btn lmsa-diff-hunk-btn--undo",
+      cls: "lmsa-chat-window-diff-hunk-btn lmsa-chat-window-diff-hunk-btn--undo",
       attr: { "aria-label": "Undo this change" },
     });
     setIcon(undoBtn, "undo");
@@ -120,7 +120,7 @@ export class DiffHunkView {
     this.containerEl.dataset.status = "pending";
 
     this.statusEl.empty();
-    this.statusEl.removeClass("lmsa-diff-hunk-badge", "lmsa-diff-hunk-badge--applied", "lmsa-diff-hunk-badge--skipped");
+    this.statusEl.removeClass("lmsa-chat-window-diff-hunk-badge", "lmsa-chat-window-diff-hunk-badge--applied", "lmsa-chat-window-diff-hunk-badge--skipped");
     this.renderConfidenceLabel(this.statusEl, this.hunk.resolvedEdit.confidence);
 
     this.actionsEl.empty();
@@ -129,7 +129,7 @@ export class DiffHunkView {
     const modeGroup = this.actionsEl.createDiv({ cls: "lmsa-chat-window-btn-group" });
 
     this.splitBtn = modeGroup.createEl("button", {
-      cls: "lmsa-btn-group-item",
+      cls: "lmsa-chat-window-btn-group-item",
       attr: { "aria-label": "Side-by-side view" },
     });
     setIcon(this.splitBtn, "columns-2");
@@ -137,7 +137,7 @@ export class DiffHunkView {
     this.splitBtn.addEventListener("click", () => this.callbacks.onModeChange("split"));
 
     this.unifiedBtn = modeGroup.createEl("button", {
-      cls: "lmsa-btn-group-item",
+      cls: "lmsa-chat-window-btn-group-item",
       attr: { "aria-label": "Unified view" },
     });
     setIcon(this.unifiedBtn, "rows-2");
@@ -148,7 +148,7 @@ export class DiffHunkView {
     const reviewGroup = this.actionsEl.createDiv({ cls: "lmsa-chat-window-btn-group" });
 
     this.acceptBtn = reviewGroup.createEl("button", {
-      cls: "lmsa-btn-group-item lmsa-btn-group-item--accept",
+      cls: "lmsa-chat-window-btn-group-item lmsa-chat-window-btn-group-item--accept",
       attr: { "aria-label": "Accept change" },
     });
     setIcon(this.acceptBtn, "check");
@@ -156,7 +156,7 @@ export class DiffHunkView {
     this.acceptBtn.addEventListener("click", () => this.callbacks.onAccept(this.hunk.id));
 
     this.rejectBtn = reviewGroup.createEl("button", {
-      cls: "lmsa-btn-group-item lmsa-btn-group-item--reject",
+      cls: "lmsa-chat-window-btn-group-item lmsa-chat-window-btn-group-item--reject",
       attr: { "aria-label": "Reject change" },
     });
     setIcon(this.rejectBtn, "x");
@@ -174,25 +174,25 @@ export class DiffHunkView {
     acceptBtn: HTMLButtonElement;
     rejectBtn: HTMLButtonElement;
   } {
-    const headerEl = this.containerEl.createDiv({ cls: "lmsa-diff-hunk-header" });
+    const headerEl = this.containerEl.createDiv({ cls: "lmsa-chat-window-diff-hunk-header" });
 
-    const metaEl = headerEl.createDiv({ cls: "lmsa-diff-hunk-meta" });
+    const metaEl = headerEl.createDiv({ cls: "lmsa-chat-window-diff-hunk-meta" });
 
     const { startLine, endLine, confidence } = this.hunk.resolvedEdit;
     const locationText =
       startLine === endLine ? `Line ${startLine}` : `Lines ${startLine}–${endLine}`;
-    metaEl.createSpan({ cls: "lmsa-diff-hunk-location", text: locationText });
+    metaEl.createSpan({ cls: "lmsa-chat-window-diff-hunk-location", text: locationText });
 
-    const statusEl = metaEl.createSpan({ cls: "lmsa-diff-hunk-confidence" });
+    const statusEl = metaEl.createSpan({ cls: "lmsa-chat-window-diff-hunk-confidence" });
     this.renderConfidenceLabel(statusEl, confidence);
 
-    const actionsEl = headerEl.createDiv({ cls: "lmsa-diff-hunk-actions" });
+    const actionsEl = headerEl.createDiv({ cls: "lmsa-chat-window-diff-hunk-actions" });
 
     // Button group 1: diff mode toggle
     const modeGroup = actionsEl.createDiv({ cls: "lmsa-chat-window-btn-group" });
 
     const splitBtn = modeGroup.createEl("button", {
-      cls: "lmsa-btn-group-item",
+      cls: "lmsa-chat-window-btn-group-item",
       attr: { "aria-label": "Side-by-side view" },
     });
     setIcon(splitBtn, "columns-2");
@@ -203,7 +203,7 @@ export class DiffHunkView {
     this.splitBtn = splitBtn;
 
     const unifiedBtn = modeGroup.createEl("button", {
-      cls: "lmsa-btn-group-item",
+      cls: "lmsa-chat-window-btn-group-item",
       attr: { "aria-label": "Unified view" },
     });
     setIcon(unifiedBtn, "rows-2");
@@ -217,7 +217,7 @@ export class DiffHunkView {
     const reviewGroup = actionsEl.createDiv({ cls: "lmsa-chat-window-btn-group" });
 
     const acceptBtn = reviewGroup.createEl("button", {
-      cls: "lmsa-btn-group-item lmsa-btn-group-item--accept",
+      cls: "lmsa-chat-window-btn-group-item lmsa-chat-window-btn-group-item--accept",
       attr: { "aria-label": "Accept change" },
     });
     setIcon(acceptBtn, "check");
@@ -225,7 +225,7 @@ export class DiffHunkView {
     acceptBtn.addEventListener("click", () => this.callbacks.onAccept(this.hunk.id));
 
     const rejectBtn = reviewGroup.createEl("button", {
-      cls: "lmsa-btn-group-item lmsa-btn-group-item--reject",
+      cls: "lmsa-chat-window-btn-group-item lmsa-chat-window-btn-group-item--reject",
       attr: { "aria-label": "Reject change" },
     });
     setIcon(rejectBtn, "x");
@@ -245,7 +245,7 @@ export class DiffHunkView {
       el.addClass("is-low-confidence");
     } else {
       el.addClass("is-no-match");
-      const warnIcon = el.createSpan({ cls: "lmsa-diff-hunk-warn-icon" });
+      const warnIcon = el.createSpan({ cls: "lmsa-chat-window-diff-hunk-warn-icon" });
       setIcon(warnIcon, "alert-triangle");
       el.createSpan({ text: "No match found" });
     }
@@ -266,9 +266,9 @@ export class DiffHunkView {
     }
 
     const modeCls = this.diffMode === "unified"
-      ? "lmsa-diff-hunk-body--unified"
-      : "lmsa-diff-hunk-body--split";
-    this.bodyEl = this.containerEl.createDiv({ cls: `lmsa-diff-hunk-body ${modeCls}` });
+      ? "lmsa-chat-window-diff-hunk-body--unified"
+      : "lmsa-chat-window-diff-hunk-body--split";
+    this.bodyEl = this.containerEl.createDiv({ cls: `lmsa-chat-window-diff-hunk-body ${modeCls}` });
 
     if (this.diffMode === "unified") {
       this.renderUnifiedBody(this.bodyEl);

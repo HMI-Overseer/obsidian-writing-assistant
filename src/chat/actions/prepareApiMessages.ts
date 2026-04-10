@@ -4,6 +4,7 @@ import { getActiveNoteText, getFullNoteContent } from "../../context/noteContext
 import { shouldUseToolCall } from "../../tools/registry";
 import { ALL_EDIT_TOOLS, CORE_EDIT_TOOLS } from "../../tools/editing/definition";
 import { ALL_VAULT_TOOLS, CORE_VAULT_TOOLS, VAULT_TOOL_NAMES } from "../../tools/vault/definition";
+import { THINK_TOOL } from "../../tools/think/definition";
 import { buildVaultToolSystemPrompt } from "../../tools/vault/systemPrompt";
 import type { CanonicalToolDefinition } from "../../tools/types";
 import type { ChatMode } from "../types";
@@ -83,12 +84,15 @@ export async function prepareApiMessages(
     }
   }
 
-  const messages: ChatTurn[] = store.getSnapshot().messageHistory.map((message) => ({
-    role: message.role as "user" | "assistant",
-    content: editMode && message.editProposal
-      ? formatEditMessageContent(message)
-      : message.content,
-  }));
+  const messages: ChatTurn[] = store
+    .getSnapshot()
+    .messageHistory.filter((message) => !message.isError)
+    .map((message) => ({
+      role: message.role as "user" | "assistant",
+      content: editMode && message.editProposal
+        ? formatEditMessageContent(message)
+        : message.content,
+    }));
 
   // Retrieve RAG context based on the latest user message.
   // Skipped when vault tools are active — in agentic mode the model controls
@@ -134,13 +138,19 @@ export async function prepareApiMessages(
   //
   // Edit tools are added on top in edit mode when preferToolUse is also on.
   // Cloud providers get the full edit tool set; local models get a reduced set.
+  // think is a meta-reasoning tool that benefits large cloud models.
+  // LM Studio (local models) already struggle with multi-tool schemas, and
+  // Magistral-family reasoning models conflict with a tool named "think" via
+  // lmstudio-ai/lmstudio-bug-tracker#1592.
+  const useThinkTool = activeProvider !== "lmstudio";
+
   let tools: CanonicalToolDefinition[] | undefined;
   if (useEditTools) {
     // Edit mode: focused document task — core vault tools for context lookup only.
     const editTools = activeProvider === "lmstudio" ? CORE_EDIT_TOOLS : ALL_EDIT_TOOLS;
-    tools = [...CORE_VAULT_TOOLS, ...editTools];
+    tools = [...CORE_VAULT_TOOLS, ...editTools, ...(useThinkTool ? [THINK_TOOL] : [])];
   } else if (useVaultTools) {
-    tools = ALL_VAULT_TOOLS;
+    tools = [...ALL_VAULT_TOOLS, ...(useThinkTool ? [THINK_TOOL] : [])];
   }
 
   // semantic_search requires a built RAG index. Remove it when unavailable so

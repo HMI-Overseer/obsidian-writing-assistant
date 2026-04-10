@@ -136,6 +136,8 @@ async function executeListFolder(
   ctx: VaultToolContext,
 ): Promise<ToolResult> {
   const rawPath = typeof args.path === "string" ? args.path.trim() : "";
+  const rawDepth = typeof args.depth === "number" ? args.depth : 1;
+  const depth = Math.max(1, Math.min(3, Math.round(rawDepth)));
 
   const folder = rawPath
     ? ctx.app.vault.getAbstractFileByPath(normalizePath(rawPath))
@@ -150,21 +152,33 @@ async function executeListFolder(
   }
 
   const items: string[] = [];
+  collectFolderItems(folder, 1, depth, items);
+  items.sort();
+
+  const header = rawPath ? `Contents of "${rawPath}"` : "Vault root";
+  const depthNote = depth > 1 ? ` (depth ${depth})` : "";
+  if (items.length === 0) {
+    return { content: `${header}${depthNote}: (empty)`, isReadOnly: true };
+  }
+  return { content: `${header}${depthNote}:\n${items.join("\n")}`, isReadOnly: true };
+}
+
+function collectFolderItems(
+  folder: TFolder,
+  currentDepth: number,
+  maxDepth: number,
+  items: string[],
+): void {
   for (const child of folder.children) {
     if (child instanceof TFolder) {
       items.push(`${child.path}/ [folder]`);
+      if (currentDepth < maxDepth) {
+        collectFolderItems(child, currentDepth + 1, maxDepth, items);
+      }
     } else if (child instanceof TFile && child.extension === "md") {
       items.push(`${child.path} [note]`);
     }
   }
-
-  items.sort();
-
-  const header = rawPath ? `Contents of "${rawPath}":` : "Vault root:";
-  if (items.length === 0) {
-    return { content: `${header} (empty)`, isReadOnly: true };
-  }
-  return { content: `${header}\n${items.join("\n")}`, isReadOnly: true };
 }
 
 async function executeGetBacklinks(

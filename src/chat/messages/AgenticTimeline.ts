@@ -6,6 +6,7 @@ const TOOL_ICONS: Record<string, string> = {
   read_note: "file-text",
   get_document_outline: "list",
   get_line_range: "scan-line",
+  think: "brain",
 };
 
 const TOOL_LABELS: Record<string, string> = {
@@ -13,6 +14,7 @@ const TOOL_LABELS: Record<string, string> = {
   read_note: "Read note",
   get_document_outline: "Read document outline",
   get_line_range: "Inspected",
+  think: "Thought",
 };
 
 /**
@@ -127,7 +129,9 @@ export class AgenticTimeline {
   }
 
   private updateSummary(): void {
-    const toolCount = this.steps.filter((s) => s.type === "tool_call").length;
+    const toolCount = this.steps.filter(
+      (s) => s.type === "tool_call" && s.toolName !== "think",
+    ).length;
     this.summaryLabelEl.textContent =
       toolCount === 0 ? "Thinking…" :
       toolCount === 1 ? "1 tool call" :

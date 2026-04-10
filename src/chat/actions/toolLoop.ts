@@ -9,11 +9,16 @@ import { executeReadOnlyTool } from "../../tools/editing/handlers";
 import { VAULT_TOOL_NAMES } from "../../tools/vault/definition";
 import { executeVaultTool } from "../../tools/vault/handlers";
 import type { VaultToolContext } from "../../tools/vault/handlers";
+import { THINK_TOOL_NAME } from "../../tools/think/definition";
 
 export type { VaultToolContext };
 
 /** All tool names that are read-only (results returned to the model to continue reasoning). */
-const ALL_READ_ONLY_TOOL_NAMES = new Set([...READ_ONLY_TOOL_NAMES, ...VAULT_TOOL_NAMES]);
+const ALL_READ_ONLY_TOOL_NAMES = new Set([
+  ...READ_ONLY_TOOL_NAMES,
+  ...VAULT_TOOL_NAMES,
+  THINK_TOOL_NAME,
+]);
 
 /** Callbacks the tool loop uses to interact with the streaming UI. */
 export interface ToolLoopCallbacks {
@@ -164,6 +169,7 @@ export async function runToolLoop(
     callbacks.onReasoningRoundFinished?.(true, round);
 
     const vaultCalls = readOnlyCalls.filter((tc) => VAULT_TOOL_NAMES.has(tc.name));
+    const thinkCalls = readOnlyCalls.filter((tc) => tc.name === THINK_TOOL_NAME);
     const safeFilePath = filePath ?? "";
 
     toolLoopTurns.push({
@@ -190,6 +196,11 @@ export async function runToolLoop(
         }
         return { tc, result: await executeVaultTool(tc, vaultToolContext) };
       }),
+      // think is a no-op: returns empty content so the model continues reasoning.
+      ...thinkCalls.map((tc) => ({
+        tc,
+        result: { content: "", isReadOnly: true as const },
+      })),
     ]);
 
     for (const { tc, result } of results) {
@@ -220,6 +231,7 @@ function extractToolInput(tc: ToolCall): string | undefined {
   const args = tc.arguments;
   if (tc.name === "semantic_search") return typeof args.query === "string" ? args.query : undefined;
   if (tc.name === "read_note") return typeof args.path === "string" ? args.path : undefined;
+  if (tc.name === THINK_TOOL_NAME) return typeof args.thought === "string" ? args.thought : undefined;
   if (tc.name === "get_line_range") {
     const start = args.start_line;
     const end = args.end_line;
@@ -243,9 +255,13 @@ function checkForFailedToolCall(
     || (stopReason === "tool_use");
 
   if (looksLikeFailedToolCall) {
+    const preview = textContent
+      ? ` Raw output: "${textContent.slice(0, 200)}${textContent.length > 200 ? "…" : ""}"`
+      : " The model produced no output.";
     throw new Error(
-      "The model attempted a tool call but failed to generate valid output. " +
-      "Try regenerating or switching to a more capable model."
+      "The model attempted a tool call but failed to generate valid output." +
+      preview +
+      " Try regenerating or switching to a more capable model."
     );
   }
 }

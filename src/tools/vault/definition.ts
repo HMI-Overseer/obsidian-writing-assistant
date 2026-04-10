@@ -57,8 +57,9 @@ export const LIST_FOLDER_TOOL: CanonicalToolDefinition = {
     "List all notes and subfolders within a vault folder. " +
     "Use this to discover what notes exist before reading or searching them. " +
     "Start here when asked to explore or survey the vault — it gives you a map before you dive in. " +
+    "Use depth > 1 to get the full subtree in a single call instead of listing each subfolder separately. " +
     "Omit path to list the vault root.",
-  strategyHint: "discover what notes and folders exist (start here when exploring)",
+  strategyHint: "discover what notes and folders exist — use depth 2-3 to get a full subtree in one call",
   parameters: {
     type: "object",
     properties: {
@@ -67,6 +68,12 @@ export const LIST_FOLDER_TOOL: CanonicalToolDefinition = {
         description:
           "Vault-relative folder path (e.g., 'Characters' or 'Scenes/Act 1'). " +
           "Omit to list the vault root.",
+      },
+      depth: {
+        type: "number",
+        description:
+          "How many levels deep to recurse. 1 = immediate children only (default). " +
+          "2 or 3 = include subfolders and their contents. Maximum 3.",
       },
     },
     required: [],

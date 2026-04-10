@@ -1,11 +1,8 @@
-import type { App } from "obsidian";
 import type { ChatClient } from "../../api/chatClient";
 import type { ChatRequest, ChatTurn } from "../../shared/chatRequest";
 import type { AgenticStep, SamplingParams } from "../../shared/types";
 import type { ToolCall } from "../../tools/types";
 import type { UsageResult, StopReason } from "../../api/usageTypes";
-import { READ_ONLY_TOOL_NAMES } from "../../tools/editing/definition";
-import { executeReadOnlyTool } from "../../tools/editing/handlers";
 import { VAULT_TOOL_NAMES } from "../../tools/vault/definition";
 import { executeVaultTool } from "../../tools/vault/handlers";
 import type { VaultToolContext } from "../../tools/vault/handlers";
@@ -15,7 +12,6 @@ export type { VaultToolContext };
 
 /** All tool names that are read-only (results returned to the model to continue reasoning). */
 const ALL_READ_ONLY_TOOL_NAMES = new Set([
-  ...READ_ONLY_TOOL_NAMES,
   ...VAULT_TOOL_NAMES,
   THINK_TOOL_NAME,
 ]);
@@ -72,8 +68,6 @@ export async function runToolLoop(
   model: string,
   params: SamplingParams,
   signal: AbortSignal,
-  app: App,
-  filePath: string | undefined,
   callbacks: ToolLoopCallbacks,
   maxRounds: number,
   vaultToolContext?: VaultToolContext,
@@ -130,13 +124,6 @@ export async function runToolLoop(
       break;
     }
 
-    // Edit read-only tools require a filePath. If present but no path, stop.
-    const editReadOnlyCalls = readOnlyCalls.filter((tc) => READ_ONLY_TOOL_NAMES.has(tc.name));
-    if (editReadOnlyCalls.length > 0 && !filePath) {
-      callbacks.onReasoningRoundFinished?.(false, round);
-      break;
-    }
-
     // Cap reached: push terminal error results to keep history valid, then let
     // the model produce one synthesis response. If it calls tools again after
     // the warning, hard-stop.
@@ -170,7 +157,6 @@ export async function runToolLoop(
 
     const vaultCalls = readOnlyCalls.filter((tc) => VAULT_TOOL_NAMES.has(tc.name));
     const thinkCalls = readOnlyCalls.filter((tc) => tc.name === THINK_TOOL_NAME);
-    const safeFilePath = filePath ?? "";
 
     toolLoopTurns.push({
       role: "assistant",
@@ -179,13 +165,7 @@ export async function runToolLoop(
     });
 
     // Execute all read-only tools in parallel.
-    // filePath is guaranteed non-empty here: we broke above if editReadOnlyCalls
-    // were present but filePath was undefined.
     const results = await Promise.all([
-      ...editReadOnlyCalls.map(async (tc) => {
-        callbacks.onToolStatus?.(tc.name);
-        return { tc, result: await executeReadOnlyTool(tc, { app, filePath: safeFilePath }) };
-      }),
       ...vaultCalls.map(async (tc) => {
         callbacks.onToolStatus?.(tc.name);
         if (!vaultToolContext) {
@@ -235,11 +215,6 @@ function extractToolInput(tc: ToolCall): string | undefined {
   if (tc.name === "directory_tree") return typeof args.path === "string" ? args.path : undefined;
   if (tc.name === "search_files") return typeof args.pattern === "string" ? args.pattern : undefined;
   if (tc.name === THINK_TOOL_NAME) return typeof args.thought === "string" ? args.thought : undefined;
-  if (tc.name === "get_line_range") {
-    const start = args.start_line;
-    const end = args.end_line;
-    if (typeof start === "number" && typeof end === "number") return `lines ${start}–${end}`;
-  }
   return undefined;
 }
 

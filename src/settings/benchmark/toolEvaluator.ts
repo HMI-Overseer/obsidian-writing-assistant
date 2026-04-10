@@ -1,5 +1,4 @@
 import type { ToolCall } from "../../tools/types";
-import { READ_ONLY_TOOL_NAMES } from "../../tools/editing/definition";
 import type { BenchmarkResult, BenchmarkTestCase } from "./types";
 
 // =========================================================================
@@ -13,7 +12,7 @@ function formatToolCall(tc: ToolCall): string {
 }
 
 function getEditCalls(toolCalls: ToolCall[]): ToolCall[] {
-  return toolCalls.filter((tc) => !READ_ONLY_TOOL_NAMES.has(tc.name));
+  return toolCalls;
 }
 
 function noToolCallsResult(response: string): BenchmarkResult {
@@ -30,7 +29,7 @@ function noToolCallsResult(response: string): BenchmarkResult {
 
 /**
  * Test: "Basic tool call"
- * Model should produce at least one apply_edit with valid search/replace args.
+ * Model should produce at least one propose_edit with valid search/replace args.
  */
 export function evaluateBasicToolCall(
   response: string,
@@ -52,11 +51,11 @@ export function evaluateBasicToolCall(
     };
   }
 
-  const applyEdits = editCalls.filter((tc) => tc.name === "apply_edit");
+  const applyEdits = editCalls.filter((tc) => tc.name === "propose_edit");
   if (applyEdits.length === 0) {
     return {
       passed: false,
-      reason: `Model used edit tools (${editCalls.map((tc) => tc.name).join(", ")}) but not apply_edit.`,
+      reason: `Model used edit tools (${editCalls.map((tc) => tc.name).join(", ")}) but not propose_edit.`,
       evidence,
     };
   }
@@ -71,52 +70,21 @@ export function evaluateBasicToolCall(
   if (!hasSearch || !hasReplace) {
     return {
       passed: false,
-      reason: "apply_edit tool call is missing search or replace arguments.",
+      reason: "propose_edit tool call is missing search or replace arguments.",
       evidence,
     };
   }
 
   return {
     passed: true,
-    reason: "Model correctly produced apply_edit tool call(s) with valid search and replace arguments.",
-    evidence,
-  };
-}
-
-/**
- * Test: "Inspect before edit"
- * First tool call should be get_document_outline or get_line_range.
- */
-export function evaluateInspectBeforeEdit(
-  response: string,
-  _testCase: BenchmarkTestCase,
-  toolCalls?: ToolCall[] | null,
-): BenchmarkResult {
-  if (!toolCalls || toolCalls.length === 0) {
-    return noToolCallsResult(response);
-  }
-
-  const evidence = toolCalls.map(formatToolCall);
-  const firstCall = toolCalls[0];
-
-  if (READ_ONLY_TOOL_NAMES.has(firstCall.name)) {
-    return {
-      passed: true,
-      reason: `Model correctly inspected first with ${firstCall.name} before making edits.`,
-      evidence,
-    };
-  }
-
-  return {
-    passed: false,
-    reason: `First tool call was ${firstCall.name} — expected get_document_outline or get_line_range.`,
+    reason: "Model correctly produced propose_edit tool call(s) with valid search and replace arguments.",
     evidence,
   };
 }
 
 /**
  * Test: "Correct tool for frontmatter"
- * Model should use update_frontmatter, not apply_edit, for frontmatter changes.
+ * Model should use update_frontmatter, not propose_edit, for frontmatter changes.
  */
 export function evaluateCorrectToolSelection(
   response: string,
@@ -131,7 +99,7 @@ export function evaluateCorrectToolSelection(
   const editCalls = getEditCalls(toolCalls);
 
   const usesFrontmatterTool = editCalls.some((tc) => tc.name === "update_frontmatter");
-  const usesApplyEdit = editCalls.some((tc) => tc.name === "apply_edit");
+  const usesApplyEdit = editCalls.some((tc) => tc.name === "propose_edit");
 
   if (usesFrontmatterTool && !usesApplyEdit) {
     return {
@@ -144,7 +112,7 @@ export function evaluateCorrectToolSelection(
   if (usesFrontmatterTool && usesApplyEdit) {
     return {
       passed: false,
-      reason: "Model used update_frontmatter but also used apply_edit for frontmatter (should use only update_frontmatter).",
+      reason: "Model used update_frontmatter but also used propose_edit for frontmatter (should use only update_frontmatter).",
       evidence,
     };
   }
@@ -152,7 +120,7 @@ export function evaluateCorrectToolSelection(
   if (usesApplyEdit) {
     return {
       passed: false,
-      reason: "Model used apply_edit instead of update_frontmatter for frontmatter changes.",
+      reason: "Model used propose_edit instead of update_frontmatter for frontmatter changes.",
       evidence,
     };
   }
@@ -166,7 +134,7 @@ export function evaluateCorrectToolSelection(
 
 /**
  * Test: "Search text precision"
- * apply_edit search should be short and contain the target phrase.
+ * propose_edit search should be short and contain the target phrase.
  */
 export function evaluateSearchPrecision(
   response: string,
@@ -178,12 +146,12 @@ export function evaluateSearchPrecision(
   }
 
   const evidence = toolCalls.map(formatToolCall);
-  const applyEdits = toolCalls.filter((tc) => tc.name === "apply_edit");
+  const applyEdits = toolCalls.filter((tc) => tc.name === "propose_edit");
 
   if (applyEdits.length === 0) {
     return {
       passed: false,
-      reason: "No apply_edit tool calls found.",
+      reason: "No propose_edit tool calls found.",
       evidence,
     };
   }
@@ -225,7 +193,7 @@ export function evaluateSearchPrecision(
 
   return {
     passed: false,
-    reason: "apply_edit calls did not have valid string search arguments.",
+    reason: "propose_edit calls did not have valid string search arguments.",
     evidence,
   };
 }
@@ -261,55 +229,3 @@ export function evaluateMultipleEdits(
   };
 }
 
-/**
- * Test: "Core tools fallback"
- * With only core tools, model should still produce valid apply_edit calls.
- */
-export function evaluateCoreToolsFallback(
-  response: string,
-  _testCase: BenchmarkTestCase,
-  toolCalls?: ToolCall[] | null,
-): BenchmarkResult {
-  if (!toolCalls || toolCalls.length === 0) {
-    return noToolCallsResult(response);
-  }
-
-  const evidence = toolCalls.map(formatToolCall);
-
-  // Check no hallucinated tools (only apply_edit and insert_at_position are available)
-  const validNames = new Set(["apply_edit", "insert_at_position"]);
-  const hallucinatedCalls = toolCalls.filter((tc) => !validNames.has(tc.name));
-  if (hallucinatedCalls.length > 0) {
-    return {
-      passed: false,
-      reason: `Model hallucinated unavailable tools: ${hallucinatedCalls.map((tc) => tc.name).join(", ")}`,
-      evidence,
-    };
-  }
-
-  const applyEdits = toolCalls.filter((tc) => tc.name === "apply_edit");
-  if (applyEdits.length === 0) {
-    return {
-      passed: false,
-      reason: "No apply_edit calls found despite it being available in the core tool set.",
-      evidence,
-    };
-  }
-
-  const hasSearch = applyEdits.some((tc) =>
-    typeof tc.arguments.search === "string" && tc.arguments.search.length > 0
-  );
-  if (!hasSearch) {
-    return {
-      passed: false,
-      reason: "apply_edit call missing search argument.",
-      evidence,
-    };
-  }
-
-  return {
-    passed: true,
-    reason: "Model correctly used apply_edit from the core tool set with valid arguments.",
-    evidence,
-  };
-}

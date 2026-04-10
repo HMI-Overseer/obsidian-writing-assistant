@@ -4,7 +4,7 @@ import { formatOpenAITools } from "../../../src/tools/formatters/openai";
 import type { CanonicalToolDefinition } from "../../../src/tools/types";
 
 const SAMPLE_TOOL: CanonicalToolDefinition = {
-  name: "apply_edit",
+  name: "propose_edit",
   description: "Propose an edit.",
   parameters: {
     type: "object",
@@ -21,7 +21,7 @@ describe("formatAnthropicTools", () => {
     const result = formatAnthropicTools([SAMPLE_TOOL]);
 
     expect(result).toHaveLength(1);
-    expect(result[0].name).toBe("apply_edit");
+    expect(result[0].name).toBe("propose_edit");
     expect(result[0].description).toBe("Propose an edit.");
     expect(result[0].input_schema.type).toBe("object");
     expect(result[0].input_schema.properties).toEqual(SAMPLE_TOOL.parameters.properties);
@@ -39,7 +39,7 @@ describe("formatAnthropicTools", () => {
     ];
     const result = formatAnthropicTools(tools);
     expect(result).toHaveLength(2);
-    expect(result[0].name).toBe("apply_edit");
+    expect(result[0].name).toBe("propose_edit");
     expect(result[1].name).toBe("other");
   });
 });
@@ -50,7 +50,7 @@ describe("formatOpenAITools", () => {
 
     expect(result).toHaveLength(1);
     expect(result[0].type).toBe("function");
-    expect(result[0].function.name).toBe("apply_edit");
+    expect(result[0].function.name).toBe("propose_edit");
     expect(result[0].function.description).toBe("Propose an edit.");
     expect(result[0].function.parameters).toEqual(SAMPLE_TOOL.parameters);
   });

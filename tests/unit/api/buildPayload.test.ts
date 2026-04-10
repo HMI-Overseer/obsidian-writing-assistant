@@ -121,7 +121,7 @@ describe("buildCompletionPayload", () => {
   test("includes tools when provided", () => {
     const tools = [{
       type: "function" as const,
-      function: { name: "apply_edit", description: "Edit.", parameters: {} },
+      function: { name: "propose_edit", description: "Edit.", parameters: {} },
     }];
     const json = JSON.parse(
       buildCompletionPayload("m", MESSAGES, makeParams(), false, tools)

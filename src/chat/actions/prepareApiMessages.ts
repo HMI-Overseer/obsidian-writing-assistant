@@ -2,7 +2,7 @@ import type { ConversationMessage, PluginSettings, ProviderOption } from "../../
 import type { ChatRequest, ChatTurn, DocumentContext, RagContextBlock } from "../../shared/chatRequest";
 import { getActiveNoteText, getFullNoteContent } from "../../context/noteContext";
 import { shouldUseToolCall } from "../../tools/registry";
-import { ALL_EDIT_TOOLS, CORE_EDIT_TOOLS } from "../../tools/editing/definition";
+import { ALL_EDIT_TOOLS } from "../../tools/editing/definition";
 import { ALL_VAULT_TOOLS, CORE_VAULT_TOOLS, VAULT_TOOL_NAMES } from "../../tools/vault/definition";
 import { THINK_TOOL } from "../../tools/think/definition";
 import { buildVaultToolSystemPrompt } from "../../tools/vault/systemPrompt";
@@ -61,7 +61,7 @@ export async function prepareApiMessages(
 
   let documentContext: DocumentContext | null = null;
 
-  if (editMode) {
+  if (editMode && sessionContextEnabled) {
     const noteData = await getFullNoteContent(app);
     if (noteData) {
       documentContext = {
@@ -147,7 +147,7 @@ export async function prepareApiMessages(
   let tools: CanonicalToolDefinition[] | undefined;
   if (useEditTools) {
     // Edit mode: focused document task — core vault tools for context lookup only.
-    const editTools = activeProvider === "lmstudio" ? CORE_EDIT_TOOLS : ALL_EDIT_TOOLS;
+    const editTools = ALL_EDIT_TOOLS;
     tools = [...CORE_VAULT_TOOLS, ...editTools, ...(useThinkTool ? [THINK_TOOL] : [])];
   } else if (useVaultTools) {
     tools = [...ALL_VAULT_TOOLS, ...(useThinkTool ? [THINK_TOOL] : [])];

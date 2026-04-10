@@ -1,56 +1,12 @@
 import { describe, test, expect } from "vitest";
 import {
-  validateGetLineRange,
-  validateApplyEdit,
-  validateReplaceSection,
-  validateInsertAtPosition,
+  validateProposeEdit,
   validateUpdateFrontmatter,
 } from "../../../src/tools/editing/validation";
 
-describe("validateGetLineRange", () => {
+describe("validateProposeEdit", () => {
   test("accepts valid args", () => {
-    const result = validateGetLineRange({ start_line: 1, end_line: 10 });
-    expect(result.ok).toBe(true);
-    if (result.ok) {
-      expect(result.args.start_line).toBe(1);
-      expect(result.args.end_line).toBe(10);
-    }
-  });
-
-  test("accepts without end_line", () => {
-    const result = validateGetLineRange({ start_line: 5 });
-    expect(result.ok).toBe(true);
-    if (result.ok) {
-      expect(result.args.end_line).toBeUndefined();
-    }
-  });
-
-  test("rejects non-number start_line", () => {
-    const result = validateGetLineRange({ start_line: "5" });
-    expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.error).toContain("start_line must be a finite number");
-  });
-
-  test("rejects missing start_line", () => {
-    const result = validateGetLineRange({});
-    expect(result.ok).toBe(false);
-  });
-
-  test("rejects start_line < 1", () => {
-    const result = validateGetLineRange({ start_line: 0 });
-    expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.error).toContain(">= 1");
-  });
-
-  test("rejects non-number end_line", () => {
-    const result = validateGetLineRange({ start_line: 1, end_line: "10" });
-    expect(result.ok).toBe(false);
-  });
-});
-
-describe("validateApplyEdit", () => {
-  test("accepts valid args", () => {
-    const result = validateApplyEdit({ search: "old", replace: "new" });
+    const result = validateProposeEdit({ search: "old", replace: "new" });
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.args.search).toBe("old");
@@ -59,86 +15,21 @@ describe("validateApplyEdit", () => {
   });
 
   test("accepts empty replace for deletions", () => {
-    const result = validateApplyEdit({ search: "old", replace: "" });
+    const result = validateProposeEdit({ search: "old", replace: "" });
     expect(result.ok).toBe(true);
     if (result.ok) expect(result.args.replace).toBe("");
   });
 
   test("treats undefined replace as empty string", () => {
-    const result = validateApplyEdit({ search: "old" });
+    const result = validateProposeEdit({ search: "old" });
     expect(result.ok).toBe(true);
     if (result.ok) expect(result.args.replace).toBe("");
   });
 
   test("rejects non-string search", () => {
-    const result = validateApplyEdit({ search: 123, replace: "new" });
+    const result = validateProposeEdit({ search: 123, replace: "new" });
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error).toContain("search must be a string");
-  });
-});
-
-describe("validateReplaceSection", () => {
-  test("accepts valid args", () => {
-    const result = validateReplaceSection({ heading: "Intro", new_content: "New text" });
-    expect(result.ok).toBe(true);
-  });
-
-  test("rejects empty heading", () => {
-    const result = validateReplaceSection({ heading: "", new_content: "text" });
-    expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.error).toContain("non-empty string");
-  });
-
-  test("rejects non-string new_content", () => {
-    const result = validateReplaceSection({ heading: "H", new_content: 42 });
-    expect(result.ok).toBe(false);
-  });
-});
-
-describe("validateInsertAtPosition", () => {
-  test("accepts with after_heading", () => {
-    const result = validateInsertAtPosition({ text: "new", after_heading: "H1" });
-    expect(result.ok).toBe(true);
-    if (result.ok) {
-      expect(result.args.after_heading).toBe("H1");
-      expect(result.args.line_number).toBeUndefined();
-    }
-  });
-
-  test("accepts with line_number", () => {
-    const result = validateInsertAtPosition({ text: "new", line_number: 5 });
-    expect(result.ok).toBe(true);
-    if (result.ok) {
-      expect(result.args.line_number).toBe(5);
-      expect(result.args.after_heading).toBeUndefined();
-    }
-  });
-
-  test("accepts line_number -1 (end of file)", () => {
-    const result = validateInsertAtPosition({ text: "new", line_number: -1 });
-    expect(result.ok).toBe(true);
-  });
-
-  test("accepts line_number 0 (beginning of file)", () => {
-    const result = validateInsertAtPosition({ text: "new", line_number: 0 });
-    expect(result.ok).toBe(true);
-  });
-
-  test("rejects both after_heading and line_number", () => {
-    const result = validateInsertAtPosition({ text: "new", after_heading: "H", line_number: 5 });
-    expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.error).toContain("not both");
-  });
-
-  test("rejects neither after_heading nor line_number", () => {
-    const result = validateInsertAtPosition({ text: "new" });
-    expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.error).toContain("Provide either");
-  });
-
-  test("rejects non-string text", () => {
-    const result = validateInsertAtPosition({ text: 42, line_number: 1 });
-    expect(result.ok).toBe(false);
   });
 });
 

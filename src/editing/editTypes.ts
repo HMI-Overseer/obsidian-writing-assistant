@@ -5,7 +5,7 @@ export interface EditBlock {
   replaceText: string;
   rawBlock: string;
   /** For structure-aware tools, the originating tool name. */
-  toolName?: "replace_section" | "insert_at_position" | "update_frontmatter";
+  toolName?: "update_frontmatter";
   /** Tool-specific arguments needed for resolution (e.g., heading text, line number). */
   toolArgs?: Record<string, unknown>;
 }

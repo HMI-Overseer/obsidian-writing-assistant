@@ -209,7 +209,7 @@ describe("buildAnthropicPayload", () => {
 
   test("includes tools when provided", () => {
     const tools = [{
-      name: "apply_edit",
+      name: "propose_edit",
       description: "Edit.",
       input_schema: { type: "object" as const, properties: {}, required: [] },
     }];

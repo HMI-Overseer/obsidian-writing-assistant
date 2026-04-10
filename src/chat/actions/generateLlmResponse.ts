@@ -175,8 +175,6 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
       activeModel.modelId,
       buildSamplingParams(plugin.settings),
       abortController.signal,
-      plugin.app,
-      apiMessages.documentContext?.filePath,
       {
         onDelta: (delta) => renderer.appendDelta(delta),
         getFullResponse: () =>

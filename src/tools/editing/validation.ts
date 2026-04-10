@@ -23,34 +23,12 @@ function err(error: string): ValidationErr {
 }
 
 // ---------------------------------------------------------------------------
-// Read-only tool argument types
-// ---------------------------------------------------------------------------
-
-export interface GetLineRangeArgs {
-  start_line: number;
-  end_line?: number;
-}
-
-// ---------------------------------------------------------------------------
 // Write tool argument types
 // ---------------------------------------------------------------------------
 
-export interface ApplyEditArgs {
+export interface ProposeEditArgs {
   search: string;
   replace: string;
-  explanation?: string;
-}
-
-export interface ReplaceSectionArgs {
-  heading: string;
-  new_content: string;
-  explanation?: string;
-}
-
-export interface InsertAtPositionArgs {
-  text: string;
-  after_heading?: string;
-  line_number?: number;
   explanation?: string;
 }
 
@@ -69,27 +47,9 @@ export interface UpdateFrontmatterArgs {
 // Validators
 // ---------------------------------------------------------------------------
 
-export function validateGetLineRange(
+export function validateProposeEdit(
   args: Record<string, unknown>,
-): ValidationResult<GetLineRangeArgs> {
-  if (typeof args.start_line !== "number" || !Number.isFinite(args.start_line)) {
-    return err("start_line must be a finite number (1-indexed). Got: " + JSON.stringify(args.start_line));
-  }
-  if (args.start_line < 1) {
-    return err("start_line must be >= 1 (1-indexed). Got: " + args.start_line);
-  }
-  if (args.end_line !== undefined && typeof args.end_line !== "number") {
-    return err("end_line must be a number or omitted. Got: " + JSON.stringify(args.end_line));
-  }
-  return ok({
-    start_line: args.start_line,
-    end_line: args.end_line as number | undefined,
-  });
-}
-
-export function validateApplyEdit(
-  args: Record<string, unknown>,
-): ValidationResult<ApplyEditArgs> {
+): ValidationResult<ProposeEditArgs> {
   if (typeof args.search !== "string") {
     return err("search must be a string. Got: " + typeof args.search);
   }
@@ -99,51 +59,6 @@ export function validateApplyEdit(
   return ok({
     search: args.search,
     replace: typeof args.replace === "string" ? args.replace : "",
-    explanation: typeof args.explanation === "string" ? args.explanation : undefined,
-  });
-}
-
-export function validateReplaceSection(
-  args: Record<string, unknown>,
-): ValidationResult<ReplaceSectionArgs> {
-  if (typeof args.heading !== "string" || args.heading.trim() === "") {
-    return err("heading must be a non-empty string. Got: " + JSON.stringify(args.heading));
-  }
-  if (typeof args.new_content !== "string") {
-    return err("new_content must be a string. Got: " + typeof args.new_content);
-  }
-  return ok({
-    heading: args.heading,
-    new_content: args.new_content,
-    explanation: typeof args.explanation === "string" ? args.explanation : undefined,
-  });
-}
-
-export function validateInsertAtPosition(
-  args: Record<string, unknown>,
-): ValidationResult<InsertAtPositionArgs> {
-  if (typeof args.text !== "string") {
-    return err("text must be a string. Got: " + typeof args.text);
-  }
-  const hasHeading = args.after_heading !== undefined;
-  const hasLine = args.line_number !== undefined;
-
-  if (hasHeading && typeof args.after_heading !== "string") {
-    return err("after_heading must be a string. Got: " + typeof args.after_heading);
-  }
-  if (hasLine && typeof args.line_number !== "number") {
-    return err("line_number must be a number. Got: " + typeof args.line_number);
-  }
-  if (hasHeading && hasLine) {
-    return err("Provide either after_heading or line_number, not both.");
-  }
-  if (!hasHeading && !hasLine) {
-    return err("Provide either after_heading or line_number to specify where to insert.");
-  }
-  return ok({
-    text: args.text,
-    after_heading: hasHeading ? (args.after_heading as string) : undefined,
-    line_number: hasLine ? (args.line_number as number) : undefined,
     explanation: typeof args.explanation === "string" ? args.explanation : undefined,
   });
 }

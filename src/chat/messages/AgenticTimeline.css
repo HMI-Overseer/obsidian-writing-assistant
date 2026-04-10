@@ -1,0 +1,124 @@
+@layer components {
+  /* Hide the container when empty (no timeline rendered inside). */
+  .lmsa-chat-window-message-timeline:empty {
+    display: none;
+  }
+
+  .lmsa-agentic-timeline {
+    width: 100%;
+    font-size: var(--font-ui-small);
+    color: var(--text-muted);
+  }
+
+  .lmsa-agentic-timeline-summary {
+    @apply lmsa-inline-flex lmsa-cursor-pointer lmsa-select-none lmsa-items-center lmsa-gap-1.5;
+    list-style: none;
+    opacity: 0.65;
+    transition: opacity 120ms ease;
+  }
+
+  .lmsa-agentic-timeline-summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .lmsa-agentic-timeline-summary:hover {
+    opacity: 1;
+  }
+
+  .lmsa-agentic-timeline-summary-icon {
+    @apply lmsa-inline-flex lmsa-h-3.5 lmsa-w-3.5 lmsa-items-center lmsa-justify-center;
+    color: var(--lmsa-mode-accent);
+  }
+
+  .lmsa-agentic-timeline-summary-icon svg {
+    width: 14px;
+    height: 14px;
+  }
+
+  .lmsa-agentic-timeline-summary-label {
+    color: var(--text-muted);
+  }
+
+  /* ── Step list ──────────────────────────────────────────────────── */
+
+  .lmsa-agentic-timeline-list {
+    position: relative;
+    padding: 6px 0 2px 26px;
+    margin-top: 4px;
+  }
+
+  /* Vertical connecting line */
+  .lmsa-agentic-timeline-list::before {
+    content: "";
+    position: absolute;
+    left: 8px;
+    top: 16px;
+    bottom: 10px;
+    width: 2px;
+    background: var(--background-modifier-border);
+    border-radius: 1px;
+  }
+
+  .lmsa-agentic-timeline-step {
+    @apply lmsa-flex lmsa-items-start lmsa-gap-2;
+    position: relative;
+    padding: 3px 0;
+    min-height: 22px;
+  }
+
+  /* ── Dot on the line ─────────────────────────────────────────────── */
+
+  .lmsa-agentic-timeline-dot {
+    @apply lmsa-inline-flex lmsa-flex-shrink-0 lmsa-items-center lmsa-justify-center lmsa-rounded-full;
+    position: absolute;
+    left: -26px;
+    top: 1px;
+    width: 18px;
+    height: 18px;
+    background: var(--background-primary);
+    border: 2px solid var(--background-modifier-border);
+    box-sizing: border-box;
+  }
+
+  .lmsa-agentic-timeline-dot svg {
+    width: 10px;
+    height: 10px;
+  }
+
+  .lmsa-agentic-timeline-step--tool .lmsa-agentic-timeline-dot {
+    color: var(--color-cyan, var(--lmsa-mode-accent));
+    border-color: color-mix(in srgb, var(--color-cyan, var(--lmsa-mode-accent)) 55%, var(--background-modifier-border));
+    background: color-mix(in srgb, var(--color-cyan, var(--lmsa-mode-accent)) 10%, var(--background-primary));
+  }
+
+  .lmsa-agentic-timeline-step--reasoning .lmsa-agentic-timeline-dot {
+    color: var(--text-faint);
+    border-color: var(--background-modifier-border);
+  }
+
+  /* ── Step body ───────────────────────────────────────────────────── */
+
+  .lmsa-agentic-timeline-step-body {
+    @apply lmsa-flex lmsa-min-w-0 lmsa-flex-wrap lmsa-items-baseline lmsa-gap-x-1.5;
+    line-height: 1.5;
+  }
+
+  .lmsa-agentic-timeline-step-name {
+    color: var(--text-normal);
+    font-weight: 500;
+  }
+
+  .lmsa-agentic-timeline-step--reasoning .lmsa-agentic-timeline-step-name {
+    font-weight: 400;
+    color: var(--text-muted);
+    font-style: italic;
+  }
+
+  .lmsa-agentic-timeline-step-detail {
+    color: var(--text-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 280px;
+  }
+}

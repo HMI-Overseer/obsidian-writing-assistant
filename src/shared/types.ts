@@ -81,6 +81,18 @@ export interface MessageVersion {
   ragSources?: RagSourceRef[];
 }
 
+/** A single step recorded during agentic tool-call execution. Stored with the message but never sent to the API. */
+export interface AgenticStep {
+  type: "tool_call" | "reasoning";
+  round: number;
+  /** For tool_call: the tool name identifier (e.g. "search_vault"). */
+  toolName?: string;
+  /** For tool_call: a human-readable display string of the key argument (e.g. the search query or file path). */
+  toolInput?: string;
+  /** For reasoning: the model's prose emitted between tool rounds. */
+  text?: string;
+}
+
 /**
  * A single message in a conversation transcript.
  * The `id` field provides a stable message identity for editing, branching,
@@ -112,6 +124,8 @@ export interface ConversationMessage {
   rewrittenQuery?: string;
   /** Raw tool calls from the model response (edit mode with tool use). */
   toolCalls?: ToolCall[];
+  /** Agentic tool-call timeline for this response. Stored for display; never sent to the API. */
+  agenticSteps?: AgenticStep[];
 }
 
 /**

@@ -19,6 +19,7 @@ import type { UsageResult } from "../../api/usageTypes";
 import type { MessageUsage } from "../../shared/types";
 import { runToolLoop } from "./toolLoop";
 import type { VaultToolContext } from "./toolLoop";
+import { AgenticTimeline } from "../messages/AgenticTimeline";
 import { CONTEXT_DANGER_THRESHOLD } from "../../constants";
 
 /**
@@ -146,6 +147,11 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
     ? new EditStreamingRenderer(assistantBubble, transcript, { useToolMode })
     : new StreamingRenderer(assistantBubble, transcript);
 
+  // Create an agentic timeline when tools are included in the request.
+  const timeline = apiMessages.tools?.length
+    ? new AgenticTimeline(assistantBubble.timelineEl)
+    : null;
+
   const vaultToolContext: VaultToolContext = {
     app: plugin.app,
     ragService: plugin.ragService,
@@ -181,6 +187,7 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
           if (editRenderer) editRenderer.beginNewRound();
           else chatRenderer?.beginNewRound();
         },
+        onStepRecorded: timeline ? (step) => timeline.addStep(step) : undefined,
         onCalibrate: onCalibrate
           ? (request, usage) => {
               const estimated = estimateTokenCount(request);
@@ -193,6 +200,8 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
 
     await renderer.flush();
     assistantBubble.bodyEl.removeClass("is-streaming");
+
+    const agenticSteps = timeline?.getSteps();
 
     if (editMode && renderer instanceof EditStreamingRenderer) {
       await finalizeEditResponse({
@@ -207,6 +216,7 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
         provider: activeModel.provider,
         usage: finalUsage,
         toolCalls: writeToolCalls,
+        agenticSteps,
       });
     } else if (finalization.kind === "replace") {
       const fullResponse = renderer.getFullResponse();
@@ -217,6 +227,7 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
           ...(finalUsage && { usage: buildMessageUsage(activeModel.modelId, finalUsage) }),
           ragSources,
           rewrittenQuery,
+          ...(agenticSteps?.length && { agenticSteps }),
         });
       } else {
         transcript.renderPlainTextContent(assistantBubble, "(no response)");
@@ -234,6 +245,7 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
         finalUsage,
         ragSources,
         rewrittenQuery,
+        agenticSteps,
       );
     }
   } catch (error) {
@@ -241,6 +253,7 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
     assistantBubble.bodyEl.removeClass("is-streaming");
 
     if (isAbortError(error)) {
+      const partialSteps = timeline?.getSteps();
       if (editMode && renderer instanceof EditStreamingRenderer) {
         await finalizeEditResponse({
           app: plugin.app,
@@ -252,6 +265,7 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
           plugin,
           modelId: activeModel.modelId,
           provider: activeModel.provider,
+          agenticSteps: partialSteps,
         });
       } else if (finalization.kind === "replace") {
         const fullResponse = renderer.getFullResponse();
@@ -259,6 +273,7 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
           store.finalizeRegeneration(finalization.oldMessage, fullResponse, {
             modelId: activeModel.modelId,
             provider: activeModel.provider,
+            ...(partialSteps?.length && { agenticSteps: partialSteps }),
           });
         } else {
           transcript.renderPlainTextContent(assistantBubble, "Generation stopped.");
@@ -274,6 +289,7 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
           activeModel.provider,
           ragSources,
           rewrittenQuery,
+          partialSteps,
         );
       }
     } else {

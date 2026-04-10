@@ -1174,6 +1174,128 @@
     opacity: 0.6;
     line-height: 1.4;
   }
+/* Hide the container when empty (no timeline rendered inside). */
+.lmsa-chat-window-message-timeline:empty {
+    display: none;
+  }
+.lmsa-agentic-timeline {
+    width: 100%;
+    font-size: var(--font-ui-small);
+    color: var(--text-muted);
+  }
+.lmsa-agentic-timeline-summary {
+    display: inline-flex;
+    cursor: pointer;
+    -webkit-user-select: none;
+       -moz-user-select: none;
+            user-select: none;
+    align-items: center;
+    gap: 0.375rem;
+    list-style: none;
+    opacity: 0.65;
+    transition: opacity 120ms ease;
+}
+.lmsa-agentic-timeline-summary::-webkit-details-marker {
+    display: none;
+  }
+.lmsa-agentic-timeline-summary:hover {
+    opacity: 1;
+  }
+.lmsa-agentic-timeline-summary-icon {
+    display: inline-flex;
+    height: 0.875rem;
+    width: 0.875rem;
+    align-items: center;
+    justify-content: center;
+    color: var(--lmsa-mode-accent);
+}
+.lmsa-agentic-timeline-summary-icon svg {
+    width: 14px;
+    height: 14px;
+  }
+.lmsa-agentic-timeline-summary-label {
+    color: var(--text-muted);
+  }
+/* ── Step list ──────────────────────────────────────────────────── */
+.lmsa-agentic-timeline-list {
+    position: relative;
+    padding: 6px 0 2px 26px;
+    margin-top: 4px;
+  }
+/* Vertical connecting line */
+.lmsa-agentic-timeline-list::before {
+    content: "";
+    position: absolute;
+    left: 8px;
+    top: 16px;
+    bottom: 10px;
+    width: 2px;
+    background: var(--background-modifier-border);
+    border-radius: 1px;
+  }
+.lmsa-agentic-timeline-step {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+    position: relative;
+    padding: 3px 0;
+    min-height: 22px;
+}
+/* ── Dot on the line ─────────────────────────────────────────────── */
+.lmsa-agentic-timeline-dot {
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    border-radius: 9999px;
+    position: absolute;
+    left: -26px;
+    top: 1px;
+    width: 18px;
+    height: 18px;
+    background: var(--background-primary);
+    border: 2px solid var(--background-modifier-border);
+    box-sizing: border-box;
+}
+.lmsa-agentic-timeline-dot svg {
+    width: 10px;
+    height: 10px;
+  }
+.lmsa-agentic-timeline-step--tool .lmsa-agentic-timeline-dot {
+    color: var(--color-cyan, var(--lmsa-mode-accent));
+    border-color: color-mix(in srgb, var(--color-cyan, var(--lmsa-mode-accent)) 55%, var(--background-modifier-border));
+    background: color-mix(in srgb, var(--color-cyan, var(--lmsa-mode-accent)) 10%, var(--background-primary));
+  }
+.lmsa-agentic-timeline-step--reasoning .lmsa-agentic-timeline-dot {
+    color: var(--text-faint);
+    border-color: var(--background-modifier-border);
+  }
+/* ── Step body ───────────────────────────────────────────────────── */
+.lmsa-agentic-timeline-step-body {
+    display: flex;
+    min-width: 0px;
+    flex-wrap: wrap;
+    align-items: baseline;
+    -moz-column-gap: 0.375rem;
+         column-gap: 0.375rem;
+    line-height: 1.5;
+}
+.lmsa-agentic-timeline-step-name {
+    color: var(--text-normal);
+    font-weight: 500;
+  }
+.lmsa-agentic-timeline-step--reasoning .lmsa-agentic-timeline-step-name {
+    font-weight: 400;
+    color: var(--text-muted);
+    font-style: italic;
+  }
+.lmsa-agentic-timeline-step-detail {
+    color: var(--text-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 280px;
+  }
 .lmsa-chat-window-message.is-editing .lmsa-chat-window-message-body {
     border-style: dashed;
     border-color: color-mix(in srgb, var(--lmsa-mode-accent) 50%, var(--background-modifier-border));
@@ -4007,6 +4129,9 @@
 .lmsa-hidden {
     display: none;
 }
+.lmsa-h-3\.5 {
+    height: 0.875rem;
+}
 .lmsa-h-4 {
     height: 1rem;
 }
@@ -4039,6 +4164,9 @@
 }
 .lmsa-min-h-\[22px\] {
     min-height: 22px;
+}
+.lmsa-w-3\.5 {
+    width: 0.875rem;
 }
 .lmsa-w-4 {
     width: 1rem;
@@ -4177,6 +4305,10 @@
 }
 .lmsa-gap-\[5px\] {
     gap: 5px;
+}
+.lmsa-gap-x-1 {
+    -moz-column-gap: 0.25rem;
+         column-gap: 0.25rem;
 }
 .lmsa-self-auto {
     align-self: auto;

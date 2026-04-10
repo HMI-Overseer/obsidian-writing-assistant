@@ -217,7 +217,7 @@ export class ChatSessionStore {
   finalizeRegeneration(
     oldMessage: ConversationMessage,
     newContent: string,
-    metadata?: Pick<ConversationMessage, "modelId" | "provider" | "usage" | "ragSources" | "rewrittenQuery">
+    metadata?: Pick<ConversationMessage, "modelId" | "provider" | "usage" | "ragSources" | "rewrittenQuery" | "agenticSteps">
   ): ConversationMessage {
     const now = Date.now();
 

@@ -14,6 +14,8 @@ export type BubbleRefs = {
   rowEl: HTMLElement;
   columnEl: HTMLElement;
   chromeEl: HTMLElement;
+  /** Container for the agentic step timeline. Sits between the role label and the bubble body. Empty for non-agentic messages. */
+  timelineEl: HTMLElement;
   bodyEl: HTMLElement;
   contentEl: HTMLElement;
 };

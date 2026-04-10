@@ -1,7 +1,7 @@
 import type { App } from "obsidian";
 import type { ChatClient } from "../../api/chatClient";
 import type { ChatRequest, ChatTurn } from "../../shared/chatRequest";
-import type { SamplingParams } from "../../shared/types";
+import type { AgenticStep, SamplingParams } from "../../shared/types";
 import type { ToolCall } from "../../tools/types";
 import type { UsageResult, StopReason } from "../../api/usageTypes";
 import { READ_ONLY_TOOL_NAMES } from "../../tools/editing/definition";
@@ -28,6 +28,8 @@ export interface ToolLoopCallbacks {
   onToolStatus?: (toolName: string) => void;
   /** Called to reset the renderer between tool-loop rounds. */
   onNewRound?: () => void;
+  /** Called after each read-only tool call completes, with a record of what was done. */
+  onStepRecorded?: (step: AgenticStep) => void;
   /** Called with the first round's usage for token estimation calibration. */
   onCalibrate?: (request: ChatRequest, usage: UsageResult) => void;
 }
@@ -108,6 +110,11 @@ export async function runToolLoop(
       // Edit read-only tools require a filePath. If there are edit calls but no path, stop.
       if (editReadOnlyCalls.length > 0 && !filePath) break;
 
+      // Record any reasoning prose the model emitted before calling tools.
+      if (roundText.trim()) {
+        callbacks.onStepRecorded?.({ type: "reasoning", round, text: roundText.trim() });
+      }
+
       const assistantTurn: ChatTurn = {
         role: "assistant",
         content: roundText || null,
@@ -146,6 +153,12 @@ export async function runToolLoop(
           content: result.content,
           toolCallId: tc.id,
         });
+        callbacks.onStepRecorded?.({
+          type: "tool_call",
+          round,
+          toolName: tc.name,
+          toolInput: extractToolInput(tc),
+        });
       }
 
       previousRoundsText = totalText;
@@ -161,6 +174,18 @@ export async function runToolLoop(
     writeToolCalls: allWriteToolCalls.length > 0 ? allWriteToolCalls : null,
     usage: finalUsage,
   };
+}
+
+function extractToolInput(tc: ToolCall): string | undefined {
+  const args = tc.arguments;
+  if (tc.name === "search_vault") return typeof args.query === "string" ? args.query : undefined;
+  if (tc.name === "read_note") return typeof args.path === "string" ? args.path : undefined;
+  if (tc.name === "get_line_range") {
+    const start = args.start_line;
+    const end = args.end_line;
+    if (typeof start === "number" && typeof end === "number") return `lines ${start}–${end}`;
+  }
+  return undefined;
 }
 
 function checkForFailedToolCall(

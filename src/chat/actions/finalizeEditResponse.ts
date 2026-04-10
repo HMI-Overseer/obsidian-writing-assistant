@@ -12,7 +12,7 @@ import { DiffReviewPanel } from "../messages/DiffReviewPanel";
 import type { BubbleRefs } from "../types";
 import type { EditStreamingRenderer } from "./EditStreamingRenderer";
 import type LMStudioWritingAssistant from "../../main";
-import type { ProviderOption } from "../../shared/types";
+import type { AgenticStep, ProviderOption } from "../../shared/types";
 import type { ToolCall } from "../../tools/types";
 import type { UsageResult } from "../../api/usageTypes";
 import { attachUsageToMessage } from "./finalizeResponse";
@@ -30,6 +30,8 @@ export interface FinalizeEditOptions {
   usage?: UsageResult | null;
   /** Tool calls from the stream result. When present, uses tool-call extraction instead of regex parsing. */
   toolCalls?: ToolCall[] | null;
+  /** Agentic step timeline from the tool loop. Attached to the saved message; never sent to the API. */
+  agenticSteps?: AgenticStep[];
 }
 
 /**
@@ -40,7 +42,7 @@ export interface FinalizeEditOptions {
  * are found. Falls back to normal message rendering if no blocks are present.
  */
 export async function finalizeEditResponse(options: FinalizeEditOptions): Promise<void> {
-  const { app, owner, store, transcript, bubble, renderer, plugin, modelId, provider, usage, toolCalls } = options;
+  const { app, owner, store, transcript, bubble, renderer, plugin, modelId, provider, usage, toolCalls, agenticSteps } = options;
 
   const fullResponse = renderer.getFullResponse();
   if (!fullResponse && (!toolCalls || toolCalls.length === 0)) {
@@ -50,7 +52,7 @@ export async function finalizeEditResponse(options: FinalizeEditOptions): Promis
 
   const file = app.workspace.getActiveFile();
   if (!file) {
-    await renderAsNormalMessage(store, transcript, bubble, fullResponse || "", modelId, provider, usage);
+    await renderAsNormalMessage(store, transcript, bubble, fullResponse || "", modelId, provider, usage, agenticSteps);
     return;
   }
 
@@ -71,7 +73,7 @@ export async function finalizeEditResponse(options: FinalizeEditOptions): Promis
     if (fullResponse.includes("<<<SEARCH")) {
       new Notice("Edit blocks were detected but couldn't be parsed.");
     }
-    await renderAsNormalMessage(store, transcript, bubble, fullResponse, modelId, provider, usage);
+    await renderAsNormalMessage(store, transcript, bubble, fullResponse, modelId, provider, usage, agenticSteps);
     return;
   }
 
@@ -106,6 +108,7 @@ export async function finalizeEditResponse(options: FinalizeEditOptions): Promis
   if (toolCalls && toolCalls.length > 0) {
     assistantMessage.toolCalls = toolCalls;
   }
+  if (agenticSteps?.length) assistantMessage.agenticSteps = agenticSteps;
   attachUsageToMessage(assistantMessage, modelId, provider, usage);
   store.appendMessage(assistantMessage);
   store.setLastAssistantResponse(fullResponse);
@@ -165,10 +168,12 @@ async function renderAsNormalMessage(
   fullResponse: string,
   modelId?: string,
   provider?: ProviderOption,
-  usage?: UsageResult | null
+  usage?: UsageResult | null,
+  agenticSteps?: AgenticStep[]
 ): Promise<void> {
   const assistantMessage = makeMessage("assistant", fullResponse);
   attachUsageToMessage(assistantMessage, modelId, provider, usage);
+  if (agenticSteps?.length) assistantMessage.agenticSteps = agenticSteps;
   store.appendMessage(assistantMessage);
   store.setLastAssistantResponse(fullResponse);
   await transcript.renderBubbleContent(bubble, fullResponse);

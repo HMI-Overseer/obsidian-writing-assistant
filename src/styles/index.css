@@ -9,6 +9,7 @@
 @import "../chat/messages/BubbleVersionNav.css";
 @import "../chat/messages/UsageBadge.css";
 @import "../chat/messages/RagSourcesList.css";
+@import "../chat/messages/AgenticTimeline.css";
 @import "../chat/messages/InlineMessageEditor.css";
 @import "../chat/models/ChatModelSelector.css";
 @import "../chat/models/ProfileSettingsPopover.css";

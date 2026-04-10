@@ -150,6 +150,9 @@ export function normalizeConversation(raw: Record<string, unknown>): Conversatio
           if (typeof message.rewrittenQuery === "string") {
             base.rewrittenQuery = message.rewrittenQuery;
           }
+          if (Array.isArray(message.agenticSteps)) {
+            base.agenticSteps = message.agenticSteps as ConversationMessage["agenticSteps"];
+          }
 
           return base;
         })

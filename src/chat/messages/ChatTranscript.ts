@@ -5,6 +5,7 @@ import { BubbleActionToolbar } from "./BubbleActionToolbar";
 import { BubbleVersionNav } from "./BubbleVersionNav";
 import { renderUsageBadge } from "./UsageBadge";
 import { renderRagSources } from "./RagSourcesList";
+import { AgenticTimeline } from "./AgenticTimeline";
 
 export type BubbleActionCallbacks = {
   onCopy: (messageId: string) => void;
@@ -46,6 +47,10 @@ export class ChatTranscript {
     for (let i = 0; i < messages.length; i++) {
       const message = messages[i];
       const bubble = this.createBubble(message.role, message.id);
+
+      if (message.role === "assistant" && message.agenticSteps?.length) {
+        AgenticTimeline.render(bubble.timelineEl, message.agenticSteps);
+      }
 
       if (message.isError) {
         bubble.bodyEl.addClass("is-error");
@@ -129,11 +134,12 @@ export class ChatTranscript {
       text: role === "user" ? "You" : "Assistant",
     });
 
+    const timelineEl = columnEl.createDiv({ cls: "lmsa-chat-window-message-timeline" });
     const bodyEl = columnEl.createDiv({ cls: "lmsa-chat-window-message-body lmsa-ui-card" });
     const contentEl = bodyEl.createDiv({ cls: "lmsa-chat-window-message-content" });
 
     this.scrollToBottom();
-    return { role, rowEl, columnEl, chromeEl, bodyEl, contentEl };
+    return { role, rowEl, columnEl, chromeEl, timelineEl, bodyEl, contentEl };
   }
 
   setEmptyStateVisible(isVisible: boolean): void {

@@ -1,6 +1,6 @@
 import { Notice } from "obsidian";
 import type LMStudioWritingAssistant from "../../main";
-import type { ProviderOption, RagSourceRef } from "../../shared/types";
+import type { AgenticStep, ProviderOption, RagSourceRef } from "../../shared/types";
 import type { UsageResult } from "../../api/usageTypes";
 import type { BubbleRefs } from "../types";
 import { makeMessage } from "../conversation/conversationUtils";
@@ -39,7 +39,8 @@ export async function finalizeResponse(
   provider?: ProviderOption,
   usage?: UsageResult | null,
   ragSources?: RagSourceRef[],
-  rewrittenQuery?: string
+  rewrittenQuery?: string,
+  agenticSteps?: AgenticStep[]
 ): Promise<void> {
   const fullResponse = renderer.getFullResponse();
 
@@ -48,6 +49,7 @@ export async function finalizeResponse(
     attachUsageToMessage(assistantMessage, modelId, provider, usage);
     if (ragSources) assistantMessage.ragSources = ragSources;
     if (rewrittenQuery) assistantMessage.rewrittenQuery = rewrittenQuery;
+    if (agenticSteps?.length) assistantMessage.agenticSteps = agenticSteps;
     store.appendMessage(assistantMessage);
     store.setLastAssistantResponse(fullResponse);
 
@@ -74,7 +76,8 @@ export async function finalizeAbortedResponse(
   modelId?: string,
   provider?: ProviderOption,
   ragSources?: RagSourceRef[],
-  rewrittenQuery?: string
+  rewrittenQuery?: string,
+  agenticSteps?: AgenticStep[]
 ): Promise<void> {
   const fullResponse = renderer.getFullResponse();
 
@@ -83,6 +86,7 @@ export async function finalizeAbortedResponse(
     attachUsageToMessage(assistantMessage, modelId, provider);
     if (ragSources) assistantMessage.ragSources = ragSources;
     if (rewrittenQuery) assistantMessage.rewrittenQuery = rewrittenQuery;
+    if (agenticSteps?.length) assistantMessage.agenticSteps = agenticSteps;
     store.appendMessage(assistantMessage);
     store.setLastAssistantResponse(fullResponse);
 

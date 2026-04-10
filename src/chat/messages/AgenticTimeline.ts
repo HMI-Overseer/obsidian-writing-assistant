@@ -37,7 +37,7 @@ export class AgenticTimeline {
       cls: "lmsa-agentic-timeline-summary",
     });
     const iconEl = summaryEl.createSpan({ cls: "lmsa-agentic-timeline-summary-icon" });
-    setIcon(iconEl, "bot");
+    setIcon(iconEl, "hammer");
     this.summaryLabelEl = summaryEl.createSpan({
       cls: "lmsa-agentic-timeline-summary-label",
       text: "Thinking…",

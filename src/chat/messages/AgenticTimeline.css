@@ -72,7 +72,7 @@
     @apply lmsa-inline-flex lmsa-flex-shrink-0 lmsa-items-center lmsa-justify-center lmsa-rounded-full;
     position: absolute;
     left: -26px;
-    top: 1px;
+    top: 3px;
     width: 18px;
     height: 18px;
     background: var(--background-primary);
@@ -85,7 +85,7 @@
     height: 10px;
   }
 
-  .lmsa-agentic-timeline-step--tool .lmsa-agentic-timeline-dot {
+  .lmsa-agentic-timeline-step--tool_call .lmsa-agentic-timeline-dot {
     color: var(--color-cyan, var(--lmsa-mode-accent));
     border-color: color-mix(in srgb, var(--color-cyan, var(--lmsa-mode-accent)) 55%, var(--background-modifier-border));
     background: color-mix(in srgb, var(--color-cyan, var(--lmsa-mode-accent)) 10%, var(--background-primary));

@@ -19,10 +19,8 @@ const ALL_READ_ONLY_TOOL_NAMES = new Set([
 
 /** Callbacks the tool loop uses to interact with the streaming UI. */
 export interface ToolLoopCallbacks {
-  /** Called with each text delta from the stream. */
+  /** Called with text that should appear in the chat bubble. In agentic mode this is only called for the final round's text (flushed after the stream ends). */
   onDelta: (delta: string) => void;
-  /** Called to retrieve the full accumulated response text. */
-  getFullResponse: () => string;
   /** Called when a read-only tool is about to execute. */
   onToolStatus?: (toolName: string) => void;
   /** Called as soon as a read-only tool call is identified by name during streaming, before execution. */
@@ -73,10 +71,12 @@ export async function runToolLoop(
   signal: AbortSignal,
   callbacks: ToolLoopCallbacks,
   maxRounds: number,
+  agenticMode: boolean,
   vaultToolContext?: VaultToolContext,
 ): Promise<ToolLoopResult> {
   const toolLoopTurns: ChatTurn[] = [];
   let allWriteToolCalls: ToolCall[] = [];
+  let fullText = "";
   let previousRoundsText = "";
   let finalUsage: UsageResult | null = null;
   let calibrated = false;
@@ -95,9 +95,27 @@ export async function runToolLoop(
         : undefined,
     );
 
-    for await (const delta of streamResult.deltas) {
-      callbacks.onDelta(delta);
-      callbacks.onReasoningDelta?.(delta);
+    // In agentic mode, buffer deltas internally — only the timeline receives
+    // live updates. The bubble gets the text only for the final round (flushed
+    // after we confirm no tool calls follow). In non-agentic mode, deltas flow
+    // directly to the bubble as before.
+    let roundBuffer = "";
+    try {
+      for await (const delta of streamResult.deltas) {
+        fullText += delta;
+        roundBuffer += delta;
+        if (!agenticMode) {
+          callbacks.onDelta(delta);
+        }
+        callbacks.onReasoningDelta?.(delta);
+      }
+    } catch (e) {
+      // On abort (or other errors), flush whatever we buffered so partial
+      // text is preserved in the renderer for finalizeAbortedResponse.
+      if (agenticMode && roundBuffer) {
+        callbacks.onDelta(roundBuffer);
+      }
+      throw e;
     }
 
     const usage = await streamResult.usage;
@@ -110,8 +128,7 @@ export async function runToolLoop(
     }
     if (usage) finalUsage = usage;
 
-    const totalText = callbacks.getFullResponse();
-    const roundText = totalText.slice(previousRoundsText.length);
+    const roundText = fullText.slice(previousRoundsText.length);
 
     const hasToolCalls = toolCalls !== null && toolCalls.length > 0;
 
@@ -119,6 +136,10 @@ export async function runToolLoop(
     checkForFailedToolCall(hasToolCalls, roundText, stopReason);
 
     if (!hasToolCalls || !toolCalls) {
+      // Final round — flush buffered text to the bubble.
+      if (agenticMode && roundBuffer) {
+        callbacks.onDelta(roundBuffer);
+      }
       callbacks.onReasoningRoundFinished?.(false, round);
       break;
     }
@@ -128,7 +149,11 @@ export async function runToolLoop(
     allWriteToolCalls = [...allWriteToolCalls, ...writeCalls];
 
     // Write tool calls (or a mix of read + write) — hand off to the edit pipeline.
+    // Flush buffered text so the edit renderer has the prose content.
     if (writeCalls.length > 0) {
+      if (agenticMode && roundBuffer) {
+        callbacks.onDelta(roundBuffer);
+      }
       callbacks.onReasoningRoundFinished?.(true, round);
       break;
     }
@@ -139,6 +164,9 @@ export async function runToolLoop(
     if (capHit || round >= maxRounds) {
       if (capHit) {
         // Model ignored the cap warning and called tools again — hard stop.
+        if (agenticMode && roundBuffer) {
+          callbacks.onDelta(roundBuffer);
+        }
         callbacks.onReasoningRoundFinished?.(false, round);
         break;
       }
@@ -156,12 +184,12 @@ export async function runToolLoop(
         });
       }
       callbacks.onReasoningRoundFinished?.(true, round);
-      previousRoundsText = totalText;
+      previousRoundsText = fullText;
       callbacks.onNewRound?.();
       continue;
     }
 
-    // Normal tool execution round.
+    // Normal intermediate tool execution round — do NOT flush to bubble.
     callbacks.onReasoningRoundFinished?.(true, round);
 
     const vaultCalls = readOnlyCalls.filter((tc) => VAULT_TOOL_NAMES.has(tc.name));
@@ -206,7 +234,7 @@ export async function runToolLoop(
       });
     }
 
-    previousRoundsText = totalText;
+    previousRoundsText = fullText;
     callbacks.onNewRound?.();
   }
 

@@ -169,6 +169,8 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
       ? plugin.settings.maxToolRoundsEdit
       : plugin.settings.maxToolRoundsChat;
 
+    const agenticMode = !!timeline;
+
     const { writeToolCalls, usage: finalUsage } = await runToolLoop(
       client,
       apiMessages,
@@ -177,10 +179,6 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
       abortController.signal,
       {
         onDelta: (delta) => renderer.appendDelta(delta),
-        getFullResponse: () =>
-          renderer instanceof EditStreamingRenderer
-            ? renderer.getFullResponse()
-            : (renderer as StreamingRenderer).getFullResponse(),
         onToolStatus: (name) => {
           if (editRenderer) editRenderer.showToolStatus(name);
           else chatRenderer?.showToolStatus(name);
@@ -194,11 +192,11 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
         onReasoningDelta: timeline ? (delta) => timeline.addReasoningDelta(delta) : undefined,
         onReasoningRoundFinished: timeline
           ? (committed, round) => {
-              // Always commit — every round's reasoning is worth keeping in the timeline.
-              timeline.commitLiveReasoning(round);
-              // Clear the bubble only for intermediate rounds (tool calls follow).
-              // For the final round the text stays in the bubble as the actual response.
-              if (committed) chatRenderer?.beginNewRound();
+              if (committed) {
+                timeline.commitLiveReasoning(round);
+              } else {
+                timeline.discardLiveReasoning();
+              }
             }
           : undefined,
         onCalibrate: onCalibrate
@@ -209,6 +207,7 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
           : undefined,
       },
       maxRounds,
+      agenticMode,
       vaultToolContext,
     );
 

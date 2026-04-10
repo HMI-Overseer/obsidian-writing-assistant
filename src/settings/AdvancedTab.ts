@@ -4,6 +4,25 @@ import { TOOL_EDIT_SYSTEM_PROMPT } from "../tools/editing/systemPrompt";
 import { createSettingsSection, SettingItem } from "./ui";
 
 export function renderAdvancedTab(container: HTMLElement, plugin: LMStudioWritingAssistant): void {
+  const agentic = createSettingsSection(
+    container,
+    "Agentic mode",
+    "Allow the model to call tools: search your vault, read notes, and apply structured edits across multiple reasoning rounds.",
+    { icon: "bot" }
+  );
+
+  new SettingItem(agentic.bodyEl)
+    .setName("Enable agentic mode")
+    .setDesc(
+      "Vault search and edit tools become available. The model can read notes and iterate before producing a response."
+    )
+    .addToggle((toggle) =>
+      toggle.setValue(plugin.settings.agenticMode).onChange(async (value) => {
+        plugin.settings.agenticMode = value;
+        await plugin.saveSettings();
+      })
+    );
+
   const editing = createSettingsSection(
     container,
     "Document Editing",

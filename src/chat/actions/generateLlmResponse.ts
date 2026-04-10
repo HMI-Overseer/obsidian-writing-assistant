@@ -157,6 +157,7 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
 
   try {
     const editRenderer = renderer instanceof EditStreamingRenderer ? renderer : null;
+    const chatRenderer = renderer instanceof StreamingRenderer ? renderer : null;
 
     const { writeToolCalls, usage: finalUsage } = await runToolLoop(
       client,
@@ -172,8 +173,14 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
           renderer instanceof EditStreamingRenderer
             ? renderer.getFullResponse()
             : (renderer as StreamingRenderer).getFullResponse(),
-        onToolStatus: editRenderer ? (name) => editRenderer.showToolStatus(name) : undefined,
-        onNewRound: editRenderer ? () => editRenderer.beginNewRound() : undefined,
+        onToolStatus: (name) => {
+          if (editRenderer) editRenderer.showToolStatus(name);
+          else chatRenderer?.showToolStatus(name);
+        },
+        onNewRound: () => {
+          if (editRenderer) editRenderer.beginNewRound();
+          else chatRenderer?.beginNewRound();
+        },
         onCalibrate: onCalibrate
           ? (request, usage) => {
               const estimated = estimateTokenCount(request);

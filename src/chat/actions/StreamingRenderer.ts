@@ -3,11 +3,18 @@ import type { ChatTranscript } from "../messages/ChatTranscript";
 
 const STREAMING_MARKDOWN_RENDER_DEBOUNCE_MS = 80;
 
+const TOOL_STATUS_LABELS: Record<string, string> = {
+  search_vault: "Searching vault...",
+  read_note: "Reading note...",
+};
+
 export class StreamingRenderer {
   private fullResponse = "";
   private hasRenderedMarkdown = false;
   private lastRenderedText = "";
+  private lastRenderKey = "";
   private queuedText = "";
+  private toolStatusText = "";
   private renderTimer: number | null = null;
   private renderChain = Promise.resolve();
 
@@ -39,6 +46,20 @@ export class StreamingRenderer {
     this.transcript.scrollToBottom();
   }
 
+  showToolStatus(toolName: string): void {
+    this.toolStatusText = TOOL_STATUS_LABELS[toolName] ?? `Running ${toolName}...`;
+    // Bypass the debounce so the status is visible before the tool completes.
+    this.queuedText = this.fullResponse;
+    this.renderChain = this.renderChain.then(() => this.renderOnce()).catch(() => undefined);
+  }
+
+  beginNewRound(): void {
+    this.toolStatusText = "";
+    // Render immediately so the status clears as soon as the next round starts.
+    this.queuedText = this.fullResponse;
+    this.renderChain = this.renderChain.then(() => this.renderOnce()).catch(() => undefined);
+  }
+
   private queueRender(): void {
     this.queuedText = this.fullResponse;
     if (this.renderTimer !== null) return;
@@ -46,25 +67,31 @@ export class StreamingRenderer {
     this.renderTimer = window.setTimeout(() => {
       this.renderTimer = null;
       this.renderChain = this.renderChain
-        .then(async () => {
-          const textToRender = this.queuedText;
-          if (
-            !textToRender ||
-            textToRender === this.lastRenderedText ||
-            !this.bubble.contentEl.isConnected
-          ) {
-            return;
-          }
-
-          await this.transcript.renderBubbleContent(this.bubble, textToRender, {
-            preserveStreaming: true,
-          });
-          this.hasRenderedMarkdown = true;
-          this.lastRenderedText = textToRender;
-          this.transcript.scrollToBottom();
-        })
+        .then(() => this.renderOnce())
         .catch(() => undefined);
     }, STREAMING_MARKDOWN_RENDER_DEBOUNCE_MS);
+  }
+
+  private async renderOnce(): Promise<void> {
+    const textToRender = this.queuedText;
+    const displayText = this.toolStatusText
+      ? (textToRender
+          ? `${textToRender}\n\n*${this.toolStatusText}*`
+          : `*${this.toolStatusText}*`)
+      : textToRender;
+
+    if (!displayText || !this.bubble.contentEl.isConnected) return;
+
+    const renderKey = `${textToRender}|${this.toolStatusText}`;
+    if (renderKey === this.lastRenderKey) return;
+
+    await this.transcript.renderBubbleContent(this.bubble, displayText, {
+      preserveStreaming: true,
+    });
+    this.hasRenderedMarkdown = true;
+    this.lastRenderedText = textToRender;
+    this.lastRenderKey = renderKey;
+    this.transcript.scrollToBottom();
   }
 
   async flush(): Promise<void> {
@@ -74,23 +101,7 @@ export class StreamingRenderer {
     }
 
     this.renderChain = this.renderChain
-      .then(async () => {
-        const textToRender = this.queuedText;
-        if (
-          !textToRender ||
-          textToRender === this.lastRenderedText ||
-          !this.bubble.contentEl.isConnected
-        ) {
-          return;
-        }
-
-        await this.transcript.renderBubbleContent(this.bubble, textToRender, {
-          preserveStreaming: true,
-        });
-        this.hasRenderedMarkdown = true;
-        this.lastRenderedText = textToRender;
-        this.transcript.scrollToBottom();
-      })
+      .then(() => this.renderOnce())
       .catch(() => undefined);
 
     await this.renderChain;

@@ -74,50 +74,50 @@ function tc(name: string, args: Record<string, unknown> = {}): ToolCall {
 }
 
 // ---------------------------------------------------------------------------
-// list_folder
+// list_directory
 // ---------------------------------------------------------------------------
 
-describe("list_folder", () => {
-  test("lists notes and subfolders in a folder", async () => {
+describe("list_directory", () => {
+  test("lists notes and subfolders with [FILE]/[DIR] prefixes", async () => {
     const noteA = makeFile("Characters/Alaric.md");
     const noteB = makeFile("Characters/Will.md");
     const sub = makeFolder("Characters/Drafts", [makeFile("Characters/Drafts/old.md")]);
     const folder = makeFolder("Characters", [noteA, noteB, sub]);
 
     const ctx = makeCtx({ abstractFiles: { Characters: folder } });
-    const result = await executeVaultTool(tc("list_folder", { path: "Characters" }), ctx);
+    const result = await executeVaultTool(tc("list_directory", { path: "Characters" }), ctx);
 
     expect(result.isReadOnly).toBe(true);
     expect(result.isError).toBeUndefined();
-    expect(result.content).toContain("Characters/Alaric.md [note]");
-    expect(result.content).toContain("Characters/Will.md [note]");
-    expect(result.content).toContain("Characters/Drafts/ [folder]");
+    expect(result.content).toContain("[FILE] Characters/Alaric.md");
+    expect(result.content).toContain("[FILE] Characters/Will.md");
+    expect(result.content).toContain("[DIR] Characters/Drafts");
   });
 
   test("uses vault root when path is omitted", async () => {
     const note = makeFile("index.md");
     const root = makeFolder("", [note]);
     const ctx = makeCtx({ root });
-    const result = await executeVaultTool(tc("list_folder", {}), ctx);
+    const result = await executeVaultTool(tc("list_directory", {}), ctx);
 
     expect(result.content).toContain("Vault root:");
-    expect(result.content).toContain("index.md [note]");
+    expect(result.content).toContain("[FILE] index.md");
   });
 
   test("excludes non-markdown files", async () => {
-    const md = makeFile("note.md");
-    const img = makeFile("image.png", "png");
+    const md = makeFile("Assets/note.md");
+    const img = makeFile("Assets/image.png", "png");
     const folder = makeFolder("Assets", [md, img]);
     const ctx = makeCtx({ abstractFiles: { Assets: folder } });
 
-    const result = await executeVaultTool(tc("list_folder", { path: "Assets" }), ctx);
-    expect(result.content).toContain("note.md [note]");
+    const result = await executeVaultTool(tc("list_directory", { path: "Assets" }), ctx);
+    expect(result.content).toContain("[FILE] Assets/note.md");
     expect(result.content).not.toContain("image.png");
   });
 
   test("returns error when folder not found", async () => {
     const ctx = makeCtx({});
-    const result = await executeVaultTool(tc("list_folder", { path: "Missing" }), ctx);
+    const result = await executeVaultTool(tc("list_directory", { path: "Missing" }), ctx);
 
     expect(result.isError).toBe(true);
     expect(result.content).toContain("Error:");
@@ -126,8 +126,130 @@ describe("list_folder", () => {
   test("returns error when path resolves to a file not a folder", async () => {
     const file = makeFile("note.md");
     const ctx = makeCtx({ abstractFiles: { "note.md": file } });
-    const result = await executeVaultTool(tc("list_folder", { path: "note.md" }), ctx);
+    const result = await executeVaultTool(tc("list_directory", { path: "note.md" }), ctx);
 
+    expect(result.isError).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// directory_tree
+// ---------------------------------------------------------------------------
+
+describe("directory_tree", () => {
+  test("returns recursive JSON tree", async () => {
+    const noteA = makeFile("Characters/Alaric.md");
+    const sub = makeFolder("Characters/Drafts", [makeFile("Characters/Drafts/old.md")]);
+    const folder = makeFolder("Characters", [noteA, sub]);
+
+    const ctx = makeCtx({ abstractFiles: { Characters: folder } });
+    const result = await executeVaultTool(tc("directory_tree", { path: "Characters" }), ctx);
+
+    expect(result.isReadOnly).toBe(true);
+    expect(result.isError).toBeUndefined();
+    const tree = JSON.parse(result.content);
+    expect(tree.name).toBe("Characters");
+    expect(tree.path).toBe("Characters");
+    expect(tree.type).toBe("directory");
+    const childNames = tree.children.map((c: { name: string }) => c.name);
+    expect(childNames).toContain("Alaric.md");
+    expect(childNames).toContain("Drafts");
+    const alaric = tree.children.find((c: { name: string }) => c.name === "Alaric.md");
+    expect(alaric.path).toBe("Characters/Alaric.md");
+    const drafts = tree.children.find((c: { name: string }) => c.name === "Drafts");
+    expect(drafts.type).toBe("directory");
+    expect(drafts.path).toBe("Characters/Drafts");
+    expect(drafts.children[0].name).toBe("old.md");
+    expect(drafts.children[0].path).toBe("Characters/Drafts/old.md");
+  });
+
+  test("uses vault root when path is omitted", async () => {
+    const note = makeFile("index.md");
+    const root = makeFolder("", [note]);
+    const ctx = makeCtx({ root });
+    const result = await executeVaultTool(tc("directory_tree", {}), ctx);
+
+    expect(result.isReadOnly).toBe(true);
+    const tree = JSON.parse(result.content);
+    expect(tree.type).toBe("directory");
+    expect(tree.children[0].name).toBe("index.md");
+  });
+
+  test("returns error when folder not found", async () => {
+    const ctx = makeCtx({});
+    const result = await executeVaultTool(tc("directory_tree", { path: "Missing" }), ctx);
+    expect(result.isError).toBe(true);
+    expect(result.content).toContain("Error:");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// search_files
+// ---------------------------------------------------------------------------
+
+describe("search_files", () => {
+  test("matches files by glob pattern", async () => {
+    const files = [
+      makeFile("Characters/Will.md"),
+      makeFile("Characters/Alaric.md"),
+      makeFile("Scenes/Act1.md"),
+    ];
+    const ctx = makeCtx({ files });
+    const result = await executeVaultTool(tc("search_files", { pattern: "Will*" }), ctx);
+
+    expect(result.isReadOnly).toBe(true);
+    expect(result.isError).toBeUndefined();
+    expect(result.content).toContain("Characters/Will.md");
+    expect(result.content).not.toContain("Alaric.md");
+    expect(result.content).not.toContain("Act1.md");
+  });
+
+  test("search is case-insensitive", async () => {
+    const files = [makeFile("Characters/WILL.md")];
+    const ctx = makeCtx({ files });
+    const result = await executeVaultTool(tc("search_files", { pattern: "will*" }), ctx);
+    expect(result.content).toContain("Characters/WILL.md");
+  });
+
+  test("restricts search to given path", async () => {
+    const files = [
+      makeFile("Characters/Will.md"),
+      makeFile("Scenes/Will-scene.md"),
+    ];
+    const ctx = makeCtx({ files });
+    const result = await executeVaultTool(
+      tc("search_files", { path: "Characters", pattern: "Will*" }),
+      ctx,
+    );
+    expect(result.content).toContain("Characters/Will.md");
+    expect(result.content).not.toContain("Scenes/Will-scene.md");
+  });
+
+  test("respects excludePatterns", async () => {
+    const files = [
+      makeFile("Characters/Will.md"),
+      makeFile("Characters/Will-draft.md"),
+    ];
+    const ctx = makeCtx({ files });
+    const result = await executeVaultTool(
+      tc("search_files", { pattern: "Will*", excludePatterns: ["*draft*"] }),
+      ctx,
+    );
+    expect(result.content).toContain("Characters/Will.md");
+    expect(result.content).not.toContain("Will-draft.md");
+  });
+
+  test("reports no results when nothing matches", async () => {
+    const files = [makeFile("Characters/Alaric.md")];
+    const ctx = makeCtx({ files });
+    const result = await executeVaultTool(tc("search_files", { pattern: "Zzz*" }), ctx);
+    expect(result.isError).toBeUndefined();
+    expect(result.content).toContain("No notes found");
+  });
+
+  test("returns error when pattern is missing", async () => {
+    const ctx = makeCtx({});
+    const result = await executeVaultTool(tc("search_files", {}), ctx);
     expect(result.isError).toBe(true);
   });
 });

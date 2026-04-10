@@ -35,10 +35,14 @@ export async function executeVaultTool(
   switch (toolCall.name) {
     case "semantic_search":
       return executeSearchVault(toolCall.arguments, ctx);
-    case "read_note":
-      return executeReadNote(toolCall.arguments, ctx);
-    case "list_folder":
-      return executeListFolder(toolCall.arguments, ctx);
+    case "read_file":
+      return executeReadFile(toolCall.arguments, ctx);
+    case "list_directory":
+      return executeListDirectory(toolCall.arguments, ctx);
+    case "directory_tree":
+      return executeDirectoryTree(toolCall.arguments, ctx);
+    case "search_files":
+      return executeSearchFiles(toolCall.arguments, ctx);
     case "get_backlinks":
       return executeGetBacklinks(toolCall.arguments, ctx);
     case "find_notes_by_tag":
@@ -94,7 +98,7 @@ async function executeSearchVault(
   return { content: parts.join("\n").replace(/\s+$/, ""), isReadOnly: true };
 }
 
-async function executeReadNote(
+async function executeReadFile(
   args: Record<string, unknown>,
   ctx: VaultToolContext,
 ): Promise<ToolResult> {
@@ -131,13 +135,11 @@ async function executeReadNote(
   return { content: parts.join("\n"), isReadOnly: true };
 }
 
-async function executeListFolder(
+async function executeListDirectory(
   args: Record<string, unknown>,
   ctx: VaultToolContext,
 ): Promise<ToolResult> {
   const rawPath = typeof args.path === "string" ? args.path.trim() : "";
-  const rawDepth = typeof args.depth === "number" ? args.depth : 1;
-  const depth = Math.max(1, Math.min(3, Math.round(rawDepth)));
 
   const folder = rawPath
     ? ctx.app.vault.getAbstractFileByPath(normalizePath(rawPath))
@@ -152,33 +154,123 @@ async function executeListFolder(
   }
 
   const items: string[] = [];
-  collectFolderItems(folder, 1, depth, items);
+  for (const child of folder.children) {
+    if (child instanceof TFolder) {
+      items.push(`[DIR] ${child.path}`);
+    } else if (child instanceof TFile && child.extension === "md") {
+      items.push(`[FILE] ${child.path}`);
+    }
+  }
   items.sort();
 
   const header = rawPath ? `Contents of "${rawPath}"` : "Vault root";
-  const depthNote = depth > 1 ? ` (depth ${depth})` : "";
   if (items.length === 0) {
-    return { content: `${header}${depthNote}: (empty)`, isReadOnly: true };
+    return { content: `${header}: (empty)`, isReadOnly: true };
   }
-  return { content: `${header}${depthNote}:\n${items.join("\n")}`, isReadOnly: true };
+  return { content: `${header}:\n${items.join("\n")}`, isReadOnly: true };
 }
 
-function collectFolderItems(
-  folder: TFolder,
-  currentDepth: number,
-  maxDepth: number,
-  items: string[],
-): void {
+async function executeDirectoryTree(
+  args: Record<string, unknown>,
+  ctx: VaultToolContext,
+): Promise<ToolResult> {
+  const rawPath = typeof args.path === "string" ? args.path.trim() : "";
+
+  const folder = rawPath
+    ? ctx.app.vault.getAbstractFileByPath(normalizePath(rawPath))
+    : ctx.app.vault.getRoot();
+
+  if (!folder || !(folder instanceof TFolder)) {
+    return {
+      content: `Error: folder not found at path "${rawPath || "/"}".`,
+      isReadOnly: true,
+      isError: true,
+    };
+  }
+
+  const tree = buildDirectoryTree(folder);
+  return { content: JSON.stringify(tree, null, 2), isReadOnly: true };
+}
+
+interface TreeNode {
+  name: string;
+  path: string;
+  type: "file" | "directory";
+  children?: TreeNode[];
+}
+
+function buildDirectoryTree(folder: TFolder): TreeNode {
+  const children: TreeNode[] = [];
+
   for (const child of folder.children) {
     if (child instanceof TFolder) {
-      items.push(`${child.path}/ [folder]`);
-      if (currentDepth < maxDepth) {
-        collectFolderItems(child, currentDepth + 1, maxDepth, items);
-      }
+      children.push(buildDirectoryTree(child));
     } else if (child instanceof TFile && child.extension === "md") {
-      items.push(`${child.path} [note]`);
+      children.push({ name: child.name, path: child.path, type: "file" });
     }
   }
+
+  children.sort((a, b) => {
+    if (a.type !== b.type) return a.type === "directory" ? -1 : 1;
+    return a.name.localeCompare(b.name);
+  });
+
+  return {
+    name: folder.name || "/",
+    path: folder.path || "/",
+    type: "directory",
+    children,
+  };
+}
+
+async function executeSearchFiles(
+  args: Record<string, unknown>,
+  ctx: VaultToolContext,
+): Promise<ToolResult> {
+  const rawPattern = typeof args.pattern === "string" ? args.pattern.trim() : "";
+  if (!rawPattern) {
+    return { content: "Error: pattern is required.", isReadOnly: true, isError: true };
+  }
+
+  const rawPath = typeof args.path === "string" ? args.path.trim() : "";
+  const excludePatterns = Array.isArray(args.excludePatterns)
+    ? (args.excludePatterns as unknown[]).filter((p): p is string => typeof p === "string")
+    : [];
+
+  const patternRegex = globToRegex(rawPattern);
+  const excludeRegexes = excludePatterns.map(globToRegex);
+
+  const matches: string[] = [];
+  for (const file of ctx.app.vault.getMarkdownFiles()) {
+    if (rawPath && !file.path.startsWith(rawPath + "/") && file.path !== rawPath) {
+      continue;
+    }
+    if (!patternRegex.test(file.name)) continue;
+    if (excludeRegexes.some((rx) => rx.test(file.name) || rx.test(file.path))) continue;
+    matches.push(file.path);
+  }
+
+  matches.sort();
+
+  if (matches.length === 0) {
+    const scope = rawPath ? `in "${rawPath}"` : "in vault";
+    return {
+      content: `No notes found matching pattern "${rawPattern}" ${scope}.`,
+      isReadOnly: true,
+    };
+  }
+
+  const scope = rawPath ? `in "${rawPath}"` : "in vault";
+  return {
+    content: `Notes matching "${rawPattern}" ${scope} (${matches.length}):\n${matches.join("\n")}`,
+    isReadOnly: true,
+  };
+}
+
+function globToRegex(pattern: string): RegExp {
+  const escaped = pattern.replace(/[.+^${}()|[\]\\]/g, "\\$&");
+  const regexStr = escaped.replace(/\*/g, ".*").replace(/\?/g, ".");
+  return new RegExp(`^${regexStr}$`, "i");
 }
 
 async function executeGetBacklinks(

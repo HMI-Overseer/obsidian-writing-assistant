@@ -230,7 +230,10 @@ export async function runToolLoop(
 function extractToolInput(tc: ToolCall): string | undefined {
   const args = tc.arguments;
   if (tc.name === "semantic_search") return typeof args.query === "string" ? args.query : undefined;
-  if (tc.name === "read_note") return typeof args.path === "string" ? args.path : undefined;
+  if (tc.name === "read_file") return typeof args.path === "string" ? args.path : undefined;
+  if (tc.name === "list_directory") return typeof args.path === "string" ? args.path : undefined;
+  if (tc.name === "directory_tree") return typeof args.path === "string" ? args.path : undefined;
+  if (tc.name === "search_files") return typeof args.pattern === "string" ? args.pattern : undefined;
   if (tc.name === THINK_TOOL_NAME) return typeof args.thought === "string" ? args.thought : undefined;
   if (tc.name === "get_line_range") {
     const start = args.start_line;

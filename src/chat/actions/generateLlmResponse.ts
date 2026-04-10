@@ -188,6 +188,16 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
           else chatRenderer?.beginNewRound();
         },
         onStepRecorded: timeline ? (step) => timeline.addStep(step) : undefined,
+        onReasoningDelta: timeline ? (delta) => timeline.addReasoningDelta(delta) : undefined,
+        onReasoningRoundFinished: timeline
+          ? (committed, round) => {
+              // Always commit — every round's reasoning is worth keeping in the timeline.
+              timeline.commitLiveReasoning(round);
+              // Clear the bubble only for intermediate rounds (tool calls follow).
+              // For the final round the text stays in the bubble as the actual response.
+              if (committed) chatRenderer?.beginNewRound();
+            }
+          : undefined,
         onCalibrate: onCalibrate
           ? (request, usage) => {
               const estimated = estimateTokenCount(request);
@@ -219,9 +229,9 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
         agenticSteps,
       });
     } else if (finalization.kind === "replace") {
-      const fullResponse = renderer.getFullResponse();
-      if (fullResponse) {
-        store.finalizeRegeneration(finalization.oldMessage, fullResponse, {
+      const response = chatRenderer?.getCurrentRoundResponse() ?? "";
+      if (response) {
+        store.finalizeRegeneration(finalization.oldMessage, response, {
           modelId: activeModel.modelId,
           provider: activeModel.provider,
           ...(finalUsage && { usage: buildMessageUsage(activeModel.modelId, finalUsage) }),
@@ -268,9 +278,9 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
           agenticSteps: partialSteps,
         });
       } else if (finalization.kind === "replace") {
-        const fullResponse = renderer.getFullResponse();
-        if (fullResponse) {
-          store.finalizeRegeneration(finalization.oldMessage, fullResponse, {
+        const response = chatRenderer?.getCurrentRoundResponse() ?? "";
+        if (response) {
+          store.finalizeRegeneration(finalization.oldMessage, response, {
             modelId: activeModel.modelId,
             provider: activeModel.provider,
             ...(partialSteps?.length && { agenticSteps: partialSteps }),

@@ -27,6 +27,11 @@ export class AgenticTimeline {
   private readonly summaryLabelEl: HTMLElement;
   private readonly listEl: HTMLElement;
 
+  // Live-streaming reasoning state for the current round.
+  private liveReasoningText = "";
+  private liveReasoningEl: HTMLElement | null = null;
+  private liveReasoningNameEl: HTMLElement | null = null;
+
   constructor(private readonly containerEl: HTMLElement) {
     const detailsEl = containerEl.createEl("details", {
       cls: "lmsa-agentic-timeline",
@@ -52,6 +57,49 @@ export class AgenticTimeline {
     this.updateSummary();
   }
 
+  /**
+   * Append a text delta to the live reasoning entry for the current round.
+   * Creates the entry on first call; updates its display on subsequent calls.
+   */
+  addReasoningDelta(delta: string): void {
+    this.liveReasoningText += delta;
+    if (!this.liveReasoningEl) {
+      this.initLiveReasoning();
+    }
+    const text = this.liveReasoningText;
+    if (this.liveReasoningNameEl) {
+      this.liveReasoningNameEl.textContent =
+        text.length > 120 ? text.slice(0, 120) + "…" : text;
+    }
+  }
+
+  /**
+   * Commit the live reasoning entry as a permanent step (model called tools after this text).
+   * Stores the step for persistence and releases the live references so the next round starts fresh.
+   */
+  commitLiveReasoning(round: number): void {
+    const text = this.liveReasoningText.trim();
+    if (!text) {
+      this.discardLiveReasoning();
+      return;
+    }
+    this.steps.push({ type: "reasoning", round, text });
+    // The live DOM element stays in place as the committed step.
+    this.liveReasoningEl = null;
+    this.liveReasoningNameEl = null;
+    this.liveReasoningText = "";
+  }
+
+  /**
+   * Remove the live reasoning entry without recording it (model produced a final text response).
+   */
+  discardLiveReasoning(): void {
+    this.liveReasoningEl?.remove();
+    this.liveReasoningEl = null;
+    this.liveReasoningNameEl = null;
+    this.liveReasoningText = "";
+  }
+
   getSteps(): AgenticStep[] {
     return [...this.steps];
   }
@@ -62,6 +110,20 @@ export class AgenticTimeline {
     for (const step of steps) {
       timeline.addStep(step);
     }
+  }
+
+  private initLiveReasoning(): void {
+    const stepEl = this.listEl.createDiv({
+      cls: "lmsa-agentic-timeline-step lmsa-agentic-timeline-step--reasoning",
+    });
+    const dotEl = stepEl.createDiv({ cls: "lmsa-agentic-timeline-dot" });
+    setIcon(dotEl, "message-square");
+    const bodyEl = stepEl.createDiv({ cls: "lmsa-agentic-timeline-step-body" });
+    this.liveReasoningNameEl = bodyEl.createSpan({
+      cls: "lmsa-agentic-timeline-step-name",
+      text: "…",
+    });
+    this.liveReasoningEl = stepEl;
   }
 
   private updateSummary(): void {

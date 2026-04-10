@@ -30,6 +30,14 @@ export interface ToolLoopCallbacks {
   onNewRound?: () => void;
   /** Called after each read-only tool call completes, with a record of what was done. */
   onStepRecorded?: (step: AgenticStep) => void;
+  /** Called with each text delta during streaming for live reasoning display in the timeline. */
+  onReasoningDelta?: (delta: string) => void;
+  /**
+   * Called when a round ends.
+   * committed=true: the model called tools — keep the live reasoning entry.
+   * committed=false: the model produced a final text response — discard the live entry.
+   */
+  onReasoningRoundFinished?: (committed: boolean, round: number) => void;
   /** Called with the first round's usage for token estimation calibration. */
   onCalibrate?: (request: ChatRequest, usage: UsageResult) => void;
 }
@@ -76,6 +84,7 @@ export async function runToolLoop(
 
     for await (const delta of streamResult.deltas) {
       callbacks.onDelta(delta);
+      callbacks.onReasoningDelta?.(delta);
     }
 
     const usage = await streamResult.usage;
@@ -96,7 +105,10 @@ export async function runToolLoop(
     // Detect failed tool calls: model stopped but produced nothing useful.
     checkForFailedToolCall(hasToolCalls, roundText, stopReason);
 
-    if (!hasToolCalls || !toolCalls) break;
+    if (!hasToolCalls || !toolCalls) {
+      callbacks.onReasoningRoundFinished?.(false, round);
+      break;
+    }
 
     const readOnlyCalls = toolCalls.filter((tc) => ALL_READ_ONLY_TOOL_NAMES.has(tc.name));
     const writeCalls = toolCalls.filter((tc) => !ALL_READ_ONLY_TOOL_NAMES.has(tc.name));
@@ -108,12 +120,13 @@ export async function runToolLoop(
       const vaultCalls = readOnlyCalls.filter((tc) => VAULT_TOOL_NAMES.has(tc.name));
 
       // Edit read-only tools require a filePath. If there are edit calls but no path, stop.
-      if (editReadOnlyCalls.length > 0 && !filePath) break;
-
-      // Record any reasoning prose the model emitted before calling tools.
-      if (roundText.trim()) {
-        callbacks.onStepRecorded?.({ type: "reasoning", round, text: roundText.trim() });
+      if (editReadOnlyCalls.length > 0 && !filePath) {
+        callbacks.onReasoningRoundFinished?.(false, round);
+        break;
       }
+
+      // Commit the live reasoning entry — the model was thinking before these tool calls.
+      callbacks.onReasoningRoundFinished?.(true, round);
 
       const assistantTurn: ChatTurn = {
         role: "assistant",
@@ -166,7 +179,8 @@ export async function runToolLoop(
       continue;
     }
 
-    // Has write tool calls (or mixed) — break and finalize.
+    // Has write tool calls (or mixed) — commit any reasoning before the writes and finalize.
+    callbacks.onReasoningRoundFinished?.(true, round);
     break;
   }
 

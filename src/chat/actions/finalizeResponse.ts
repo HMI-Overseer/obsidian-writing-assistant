@@ -42,26 +42,29 @@ export async function finalizeResponse(
   rewrittenQuery?: string,
   agenticSteps?: AgenticStep[]
 ): Promise<void> {
-  const fullResponse = renderer.getFullResponse();
+  // In agentic multi-round sessions the bubble only shows the final round.
+  // getCurrentRoundResponse() returns that slice; for single-round sessions it
+  // equals getFullResponse().
+  const response = renderer.getCurrentRoundResponse();
 
-  if (fullResponse) {
-    const assistantMessage = makeMessage("assistant", fullResponse);
+  if (response) {
+    const assistantMessage = makeMessage("assistant", response);
     attachUsageToMessage(assistantMessage, modelId, provider, usage);
     if (ragSources) assistantMessage.ragSources = ragSources;
     if (rewrittenQuery) assistantMessage.rewrittenQuery = rewrittenQuery;
     if (agenticSteps?.length) assistantMessage.agenticSteps = agenticSteps;
     store.appendMessage(assistantMessage);
-    store.setLastAssistantResponse(fullResponse);
+    store.setLastAssistantResponse(response);
 
     if (
       !renderer.hasStreamRenderedMarkdown() ||
-      renderer.getLastRenderedText() !== fullResponse
+      renderer.getLastRenderedText() !== response
     ) {
-      await transcript.renderBubbleContent(bubble, fullResponse);
+      await transcript.renderBubbleContent(bubble, response);
     }
 
     if (autoInsertAfterResponse) {
-      await insertLastResponse(plugin, fullResponse);
+      await insertLastResponse(plugin, response);
     }
   } else {
     transcript.renderPlainTextContent(bubble, "(no response)");
@@ -79,22 +82,22 @@ export async function finalizeAbortedResponse(
   rewrittenQuery?: string,
   agenticSteps?: AgenticStep[]
 ): Promise<void> {
-  const fullResponse = renderer.getFullResponse();
+  const response = renderer.getCurrentRoundResponse();
 
-  if (fullResponse) {
-    const assistantMessage = makeMessage("assistant", fullResponse);
+  if (response) {
+    const assistantMessage = makeMessage("assistant", response);
     attachUsageToMessage(assistantMessage, modelId, provider);
     if (ragSources) assistantMessage.ragSources = ragSources;
     if (rewrittenQuery) assistantMessage.rewrittenQuery = rewrittenQuery;
     if (agenticSteps?.length) assistantMessage.agenticSteps = agenticSteps;
     store.appendMessage(assistantMessage);
-    store.setLastAssistantResponse(fullResponse);
+    store.setLastAssistantResponse(response);
 
     if (
       !renderer.hasStreamRenderedMarkdown() ||
-      renderer.getLastRenderedText() !== fullResponse
+      renderer.getLastRenderedText() !== response
     ) {
-      await transcript.renderBubbleContent(bubble, fullResponse);
+      await transcript.renderBubbleContent(bubble, response);
     }
   } else {
     transcript.renderPlainTextContent(bubble, "Generation stopped.");

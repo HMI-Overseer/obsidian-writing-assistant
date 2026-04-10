@@ -4,6 +4,7 @@ import { getActiveNoteText, getFullNoteContent } from "../../context/noteContext
 import { shouldUseToolCall } from "../../tools/registry";
 import { ALL_EDIT_TOOLS, CORE_EDIT_TOOLS } from "../../tools/editing/definition";
 import { ALL_VAULT_TOOLS } from "../../tools/vault/definition";
+import { VAULT_TOOL_SYSTEM_PROMPT } from "../../tools/vault/systemPrompt";
 import type { CanonicalToolDefinition } from "../../tools/types";
 import type { ChatMode } from "../types";
 import type { App } from "obsidian";
@@ -123,7 +124,8 @@ export async function prepareApiMessages(
       ? "\n\nWhen retrieved notes are provided, use them as reference material. Documents may include <graph_context> annotations showing entities and relationships from the vault's knowledge graph — use these to understand how topics connect across documents."
       : "\n\nWhen retrieved notes are provided, use them as reference material. If the retrieved notes don't contain relevant information for the question, rely on your general knowledge instead.";
   }
-  const finalSystemPrompt = systemPrompt + groundingNote;
+  const vaultGuidance = useVaultTools ? "\n\n" + VAULT_TOOL_SYSTEM_PROMPT : "";
+  const finalSystemPrompt = systemPrompt + groundingNote + vaultGuidance;
 
   // Build the tool list based on mode and agentic settings.
   // Vault tools are included whenever agentic mode is on and the model supports tools.

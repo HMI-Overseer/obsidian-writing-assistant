@@ -3,7 +3,7 @@ import type { ChatRequest, ChatTurn, DocumentContext, RagContextBlock } from "..
 import { getActiveNoteText, getFullNoteContent } from "../../context/noteContext";
 import { shouldUseToolCall } from "../../tools/registry";
 import { ALL_EDIT_TOOLS, CORE_EDIT_TOOLS } from "../../tools/editing/definition";
-import { ALL_VAULT_TOOLS, CORE_VAULT_TOOLS } from "../../tools/vault/definition";
+import { ALL_VAULT_TOOLS, CORE_VAULT_TOOLS, VAULT_TOOL_NAMES } from "../../tools/vault/definition";
 import { buildVaultToolSystemPrompt } from "../../tools/vault/systemPrompt";
 import type { CanonicalToolDefinition } from "../../tools/types";
 import type { ChatMode } from "../types";
@@ -140,8 +140,7 @@ export async function prepareApiMessages(
     const editTools = activeProvider === "lmstudio" ? CORE_EDIT_TOOLS : ALL_EDIT_TOOLS;
     tools = [...CORE_VAULT_TOOLS, ...editTools];
   } else if (useVaultTools) {
-    // Chat / Plan mode: full exploration suite for cloud, core for local models.
-    tools = activeProvider === "lmstudio" ? CORE_VAULT_TOOLS : ALL_VAULT_TOOLS;
+    tools = ALL_VAULT_TOOLS;
   }
 
   // semantic_search requires a built RAG index. Remove it when unavailable so
@@ -151,10 +150,11 @@ export async function prepareApiMessages(
     tools = tools.filter((t) => t.name !== "semantic_search");
   }
 
-  // Build vault guidance after filtering so the system prompt accurately reflects
-  // which tools are available — in particular, whether semantic_search is present.
-  const hasSemanticSearch = tools?.some((t) => t.name === "semantic_search") ?? false;
-  const vaultGuidance = useVaultTools ? "\n\n" + buildVaultToolSystemPrompt(hasSemanticSearch) : "";
+  // Build vault guidance from the filtered vault tools so the system prompt
+  // accurately reflects what is actually available (e.g. no semantic_search
+  // when the RAG index is not ready).
+  const activeVaultTools = (tools ?? []).filter((t) => VAULT_TOOL_NAMES.has(t.name));
+  const vaultGuidance = useVaultTools ? "\n\n" + buildVaultToolSystemPrompt(activeVaultTools) : "";
   const finalSystemPrompt = systemPrompt + groundingNote + vaultGuidance;
 
   return { systemPrompt: finalSystemPrompt, documentContext, ragContext, rewrittenQuery, messages, tools };

@@ -7,6 +7,8 @@ export const SEARCH_VAULT_TOOL: CanonicalToolDefinition = {
     "with their source file, heading path, similarity score, and content. " +
     "Use this when you need information from the vault that wasn't in the initial context, " +
     "or to follow up on references found in previous results.",
+  strategyHint: "find notes by meaning when you know what you need but not where it lives",
+  errorGuidance: "Retry with a rephrased or more specific query. Never repeat the same query exactly.",
   parameters: {
     type: "object",
     properties: {
@@ -33,6 +35,8 @@ export const READ_NOTE_TOOL: CanonicalToolDefinition = {
     "Read the full content of a specific vault note by its file path. " +
     "Use this when you already know which note you need (e.g., from a wikilink or search result) " +
     "and want the complete text rather than matched chunks.",
+  strategyHint: "read the full content of a specific note once you know its path",
+  errorGuidance: "If the note was not found, call list_folder first to locate the correct path.",
   parameters: {
     type: "object",
     properties: {
@@ -54,6 +58,7 @@ export const LIST_FOLDER_TOOL: CanonicalToolDefinition = {
     "Use this to discover what notes exist before reading or searching them. " +
     "Start here when asked to explore or survey the vault — it gives you a map before you dive in. " +
     "Omit path to list the vault root.",
+  strategyHint: "discover what notes and folders exist (start here when exploring)",
   parameters: {
     type: "object",
     properties: {
@@ -75,6 +80,8 @@ export const GET_BACKLINKS_TOOL: CanonicalToolDefinition = {
     "Use this to answer 'which scenes feature this character?' or 'what references this concept?'. " +
     "More reliable than semantic search for explicit wikilink connections — " +
     "a scene may link [[Character Name]] without ever spelling out the name in prose.",
+  strategyHint: "find every note that links to a given note (reliable for explicit wikilink connections)",
+  errorGuidance: "If the note was not found, call list_folder to find the correct path.",
   parameters: {
     type: "object",
     properties: {
@@ -94,6 +101,8 @@ export const FIND_NOTES_BY_TAG_TOOL: CanonicalToolDefinition = {
     "Use this to enumerate notes by type or category " +
     "(e.g., '#character', '#location', '#antagonist'). " +
     "Call list_folder first if you are not sure which tags exist.",
+  strategyHint: "enumerate notes by type or category (e.g. #character, #location)",
+  errorGuidance: "If no notes found, the result will suggest similar tags — try one of those.",
   parameters: {
     type: "object",
     properties: {
@@ -114,6 +123,7 @@ export const GET_FRONTMATTER_TOOL: CanonicalToolDefinition = {
     "their full prose content. Use this to compare attributes across several notes efficiently " +
     "(e.g., species, affiliation, status across all characters). " +
     "Accepts multiple paths in one call to avoid multiple round trips.",
+  strategyHint: "compare structured attributes across several notes without reading full content",
   parameters: {
     type: "object",
     properties: {

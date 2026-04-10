@@ -17,6 +17,18 @@ export interface CanonicalToolDefinition {
     properties: Record<string, JsonSchemaProperty>;
     required: string[];
   };
+  /**
+   * One-line hint used in the exploration strategy section of the system prompt.
+   * Describes *when* to reach for this tool relative to others.
+   * Not sent to the API — system-prompt generation only.
+   */
+  strategyHint?: string;
+  /**
+   * What to do when this tool returns an error result.
+   * Shown in the error handling section of the system prompt.
+   * Not sent to the API — system-prompt generation only.
+   */
+  errorGuidance?: string;
 }
 
 /** A parsed tool call from a model response. */

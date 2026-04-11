@@ -196,6 +196,29 @@
     @apply lmsa-px-0;
   }
 
+  /* ── Disclaimer modal ──────────────────────────────────────────────── */
+
+  .lmsa-disclaimer-modal .modal-content {
+    max-width: 540px;
+  }
+
+  .lmsa-disclaimer-modal p {
+    color: var(--lmsa-text-secondary);
+    line-height: 1.65;
+    margin: 0.75em 0;
+  }
+
+  .lmsa-disclaimer-modal p:first-of-type {
+    margin-top: 0.25em;
+  }
+
+  .lmsa-disclaimer-buttons {
+    @apply lmsa-flex lmsa-justify-end lmsa-gap-2;
+    margin-top: 1.25em;
+    padding-top: 1em;
+    border-top: 1px solid var(--lmsa-border-default);
+  }
+
   /* ── Toggle ──────────────────────────────────────────────────────────── */
 
   .lmsa-toggle {

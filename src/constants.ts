@@ -105,6 +105,7 @@ export const DEFAULT_SETTINGS: PluginSettings = {
   chatSystemPromptPrefix: DEFAULT_CHAT_SYSTEM_PROMPT_PREFIX,
   editToolSystemPromptPrefix: TOOL_EDIT_SYSTEM_PROMPT,
   editFallbackSystemPromptPrefix: EDIT_SYSTEM_PROMPT,
+  apiKeysDisclaimerAccepted: false,
   agenticMode: false,
   preferToolUse: false,
   maxToolRoundsEdit: DEFAULT_MAX_TOOL_ROUNDS_EDIT,

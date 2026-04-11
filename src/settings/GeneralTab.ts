@@ -1,6 +1,16 @@
 import type WritingAssistantChat from "../main";
-import { ApiKeysModal } from "./modals";
+import { ApiKeysModal, ApiKeysDisclaimerModal } from "./modals";
 import { createSettingsSection, SettingItem } from "./ui";
+
+function openApiKeysWithDisclaimer(plugin: WritingAssistantChat): void {
+  if (plugin.settings.apiKeysDisclaimerAccepted) {
+    new ApiKeysModal(plugin.app, plugin).open();
+    return;
+  }
+  new ApiKeysDisclaimerModal(plugin.app, plugin, () => {
+    new ApiKeysModal(plugin.app, plugin).open();
+  }).open();
+}
 
 export function renderGeneralTab(container: HTMLElement, plugin: WritingAssistantChat): void {
   // ── Provider API Keys ──────────────────────────────────────────────
@@ -19,7 +29,7 @@ export function renderGeneralTab(container: HTMLElement, plugin: WritingAssistan
         .setButtonText("Manage keys")
         .setCta()
         .onClick(() => {
-          new ApiKeysModal(plugin.app, plugin).open();
+          openApiKeysWithDisclaimer(plugin);
         })
     );
 

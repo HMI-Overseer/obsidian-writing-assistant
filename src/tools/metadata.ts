@@ -66,6 +66,8 @@ export function extractToolInput(
     case "get_backlinks": return typeof args.path === "string" ? args.path : undefined;
     case "find_notes_by_tag": return typeof args.tag === "string" ? args.tag : undefined;
     case "get_frontmatter": return Array.isArray(args.paths) ? `${args.paths.length} note(s)` : undefined;
+    case "propose_edit": return typeof args.explanation === "string" ? args.explanation : undefined;
+    case "update_frontmatter": return typeof args.explanation === "string" ? args.explanation : undefined;
     case "think": return typeof args.thought === "string" ? args.thought : undefined;
     default: return undefined;
   }

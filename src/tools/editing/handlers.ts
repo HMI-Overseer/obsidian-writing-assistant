@@ -1,6 +1,10 @@
 import type { App, TFile } from "obsidian";
 import type { EditBlock } from "../../editing/editTypes";
+import type { ToolCall, ToolResult } from "../types";
+import { EDIT_TOOL_NAMES } from "./definition";
+import { validateProposeEdit, validateUpdateFrontmatter } from "./validation";
 import type { FrontmatterOperation } from "./validation";
+import { normalizeEscapes } from "./conversion";
 
 // ---------------------------------------------------------------------------
 // Public API
@@ -10,6 +14,114 @@ export interface ToolExecutionContext {
   app: App;
   /** Vault-relative path to the active file. */
   filePath: string;
+}
+
+/**
+ * Execute an edit tool inside the tool loop and return a result for the model.
+ *
+ * Edit tools are validated and checked against the active document so the model
+ * gets immediate feedback (e.g. "search text not found") and can self-correct
+ * before the loop ends. The actual diff review happens at finalization — this
+ * function only validates and acknowledges.
+ */
+export async function executeEditTool(
+  toolCall: ToolCall,
+  ctx: ToolExecutionContext,
+): Promise<ToolResult> {
+  if (!EDIT_TOOL_NAMES.has(toolCall.name)) {
+    return { content: `Unknown edit tool: ${toolCall.name}`, isReadOnly: false, isError: true };
+  }
+
+  switch (toolCall.name) {
+    case "propose_edit":
+      return executeProposeEdit(toolCall.arguments, ctx);
+    case "update_frontmatter":
+      return executeUpdateFrontmatter(toolCall.arguments);
+    default:
+      return { content: `Unknown edit tool: ${toolCall.name}`, isReadOnly: false, isError: true };
+  }
+}
+
+/**
+ * Resolve the target file for edit operations. Uses the pre-set filePath
+ * from document context when available, otherwise falls back to the
+ * currently active file in the workspace.
+ */
+function resolveTargetFile(ctx: ToolExecutionContext) {
+  if (ctx.filePath) {
+    const file = ctx.app.vault.getFileByPath(ctx.filePath);
+    if (file) return { file, path: ctx.filePath };
+  }
+  const active = ctx.app.workspace.getActiveFile();
+  if (active) return { file: active, path: active.path };
+  return null;
+}
+
+async function executeProposeEdit(
+  args: Record<string, unknown>,
+  ctx: ToolExecutionContext,
+): Promise<ToolResult> {
+  const v = validateProposeEdit(args);
+  if (!v.ok) {
+    return { content: `Invalid propose_edit arguments: ${v.error}`, isReadOnly: false, isError: true };
+  }
+
+  const searchText = normalizeEscapes(v.args.search);
+  if (!searchText) {
+    return { content: "search text must not be empty.", isReadOnly: false, isError: true };
+  }
+
+  const target = resolveTargetFile(ctx);
+  if (!target) {
+    return {
+      content: "No active document. Open the file you want to edit, or use read_file to inspect it first.",
+      isReadOnly: false,
+      isError: true,
+    };
+  }
+
+  const content = await ctx.app.vault.read(target.file);
+  const idx = content.indexOf(searchText);
+
+  if (idx === -1) {
+    return {
+      content:
+        `Search text not found in "${target.path}". ` +
+        "Ensure the search string matches the document exactly, including whitespace and indentation. " +
+        "Use read_file to verify the current content.",
+      isReadOnly: false,
+      isError: true,
+    };
+  }
+
+  const lineNumber = content.slice(0, idx).split("\n").length;
+  const explanation = v.args.explanation ? ` (${v.args.explanation})` : "";
+  return {
+    content: `Edit proposed for "${target.path}": matched at line ${lineNumber}${explanation}. Queued for user review.`,
+    isReadOnly: false,
+  };
+}
+
+function executeUpdateFrontmatter(
+  args: Record<string, unknown>,
+): Promise<ToolResult> {
+  const v = validateUpdateFrontmatter(args);
+  if (!v.ok) {
+    return Promise.resolve({
+      content: `Invalid update_frontmatter arguments: ${v.error}`,
+      isReadOnly: false,
+      isError: true,
+    });
+  }
+
+  const summary = v.args.operations
+    .map((op) => `${op.action} '${op.key}'`)
+    .join(", ");
+  const explanation = v.args.explanation ? ` (${v.args.explanation})` : "";
+  return Promise.resolve({
+    content: `Frontmatter update proposed: ${summary}${explanation}. Queued for user review.`,
+    isReadOnly: false,
+  });
 }
 
 /**

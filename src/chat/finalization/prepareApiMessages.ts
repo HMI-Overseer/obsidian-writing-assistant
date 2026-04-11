@@ -2,7 +2,8 @@ import type { ConversationMessage, PluginSettings, ProviderOption } from "../../
 import type { ChatRequest, ChatTurn, DocumentContext, RagContextBlock } from "../../shared/chatRequest";
 import { getActiveNoteText, getFullNoteContent } from "../../context/noteContext";
 import { shouldUseToolCall } from "../../tools/registry";
-import { ALL_EDIT_TOOLS } from "../../tools/editing/definition";
+import { ALL_EDIT_TOOLS, EDIT_TOOL_NAMES } from "../../tools/editing/definition";
+import { buildEditToolSystemPrompt } from "../../tools/editing/systemPrompt";
 import { ALL_VAULT_TOOLS, CORE_VAULT_TOOLS, VAULT_TOOL_NAMES } from "../../tools/vault/definition";
 import { THINK_TOOL } from "../../tools/think/definition";
 import { buildVaultToolSystemPrompt } from "../../tools/vault/systemPrompt";
@@ -160,12 +161,14 @@ export async function prepareApiMessages(
     tools = tools.filter((t) => t.name !== "semantic_search");
   }
 
-  // Build vault guidance from the filtered vault tools so the system prompt
+  // Build tool guidance from the filtered tool lists so the system prompt
   // accurately reflects what is actually available (e.g. no semantic_search
   // when the RAG index is not ready).
   const activeVaultTools = (tools ?? []).filter((t) => VAULT_TOOL_NAMES.has(t.name));
   const vaultGuidance = useVaultTools ? "\n\n" + buildVaultToolSystemPrompt(activeVaultTools) : "";
-  const finalSystemPrompt = systemPrompt + groundingNote + vaultGuidance;
+  const activeEditTools = (tools ?? []).filter((t) => EDIT_TOOL_NAMES.has(t.name));
+  const editGuidance = useEditTools ? "\n\n" + buildEditToolSystemPrompt(activeEditTools) : "";
+  const finalSystemPrompt = systemPrompt + groundingNote + vaultGuidance + editGuidance;
 
   return { systemPrompt: finalSystemPrompt, documentContext, ragContext, rewrittenQuery, messages, tools };
 }

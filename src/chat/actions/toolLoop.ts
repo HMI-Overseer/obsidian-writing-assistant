@@ -6,14 +6,18 @@ import type { UsageResult, StopReason } from "../../api/usageTypes";
 import { VAULT_TOOL_NAMES } from "../../tools/vault/definition";
 import { executeVaultTool } from "../../tools/vault/handlers";
 import type { VaultToolContext } from "../../tools/vault/handlers";
+import { EDIT_TOOL_NAMES } from "../../tools/editing/definition";
+import { executeEditTool } from "../../tools/editing/handlers";
+import type { ToolExecutionContext } from "../../tools/editing/handlers";
 import { THINK_TOOL_NAME } from "../../tools/think/definition";
 import { extractToolInput } from "../../tools/metadata";
 
-export type { VaultToolContext };
+export type { VaultToolContext, ToolExecutionContext };
 
-/** All tool names that are read-only (results returned to the model to continue reasoning). */
-const ALL_READ_ONLY_TOOL_NAMES = new Set([
+/** All tool names that execute inside the tool loop (results feed back to the model). */
+const ALL_LOOP_TOOL_NAMES = new Set([
   ...VAULT_TOOL_NAMES,
+  ...EDIT_TOOL_NAMES,
   THINK_TOOL_NAME,
 ]);
 
@@ -73,6 +77,7 @@ export async function runToolLoop(
   maxRounds: number,
   agenticMode: boolean,
   vaultToolContext?: VaultToolContext,
+  editToolContext?: ToolExecutionContext,
 ): Promise<ToolLoopResult> {
   const toolLoopTurns: ChatTurn[] = [];
   let allWriteToolCalls: ToolCall[] = [];
@@ -91,7 +96,7 @@ export async function runToolLoop(
     const streamResult = client.stream(
       roundRequest, model, params, signal,
       onToolCallStreaming
-        ? (_idx, name) => { if (ALL_READ_ONLY_TOOL_NAMES.has(name)) onToolCallStreaming(name); }
+        ? (_idx, name) => { if (ALL_LOOP_TOOL_NAMES.has(name)) onToolCallStreaming(name); }
         : undefined,
     );
 
@@ -144,18 +149,19 @@ export async function runToolLoop(
       break;
     }
 
-    const readOnlyCalls = toolCalls.filter((tc) => ALL_READ_ONLY_TOOL_NAMES.has(tc.name));
-    const writeCalls = toolCalls.filter((tc) => !ALL_READ_ONLY_TOOL_NAMES.has(tc.name));
-    allWriteToolCalls = [...allWriteToolCalls, ...writeCalls];
+    // Classify tool calls: known loop tools execute inline; unknown tools are
+    // accumulated as write tool calls for the finalization pipeline.
+    const loopCalls = toolCalls.filter((tc) => ALL_LOOP_TOOL_NAMES.has(tc.name));
+    const unknownCalls = toolCalls.filter((tc) => !ALL_LOOP_TOOL_NAMES.has(tc.name));
+    if (unknownCalls.length > 0) {
+      allWriteToolCalls = [...allWriteToolCalls, ...unknownCalls];
+    }
 
-    // Write tool calls (or a mix of read + write) — hand off to the edit pipeline.
-    // Flush buffered text so the edit renderer has the prose content.
-    if (writeCalls.length > 0) {
-      if (agenticMode && roundBuffer) {
-        callbacks.onDelta(roundBuffer);
-      }
-      callbacks.onReasoningRoundFinished?.(true, round);
-      break;
+    // Collect edit tool calls for finalization (they execute in the loop AND
+    // get accumulated so the diff review panel can render them at the end).
+    const editCalls = loopCalls.filter((tc) => EDIT_TOOL_NAMES.has(tc.name));
+    if (editCalls.length > 0) {
+      allWriteToolCalls = [...allWriteToolCalls, ...editCalls];
     }
 
     // Cap reached: push terminal error results to keep history valid, then let
@@ -174,9 +180,9 @@ export async function runToolLoop(
       toolLoopTurns.push({
         role: "assistant",
         content: roundText || null,
-        toolCalls: readOnlyCalls.map((tc) => ({ id: tc.id, name: tc.name, arguments: tc.arguments })),
+        toolCalls: loopCalls.map((tc) => ({ id: tc.id, name: tc.name, arguments: tc.arguments })),
       });
-      for (const tc of readOnlyCalls) {
+      for (const tc of loopCalls) {
         toolLoopTurns.push({
           role: "tool",
           content: "Retrieval limit reached. Synthesize an answer from the information gathered so far.",
@@ -192,16 +198,16 @@ export async function runToolLoop(
     // Normal intermediate tool execution round — do NOT flush to bubble.
     callbacks.onReasoningRoundFinished?.(true, round);
 
-    const vaultCalls = readOnlyCalls.filter((tc) => VAULT_TOOL_NAMES.has(tc.name));
-    const thinkCalls = readOnlyCalls.filter((tc) => tc.name === THINK_TOOL_NAME);
+    const vaultCalls = loopCalls.filter((tc) => VAULT_TOOL_NAMES.has(tc.name));
+    const thinkCalls = loopCalls.filter((tc) => tc.name === THINK_TOOL_NAME);
 
     toolLoopTurns.push({
       role: "assistant",
       content: roundText || null,
-      toolCalls: readOnlyCalls.map((tc) => ({ id: tc.id, name: tc.name, arguments: tc.arguments })),
+      toolCalls: loopCalls.map((tc) => ({ id: tc.id, name: tc.name, arguments: tc.arguments })),
     });
 
-    // Execute all read-only tools in parallel.
+    // Execute all tools in parallel.
     const results = await Promise.all([
       ...vaultCalls.map(async (tc) => {
         callbacks.onToolStatus?.(tc.name);
@@ -212,6 +218,16 @@ export async function runToolLoop(
           };
         }
         return { tc, result: await executeVaultTool(tc, vaultToolContext) };
+      }),
+      ...editCalls.map(async (tc) => {
+        callbacks.onToolStatus?.(tc.name);
+        if (!editToolContext) {
+          return {
+            tc,
+            result: { content: "Edit tool context unavailable.", isReadOnly: false, isError: true },
+          };
+        }
+        return { tc, result: await executeEditTool(tc, editToolContext) };
       }),
       // think is a no-op: returns empty content so the model continues reasoning.
       ...thinkCalls.map((tc) => ({

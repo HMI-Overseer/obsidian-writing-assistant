@@ -10,6 +10,11 @@ export const PROPOSE_EDIT_TOOL: CanonicalToolDefinition = {
     "Propose a targeted search-and-replace edit to the document. " +
     "The edit is shown to the user for review before being applied. " +
     "Use one call per distinct change — multiple changes require multiple propose_edit calls.",
+  strategyHint:
+    "targeted search/replace for prose changes. Requires exact text from the document — " +
+    "use read_file first if the document content is not already in context.",
+  errorGuidance:
+    "If the search text was not found, re-read the document with read_file and match the exact text including whitespace.",
   parameters: {
     type: "object",
     properties: {
@@ -44,6 +49,10 @@ export const UPDATE_FRONTMATTER_TOOL: CanonicalToolDefinition = {
     "with multiple operations — do not make separate calls per property. " +
     "To keep only specific properties, remove all the others by name. " +
     "If the document has no frontmatter, a new block will be created.",
+  strategyHint:
+    "add, update, or remove YAML frontmatter properties. Batch all changes into a single call.",
+  errorGuidance:
+    "If operations are invalid, check the key names and action values (must be 'set' or 'remove').",
   parameters: {
     type: "object",
     properties: {
@@ -84,3 +93,6 @@ export const ALL_EDIT_TOOLS: CanonicalToolDefinition[] = [
   PROPOSE_EDIT_TOOL,
   UPDATE_FRONTMATTER_TOOL,
 ];
+
+/** Set of edit tool names for fast membership checks in the tool loop. */
+export const EDIT_TOOL_NAMES = new Set(ALL_EDIT_TOOLS.map((t) => t.name));

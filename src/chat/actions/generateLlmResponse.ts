@@ -18,7 +18,7 @@ import { estimateCost } from "../../api/pricing";
 import type { UsageResult } from "../../api/usageTypes";
 import type { MessageUsage } from "../../shared/types";
 import { runToolLoop } from "./toolLoop";
-import type { VaultToolContext } from "./toolLoop";
+import type { VaultToolContext, ToolExecutionContext } from "./toolLoop";
 import { AgenticTimeline } from "../messages/AgenticTimeline";
 import { CONTEXT_DANGER_THRESHOLD } from "../../constants";
 
@@ -158,6 +158,11 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
     activeFilePath: apiMessages.documentContext?.filePath,
   };
 
+  const editToolContext: ToolExecutionContext | undefined =
+    editMode
+      ? { app: plugin.app, filePath: apiMessages.documentContext?.filePath ?? "" }
+      : undefined;
+
   const abortController = new AbortController();
   setActiveAbortController(abortController);
 
@@ -209,6 +214,7 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
       maxRounds,
       agenticMode,
       vaultToolContext,
+      editToolContext,
     );
 
     await renderer.flush();

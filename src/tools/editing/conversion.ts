@@ -11,7 +11,7 @@ import type { FrontmatterOperation } from "./validation";
  * Normalize literal escape sequences that some LM Studio models emit
  * in tool call string arguments (e.g., literal `\n` instead of a newline).
  */
-function normalizeEscapes(value: unknown): string {
+export function normalizeEscapes(value: unknown): string {
   if (typeof value !== "string") return "";
   // Only replace sequences that look like literal escape codes.
   // Actual newlines/tabs are untouched since they don't contain a backslash.

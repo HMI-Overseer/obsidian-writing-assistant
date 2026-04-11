@@ -117,22 +117,8 @@ async function executeReadFile(
   }
 
   const content = await ctx.app.vault.read(file);
-  const cache = ctx.app.metadataCache.getFileCache(file);
 
-  const parts: string[] = [`[${path}]`];
-
-  if (cache?.frontmatter) {
-    const fm = cache.frontmatter;
-    const keys = Object.keys(fm).filter((k) => k !== "position");
-    if (keys.length > 0) {
-      parts.push(`Frontmatter: ${keys.map((k) => `${k}: ${String(fm[k])}`).join(", ")}`);
-    }
-  }
-
-  parts.push("");
-  parts.push(content);
-
-  return { content: parts.join("\n"), isReadOnly: true };
+  return { content: `[${path}]\n\n${content}`, isReadOnly: true };
 }
 
 async function executeListDirectory(

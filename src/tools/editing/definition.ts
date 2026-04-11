@@ -45,9 +45,8 @@ export const PROPOSE_EDIT_TOOL: CanonicalToolDefinition = {
 export const UPDATE_FRONTMATTER_TOOL: CanonicalToolDefinition = {
   name: "update_frontmatter",
   description:
-    "Add, update, or remove YAML frontmatter properties. Put ALL frontmatter changes into a single call " +
-    "with multiple operations — do not make separate calls per property. " +
-    "To keep only specific properties, remove all the others by name. " +
+    "Add, update, or remove YAML frontmatter properties. Put ALL changes into one call. " +
+    "Each operation must use action 'set' or 'remove'. Skip properties you want to leave as-is. " +
     "If the document has no frontmatter, a new block will be created.",
   strategyHint:
     "add, update, or remove YAML frontmatter properties. Batch all changes into a single call.",

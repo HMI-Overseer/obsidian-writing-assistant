@@ -768,7 +768,10 @@ export class ChatView extends ItemView {
     const activeModel = this.sessionStore?.getResolvedConversationModel();
 
     return {
-      systemPrompt: this.plugin.settings.globalSystemPrompt,
+      systemPrompt: getActiveProfile(
+        this.plugin.settings,
+        activeModel?.provider ?? "lmstudio",
+      ).systemPrompt,
       documentContext: this.cachedDocumentContext,
       messages: snapshot?.messageHistory ?? [],
       draft: draft ?? this.composer?.getDraft() ?? "",

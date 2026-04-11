@@ -28,8 +28,6 @@ export interface CompletionModel {
   provider: ProviderOption;
   /** Optional context window size in tokens. Enables future context-aware truncation. */
   contextWindowSize?: number;
-  /** @deprecated Use ProviderProfile.anthropicCacheSettings instead. */
-  anthropicCacheSettings?: AnthropicCacheSettings;
   /** Whether the model was trained for tool/function calling. Only relevant for LM Studio models. */
   trainedForToolUse?: boolean;
   /** Whether the model supports vision (image input). */
@@ -255,10 +253,6 @@ export interface KnowledgeGraphSettings {
 }
 
 export interface PluginSettings {
-  /** @deprecated Use providerSettings.lmstudio.baseUrl */
-  lmStudioUrl: string;
-  /** @deprecated Use providerSettings.lmstudio.bypassCors */
-  bypassCors: boolean;
   providerSettings: ProviderSettingsMap;
   includeNoteContext: boolean;
   maxContextChars: number;
@@ -266,22 +260,6 @@ export interface PluginSettings {
   embeddingModels: EmbeddingModel[];
   commands: CustomCommand[];
   chatHistory: ChatHistory;
-  /** @deprecated Use providerProfiles instead. */
-  globalSystemPrompt: string;
-  /** @deprecated Use providerProfiles instead. */
-  globalTemperature: number;
-  /** @deprecated Use providerProfiles instead. */
-  globalMaxTokens: number | null;
-  /** @deprecated Use providerProfiles instead. */
-  globalTopP: number | null;
-  /** @deprecated Use providerProfiles instead. */
-  globalTopK: number | null;
-  /** @deprecated Use providerProfiles instead. */
-  globalMinP: number | null;
-  /** @deprecated Use providerProfiles instead. */
-  globalRepeatPenalty: number | null;
-  /** @deprecated Use providerProfiles instead. */
-  globalReasoning: ReasoningLevel | null;
   /** Provider-scoped parameter profiles. */
   providerProfiles: ProviderProfile[];
   /** Active profile ID per provider. */

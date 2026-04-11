@@ -74,8 +74,6 @@ export function makeDefaultProfile(provider: ProviderOption): ProviderProfile {
 }
 
 export const DEFAULT_SETTINGS: PluginSettings = {
-  lmStudioUrl: "http://localhost:1234/v1",
-  bypassCors: true,
   providerSettings: {
     lmstudio: { baseUrl: "http://localhost:1234/v1", bypassCors: true },
     anthropic: { apiKey: "" },
@@ -83,14 +81,6 @@ export const DEFAULT_SETTINGS: PluginSettings = {
   },
   includeNoteContext: true,
   maxContextChars: 12000,
-  globalSystemPrompt: "",
-  globalTemperature: 0.7,
-  globalMaxTokens: 2000,
-  globalTopP: null,
-  globalTopK: null,
-  globalMinP: null,
-  globalRepeatPenalty: null,
-  globalReasoning: null,
   providerProfiles: [],
   activeProfileIds: { ...DEFAULT_ACTIVE_PROFILE_IDS },
   completionModels: [],

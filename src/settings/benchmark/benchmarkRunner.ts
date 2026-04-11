@@ -1,5 +1,5 @@
 import type { ChatClient } from "../../api/chatClient";
-import type { CompletionModel, SamplingParams } from "../../shared/types";
+import type { AnthropicCacheSettings, CompletionModel, SamplingParams } from "../../shared/types";
 import type { ChatRequest, ChatTurn } from "../../shared/chatRequest";
 import type { ToolCall } from "../../tools/types";
 import type { BenchmarkTestCase, BenchmarkRunResult, BenchmarkIterationResult } from "./types";
@@ -21,7 +21,8 @@ export async function runBenchmarkTest(
   iterationCount: number,
   params: SamplingParams,
   onIteration?: (testId: string, iteration: BenchmarkIterationResult) => void,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  cacheSettings?: AnthropicCacheSettings,
 ): Promise<BenchmarkRunResult> {
   const baseRequest: ChatRequest = {
     systemPrompt: testCase.systemPromptSuffix,
@@ -38,8 +39,8 @@ export async function runBenchmarkTest(
     tools: testCase.tools,
   };
 
-  if (model.anthropicCacheSettings?.enabled) {
-    baseRequest.anthropicCacheSettings = model.anthropicCacheSettings;
+  if (cacheSettings?.enabled) {
+    baseRequest.anthropicCacheSettings = cacheSettings;
   }
 
   const iterations: BenchmarkIterationResult[] = [];
@@ -85,14 +86,15 @@ export async function runAllBenchmarks(
   params: SamplingParams,
   onTestComplete: (result: BenchmarkRunResult, index: number) => void,
   onIteration?: (testId: string, iteration: BenchmarkIterationResult) => void,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  cacheSettings?: AnthropicCacheSettings,
 ): Promise<BenchmarkRunResult[]> {
   const results: BenchmarkRunResult[] = [];
 
   for (let i = 0; i < testCases.length; i++) {
     if (signal?.aborted) break;
 
-    const result = await runBenchmarkTest(client, model, testCases[i], iterationCount, params, onIteration, signal);
+    const result = await runBenchmarkTest(client, model, testCases[i], iterationCount, params, onIteration, signal, cacheSettings);
     results.push(result);
     onTestComplete(result, i);
   }

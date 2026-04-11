@@ -10,7 +10,6 @@ export function normalizeCompletionModel(
     modelId: model?.modelId ?? "",
     provider: model?.provider ?? "lmstudio",
     ...(model?.contextWindowSize && { contextWindowSize: model.contextWindowSize }),
-    ...(model?.anthropicCacheSettings && { anthropicCacheSettings: model.anthropicCacheSettings }),
   };
 }
 

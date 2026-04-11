@@ -21,7 +21,7 @@ import {
   DEFAULT_SETTINGS,
   VIEW_TYPE_CHAT,
 } from "./constants";
-import { normalizeLMStudioBaseUrl, ModelAvailabilityService } from "./api";
+import { ModelAvailabilityService } from "./api";
 import { ChatView } from "./chat";
 import { normalizeChatHistory } from "./chat/conversation/conversationUtils";
 import { normalizeCompletionModel, normalizeEmbeddingModel } from "./shared/normalizeModels";
@@ -79,31 +79,30 @@ function normalizeRagSettings(raw: unknown): RagSettings {
   };
 }
 
-function migrateProviderSettings(
+function normalizeProviderSettingsMap(
   data: Partial<PluginSettings> | null,
-  lmStudioUrl: string,
-  bypassCors: boolean
 ): ProviderSettingsMap {
   const saved = data?.providerSettings;
+  const defaults = DEFAULT_SETTINGS.providerSettings;
   return {
     lmstudio: {
-      baseUrl: saved?.lmstudio?.baseUrl ?? lmStudioUrl,
+      baseUrl: saved?.lmstudio?.baseUrl ?? defaults.lmstudio.baseUrl,
       bypassCors: typeof saved?.lmstudio?.bypassCors === "boolean"
         ? saved.lmstudio.bypassCors
-        : bypassCors,
+        : defaults.lmstudio.bypassCors,
     },
     anthropic: {
       apiKey: typeof saved?.anthropic?.apiKey === "string"
         ? saved.anthropic.apiKey
-        : DEFAULT_SETTINGS.providerSettings.anthropic.apiKey,
+        : defaults.anthropic.apiKey,
     },
     openai: {
       apiKey: typeof saved?.openai?.apiKey === "string"
         ? saved.openai.apiKey
-        : DEFAULT_SETTINGS.providerSettings.openai.apiKey,
+        : defaults.openai.apiKey,
       baseUrl: typeof saved?.openai?.baseUrl === "string"
         ? saved.openai.baseUrl
-        : DEFAULT_SETTINGS.providerSettings.openai.baseUrl,
+        : defaults.openai.baseUrl,
     },
   };
 }
@@ -250,15 +249,9 @@ export default class WritingAssistantChat extends Plugin {
         ? normalizeChatHistory(data.chatHistory)
         : { ...DEFAULT_CHAT_HISTORY };
 
-    const lmStudioUrl = normalizeLMStudioBaseUrl(data?.lmStudioUrl ?? DEFAULT_SETTINGS.lmStudioUrl);
-    const bypassCors =
-      typeof data?.bypassCors === "boolean" ? data.bypassCors : DEFAULT_SETTINGS.bypassCors;
-
-    const providerSettings = migrateProviderSettings(data, lmStudioUrl, bypassCors);
+    const providerSettings = normalizeProviderSettingsMap(data);
 
     this.settings = {
-      lmStudioUrl,
-      bypassCors,
       providerSettings,
       includeNoteContext:
         typeof data?.includeNoteContext === "boolean"
@@ -272,38 +265,6 @@ export default class WritingAssistantChat extends Plugin {
       embeddingModels,
       commands,
       chatHistory,
-      globalSystemPrompt:
-        typeof data?.globalSystemPrompt === "string"
-          ? data.globalSystemPrompt
-          : DEFAULT_SETTINGS.globalSystemPrompt,
-      globalTemperature:
-        typeof data?.globalTemperature === "number"
-          ? data.globalTemperature
-          : DEFAULT_SETTINGS.globalTemperature,
-      globalMaxTokens:
-        typeof data?.globalMaxTokens === "number" || data?.globalMaxTokens === null
-          ? data.globalMaxTokens
-          : DEFAULT_SETTINGS.globalMaxTokens,
-      globalTopP:
-        typeof data?.globalTopP === "number" || data?.globalTopP === null
-          ? data.globalTopP
-          : DEFAULT_SETTINGS.globalTopP,
-      globalTopK:
-        typeof data?.globalTopK === "number" || data?.globalTopK === null
-          ? data.globalTopK
-          : DEFAULT_SETTINGS.globalTopK,
-      globalMinP:
-        typeof data?.globalMinP === "number" || data?.globalMinP === null
-          ? data.globalMinP
-          : DEFAULT_SETTINGS.globalMinP,
-      globalRepeatPenalty:
-        typeof data?.globalRepeatPenalty === "number" || data?.globalRepeatPenalty === null
-          ? data.globalRepeatPenalty
-          : DEFAULT_SETTINGS.globalRepeatPenalty,
-      globalReasoning:
-        typeof data?.globalReasoning === "string" || data?.globalReasoning === null
-          ? data.globalReasoning
-          : DEFAULT_SETTINGS.globalReasoning,
       providerProfiles: normalizeProviderProfiles(data?.providerProfiles),
       activeProfileIds: normalizeActiveProfileIds(data?.activeProfileIds),
       diffContextLines:

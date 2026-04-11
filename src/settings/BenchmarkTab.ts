@@ -609,18 +609,20 @@ export function renderBenchmarkTab(
 
     try {
       const client = createChatClient(selectedModel.provider, plugin.settings.providerSettings);
+      const profile = getActiveProfile(plugin.settings, selectedModel.provider);
       const result = await runBenchmarkTest(
         client,
         selectedModel,
         tc,
         iterationCount,
-        buildSamplingParams(getActiveProfile(plugin.settings, selectedModel.provider)),
+        buildSamplingParams(profile),
         (_testId, _iter) => {
           globalCompletedIterations++;
           updateCardProgress(tc.id, globalCompletedIterations, iterationCount);
           updateGlobalSummary();
         },
-        abortController.signal
+        abortController.signal,
+        profile.anthropicCacheSettings,
       );
       updateCard(tc.id, result);
     } catch (err) {
@@ -657,12 +659,13 @@ export function renderBenchmarkTab(
 
     try {
       const client = createChatClient(selectedModel.provider, plugin.settings.providerSettings);
+      const profile = getActiveProfile(plugin.settings, selectedModel.provider);
       await runAllBenchmarks(
         client,
         selectedModel,
         suite.testCases,
         iterationCount,
-        buildSamplingParams(getActiveProfile(plugin.settings, selectedModel.provider)),
+        buildSamplingParams(profile),
         (result, _index) => {
           updateCard(result.testId, result);
           updateSuiteSummary(suite);
@@ -675,7 +678,8 @@ export function renderBenchmarkTab(
           globalCompletedIterations++;
           updateGlobalSummary();
         },
-        abortController.signal
+        abortController.signal,
+        profile.anthropicCacheSettings,
       );
     } catch {
       for (const tc of suite.testCases) {
@@ -716,6 +720,7 @@ export function renderBenchmarkTab(
 
     try {
       const client = createChatClient(selectedModel.provider, plugin.settings.providerSettings);
+      const profile = getActiveProfile(plugin.settings, selectedModel.provider);
       for (const suite of suites) {
         if (abortController.signal.aborted) break;
         await runAllBenchmarks(
@@ -723,7 +728,7 @@ export function renderBenchmarkTab(
           selectedModel,
           suite.testCases,
           iterationCount,
-          buildSamplingParams(getActiveProfile(plugin.settings, selectedModel.provider)),
+          buildSamplingParams(profile),
           (result, _index) => {
             updateCard(result.testId, result);
             updateSuiteSummary(suite);
@@ -736,7 +741,8 @@ export function renderBenchmarkTab(
             globalCompletedIterations++;
             updateGlobalSummary();
           },
-          abortController.signal
+          abortController.signal,
+          profile.anthropicCacheSettings,
         );
       }
     } catch {

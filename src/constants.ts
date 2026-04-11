@@ -1,4 +1,4 @@
-import type { ChatHistory, KnowledgeGraphSettings, PluginSettings, RagSettings } from "./shared/types";
+import type { ChatHistory, KnowledgeGraphSettings, PluginSettings, ProviderOption, ProviderProfile, RagSettings } from "./shared/types";
 import { EDIT_SYSTEM_PROMPT } from "./editing/regexEditSystemPrompt";
 import { TOOL_EDIT_SYSTEM_PROMPT } from "./tools/editing/systemPrompt";
 
@@ -49,6 +49,30 @@ export const DEFAULT_PLAN_SYSTEM_PROMPT_PREFIX = DEFAULT_CHAT_SYSTEM_PROMPT_PREF
 export const DEFAULT_MAX_TOOL_ROUNDS_EDIT = 5;
 export const DEFAULT_MAX_TOOL_ROUNDS_CHAT = 20;
 
+export const DEFAULT_ACTIVE_PROFILE_IDS: Record<ProviderOption, string> = {
+  lmstudio: "lmstudio-default",
+  anthropic: "anthropic-default",
+  openai: "openai-default",
+};
+
+export function makeDefaultProfile(provider: ProviderOption): ProviderProfile {
+  return {
+    id: `${provider}-default`,
+    name: "Default",
+    provider,
+    isDefault: true,
+    systemPrompt: "",
+    temperature: DEFAULT_COMPLETION_TEMPERATURE,
+    maxTokens: provider === "anthropic" ? DEFAULT_COMPLETION_MAX_TOKENS : null,
+    topP: null,
+    topK: null,
+    minP: null,
+    repeatPenalty: null,
+    reasoning: null,
+    anthropicCacheSettings: { enabled: false, ttl: "default" },
+  };
+}
+
 export const DEFAULT_SETTINGS: PluginSettings = {
   lmStudioUrl: "http://localhost:1234/v1",
   bypassCors: true,
@@ -67,6 +91,8 @@ export const DEFAULT_SETTINGS: PluginSettings = {
   globalMinP: null,
   globalRepeatPenalty: null,
   globalReasoning: null,
+  providerProfiles: [],
+  activeProfileIds: { ...DEFAULT_ACTIVE_PROFILE_IDS },
   completionModels: [],
   embeddingModels: [],
   commands: [],

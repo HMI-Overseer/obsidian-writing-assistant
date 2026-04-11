@@ -7,6 +7,7 @@ import type { ChatComposer } from "../composer/ChatComposer";
 import type { ChatSessionStore } from "../conversation/ChatSessionStore";
 import type { ChatTranscript } from "../messages/ChatTranscript";
 import type { CompletionModel, ConversationMessage } from "../../shared/types";
+import { getActiveProfile } from "../../shared/profileUtils";
 import { makeMessage } from "../conversation/conversationUtils";
 import { prepareApiMessages } from "../finalization/prepareApiMessages";
 import { estimateTokenCount } from "../../shared/tokenEstimation";
@@ -91,6 +92,8 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
     onCalibrate,
   } = options;
 
+  const activeProfile = getActiveProfile(plugin.settings, activeModel.provider);
+
   const apiMessages = await prepareApiMessages({
     app: plugin.app,
     store,
@@ -108,6 +111,7 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
     },
     chatClient: client,
     completionModelId: activeModel.modelId,
+    profileSystemPrompt: activeProfile.systemPrompt,
   });
 
   const ragSources = apiMessages.ragContext?.map(
@@ -121,8 +125,8 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
   );
   const { rewrittenQuery } = apiMessages;
 
-  if (activeModel.anthropicCacheSettings?.enabled) {
-    apiMessages.anthropicCacheSettings = activeModel.anthropicCacheSettings;
+  if (activeProfile.anthropicCacheSettings.enabled) {
+    apiMessages.anthropicCacheSettings = activeProfile.anthropicCacheSettings;
   }
 
   await store.persistActiveConversation();
@@ -180,7 +184,7 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
       client,
       apiMessages,
       activeModel.modelId,
-      buildSamplingParams(plugin.settings),
+      buildSamplingParams(activeProfile),
       abortController.signal,
       {
         onDelta: (delta) => renderer.appendDelta(delta),

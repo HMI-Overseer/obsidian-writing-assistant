@@ -1,13 +1,13 @@
-import type { PluginSettings, SamplingParams } from "../../shared/types";
+import type { ProviderProfile, SamplingParams } from "../../shared/types";
 
-export function buildSamplingParams(settings: PluginSettings): SamplingParams {
+export function buildSamplingParams(profile: ProviderProfile): SamplingParams {
   return {
-    temperature: settings.globalTemperature,
-    maxTokens: settings.globalMaxTokens,
-    topP: settings.globalTopP,
-    topK: settings.globalTopK,
-    minP: settings.globalMinP,
-    repeatPenalty: settings.globalRepeatPenalty,
-    reasoning: settings.globalReasoning,
+    temperature: profile.temperature,
+    maxTokens: profile.maxTokens,
+    topP: profile.topP,
+    topK: profile.topK,
+    minP: profile.minP,
+    repeatPenalty: profile.repeatPenalty,
+    reasoning: profile.reasoning,
   };
 }

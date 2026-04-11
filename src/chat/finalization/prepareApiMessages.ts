@@ -33,6 +33,8 @@ export interface PrepareMessagesOptions {
   chatClient?: ChatClient;
   /** Completion model ID for internal LLM calls. */
   completionModelId?: string;
+  /** System prompt from the active provider profile. */
+  profileSystemPrompt?: string;
 }
 
 export async function prepareApiMessages(
@@ -51,6 +53,7 @@ export async function prepareApiMessages(
     modelCapabilities,
     chatClient,
     completionModelId,
+    profileSystemPrompt = "",
   } = options;
 
   const editMode = mode === "edit";
@@ -58,7 +61,7 @@ export async function prepareApiMessages(
   const useVaultTools = settings.agenticMode && modelCanUseTools;
   const useEditTools = editMode && settings.agenticMode && modelCanUseTools && settings.preferToolUse;
 
-  const systemPrompt = composeSystemPrompt(mode, useEditTools, settings);
+  const systemPrompt = composeSystemPrompt(mode, useEditTools, settings, profileSystemPrompt);
 
   let documentContext: DocumentContext | null = null;
 
@@ -174,13 +177,14 @@ export async function prepareApiMessages(
 }
 
 /**
- * Combines a mode-specific prefix with the user's custom prompt.
+ * Combines a mode-specific prefix with the user's custom prompt from the active profile.
  * `useEditTools` selects between the tool vs fallback edit prefix.
  */
 export function composeSystemPrompt(
   mode: ChatMode,
   useEditTools: boolean,
   settings: PluginSettings,
+  profileSystemPrompt: string,
 ): string {
   let prefix: string;
   switch (mode) {
@@ -197,8 +201,7 @@ export function composeSystemPrompt(
       break;
   }
 
-  const userPrompt = settings.globalSystemPrompt;
-  return [prefix, userPrompt].filter(Boolean).join("\n\n");
+  return [prefix, profileSystemPrompt].filter(Boolean).join("\n\n");
 }
 
 /**

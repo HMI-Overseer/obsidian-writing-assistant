@@ -1,6 +1,7 @@
 import { describe, test, expect } from "vitest";
 import { composeSystemPrompt } from "../../../src/chat/finalization/prepareApiMessages";
 import type { PluginSettings } from "../../../src/shared/types";
+import { DEFAULT_ACTIVE_PROFILE_IDS } from "../../../src/constants";
 
 function makeSettings(overrides: Partial<PluginSettings> = {}): PluginSettings {
   return {
@@ -26,6 +27,8 @@ function makeSettings(overrides: Partial<PluginSettings> = {}): PluginSettings {
     globalMinP: null,
     globalRepeatPenalty: null,
     globalReasoning: null,
+    providerProfiles: [],
+    activeProfileIds: { ...DEFAULT_ACTIVE_PROFILE_IDS },
     completionModels: [],
     embeddingModels: [],
     commands: [],
@@ -52,27 +55,26 @@ function makeSettings(overrides: Partial<PluginSettings> = {}): PluginSettings {
 }
 
 describe("composeSystemPrompt", () => {
-  test("returns only user prompt when prefix is empty (conversation mode)", () => {
-    const settings = makeSettings({ globalSystemPrompt: "Be helpful." });
-    expect(composeSystemPrompt("conversation", false, settings)).toBe("Be helpful.");
+  test("returns only profile prompt when prefix is empty (conversation mode)", () => {
+    const settings = makeSettings();
+    expect(composeSystemPrompt("conversation", false, settings, "Be helpful.")).toBe("Be helpful.");
   });
 
-  test("returns only prefix when user prompt is empty", () => {
+  test("returns only prefix when profile prompt is empty", () => {
     const settings = makeSettings({ editFallbackSystemPromptPrefix: "Edit instructions." });
-    expect(composeSystemPrompt("edit", false, settings)).toBe("Edit instructions.");
+    expect(composeSystemPrompt("edit", false, settings, "")).toBe("Edit instructions.");
   });
 
-  test("combines prefix and user prompt with double newline", () => {
+  test("combines prefix and profile prompt with double newline", () => {
     const settings = makeSettings({
       editToolSystemPromptPrefix: "Tool prefix.",
-      globalSystemPrompt: "User prompt.",
     });
-    expect(composeSystemPrompt("edit", true, settings)).toBe("Tool prefix.\n\nUser prompt.");
+    expect(composeSystemPrompt("edit", true, settings, "User prompt.")).toBe("Tool prefix.\n\nUser prompt.");
   });
 
   test("returns empty string when both are empty", () => {
     const settings = makeSettings();
-    expect(composeSystemPrompt("conversation", false, settings)).toBe("");
+    expect(composeSystemPrompt("conversation", false, settings, "")).toBe("");
   });
 
   test("uses tool prefix in edit mode when useToolUse=true", () => {
@@ -80,17 +82,17 @@ describe("composeSystemPrompt", () => {
       editToolSystemPromptPrefix: "TOOL",
       editFallbackSystemPromptPrefix: "FALLBACK",
     });
-    expect(composeSystemPrompt("edit", true, settings)).toBe("TOOL");
-    expect(composeSystemPrompt("edit", false, settings)).toBe("FALLBACK");
+    expect(composeSystemPrompt("edit", true, settings, "")).toBe("TOOL");
+    expect(composeSystemPrompt("edit", false, settings, "")).toBe("FALLBACK");
   });
 
   test("uses plan prefix for plan mode", () => {
     const settings = makeSettings({ planSystemPromptPrefix: "Plan prefix." });
-    expect(composeSystemPrompt("plan", false, settings)).toBe("Plan prefix.");
+    expect(composeSystemPrompt("plan", false, settings, "")).toBe("Plan prefix.");
   });
 
   test("uses chat prefix for conversation mode", () => {
     const settings = makeSettings({ chatSystemPromptPrefix: "Chat prefix." });
-    expect(composeSystemPrompt("conversation", false, settings)).toBe("Chat prefix.");
+    expect(composeSystemPrompt("conversation", false, settings, "")).toBe("Chat prefix.");
   });
 });

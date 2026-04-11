@@ -28,12 +28,33 @@ export interface CompletionModel {
   provider: ProviderOption;
   /** Optional context window size in tokens. Enables future context-aware truncation. */
   contextWindowSize?: number;
-  /** Anthropic prompt caching configuration. Only relevant when provider is "anthropic". */
+  /** @deprecated Use ProviderProfile.anthropicCacheSettings instead. */
   anthropicCacheSettings?: AnthropicCacheSettings;
   /** Whether the model was trained for tool/function calling. Only relevant for LM Studio models. */
   trainedForToolUse?: boolean;
   /** Whether the model supports vision (image input). */
   vision?: boolean;
+}
+
+/** A named, provider-scoped set of sampling and behavior overrides. */
+export interface ProviderProfile {
+  id: string;
+  name: string;
+  provider: ProviderOption;
+  isDefault: boolean;
+
+  // Sampling params (nullable = use provider default)
+  systemPrompt: string;
+  temperature: number;
+  maxTokens: number | null;
+  topP: number | null;
+  topK: number | null;
+  minP: number | null;
+  repeatPenalty: number | null;
+  reasoning: ReasoningLevel | null;
+
+  // Anthropic-specific (present on all profiles, only rendered/used for Anthropic)
+  anthropicCacheSettings: AnthropicCacheSettings;
 }
 
 export interface EmbeddingModel {
@@ -245,22 +266,26 @@ export interface PluginSettings {
   embeddingModels: EmbeddingModel[];
   commands: CustomCommand[];
   chatHistory: ChatHistory;
-  /** Global system prompt sent before each chat request. */
+  /** @deprecated Use providerProfiles instead. */
   globalSystemPrompt: string;
-  /** Global temperature for chat completions (0–1). */
+  /** @deprecated Use providerProfiles instead. */
   globalTemperature: number;
-  /** Maximum tokens to generate (null = model default). */
+  /** @deprecated Use providerProfiles instead. */
   globalMaxTokens: number | null;
-  /** Top-p / nucleus sampling (null = model default). */
+  /** @deprecated Use providerProfiles instead. */
   globalTopP: number | null;
-  /** Top-k sampling (null = model default). */
+  /** @deprecated Use providerProfiles instead. */
   globalTopK: number | null;
-  /** Min-p sampling threshold (null = model default). */
+  /** @deprecated Use providerProfiles instead. */
   globalMinP: number | null;
-  /** Repeat penalty (null = model default). */
+  /** @deprecated Use providerProfiles instead. */
   globalRepeatPenalty: number | null;
-  /** Reasoning level (null = model default). */
+  /** @deprecated Use providerProfiles instead. */
   globalReasoning: ReasoningLevel | null;
+  /** Provider-scoped parameter profiles. */
+  providerProfiles: ProviderProfile[];
+  /** Active profile ID per provider. */
+  activeProfileIds: Record<ProviderOption, string>;
   /** Number of context lines shown above/below each diff hunk. */
   diffContextLines: number;
   /** Minimum fuzzy match confidence (0–1) to consider a match valid. */

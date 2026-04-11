@@ -7,11 +7,14 @@ import type {
   EmbeddingModel,
   KnowledgeGraphSettings,
   PluginSettings,
+  ProviderOption,
+  ProviderProfile,
   ProviderSettingsMap,
   RagSettings,
 } from "./shared/types";
 import { ConversationStorage } from "./chat/conversation/ConversationStorage";
 import {
+  DEFAULT_ACTIVE_PROFILE_IDS,
   DEFAULT_CHAT_HISTORY,
   DEFAULT_KNOWLEDGE_GRAPH_SETTINGS,
   DEFAULT_RAG_SETTINGS,
@@ -103,6 +106,33 @@ function migrateProviderSettings(
         : DEFAULT_SETTINGS.providerSettings.openai.baseUrl,
     },
   };
+}
+
+const VALID_PROVIDERS = new Set<string>(["lmstudio", "openai", "anthropic"]);
+
+function normalizeProviderProfiles(raw: unknown): ProviderProfile[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.filter(
+    (p): p is ProviderProfile =>
+      typeof p === "object" &&
+      p !== null &&
+      typeof p.id === "string" &&
+      typeof p.name === "string" &&
+      VALID_PROVIDERS.has(p.provider) &&
+      !p.isDefault,
+  );
+}
+
+function normalizeActiveProfileIds(raw: unknown): Record<ProviderOption, string> {
+  const defaults = { ...DEFAULT_ACTIVE_PROFILE_IDS };
+  if (typeof raw !== "object" || raw === null) return defaults;
+  const obj = raw as Record<string, unknown>;
+  for (const key of Object.keys(defaults) as ProviderOption[]) {
+    if (typeof obj[key] === "string") {
+      defaults[key] = obj[key] as string;
+    }
+  }
+  return defaults;
 }
 
 export default class LMStudioWritingAssistant extends Plugin {
@@ -274,6 +304,8 @@ export default class LMStudioWritingAssistant extends Plugin {
         typeof data?.globalReasoning === "string" || data?.globalReasoning === null
           ? data.globalReasoning
           : DEFAULT_SETTINGS.globalReasoning,
+      providerProfiles: normalizeProviderProfiles(data?.providerProfiles),
+      activeProfileIds: normalizeActiveProfileIds(data?.activeProfileIds),
       diffContextLines:
         typeof data?.diffContextLines === "number"
           ? data.diffContextLines

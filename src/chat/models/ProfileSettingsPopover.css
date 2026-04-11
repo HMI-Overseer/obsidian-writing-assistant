@@ -44,6 +44,12 @@
     transform-origin: top left;
   }
 
+  .lmsa-profile-popover.is-default-profile .lmsa-params-body,
+  .lmsa-profile-popover.is-default-profile .lmsa-profile-popover-section {
+    opacity: 0.5;
+    pointer-events: none;
+  }
+
   .lmsa-profile-popover-title {
     @apply lmsa-flex lmsa-flex-col lmsa-gap-1 lmsa-font-bold lmsa-text-obsidian-text;
     font-size: var(--font-ui-small);
@@ -72,9 +78,90 @@
     opacity: 0.7;
   }
 
+  .lmsa-profile-popover-hint {
+    @apply lmsa-py-3 lmsa-text-center lmsa-text-obsidian-muted;
+    font-size: var(--font-ui-smaller);
+    font-style: italic;
+  }
+
   .lmsa-profile-popover-empty {
     @apply lmsa-py-4 lmsa-text-center lmsa-text-obsidian-muted;
     font-size: var(--font-ui-smaller);
+  }
+
+  /* ── Profile selector ───────────────────────────────────────────────── */
+
+  .lmsa-profile-selector-row {
+    @apply lmsa-flex lmsa-items-center lmsa-gap-2;
+    margin-bottom: 0.5rem;
+  }
+
+  .lmsa-profile-selector-select {
+    @apply lmsa-flex-1 lmsa-rounded-lg lmsa-border lmsa-border-obsidian-border lmsa-px-3 lmsa-py-1.5;
+    font-family: var(--font-text);
+    font-size: var(--font-ui-small);
+    color: var(--text-normal);
+    background: var(--background-secondary);
+    outline: none;
+    cursor: pointer;
+    min-width: 0;
+    transition: border-color 120ms ease;
+  }
+
+  .lmsa-profile-selector-select:focus {
+    border-color: var(--lmsa-mode-accent);
+  }
+
+  .lmsa-profile-action-btn {
+    @apply lmsa-inline-flex lmsa-flex-none lmsa-cursor-pointer lmsa-items-center lmsa-justify-center lmsa-rounded-md lmsa-border-none lmsa-p-1;
+    color: var(--text-muted);
+    min-height: unset;
+    background: transparent !important;
+    box-shadow: none !important;
+    outline: none;
+    appearance: none;
+    transition: background 120ms ease, color 120ms ease;
+  }
+
+  .lmsa-profile-action-btn:hover {
+    background: color-mix(in srgb, var(--background-modifier-hover) 60%, transparent) !important;
+    color: var(--text-normal);
+  }
+
+  .lmsa-profile-action-btn--danger:hover {
+    color: var(--text-error);
+  }
+
+  .lmsa-profile-action-btn.is-disabled {
+    opacity: 0.3;
+    pointer-events: none;
+  }
+
+  .lmsa-profile-action-btn svg {
+    width: 14px;
+    height: 14px;
+  }
+
+  /* ── Create profile inline ──────────────────────────────────────────── */
+
+  .lmsa-profile-create-inline {
+    @apply lmsa-flex lmsa-items-center lmsa-gap-2;
+    margin-bottom: 0.5rem;
+  }
+
+  .lmsa-profile-create-input {
+    @apply lmsa-flex-1 lmsa-rounded-lg lmsa-border lmsa-border-obsidian-border lmsa-px-3 lmsa-py-1.5;
+    font-family: var(--font-text);
+    font-size: var(--font-ui-small);
+    color: var(--text-normal);
+    background: var(--background-secondary);
+    outline: none;
+    min-width: 0;
+    transition: border-color 120ms ease;
+  }
+
+  .lmsa-profile-create-input:focus {
+    border-color: var(--lmsa-mode-accent);
   }
 
   /* ── Cache settings rows ────────────────────────────────────────────── */
@@ -110,7 +197,7 @@
     box-shadow: 0 0 0 2px color-mix(in srgb, var(--interactive-accent) 30%, transparent);
   }
 
-  /* ── Model parameter controls (reused from params drawer) ───────────── */
+  /* ── Model parameter controls ───────────────────────────────────────── */
 
   .lmsa-profile-popover .lmsa-params-body {
     @apply lmsa-flex lmsa-flex-col lmsa-gap-5;

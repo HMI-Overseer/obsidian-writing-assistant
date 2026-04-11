@@ -1604,6 +1604,11 @@
       inset 0 1px 0 rgba(255, 255, 255, 0.04);
     transform-origin: top left;
 }
+.lmsa-profile-popover.is-default-profile .lmsa-params-body,
+  .lmsa-profile-popover.is-default-profile .lmsa-profile-popover-section {
+    opacity: 0.5;
+    pointer-events: none;
+  }
 .lmsa-profile-popover-title {
     display: flex;
     flex-direction: column;
@@ -1637,6 +1642,14 @@
     letter-spacing: 0.04em;
     opacity: 0.7;
 }
+.lmsa-profile-popover-hint {
+    padding-top: 0.75rem;
+    padding-bottom: 0.75rem;
+    text-align: center;
+    color: var(--text-muted);
+    font-size: var(--font-ui-smaller);
+    font-style: italic;
+}
 .lmsa-profile-popover-empty {
     padding-top: 1rem;
     padding-bottom: 1rem;
@@ -1644,6 +1657,95 @@
     color: var(--text-muted);
     font-size: var(--font-ui-smaller);
 }
+/* ── Profile selector ───────────────────────────────────────────────── */
+.lmsa-profile-selector-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+}
+.lmsa-profile-selector-select {
+    flex: 1 1 0%;
+    border-radius: 0.5rem;
+    border-width: 1px;
+    border-color: var(--background-modifier-border);
+    padding-left: 0.75rem;
+    padding-right: 0.75rem;
+    padding-top: 0.375rem;
+    padding-bottom: 0.375rem;
+    font-family: var(--font-text);
+    font-size: var(--font-ui-small);
+    color: var(--text-normal);
+    background: var(--background-secondary);
+    outline: none;
+    cursor: pointer;
+    min-width: 0;
+    transition: border-color 120ms ease;
+}
+.lmsa-profile-selector-select:focus {
+    border-color: var(--lmsa-mode-accent);
+  }
+.lmsa-profile-action-btn {
+    display: inline-flex;
+    flex: none;
+    cursor: pointer;
+    align-items: center;
+    justify-content: center;
+    border-radius: 0.375rem;
+    border-style: none;
+    padding: 0.25rem;
+    color: var(--text-muted);
+    min-height: unset;
+    background: transparent !important;
+    box-shadow: none !important;
+    outline: none;
+    -webkit-appearance: none;
+       -moz-appearance: none;
+            appearance: none;
+    transition: background 120ms ease, color 120ms ease;
+}
+.lmsa-profile-action-btn:hover {
+    background: color-mix(in srgb, var(--background-modifier-hover) 60%, transparent) !important;
+    color: var(--text-normal);
+  }
+.lmsa-profile-action-btn--danger:hover {
+    color: var(--text-error);
+  }
+.lmsa-profile-action-btn.is-disabled {
+    opacity: 0.3;
+    pointer-events: none;
+  }
+.lmsa-profile-action-btn svg {
+    width: 14px;
+    height: 14px;
+  }
+/* ── Create profile inline ──────────────────────────────────────────── */
+.lmsa-profile-create-inline {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+}
+.lmsa-profile-create-input {
+    flex: 1 1 0%;
+    border-radius: 0.5rem;
+    border-width: 1px;
+    border-color: var(--background-modifier-border);
+    padding-left: 0.75rem;
+    padding-right: 0.75rem;
+    padding-top: 0.375rem;
+    padding-bottom: 0.375rem;
+    font-family: var(--font-text);
+    font-size: var(--font-ui-small);
+    color: var(--text-normal);
+    background: var(--background-secondary);
+    outline: none;
+    min-width: 0;
+    transition: border-color 120ms ease;
+}
+.lmsa-profile-create-input:focus {
+    border-color: var(--lmsa-mode-accent);
+  }
 /* ── Cache settings rows ────────────────────────────────────────────── */
 .lmsa-profile-popover-row {
     display: flex;
@@ -1674,7 +1776,7 @@
 .lmsa-profile-ttl-select:focus {
     box-shadow: 0 0 0 2px color-mix(in srgb, var(--interactive-accent) 30%, transparent);
   }
-/* ── Model parameter controls (reused from params drawer) ───────────── */
+/* ── Model parameter controls ───────────────────────────────────────── */
 .lmsa-profile-popover .lmsa-params-body {
     display: flex;
     flex-direction: column;
@@ -4837,6 +4939,10 @@
 .lmsa-py-2 {
     padding-top: 0.5rem;
     padding-bottom: 0.5rem;
+}
+.lmsa-py-3 {
+    padding-top: 0.75rem;
+    padding-bottom: 0.75rem;
 }
 .lmsa-py-4 {
     padding-top: 1rem;

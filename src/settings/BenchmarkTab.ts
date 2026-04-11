@@ -1,13 +1,16 @@
 import { setIcon } from "obsidian";
 import type LMStudioWritingAssistant from "../main";
-import type { CompletionModel } from "../shared/types";
+import type { CompletionModel, ProviderProfile } from "../shared/types";
 import { getProviderDescriptor, createChatClient } from "../providers/registry";
+import { PROVIDER_DESCRIPTORS } from "../providers/descriptors";
 import { createSettingsSection, createModelSelector } from "./ui";
 import { getTestSuites } from "./benchmark/testSuites";
 import { runBenchmarkTest, runAllBenchmarks } from "./benchmark/benchmarkRunner";
 import type { BenchmarkRunResult, BenchmarkTestCase, BenchmarkTestSuite, EvaluationCriteria, BenchmarkMessage } from "./benchmark/types";
 import { ProfileSettingsPopover } from "../chat/models/ProfileSettingsPopover";
 import { buildSamplingParams } from "../chat/finalization/buildSamplingParams";
+import { getActiveProfile, getProfilesForProvider, generateProfileId } from "../shared/profileUtils";
+import { makeDefaultProfile } from "../constants";
 
 export function renderBenchmarkTab(
   container: HTMLElement,
@@ -79,56 +82,45 @@ export function renderBenchmarkTab(
     { profileSettingsBtn, profileSettingsPopoverEl },
     {
       getActiveModel: () => selectedModel,
-      onCacheSettingsChange: async (modelId, settings) => {
-        const model = plugin.settings.completionModels.find((m) => m.id === modelId);
-        if (model) {
-          model.anthropicCacheSettings = settings;
-          await plugin.saveSettings();
+      getProfilesForProvider: (provider) =>
+        getProfilesForProvider(plugin.settings, provider),
+      getActiveProfile: (provider) =>
+        getActiveProfile(plugin.settings, provider),
+      getProviderDescriptor: (provider) => PROVIDER_DESCRIPTORS[provider],
+      onProfileSelect: async (profileId) => {
+        if (!selectedModel) return;
+        plugin.settings.activeProfileIds[selectedModel.provider] = profileId;
+        await plugin.saveSettings();
+      },
+      onProfileCreate: async (name, provider) => {
+        const profile: ProviderProfile = {
+          ...makeDefaultProfile(provider),
+          id: generateProfileId(provider),
+          name,
+          isDefault: false,
+        };
+        plugin.settings.providerProfiles.push(profile);
+        plugin.settings.activeProfileIds[provider] = profile.id;
+        await plugin.saveSettings();
+        return profile;
+      },
+      onProfileDelete: async (profileId) => {
+        const idx = plugin.settings.providerProfiles.findIndex((p) => p.id === profileId);
+        if (idx === -1) return;
+        const deleted = plugin.settings.providerProfiles[idx];
+        plugin.settings.providerProfiles.splice(idx, 1);
+        if (plugin.settings.activeProfileIds[deleted.provider] === profileId) {
+          plugin.settings.activeProfileIds[deleted.provider] = `${deleted.provider}-default`;
         }
-      },
-      getParamSettings: () => ({
-        globalSystemPrompt: plugin.settings.globalSystemPrompt,
-        globalTemperature: plugin.settings.globalTemperature,
-        globalMaxTokens: plugin.settings.globalMaxTokens,
-        globalTopP: plugin.settings.globalTopP,
-        globalTopK: plugin.settings.globalTopK,
-        globalMinP: plugin.settings.globalMinP,
-        globalRepeatPenalty: plugin.settings.globalRepeatPenalty,
-        globalReasoning: plugin.settings.globalReasoning,
-      }),
-      onSystemPromptChange: async (value) => {
-        plugin.settings.globalSystemPrompt = value;
         await plugin.saveSettings();
       },
-      onTemperatureChange: async (value) => {
-        plugin.settings.globalTemperature = value;
+      onProfileUpdate: async (profileId, patch) => {
+        const profile = plugin.settings.providerProfiles.find((p) => p.id === profileId);
+        if (!profile || profile.isDefault) return;
+        Object.assign(profile, patch);
         await plugin.saveSettings();
       },
-      onMaxTokensChange: async (value) => {
-        plugin.settings.globalMaxTokens = value;
-        await plugin.saveSettings();
-      },
-      onTopPChange: async (value) => {
-        plugin.settings.globalTopP = value;
-        await plugin.saveSettings();
-      },
-      onTopKChange: async (value) => {
-        plugin.settings.globalTopK = value;
-        await plugin.saveSettings();
-      },
-      onMinPChange: async (value) => {
-        plugin.settings.globalMinP = value;
-        await plugin.saveSettings();
-      },
-      onRepeatPenaltyChange: async (value) => {
-        plugin.settings.globalRepeatPenalty = value;
-        await plugin.saveSettings();
-      },
-      onReasoningChange: async (value) => {
-        plugin.settings.globalReasoning = value;
-        await plugin.saveSettings();
-      },
-    }
+    },
   );
   profilePopover.syncVisibility();
 
@@ -622,7 +614,7 @@ export function renderBenchmarkTab(
         selectedModel,
         tc,
         iterationCount,
-        buildSamplingParams(plugin.settings),
+        buildSamplingParams(getActiveProfile(plugin.settings, selectedModel.provider)),
         (_testId, _iter) => {
           globalCompletedIterations++;
           updateCardProgress(tc.id, globalCompletedIterations, iterationCount);
@@ -670,7 +662,7 @@ export function renderBenchmarkTab(
         selectedModel,
         suite.testCases,
         iterationCount,
-        buildSamplingParams(plugin.settings),
+        buildSamplingParams(getActiveProfile(plugin.settings, selectedModel.provider)),
         (result, _index) => {
           updateCard(result.testId, result);
           updateSuiteSummary(suite);
@@ -731,7 +723,7 @@ export function renderBenchmarkTab(
           selectedModel,
           suite.testCases,
           iterationCount,
-          buildSamplingParams(plugin.settings),
+          buildSamplingParams(getActiveProfile(plugin.settings, selectedModel.provider)),
           (result, _index) => {
             updateCard(result.testId, result);
             updateSuiteSummary(suite);

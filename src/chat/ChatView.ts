@@ -1,10 +1,12 @@
 import type { WorkspaceLeaf } from "obsidian";
 import { ItemView, Notice } from "obsidian";
-import type { ConversationMessage, CustomCommand } from "../shared/types";
+import type { ConversationMessage, CustomCommand, ProviderProfile } from "../shared/types";
 import type { DocumentContext } from "../shared/chatRequest";
 import type { ChatMode } from "./types";
 import type LMStudioWritingAssistant from "../main";
-import { VIEW_TYPE_CHAT } from "../constants";
+import { VIEW_TYPE_CHAT, makeDefaultProfile } from "../constants";
+import { getActiveProfile, getProfilesForProvider, generateProfileId } from "../shared/profileUtils";
+import { PROVIDER_DESCRIPTORS } from "../providers/descriptors";
 import { getActiveNoteText } from "../context/noteContext";
 import { ChatGenerationController } from "./ChatGenerationController";
 import { ChatConversationController } from "./ChatConversationController";
@@ -146,53 +148,44 @@ export class ChatView extends ItemView {
 
     this.profilePopover = new ProfileSettingsPopover(this.layout, {
       getActiveModel: () => this.sessionStore?.getResolvedConversationModel() ?? null,
-      onCacheSettingsChange: async (modelId, settings) => {
-        const model = this.plugin.settings.completionModels.find((m) => m.id === modelId);
-        if (model) {
-          model.anthropicCacheSettings = settings;
-          await this.plugin.saveSettings();
+      getProfilesForProvider: (provider) =>
+        getProfilesForProvider(this.plugin.settings, provider),
+      getActiveProfile: (provider) =>
+        getActiveProfile(this.plugin.settings, provider),
+      getProviderDescriptor: (provider) => PROVIDER_DESCRIPTORS[provider],
+      onProfileSelect: async (profileId) => {
+        const model = this.sessionStore?.getResolvedConversationModel();
+        if (!model) return;
+        this.plugin.settings.activeProfileIds[model.provider] = profileId;
+        await this.plugin.saveSettings();
+      },
+      onProfileCreate: async (name, provider) => {
+        const profile: ProviderProfile = {
+          ...makeDefaultProfile(provider),
+          id: generateProfileId(provider),
+          name,
+          isDefault: false,
+        };
+        this.plugin.settings.providerProfiles.push(profile);
+        this.plugin.settings.activeProfileIds[provider] = profile.id;
+        await this.plugin.saveSettings();
+        return profile;
+      },
+      onProfileDelete: async (profileId) => {
+        const idx = this.plugin.settings.providerProfiles.findIndex((p) => p.id === profileId);
+        if (idx === -1) return;
+        const deleted = this.plugin.settings.providerProfiles[idx];
+        this.plugin.settings.providerProfiles.splice(idx, 1);
+        // Reset to default if the deleted profile was active
+        if (this.plugin.settings.activeProfileIds[deleted.provider] === profileId) {
+          this.plugin.settings.activeProfileIds[deleted.provider] = `${deleted.provider}-default`;
         }
-      },
-      getParamSettings: () => ({
-        globalSystemPrompt: this.plugin.settings.globalSystemPrompt,
-        globalTemperature: this.plugin.settings.globalTemperature,
-        globalMaxTokens: this.plugin.settings.globalMaxTokens,
-        globalTopP: this.plugin.settings.globalTopP,
-        globalTopK: this.plugin.settings.globalTopK,
-        globalMinP: this.plugin.settings.globalMinP,
-        globalRepeatPenalty: this.plugin.settings.globalRepeatPenalty,
-        globalReasoning: this.plugin.settings.globalReasoning,
-      }),
-      onSystemPromptChange: async (value) => {
-        this.plugin.settings.globalSystemPrompt = value;
         await this.plugin.saveSettings();
       },
-      onTemperatureChange: async (value) => {
-        this.plugin.settings.globalTemperature = value;
-        await this.plugin.saveSettings();
-      },
-      onMaxTokensChange: async (value) => {
-        this.plugin.settings.globalMaxTokens = value;
-        await this.plugin.saveSettings();
-      },
-      onTopPChange: async (value) => {
-        this.plugin.settings.globalTopP = value;
-        await this.plugin.saveSettings();
-      },
-      onTopKChange: async (value) => {
-        this.plugin.settings.globalTopK = value;
-        await this.plugin.saveSettings();
-      },
-      onMinPChange: async (value) => {
-        this.plugin.settings.globalMinP = value;
-        await this.plugin.saveSettings();
-      },
-      onRepeatPenaltyChange: async (value) => {
-        this.plugin.settings.globalRepeatPenalty = value;
-        await this.plugin.saveSettings();
-      },
-      onReasoningChange: async (value) => {
-        this.plugin.settings.globalReasoning = value;
+      onProfileUpdate: async (profileId, patch) => {
+        const profile = this.plugin.settings.providerProfiles.find((p) => p.id === profileId);
+        if (!profile || profile.isDefault) return;
+        Object.assign(profile, patch);
         await this.plugin.saveSettings();
       },
     });

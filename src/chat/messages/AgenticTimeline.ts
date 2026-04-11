@@ -194,8 +194,17 @@ export class AgenticTimeline {
         this.renderExpandableArgs(stepEl, step.toolArgs);
       }
     } else if (step.text) {
-      const truncated = step.text.length > 120 ? step.text.slice(0, 120) + "…" : step.text;
+      const needsTruncation = step.text.length > 120;
+      const truncated = needsTruncation ? step.text.slice(0, 120) + "…" : step.text;
       bodyEl.createSpan({ cls: "lmsa-agentic-timeline-step-name", text: truncated });
+      if (needsTruncation) {
+        const expandEl = bodyEl.createDiv({ cls: "lmsa-agentic-timeline-step-expand" });
+        expandEl.createEl("pre", { cls: "lmsa-agentic-timeline-arg-value", text: step.text });
+        stepEl.classList.add("lmsa-agentic-timeline-step--expandable");
+        stepEl.addEventListener("click", () => {
+          stepEl.classList.toggle("is-expanded");
+        });
+      }
     }
   }
 

@@ -89,6 +89,8 @@ export interface AgenticStep {
   toolName?: string;
   /** For tool_call: a human-readable display string of the key argument (e.g. the search query or file path). */
   toolInput?: string;
+  /** For tool_call: the full arguments object sent by the model. Used for timeline expansion. */
+  toolArgs?: Record<string, unknown>;
   /** For reasoning: the model's prose emitted between tool rounds. */
   text?: string;
 }

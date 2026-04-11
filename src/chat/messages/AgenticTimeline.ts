@@ -81,6 +81,9 @@ export class AgenticTimeline {
         } else {
           detailEl.remove();
         }
+        if (step.toolArgs) {
+          this.renderExpandableArgs(stepEl, step.toolArgs);
+        }
         this.updateSummary();
         return;
       }
@@ -187,9 +190,38 @@ export class AgenticTimeline {
       if (step.toolInput) {
         bodyEl.createSpan({ cls: "lmsa-agentic-timeline-step-detail", text: step.toolInput });
       }
+      if (step.toolArgs) {
+        this.renderExpandableArgs(stepEl, step.toolArgs);
+      }
     } else if (step.text) {
       const truncated = step.text.length > 120 ? step.text.slice(0, 120) + "…" : step.text;
       bodyEl.createSpan({ cls: "lmsa-agentic-timeline-step-name", text: truncated });
     }
+  }
+
+  /**
+   * Render a clickable expand toggle that reveals the full tool arguments below
+   * the step body. Clicking the step row toggles the expanded block.
+   */
+  private renderExpandableArgs(
+    stepEl: HTMLElement,
+    args: Record<string, unknown>,
+  ): void {
+    // Append inside the step body (second child after the dot) so flex layout
+    // keeps the expand block below the label, not beside the dot.
+    const bodyEl = stepEl.querySelector(".lmsa-agentic-timeline-step-body") ?? stepEl;
+    const expandEl = (bodyEl as HTMLElement).createDiv({ cls: "lmsa-agentic-timeline-step-expand" });
+
+    for (const [key, value] of Object.entries(args)) {
+      const entryEl = expandEl.createDiv({ cls: "lmsa-agentic-timeline-arg-entry" });
+      entryEl.createSpan({ cls: "lmsa-agentic-timeline-arg-key", text: key });
+      const valueStr = typeof value === "string" ? value : JSON.stringify(value, null, 2);
+      entryEl.createEl("pre", { cls: "lmsa-agentic-timeline-arg-value", text: valueStr });
+    }
+
+    stepEl.classList.add("lmsa-agentic-timeline-step--expandable");
+    stepEl.addEventListener("click", () => {
+      stepEl.classList.toggle("is-expanded");
+    });
   }
 }

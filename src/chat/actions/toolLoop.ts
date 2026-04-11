@@ -247,6 +247,7 @@ export async function runToolLoop(
         round,
         toolName: tc.name,
         toolInput: extractToolInput(tc),
+        toolArgs: tc.arguments,
       });
     }
 

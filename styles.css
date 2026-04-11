@@ -1304,6 +1304,53 @@
     0%, 100% { opacity: 1; }
     50% { opacity: 0.35; }
   }
+/* ── Expandable tool args ──────────────────────────────────────── */
+.lmsa-agentic-timeline-step--expandable {
+    cursor: pointer;
+  }
+.lmsa-agentic-timeline-step--expandable:hover .lmsa-agentic-timeline-step-name {
+    text-decoration: underline;
+    text-decoration-style: dotted;
+  }
+.lmsa-agentic-timeline-step-expand {
+    display: none;
+    width: 100%;
+    margin-top: 4px;
+    padding: 6px 8px;
+    background: var(--background-secondary);
+    border-radius: var(--radius-s);
+    border: 1px solid var(--background-modifier-border);
+    font-size: var(--font-ui-smaller);
+  }
+.lmsa-agentic-timeline-step.is-expanded .lmsa-agentic-timeline-step-expand {
+    display: block;
+  }
+.lmsa-agentic-timeline-arg-entry {
+    display: flex;
+    flex-direction: column;
+    gap: 0.125rem;
+    padding: 2px 0;
+}
+.lmsa-agentic-timeline-arg-entry + .lmsa-agentic-timeline-arg-entry {
+    margin-top: 4px;
+    padding-top: 4px;
+    border-top: 1px solid var(--background-modifier-border);
+  }
+.lmsa-agentic-timeline-arg-key {
+    color: var(--text-accent);
+    font-weight: 600;
+  }
+.lmsa-agentic-timeline-arg-value {
+    margin: 0;
+    padding: 4px 6px;
+    background: var(--background-primary);
+    border-radius: var(--radius-s);
+    color: var(--text-normal);
+    white-space: pre-wrap;
+    word-break: break-word;
+    max-height: 300px;
+    overflow-y: auto;
+  }
 .lmsa-chat-window-message.is-editing .lmsa-chat-window-message-body {
     border-style: dashed;
     border-color: color-mix(in srgb, var(--lmsa-mode-accent) 50%, var(--background-modifier-border));

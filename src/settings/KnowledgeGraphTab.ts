@@ -1,5 +1,5 @@
 import { Setting } from "obsidian";
-import type LMStudioWritingAssistant from "../main";
+import type WritingAssistantChat from "../main";
 import type { GraphBuildState } from "../rag/graph";
 import type { ModelAvailabilityState } from "../shared/types";
 import { getProviderDescriptor } from "../providers/registry";
@@ -11,7 +11,7 @@ import { createSettingsSection, createModelSelector, Button, SettingItem } from 
  */
 export function renderKnowledgeGraphTab(
   container: HTMLElement,
-  plugin: LMStudioWritingAssistant,
+  plugin: WritingAssistantChat,
 ): () => void {
   const { knowledgeGraph: kg } = plugin.settings;
 

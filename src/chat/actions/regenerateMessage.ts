@@ -1,7 +1,7 @@
 import type { Component } from "obsidian";
 import { Notice } from "obsidian";
 import { createChatClient } from "../../providers/registry";
-import type LMStudioWritingAssistant from "../../main";
+import type WritingAssistantChat from "../../main";
 import type { ChatComposer } from "../composer/ChatComposer";
 import type { ChatSessionStore } from "../conversation/ChatSessionStore";
 import type { ChatTranscript } from "../messages/ChatTranscript";
@@ -9,7 +9,7 @@ import type { ChatModelSelector } from "../models/ChatModelSelector";
 import { generateLlmResponse } from "./generateLlmResponse";
 
 export type RegenerateOptions = {
-  plugin: LMStudioWritingAssistant;
+  plugin: WritingAssistantChat;
   owner: Component;
   store: ChatSessionStore;
   transcript: ChatTranscript;

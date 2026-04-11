@@ -1,5 +1,5 @@
 import { Notice } from "obsidian";
-import type LMStudioWritingAssistant from "../../main";
+import type WritingAssistantChat from "../../main";
 import type { AgenticStep, ProviderOption, RagSourceRef } from "../../shared/types";
 import type { UsageResult } from "../../api/usageTypes";
 import type { BubbleRefs } from "../types";
@@ -34,7 +34,7 @@ export async function finalizeResponse(
   bubble: BubbleRefs,
   renderer: StreamingRenderer,
   autoInsertAfterResponse: boolean,
-  plugin: LMStudioWritingAssistant,
+  plugin: WritingAssistantChat,
   modelId?: string,
   provider?: ProviderOption,
   usage?: UsageResult | null,
@@ -106,7 +106,7 @@ export async function finalizeAbortedResponse(
 }
 
 async function insertLastResponse(
-  plugin: LMStudioWritingAssistant,
+  plugin: WritingAssistantChat,
   lastAssistantResponse: string
 ): Promise<void> {
   if (!lastAssistantResponse) return;

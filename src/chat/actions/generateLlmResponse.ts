@@ -1,7 +1,7 @@
 import type { Component } from "obsidian";
 import { Notice } from "obsidian";
 import { buildSamplingParams } from "../finalization/buildSamplingParams";
-import type LMStudioWritingAssistant from "../../main";
+import type WritingAssistantChat from "../../main";
 import type { ChatClient } from "../../api/chatClient";
 import type { ChatComposer } from "../composer/ChatComposer";
 import type { ChatSessionStore } from "../conversation/ChatSessionStore";
@@ -33,7 +33,7 @@ type FinalizationMode =
   | { kind: "replace"; oldMessage: ConversationMessage };
 
 export interface LlmGenerationOptions {
-  plugin: LMStudioWritingAssistant;
+  plugin: WritingAssistantChat;
   owner: Component;
   store: ChatSessionStore;
   transcript: ChatTranscript;

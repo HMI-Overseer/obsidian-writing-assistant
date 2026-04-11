@@ -1,7 +1,7 @@
 import type { App } from "obsidian";
 import { Modal, Notice } from "obsidian";
 import { SettingItem } from "../ui";
-import type LMStudioWritingAssistant from "../../main";
+import type WritingAssistantChat from "../../main";
 import type { LMStudioModelsService } from "../../api";
 import type { AnthropicModelsService } from "../../api/AnthropicModelsService";
 import type { ModelCandidateResult, ModelDigest } from "../../api/types";
@@ -16,7 +16,7 @@ export abstract class ModelProfileModal<T extends BaseModel> extends Modal {
 
   constructor(
     app: App,
-    protected plugin: LMStudioWritingAssistant,
+    protected plugin: WritingAssistantChat,
     source: T | null,
     private onSave: (model: T) => void,
     prefill?: Partial<T>

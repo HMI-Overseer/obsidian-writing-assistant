@@ -53,7 +53,7 @@ export class ConversationStorage {
   }
 
   private dirPath(): string {
-    return `${this.app.vault.configDir}/plugins/obsidian-writing-assistant/${CONVERSATIONS_DIR}`;
+    return `${this.app.vault.configDir}/plugins/writing-assistant-chat/${CONVERSATIONS_DIR}`;
   }
 
   private async ensureDir(): Promise<void> {

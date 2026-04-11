@@ -1,5 +1,5 @@
 import type { ModelDigest } from "../api/types";
-import type LMStudioWritingAssistant from "../main";
+import type WritingAssistantChat from "../main";
 import type { EmbeddingModel } from "../shared/types";
 import { EmbeddingModelModal } from "./modals";
 import { renderModelProfileTab } from "./ModelProfileTab";
@@ -13,7 +13,7 @@ function formatEmbeddingSummary(model: ModelDigest): string {
 
 export function renderEmbeddingModelsTab(
   container: HTMLElement,
-  plugin: LMStudioWritingAssistant
+  plugin: WritingAssistantChat
 ): void {
   const { settings } = plugin;
 

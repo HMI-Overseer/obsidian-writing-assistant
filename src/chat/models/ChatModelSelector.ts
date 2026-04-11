@@ -1,4 +1,4 @@
-import type LMStudioWritingAssistant from "../../main";
+import type WritingAssistantChat from "../../main";
 import type { CompletionModel, ModelAvailabilityState } from "../../shared/types";
 import type { ChatLayoutRefs } from "../types";
 import { setIcon } from "obsidian";
@@ -18,7 +18,7 @@ export class ChatModelSelector {
   private isCheckingModelStatus = false;
 
   constructor(
-    private readonly plugin: LMStudioWritingAssistant,
+    private readonly plugin: WritingAssistantChat,
     private readonly refs: Pick<
       ChatLayoutRefs,
       | "modelSelectorBtn"

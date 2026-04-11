@@ -1,8 +1,8 @@
-import type LMStudioWritingAssistant from "../main";
+import type WritingAssistantChat from "../main";
 import { ApiKeysModal } from "./modals";
 import { createSettingsSection, SettingItem } from "./ui";
 
-export function renderGeneralTab(container: HTMLElement, plugin: LMStudioWritingAssistant): void {
+export function renderGeneralTab(container: HTMLElement, plugin: WritingAssistantChat): void {
   // ── Provider API Keys ──────────────────────────────────────────────
   const keys = createSettingsSection(
     container,

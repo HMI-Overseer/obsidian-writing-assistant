@@ -58,7 +58,7 @@ export function createChatLayout(contentEl: HTMLElement): ChatLayoutRefs {
 
   const header = shell.createDiv({ cls: "lmsa-chat-header" });
   const titleGroup = header.createDiv({ cls: "lmsa-chat-header-copy" });
-  titleGroup.createEl("div", { cls: "lmsa-chat-header-title", text: "Obsidian writing assistant chat" });
+  titleGroup.createEl("div", { cls: "lmsa-chat-header-title", text: "Writing assistant chat" });
 
   const headerMetaWrap = titleGroup.createDiv({ cls: "lmsa-chat-header-meta-wrap" });
   const headerMetaBtn = headerMetaWrap.createDiv({ cls: "lmsa-chat-header-meta" });

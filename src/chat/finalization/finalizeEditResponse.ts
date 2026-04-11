@@ -11,7 +11,7 @@ import type { ChatTranscript } from "../messages/ChatTranscript";
 import { DiffReviewPanel } from "../messages/DiffReviewPanel";
 import type { BubbleRefs } from "../types";
 import type { EditStreamingRenderer } from "../streaming/EditStreamingRenderer";
-import type LMStudioWritingAssistant from "../../main";
+import type WritingAssistantChat from "../../main";
 import type { AgenticStep, ProviderOption } from "../../shared/types";
 import type { ToolCall } from "../../tools/types";
 import type { UsageResult } from "../../api/usageTypes";
@@ -24,7 +24,7 @@ export interface FinalizeEditOptions {
   transcript: ChatTranscript;
   bubble: BubbleRefs;
   renderer: EditStreamingRenderer;
-  plugin: LMStudioWritingAssistant;
+  plugin: WritingAssistantChat;
   modelId?: string;
   provider?: ProviderOption;
   usage?: UsageResult | null;

@@ -1,5 +1,5 @@
 import type { ModelDigest } from "../api/types";
-import type LMStudioWritingAssistant from "../main";
+import type WritingAssistantChat from "../main";
 import type { CompletionModel } from "../shared/types";
 import { CompletionModelModal } from "./modals";
 import { renderModelProfileTab } from "./ModelProfileTab";
@@ -26,7 +26,7 @@ function formatDiscoveryMeta(model: ModelDigest): string {
 
 export function renderCompletionModelsTab(
   container: HTMLElement,
-  plugin: LMStudioWritingAssistant
+  plugin: WritingAssistantChat
 ): void {
   const { settings } = plugin;
 

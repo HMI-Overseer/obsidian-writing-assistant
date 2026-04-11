@@ -6,7 +6,7 @@ import type {
   MessageVersion,
   RagSourceRef,
 } from "../../shared/types";
-import type LMStudioWritingAssistant from "../../main";
+import type WritingAssistantChat from "../../main";
 import { resolveCompletionModel } from "../../utils";
 import {
   createConversation,
@@ -32,7 +32,7 @@ export class ChatSessionStore {
   private activeCreatedAt = 0;
 
   constructor(
-    private readonly plugin: LMStudioWritingAssistant,
+    private readonly plugin: WritingAssistantChat,
     private readonly storage: ConversationStorage,
   ) {}
 

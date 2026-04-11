@@ -2,7 +2,7 @@ import type { ChatHistory, KnowledgeGraphSettings, PluginSettings, ProviderOptio
 import { EDIT_SYSTEM_PROMPT } from "./editing/regexEditSystemPrompt";
 import { TOOL_EDIT_SYSTEM_PROMPT } from "./tools/editing/systemPrompt";
 
-export const VIEW_TYPE_CHAT = "lm-studio-chat";
+export const VIEW_TYPE_CHAT = "writing-assistant-chat";
 
 export const DEFAULT_SYSTEM_PROMPT =
   "You are a helpful creative writing assistant. Be concise, specific, and match the tone of the existing text.";

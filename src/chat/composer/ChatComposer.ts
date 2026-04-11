@@ -1,7 +1,7 @@
 import { setIcon } from "obsidian";
 import type { App } from "obsidian";
 import type { CompletionModel, CustomCommand } from "../../shared/types";
-import type LMStudioWritingAssistant from "../../main";
+import type WritingAssistantChat from "../../main";
 import { shouldUseToolCall } from "../../tools/registry";
 import { getActiveFileName } from "../../context/noteContext";
 import type { ChatLayoutRefs, ChatMode } from "../types";
@@ -35,7 +35,7 @@ export class ChatComposer {
 
   constructor(
     private readonly app: App,
-    private readonly plugin: LMStudioWritingAssistant,
+    private readonly plugin: WritingAssistantChat,
     private readonly refs: Pick<
       ChatLayoutRefs,
       "commandBarEl" | "contextChipsEl" | "textareaEl" | "modeToggleEl" | "toolUseIndicatorEl" | "toolUsePopoverEl" | "knowledgeIndicatorEl" | "visionIndicatorEl" | "actionBtn"

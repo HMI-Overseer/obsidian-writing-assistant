@@ -290,7 +290,7 @@ export class GraphService {
   }
 
   private getGraphPath(): string {
-    const pluginDir = `${this.app.vault.configDir}/plugins/obsidian-writing-assistant`;
+    const pluginDir = `${this.app.vault.configDir}/plugins/writing-assistant-chat`;
     return `${pluginDir}/${GRAPH_FILE}`;
   }
 

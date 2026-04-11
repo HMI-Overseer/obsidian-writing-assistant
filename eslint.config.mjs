@@ -57,7 +57,7 @@ export default tseslint.config(
       "obsidianmd/ui/sentence-case": ["error", {
         enforceCamelCaseLower: true,
         brands: [...DEFAULT_BRANDS, "LM Studio", "OpenAI", "Claude", "Anthropic", "Electron"],
-        acronyms: [...DEFAULT_ACRONYMS, "CORS", "TTL", "GPT"],
+        acronyms: [...DEFAULT_ACRONYMS, "CORS", "TTL", "GPT", "LLM"],
         ignoreRegex: ["^sk-", "^https?://"],
       }],
     },

@@ -3,7 +3,7 @@ import { ItemView, Notice } from "obsidian";
 import type { ConversationMessage, CustomCommand, ProviderProfile } from "../shared/types";
 import type { DocumentContext } from "../shared/chatRequest";
 import type { ChatMode } from "./types";
-import type LMStudioWritingAssistant from "../main";
+import type WritingAssistantChat from "../main";
 import { VIEW_TYPE_CHAT, makeDefaultProfile } from "../constants";
 import { getActiveProfile, getProfilesForProvider, generateProfileId } from "../shared/profileUtils";
 import { PROVIDER_DESCRIPTORS } from "../providers/descriptors";
@@ -35,7 +35,7 @@ const NO_MODEL_SELECTED_LABEL = "No model selected";
 const MIN_VIEW_WIDTH_PX = 300;
 
 export class ChatView extends ItemView {
-  plugin: LMStudioWritingAssistant;
+  plugin: WritingAssistantChat;
 
   private layout: ChatLayoutRefs | null = null;
   private sessionStore: ChatSessionStore | null = null;
@@ -53,7 +53,7 @@ export class ChatView extends ItemView {
   private resizeObserver: ResizeObserver | null = null;
   private cachedDocumentContext: DocumentContext | null = null;
 
-  constructor(leaf: WorkspaceLeaf, plugin: LMStudioWritingAssistant) {
+  constructor(leaf: WorkspaceLeaf, plugin: WritingAssistantChat) {
     super(leaf);
     this.plugin = plugin;
   }

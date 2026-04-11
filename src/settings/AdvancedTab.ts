@@ -1,4 +1,4 @@
-import type LMStudioWritingAssistant from "../main";
+import type WritingAssistantChat from "../main";
 import { EDIT_SYSTEM_PROMPT } from "../editing/regexEditSystemPrompt";
 import { TOOL_EDIT_SYSTEM_PROMPT } from "../tools/editing/systemPrompt";
 import {
@@ -9,7 +9,7 @@ import {
 } from "../constants";
 import { createSettingsSection, SettingItem } from "./ui";
 
-export function renderAdvancedTab(container: HTMLElement, plugin: LMStudioWritingAssistant): void {
+export function renderAdvancedTab(container: HTMLElement, plugin: WritingAssistantChat): void {
   const agentic = createSettingsSection(
     container,
     "Agentic mode",
@@ -150,7 +150,7 @@ type PromptPrefixKey =
 
 function renderPromptPrefixSetting(
   container: HTMLElement,
-  plugin: LMStudioWritingAssistant,
+  plugin: WritingAssistantChat,
   name: string,
   desc: string,
   key: PromptPrefixKey,

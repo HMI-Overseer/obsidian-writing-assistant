@@ -25,7 +25,7 @@ import { normalizeLMStudioBaseUrl, ModelAvailabilityService } from "./api";
 import { ChatView } from "./chat";
 import { normalizeChatHistory } from "./chat/conversation/conversationUtils";
 import { normalizeCompletionModel, normalizeEmbeddingModel } from "./shared/normalizeModels";
-import { LMStudioSettingTab } from "./settings/SettingsTab";
+import { WritingAssistantSettingTab } from "./settings/SettingsTab";
 import { RagService } from "./rag";
 import { GraphService } from "./rag/graph";
 
@@ -135,7 +135,7 @@ function normalizeActiveProfileIds(raw: unknown): Record<ProviderOption, string>
   return defaults;
 }
 
-export default class LMStudioWritingAssistant extends Plugin {
+export default class WritingAssistantChat extends Plugin {
   settings!: PluginSettings;
   modelAvailability!: ModelAvailabilityService;
   ragService!: RagService;
@@ -169,14 +169,14 @@ export default class LMStudioWritingAssistant extends Plugin {
     });
 
     this.addCommand({
-      id: "open-lm-studio-chat",
-      name: "Open writing assistant chat",
+      id: "open-chat",
+      name: "Open chat",
       callback: () => this.activateChatView(),
     });
 
     this.addCommand({
       id: "send-selection-to-chat",
-      name: "Send selection to writing assistant chat",
+      name: "Send selection to chat",
       editorCallback: (editor) => {
         const selection = editor.getSelection();
         if (!selection) {
@@ -209,7 +209,7 @@ export default class LMStudioWritingAssistant extends Plugin {
       },
     });
 
-    this.addSettingTab(new LMStudioSettingTab(this.app, this));
+    this.addSettingTab(new WritingAssistantSettingTab(this.app, this));
 
     if (this.app.workspace.layoutReady) {
       this.initLeafIfNeeded();

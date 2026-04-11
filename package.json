@@ -1,7 +1,7 @@
 {
-  "name": "obsidian-writing-assistant",
+  "name": "writing-assistant-chat",
   "version": "1.0.0",
-  "description": "Obsidian plugin: Obsidian Writing Assistant",
+  "description": "Obsidian plugin: Writing Assistant Chat",
   "main": "main.js",
   "scripts": {
     "dev": "node esbuild.config.mjs",

@@ -1,5 +1,5 @@
 import { setIcon } from "obsidian";
-import type LMStudioWritingAssistant from "../main";
+import type WritingAssistantChat from "../main";
 import type { CompletionModel, ProviderProfile } from "../shared/types";
 import { getProviderDescriptor, createChatClient } from "../providers/registry";
 import { PROVIDER_DESCRIPTORS } from "../providers/descriptors";
@@ -14,7 +14,7 @@ import { makeDefaultProfile } from "../constants";
 
 export function renderBenchmarkTab(
   container: HTMLElement,
-  plugin: LMStudioWritingAssistant,
+  plugin: WritingAssistantChat,
   _refresh: () => void
 ): () => void {
   const models = plugin.settings.completionModels;

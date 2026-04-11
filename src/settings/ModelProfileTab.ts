@@ -2,7 +2,7 @@ import type { App } from "obsidian";
 import { Notice } from "obsidian";
 import { normalizeLMStudioBaseUrl } from "../api";
 import type { ModelCandidateResult, ModelDigest } from "../api/types";
-import type LMStudioWritingAssistant from "../main";
+import type WritingAssistantChat from "../main";
 import type { ProviderOption } from "../shared/types";
 import { getProviderDescriptor } from "../providers/registry";
 import { createSettingsSection, SettingItem } from "./ui";
@@ -27,7 +27,7 @@ export type ModelProfileTabConfig<T extends BaseModel> = {
   formatDiscoveryMeta: (model: ModelDigest) => string;
   openModal: (
     app: App,
-    plugin: LMStudioWritingAssistant,
+    plugin: WritingAssistantChat,
     source: T | null,
     onSave: (model: T) => void,
     prefill?: Partial<T>
@@ -46,7 +46,7 @@ const PROVIDER_LABELS: Record<ProviderOption, string> = {
 
 export function renderModelProfileTab<T extends BaseModel>(
   container: HTMLElement,
-  plugin: LMStudioWritingAssistant,
+  plugin: WritingAssistantChat,
   config: ModelProfileTabConfig<T>
 ): void {
   const { settings } = plugin;

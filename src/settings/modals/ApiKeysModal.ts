@@ -1,7 +1,7 @@
 import type { App } from "obsidian";
 import { Modal } from "obsidian";
 import { SettingItem } from "../ui";
-import type LMStudioWritingAssistant from "../../main";
+import type WritingAssistantChat from "../../main";
 
 /**
  * Modal for managing API keys across all providers that require them.
@@ -10,7 +10,7 @@ import type LMStudioWritingAssistant from "../../main";
 export class ApiKeysModal extends Modal {
   constructor(
     app: App,
-    private plugin: LMStudioWritingAssistant
+    private plugin: WritingAssistantChat
   ) {
     super(app);
   }

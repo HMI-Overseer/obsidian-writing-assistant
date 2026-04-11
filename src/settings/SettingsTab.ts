@@ -1,6 +1,6 @@
 import type { App } from "obsidian";
 import { PluginSettingTab, setIcon, Setting } from "obsidian";
-import type LMStudioWritingAssistant from "../main";
+import type WritingAssistantChat from "../main";
 import { renderAdvancedTab } from "./AdvancedTab";
 import { renderCommandsTab } from "./CommandsTab";
 import { renderCompletionModelsTab } from "./CompletionModelsTab";
@@ -51,7 +51,7 @@ const TAB_SLUGS: Record<TabName, string> = {
 const TAB_META: Record<TabName, TabMeta> = {
   "General": {
     title: "Connection and Context",
-    description: "Configure how the plugin talks to LM Studio and how much note context is sent with each request.",
+    description: "Configure how the plugin talks to LLM providers and how much note context is sent with each request.",
   },
   "Completion Models": {
     title: "Completion Model Library",
@@ -83,7 +83,7 @@ const TAB_META: Record<TabName, TabMeta> = {
   },
 };
 
-export class LMStudioSettingTab extends PluginSettingTab {
+export class WritingAssistantSettingTab extends PluginSettingTab {
   private activeTab: TabName = "General";
   private cleanupBenchmark: (() => void) | null = null;
   private cleanupRag: (() => void) | null = null;
@@ -91,7 +91,7 @@ export class LMStudioSettingTab extends PluginSettingTab {
 
   constructor(
     app: App,
-    private plugin: LMStudioWritingAssistant
+    private plugin: WritingAssistantChat
   ) {
     super(app, plugin);
   }

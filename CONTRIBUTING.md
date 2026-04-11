@@ -1,6 +1,6 @@
 # Contributing
 
-Thanks for your interest in contributing to the Obsidian Writing Assistant. This document covers everything you need to get the project running locally and working on it effectively.
+Thanks for your interest in contributing to Writing Assistant Chat. This document covers everything you need to get the project running locally and working on it effectively.
 
 ---
 
@@ -15,15 +15,15 @@ Thanks for your interest in contributing to the Obsidian Writing Assistant. This
 ## Setting Up
 
 ```bash
-git clone https://github.com/HMI-Overseer/local-obsidian-writing-assistant.git
-cd local-obsidian-writing-assistant
+git clone https://github.com/HMI-Overseer/writing-assistant-chat.git
+cd writing-assistant-chat
 npm install
 ```
 
 To see changes live inside Obsidian, symlink (or copy) the project folder into your vault's plugin directory:
 
 ```
-<your-vault>/.obsidian/plugins/obsidian-writing-assistant/
+<your-vault>/.obsidian/plugins/writing-assistant-chat/
 ```
 
 Then run the dev watcher:

@@ -1,10 +1,10 @@
-import type LMStudioWritingAssistant from "../main";
+import type WritingAssistantChat from "../main";
 import { CommandModal } from "./modals";
 import { createSettingsSection } from "./ui";
 
 export function renderCommandsTab(
   container: HTMLElement,
-  plugin: LMStudioWritingAssistant,
+  plugin: WritingAssistantChat,
   refresh: () => void
 ): void {
   const { settings } = plugin;

@@ -1,4 +1,4 @@
-import type LMStudioWritingAssistant from "../main";
+import type WritingAssistantChat from "../main";
 import type { IndexingState } from "../rag/types";
 import type { ModelAvailabilityState } from "../shared/types";
 import { getProviderDescriptor } from "../providers/registry";
@@ -11,7 +11,7 @@ import { DEFAULT_RAG_SETTINGS } from "../constants";
  */
 export function renderRagTab(
   container: HTMLElement,
-  plugin: LMStudioWritingAssistant,
+  plugin: WritingAssistantChat,
 ): () => void {
   const { rag } = plugin.settings;
 

@@ -21,6 +21,7 @@ const AUTO_SCROLL_BOTTOM_THRESHOLD_PX = 10;
 export class ChatTranscript {
   private bubbleRenderChildren = new Map<HTMLElement, Component>();
   private bubblesByMessageId = new Map<string, BubbleRefs>();
+  private renderedMessageIds: string[] = [];
   private shouldAutoScroll = true;
 
   constructor(
@@ -37,6 +38,69 @@ export class ChatTranscript {
     messages: ConversationMessage[],
     actionCallbacks?: BubbleActionCallbacks,
     forceScroll = true
+  ): Promise<void> {
+    const newIds = messages.map((m) => m.id);
+    const canIncrement = this.canIncrementalUpdate(newIds);
+
+    if (canIncrement) {
+      await this.incrementalRender(messages, actionCallbacks);
+    } else {
+      await this.fullRender(messages, actionCallbacks);
+    }
+
+    this.renderedMessageIds = newIds;
+    this.scrollToBottom(forceScroll);
+  }
+
+  /**
+   * Incremental render is possible when the existing messages are a prefix
+   * of the new message list (same IDs in the same order). This handles the
+   * common case: new messages appended to the end of a conversation.
+   */
+  private canIncrementalUpdate(newIds: string[]): boolean {
+    if (this.renderedMessageIds.length === 0) return false;
+    if (this.renderedMessageIds.length > newIds.length) return false;
+
+    for (let i = 0; i < this.renderedMessageIds.length; i++) {
+      if (this.renderedMessageIds[i] !== newIds[i]) return false;
+    }
+    return true;
+  }
+
+  private async incrementalRender(
+    messages: ConversationMessage[],
+    actionCallbacks?: BubbleActionCallbacks,
+  ): Promise<void> {
+    const lastAssistantIndex = this.findLastAssistantIndex(messages);
+    const startIndex = this.renderedMessageIds.length;
+
+    for (let i = startIndex; i < messages.length; i++) {
+      const message = messages[i];
+      const bubble = this.createBubble(message.role, message.id);
+
+      if (message.role === "assistant" && message.agenticSteps?.length) {
+        AgenticTimeline.render(bubble.timelineEl, message.agenticSteps);
+      }
+
+      if (message.isError) {
+        bubble.bodyEl.addClass("is-error");
+        this.renderPlainTextContent(bubble, message.content);
+      } else {
+        await this.renderBubbleContent(bubble, message.content);
+      }
+
+      this.bubblesByMessageId.set(message.id, bubble);
+
+      if (actionCallbacks) {
+        const isLastAssistant = i === lastAssistantIndex;
+        this.attachBubbleActions(bubble, message, isLastAssistant, actionCallbacks);
+      }
+    }
+  }
+
+  private async fullRender(
+    messages: ConversationMessage[],
+    actionCallbacks?: BubbleActionCallbacks,
   ): Promise<void> {
     const wasAutoScroll = this.shouldAutoScroll;
     this.clear();
@@ -66,8 +130,6 @@ export class ChatTranscript {
         this.attachBubbleActions(bubble, message, isLastAssistant, actionCallbacks);
       }
     }
-
-    this.scrollToBottom(forceScroll);
   }
 
   getBubbleForMessage(messageId: string): BubbleRefs | null {
@@ -156,6 +218,7 @@ export class ChatTranscript {
   clear(): void {
     this.clearAllBubbleMarkdownRenders();
     this.bubblesByMessageId.clear();
+    this.renderedMessageIds = [];
     this.refs.messagesEl.empty();
     this.shouldAutoScroll = true;
   }

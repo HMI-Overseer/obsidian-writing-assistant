@@ -4,6 +4,7 @@ import type { ProviderDescriptor } from "./types";
 import { PROVIDER_DESCRIPTORS } from "./descriptors";
 import { LMStudioClient } from "../api/LMStudioClient";
 import { AnthropicClient } from "../api/AnthropicClient";
+import { OpenAIClient } from "../api/OpenAIClient";
 
 export function getProviderDescriptor(id: ProviderOption): ProviderDescriptor {
   return PROVIDER_DESCRIPTORS[id];
@@ -17,7 +18,10 @@ export function createChatClient(
     case "anthropic":
       return new AnthropicClient(providerSettings.anthropic.apiKey);
     case "openai":
-      throw new Error("OpenAI provider is not yet supported.");
+      return new OpenAIClient(
+        providerSettings.openai.apiKey,
+        providerSettings.openai.baseUrl
+      );
     case "lmstudio":
       return new LMStudioClient(
         providerSettings.lmstudio.baseUrl,

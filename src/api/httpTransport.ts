@@ -1,6 +1,7 @@
 import * as http from "http";
 import * as https from "https";
 import type { RequestMethod } from "./types";
+import { withRetry } from "./retry";
 
 export function createAbortError(): Error {
   const error = new Error("The request was aborted.");
@@ -166,10 +167,12 @@ export async function request(
   signal?: AbortSignal,
   headers?: Record<string, string>
 ): Promise<string> {
-  if (bypassCors) {
-    return nodeRequest(method, baseUrl, path, body, signal, headers);
-  }
-  return fetchRequest(method, baseUrl, path, body, signal, headers);
+  return withRetry(
+    () => bypassCors
+      ? nodeRequest(method, baseUrl, path, body, signal, headers)
+      : fetchRequest(method, baseUrl, path, body, signal, headers),
+    { signal },
+  );
 }
 
 export async function requestJson(

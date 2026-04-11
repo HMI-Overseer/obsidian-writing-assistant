@@ -6,7 +6,17 @@ import { PROVIDER_DESCRIPTORS } from "../providers/descriptors";
 import { createSettingsSection, createModelSelector } from "./ui";
 import { getTestSuites } from "./benchmark/testSuites";
 import { runBenchmarkTest, runAllBenchmarks } from "./benchmark/benchmarkRunner";
-import type { BenchmarkRunResult, BenchmarkTestCase, BenchmarkTestSuite, EvaluationCriteria, BenchmarkMessage } from "./benchmark/types";
+import type { BenchmarkTestCase, BenchmarkTestSuite, BenchmarkRunResult } from "./benchmark/types";
+import { computeSummaryStats, computeSuiteSummary } from "./benchmark/BenchmarkSummary";
+import {
+  renderCriteria,
+  renderConversationPreview,
+  renderCardResults,
+  renderCardStatus,
+  renderSummary,
+  renderSuiteSummary,
+  renderProgressSummary,
+} from "./benchmark/BenchmarkRenderers";
 import { ProfileSettingsPopover } from "../chat/models/ProfileSettingsPopover";
 import { buildSamplingParams } from "../chat/finalization/buildSamplingParams";
 import { getActiveProfile, getProfilesForProvider, generateProfileId } from "../shared/profileUtils";
@@ -65,7 +75,6 @@ export function renderBenchmarkTab(
     },
   });
 
-  // Add benchmark-specific class for right-aligned layout
   selector.wrapEl.addClass("lmsa-benchmark-model-wrap");
 
   const profileSettingsBtn = selector.wrapEl.createEl("button", {
@@ -132,7 +141,6 @@ export function renderBenchmarkTab(
     icon: "flask-conical",
   });
 
-  // Header actions: Run All / Abort
   const runAllBtn = suitesSection.headerActionsEl.createEl("button", {
     cls: "lmsa-benchmark-btn lmsa-benchmark-btn--run-all",
     text: "Run all",
@@ -144,7 +152,7 @@ export function renderBenchmarkTab(
   });
   abortBtn.addClass("lmsa-hidden");
 
-  // Iterations setting (global, shared across suites)
+  // Iterations setting
   const iterRow = suitesSection.bodyEl.createDiv({ cls: "lmsa-benchmark-setting-row" });
   const iterInfo = iterRow.createDiv({ cls: "lmsa-benchmark-setting-info" });
   iterInfo.createEl("span", { cls: "lmsa-benchmark-setting-name", text: "Iterations per test" });
@@ -164,7 +172,7 @@ export function renderBenchmarkTab(
   });
 
   // -----------------------------------------------------------------------
-  // Tab bar
+  // Tab bar & test cards
   // -----------------------------------------------------------------------
 
   const tabBar = suitesSection.bodyEl.createDiv({ cls: "lmsa-benchmark-tab-bar" });
@@ -190,7 +198,6 @@ export function renderBenchmarkTab(
   let activeSuiteId = suites[0]?.id ?? "";
 
   for (const suite of suites) {
-    // --- Tab button ---
     const tabBtn = tabBar.createEl("button", { cls: "lmsa-benchmark-tab" });
     if (suite.icon) {
       const iconEl = tabBtn.createSpan({ cls: "lmsa-benchmark-tab-icon" });
@@ -199,20 +206,16 @@ export function renderBenchmarkTab(
     tabBtn.createSpan({ text: suite.name });
     if (suite.id === activeSuiteId) tabBtn.addClass("is-active");
 
-    // --- Content panel ---
     const contentEl = suitesSection.bodyEl.createDiv({ cls: "lmsa-benchmark-tab-content" });
     if (suite.id !== activeSuiteId) contentEl.addClass("lmsa-hidden");
 
-    // Suite description
     contentEl.createEl("p", {
       cls: "lmsa-settings-section-desc",
       text: suite.description,
     });
 
-    // Empty suite placeholder
     const isEmpty = suite.testCases.length === 0;
 
-    // Suite actions: Run Suite
     const suiteActionsEl = contentEl.createDiv({ cls: "lmsa-benchmark-suite-actions" });
     const runSuiteBtn = suiteActionsEl.createEl("button", {
       cls: "lmsa-benchmark-btn lmsa-benchmark-btn--run-suite",
@@ -229,7 +232,6 @@ export function renderBenchmarkTab(
       });
     }
 
-    // Test cards
     const testCardsEl = contentEl.createDiv({ cls: "lmsa-benchmark-cards" });
     const cardEls = new Map<string, CardRefs>();
 
@@ -274,13 +276,11 @@ export function renderBenchmarkTab(
 
       const detailsEl = card.createDiv({ cls: "lmsa-benchmark-card-details lmsa-hidden" });
 
-      // Static details — always visible when expanded
       if (tc.criteria) {
         renderCriteria(detailsEl, tc.criteria);
       }
       renderConversationPreview(detailsEl, tc.messages);
 
-      // Results container — populated after run
       const resultsContainerEl = detailsEl.createDiv({ cls: "lmsa-benchmark-results-container" });
 
       toggleBtn.addEventListener("click", () => {
@@ -298,7 +298,6 @@ export function renderBenchmarkTab(
       cardEls.set(tc.id, { statusEl, progressEl, detailsEl, resultsContainerEl, runBtn, toggleBtn });
     }
 
-    // Suite summary (hidden for empty suites)
     const summaryEl = contentEl.createDiv({ cls: "lmsa-benchmark-summary" });
     if (isEmpty) {
       summaryEl.addClass("lmsa-hidden");
@@ -308,20 +307,17 @@ export function renderBenchmarkTab(
 
     suiteRefs.set(suite.id, { tabBtn, contentEl, cardEls, summaryEl, runSuiteBtn });
 
-    // --- Tab click handler ---
     tabBtn.addEventListener("click", () => {
       if (suite.id === activeSuiteId) return;
       switchToSuite(suite.id);
     });
 
-    // --- Run Suite handler ---
     runSuiteBtn.addEventListener("click", () => {
       if (isRunning || !selectedModel) return;
       runSuite(suite);
     });
   }
 
-  // Global summary (aggregate across all suites)
   const globalSummaryEl = suitesSection.bodyEl.createDiv({ cls: "lmsa-benchmark-summary" });
   globalSummaryEl.setText("Run tests to see results.");
 
@@ -340,7 +336,7 @@ export function renderBenchmarkTab(
   }
 
   // -----------------------------------------------------------------------
-  // Global progress tracking
+  // Progress tracking
   // -----------------------------------------------------------------------
 
   let globalCompletedIterations = 0;
@@ -392,76 +388,10 @@ export function renderBenchmarkTab(
     if (!refs) return;
     results.set(testId, result);
 
-    const { statusEl, progressEl, resultsContainerEl } = refs;
-    progressEl.addClass("lmsa-hidden");
-    statusEl.empty();
-    statusEl.removeClass("is-passed", "is-failed", "is-running", "is-mixed");
-
     const tc = allTestCases.find((t) => t.id === testId);
-    const { passCount, totalCount, avgDurationMs } = result;
-    const avgStr = (avgDurationMs / 1000).toFixed(1);
-
-    if (passCount === totalCount) {
-      statusEl.addClass("is-passed");
-      statusEl.setText(`${passCount}/${totalCount} passed (avg ${avgStr}s)`);
-    } else if (passCount === 0) {
-      statusEl.addClass("is-failed");
-      const label = tc?.isControl ? "0/" + totalCount + " (expected)" : `0/${totalCount} passed`;
-      statusEl.setText(`${label} (avg ${avgStr}s)`);
-    } else {
-      statusEl.addClass("is-mixed");
-      statusEl.setText(`${passCount}/${totalCount} passed (avg ${avgStr}s)`);
-    }
-
-    // Populate results container with per-iteration results (preserves static criteria/conversation)
-    resultsContainerEl.empty();
-    resultsContainerEl.createDiv({ cls: "lmsa-benchmark-section-header" })
-      .createEl("strong", { text: "Results" });
-
-    for (const iter of result.iterations) {
-      const iterEl = resultsContainerEl.createDiv({ cls: "lmsa-benchmark-iteration" });
-
-      const iterHeader = iterEl.createDiv({ cls: "lmsa-benchmark-iteration-header" });
-      const iterLabel = iterHeader.createSpan({ cls: "lmsa-benchmark-iteration-label" });
-      iterLabel.setText(`Iteration ${iter.iteration}`);
-
-      const iterStatus = iterHeader.createSpan({
-        cls: `lmsa-benchmark-iteration-status ${iter.result.passed ? "is-passed" : "is-failed"}`,
-      });
-      iterStatus.setText(`${iter.result.passed ? "Passed" : "Failed"} (${(iter.durationMs / 1000).toFixed(1)}s)`);
-
-      const reasonEl = iterEl.createDiv({ cls: "lmsa-benchmark-detail-section" });
-      reasonEl.createEl("strong", { text: "Evaluation: " });
-      reasonEl.createSpan({ text: iter.result.reason });
-
-      if (iter.result.evidence.length > 0) {
-        const evidenceEl = iterEl.createDiv({ cls: "lmsa-benchmark-detail-section" });
-        evidenceEl.createEl("strong", { text: "Evidence:" });
-        const list = evidenceEl.createEl("ul", { cls: "lmsa-benchmark-evidence-list" });
-        for (const e of iter.result.evidence) {
-          list.createEl("li", { text: e });
-        }
-      }
-
-      // Show tool calls if present
-      if (iter.toolCalls && iter.toolCalls.length > 0) {
-        const toolsEl = iterEl.createDiv({ cls: "lmsa-benchmark-detail-section" });
-        toolsEl.createEl("strong", { text: `Tool calls (${iter.toolCalls.length}):` });
-        const toolsList = toolsEl.createEl("ul", { cls: "lmsa-benchmark-evidence-list" });
-        for (const tc of iter.toolCalls) {
-          const argsStr = JSON.stringify(tc.arguments, null, 2);
-          const preview = argsStr.length > 150 ? argsStr.slice(0, 150) + "..." : argsStr;
-          toolsList.createEl("li", { text: `${tc.name}(${preview})` });
-        }
-      }
-
-      const responseEl = iterEl.createDiv({ cls: "lmsa-benchmark-detail-section" });
-      responseEl.createEl("strong", { text: "Model response:" });
-      responseEl.createEl("pre", {
-        cls: "lmsa-benchmark-response-block",
-        text: iter.rawResponse || "(no text content — tool calls only)",
-      });
-    }
+    renderCardStatus(refs.statusEl, result, tc?.isControl ?? false);
+    refs.progressEl.addClass("lmsa-hidden");
+    renderCardResults(refs.resultsContainerEl, result);
   }
 
   function setCardRunning(testId: string): void {
@@ -475,119 +405,31 @@ export function renderBenchmarkTab(
     refs.progressEl.setText(`Iteration 0/${iterationCount}`);
   }
 
-  function updateSuiteSummary(suite: BenchmarkTestSuite): void {
+  function refreshSuiteSummary(suite: BenchmarkTestSuite): void {
     const refs = suiteRefs.get(suite.id);
     if (!refs) return;
-    const { summaryEl } = refs;
-    summaryEl.empty();
-
-    const nonControl = suite.testCases.filter((tc) => !tc.isControl);
-    const ranTests = nonControl.filter((tc) => results.has(tc.id));
-
-    if (ranTests.length === 0) {
-      summaryEl.setText("Run tests to see results.");
-      return;
-    }
-
-    let totalPassed = 0;
-    let totalIterations = 0;
-    let allTestsPerfect = true;
-
-    for (const tc of ranTests) {
-      const r = results.get(tc.id);
-      if (!r) continue;
-      totalPassed += r.passCount;
-      totalIterations += r.totalCount;
-      if (r.passCount < r.totalCount) allTestsPerfect = false;
-    }
-
-    const testsFullyPassed = ranTests.filter((tc) => {
-      const r = results.get(tc.id);
-      return r && r.passCount === r.totalCount;
-    }).length;
-
-    const headlineEl = summaryEl.createDiv({ cls: "lmsa-benchmark-summary-headline" });
-    headlineEl.createSpan({
-      cls: allTestsPerfect ? "lmsa-benchmark-summary--pass" : "lmsa-benchmark-summary--mixed",
-      text: `${testsFullyPassed}/${ranTests.length} tests fully passed`,
-    });
-    headlineEl.createSpan({
-      cls: "lmsa-benchmark-summary-detail",
-      text: ` (${totalPassed}/${totalIterations} total iterations)`,
-    });
-
-    // Show control result if this suite has one
-    const controlCase = suite.testCases.find((tc) => tc.isControl);
-    if (controlCase) {
-      const controlResult = results.get(controlCase.id);
-      if (controlResult) {
-        const controlRate =
-          controlResult.totalCount > 0
-            ? `${controlResult.passCount}/${controlResult.totalCount}`
-            : "—";
-        const controlText =
-          controlResult.passCount === controlResult.totalCount
-            ? ` — Control: ${controlRate} passed (annotations may not be needed for this model)`
-            : ` — Control: ${controlRate} passed (annotations provide measurable benefit)`;
-        summaryEl.createDiv({
-          cls: "lmsa-benchmark-summary-control",
-          text: controlText,
-        });
-      }
-    }
+    const stats = computeSuiteSummary(suite.testCases, results);
+    renderSuiteSummary(refs.summaryEl, stats);
   }
 
-  function updateGlobalSummary(): void {
-    globalSummaryEl.empty();
-
-    // While running, show global progress
+  function refreshGlobalSummary(): void {
     if (isRunning && globalTotalIterations > 0) {
-      const headlineEl = globalSummaryEl.createDiv({ cls: "lmsa-benchmark-summary-headline" });
-      headlineEl.createSpan({
-        cls: "lmsa-benchmark-summary-detail",
-        text: `Running: ${globalCompletedIterations}/${globalTotalIterations} iterations completed`,
-      });
-
-      const progressBar = globalSummaryEl.createDiv({ cls: "lmsa-benchmark-summary-progress-bar" });
-      const fill = progressBar.createDiv({ cls: "lmsa-benchmark-summary-progress-fill" });
-      fill.style.width = `${(globalCompletedIterations / globalTotalIterations) * 100}%`;
+      renderProgressSummary(globalSummaryEl, globalCompletedIterations, globalTotalIterations);
       return;
     }
+    const stats = computeSummaryStats(allTestCases, results);
+    renderSummary(globalSummaryEl, stats);
+  }
 
-    const nonControl = allTestCases.filter((tc) => !tc.isControl);
-    const ranTests = nonControl.filter((tc) => results.has(tc.id));
-
-    if (ranTests.length === 0) {
-      globalSummaryEl.setText("Run tests to see results.");
-      return;
+  function setCardError(testId: string, aborted: boolean): void {
+    const refs = getCardRefs(testId);
+    if (refs) {
+      refs.statusEl.empty();
+      refs.progressEl.addClass("lmsa-hidden");
+      refs.statusEl.removeClass("is-running", "is-passed", "is-mixed");
+      refs.statusEl.addClass("is-failed");
+      refs.statusEl.setText(aborted ? "Aborted" : "Error");
     }
-
-    let totalPassed = 0;
-    let totalIterations = 0;
-    let allTestsPerfect = true;
-
-    for (const tc of ranTests) {
-      const r = results.get(tc.id);
-      if (!r) continue;
-      totalPassed += r.passCount;
-      totalIterations += r.totalCount;
-      if (r.passCount < r.totalCount) allTestsPerfect = false;
-    }
-
-    const testsFullyPassed = ranTests.filter((tc) => {
-      const r = results.get(tc.id);
-      return r && r.passCount === r.totalCount;
-    }).length;
-
-    const headlineEl = globalSummaryEl.createDiv({ cls: "lmsa-benchmark-summary-headline" });
-    headlineEl.createSpan({
-      cls: allTestsPerfect ? "lmsa-benchmark-summary--pass" : "lmsa-benchmark-summary--mixed",
-      text: `${testsFullyPassed}/${ranTests.length} tests fully passed`,
-    });
-    headlineEl.createSpan({
-      cls: "lmsa-benchmark-summary-detail",
-      text: ` (${totalPassed}/${totalIterations} total iterations)`,
-    });
   }
 
   // -----------------------------------------------------------------------
@@ -603,7 +445,7 @@ export function renderBenchmarkTab(
     globalTotalIterations = iterationCount;
 
     setCardRunning(tc.id);
-    updateGlobalSummary();
+    refreshGlobalSummary();
 
     const suite = findSuiteForTest(tc.id);
 
@@ -619,26 +461,19 @@ export function renderBenchmarkTab(
         (_testId, _iter) => {
           globalCompletedIterations++;
           updateCardProgress(tc.id, globalCompletedIterations, iterationCount);
-          updateGlobalSummary();
+          refreshGlobalSummary();
         },
         abortController.signal,
         profile.anthropicCacheSettings,
       );
       updateCard(tc.id, result);
     } catch (err) {
-      const refs = getCardRefs(tc.id);
-      if (refs) {
-        refs.statusEl.empty();
-        refs.progressEl.addClass("lmsa-hidden");
-        refs.statusEl.removeClass("is-running", "is-passed", "is-mixed");
-        refs.statusEl.addClass("is-failed");
-        refs.statusEl.setText(err instanceof Error && err.name === "AbortError" ? "Aborted" : "Error");
-      }
+      setCardError(tc.id, err instanceof Error && err.name === "AbortError");
     } finally {
       abortController = null;
       setRunningState(false);
-      if (suite) updateSuiteSummary(suite);
-      updateGlobalSummary();
+      if (suite) refreshSuiteSummary(suite);
+      refreshGlobalSummary();
     }
   }
 
@@ -655,7 +490,7 @@ export function renderBenchmarkTab(
       setCardRunning(tc.id);
       iterTracker.set(tc.id, 0);
     }
-    updateGlobalSummary();
+    refreshGlobalSummary();
 
     try {
       const client = createChatClient(selectedModel.provider, plugin.settings.providerSettings);
@@ -668,41 +503,32 @@ export function renderBenchmarkTab(
         buildSamplingParams(profile),
         (result, _index) => {
           updateCard(result.testId, result);
-          updateSuiteSummary(suite);
-          updateGlobalSummary();
+          refreshSuiteSummary(suite);
+          refreshGlobalSummary();
         },
         (testId, _iter) => {
           const prev = iterTracker.get(testId) ?? 0;
           iterTracker.set(testId, prev + 1);
           updateCardProgress(testId, prev + 1, iterationCount);
           globalCompletedIterations++;
-          updateGlobalSummary();
+          refreshGlobalSummary();
         },
         abortController.signal,
         profile.anthropicCacheSettings,
       );
     } catch {
       for (const tc of suite.testCases) {
-        if (!results.has(tc.id)) {
-          const refs = getCardRefs(tc.id);
-          if (refs) {
-            refs.statusEl.empty();
-            refs.progressEl.addClass("lmsa-hidden");
-            refs.statusEl.removeClass("is-running", "is-passed", "is-mixed");
-            refs.statusEl.addClass("is-failed");
-            refs.statusEl.setText("Aborted");
-          }
-        }
+        if (!results.has(tc.id)) setCardError(tc.id, true);
       }
     } finally {
       abortController = null;
       setRunningState(false);
-      updateSuiteSummary(suite);
-      updateGlobalSummary();
+      refreshSuiteSummary(suite);
+      refreshGlobalSummary();
     }
   }
 
-  // Run All handler — runs all suites sequentially
+  // Run All handler
   runAllBtn.addEventListener("click", async () => {
     if (isRunning || !selectedModel) return;
     setRunningState(true);
@@ -716,7 +542,7 @@ export function renderBenchmarkTab(
       setCardRunning(tc.id);
       iterTracker.set(tc.id, 0);
     }
-    updateGlobalSummary();
+    refreshGlobalSummary();
 
     try {
       const client = createChatClient(selectedModel.provider, plugin.settings.providerSettings);
@@ -731,15 +557,15 @@ export function renderBenchmarkTab(
           buildSamplingParams(profile),
           (result, _index) => {
             updateCard(result.testId, result);
-            updateSuiteSummary(suite);
-            updateGlobalSummary();
+            refreshSuiteSummary(suite);
+            refreshGlobalSummary();
           },
           (testId, _iter) => {
             const prev = iterTracker.get(testId) ?? 0;
             iterTracker.set(testId, prev + 1);
             updateCardProgress(testId, prev + 1, iterationCount);
             globalCompletedIterations++;
-            updateGlobalSummary();
+            refreshGlobalSummary();
           },
           abortController.signal,
           profile.anthropicCacheSettings,
@@ -747,22 +573,13 @@ export function renderBenchmarkTab(
       }
     } catch {
       for (const tc of allTestCases) {
-        if (!results.has(tc.id)) {
-          const refs = getCardRefs(tc.id);
-          if (refs) {
-            refs.statusEl.empty();
-            refs.progressEl.addClass("lmsa-hidden");
-            refs.statusEl.removeClass("is-running", "is-passed", "is-mixed");
-            refs.statusEl.addClass("is-failed");
-            refs.statusEl.setText("Aborted");
-          }
-        }
+        if (!results.has(tc.id)) setCardError(tc.id, true);
       }
     } finally {
       abortController = null;
       setRunningState(false);
-      for (const suite of suites) updateSuiteSummary(suite);
-      updateGlobalSummary();
+      for (const suite of suites) refreshSuiteSummary(suite);
+      refreshGlobalSummary();
     }
   });
 
@@ -776,78 +593,4 @@ export function renderBenchmarkTab(
     profilePopover.destroy();
     abortController?.abort();
   };
-}
-
-// ---------------------------------------------------------------------------
-// Static detail renderers
-// ---------------------------------------------------------------------------
-
-function renderCriteria(container: HTMLElement, criteria: EvaluationCriteria): void {
-  const wrapper = container.createDiv({ cls: "lmsa-benchmark-criteria" });
-  wrapper.createDiv({ cls: "lmsa-benchmark-section-header" })
-    .createEl("strong", { text: "Evaluation criteria" });
-
-  const expectedEl = wrapper.createDiv({ cls: "lmsa-benchmark-criteria-row" });
-  expectedEl.createEl("strong", { text: "Expected: " });
-  expectedEl.createSpan({ text: criteria.expectedOutcome });
-
-  if (criteria.targetKeywords?.length) {
-    const targetEl = wrapper.createDiv({ cls: "lmsa-benchmark-criteria-row" });
-    targetEl.createEl("strong", { text: `Must target (${criteria.targetLabel ?? "target"}): ` });
-    targetEl.createSpan({ text: criteria.targetKeywords.join(", ") });
-  }
-
-  if (criteria.forbiddenKeywords?.length) {
-    const forbidEl = wrapper.createDiv({ cls: "lmsa-benchmark-criteria-row" });
-    forbidEl.createEl("strong", { text: `Must avoid (${criteria.forbiddenLabel ?? "forbidden"}): ` });
-    forbidEl.createSpan({ text: criteria.forbiddenKeywords.join(", ") });
-  }
-
-  if (criteria.requiredMentions?.length) {
-    const mentionsEl = wrapper.createDiv({ cls: "lmsa-benchmark-criteria-row" });
-    mentionsEl.createEl("strong", { text: "Response must mention: " });
-    mentionsEl.createSpan({ text: criteria.requiredMentions.join(", ") });
-  }
-
-  if (criteria.notes) {
-    const notesEl = wrapper.createDiv({ cls: "lmsa-benchmark-criteria-row lmsa-benchmark-criteria-notes" });
-    notesEl.createEl("em", { text: criteria.notes });
-  }
-}
-
-function renderConversationPreview(container: HTMLElement, messages: BenchmarkMessage[]): void {
-  const wrapper = container.createDiv({ cls: "lmsa-benchmark-conversation" });
-  wrapper.createDiv({ cls: "lmsa-benchmark-section-header" })
-    .createEl("strong", { text: `Conversation (${messages.length} messages)` });
-
-  for (const msg of messages) {
-    const msgEl = wrapper.createDiv({ cls: "lmsa-benchmark-msg" });
-    msgEl.createSpan({
-      cls: `lmsa-benchmark-msg-role lmsa-benchmark-msg-role--${msg.role}`,
-      text: msg.role,
-    });
-
-    const contentText = msg.content;
-    if (contentText.length > 200) {
-      const preview = msgEl.createSpan({ cls: "lmsa-benchmark-msg-content" });
-      preview.setText(contentText.slice(0, 200) + "...");
-      const fullContent = msgEl.createDiv({ cls: "lmsa-benchmark-msg-full lmsa-hidden" });
-      fullContent.createEl("pre", {
-        cls: "lmsa-benchmark-response-block",
-        text: contentText,
-      });
-      const showBtn = msgEl.createEl("button", {
-        cls: "lmsa-benchmark-btn lmsa-benchmark-btn--inline",
-        text: "Show full",
-      });
-      showBtn.addEventListener("click", () => {
-        const hidden = fullContent.hasClass("lmsa-hidden");
-        fullContent.toggleClass("lmsa-hidden", !hidden);
-        preview.toggleClass("lmsa-hidden", hidden);
-        showBtn.setText(hidden ? "Show less" : "Show full");
-      });
-    } else {
-      msgEl.createSpan({ cls: "lmsa-benchmark-msg-content", text: contentText });
-    }
-  }
 }

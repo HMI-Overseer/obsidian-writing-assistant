@@ -52,8 +52,8 @@ export function renderCompletionModelsTab(
       new CompletionModelModal(app, p, source, onSave, prefill).open();
     },
     fetchCandidates: {
-      lmstudio: (opts) => plugin.modelAvailability.discoverCompletionCandidates("lmstudio", opts),
-      anthropic: (opts) => plugin.modelAvailability.discoverCompletionCandidates("anthropic", opts),
+      lmstudio: (opts) => plugin.services.modelAvailability.discoverCompletionCandidates("lmstudio", opts),
+      anthropic: (opts) => plugin.services.modelAvailability.discoverCompletionCandidates("anthropic", opts),
     },
   });
 }

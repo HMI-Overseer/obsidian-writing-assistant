@@ -2,12 +2,12 @@ import { Notice } from "obsidian";
 import { MAX_CONVERSATIONS } from "../constants";
 import type { ChatSessionStore } from "./conversation/ChatSessionStore";
 import type { ChatHistoryDrawer } from "./view/ChatHistoryDrawer";
-import type { ChatGenerationController } from "./ChatGenerationController";
+import type { ChatGenerationOrchestrator } from "./ChatGenerationOrchestrator";
 
 type ConversationControllerDeps = {
   getStore: () => ChatSessionStore | null;
   getDrawer: () => ChatHistoryDrawer | null;
-  getGeneration: () => ChatGenerationController;
+  getOrchestrator: () => ChatGenerationOrchestrator;
   syncConversationUi: () => Promise<void>;
   refreshAvailability: () => Promise<void>;
 };
@@ -36,9 +36,9 @@ export class ChatConversationController {
       }
     }
 
-    const generation = this.deps.getGeneration();
-    if (generation.getIsGenerating()) {
-      generation.stopGeneration();
+    const orchestrator = this.deps.getOrchestrator();
+    if (orchestrator.getIsGenerating()) {
+      orchestrator.stopGeneration();
     }
 
     await store.persistActiveConversation();
@@ -57,9 +57,9 @@ export class ChatConversationController {
       return;
     }
 
-    const generation = this.deps.getGeneration();
-    if (generation.getIsGenerating()) {
-      generation.stopGeneration();
+    const orchestrator = this.deps.getOrchestrator();
+    if (orchestrator.getIsGenerating()) {
+      orchestrator.stopGeneration();
     }
 
     await store.persistActiveConversation();

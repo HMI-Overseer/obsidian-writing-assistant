@@ -159,7 +159,7 @@ export class ChatComposer {
     }
 
     const trainedForToolUse = activeModel.trainedForToolUse
-      ?? this.plugin.modelAvailability.getTrainedForToolUse(activeModel.modelId);
+      ?? this.plugin.services.modelAvailability.getTrainedForToolUse(activeModel.modelId);
     const modelCapable = shouldUseToolCall(activeModel.provider, { trainedForToolUse });
     const active = this.plugin.settings.agenticMode && modelCapable;
 
@@ -204,7 +204,7 @@ export class ChatComposer {
     }
 
     const supportsVision = activeModel.vision
-      ?? this.plugin.modelAvailability.getVision(activeModel.modelId)
+      ?? this.plugin.services.modelAvailability.getVision(activeModel.modelId)
       ?? false;
 
     el.toggleClass("is-active", supportsVision);

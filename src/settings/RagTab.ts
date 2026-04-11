@@ -33,7 +33,7 @@ export function renderRagTab(
       toggle.setValue(rag.enabled).onChange(async (value) => {
         rag.enabled = value;
         await plugin.saveSettings();
-        await plugin.ragService.configure(
+        await plugin.services.ragService.configure(
           rag,
           plugin.settings.embeddingModels,
           plugin.settings.providerSettings,
@@ -48,12 +48,12 @@ export function renderRagTab(
 
   const modelSelector = createModelSelector(general.bodyEl, models, {
     getAvailability: (modelId, provider) =>
-      plugin.modelAvailability.getAvailability(modelId, provider).state,
+      plugin.services.modelAvailability.getAvailability(modelId, provider).state,
     refreshLocalModels: async () => {
       if (currentModel) {
         const desc = getProviderDescriptor(currentModel.provider);
         if (desc.kind !== "cloud") {
-          await plugin.modelAvailability.refreshLocalModels({ forceRefresh: true });
+          await plugin.services.modelAvailability.refreshLocalModels({ forceRefresh: true });
         }
       }
     },
@@ -63,7 +63,7 @@ export function renderRagTab(
     onSelect: async (model) => {
       rag.activeEmbeddingModelId = model?.id ?? null;
       await plugin.saveSettings();
-      await plugin.ragService.configure(
+      await plugin.services.ragService.configure(
         rag,
         plugin.settings.embeddingModels,
         plugin.settings.providerSettings,
@@ -118,7 +118,7 @@ export function renderRagTab(
     const actionsEl = headerRow.createDiv({ cls: "lmsa-index-actions" });
     const buildBtn = new Button(actionsEl).setButtonText("Build index").setCta().onClick(async () => {
       if (!await validateModelReady()) return;
-      await plugin.ragService.startIndexing(
+      await plugin.services.ragService.startIndexing(
         rag,
         plugin.settings.embeddingModels,
         plugin.settings.providerSettings,
@@ -126,14 +126,14 @@ export function renderRagTab(
     });
     const rebuildBtn = new Button(actionsEl).setButtonText("Rebuild index").onClick(async () => {
       if (!await validateModelReady()) return;
-      await plugin.ragService.rebuild(
+      await plugin.services.ragService.rebuild(
         rag,
         plugin.settings.embeddingModels,
         plugin.settings.providerSettings,
       );
     });
     const stopBtn = new Button(actionsEl).setButtonText("Stop").onClick(() => {
-      plugin.ragService.stopIndexing();
+      plugin.services.ragService.stopIndexing();
     });
 
     const progressRow = statusBlock.createDiv({ cls: "lmsa-index-progress" });
@@ -143,8 +143,8 @@ export function renderRagTab(
 
     // ── State rendering function ──
     function updateDisplay(state: IndexingState): void {
-      const fileCount = plugin.ragService.getFileCount();
-      const chunkCount = plugin.ragService.getChunkCount();
+      const fileCount = plugin.services.ragService.getFileCount();
+      const chunkCount = plugin.services.ragService.getChunkCount();
       const hasIndex = chunkCount > 0;
       const isIndexing = state.status === "indexing";
       const isError = state.status === "error";
@@ -167,7 +167,7 @@ export function renderRagTab(
       }
 
       // Settings drift notice
-      const showDrift = hasIndex && rag.enabled && plugin.ragService.needsReindex(rag);
+      const showDrift = hasIndex && rag.enabled && plugin.services.ragService.needsReindex(rag);
       driftNoticeEl.textContent = showDrift
         ? "Settings changed since last build. Rebuild recommended."
         : "";
@@ -194,10 +194,10 @@ export function renderRagTab(
     }
 
     // Initial render.
-    updateDisplay(plugin.ragService.getIndexingState());
+    updateDisplay(plugin.services.ragService.getIndexingState());
 
     // Subscribe to live state updates.
-    plugin.ragService.onIndexingStateChange((state) => updateDisplay(state));
+    plugin.services.ragService.onIndexingStateChange((state) => updateDisplay(state));
 
     // ── Retrieval ─────────────────────────────────────────────────────
     const retrieval = createSettingsSection(
@@ -214,7 +214,7 @@ export function renderRagTab(
         toggle.setValue(rag.metadataEnrichment).onChange(async (value) => {
           rag.metadataEnrichment = value;
           await plugin.saveSettings();
-          updateDisplay(plugin.ragService.getIndexingState());
+          updateDisplay(plugin.services.ragService.getIndexingState());
         }),
       );
 
@@ -318,6 +318,6 @@ export function renderRagTab(
   // Return cleanup function.
   return () => {
     modelSelector.destroy();
-    plugin.ragService.onIndexingStateChange(null);
+    plugin.services.ragService.onIndexingStateChange(null);
   };
 }

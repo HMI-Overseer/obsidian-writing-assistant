@@ -1,6 +1,6 @@
 import type { WorkspaceLeaf } from "obsidian";
-import { ItemView, Notice } from "obsidian";
-import type { ConversationMessage, CustomCommand, ProviderProfile } from "../shared/types";
+import { ItemView } from "obsidian";
+import type { ProviderProfile } from "../shared/types";
 import type { DocumentContext } from "../shared/chatRequest";
 import type { ChatMode } from "./types";
 import type WritingAssistantChat from "../main";
@@ -8,23 +8,17 @@ import { VIEW_TYPE_CHAT, makeDefaultProfile } from "../constants";
 import { getActiveProfile, getProfilesForProvider, generateProfileId } from "../shared/profileUtils";
 import { PROVIDER_DESCRIPTORS } from "../providers/descriptors";
 import { getActiveNoteText } from "../context/noteContext";
-import { ChatGenerationController } from "./ChatGenerationController";
+import { ChatBubbleActionHandler } from "./ChatBubbleActionHandler";
+import { ChatGenerationOrchestrator } from "./ChatGenerationOrchestrator";
 import { ChatConversationController } from "./ChatConversationController";
 import type { ContextInputs } from "./ContextCapacityUpdater";
 import { ContextCapacityUpdater } from "./ContextCapacityUpdater";
-import { sendMessage } from "./actions/sendMessage";
 import { renderDiffPanel } from "./finalization/finalizeEditResponse";
-import { branchConversation } from "./actions/branchConversation";
-import { generateLlmResponse } from "./actions/generateLlmResponse";
-import { createChatClient } from "../providers/registry";
-import { regenerateMessage } from "./actions/regenerateMessage";
 import { ChatComposer } from "./composer/ChatComposer";
 import { KnowledgePopover } from "./composer/KnowledgePopover";
 import { ToolUsePopover } from "./composer/ToolUsePopover";
 import { ChatSessionStore } from "./conversation/ChatSessionStore";
-import type { BubbleActionCallbacks } from "./messages/ChatTranscript";
 import { ChatTranscript } from "./messages/ChatTranscript";
-import { InlineMessageEditor } from "./messages/InlineMessageEditor";
 import { ChatModelSelector } from "./models/ChatModelSelector";
 import { ProfileSettingsPopover } from "./models/ProfileSettingsPopover";
 import type { ChatLayoutRefs } from "./types";
@@ -47,8 +41,9 @@ export class ChatView extends ItemView {
   private toolUsePopover: ToolUsePopover | null = null;
   private historyDrawer: ChatHistoryDrawer | null = null;
   private contextUpdater: ContextCapacityUpdater | null = null;
-  private generation!: ChatGenerationController;
+  private orchestrator!: ChatGenerationOrchestrator;
   private conversation!: ChatConversationController;
+  private bubbleActions!: ChatBubbleActionHandler;
   private lastRenderedConversationId: string | null = null;
   private resizeObserver: ResizeObserver | null = null;
   private cachedDocumentContext: DocumentContext | null = null;
@@ -72,19 +67,25 @@ export class ChatView extends ItemView {
 
   async onOpen(): Promise<void> {
     this.layout = createChatLayout(this.contentEl);
-    this.sessionStore = new ChatSessionStore(this.plugin, this.plugin.conversationStorage);
+    this.sessionStore = new ChatSessionStore(this.plugin, this.plugin.services.conversationStorage);
     this.transcript = new ChatTranscript(this, this.app, this.layout);
 
-    this.generation = new ChatGenerationController(
-      () => this.composer,
-      () => this.sessionStore,
-      () => this.transcript
-    );
+    this.orchestrator = new ChatGenerationOrchestrator({
+      plugin: this.plugin,
+      owner: this,
+      getStore: () => this.sessionStore,
+      getTranscript: () => this.transcript,
+      getComposer: () => this.composer,
+      getModelSelector: () => this.modelSelector,
+      getContextUpdater: () => this.contextUpdater,
+      getLayout: () => this.layout,
+      syncConversationUi: () => this.syncConversationUi(),
+    });
 
     this.conversation = new ChatConversationController({
       getStore: () => this.sessionStore,
       getDrawer: () => this.historyDrawer,
-      getGeneration: () => this.generation,
+      getOrchestrator: () => this.orchestrator,
       syncConversationUi: () => this.syncConversationUi(),
       refreshAvailability: async () => {
         await this.modelSelector?.refreshAvailability();
@@ -93,6 +94,15 @@ export class ChatView extends ItemView {
 
     this.contextUpdater = new ContextCapacityUpdater(this.layout.contextCapacityEl);
 
+    this.bubbleActions = new ChatBubbleActionHandler({
+      getStore: () => this.sessionStore,
+      getTranscript: () => this.transcript,
+      getOrchestrator: () => this.orchestrator,
+      getContextUpdater: () => this.contextUpdater,
+      syncConversationUi: () => this.syncConversationUi(),
+      buildContextInputs: () => this.buildContextInputs(),
+    });
+
     this.composer = new ChatComposer(this.app, this.plugin, this.layout, {
       onDraftChange: (draft) => {
         this.sessionStore?.setDraft(draft);
@@ -100,13 +110,13 @@ export class ChatView extends ItemView {
         this.contextUpdater?.scheduleUpdate(this.buildContextInputs(draft));
       },
       onSendRequest: () => {
-        void this.requestSend();
+        void this.orchestrator.send();
       },
       onStopRequest: () => {
-        this.generation.stopGeneration();
+        this.orchestrator.stopGeneration();
       },
       onRunCommand: (command) => {
-        void this.runCommand(command);
+        void this.orchestrator.runCommand(command);
       },
       onModeChange: (mode) => {
         if (this.layout) {
@@ -116,8 +126,8 @@ export class ChatView extends ItemView {
           this.sessionStore?.getResolvedConversationModel() ?? null
         );
         this.composer?.refreshKnowledgeIndicator(
-          this.plugin.ragService.isReady(),
-          this.plugin.graphService.isReady(),
+          this.plugin.services.ragService.isReady(),
+          this.plugin.services.graphService.isReady(),
         );
         this.composer?.refreshVisionIndicator(
           this.sessionStore?.getResolvedConversationModel() ?? null
@@ -196,60 +206,60 @@ export class ChatView extends ItemView {
         return {
           enabled: rag.enabled,
           hasModel: !!rag.activeEmbeddingModelId,
-          ready: this.plugin.ragService.isReady(),
-          fileCount: this.plugin.ragService.getFileCount(),
-          chunkCount: this.plugin.ragService.getChunkCount(),
-          indexingState: this.plugin.ragService.getIndexingState(),
+          ready: this.plugin.services.ragService.isReady(),
+          fileCount: this.plugin.services.ragService.getFileCount(),
+          chunkCount: this.plugin.services.ragService.getChunkCount(),
+          indexingState: this.plugin.services.ragService.getIndexingState(),
         };
       },
       getGraphSnapshot: () => {
         const kg = this.plugin.settings.knowledgeGraph;
         return {
           enabled: kg.enabled,
-          ready: this.plugin.graphService.isReady(),
-          entityCount: this.plugin.graphService.getEntityCount(),
-          relationCount: this.plugin.graphService.getRelationCount(),
-          buildState: this.plugin.graphService.getBuildState(),
+          ready: this.plugin.services.graphService.isReady(),
+          entityCount: this.plugin.services.graphService.getEntityCount(),
+          relationCount: this.plugin.services.graphService.getRelationCount(),
+          buildState: this.plugin.services.graphService.getBuildState(),
         };
       },
       getEmbeddingModels: () => this.plugin.settings.embeddingModels,
       getActiveEmbeddingModelId: () => this.plugin.settings.rag.activeEmbeddingModelId,
       getAvailability: (modelId, provider) =>
-        this.plugin.modelAvailability.getAvailability(modelId, provider).state,
+        this.plugin.services.modelAvailability.getAvailability(modelId, provider).state,
       refreshLocalModels: async () => {
-        await this.plugin.modelAvailability.refreshLocalModels({ forceRefresh: true });
+        await this.plugin.services.modelAvailability.refreshLocalModels({ forceRefresh: true });
       },
       onRagToggle: async (enabled) => {
         this.plugin.settings.rag.enabled = enabled;
         await this.plugin.saveSettings();
-        await this.plugin.ragService.configure(
+        await this.plugin.services.ragService.configure(
           this.plugin.settings.rag,
           this.plugin.settings.embeddingModels,
           this.plugin.settings.providerSettings,
         );
         this.composer?.refreshKnowledgeIndicator(
-          this.plugin.ragService.isReady(),
-          this.plugin.graphService.isReady(),
+          this.plugin.services.ragService.isReady(),
+          this.plugin.services.graphService.isReady(),
         );
       },
       onGraphToggle: async (enabled) => {
         this.plugin.settings.knowledgeGraph.enabled = enabled;
         await this.plugin.saveSettings();
-        await this.plugin.graphService.configure(
+        await this.plugin.services.graphService.configure(
           this.plugin.settings.knowledgeGraph,
           this.plugin.settings.completionModels,
           this.plugin.settings.embeddingModels,
           this.plugin.settings.providerSettings,
         );
         this.composer?.refreshKnowledgeIndicator(
-          this.plugin.ragService.isReady(),
-          this.plugin.graphService.isReady(),
+          this.plugin.services.ragService.isReady(),
+          this.plugin.services.graphService.isReady(),
         );
       },
       onEmbeddingModelSelect: async (modelId) => {
         this.plugin.settings.rag.activeEmbeddingModelId = modelId;
         await this.plugin.saveSettings();
-        await this.plugin.ragService.configure(
+        await this.plugin.services.ragService.configure(
           this.plugin.settings.rag,
           this.plugin.settings.embeddingModels,
           this.plugin.settings.providerSettings,
@@ -257,7 +267,7 @@ export class ChatView extends ItemView {
       },
       onRagBuild: async () => {
         const rag = this.plugin.settings.rag;
-        await this.plugin.ragService.startIndexing(
+        await this.plugin.services.ragService.startIndexing(
           rag,
           this.plugin.settings.embeddingModels,
           this.plugin.settings.providerSettings,
@@ -265,22 +275,22 @@ export class ChatView extends ItemView {
       },
       onRagRebuild: async () => {
         const rag = this.plugin.settings.rag;
-        await this.plugin.ragService.rebuild(
+        await this.plugin.services.ragService.rebuild(
           rag,
           this.plugin.settings.embeddingModels,
           this.plugin.settings.providerSettings,
         );
       },
       onRagStop: () => {
-        this.plugin.ragService.stopIndexing();
+        this.plugin.services.ragService.stopIndexing();
       },
       onSubscribe: (onUpdate) => {
-        this.plugin.ragService.onIndexingStateChange(() => onUpdate());
-        this.plugin.graphService.onBuildStateChange(() => onUpdate());
+        this.plugin.services.ragService.onIndexingStateChange(() => onUpdate());
+        this.plugin.services.graphService.onBuildStateChange(() => onUpdate());
       },
       onUnsubscribe: () => {
-        this.plugin.ragService.onIndexingStateChange(null);
-        this.plugin.graphService.onBuildStateChange(null);
+        this.plugin.services.ragService.onIndexingStateChange(null);
+        this.plugin.services.graphService.onBuildStateChange(null);
       },
       onBeforeOpen: () => {
         if (this.toolUsePopover?.isOpen()) this.toolUsePopover.close();
@@ -293,7 +303,7 @@ export class ChatView extends ItemView {
       getPreferEditTools: () => this.plugin.settings.preferToolUse,
       getActiveModel: () => this.sessionStore?.getResolvedConversationModel() ?? null,
       getTrainedForToolUse: (modelId) =>
-        this.plugin.modelAvailability.getTrainedForToolUse(modelId),
+        this.plugin.services.modelAvailability.getTrainedForToolUse(modelId),
       onAgenticToggle: async (enabled) => {
         this.plugin.settings.agenticMode = enabled;
         await this.plugin.saveSettings();
@@ -320,44 +330,16 @@ export class ChatView extends ItemView {
 
     this.registerDomEvent(this.layout.historyBtn, "click", (event) => {
       event.stopPropagation();
-      if (this.profilePopover?.isOpen()) {
-        this.profilePopover.close();
-      }
-      if (this.knowledgePopover?.isOpen()) {
-        this.knowledgePopover.close();
-      }
-      if (this.toolUsePopover?.isOpen()) {
-        this.toolUsePopover.close();
-      }
+      this.dismissAllOverlays({ keepHistory: true });
       this.conversation.toggleHistoryDrawer();
     });
 
     this.registerDomEvent(this.layout.modelSelectorBtn, "click", () => {
-      if (this.profilePopover?.isOpen()) {
-        this.profilePopover.close();
-      }
-      if (this.knowledgePopover?.isOpen()) {
-        this.knowledgePopover.close();
-      }
-      if (this.toolUsePopover?.isOpen()) {
-        this.toolUsePopover.close();
-      }
+      this.dismissAllOverlays({ keepModelSelector: true });
     });
 
     this.registerDomEvent(document, "click", () => {
-      this.modelSelector?.close();
-      if (this.profilePopover?.isOpen()) {
-        this.profilePopover.close();
-      }
-      if (this.knowledgePopover?.isOpen()) {
-        this.knowledgePopover.close();
-      }
-      if (this.toolUsePopover?.isOpen()) {
-        this.toolUsePopover.close();
-      }
-      if (this.historyDrawer?.isOpen()) {
-        this.historyDrawer.close();
-      }
+      this.dismissAllOverlays();
     });
 
     this.registerEvent(
@@ -372,7 +354,7 @@ export class ChatView extends ItemView {
     );
 
     this.registerDomEvent(this.layout.generateResponseBtn, "click", () => {
-      void this.handleGenerateResponse();
+      void this.orchestrator.generateResponse();
     });
 
     await this.sessionStore.restorePersistedState();
@@ -392,7 +374,7 @@ export class ChatView extends ItemView {
     this.resizeObserver?.disconnect();
     this.resizeObserver = null;
     this.sessionStore?.clearDraftSaveTimer();
-    this.generation.stopGeneration();
+    this.orchestrator.stopGeneration();
     await this.sessionStore?.persistActiveConversation();
     this.contextUpdater?.destroy();
     this.transcript?.destroy();
@@ -412,52 +394,6 @@ export class ChatView extends ItemView {
     this.composer?.setMode(mode);
   }
 
-  private async requestSend(
-    promptOverride?: string,
-    autoInsertAfterResponse = false
-  ): Promise<void> {
-    if (!this.sessionStore || !this.transcript || !this.composer || !this.modelSelector) {
-      return;
-    }
-
-    const useEditMode = this.composer.getMode() === "edit";
-
-    await sendMessage({
-      plugin: this.plugin,
-      owner: this,
-      store: this.sessionStore,
-      transcript: this.transcript,
-      composer: this.composer,
-      modelSelector: this.modelSelector,
-      getIsGenerating: () => this.generation.getIsGenerating(),
-      setIsGenerating: (sending) => this.setIsGeneratingAndSync(sending),
-      setActiveAbortController: (controller) =>
-        this.generation.setActiveAbortController(controller),
-      syncConversationUi: () => this.syncConversationUi(),
-      onCalibrate: (est, actual) => this.contextUpdater?.calibrate(est, actual),
-      promptOverride,
-      autoInsertAfterResponse,
-      editMode: useEditMode,
-    });
-  }
-
-  private async runCommand(command: CustomCommand): Promise<void> {
-    const selection = this.app.workspace.activeEditor?.editor?.getSelection() ?? "";
-    const noteText =
-      (await getActiveNoteText(this.app, this.plugin.settings.maxContextChars)) ?? "";
-    const prompt = command.prompt
-      .replace(/\{\{selection\}\}/g, selection)
-      .replace(/\{\{note\}\}/g, noteText)
-      .trim();
-
-    if (!prompt) {
-      new Notice("This command produced an empty prompt.");
-      return;
-    }
-
-    await this.requestSend(prompt, command.autoInsert);
-  }
-
   private async syncConversationUi(): Promise<void> {
     if (!this.sessionStore || !this.transcript || !this.composer) return;
 
@@ -468,7 +404,7 @@ export class ChatView extends ItemView {
     this.composer.setDraft(snapshot.draft);
     await this.transcript.renderMessages(
       snapshot.messageHistory,
-      this.createBubbleActionCallbacks(),
+      this.bubbleActions.createCallbacks(),
       isConversationSwitch
     );
 
@@ -490,7 +426,7 @@ export class ChatView extends ItemView {
     }
 
     this.transcript.setEmptyStateVisible(
-      snapshot.messageHistory.length === 0 && !this.generation.getIsGenerating()
+      snapshot.messageHistory.length === 0 && !this.orchestrator.getIsGenerating()
     );
     this.updateHeader();
     this.composer.updateContextChips();
@@ -499,8 +435,8 @@ export class ChatView extends ItemView {
     );
     this.toolUsePopover?.refresh();
     this.composer.refreshKnowledgeIndicator(
-      this.plugin.ragService.isReady(),
-      this.plugin.graphService.isReady(),
+      this.plugin.services.ragService.isReady(),
+      this.plugin.services.graphService.isReady(),
     );
     this.composer.refreshVisionIndicator(
       this.sessionStore.getResolvedConversationModel()
@@ -520,104 +456,7 @@ export class ChatView extends ItemView {
     this.contextUpdater?.refreshUsage(snapshot.messageHistory);
     await this.refreshDocumentContext();
     this.contextUpdater?.immediateUpdate(this.buildContextInputs());
-    this.updateGenerateResponseButton(snapshot.messageHistory);
-  }
-
-  private createBubbleActionCallbacks(): BubbleActionCallbacks {
-    return {
-      onCopy: (messageId) => this.handleCopyMessage(messageId),
-      onEdit: (messageId) => this.handleEditMessage(messageId),
-      onDelete: (messageId) => this.handleDeleteMessage(messageId),
-      onBranch: (messageId) => void this.handleBranchMessage(messageId),
-      onRegenerate: (messageId) => void this.handleRegenerateMessage(messageId),
-      onVersionChange: (messageId, newIndex) => void this.handleVersionChange(messageId, newIndex),
-    };
-  }
-
-  private handleCopyMessage(messageId: string): void {
-    const snapshot = this.sessionStore?.getSnapshot();
-    const message = snapshot?.messageHistory.find((m) => m.id === messageId);
-    if (!message) return;
-
-    void navigator.clipboard.writeText(message.content).then(() => {
-      new Notice("Copied to clipboard");
-    });
-  }
-
-  private handleEditMessage(messageId: string): void {
-    if (!this.sessionStore || !this.transcript) return;
-
-    const bubble = this.transcript.getBubbleForMessage(messageId);
-    const snapshot = this.sessionStore.getSnapshot();
-    const message = snapshot.messageHistory.find((m) => m.id === messageId);
-    if (!bubble || !message) return;
-
-    const editor = new InlineMessageEditor(bubble, message.content, {
-      onSave: async (newContent) => {
-        if (!this.sessionStore || !this.transcript) return;
-        this.sessionStore.updateMessageContent(messageId, newContent);
-        await this.sessionStore.persistActiveConversation();
-        await this.syncConversationUi();
-      },
-      onCancel: () => {},
-    });
-    editor.activate();
-  }
-
-  private async handleDeleteMessage(messageId: string): Promise<void> {
-    if (!this.sessionStore) return;
-
-    this.sessionStore.removeMessage(messageId);
-    await this.sessionStore.persistActiveConversation();
-    await this.syncConversationUi();
-  }
-
-  private async handleBranchMessage(messageId: string): Promise<void> {
-    if (!this.sessionStore) return;
-
-    this.generation.stopGeneration();
-    await branchConversation({
-      store: this.sessionStore,
-      messageId,
-      syncConversationUi: () => this.syncConversationUi(),
-    });
-  }
-
-  private async handleRegenerateMessage(messageId: string): Promise<void> {
-    if (!this.sessionStore || !this.transcript || !this.composer || !this.modelSelector) {
-      return;
-    }
-
-    await regenerateMessage({
-      plugin: this.plugin,
-      owner: this,
-      store: this.sessionStore,
-      transcript: this.transcript,
-      composer: this.composer,
-      modelSelector: this.modelSelector,
-      messageId,
-      getIsGenerating: () => this.generation.getIsGenerating(),
-      setIsGenerating: (generating) => this.setIsGeneratingAndSync(generating),
-      setActiveAbortController: (controller) =>
-        this.generation.setActiveAbortController(controller),
-      syncConversationUi: () => this.syncConversationUi(),
-      onCalibrate: (est, actual) => this.contextUpdater?.calibrate(est, actual),
-    });
-  }
-
-  private async handleVersionChange(messageId: string, newIndex: number): Promise<void> {
-    if (!this.sessionStore || !this.transcript) return;
-
-    this.sessionStore.switchMessageVersion(messageId, newIndex);
-    await this.sessionStore.persistActiveConversation();
-
-    const snapshot = this.sessionStore.getSnapshot();
-    await this.transcript.updateBubbleVersion(
-      messageId,
-      snapshot.messageHistory,
-      this.createBubbleActionCallbacks()
-    );
-    this.contextUpdater?.immediateUpdate(this.buildContextInputs());
+    this.orchestrator.updateGenerateResponseButton(snapshot.messageHistory);
   }
 
   private updateHeader(): void {
@@ -630,89 +469,15 @@ export class ChatView extends ItemView {
   }
 
 
-  private async handleGenerateResponse(): Promise<void> {
-    if (!this.sessionStore || !this.transcript || !this.composer || !this.modelSelector) return;
-    if (this.generation.getIsGenerating()) return;
-
-    const snapshot = this.sessionStore.getSnapshot();
-    if (snapshot.messageHistory.length === 0) return;
-
-    const lastMessage = snapshot.messageHistory[snapshot.messageHistory.length - 1];
-    if (lastMessage.role !== "user" && !lastMessage.isError) return;
-
-    const activeModel = this.sessionStore.getResolvedConversationModel();
-    if (!activeModel?.modelId) {
-      new Notice("No model selected.");
-      return;
-    }
-
-    const availabilityState = await this.modelSelector.refreshAvailability();
-    if (availabilityState !== "loaded" && availabilityState !== "cloud") {
-      this.modelSelector.retriggerAttention();
-      return;
-    }
-
-    // Remove trailing error messages before generating.
-    let removed = false;
-    while (this.sessionStore.getSnapshot().messageHistory.length > 0) {
-      const msgs = this.sessionStore.getSnapshot().messageHistory;
-      const tail = msgs[msgs.length - 1];
-      if (tail.isError) {
-        this.sessionStore.removeLastMessage();
-        removed = true;
-      } else {
-        break;
-      }
-    }
-    if (removed) {
-      await this.sessionStore.persistActiveConversation();
-      await this.syncConversationUi();
-    }
-
-    if (this.sessionStore.getSnapshot().messageHistory.length === 0) return;
-
-    const editMode = this.composer.getMode() === "edit";
-    const client = createChatClient(activeModel.provider, this.plugin.settings.providerSettings);
-
-    this.setIsGeneratingAndSync(true);
-
-    await generateLlmResponse({
-      plugin: this.plugin,
-      owner: this,
-      store: this.sessionStore,
-      transcript: this.transcript,
-      composer: this.composer,
-      activeModel,
-      client,
-      editMode,
-      finalization: { kind: "append" },
-      setIsGenerating: (v) => this.setIsGeneratingAndSync(v),
-      setActiveAbortController: (c) => this.generation.setActiveAbortController(c),
-      syncConversationUi: () => this.syncConversationUi(),
-      onCalibrate: (est, actual) => this.contextUpdater?.calibrate(est, actual),
-    });
-  }
-
-  private updateGenerateResponseButton(messages: ConversationMessage[]): void {
-    const btn = this.layout?.generateResponseBtn;
-    if (!btn) return;
-
-    const isGenerating = this.generation.getIsGenerating();
-    const shouldShow =
-      messages.length > 0 &&
-      (isGenerating ||
-        messages[messages.length - 1].role === "user" ||
-        messages[messages.length - 1].isError === true);
-
-    btn.toggleClass("lmsa-hidden", !shouldShow);
-    btn.toggleClass("is-generating", isGenerating);
-    btn.toggleAttribute("disabled", isGenerating);
-  }
-
-  private setIsGeneratingAndSync(generating: boolean): void {
-    this.generation.setIsGenerating(generating);
-    const messages = this.sessionStore?.getSnapshot().messageHistory ?? [];
-    this.updateGenerateResponseButton(messages);
+  private dismissAllOverlays(options?: {
+    keepModelSelector?: boolean;
+    keepHistory?: boolean;
+  }): void {
+    if (!options?.keepModelSelector) this.modelSelector?.close();
+    if (this.profilePopover?.isOpen()) this.profilePopover.close();
+    if (this.knowledgePopover?.isOpen()) this.knowledgePopover.close();
+    if (this.toolUsePopover?.isOpen()) this.toolUsePopover.close();
+    if (!options?.keepHistory && this.historyDrawer?.isOpen()) this.historyDrawer.close();
   }
 
   private handleWidthChange(width: number): void {
@@ -776,7 +541,7 @@ export class ChatView extends ItemView {
       messages: snapshot?.messageHistory ?? [],
       draft: draft ?? this.composer?.getDraft() ?? "",
       contextWindowSize: activeModel?.contextWindowSize
-        ?? this.plugin.modelAvailability.getActiveContextLength(activeModel?.modelId ?? ""),
+        ?? this.plugin.services.modelAvailability.getActiveContextLength(activeModel?.modelId ?? ""),
     };
   }
 }

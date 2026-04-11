@@ -102,12 +102,12 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
     sessionContextEnabled: composer.isSessionContextEnabled(),
     maxContextChars: plugin.settings.maxContextChars,
     mode: editMode ? "edit" : "conversation",
-    ragService: plugin.ragService,
+    ragService: plugin.services.ragService,
     activeProvider: activeModel.provider,
     modelCapabilities: {
       trainedForToolUse:
         activeModel.trainedForToolUse ??
-        plugin.modelAvailability.getTrainedForToolUse(activeModel.modelId),
+        plugin.services.modelAvailability.getTrainedForToolUse(activeModel.modelId),
     },
     chatClient: client,
     completionModelId: activeModel.modelId,
@@ -133,7 +133,7 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
 
   const contextWindow =
     activeModel.contextWindowSize ??
-    plugin.modelAvailability.getActiveContextLength(activeModel.modelId);
+    plugin.services.modelAvailability.getActiveContextLength(activeModel.modelId);
   if (contextWindow) {
     const estimatedTokens = estimateTokenCount(apiMessages);
     if (estimatedTokens / contextWindow >= CONTEXT_DANGER_THRESHOLD) {
@@ -158,7 +158,7 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
 
   const vaultToolContext: VaultToolContext = {
     app: plugin.app,
-    ragService: plugin.ragService,
+    ragService: plugin.services.ragService,
     activeFilePath: apiMessages.documentContext?.filePath,
   };
 

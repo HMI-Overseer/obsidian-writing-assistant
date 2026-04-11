@@ -12,7 +12,6 @@ import type {
   ProviderSettingsMap,
   RagSettings,
 } from "./shared/types";
-import { ConversationStorage } from "./chat/conversation/ConversationStorage";
 import {
   DEFAULT_ACTIVE_PROFILE_IDS,
   DEFAULT_CHAT_HISTORY,
@@ -21,13 +20,11 @@ import {
   DEFAULT_SETTINGS,
   VIEW_TYPE_CHAT,
 } from "./constants";
-import { ModelAvailabilityService } from "./api";
 import { ChatView } from "./chat";
 import { normalizeChatHistory } from "./chat/conversation/conversationUtils";
 import { normalizeCompletionModel, normalizeEmbeddingModel } from "./shared/normalizeModels";
 import { WritingAssistantSettingTab } from "./settings/SettingsTab";
-import { RagService } from "./rag";
-import { GraphService } from "./rag/graph";
+import { ServiceContainer } from "./services/ServiceContainer";
 
 function normalizeKnowledgeGraphSettings(raw: unknown): KnowledgeGraphSettings {
   const data = (typeof raw === "object" && raw !== null ? raw : {}) as Partial<KnowledgeGraphSettings>;
@@ -136,30 +133,12 @@ function normalizeActiveProfileIds(raw: unknown): Record<ProviderOption, string>
 
 export default class WritingAssistantChat extends Plugin {
   settings!: PluginSettings;
-  modelAvailability!: ModelAvailabilityService;
-  ragService!: RagService;
-  graphService!: GraphService;
-  conversationStorage!: ConversationStorage;
+  services!: ServiceContainer;
 
   async onload(): Promise<void> {
     await this.loadSettings();
-    this.modelAvailability = new ModelAvailabilityService(() => this.settings.providerSettings);
-    this.conversationStorage = new ConversationStorage(this.app);
-    this.ragService = new RagService(this.app);
-    await this.ragService.configure(
-      this.settings.rag,
-      this.settings.embeddingModels,
-      this.settings.providerSettings,
-    );
-
-    this.graphService = new GraphService(this.app);
-    await this.graphService.configure(
-      this.settings.knowledgeGraph,
-      this.settings.completionModels,
-      this.settings.embeddingModels,
-      this.settings.providerSettings,
-    );
-    this.ragService.setGraphService(this.graphService);
+    this.services = new ServiceContainer(this.app, () => this.settings);
+    await this.services.initialize();
 
     this.registerView(VIEW_TYPE_CHAT, (leaf: WorkspaceLeaf) => new ChatView(leaf, this));
 
@@ -218,8 +197,7 @@ export default class WritingAssistantChat extends Plugin {
   }
 
   onunload(): void {
-    this.ragService.destroy();
-    this.graphService.destroy();
+    this.services.destroy();
     // Obsidian handles view cleanup automatically on plugin unload.
     // Detaching leaves here would reset their position on reload.
   }

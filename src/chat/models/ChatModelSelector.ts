@@ -43,7 +43,7 @@ export class ChatModelSelector {
       return;
     }
 
-    const { state } = this.plugin.modelAvailability.getAvailability(
+    const { state } = this.plugin.services.modelAvailability.getAvailability(
       activeModel.modelId,
       activeModel.provider,
     );
@@ -94,7 +94,7 @@ export class ChatModelSelector {
       return "unknown";
     }
 
-    const availability = this.plugin.modelAvailability;
+    const availability = this.plugin.services.modelAvailability;
     const info = availability.getAvailability(activeModel.modelId, activeModel.provider);
 
     if (info.state === "cloud") {
@@ -204,7 +204,7 @@ export class ChatModelSelector {
         text: model.name,
       });
 
-      const { state: itemState } = this.plugin.modelAvailability.getAvailability(
+      const { state: itemState } = this.plugin.services.modelAvailability.getAvailability(
         model.modelId,
         model.provider,
       );

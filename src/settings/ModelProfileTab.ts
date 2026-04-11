@@ -179,7 +179,7 @@ export function renderModelProfileTab<T extends BaseModel>(
         .onChange(async (value) => {
           const normalized = normalizeLMStudioBaseUrl(value);
           lmSettings.baseUrl = normalized;
-          plugin.modelAvailability.invalidate();
+          plugin.services.modelAvailability.invalidate();
           await plugin.saveSettings();
         })
     );
@@ -192,7 +192,7 @@ export function renderModelProfileTab<T extends BaseModel>(
     .addToggle((toggle) =>
       toggle.setValue(lmSettings.bypassCors).onChange(async (value) => {
         lmSettings.bypassCors = value;
-        plugin.modelAvailability.invalidate();
+        plugin.services.modelAvailability.invalidate();
         await plugin.saveSettings();
       })
     );

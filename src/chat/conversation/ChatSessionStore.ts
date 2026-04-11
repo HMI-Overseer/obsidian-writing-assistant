@@ -3,8 +3,6 @@ import type {
   Conversation,
   ConversationMeta,
   ConversationMessage,
-  MessageVersion,
-  RagSourceRef,
 } from "../../shared/types";
 import type WritingAssistantChat from "../../main";
 import { resolveCompletionModel } from "../../utils";
@@ -16,94 +14,103 @@ import {
 } from "./conversationUtils";
 import type { ConversationStorage } from "./ConversationStorage";
 import type { ChatSessionSnapshot } from "../types";
+import { ChatSessionMemory } from "./ChatSessionMemory";
 
 const CHAT_DRAFT_SAVE_DELAY_MS = 300;
 
+/**
+ * Thin coordinator: delegates in-memory state to ChatSessionMemory,
+ * disk I/O to ConversationStorage, and metadata to plugin settings.
+ *
+ * The public API is unchanged from the pre-split version so that
+ * consumers (ChatView, actions, finalization) don't need updating.
+ */
 export class ChatSessionStore {
-  private activeConversationId: string | null = null;
-  private messageHistory: ConversationMessage[] = [];
-  private lastAssistantResponse = "";
-  private draft = "";
+  private readonly memory = new ChatSessionMemory();
   private draftSaveTimer: number | null = null;
-
-  /** Metadata fields for the active conversation that don't live in messageHistory. */
-  private activeModelId = "";
-  private activeModelName = "";
-  private activeCreatedAt = 0;
 
   constructor(
     private readonly plugin: WritingAssistantChat,
     private readonly storage: ConversationStorage,
   ) {}
 
+  // ── Read-through to memory ──────────────────────────────────────
+
   getSnapshot(): ChatSessionSnapshot {
-    return {
-      activeConversationId: this.activeConversationId,
-      draft: this.draft,
-      messageHistory: [...this.messageHistory],
-      lastAssistantResponse: this.lastAssistantResponse,
-    };
+    return this.memory.getSnapshot();
+  }
+
+  getActiveConversationId(): string | null {
+    return this.memory.getActiveConversationId();
+  }
+
+  getActiveConversationMeta(): ConversationMeta | null {
+    return this.findMeta(this.memory.getActiveConversationId());
   }
 
   getConversations(): ConversationMeta[] {
     return this.plugin.settings.chatHistory.conversations;
   }
 
-  getActiveConversationId(): string | null {
-    return this.activeConversationId;
-  }
-
-  getActiveConversationMeta(): ConversationMeta | null {
-    return this.findMeta(this.activeConversationId);
-  }
-
-  /** Build a full Conversation object from the current in-memory state. */
-  private buildActiveConversation(): Conversation | null {
-    const id = this.activeConversationId;
-    if (!id) return null;
-
-    const meta = this.findMeta(id);
-    if (!meta) return null;
-
-    return {
-      id,
-      title: meta.title,
-      createdAt: this.activeCreatedAt || meta.createdAt,
-      updatedAt: meta.updatedAt,
-      modelId: meta.modelId,
-      modelName: meta.modelName,
-      messages: [...this.messageHistory],
-      draft: this.draft,
-    };
-  }
-
   getResolvedConversationModel(
-    meta: ConversationMeta | null = this.findMeta(this.activeConversationId),
+    meta: ConversationMeta | null = this.findMeta(this.memory.getActiveConversationId()),
   ): CompletionModel | null {
     return meta ? resolveCompletionModel(this.plugin.settings, meta.modelId) : null;
   }
 
+  // ── Write-through to memory ─────────────────────────────────────
+
   setDraft(draft: string): void {
-    this.draft = draft;
+    this.memory.setDraft(draft);
   }
 
   appendMessage(message: ConversationMessage): void {
-    this.messageHistory.push(message);
+    this.memory.appendMessage(message);
   }
 
   setLastAssistantResponse(text: string): void {
-    this.lastAssistantResponse = text;
+    this.memory.setLastAssistantResponse(text);
+  }
+
+  updateMessageContent(messageId: string, newContent: string): boolean {
+    return this.memory.updateMessageContent(messageId, newContent);
+  }
+
+  removeMessage(messageId: string): ConversationMessage | null {
+    return this.memory.removeMessage(messageId);
+  }
+
+  removeLastMessage(): ConversationMessage | null {
+    return this.memory.removeLastMessage();
+  }
+
+  getMessagesUpToInclusive(messageId: string): ConversationMessage[] {
+    return this.memory.getMessagesUpToInclusive(messageId);
+  }
+
+  finalizeRegeneration(
+    oldMessage: ConversationMessage,
+    newContent: string,
+    metadata?: Pick<ConversationMessage, "modelId" | "provider" | "usage" | "ragSources" | "rewrittenQuery" | "agenticSteps">,
+  ): ConversationMessage {
+    return this.memory.finalizeRegeneration(oldMessage, newContent, metadata);
+  }
+
+  switchMessageVersion(messageId: string, newIndex: number): boolean {
+    return this.memory.switchMessageVersion(messageId, newIndex);
   }
 
   ensureConversationTitleFromFirstUserMessage(text: string): boolean {
-    if (this.messageHistory.length > 0) return false;
+    if (this.memory.getSnapshot().messageHistory.length > 0) return false;
 
-    const meta = this.findMeta(this.activeConversationId);
+    const meta = this.findMeta(this.memory.getActiveConversationId());
     if (!meta || meta.title) return false;
 
     meta.title = generateConversationTitle(text);
     return true;
   }
+
+  // ── Coordinated operations (memory + persistence) ───────────────
 
   async restorePersistedState(): Promise<void> {
     const history = this.plugin.settings.chatHistory;
@@ -112,7 +119,7 @@ export class ChatSessionStore {
     if (currentId) {
       const conversation = await this.storage.load(currentId);
       if (conversation) {
-        this.hydrateFromConversation(conversation);
+        this.hydrate(conversation);
         return;
       }
     }
@@ -121,7 +128,7 @@ export class ChatSessionStore {
       const firstId = history.conversations[0].id;
       const conversation = await this.storage.load(firstId);
       if (conversation) {
-        this.hydrateFromConversation(conversation);
+        this.hydrate(conversation);
         return;
       }
     }
@@ -129,25 +136,24 @@ export class ChatSessionStore {
     const freshConversation = createConversation("", "");
     history.conversations.unshift(toConversationMeta(freshConversation));
     history.activeConversationId = freshConversation.id;
-    this.hydrateFromConversation(freshConversation);
+    this.hydrate(freshConversation);
   }
 
   async setActiveConversationModel(model: CompletionModel): Promise<void> {
-    const meta = this.findMeta(this.activeConversationId);
+    const meta = this.findMeta(this.memory.getActiveConversationId());
     if (!meta) return;
 
     meta.modelId = model.id;
     meta.modelName = model.name;
-    this.activeModelId = model.id;
-    this.activeModelName = model.name;
+    this.memory.setActiveModel(model.id, model.name);
     await this.plugin.saveSettings();
   }
 
   async newConversation(): Promise<void> {
     const history = this.plugin.settings.chatHistory;
     const conversation = createConversation(
-      this.activeModelId,
-      this.activeModelName,
+      this.memory.getActiveModelId(),
+      this.memory.getActiveModelName(),
     );
 
     history.conversations.unshift(toConversationMeta(conversation));
@@ -156,13 +162,13 @@ export class ChatSessionStore {
       await this.storage.delete(id);
     }
 
-    this.hydrateFromConversation(conversation);
+    this.hydrate(conversation);
     await this.storage.save(conversation);
     await this.plugin.saveSettings();
   }
 
   async switchToConversation(id: string): Promise<boolean> {
-    if (id === this.activeConversationId) return false;
+    if (id === this.memory.getActiveConversationId()) return false;
 
     const meta = this.findMeta(id);
     if (!meta) return false;
@@ -170,95 +176,8 @@ export class ChatSessionStore {
     const conversation = await this.storage.load(id);
     if (!conversation) return false;
 
-    this.hydrateFromConversation(conversation);
+    this.hydrate(conversation);
     await this.plugin.saveSettings();
-    return true;
-  }
-
-  updateMessageContent(messageId: string, newContent: string): boolean {
-    const message = this.messageHistory.find((m) => m.id === messageId);
-    if (!message) return false;
-
-    message.content = newContent;
-    return true;
-  }
-
-  removeMessage(messageId: string): ConversationMessage | null {
-    const index = this.messageHistory.findIndex((m) => m.id === messageId);
-    if (index === -1) return null;
-
-    const [removed] = this.messageHistory.splice(index, 1);
-
-    const lastAssistant = [...this.messageHistory].reverse().find((m) => m.role === "assistant");
-    this.lastAssistantResponse = lastAssistant?.content ?? "";
-
-    return removed;
-  }
-
-  removeLastMessage(): ConversationMessage | null {
-    if (this.messageHistory.length === 0) return null;
-
-    const removed = this.messageHistory.pop();
-    if (!removed) return null;
-
-    const lastAssistant = [...this.messageHistory].reverse().find((m) => m.role === "assistant");
-    this.lastAssistantResponse = lastAssistant?.content ?? "";
-
-    return removed;
-  }
-
-  getMessagesUpToInclusive(messageId: string): ConversationMessage[] {
-    const index = this.messageHistory.findIndex((m) => m.id === messageId);
-    if (index === -1) return [];
-
-    return this.messageHistory.slice(0, index + 1);
-  }
-
-  finalizeRegeneration(
-    oldMessage: ConversationMessage,
-    newContent: string,
-    metadata?: Pick<ConversationMessage, "modelId" | "provider" | "usage" | "ragSources" | "rewrittenQuery" | "agenticSteps">
-  ): ConversationMessage {
-    const now = Date.now();
-
-    let versions: MessageVersion[];
-    if (oldMessage.versions && oldMessage.versions.length > 0) {
-      versions = [...oldMessage.versions];
-    } else {
-      versions = [{ content: oldMessage.content, createdAt: now, usage: oldMessage.usage, ragSources: oldMessage.ragSources }];
-    }
-    versions.push({ content: newContent, createdAt: now, usage: metadata?.usage, ragSources: metadata?.ragSources });
-
-    const newMessage: ConversationMessage = {
-      id: oldMessage.id,
-      role: "assistant",
-      content: newContent,
-      versions,
-      activeVersionIndex: versions.length - 1,
-      ...metadata,
-    };
-
-    this.messageHistory.push(newMessage);
-    this.lastAssistantResponse = newContent;
-    return newMessage;
-  }
-
-  switchMessageVersion(messageId: string, newIndex: number): boolean {
-    const message = this.messageHistory.find((m) => m.id === messageId);
-    if (!message || !message.versions) return false;
-    if (newIndex < 0 || newIndex >= message.versions.length) return false;
-
-    message.content = message.versions[newIndex].content;
-    message.ragSources = message.versions[newIndex].ragSources;
-    message.activeVersionIndex = newIndex;
-
-    if (message.role === "assistant") {
-      const lastAssistant = [...this.messageHistory].reverse().find((m) => m.role === "assistant");
-      if (lastAssistant?.id === messageId) {
-        this.lastAssistantResponse = message.content;
-      }
-    }
-
     return true;
   }
 
@@ -270,14 +189,14 @@ export class ChatSessionStore {
       await this.storage.delete(id);
     }
 
-    this.hydrateFromConversation(conversation);
+    this.hydrate(conversation);
     await this.storage.save(conversation);
     await this.plugin.saveSettings();
   }
 
   async deleteConversation(id: string): Promise<void> {
     const history = this.plugin.settings.chatHistory;
-    const isActiveConversation = id === this.activeConversationId;
+    const isActiveConversation = id === this.memory.getActiveConversationId();
 
     history.conversations = history.conversations.filter((meta) => meta.id !== id);
     await this.storage.delete(id);
@@ -287,16 +206,12 @@ export class ChatSessionStore {
         const firstId = history.conversations[0].id;
         const conversation = await this.storage.load(firstId);
         if (conversation) {
-          this.hydrateFromConversation(conversation);
+          this.hydrate(conversation);
         } else {
-          const freshConversation = createConversation("", "");
-          history.conversations.unshift(toConversationMeta(freshConversation));
-          this.hydrateFromConversation(freshConversation);
+          this.hydrateWithFresh(history);
         }
       } else {
-        const freshConversation = createConversation("", "");
-        history.conversations.unshift(toConversationMeta(freshConversation));
-        this.hydrateFromConversation(freshConversation);
+        this.hydrateWithFresh(history);
       }
     }
 
@@ -304,15 +219,16 @@ export class ChatSessionStore {
   }
 
   async persistActiveConversation(): Promise<void> {
-    const id = this.activeConversationId;
+    const id = this.memory.getActiveConversationId();
     if (!id) return;
 
     const history = this.plugin.settings.chatHistory;
     const metaIndex = history.conversations.findIndex((meta) => meta.id === id);
     if (metaIndex === -1) return;
 
-    const cleanMessages = this.messageHistory.filter((m) => !m.isError).map(stripRagChunkContent);
-    const isEmptyConversation = cleanMessages.length === 0 && !this.draft.trim();
+    const cleanMessages = this.memory.getCleanMessagesForPersistence();
+    const snapshot = this.memory.getSnapshot();
+    const isEmptyConversation = cleanMessages.length === 0 && !snapshot.draft.trim();
     const meta = history.conversations[metaIndex];
 
     if (isEmptyConversation && !meta.title) {
@@ -325,23 +241,23 @@ export class ChatSessionStore {
       return;
     }
 
-    // Write full conversation to its own file.
     const conversation: Conversation = {
       id,
       title: meta.title,
-      createdAt: this.activeCreatedAt || meta.createdAt,
+      createdAt: this.memory.getActiveCreatedAt() || meta.createdAt,
       updatedAt: Date.now(),
       modelId: meta.modelId,
       modelName: meta.modelName,
       messages: cleanMessages,
-      draft: this.draft,
+      draft: snapshot.draft,
     };
     await this.storage.save(conversation);
 
-    // Update lightweight metadata index.
     history.conversations[metaIndex] = toConversationMeta(conversation);
     await this.plugin.saveSettings();
   }
+
+  // ── Draft save scheduling ───────────────────────────────────────
 
   scheduleDraftSave(): void {
     this.clearDraftSaveTimer();
@@ -358,39 +274,21 @@ export class ChatSessionStore {
     this.draftSaveTimer = null;
   }
 
+  // ── Internal helpers ────────────────────────────────────────────
+
   private findMeta(id: string | null): ConversationMeta | null {
     if (!id) return null;
     return this.plugin.settings.chatHistory.conversations.find((meta) => meta.id === id) ?? null;
   }
 
-  private hydrateFromConversation(conversation: Conversation): void {
-    this.activeConversationId = conversation.id;
-    this.messageHistory = [...conversation.messages];
-    this.lastAssistantResponse =
-      [...conversation.messages].reverse().find((message) => message.role === "assistant")
-        ?.content ?? "";
-    this.draft = conversation.draft;
-    this.activeModelId = conversation.modelId;
-    this.activeModelName = conversation.modelName;
-    this.activeCreatedAt = conversation.createdAt;
+  private hydrate(conversation: Conversation): void {
+    this.memory.hydrateFromConversation(conversation);
     this.plugin.settings.chatHistory.activeConversationId = conversation.id;
   }
-}
 
-/** Strip chunk text content from RAG sources to keep persisted data lean. */
-function stripRagSources(sources?: RagSourceRef[]): RagSourceRef[] | undefined {
-  if (!sources) return undefined;
-  return sources.map(({ filePath, headingPath, score }) => ({ filePath, headingPath, score }));
-}
-
-/** Return a shallow copy of the message with chunk content stripped from ragSources (top-level and per-version). */
-function stripRagChunkContent(message: ConversationMessage): ConversationMessage {
-  if (!message.ragSources && !message.versions?.some((v) => v.ragSources)) return message;
-  return {
-    ...message,
-    ragSources: stripRagSources(message.ragSources),
-    versions: message.versions?.map((v) =>
-      v.ragSources ? { ...v, ragSources: stripRagSources(v.ragSources) } : v
-    ),
-  };
+  private hydrateWithFresh(history: { conversations: ConversationMeta[]; activeConversationId: string | null }): void {
+    const freshConversation = createConversation("", "");
+    history.conversations.unshift(toConversationMeta(freshConversation));
+    this.hydrate(freshConversation);
+  }
 }

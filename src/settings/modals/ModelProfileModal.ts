@@ -125,12 +125,12 @@ export abstract class ModelProfileModal<T extends BaseModel> extends Modal {
     void (async () => {
       try {
         if (this.model.provider === "lmstudio") {
-          const service = this.plugin.modelAvailability.getLMStudioService();
+          const service = this.plugin.services.modelAvailability.getLMStudioService();
           fillOptions(await this.getLMStudioCandidates(service));
         } else if (this.model.provider === "anthropic") {
           const apiKey = this.plugin.settings.providerSettings.anthropic.apiKey;
           if (!apiKey) return;
-          const service = this.plugin.modelAvailability.getAnthropicService();
+          const service = this.plugin.services.modelAvailability.getAnthropicService();
           fillOptions(await this.getAnthropicCandidates(service));
         }
       } catch {

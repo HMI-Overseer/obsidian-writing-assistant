@@ -32,7 +32,7 @@ export function renderKnowledgeGraphTab(
       toggle.setValue(kg.enabled).onChange(async (value) => {
         kg.enabled = value;
         await plugin.saveSettings();
-        await plugin.graphService.configure(
+        await plugin.services.graphService.configure(
           kg,
           plugin.settings.completionModels,
           plugin.settings.embeddingModels,
@@ -50,12 +50,12 @@ export function renderKnowledgeGraphTab(
 
   const modelSelector = createModelSelector(general.bodyEl, models, {
     getAvailability: (modelId, provider) =>
-      plugin.modelAvailability.getAvailability(modelId, provider).state,
+      plugin.services.modelAvailability.getAvailability(modelId, provider).state,
     refreshLocalModels: async () => {
       if (currentModel) {
         const desc = getProviderDescriptor(currentModel.provider);
         if (desc.kind !== "cloud") {
-          await plugin.modelAvailability.refreshLocalModels({ forceRefresh: true });
+          await plugin.services.modelAvailability.refreshLocalModels({ forceRefresh: true });
         }
       }
     },
@@ -65,7 +65,7 @@ export function renderKnowledgeGraphTab(
     onSelect: async (model) => {
       kg.activeCompletionModelId = model?.id ?? null;
       await plugin.saveSettings();
-      await plugin.graphService.configure(
+      await plugin.services.graphService.configure(
         kg,
         plugin.settings.completionModels,
         plugin.settings.embeddingModels,
@@ -82,12 +82,12 @@ export function renderKnowledgeGraphTab(
 
   const embModelSelector = createModelSelector(general.bodyEl, embModels, {
     getAvailability: (modelId, provider) =>
-      plugin.modelAvailability.getAvailability(modelId, provider).state,
+      plugin.services.modelAvailability.getAvailability(modelId, provider).state,
     refreshLocalModels: async () => {
       if (currentEmbModel) {
         const desc = getProviderDescriptor(currentEmbModel.provider);
         if (desc.kind !== "cloud") {
-          await plugin.modelAvailability.refreshLocalModels({ forceRefresh: true });
+          await plugin.services.modelAvailability.refreshLocalModels({ forceRefresh: true });
         }
       }
     },
@@ -97,7 +97,7 @@ export function renderKnowledgeGraphTab(
     onSelect: async (model) => {
       kg.activeEmbeddingModelId = model?.id ?? null;
       await plugin.saveSettings();
-      await plugin.graphService.configure(
+      await plugin.services.graphService.configure(
         kg,
         plugin.settings.completionModels,
         plugin.settings.embeddingModels,
@@ -156,7 +156,7 @@ export function renderKnowledgeGraphTab(
     const actionsEl = headerRow.createDiv({ cls: "lmsa-index-actions" });
     const buildBtn = new Button(actionsEl).setButtonText("Build graph").setCta().onClick(async () => {
       if (!await validateModelsReady()) return;
-      await plugin.graphService.startBuild(
+      await plugin.services.graphService.startBuild(
         kg,
         plugin.settings.completionModels,
         plugin.settings.embeddingModels,
@@ -165,7 +165,7 @@ export function renderKnowledgeGraphTab(
     });
     const rebuildBtn = new Button(actionsEl).setButtonText("Rebuild graph").onClick(async () => {
       if (!await validateModelsReady()) return;
-      await plugin.graphService.rebuild(
+      await plugin.services.graphService.rebuild(
         kg,
         plugin.settings.completionModels,
         plugin.settings.embeddingModels,
@@ -173,7 +173,7 @@ export function renderKnowledgeGraphTab(
       );
     });
     const stopBtn = new Button(actionsEl).setButtonText("Stop").onClick(async () => {
-      await plugin.graphService.stopBuild();
+      await plugin.services.graphService.stopBuild();
     });
 
     const progressRow = statusBlock.createDiv({ cls: "lmsa-index-progress" });
@@ -185,9 +185,9 @@ export function renderKnowledgeGraphTab(
 
     // ── State rendering function ──
     function updateDisplay(state: GraphBuildState): void {
-      const entityCount = plugin.graphService.getEntityCount();
-      const relationCount = plugin.graphService.getRelationCount();
-      const fileCount = plugin.graphService.getFileCount();
+      const entityCount = plugin.services.graphService.getEntityCount();
+      const relationCount = plugin.services.graphService.getRelationCount();
+      const fileCount = plugin.services.graphService.getFileCount();
       const hasGraph = entityCount > 0;
       const isExtracting = state.status === "extracting";
       const isError = state.status === "error";
@@ -238,7 +238,7 @@ export function renderKnowledgeGraphTab(
       folderSectionEl.empty();
       if (!canAct) return;
 
-      const folderStats = plugin.graphService.getFolderStats(kg.excludePatterns);
+      const folderStats = plugin.services.graphService.getFolderStats(kg.excludePatterns);
       if (folderStats.size === 0) return;
 
       const folders = [...folderStats.keys()].sort((a, b) => {
@@ -282,7 +282,7 @@ export function renderKnowledgeGraphTab(
             text: "Stop",
           });
           stopFolderBtn.addEventListener("click", async () => {
-            await plugin.graphService.stopBuild();
+            await plugin.services.graphService.stopBuild();
           });
         } else if (!isComplete && canAct && !isExtracting) {
           const btn = actionEl.createEl("button", {
@@ -291,7 +291,7 @@ export function renderKnowledgeGraphTab(
           });
           btn.addEventListener("click", async () => {
             if (!await validateModelsReady()) return;
-            await plugin.graphService.startBuildFolder(
+            await plugin.services.graphService.startBuildFolder(
               folder,
               kg,
               plugin.settings.completionModels,
@@ -306,10 +306,10 @@ export function renderKnowledgeGraphTab(
     }
 
     // Initial render.
-    updateDisplay(plugin.graphService.getBuildState());
+    updateDisplay(plugin.services.graphService.getBuildState());
 
     // Subscribe to live state updates.
-    plugin.graphService.onBuildStateChange((state) => updateDisplay(state));
+    plugin.services.graphService.onBuildStateChange((state) => updateDisplay(state));
 
     // ── Exclude Patterns ─────────────────────────────────────────────
     const filtering = createSettingsSection(
@@ -342,6 +342,6 @@ export function renderKnowledgeGraphTab(
   return () => {
     modelSelector.destroy();
     embModelSelector.destroy();
-    plugin.graphService.onBuildStateChange(null);
+    plugin.services.graphService.onBuildStateChange(null);
   };
 }

@@ -38,7 +38,7 @@ export function renderEmbeddingModelsTab(
       new EmbeddingModelModal(app, p, source, onSave, prefill).open();
     },
     fetchCandidates: {
-      lmstudio: (opts) => plugin.modelAvailability.discoverEmbeddingCandidates(opts),
+      lmstudio: (opts) => plugin.services.modelAvailability.discoverEmbeddingCandidates(opts),
       // Anthropic has no embedding models — omitted so UI shows the "not available" message
     },
   });

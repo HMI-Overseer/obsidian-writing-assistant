@@ -48,12 +48,12 @@ export function renderBenchmarkTab(
 
   const selector = createModelSelector(modelSection.bodyEl, models, {
     getAvailability: (modelId, provider) =>
-      plugin.modelAvailability.getAvailability(modelId, provider).state,
+      plugin.services.modelAvailability.getAvailability(modelId, provider).state,
     refreshLocalModels: async () => {
       if (selectedModel) {
         const descriptor = getProviderDescriptor(selectedModel.provider);
         if (descriptor.kind !== "cloud") {
-          await plugin.modelAvailability.refreshLocalModels({ forceRefresh: true });
+          await plugin.services.modelAvailability.refreshLocalModels({ forceRefresh: true });
         }
       }
     },

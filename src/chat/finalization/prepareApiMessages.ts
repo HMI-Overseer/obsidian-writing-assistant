@@ -37,6 +37,8 @@ export interface PrepareMessagesOptions {
   completionModelId?: string;
   /** System prompt from the active provider profile. */
   profileSystemPrompt?: string;
+  /** When true, all built-in additions are omitted — only profileSystemPrompt is sent. */
+  disableBuiltinSystemPrompts?: boolean;
 }
 
 export async function prepareApiMessages(
@@ -56,6 +58,7 @@ export async function prepareApiMessages(
     chatClient,
     completionModelId,
     profileSystemPrompt = "",
+    disableBuiltinSystemPrompts = false,
   } = options;
 
   const editMode = mode === "edit";
@@ -189,7 +192,9 @@ export async function prepareApiMessages(
   const vaultGuidance = useVaultTools ? "\n\n" + buildVaultToolSystemPrompt(activeVaultTools) : "";
   const activeEditTools = (tools ?? []).filter((t) => EDIT_TOOL_NAMES.has(t.name));
   const editGuidance = useEditTools ? "\n\n" + buildEditToolSystemPrompt(activeEditTools) : "";
-  const finalSystemPrompt = systemPrompt + groundingNote + vaultGuidance + editGuidance;
+  const finalSystemPrompt = disableBuiltinSystemPrompts
+    ? profileSystemPrompt
+    : systemPrompt + groundingNote + vaultGuidance + editGuidance;
 
   return { systemPrompt: finalSystemPrompt, documentContext, ragContext, rewrittenQuery, messages, tools, additionalContextItems };
 }

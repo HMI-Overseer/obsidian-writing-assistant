@@ -152,6 +152,9 @@ export class ProfileSettingsPopover {
       });
     }
 
+    // Disable built-in system prompts (all providers)
+    this.buildDisableBuiltinPromptsSection(body, profile);
+
     // Disable all controls when on default profile
     this.setControlsDisabled(profile.isDefault);
   }
@@ -271,6 +274,34 @@ export class ProfileSettingsPopover {
           this.emitProfileUpdate({ systemPrompt: this.promptTextareaEl.value });
         }
       });
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // Disable built-in system prompts
+  // ---------------------------------------------------------------------------
+
+  private buildDisableBuiltinPromptsSection(container: HTMLElement, profile: ProviderProfile): void {
+    const section = container.createDiv({ cls: "lmsa-profile-popover-section" });
+
+    const toggleRow = section.createDiv({ cls: "lmsa-params-toggle-row" });
+    const toggle = toggleRow.createEl("input", {
+      cls: "lmsa-params-toggle",
+      attr: { type: "checkbox" },
+    }) as HTMLInputElement;
+    toggle.checked = profile.disableBuiltinSystemPrompts;
+    toggleRow.createEl("label", {
+      cls: "lmsa-params-label",
+      text: "Disable built-in system prompts",
+    });
+
+    section.createEl("span", {
+      cls: "lmsa-disable-prompts-warning",
+      text: "Edit, agentic, and tool features may not work correctly.",
+    });
+
+    toggle.addEventListener("change", () => {
+      this.emitProfileUpdate({ disableBuiltinSystemPrompts: toggle.checked });
     });
   }
 

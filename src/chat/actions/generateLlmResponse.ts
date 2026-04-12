@@ -110,6 +110,7 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
     chatClient: client,
     completionModelId: activeModel.modelId,
     profileSystemPrompt: activeProfile.systemPrompt,
+    disableBuiltinSystemPrompts: activeProfile.disableBuiltinSystemPrompts,
   });
 
   const ragSources = apiMessages.ragContext?.map(

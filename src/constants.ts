@@ -62,6 +62,7 @@ export function makeDefaultProfile(provider: ProviderOption): ProviderProfile {
     provider,
     isDefault: true,
     systemPrompt: "",
+    disableBuiltinSystemPrompts: false,
     temperature: DEFAULT_COMPLETION_TEMPERATURE,
     maxTokens: provider === "anthropic" ? DEFAULT_COMPLETION_MAX_TOKENS : null,
     topP: null,

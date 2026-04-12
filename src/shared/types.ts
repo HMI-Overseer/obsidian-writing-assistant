@@ -43,6 +43,8 @@ export interface ProviderProfile {
 
   // Sampling params (nullable = use provider default)
   systemPrompt: string;
+  /** When true, all built-in system prompt additions are omitted. Only the profile system prompt is sent. */
+  disableBuiltinSystemPrompts: boolean;
   temperature: number;
   maxTokens: number | null;
   topP: number | null;

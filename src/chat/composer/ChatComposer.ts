@@ -4,6 +4,7 @@ import type { CompletionModel, CustomCommand } from "../../shared/types";
 import type WritingAssistantChat from "../../main";
 import { shouldUseToolCall } from "../../tools/registry";
 import { getActiveFileName } from "../../context/noteContext";
+import type { ExtraContextItem } from "../../shared/chatRequest";
 import type { ChatLayoutRefs, ChatMode } from "../types";
 import { SlashCommandSuggester } from "./SlashCommandSuggester";
 
@@ -30,7 +31,13 @@ type ChatComposerCallbacks = {
 };
 
 export class ChatComposer {
-  private sessionContextEnabled = true;
+  /**
+   * Whether the active note is currently attached to the context.
+   * Initialized from `includeNoteContext` setting; can be toggled per-session
+   * by the user (remove chip or add via context picker).
+   */
+  private activeNoteAttached: boolean;
+  private extraContextItems: ExtraContextItem[] = [];
   private isSending = false;
   private currentMode: ChatMode = "conversation";
   private modeButtons = new Map<ChatMode, HTMLButtonElement>();
@@ -41,10 +48,21 @@ export class ChatComposer {
     private readonly plugin: WritingAssistantChat,
     private readonly refs: Pick<
       ChatLayoutRefs,
-      "slashDropdownEl" | "contextChipsEl" | "textareaEl" | "modeToggleEl" | "toolUseIndicatorEl" | "toolUsePopoverEl" | "knowledgeIndicatorEl" | "visionIndicatorEl" | "actionBtn"
+      | "slashDropdownEl"
+      | "contextChipsEl"
+      | "textareaEl"
+      | "modeToggleEl"
+      | "toolUseIndicatorEl"
+      | "toolUsePopoverEl"
+      | "knowledgeIndicatorEl"
+      | "visionIndicatorEl"
+      | "actionBtn"
     >,
     private readonly callbacks: ChatComposerCallbacks
   ) {
+    this.activeNoteAttached =
+      this.plugin.settings.includeNoteContext && !!this.app.workspace.getActiveFile();
+
     this.slashSuggester = new SlashCommandSuggester(
       this.refs.textareaEl,
       this.refs.slashDropdownEl,
@@ -135,38 +153,77 @@ export class ChatComposer {
     this.refs.textareaEl.disabled = sending;
   }
 
-  isSessionContextEnabled(): boolean {
-    return this.sessionContextEnabled;
+  isActiveNoteAttached(): boolean {
+    return this.activeNoteAttached;
+  }
+
+  getExtraContextItems(): ExtraContextItem[] {
+    return [...this.extraContextItems];
+  }
+
+  /**
+   * Attach the active note manually (used by ContextPickerPopover).
+   * Ignored if the active note is already attached.
+   */
+  attachActiveNote(): void {
+    if (this.activeNoteAttached) return;
+    this.activeNoteAttached = true;
+    this.updateContextChips();
+    this.callbacks.onContextToggle();
+  }
+
+  /**
+   * Add a vault note to the extra context. Deduplicates by filePath.
+   * Used by ContextPickerPopover after the user picks a file.
+   */
+  addExtraContextItem(item: ExtraContextItem): void {
+    if (this.extraContextItems.some((i) => i.filePath === item.filePath)) return;
+    this.extraContextItems.push(item);
+    this.updateContextChips();
+  }
+
+  /**
+   * Reset context to the default state for a new conversation:
+   * re-apply the auto-attach setting, clear manual vault-note items.
+   */
+  resetContextForNewConversation(): void {
+    this.activeNoteAttached =
+      this.plugin.settings.includeNoteContext && !!this.app.workspace.getActiveFile();
+    this.extraContextItems = [];
+    this.updateContextChips();
   }
 
   updateContextChips(): void {
-    this.refs.contextChipsEl.empty();
-
-    const fileName = getActiveFileName(this.app);
-    if (
-      !fileName ||
-      !this.plugin.settings.includeNoteContext ||
-      !this.sessionContextEnabled
-    ) {
-      return;
+    // Preserve the + button (first child) and re-render the rest.
+    // Remove all chips except the + button.
+    const children = Array.from(this.refs.contextChipsEl.children);
+    for (const child of children) {
+      if (!child.hasClass("lmsa-chat-composer-add-context-btn")) {
+        child.remove();
+      }
     }
 
-    const isEditMode = this.currentMode === "edit";
-    const chip = this.refs.contextChipsEl.createDiv({ cls: "lmsa-chat-composer-chip" });
-    const fileIcon = chip.createEl("span", { cls: "lmsa-chat-composer-chip-icon" });
-    setIcon(fileIcon, isEditMode ? "file-pen-line" : "file-text");
-    chip.createEl("span", { cls: "lmsa-chat-composer-chip-label", text: fileName });
-    const removeBtn = chip.createEl("button", {
-      cls: "lmsa-chat-composer-chip-remove",
-      attr: { "aria-label": "Remove context" },
-    });
-    setIcon(removeBtn.createEl("span"), "x");
-    removeBtn.addEventListener("click", (event) => {
-      event.stopPropagation();
-      this.sessionContextEnabled = false;
-      this.updateContextChips();
-      this.callbacks.onContextToggle();
-    });
+    const fileName = getActiveFileName(this.app);
+    if (fileName && this.activeNoteAttached) {
+      this.renderChip(
+        this.currentMode === "edit" ? "file-pen-line" : "file-text",
+        fileName,
+        () => {
+          this.activeNoteAttached = false;
+          this.updateContextChips();
+          this.callbacks.onContextToggle();
+        },
+      );
+    }
+
+    for (const item of this.extraContextItems) {
+      this.renderChip("file-text", item.fileName, () => {
+        this.extraContextItems = this.extraContextItems.filter(
+          (i) => i.filePath !== item.filePath,
+        );
+        this.updateContextChips();
+      });
+    }
   }
 
   /**
@@ -244,6 +301,22 @@ export class ChatComposer {
 
   destroy(): void {
     this.slashSuggester.destroy();
+  }
+
+  private renderChip(icon: string, label: string, onRemove: () => void): void {
+    const chip = this.refs.contextChipsEl.createDiv({ cls: "lmsa-chat-composer-chip" });
+    const fileIcon = chip.createEl("span", { cls: "lmsa-chat-composer-chip-icon" });
+    setIcon(fileIcon, icon);
+    chip.createEl("span", { cls: "lmsa-chat-composer-chip-label", text: label });
+    const removeBtn = chip.createEl("button", {
+      cls: "lmsa-chat-composer-chip-remove",
+      attr: { "aria-label": "Remove context" },
+    });
+    setIcon(removeBtn.createEl("span"), "x");
+    removeBtn.addEventListener("click", (event) => {
+      event.stopPropagation();
+      onRemove();
+    });
   }
 
   private renderModeToggle(): void {

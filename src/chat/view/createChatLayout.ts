@@ -111,7 +111,13 @@ export function createChatLayout(contentEl: HTMLElement): ChatLayoutRefs {
 
   const composerPanel = composer.createDiv({ cls: "lmsa-chat-composer-panel" });
   const slashDropdownEl = composerPanel.createDiv({ cls: "lmsa-slash-dropdown lmsa-hidden" });
+  const contextPickerPopoverEl = composerPanel.createDiv({ cls: "lmsa-context-picker-popover lmsa-hidden" });
   const contextChipsEl = composerPanel.createDiv({ cls: "lmsa-chat-composer-chips" });
+  const contextAddBtnEl = contextChipsEl.createEl("button", {
+    cls: "lmsa-chat-composer-add-context-btn",
+    attr: { "aria-label": "Add context" },
+  }) as HTMLButtonElement;
+  setIcon(contextAddBtnEl, "plus");
 
   const textareaEl = composerPanel.createEl("textarea", {
     cls: "lmsa-chat-composer-textarea",
@@ -199,5 +205,7 @@ export function createChatLayout(contentEl: HTMLElement): ChatLayoutRefs {
     profileSettingsPopoverEl,
     contextCapacityEl,
     generateResponseBtn,
+    contextAddBtnEl,
+    contextPickerPopoverEl,
   };
 }

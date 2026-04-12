@@ -10,6 +10,7 @@ type ConversationControllerDeps = {
   getOrchestrator: () => ChatGenerationOrchestrator;
   syncConversationUi: () => Promise<void>;
   refreshAvailability: () => Promise<void>;
+  onNewConversation?: () => void;
 };
 
 export class ChatConversationController {
@@ -43,6 +44,7 @@ export class ChatConversationController {
 
     await store.persistActiveConversation();
     await store.newConversation();
+    this.deps.onNewConversation?.();
     await this.deps.syncConversationUi();
     void this.deps.refreshAvailability();
     this.deps.getDrawer()?.close();

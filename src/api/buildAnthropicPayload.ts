@@ -46,6 +46,12 @@ export function buildAnthropicMessages(
     systemParts.push(`---\n${label}:\n${request.documentContext.content}`);
   }
 
+  if (request.additionalContextItems) {
+    for (const item of request.additionalContextItems) {
+      systemParts.push(`---\nContext note (${item.filePath}):\n${item.content}`);
+    }
+  }
+
   const systemText = systemParts.join("\n\n");
 
   const messages: AnthropicMessage[] = [];

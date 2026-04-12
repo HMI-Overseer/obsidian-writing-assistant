@@ -17,6 +17,7 @@ import type { ContextInputs } from "./ContextCapacityUpdater";
 import { ContextCapacityUpdater } from "./ContextCapacityUpdater";
 import { renderDiffPanel } from "./finalization/finalizeEditResponse";
 import { ChatComposer } from "./composer/ChatComposer";
+import { ContextPickerPopover } from "./composer/ContextPickerPopover";
 import { KnowledgePopover } from "./composer/KnowledgePopover";
 import { ToolUsePopover } from "./composer/ToolUsePopover";
 import { ChatSessionStore } from "./conversation/ChatSessionStore";
@@ -39,6 +40,7 @@ export class ChatView extends ItemView {
   private composer: ChatComposer | null = null;
   private modelSelector: ChatModelSelector | null = null;
   private profilePopover: ProfileSettingsPopover | null = null;
+  private contextPickerPopover: ContextPickerPopover | null = null;
   private knowledgePopover: KnowledgePopover | null = null;
   private toolUsePopover: ToolUsePopover | null = null;
   private historyDrawer: ChatHistoryDrawer | null = null;
@@ -93,6 +95,9 @@ export class ChatView extends ItemView {
       refreshAvailability: async () => {
         await this.modelSelector?.refreshAvailability();
         this.refreshComposerIndicators();
+      },
+      onNewConversation: () => {
+        this.composer?.resetContextForNewConversation();
       },
     });
 
@@ -329,6 +334,22 @@ export class ChatView extends ItemView {
       },
     });
 
+    this.contextPickerPopover = new ContextPickerPopover(this.app, this.layout, {
+      isActiveNoteAttached: () => this.composer?.isActiveNoteAttached() ?? false,
+      getActiveFileName: () => this.app.workspace.getActiveFile()?.name ?? null,
+      onAddActiveNote: () => {
+        this.composer?.attachActiveNote();
+      },
+      onAddVaultNote: (filePath, fileName) => {
+        this.composer?.addExtraContextItem({ filePath, fileName });
+      },
+      onBeforeOpen: () => {
+        if (this.knowledgePopover?.isOpen()) this.knowledgePopover.close();
+        if (this.toolUsePopover?.isOpen()) this.toolUsePopover.close();
+        if (this.profilePopover?.isOpen()) this.profilePopover.close();
+      },
+    });
+
     this.historyDrawer = new ChatHistoryDrawer(this.layout.messagesPaneEl, {
       onSelect: (id) => void this.conversation.switchConversation(id),
       onNew: () => void this.conversation.startNewConversation(),
@@ -387,6 +408,7 @@ export class ChatView extends ItemView {
     this.transcript?.destroy();
     this.modelSelector?.destroy();
     this.profilePopover?.destroy();
+    this.contextPickerPopover?.destroy();
     this.knowledgePopover?.destroy();
     this.toolUsePopover?.destroy();
   }
@@ -531,6 +553,7 @@ export class ChatView extends ItemView {
   }): void {
     if (!options?.keepModelSelector) this.modelSelector?.close();
     if (this.profilePopover?.isOpen()) this.profilePopover.close();
+    if (this.contextPickerPopover?.isOpen()) this.contextPickerPopover.close();
     if (this.knowledgePopover?.isOpen()) this.knowledgePopover.close();
     if (this.toolUsePopover?.isOpen()) this.toolUsePopover.close();
     if (!options?.keepHistory && this.historyDrawer?.isOpen()) this.historyDrawer.close();
@@ -558,10 +581,7 @@ export class ChatView extends ItemView {
 
 
   private async refreshDocumentContext(): Promise<void> {
-    if (
-      !this.plugin.settings.includeNoteContext ||
-      !this.composer?.isSessionContextEnabled()
-    ) {
+    if (!this.composer?.isActiveNoteAttached()) {
       this.cachedDocumentContext = null;
       return;
     }

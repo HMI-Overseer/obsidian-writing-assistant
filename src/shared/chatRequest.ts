@@ -1,6 +1,19 @@
 import type { AnthropicCacheSettings } from "./types";
 import type { CanonicalToolDefinition } from "../tools/types";
 
+/** A context item manually attached by the user via the context picker. */
+export interface ExtraContextItem {
+  filePath: string;
+  fileName: string;
+}
+
+/** A resolved extra context item ready to be sent to the provider. */
+export interface AdditionalContextItem {
+  filePath: string;
+  fileName: string;
+  content: string;
+}
+
 /** Document context attached to the request. */
 export interface DocumentContext {
   /** File path within the vault. */
@@ -59,4 +72,6 @@ export interface ChatRequest {
   anthropicCacheSettings?: AnthropicCacheSettings;
   /** Tool definitions to include in the request. null/undefined = no tools. */
   tools?: CanonicalToolDefinition[] | null;
+  /** Additional context notes manually attached by the user. */
+  additionalContextItems?: AdditionalContextItem[];
 }

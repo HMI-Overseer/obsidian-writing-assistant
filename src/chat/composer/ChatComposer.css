@@ -69,11 +69,12 @@
   /* ── Context chips ───────────────────────────────────────────────────────── */
 
   .lmsa-chat-composer-chips {
-    @apply lmsa-flex lmsa-flex-wrap lmsa-gap-1.5 lmsa-px-1 lmsa-pb-2.5;
+    @apply lmsa-flex lmsa-flex-wrap lmsa-items-center lmsa-gap-1.5 lmsa-px-1 lmsa-pb-1;
   }
 
-  .lmsa-chat-composer-chips:empty {
-    @apply lmsa-hidden;
+  /* Only add bottom breathing room when actual context chips are present */
+  .lmsa-chat-composer-chips:has(.lmsa-chat-composer-chip) {
+    padding-bottom: 0.625rem; /* pb-2.5 */
   }
 
   .lmsa-chat-composer-chip {

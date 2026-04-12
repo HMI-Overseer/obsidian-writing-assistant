@@ -1,5 +1,5 @@
 import type { ConversationMessage, PluginSettings, ProviderOption } from "../../shared/types";
-import type { ChatRequest, ChatTurn, DocumentContext, RagContextBlock } from "../../shared/chatRequest";
+import type { AdditionalContextItem, ChatRequest, ChatTurn, DocumentContext, ExtraContextItem, RagContextBlock } from "../../shared/chatRequest";
 import { getActiveNoteText, getFullNoteContent } from "../../context/noteContext";
 import { shouldUseToolCall } from "../../tools/registry";
 import { ALL_EDIT_TOOLS, EDIT_TOOL_NAMES } from "../../tools/editing/definition";
@@ -20,8 +20,10 @@ export interface PrepareMessagesOptions {
   app: App;
   store: ChatSessionStore;
   settings: PluginSettings;
-  includeNoteContext: boolean;
-  sessionContextEnabled: boolean;
+  /** Whether the active note is currently attached (replaces includeNoteContext + sessionContextEnabled). */
+  activeNoteAttached: boolean;
+  /** Extra vault notes manually attached by the user via the context picker. */
+  extraContextItems: ExtraContextItem[];
   maxContextChars: number;
   mode: ChatMode;
   ragService?: RagService;
@@ -44,8 +46,8 @@ export async function prepareApiMessages(
     app,
     store,
     settings,
-    includeNoteContext,
-    sessionContextEnabled,
+    activeNoteAttached,
+    extraContextItems,
     maxContextChars,
     mode,
     ragService,
@@ -65,7 +67,7 @@ export async function prepareApiMessages(
 
   let documentContext: DocumentContext | null = null;
 
-  if (editMode && sessionContextEnabled) {
+  if (editMode && activeNoteAttached) {
     const noteData = await getFullNoteContent(app);
     if (noteData) {
       documentContext = {
@@ -74,7 +76,7 @@ export async function prepareApiMessages(
         isFull: true,
       };
     }
-  } else if (includeNoteContext && sessionContextEnabled) {
+  } else if (activeNoteAttached) {
     const file = app.workspace.getActiveFile();
     if (file) {
       const text = await getActiveNoteText(app, maxContextChars);
@@ -86,6 +88,22 @@ export async function prepareApiMessages(
         };
       }
     }
+  }
+
+  // Resolve extra vault-note items attached via the context picker.
+  let additionalContextItems: AdditionalContextItem[] | undefined;
+  if (extraContextItems.length > 0) {
+    const resolved: AdditionalContextItem[] = [];
+    for (const item of extraContextItems) {
+      const file = app.vault.getFileByPath(item.filePath);
+      if (!file) continue;
+      const raw = await app.vault.read(file);
+      const content = raw.length > maxContextChars
+        ? raw.slice(0, maxContextChars) + "\n\n[...note truncated...]"
+        : raw;
+      resolved.push({ filePath: item.filePath, fileName: item.fileName, content });
+    }
+    if (resolved.length > 0) additionalContextItems = resolved;
   }
 
   const messages: ChatTurn[] = store
@@ -173,7 +191,7 @@ export async function prepareApiMessages(
   const editGuidance = useEditTools ? "\n\n" + buildEditToolSystemPrompt(activeEditTools) : "";
   const finalSystemPrompt = systemPrompt + groundingNote + vaultGuidance + editGuidance;
 
-  return { systemPrompt: finalSystemPrompt, documentContext, ragContext, rewrittenQuery, messages, tools };
+  return { systemPrompt: finalSystemPrompt, documentContext, ragContext, rewrittenQuery, messages, tools, additionalContextItems };
 }
 
 /**

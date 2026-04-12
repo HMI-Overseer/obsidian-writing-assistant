@@ -241,6 +241,15 @@ export class LMStudioClient implements ChatClient {
       });
     }
 
+    if (request.additionalContextItems) {
+      for (const item of request.additionalContextItems) {
+        messages.push({
+          role: "system",
+          content: `---\nContext note (${item.filePath}):\n${item.content}`,
+        });
+      }
+    }
+
     for (const turn of request.messages) {
       if (turn.role === "assistant" && turn.toolCalls && turn.toolCalls.length > 0) {
         messages.push({

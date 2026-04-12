@@ -47,6 +47,8 @@ export type ChatLayoutRefs = {
   profileSettingsPopoverEl: HTMLElement;
   contextCapacityEl: HTMLElement;
   generateResponseBtn: HTMLButtonElement;
+  contextAddBtnEl: HTMLButtonElement;
+  contextPickerPopoverEl: HTMLElement;
 };
 
 export type ChatSessionSnapshot = {

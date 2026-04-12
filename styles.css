@@ -347,8 +347,8 @@
     width: auto;
     border-radius: 0.375rem;
     border-style: none;
-    background-color: transparent;
     padding: 0.375rem;
+    background: transparent !important;
     box-shadow: none;
     outline: none;
     -webkit-appearance: none;
@@ -357,11 +357,12 @@
     min-height: unset;
     transition: background 120ms ease, color 120ms ease;
 }
-.lmsa-chat-header-actions .lmsa-ui-icon-btn:hover {
-    background-color: var(--background-modifier-hover);
+.lmsa-chat-header-actions .lmsa-ui-icon-btn:hover,
+  .lmsa-chat-header-btn:hover {
+    background: color-mix(in srgb, var(--background-modifier-hover) 60%, transparent) !important;
     color: var(--text-normal);
     box-shadow: none;
-}
+  }
 .lmsa-chat-header-actions .lmsa-ui-icon-btn:focus-visible {
     box-shadow: 0 0 0 2px var(--lmsa-mode-accent);
   }
@@ -2157,7 +2158,7 @@
     stroke: var(--background-modifier-border);
   }
 .lmsa-context-ring-fill {
-    stroke: var(--interactive-accent);
+    stroke: var(--lmsa-mode-accent);
     transition: stroke-dashoffset 0.4s ease, stroke 0.2s ease;
   }
 .lmsa-chat-composer-context-capacity.is-warning .lmsa-context-ring-fill {

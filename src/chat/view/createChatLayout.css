@@ -101,7 +101,8 @@
   }
 
   .lmsa-chat-header-actions .lmsa-ui-icon-btn {
-    @apply lmsa-h-auto lmsa-w-auto lmsa-rounded-md lmsa-border-none lmsa-bg-transparent lmsa-p-1.5;
+    @apply lmsa-h-auto lmsa-w-auto lmsa-rounded-md lmsa-border-none lmsa-p-1.5;
+    background: transparent !important;
     box-shadow: none;
     outline: none;
     appearance: none;
@@ -109,8 +110,10 @@
     transition: background 120ms ease, color 120ms ease;
   }
 
-  .lmsa-chat-header-actions .lmsa-ui-icon-btn:hover {
-    @apply lmsa-bg-[var(--background-modifier-hover)] lmsa-text-obsidian-text;
+  .lmsa-chat-header-actions .lmsa-ui-icon-btn:hover,
+  .lmsa-chat-header-btn:hover {
+    background: color-mix(in srgb, var(--background-modifier-hover) 60%, transparent) !important;
+    color: var(--text-normal);
     box-shadow: none;
   }
 

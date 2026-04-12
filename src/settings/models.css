@@ -61,6 +61,10 @@
     @apply lmsa-flex lmsa-flex-col lmsa-gap-3;
   }
 
+  * + .lmsa-item-list {
+    @apply lmsa-mt-3;
+  }
+
   .lmsa-item-row {
     @apply lmsa-flex lmsa-items-start lmsa-justify-between lmsa-gap-4 lmsa-rounded-[18px] lmsa-border lmsa-p-4;
     border-color: var(--lmsa-border-default);

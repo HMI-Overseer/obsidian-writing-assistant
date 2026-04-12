@@ -3724,6 +3724,9 @@
     flex-direction: column;
     gap: 0.75rem;
 }
+* + .lmsa-item-list {
+    margin-top: 0.75rem;
+}
 .lmsa-item-row {
     display: flex;
     align-items: flex-start;

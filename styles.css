@@ -2543,6 +2543,101 @@
     text-overflow: ellipsis;
     white-space: nowrap;
   }
+/* ── Search view ────────────────────────────────────────────────────────── */
+.lmsa-context-picker-popover.is-search {
+    width: min(280px, calc(100% - 16px));
+  }
+.lmsa-context-picker-search-wrap {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 6px 10px;
+    border-radius: 9px;
+    background: color-mix(in srgb, var(--background-modifier-border) 30%, transparent);
+    margin-bottom: 3px;
+  }
+.lmsa-context-picker-search-icon {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    color: var(--text-faint);
+  }
+.lmsa-context-picker-search-icon svg {
+    width: 12px;
+    height: 12px;
+  }
+.lmsa-context-picker-search-input {
+    flex: 1;
+    min-width: 0;
+    background: none;
+    border: none;
+    outline: none;
+    padding: 0;
+    font-size: var(--font-ui-small);
+    color: var(--text-normal);
+    caret-color: var(--lmsa-mode-accent);
+  }
+.lmsa-context-picker-search-input::-moz-placeholder {
+    color: var(--text-faint);
+  }
+.lmsa-context-picker-search-input::placeholder {
+    color: var(--text-faint);
+  }
+/* ── Results list ────────────────────────────────────────────────────────── */
+.lmsa-context-picker-results {
+    display: flex;
+    flex-direction: column;
+    max-height: 180px;
+    overflow-y: auto;
+    overflow-x: hidden;
+  }
+.lmsa-context-picker-results::-webkit-scrollbar {
+    width: 3px;
+  }
+.lmsa-context-picker-results::-webkit-scrollbar-track {
+    background: transparent;
+  }
+.lmsa-context-picker-results::-webkit-scrollbar-thumb {
+    background: color-mix(in srgb, var(--background-modifier-border) 80%, transparent);
+    border-radius: 2px;
+  }
+.lmsa-context-picker-result-item {
+    display: flex;
+    flex-direction: column;
+    padding: 6px 10px;
+    border-radius: 7px;
+    cursor: pointer;
+    -webkit-user-select: none;
+       -moz-user-select: none;
+            user-select: none;
+    transition: background 100ms ease;
+  }
+.lmsa-context-picker-result-item:hover {
+    background: var(--background-modifier-hover);
+  }
+.lmsa-context-picker-result-name {
+    font-size: var(--font-ui-small);
+    font-weight: 500;
+    color: var(--text-normal);
+    line-height: 1.3;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+.lmsa-context-picker-result-path {
+    font-size: var(--font-ui-smaller);
+    color: var(--text-faint);
+    line-height: 1.2;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+.lmsa-context-picker-results-empty {
+    padding: 12px 10px;
+    font-size: var(--font-ui-small);
+    color: var(--text-faint);
+    text-align: center;
+  }
 /* ── Check icon (shown when option is already active) ───────────────────── */
 .lmsa-context-picker-row-check {
     display: inline-flex;

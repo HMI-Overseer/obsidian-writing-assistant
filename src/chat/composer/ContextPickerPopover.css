@@ -33,10 +33,10 @@
 
   /* Active state while the popover is open */
   .lmsa-root .lmsa-chat-composer-add-context-btn.is-open {
-    color: var(--interactive-accent);
-    border-color: color-mix(in srgb, var(--interactive-accent) 60%, transparent);
+    color: var(--lmsa-mode-accent);
+    border-color: color-mix(in srgb, var(--lmsa-mode-accent) 60%, transparent);
     border-style: solid;
-    background: color-mix(in srgb, var(--interactive-accent) 12%, transparent);
+    background: color-mix(in srgb, var(--lmsa-mode-accent) 12%, transparent);
   }
 
   .lmsa-root .lmsa-chat-composer-add-context-btn svg {
@@ -140,7 +140,7 @@
     display: inline-flex;
     flex: none;
     align-items: center;
-    color: var(--interactive-accent);
+    color: var(--lmsa-mode-accent);
     opacity: 0.75;
   }
 

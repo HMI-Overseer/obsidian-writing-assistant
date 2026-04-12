@@ -3447,6 +3447,42 @@
 .lmsa-settings-section:hover::after {
     opacity: 0.85;
   }
+/* ── Warning section — animated border shimmer ─────────────────────────── */
+.lmsa-kg-warning {
+    border-color: transparent;
+  }
+.lmsa-kg-warning:hover {
+    border-color: transparent;
+    box-shadow:
+      0 14px 34px var(--lmsa-shadow-subtle),
+      inset 0 1px 0 var(--lmsa-inset-highlight);
+  }
+.lmsa-kg-warning::before {
+    content: "";
+    pointer-events: none;
+    position: absolute;
+    inset: -1px;
+    border-radius: inherit;
+    padding: 1.5px;
+    background: conic-gradient(
+      from var(--lmsa-border-angle),
+      transparent 0deg,
+      color-mix(in srgb, var(--lmsa-section-accent) 90%, white) 40deg,
+      transparent 80deg,
+      transparent 180deg,
+      color-mix(in srgb, var(--lmsa-section-accent) 90%, white) 220deg,
+      transparent 260deg,
+      transparent 360deg
+    );
+    -webkit-mask:
+      linear-gradient(#fff 0 0) content-box,
+      linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    animation: lmsa-border-spin 5s linear infinite;
+    opacity: 0.55;
+    z-index: 0;
+  }
 /* ── Section header ────────────────────────────────────────────────────── */
 .lmsa-settings-section-header {
     display: flex;
@@ -3836,39 +3872,9 @@
         align-items: stretch;
     }
   }
-.lmsa-settings-discovery-status {
-    margin-bottom: 16px;
-  }
-.lmsa-connection-status {
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-    border-radius: 18px;
-    border-width: 1px;
-    padding: 1rem;
-    border-color: var(--lmsa-border-default);
-    background: var(--lmsa-surface-raised);
-}
-.lmsa-connection-status.is-loading {
-    border-color: color-mix(in srgb, var(--lmsa-section-accent) 20%, var(--lmsa-border-default));
-  }
-.lmsa-connection-status.is-connected {
-    border-color: color-mix(in srgb, var(--lmsa-status-success) 42%, var(--lmsa-border-default));
-    background: color-mix(in srgb, var(--lmsa-status-success) 8%, var(--background-secondary));
-  }
-.lmsa-connection-status.is-error {
-    border-color: color-mix(in srgb, var(--lmsa-status-error-bg) 72%, var(--lmsa-border-default));
-    background: color-mix(in srgb, var(--lmsa-status-error-bg) 8%, var(--background-secondary));
-  }
-.lmsa-connection-status-summary {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 0.5rem;
-}
-.lmsa-connection-status-badge,
-  .lmsa-model-state-badge {
+.lmsa-model-state-badge {
     display: inline-flex;
+    flex: none;
     align-items: center;
     border-radius: 9999px;
     padding-left: 0.625rem;
@@ -3881,45 +3887,42 @@
     background: color-mix(in srgb, var(--background-modifier-hover) 84%, transparent);
     color: var(--lmsa-text-primary);
 }
-.lmsa-connection-status.is-connected .lmsa-connection-status-badge,
-  .lmsa-model-state-badge.is-loaded {
+.lmsa-model-state-badge.is-loaded {
     background: color-mix(in srgb, var(--lmsa-status-success) 18%, transparent);
     color: color-mix(in srgb, var(--lmsa-status-success) 74%, var(--lmsa-text-primary));
   }
-.lmsa-connection-status.is-error .lmsa-connection-status-badge,
-  .lmsa-model-state-badge.is-unloaded {
+.lmsa-model-state-badge.is-unloaded {
     background: color-mix(in srgb, var(--lmsa-status-error-bg) 18%, transparent);
     color: color-mix(in srgb, var(--lmsa-status-error-bg) 88%, var(--lmsa-text-primary));
-  }
-.lmsa-connection-status-text {
-    font-weight: 600;
-    color: var(--lmsa-text-primary);
-}
-.lmsa-connection-status-meta {
-    color: var(--lmsa-text-secondary);
-    line-height: 1.55;
-    word-break: break-word;
   }
 .lmsa-item-list {
     display: flex;
     flex-direction: column;
-    gap: 0.75rem;
-}
-* + .lmsa-item-list {
-    margin-top: 0.75rem;
 }
 .lmsa-item-row {
+    position: relative;
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
     gap: 1rem;
-    border-radius: 18px;
-    border-width: 1px;
-    padding: 1rem;
-    border-color: var(--lmsa-border-default);
-    background: var(--lmsa-surface-raised);
-    box-shadow: inset 0 1px 0 var(--lmsa-inset-highlight-subtle);
+    padding-top: 0.75rem;
+    padding-bottom: 0.75rem;
 }
+.lmsa-item-row:not(:first-child)::before {
+    content: "";
+    pointer-events: none;
+    position: absolute;
+    left: 0px;
+    right: 0px;
+    top: 0px;
+    height: 1px;
+    background: linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--lmsa-section-accent) 20%, transparent),
+      var(--lmsa-border-subtle),
+      color-mix(in srgb, var(--lmsa-section-accent-secondary) 20%, transparent)
+    );
+  }
 .lmsa-item-info {
     display: flex;
     min-width: 0px;
@@ -3984,12 +3987,9 @@
     display: flex;
     align-items: center;
     gap: 0.75rem;
-    border-radius: 18px;
-    border-width: 1px;
-    padding: 1rem;
-    border-color: var(--lmsa-border-default);
-    background: var(--lmsa-surface-raised);
-    margin-bottom: 16px;
+    padding-top: 0.75rem;
+    padding-bottom: 0.75rem;
+    margin-bottom: 8px;
 }
 .lmsa-provider-selector-label {
     flex-shrink: 0;
@@ -4022,40 +4022,13 @@
     flex-direction: column;
 }
 .lmsa-provider-placeholder {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 18px;
-    border-width: 1px;
-    padding: 1.5rem;
-    border-color: var(--lmsa-border-default);
-    border-style: dashed;
-    background: var(--lmsa-surface-raised);
-    min-height: 80px;
-}
-.lmsa-provider-placeholder .lmsa-empty-state {
-    margin: 0px;
+    padding-top: 0.75rem;
+    padding-bottom: 0.75rem;
 }
 .lmsa-provider-connection {
     display: flex;
     flex-direction: column;
-    border-radius: 18px;
-    border-width: 1px;
-    padding: 1rem;
-    border-color: var(--lmsa-border-default);
-    background: var(--lmsa-surface-raised);
-    margin-bottom: 16px;
 }
-.lmsa-provider-connection .lmsa-setting-item {
-    border-width: 0px;
-    padding: 0px;
-}
-.lmsa-provider-connection .lmsa-setting-item:not(:first-child) {
-    padding-top: 12px;
-  }
-.lmsa-provider-connection .lmsa-setting-item:not(:last-child) {
-    padding-bottom: 12px;
-  }
 .lmsa-discovery-header {
     display: flex;
     justify-content: flex-end;
@@ -4074,10 +4047,6 @@
     .lmsa-provider-selector-row {
         flex-direction: column;
         align-items: stretch;
-    }
-
-    .lmsa-provider-selector-select {
-      max-width: none;
     }
   }
 /* ── Command icon badge ──────────────────────────────────────────────── */

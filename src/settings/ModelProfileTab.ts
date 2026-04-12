@@ -228,41 +228,11 @@ export function renderModelProfileTab<T extends BaseModel>(
     text: "Refresh models",
   });
 
-  const statusCard = discoveryEl.createDiv({
-    cls: "lmsa-connection-status lmsa-settings-discovery-status is-idle",
-  });
-  const statusSummary = statusCard.createDiv({ cls: "lmsa-connection-status-summary" });
-  const statusBadge = statusSummary.createSpan({
-    cls: "lmsa-connection-status-badge",
-    text: "Idle",
-  });
-  const statusText = statusSummary.createSpan({
-    cls: "lmsa-connection-status-text",
-    text: `Refresh to discover available ${config.kind} models.`,
-  });
-  const statusMeta = statusCard.createDiv({
-    cls: "lmsa-connection-status-meta",
-    text: "Saved profiles keep working regardless of provider availability.",
-  });
-
   const liveModelsListEl = discoveryEl.createDiv({ cls: "lmsa-item-list" });
   liveModelsListEl.createEl("p", {
     cls: "lmsa-empty-state",
     text: config.emptyDiscoveryText,
   });
-
-  const setStatus = (
-    variant: "idle" | "loading" | "connected" | "error",
-    badgeText: string,
-    text: string,
-    meta: string
-  ) => {
-    statusCard.removeClass("is-idle", "is-loading", "is-connected", "is-error");
-    statusCard.addClass(`is-${variant}`);
-    statusBadge.setText(badgeText);
-    statusText.setText(text);
-    statusMeta.setText(meta);
-  };
 
   const renderLiveModels = (models: ModelDigest[]) => {
     liveModelsListEl.empty();
@@ -279,7 +249,6 @@ export function renderModelProfileTab<T extends BaseModel>(
       const row = liveModelsListEl.createDiv({ cls: "lmsa-item-row lmsa-live-model-row" });
       const info = row.createDiv({ cls: "lmsa-item-info" });
       const header = info.createDiv({ cls: "lmsa-live-model-header" });
-      header.createDiv({ cls: "lmsa-item-name", text: model.displayName });
 
       if (model.isLoaded !== undefined) {
         header.createSpan({
@@ -287,6 +256,8 @@ export function renderModelProfileTab<T extends BaseModel>(
           text: model.isLoaded ? "Loaded" : "Not loaded",
         });
       }
+
+      header.createDiv({ cls: "lmsa-item-name", text: model.displayName });
 
       info.createDiv({
         cls: "lmsa-item-sub",
@@ -349,28 +320,14 @@ export function renderModelProfileTab<T extends BaseModel>(
     const providerLabel = PROVIDER_LABELS[selected];
 
     refetchButton.disabled = true;
-    setStatus(
-      "loading",
-      "Loading...",
-      `Fetching ${config.kind} models from ${providerLabel}...`,
-      "This only refreshes live discovery suggestions. Your saved profiles are unchanged."
-    );
     liveModelsListEl.empty();
     liveModelsListEl.createEl("p", {
       cls: "lmsa-empty-state",
-      text: "Fetching live model suggestions...",
+      text: `Fetching ${config.kind} models from ${providerLabel}...`,
     });
 
     try {
       const result = await fetcher({ forceRefresh: true });
-      const reachableAt = new Date(result.discoveredAt).toLocaleTimeString();
-
-      setStatus(
-        "connected",
-        "Connected",
-        `${result.candidates.length} ${config.kind} model${result.candidates.length === 1 ? "" : "s"} found`,
-        `Last checked at ${reachableAt} via ${providerLabel}.`
-      );
       renderLiveModels(result.candidates);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
@@ -379,16 +336,10 @@ export function renderModelProfileTab<T extends BaseModel>(
         ? "Check your API key in Settings → General → Provider API Keys."
         : `Could not reach ${providerLabel}. Check your connection settings and try again.`;
 
-      setStatus(
-        "error",
-        "Unavailable",
-        `Could not load models from ${providerLabel}`,
-        hint
-      );
       liveModelsListEl.empty();
       liveModelsListEl.createEl("p", {
         cls: "lmsa-empty-state",
-        text: "No live model data available right now.",
+        text: hint,
       });
     } finally {
       refetchButton.disabled = false;

@@ -14,6 +14,31 @@ export function renderKnowledgeGraphTab(
 ): () => void {
   const { knowledgeGraph: kg } = plugin.settings;
 
+  // ── Resource warning ───────────────────────────────────────────────
+  const warning = createSettingsSection(
+    container,
+    "Before you begin",
+    undefined,
+    { icon: "triangle-alert" },
+  );
+  warning.sectionEl.addClass("lmsa-kg-warning");
+
+  new SettingItem(warning.bodyEl)
+    .setName("Compute")
+    .setDesc("Every note is sent to a completion model to find relationships and interconnect entities, then each entity is embedded. This is resource intensive on both compute and memory.");
+
+  new SettingItem(warning.bodyEl)
+    .setName("Large vaults")
+    .setDesc("Vaults with hundreds or thousands of notes will take considerably longer to process.");
+
+  new SettingItem(warning.bodyEl)
+    .setName("Cost")
+    .setDesc("Cloud providers charge per token. A full build can consume a meaningful amount of API credits.");
+
+  new SettingItem(warning.bodyEl)
+    .setName("Benefits")
+    .setDesc("Once built, the graph surfaces connections across notes that are hard to find manually — useful for world-building, story planning, and discovering narrative threads between characters, locations, and events.");
+
   const conditionalWrapper = container.createDiv({ cls: "lmsa-kg-conditional" });
 
   // ── Enable / Disable ──────────────────────────────────────────────

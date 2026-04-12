@@ -1,75 +1,37 @@
 @layer components {
-  .lmsa-settings-discovery-status {
-    margin-bottom: 16px;
-  }
-
-  .lmsa-connection-status {
-    @apply lmsa-flex lmsa-flex-col lmsa-gap-2 lmsa-rounded-[18px] lmsa-border lmsa-p-4;
-    border-color: var(--lmsa-border-default);
-    background: var(--lmsa-surface-raised);
-  }
-
-  .lmsa-connection-status.is-loading {
-    border-color: color-mix(in srgb, var(--lmsa-section-accent) 20%, var(--lmsa-border-default));
-  }
-
-  .lmsa-connection-status.is-connected {
-    border-color: color-mix(in srgb, var(--lmsa-status-success) 42%, var(--lmsa-border-default));
-    background: color-mix(in srgb, var(--lmsa-status-success) 8%, var(--background-secondary));
-  }
-
-  .lmsa-connection-status.is-error {
-    border-color: color-mix(in srgb, var(--lmsa-status-error-bg) 72%, var(--lmsa-border-default));
-    background: color-mix(in srgb, var(--lmsa-status-error-bg) 8%, var(--background-secondary));
-  }
-
-  .lmsa-connection-status-summary {
-    @apply lmsa-flex lmsa-flex-wrap lmsa-items-center lmsa-gap-2;
-  }
-
-  .lmsa-connection-status-badge,
   .lmsa-model-state-badge {
-    @apply lmsa-inline-flex lmsa-items-center lmsa-rounded-full lmsa-px-2.5 lmsa-py-1 lmsa-text-xs lmsa-font-semibold;
+    @apply lmsa-inline-flex lmsa-flex-none lmsa-items-center lmsa-rounded-full lmsa-px-2.5 lmsa-py-1 lmsa-text-xs lmsa-font-semibold;
     background: color-mix(in srgb, var(--background-modifier-hover) 84%, transparent);
     color: var(--lmsa-text-primary);
   }
 
-  .lmsa-connection-status.is-connected .lmsa-connection-status-badge,
   .lmsa-model-state-badge.is-loaded {
     background: color-mix(in srgb, var(--lmsa-status-success) 18%, transparent);
     color: color-mix(in srgb, var(--lmsa-status-success) 74%, var(--lmsa-text-primary));
   }
 
-  .lmsa-connection-status.is-error .lmsa-connection-status-badge,
   .lmsa-model-state-badge.is-unloaded {
     background: color-mix(in srgb, var(--lmsa-status-error-bg) 18%, transparent);
     color: color-mix(in srgb, var(--lmsa-status-error-bg) 88%, var(--lmsa-text-primary));
   }
 
-  .lmsa-connection-status-text {
-    @apply lmsa-font-semibold;
-    color: var(--lmsa-text-primary);
-  }
-
-  .lmsa-connection-status-meta {
-    color: var(--lmsa-text-secondary);
-    line-height: 1.55;
-    word-break: break-word;
-  }
-
   .lmsa-item-list {
-    @apply lmsa-flex lmsa-flex-col lmsa-gap-3;
-  }
-
-  * + .lmsa-item-list {
-    @apply lmsa-mt-3;
+    @apply lmsa-flex lmsa-flex-col;
   }
 
   .lmsa-item-row {
-    @apply lmsa-flex lmsa-items-start lmsa-justify-between lmsa-gap-4 lmsa-rounded-[18px] lmsa-border lmsa-p-4;
-    border-color: var(--lmsa-border-default);
-    background: var(--lmsa-surface-raised);
-    box-shadow: inset 0 1px 0 var(--lmsa-inset-highlight-subtle);
+    @apply lmsa-relative lmsa-flex lmsa-items-start lmsa-justify-between lmsa-gap-4 lmsa-py-3;
+  }
+
+  .lmsa-item-row:not(:first-child)::before {
+    content: "";
+    @apply lmsa-pointer-events-none lmsa-absolute lmsa-inset-x-0 lmsa-top-0 lmsa-h-px;
+    background: linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--lmsa-section-accent) 20%, transparent),
+      var(--lmsa-border-subtle),
+      color-mix(in srgb, var(--lmsa-section-accent-secondary) 20%, transparent)
+    );
   }
 
   .lmsa-item-info {
@@ -135,10 +97,8 @@
   /* ── Provider selector ────────────────────────────────────────────── */
 
   .lmsa-provider-selector-row {
-    @apply lmsa-flex lmsa-items-center lmsa-gap-3 lmsa-rounded-[18px] lmsa-border lmsa-p-4;
-    border-color: var(--lmsa-border-default);
-    background: var(--lmsa-surface-raised);
-    margin-bottom: 16px;
+    @apply lmsa-flex lmsa-items-center lmsa-gap-3 lmsa-py-3;
+    margin-bottom: 8px;
   }
 
   .lmsa-provider-selector-label {
@@ -174,34 +134,11 @@
   }
 
   .lmsa-provider-placeholder {
-    @apply lmsa-flex lmsa-items-center lmsa-justify-center lmsa-rounded-[18px] lmsa-border lmsa-p-6;
-    border-color: var(--lmsa-border-default);
-    border-style: dashed;
-    background: var(--lmsa-surface-raised);
-    min-height: 80px;
-  }
-
-  .lmsa-provider-placeholder .lmsa-empty-state {
-    @apply lmsa-m-0;
+    @apply lmsa-py-3;
   }
 
   .lmsa-provider-connection {
-    @apply lmsa-flex lmsa-flex-col lmsa-rounded-[18px] lmsa-border lmsa-p-4;
-    border-color: var(--lmsa-border-default);
-    background: var(--lmsa-surface-raised);
-    margin-bottom: 16px;
-  }
-
-  .lmsa-provider-connection .lmsa-setting-item {
-    @apply lmsa-border-0 lmsa-p-0;
-  }
-
-  .lmsa-provider-connection .lmsa-setting-item:not(:first-child) {
-    padding-top: 12px;
-  }
-
-  .lmsa-provider-connection .lmsa-setting-item:not(:last-child) {
-    padding-bottom: 12px;
+    @apply lmsa-flex lmsa-flex-col;
   }
 
   .lmsa-discovery-header {
@@ -220,10 +157,6 @@
 
     .lmsa-provider-selector-row {
       @apply lmsa-flex-col lmsa-items-stretch;
-    }
-
-    .lmsa-provider-selector-select {
-      max-width: none;
     }
   }
 

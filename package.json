@@ -14,7 +14,8 @@
     "test:all": "vitest run",
     "test:unit": "vitest run --include 'tests/unit/**/*.test.ts'",
     "test:integration": "vitest run --include 'tests/integration/**/*.test.ts'",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "version": "node version-bump.mjs && git add manifest.json versions.json"
   },
   "keywords": [],
   "author": "Harbingers",

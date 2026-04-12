@@ -175,6 +175,32 @@ Follow the official [Obsidian plugin guidelines](https://docs.obsidian.md/Plugin
 
 ---
 
+## Releasing
+
+Releases are automated via GitHub Actions. When you push a tag, the workflow builds the plugin and creates a draft release with `main.js`, `manifest.json`, and `styles.css` attached.
+
+### Version bump and release
+
+```bash
+npm version patch    # or minor, or major
+git push origin main --tags
+```
+
+`npm version` automatically:
+
+1. Bumps `package.json`
+2. Syncs the version into `manifest.json` and `versions.json` (via `version-bump.mjs`)
+3. Commits and creates a git tag
+
+After pushing, go to **Releases** on GitHub, review the draft, and publish it.
+
+### Versioning
+
+- Follow [semantic versioning](https://semver.org): `patch` for fixes, `minor` for features, `major` for breaking changes.
+- `manifest.json`, `package.json`, and git tags must always match. The `version` script handles this — never bump versions manually.
+
+---
+
 ## License
 
 By contributing, you agree that your contributions will be licensed under the [MIT License](LICENSE).

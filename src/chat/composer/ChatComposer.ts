@@ -38,6 +38,10 @@ export class ChatComposer {
   private isSending = false;
   private currentMode: ChatMode = "conversation";
   private modeButtons = new Map<ChatMode, HTMLButtonElement>();
+  private readonly handleKeydown: (event: KeyboardEvent) => void;
+  private readonly handleInput: () => void;
+  private readonly handleActionClick: () => void;
+
   constructor(
     private readonly app: App,
     private readonly plugin: WritingAssistantChat,
@@ -57,7 +61,7 @@ export class ChatComposer {
     this.activeNoteAttached =
       this.plugin.settings.includeNoteContext && !!this.app.workspace.getActiveFile();
 
-    this.refs.textareaEl.addEventListener("keydown", (event) => {
+    this.handleKeydown = (event: KeyboardEvent) => {
       if (
         event.key === "Enter" &&
         !event.shiftKey &&
@@ -68,20 +72,23 @@ export class ChatComposer {
         event.preventDefault();
         this.callbacks.onSendRequest();
       }
-    });
+    };
+    this.refs.textareaEl.addEventListener("keydown", this.handleKeydown);
 
-    this.refs.textareaEl.addEventListener("input", () => {
+    this.handleInput = () => {
       this.autoResizeTextarea();
       this.callbacks.onDraftChange(this.refs.textareaEl.value);
-    });
+    };
+    this.refs.textareaEl.addEventListener("input", this.handleInput);
 
-    this.refs.actionBtn.addEventListener("click", () => {
+    this.handleActionClick = () => {
       if (this.isSending) {
         this.callbacks.onStopRequest();
       } else {
         this.callbacks.onSendRequest();
       }
-    });
+    };
+    this.refs.actionBtn.addEventListener("click", this.handleActionClick);
 
     this.renderModeToggle();
   }
@@ -267,7 +274,11 @@ export class ChatComposer {
       : "Vision not available");
   }
 
-  destroy(): void {}
+  destroy(): void {
+    this.refs.textareaEl.removeEventListener("keydown", this.handleKeydown);
+    this.refs.textareaEl.removeEventListener("input", this.handleInput);
+    this.refs.actionBtn.removeEventListener("click", this.handleActionClick);
+  }
 
   private renderChip(icon: string, label: string, onRemove: () => void): void {
     const chip = this.refs.contextChipsEl.createDiv({ cls: "lmsa-chat-composer-chip" });

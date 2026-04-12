@@ -403,6 +403,7 @@ export class ChatView extends ItemView {
     this.contextPickerPopover?.destroy();
     this.knowledgePopover?.destroy();
     this.toolUsePopover?.destroy();
+    this.composer?.destroy();
   }
 
   seedPrompt(text: string): void {

@@ -121,6 +121,11 @@ export class OpenAIClient implements ChatClient {
 
     const rawDeltas = streamFetch(url, body, signal, this.headers, undefined, onEvent);
 
+    /**
+     * Wraps the raw SSE generator to resolve deferred promises once the stream
+     * ends. CONTRACT: promises resolve only after `deltas` is fully consumed
+     * (iterated to completion, thrown, or returned).
+     */
     async function* wrappedDeltas(): AsyncGenerator<string> {
       try {
         yield* rawDeltas;

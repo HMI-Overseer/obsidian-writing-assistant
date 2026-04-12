@@ -223,6 +223,11 @@ export class AnthropicClient implements ChatClient {
       url, payload, signal, buildAnthropicHeaders(this.apiKey, ANTHROPIC_VERSION, cacheSettings), anthropicDeltaExtractor, onEvent
     );
 
+    /**
+     * Wraps the raw SSE generator to resolve deferred promises once the stream
+     * ends. CONTRACT: promises resolve only after `deltas` is fully consumed
+     * (iterated to completion, thrown, or returned).
+     */
     async function* wrappedDeltas(): AsyncGenerator<string> {
       try {
         yield* rawGenerator;

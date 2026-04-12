@@ -170,7 +170,7 @@ export function renderBenchmarkTab(
   }) as HTMLInputElement;
   iterInput.addEventListener("input", () => {
     const parsed = parseInt(iterInput.value, 10);
-    if (!isNaN(parsed) && parsed >= 1 && parsed <= 20) {
+    if (!Number.isNaN(parsed) && parsed >= 1 && parsed <= 20) {
       iterationCount = parsed;
     }
   });

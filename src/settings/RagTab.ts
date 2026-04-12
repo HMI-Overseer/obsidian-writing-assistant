@@ -229,7 +229,7 @@ export function renderRagTab(
         text.setValue(String(rag.topK));
         text.onChange(async (value) => {
           const num = parseInt(value, 10);
-          if (!isNaN(num) && num >= 1 && num <= 20) {
+          if (!Number.isNaN(num) && num >= 1 && num <= 20) {
             rag.topK = num;
             await plugin.saveSettings();
           }
@@ -243,7 +243,7 @@ export function renderRagTab(
         text.setValue(String(rag.maxChunksPerFile));
         text.onChange(async (value) => {
           const num = parseInt(value, 10);
-          if (!isNaN(num) && num >= 1 && num <= 20) {
+          if (!Number.isNaN(num) && num >= 1 && num <= 20) {
             rag.maxChunksPerFile = num;
             await plugin.saveSettings();
           }
@@ -257,7 +257,7 @@ export function renderRagTab(
         text.setValue(String(rag.minScore));
         text.onChange(async (value) => {
           const num = parseFloat(value);
-          if (!isNaN(num) && num >= 0 && num <= 0.8) {
+          if (!Number.isNaN(num) && num >= 0 && num <= 0.8) {
             rag.minScore = num;
             await plugin.saveSettings();
           }
@@ -279,7 +279,7 @@ export function renderRagTab(
         text.setValue(String(rag.chunkSize));
         text.onChange(async (value) => {
           const num = parseInt(value, 10);
-          if (!isNaN(num) && num >= 500 && num <= 3000) {
+          if (!Number.isNaN(num) && num >= 500 && num <= 3000) {
             rag.chunkSize = num;
             await plugin.saveSettings();
           }
@@ -293,7 +293,7 @@ export function renderRagTab(
         text.setValue(String(rag.chunkOverlap));
         text.onChange(async (value) => {
           const num = parseInt(value, 10);
-          if (!isNaN(num) && num >= 0 && num <= 500) {
+          if (!Number.isNaN(num) && num >= 0 && num <= 500) {
             rag.chunkOverlap = num;
             await plugin.saveSettings();
           }

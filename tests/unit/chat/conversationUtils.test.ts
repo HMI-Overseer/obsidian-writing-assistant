@@ -190,6 +190,118 @@ describe("normalizeChatHistory — metadata index", () => {
   });
 });
 
+describe("normalizeConversation — editProposal / appliedEdit validation", () => {
+  function makeEditProposal() {
+    return {
+      id: "ep-1",
+      targetFilePath: "notes/test.md",
+      documentSnapshot: "original content",
+      snapshotTimestamp: 1000,
+      hunks: [{ id: "h1", resolvedEdit: {}, status: "pending" }],
+      prose: "Here are the changes.",
+    };
+  }
+
+  function makeAppliedEditRecord() {
+    return {
+      proposalId: "ep-1",
+      targetFilePath: "notes/test.md",
+      preApplySnapshot: "before",
+      postApplySnapshot: "after",
+      appliedAt: 2000,
+      appliedHunkIds: ["h1"],
+    };
+  }
+
+  test("preserves a well-formed editProposal after round-trip", () => {
+    const msg: ConversationMessage = {
+      id: "msg-1",
+      role: "assistant",
+      content: "Edit response",
+      editProposal: makeEditProposal() as ConversationMessage["editProposal"],
+    };
+
+    const raw = jsonRoundTrip(makeConversation([msg])) as Record<string, unknown>;
+    const result = normalizeConversation(raw);
+    const normalized = result!.messages[0];
+
+    expect(normalized.editProposal).toBeDefined();
+    expect(normalized.editProposal!.id).toBe("ep-1");
+    expect(normalized.editProposal!.targetFilePath).toBe("notes/test.md");
+    expect(normalized.editProposal!.hunks).toHaveLength(1);
+  });
+
+  test("drops editProposal missing required fields", () => {
+    const msg: ConversationMessage = {
+      id: "msg-1",
+      role: "assistant",
+      content: "Edit response",
+    };
+
+    const raw = jsonRoundTrip(makeConversation([msg])) as Record<string, unknown>;
+    // Inject a malformed editProposal (missing hunks, prose, etc.)
+    const messages = raw.messages as Array<Record<string, unknown>>;
+    messages[0].editProposal = { id: "ep-bad" };
+
+    const result = normalizeConversation(raw);
+    const normalized = result!.messages[0];
+
+    expect(normalized.editProposal).toBeUndefined();
+  });
+
+  test("drops non-object truthy editProposal", () => {
+    const msg: ConversationMessage = {
+      id: "msg-1",
+      role: "assistant",
+      content: "Edit response",
+    };
+
+    const raw = jsonRoundTrip(makeConversation([msg])) as Record<string, unknown>;
+    const messages = raw.messages as Array<Record<string, unknown>>;
+    messages[0].editProposal = "not-an-object";
+
+    const result = normalizeConversation(raw);
+    const normalized = result!.messages[0];
+
+    expect(normalized.editProposal).toBeUndefined();
+  });
+
+  test("preserves a well-formed appliedEdit after round-trip", () => {
+    const msg: ConversationMessage = {
+      id: "msg-1",
+      role: "assistant",
+      content: "Edit response",
+      editProposal: makeEditProposal() as ConversationMessage["editProposal"],
+      appliedEdit: makeAppliedEditRecord() as ConversationMessage["appliedEdit"],
+    };
+
+    const raw = jsonRoundTrip(makeConversation([msg])) as Record<string, unknown>;
+    const result = normalizeConversation(raw);
+    const normalized = result!.messages[0];
+
+    expect(normalized.appliedEdit).toBeDefined();
+    expect(normalized.appliedEdit!.proposalId).toBe("ep-1");
+    expect(normalized.appliedEdit!.appliedHunkIds).toEqual(["h1"]);
+  });
+
+  test("drops malformed appliedEdit", () => {
+    const msg: ConversationMessage = {
+      id: "msg-1",
+      role: "assistant",
+      content: "Edit response",
+    };
+
+    const raw = jsonRoundTrip(makeConversation([msg])) as Record<string, unknown>;
+    const messages = raw.messages as Array<Record<string, unknown>>;
+    messages[0].appliedEdit = { proposalId: "ep-1" }; // missing targetFilePath, appliedHunkIds
+
+    const result = normalizeConversation(raw);
+    const normalized = result!.messages[0];
+
+    expect(normalized.appliedEdit).toBeUndefined();
+  });
+});
+
 describe("toConversationMeta", () => {
   test("extracts metadata from full conversation", () => {
     const conv = makeConversation([

@@ -203,34 +203,38 @@ export async function* streamFetch(
   const decoder = new TextDecoder();
   let buffer = "";
 
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
 
-    buffer += decoder.decode(value, { stream: true });
-    const lines = buffer.split("\n");
-    buffer = lines.pop() ?? "";
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split("\n");
+      buffer = lines.pop() ?? "";
 
-    for (const line of lines) {
-      const trimmed = line.trim();
-      if (!trimmed.startsWith("data: ")) continue;
-      const payload = trimmed.slice(6);
-      if (payload === "[DONE]") return;
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed.startsWith("data: ")) continue;
+        const payload = trimmed.slice(6);
+        if (payload === "[DONE]") return;
 
-      let parsed: unknown;
-      try {
-        parsed = JSON.parse(payload);
-      } catch {
-        continue; // Skip malformed chunks from the stream.
+        let parsed: unknown;
+        try {
+          parsed = JSON.parse(payload);
+        } catch {
+          continue; // Skip malformed chunks from the stream.
+        }
+
+        onEvent?.(parsed);
+
+        const sseError = extractSSEError(parsed);
+        if (sseError) throw new Error(sseError);
+
+        const delta = extractDelta(parsed);
+        if (delta) yield delta;
       }
-
-      onEvent?.(parsed);
-
-      const sseError = extractSSEError(parsed);
-      if (sseError) throw new Error(sseError);
-
-      const delta = extractDelta(parsed);
-      if (delta) yield delta;
     }
+  } finally {
+    await reader.cancel();
   }
 }

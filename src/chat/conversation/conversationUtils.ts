@@ -129,11 +129,11 @@ export function normalizeConversation(raw: Record<string, unknown>): Conversatio
             }
           }
 
-          // Preserve edit proposal and applied edit records if present
-          if (message.editProposal && typeof message.editProposal === "object") {
+          // Preserve edit proposal and applied edit records if present and valid
+          if (isValidEditProposal(message.editProposal)) {
             base.editProposal = message.editProposal as ConversationMessage["editProposal"];
           }
-          if (message.appliedEdit && typeof message.appliedEdit === "object") {
+          if (isValidAppliedEditRecord(message.appliedEdit)) {
             base.appliedEdit = message.appliedEdit as ConversationMessage["appliedEdit"];
           }
 
@@ -192,6 +192,29 @@ export function createBranchConversation(
   branch.parentConversationId = source.id;
   branch.branchFromMessageId = branchMessageId;
   return branch;
+}
+
+function isValidEditProposal(value: unknown): boolean {
+  if (!value || typeof value !== "object") return false;
+  const obj = value as Record<string, unknown>;
+  return (
+    typeof obj.id === "string" &&
+    typeof obj.targetFilePath === "string" &&
+    typeof obj.documentSnapshot === "string" &&
+    typeof obj.snapshotTimestamp === "number" &&
+    typeof obj.prose === "string" &&
+    Array.isArray(obj.hunks)
+  );
+}
+
+function isValidAppliedEditRecord(value: unknown): boolean {
+  if (!value || typeof value !== "object") return false;
+  const obj = value as Record<string, unknown>;
+  return (
+    typeof obj.proposalId === "string" &&
+    typeof obj.targetFilePath === "string" &&
+    Array.isArray(obj.appliedHunkIds)
+  );
 }
 
 export function formatRelativeDate(timestamp: number): string {

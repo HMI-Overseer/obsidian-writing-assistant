@@ -140,7 +140,7 @@ export function renderDiffPanel(
       const msg = messages.find((m) => m.editProposal?.id === updatedProposal.id);
       if (msg) {
         msg.editProposal = updatedProposal;
-        store.persistActiveConversation();
+        void store.persistActiveConversation();
       }
     },
     onApplied: (record) => {
@@ -148,7 +148,7 @@ export function renderDiffPanel(
       const msg = messages.find((m) => m.editProposal?.id === proposal.id);
       if (msg) {
         msg.appliedEdit = record;
-        store.persistActiveConversation();
+        void store.persistActiveConversation();
       }
     },
     onUndone: () => {
@@ -156,7 +156,7 @@ export function renderDiffPanel(
       const msg = messages.find((m) => m.editProposal?.id === proposal.id);
       if (msg) {
         msg.appliedEdit = undefined;
-        store.persistActiveConversation();
+        void store.persistActiveConversation();
       }
     },
   }, existingRecord);

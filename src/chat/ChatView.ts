@@ -7,8 +7,6 @@ import type WritingAssistantChat from "../main";
 import { VIEW_TYPE_CHAT, makeDefaultProfile } from "../constants";
 import { getActiveProfile, getProfilesForProvider, generateProfileId } from "../shared/profileUtils";
 import { PROVIDER_DESCRIPTORS } from "../providers/descriptors";
-import { expandCommandTemplate } from "../commands";
-import { getAllCommands } from "../commands";
 import { getActiveNoteText } from "../context/noteContext";
 import { ChatBubbleActionHandler } from "./ChatBubbleActionHandler";
 import { ChatGenerationOrchestrator } from "./ChatGenerationOrchestrator";
@@ -142,12 +140,6 @@ export class ChatView extends ItemView {
       onContextToggle: () => {
         this.cachedDocumentContext = null;
         this.contextUpdater?.immediateUpdate(this.buildContextInputs());
-      },
-      getCommands: () => getAllCommands(this.plugin.settings.commands),
-      expandCommand: (command) => {
-        const selection = this.app.workspace.activeEditor?.editor?.getSelection() ?? "";
-        const noteText = this.cachedDocumentContext?.content ?? "";
-        return expandCommandTemplate(command.prompt, { selection, noteText });
       },
     });
 
@@ -557,7 +549,6 @@ export class ChatView extends ItemView {
     if (this.knowledgePopover?.isOpen()) this.knowledgePopover.close();
     if (this.toolUsePopover?.isOpen()) this.toolUsePopover.close();
     if (!options?.keepHistory && this.historyDrawer?.isOpen()) this.historyDrawer.close();
-    this.composer?.closeSlashSuggester();
   }
 
   private handleWidthChange(width: number): void {

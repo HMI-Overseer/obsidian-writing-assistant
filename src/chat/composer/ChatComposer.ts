@@ -1,12 +1,11 @@
 import { setIcon } from "obsidian";
 import type { App } from "obsidian";
-import type { CompletionModel, CustomCommand } from "../../shared/types";
+import type { CompletionModel } from "../../shared/types";
 import type WritingAssistantChat from "../../main";
 import { shouldUseToolCall } from "../../tools/registry";
 import { getActiveFileName } from "../../context/noteContext";
 import type { ExtraContextItem } from "../../shared/chatRequest";
 import type { ChatLayoutRefs, ChatMode } from "../types";
-import { SlashCommandSuggester } from "./SlashCommandSuggester";
 
 const MODE_OPTIONS: { mode: ChatMode; label: string; icon: string }[] = [
   { mode: "plan", icon: "zap", label: "Plan" },
@@ -26,8 +25,6 @@ type ChatComposerCallbacks = {
   onStopRequest: () => void;
   onModeChange: (mode: ChatMode) => void;
   onContextToggle: () => void;
-  getCommands: () => CustomCommand[];
-  expandCommand: (command: CustomCommand) => string;
 };
 
 export class ChatComposer {
@@ -41,14 +38,11 @@ export class ChatComposer {
   private isSending = false;
   private currentMode: ChatMode = "conversation";
   private modeButtons = new Map<ChatMode, HTMLButtonElement>();
-  private slashSuggester: SlashCommandSuggester;
-
   constructor(
     private readonly app: App,
     private readonly plugin: WritingAssistantChat,
     private readonly refs: Pick<
       ChatLayoutRefs,
-      | "slashDropdownEl"
       | "contextChipsEl"
       | "textareaEl"
       | "modeToggleEl"
@@ -63,34 +57,13 @@ export class ChatComposer {
     this.activeNoteAttached =
       this.plugin.settings.includeNoteContext && !!this.app.workspace.getActiveFile();
 
-    this.slashSuggester = new SlashCommandSuggester(
-      this.refs.textareaEl,
-      this.refs.slashDropdownEl,
-      {
-        getCommands: () => this.callbacks.getCommands(),
-        onSelect: (command, triggerStart, triggerEnd) => {
-          const expanded = this.callbacks.expandCommand(command);
-          const text = this.refs.textareaEl.value;
-          const before = text.slice(0, triggerStart);
-          const after = text.slice(triggerEnd);
-          const newText = before + expanded + after;
-          this.setDraft(newText);
-          const cursorPos = triggerStart + expanded.length;
-          this.refs.textareaEl.setSelectionRange(cursorPos, cursorPos);
-          this.refs.textareaEl.focus();
-          this.callbacks.onDraftChange(newText);
-        },
-      },
-    );
-
     this.refs.textareaEl.addEventListener("keydown", (event) => {
       if (
         event.key === "Enter" &&
         !event.shiftKey &&
         !event.ctrlKey &&
         !event.metaKey &&
-        !event.altKey &&
-        !this.slashSuggester.isOpen()
+        !event.altKey
       ) {
         event.preventDefault();
         this.callbacks.onSendRequest();
@@ -99,7 +72,6 @@ export class ChatComposer {
 
     this.refs.textareaEl.addEventListener("input", () => {
       this.autoResizeTextarea();
-      this.slashSuggester.handleInput();
       this.callbacks.onDraftChange(this.refs.textareaEl.value);
     });
 
@@ -295,13 +267,7 @@ export class ChatComposer {
       : "Vision not available");
   }
 
-  closeSlashSuggester(): void {
-    this.slashSuggester.close();
-  }
-
-  destroy(): void {
-    this.slashSuggester.destroy();
-  }
+  destroy(): void {}
 
   private renderChip(icon: string, label: string, onRemove: () => void): void {
     const chip = this.refs.contextChipsEl.createDiv({ cls: "lmsa-chat-composer-chip" });

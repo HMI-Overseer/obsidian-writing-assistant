@@ -1963,6 +1963,16 @@
     color: var(--text-normal);
     font-size: var(--font-ui-small);
 }
+.lmsa-slash-dropdown-icon {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    color: var(--text-muted);
+}
+.lmsa-slash-dropdown-icon svg {
+    width: 14px;
+    height: 14px;
+  }
 .lmsa-slash-dropdown-desc {
     min-width: 0px;
     flex: 1 1 0%;
@@ -3898,6 +3908,70 @@
     .lmsa-provider-selector-select {
       max-width: none;
     }
+  }
+/* ── Command icon badge ──────────────────────────────────────────────── */
+.lmsa-command-icon {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 10px;
+    background: color-mix(in srgb, var(--lmsa-section-accent) 12%, var(--background-secondary));
+    color: var(--lmsa-section-accent);
+}
+.lmsa-command-icon svg {
+    width: 16px;
+    height: 16px;
+  }
+/* ── Built-in command rows ───────────────────────────────────────────── */
+.lmsa-item-row.is-builtin {
+    opacity: 0.85;
+  }
+.lmsa-model-state-badge.is-builtin {
+    background: color-mix(in srgb, var(--lmsa-section-accent) 14%, transparent);
+    color: color-mix(in srgb, var(--lmsa-section-accent) 74%, var(--lmsa-text-primary));
+  }
+.lmsa-command-category-label {
+    font-size: 0.75rem;
+    line-height: 1rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.025em;
+    color: var(--lmsa-text-secondary);
+    padding: 4px 0 2px;
+}
+/* ── Icon picker grid ────────────────────────────────────────────────── */
+.lmsa-icon-picker-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(36px, 1fr));
+    gap: 4px;
+  }
+.lmsa-icon-picker-cell {
+    display: inline-flex;
+    cursor: pointer;
+    align-items: center;
+    justify-content: center;
+    border-radius: 0.5rem;
+    width: 36px;
+    height: 36px;
+    border: 1px solid transparent;
+    color: var(--lmsa-text-secondary);
+    transition: background 120ms ease, border-color 120ms ease, color 120ms ease;
+}
+.lmsa-icon-picker-cell:hover {
+    background: color-mix(in srgb, var(--background-modifier-hover) 60%, transparent);
+    color: var(--lmsa-text-primary);
+  }
+.lmsa-icon-picker-cell.is-selected {
+    border-color: var(--lmsa-section-accent);
+    background: color-mix(in srgb, var(--lmsa-section-accent) 14%, transparent);
+    color: var(--lmsa-section-accent);
+  }
+.lmsa-icon-picker-cell svg {
+    width: 16px;
+    height: 16px;
   }
 .lmsa-benchmark-empty {
     color: var(--lmsa-text-secondary);

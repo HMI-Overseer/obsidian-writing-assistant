@@ -1,4 +1,6 @@
+import { setIcon } from "obsidian";
 import type WritingAssistantChat from "../main";
+import { BUILTIN_COMMAND_CATEGORIES } from "../commands";
 import { CommandModal } from "./modals";
 import { createSettingsSection } from "./ui";
 
@@ -11,8 +13,8 @@ export function renderCommandsTab(
 
   const library = createSettingsSection(
     container,
-    "Command Library",
-    "Prompt shortcuts that appear in chat and can automatically pull from your current selection or note.",
+    "Command library",
+    "Prompt shortcuts that appear in chat and the editor context menu. Select text, right-click, and pick a command from the Writing assistant submenu.",
     { icon: "terminal" }
   );
 
@@ -29,12 +31,41 @@ export function renderCommandsTab(
     text: "{{note}} inserts the active note text, trimmed by the advanced context limit.",
   });
 
-  const listEl = library.bodyEl.createDiv({ cls: "lmsa-item-list" });
+  // ── Built-in commands ──────────────────────────────────────────────────
+
+  const builtinListEl = library.bodyEl.createDiv({ cls: "lmsa-item-list" });
+
+  for (const category of BUILTIN_COMMAND_CATEGORIES) {
+    builtinListEl.createDiv({
+      cls: "lmsa-command-category-label",
+      text: category.label,
+    });
+
+    for (const command of category.commands) {
+      const row = builtinListEl.createDiv({ cls: "lmsa-item-row is-builtin" });
+
+      const iconEl = row.createDiv({ cls: "lmsa-command-icon" });
+      setIcon(iconEl, command.icon ?? "wand");
+
+      const info = row.createDiv({ cls: "lmsa-item-info" });
+      const header = info.createDiv({ cls: "lmsa-live-model-header" });
+      header.createDiv({ cls: "lmsa-item-name", text: command.name });
+      header.createDiv({
+        cls: "lmsa-model-state-badge is-builtin",
+        text: "Built-in",
+      });
+      info.createDiv({ cls: "lmsa-item-sub", text: command.prompt });
+    }
+  }
+
+  // ── Custom commands ────────────────────────────────────────────────────
+
+  const customListEl = library.bodyEl.createDiv({ cls: "lmsa-item-list" });
 
   const renderList = () => {
-    listEl.empty();
+    customListEl.empty();
     if (settings.commands.length === 0) {
-      listEl.createEl("p", {
+      customListEl.createEl("p", {
         cls: "lmsa-empty-state",
         text: "No custom commands configured yet.",
       });
@@ -42,7 +73,13 @@ export function renderCommandsTab(
     }
 
     for (const command of settings.commands) {
-      const row = listEl.createDiv({ cls: "lmsa-item-row" });
+      const row = customListEl.createDiv({ cls: "lmsa-item-row" });
+
+      if (command.icon) {
+        const iconEl = row.createDiv({ cls: "lmsa-command-icon" });
+        setIcon(iconEl, command.icon);
+      }
+
       const info = row.createDiv({ cls: "lmsa-item-info" });
       info.createDiv({ cls: "lmsa-item-name", text: command.name });
       info.createDiv({ cls: "lmsa-item-sub", text: command.prompt });

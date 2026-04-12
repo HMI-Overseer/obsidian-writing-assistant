@@ -66,6 +66,8 @@ export interface CustomCommand {
   id: string;
   name: string;
   prompt: string;
+  /** Lucide icon name for context menu and settings display. */
+  icon?: string;
 }
 
 export interface MessageUsage {

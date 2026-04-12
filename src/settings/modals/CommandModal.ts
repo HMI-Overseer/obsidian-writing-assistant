@@ -1,8 +1,17 @@
 import type { App } from "obsidian";
-import { Modal, Notice } from "obsidian";
+import { Modal, Notice, setIcon } from "obsidian";
 import { SettingItem } from "../ui";
 import type { CustomCommand } from "../../shared/types";
 import { generateId } from "../../utils";
+
+/** Curated palette of writing-relevant Lucide icons. */
+const COMMAND_ICON_PALETTE = [
+  "wand", "scissors", "pencil", "pen-line", "eraser",
+  "spell-check", "type", "text", "file-text", "book-open",
+  "lightbulb", "sparkles", "star", "eye", "message-circle",
+  "list", "arrow-right", "minimize-2", "unfold-vertical", "replace",
+  "brain", "search", "check", "bookmark", "hash",
+] as const;
 
 export class CommandModal extends Modal {
   private command: CustomCommand;
@@ -26,7 +35,7 @@ export class CommandModal extends Modal {
     const { contentEl } = this;
     contentEl.addClass("lmsa-modal");
     contentEl.createEl("h2", {
-      text: this.command.name ? `Edit: ${this.command.name}` : "Add Command",
+      text: this.command.name ? `Edit: ${this.command.name}` : "Add command",
     });
 
     new SettingItem(contentEl)
@@ -38,6 +47,36 @@ export class CommandModal extends Modal {
           .setValue(this.command.name)
           .onChange((value) => (this.command.name = value))
       );
+
+    // ── Icon picker ────────────────────────────────────────────────────
+
+    const iconSetting = new SettingItem(contentEl);
+    iconSetting.setName("Icon");
+    iconSetting.setDesc("Displayed in the context menu and command list.");
+
+    const gridEl = iconSetting.controlEl.createDiv({ cls: "lmsa-icon-picker-grid" });
+    const cellEls: HTMLElement[] = [];
+
+    const selectedIcon = this.command.icon ?? "wand";
+
+    for (const iconName of COMMAND_ICON_PALETTE) {
+      const cell = gridEl.createDiv({ cls: "lmsa-icon-picker-cell" });
+      setIcon(cell, iconName);
+
+      if (iconName === selectedIcon) {
+        cell.addClass("is-selected");
+      }
+
+      cell.addEventListener("click", () => {
+        for (const el of cellEls) el.removeClass("is-selected");
+        cell.addClass("is-selected");
+        this.command.icon = iconName;
+      });
+
+      cellEls.push(cell);
+    }
+
+    // ── Prompt template ────────────────────────────────────────────────
 
     new SettingItem(contentEl)
       .setName("Prompt template")

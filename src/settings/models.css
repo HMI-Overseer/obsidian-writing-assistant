@@ -226,4 +226,70 @@
       max-width: none;
     }
   }
+
+  /* ── Command icon badge ──────────────────────────────────────────────── */
+
+  .lmsa-command-icon {
+    @apply lmsa-inline-flex lmsa-flex-none lmsa-items-center lmsa-justify-center;
+    width: 32px;
+    height: 32px;
+    border-radius: 10px;
+    background: color-mix(in srgb, var(--lmsa-section-accent) 12%, var(--background-secondary));
+    color: var(--lmsa-section-accent);
+  }
+
+  .lmsa-command-icon svg {
+    width: 16px;
+    height: 16px;
+  }
+
+  /* ── Built-in command rows ───────────────────────────────────────────── */
+
+  .lmsa-item-row.is-builtin {
+    opacity: 0.85;
+  }
+
+  .lmsa-model-state-badge.is-builtin {
+    background: color-mix(in srgb, var(--lmsa-section-accent) 14%, transparent);
+    color: color-mix(in srgb, var(--lmsa-section-accent) 74%, var(--lmsa-text-primary));
+  }
+
+  .lmsa-command-category-label {
+    @apply lmsa-text-xs lmsa-font-semibold lmsa-uppercase lmsa-tracking-wide;
+    color: var(--lmsa-text-secondary);
+    padding: 4px 0 2px;
+  }
+
+  /* ── Icon picker grid ────────────────────────────────────────────────── */
+
+  .lmsa-icon-picker-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(36px, 1fr));
+    gap: 4px;
+  }
+
+  .lmsa-icon-picker-cell {
+    @apply lmsa-inline-flex lmsa-cursor-pointer lmsa-items-center lmsa-justify-center lmsa-rounded-lg;
+    width: 36px;
+    height: 36px;
+    border: 1px solid transparent;
+    color: var(--lmsa-text-secondary);
+    transition: background 120ms ease, border-color 120ms ease, color 120ms ease;
+  }
+
+  .lmsa-icon-picker-cell:hover {
+    background: color-mix(in srgb, var(--background-modifier-hover) 60%, transparent);
+    color: var(--lmsa-text-primary);
+  }
+
+  .lmsa-icon-picker-cell.is-selected {
+    border-color: var(--lmsa-section-accent);
+    background: color-mix(in srgb, var(--lmsa-section-accent) 14%, transparent);
+    color: var(--lmsa-section-accent);
+  }
+
+  .lmsa-icon-picker-cell svg {
+    width: 16px;
+    height: 16px;
+  }
 }

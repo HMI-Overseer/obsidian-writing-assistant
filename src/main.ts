@@ -21,7 +21,7 @@ import {
   VIEW_TYPE_CHAT,
 } from "./constants";
 import { ChatView } from "./chat";
-import { expandCommandTemplate, getAllCommands } from "./commands";
+import { BUILTIN_COMMAND_CATEGORIES, expandCommandTemplate } from "./commands";
 import { getActiveNoteText } from "./context/noteContext";
 import { normalizeChatHistory } from "./chat/conversation/conversationUtils";
 import { normalizeCompletionModel, normalizeEmbeddingModel } from "./shared/normalizeModels";
@@ -194,16 +194,13 @@ export default class WritingAssistantChat extends Plugin {
         const selection = editor.getSelection();
         if (!selection) return;
 
-        const commands = getAllCommands(this.settings.commands);
-        if (commands.length === 0) return;
-
         menu.addItem((item) => {
           item.setTitle("Writing assistant").setIcon("message-square");
           const submenu = (item as MenuItem & { setSubmenu: () => typeof menu }).setSubmenu();
 
-          for (const command of commands) {
+          const addCommandItem = (command: CustomCommand) => {
             submenu.addItem((sub) => {
-              sub.setTitle(command.name).setIcon("wand").onClick(async () => {
+              sub.setTitle(command.name).setIcon(command.icon ?? "wand").onClick(async () => {
                 const noteText =
                   (await getActiveNoteText(this.app, this.settings.maxContextChars)) ?? "";
                 const expanded = expandCommandTemplate(command.prompt, { selection, noteText });
@@ -217,6 +214,21 @@ export default class WritingAssistantChat extends Plugin {
                 }, 100);
               });
             });
+          };
+
+          for (let i = 0; i < BUILTIN_COMMAND_CATEGORIES.length; i++) {
+            if (i > 0) submenu.addSeparator();
+            for (const command of BUILTIN_COMMAND_CATEGORIES[i].commands) {
+              addCommandItem(command);
+            }
+          }
+
+          const userCommands = this.settings.commands;
+          if (userCommands.length > 0) {
+            submenu.addSeparator();
+            for (const command of userCommands) {
+              addCommandItem(command);
+            }
           }
         });
       })

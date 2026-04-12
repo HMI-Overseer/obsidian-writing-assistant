@@ -51,6 +51,16 @@
     font-size: var(--font-ui-small);
   }
 
+  .lmsa-slash-dropdown-icon {
+    @apply lmsa-inline-flex lmsa-flex-none lmsa-items-center;
+    color: var(--text-muted);
+  }
+
+  .lmsa-slash-dropdown-icon svg {
+    width: 14px;
+    height: 14px;
+  }
+
   .lmsa-slash-dropdown-desc {
     @apply lmsa-min-w-0 lmsa-flex-1 lmsa-truncate lmsa-text-obsidian-muted;
     font-size: var(--font-ui-smaller);

@@ -1,3 +1,4 @@
+import { setIcon } from "obsidian";
 import type { CustomCommand } from "../../shared/types";
 
 type SlashCommandCallbacks = {
@@ -158,6 +159,10 @@ export class SlashCommandSuggester {
       const command = this.items[i];
       const item = list.createDiv({ cls: "lmsa-slash-dropdown-item" });
 
+      if (command.icon) {
+        const iconEl = item.createDiv({ cls: "lmsa-slash-dropdown-icon" });
+        setIcon(iconEl, command.icon);
+      }
       item.createDiv({ cls: "lmsa-slash-dropdown-name", text: `/${command.name}` });
       item.createDiv({
         cls: "lmsa-slash-dropdown-desc",

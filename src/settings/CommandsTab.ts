@@ -49,11 +49,11 @@ export function renderCommandsTab(
 
       const info = row.createDiv({ cls: "lmsa-item-info" });
       const header = info.createDiv({ cls: "lmsa-live-model-header" });
-      header.createDiv({ cls: "lmsa-item-name", text: command.name });
       header.createDiv({
         cls: "lmsa-model-state-badge is-builtin",
         text: "Built-in",
       });
+      header.createDiv({ cls: "lmsa-item-name", text: command.name });
       info.createDiv({ cls: "lmsa-item-sub", text: command.prompt });
     }
   }

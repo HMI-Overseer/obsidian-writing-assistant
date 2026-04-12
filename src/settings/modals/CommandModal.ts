@@ -53,8 +53,11 @@ export class CommandModal extends Modal {
     const iconSetting = new SettingItem(contentEl);
     iconSetting.setName("Icon");
     iconSetting.setDesc("Displayed in the context menu and command list.");
+    iconSetting.settingEl.addClass("lmsa-icon-picker-section");
 
-    const gridEl = iconSetting.controlEl.createDiv({ cls: "lmsa-icon-picker-grid" });
+    // Grid lives as a direct child of settingEl (not controlEl) so it can
+    // stretch to full width rather than being constrained by the flex control slot.
+    const gridEl = iconSetting.settingEl.createDiv({ cls: "lmsa-icon-picker-grid" });
     const cellEls: HTMLElement[] = [];
 
     const selectedIcon = this.command.icon ?? "wand";

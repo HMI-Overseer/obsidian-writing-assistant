@@ -4108,6 +4108,19 @@
     color: var(--lmsa-text-secondary);
     padding: 4px 0 2px;
 }
+/* ── Icon picker section (stacked layout so grid spans full width) ───── */
+.lmsa-icon-picker-section {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+.lmsa-icon-picker-section .lmsa-setting-item-info {
+    flex: 0 0 auto;
+    padding-right: 0;
+  }
+.lmsa-icon-picker-section .lmsa-setting-item-control:empty {
+    display: none;
+  }
 /* ── Icon picker grid ────────────────────────────────────────────────── */
 .lmsa-icon-picker-grid {
     display: grid;

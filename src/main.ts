@@ -1,4 +1,4 @@
-import type { WorkspaceLeaf } from "obsidian";
+import type { MenuItem, WorkspaceLeaf } from "obsidian";
 import { Notice, Plugin } from "obsidian";
 import type {
   ChatHistory,
@@ -21,6 +21,8 @@ import {
   VIEW_TYPE_CHAT,
 } from "./constants";
 import { ChatView } from "./chat";
+import { expandCommandTemplate, getAllCommands } from "./commands";
+import { getActiveNoteText } from "./context/noteContext";
 import { normalizeChatHistory } from "./chat/conversation/conversationUtils";
 import { normalizeCompletionModel, normalizeEmbeddingModel } from "./shared/normalizeModels";
 import { WritingAssistantSettingTab } from "./settings/SettingsTab";
@@ -186,6 +188,39 @@ export default class WritingAssistantChat extends Plugin {
         }
       },
     });
+
+    this.registerEvent(
+      this.app.workspace.on("editor-menu", (menu, editor) => {
+        const selection = editor.getSelection();
+        if (!selection) return;
+
+        const commands = getAllCommands(this.settings.commands);
+        if (commands.length === 0) return;
+
+        menu.addItem((item) => {
+          item.setTitle("Writing assistant").setIcon("message-square");
+          const submenu = (item as MenuItem & { setSubmenu: () => typeof menu }).setSubmenu();
+
+          for (const command of commands) {
+            submenu.addItem((sub) => {
+              sub.setTitle(command.name).setIcon("wand").onClick(async () => {
+                const noteText =
+                  (await getActiveNoteText(this.app, this.settings.maxContextChars)) ?? "";
+                const expanded = expandCommandTemplate(command.prompt, { selection, noteText });
+
+                await this.activateChatView();
+                setTimeout(async () => {
+                  const leaves = this.app.workspace.getLeavesOfType(VIEW_TYPE_CHAT);
+                  if (leaves.length > 0) {
+                    await (leaves[0].view as ChatView).sendCommand(expanded);
+                  }
+                }, 100);
+              });
+            });
+          }
+        });
+      })
+    );
 
     this.addSettingTab(new WritingAssistantSettingTab(this.app, this));
 

@@ -7,6 +7,8 @@ import type WritingAssistantChat from "../main";
 import { VIEW_TYPE_CHAT, makeDefaultProfile } from "../constants";
 import { getActiveProfile, getProfilesForProvider, generateProfileId } from "../shared/profileUtils";
 import { PROVIDER_DESCRIPTORS } from "../providers/descriptors";
+import { expandCommandTemplate } from "../commands";
+import { getAllCommands } from "../commands";
 import { getActiveNoteText } from "../context/noteContext";
 import { ChatBubbleActionHandler } from "./ChatBubbleActionHandler";
 import { ChatGenerationOrchestrator } from "./ChatGenerationOrchestrator";
@@ -135,14 +137,11 @@ export class ChatView extends ItemView {
         this.cachedDocumentContext = null;
         this.contextUpdater?.immediateUpdate(this.buildContextInputs());
       },
-      getCommands: () => this.plugin.settings.commands,
+      getCommands: () => getAllCommands(this.plugin.settings.commands),
       expandCommand: (command) => {
         const selection = this.app.workspace.activeEditor?.editor?.getSelection() ?? "";
         const noteText = this.cachedDocumentContext?.content ?? "";
-        return command.prompt
-          .replace(/\{\{selection\}\}/g, selection)
-          .replace(/\{\{note\}\}/g, noteText)
-          .trim();
+        return expandCommandTemplate(command.prompt, { selection, noteText });
       },
     });
 
@@ -395,6 +394,10 @@ export class ChatView extends ItemView {
     this.composer?.seedPrompt(text);
     this.sessionStore?.setDraft(text);
     this.sessionStore?.scheduleDraftSave();
+  }
+
+  async sendCommand(expandedPrompt: string): Promise<void> {
+    await this.orchestrator.send(expandedPrompt);
   }
 
   setMode(mode: ChatMode): void {

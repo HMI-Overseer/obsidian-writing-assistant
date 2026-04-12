@@ -3827,6 +3827,66 @@
 .lmsa-settings-model-selector.is-attention {
     animation: lmsa-settings-model-selector-attention 0.7s ease;
   }
+/* ── Support cards ─────────────────────────────────────────────────────── */
+.lmsa-support-grid {
+    display: grid;
+    gap: 0.75rem;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+}
+.lmsa-support-card {
+    position: relative;
+    display: flex;
+    cursor: pointer;
+    align-items: center;
+    gap: 0.75rem;
+    border-radius: 0.75rem;
+    border-width: 1px;
+    padding-left: 1rem;
+    padding-right: 1rem;
+    padding-top: 0.75rem;
+    padding-bottom: 0.75rem;
+    border-color: var(--lmsa-border-subtle);
+    background: var(--lmsa-surface-inset);
+    transition: border-color 200ms ease, box-shadow 200ms ease, background 200ms ease;
+}
+.lmsa-support-card:hover {
+    border-color: var(--lmsa-border-emphasis);
+    background: var(--lmsa-tint-5);
+    box-shadow: 0 4px 16px var(--lmsa-shadow-subtle);
+  }
+.lmsa-support-card-icon {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    background: linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--lmsa-section-accent) 20%, var(--background-secondary)),
+      color-mix(in srgb, var(--lmsa-section-accent-secondary) 15%, var(--background-secondary))
+    );
+    color: var(--lmsa-section-accent);
+}
+.lmsa-support-card-icon svg {
+    width: 18px;
+    height: 18px;
+  }
+.lmsa-support-card-text {
+    display: flex;
+    min-width: 0px;
+    flex-direction: column;
+}
+.lmsa-support-card-name {
+    font-weight: 600;
+    color: var(--lmsa-text-primary);
+    font-size: var(--font-ui-small);
+}
+.lmsa-support-card-desc {
+    color: var(--lmsa-text-faint);
+    font-size: var(--font-ui-smaller);
+  }
 /* ── Responsive ────────────────────────────────────────────────────────── */
 @media (max-width: 700px) {
     .lmsa-settings-panel-header {
@@ -4863,6 +4923,9 @@
 }
 .lmsa-inline-flex {
     display: inline-flex;
+}
+.lmsa-grid {
+    display: grid;
 }
 .lmsa-hidden {
     display: none;

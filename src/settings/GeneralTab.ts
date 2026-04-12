@@ -1,3 +1,4 @@
+import { setIcon } from "obsidian";
 import type WritingAssistantChat from "../main";
 import { ApiKeysModal, ApiKeysDisclaimerModal } from "./modals";
 import { createSettingsSection, SettingItem } from "./ui";
@@ -52,4 +53,24 @@ export function renderGeneralTab(container: HTMLElement, plugin: WritingAssistan
         await plugin.saveSettings();
       })
     );
+
+  // ── Support ─────────────────────────────────────────────────────────
+  const support = createSettingsSection(
+    container,
+    "Support",
+    "This plugin and all of its features are, and will always be, free. If it helped you get closer to achieving your creative goals, you can support this project in the following ways.",
+    { icon: "heart" }
+  );
+
+  const grid = support.bodyEl.createDiv({ cls: "lmsa-support-grid" });
+
+  const card = grid.createDiv({ cls: "lmsa-support-card" });
+  card.addEventListener("click", () => window.open("https://buymeacoffee.com/resolvepublic"));
+
+  const iconEl = card.createDiv({ cls: "lmsa-support-card-icon" });
+  setIcon(iconEl, "coffee");
+
+  const textEl = card.createDiv({ cls: "lmsa-support-card-text" });
+  textEl.createDiv({ cls: "lmsa-support-card-name", text: "Buy Me a Coffee" });
+  textEl.createDiv({ cls: "lmsa-support-card-desc", text: "One-time support" });
 }

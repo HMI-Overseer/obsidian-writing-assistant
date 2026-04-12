@@ -144,6 +144,16 @@ The plugin reads files in your vault to provide note context, RAG retrieval, and
 
 ---
 
+## Support
+
+This plugin and all of its features are, and will always be, free. If it helped you get closer to achieving your creative goals, you can support this project in the following ways:
+
+- [Buy Me a Coffee](https://buymeacoffee.com/resolvepublic)
+
+You can also find these links in **Settings > Writing Assistant Chat > General**.
+
+---
+
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for setup instructions, project structure, coding standards, and the development workflow.

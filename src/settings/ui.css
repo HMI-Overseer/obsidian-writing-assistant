@@ -462,6 +462,59 @@
     animation: lmsa-settings-model-selector-attention 0.7s ease;
   }
 
+  /* ── Support cards ─────────────────────────────────────────────────────── */
+
+  .lmsa-support-grid {
+    @apply lmsa-grid lmsa-gap-3;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  }
+
+  .lmsa-support-card {
+    @apply lmsa-relative lmsa-flex lmsa-cursor-pointer lmsa-items-center lmsa-gap-3 lmsa-rounded-xl lmsa-border lmsa-px-4 lmsa-py-3;
+    border-color: var(--lmsa-border-subtle);
+    background: var(--lmsa-surface-inset);
+    transition: border-color 200ms ease, box-shadow 200ms ease, background 200ms ease;
+  }
+
+  .lmsa-support-card:hover {
+    border-color: var(--lmsa-border-emphasis);
+    background: var(--lmsa-tint-5);
+    box-shadow: 0 4px 16px var(--lmsa-shadow-subtle);
+  }
+
+  .lmsa-support-card-icon {
+    @apply lmsa-inline-flex lmsa-flex-none lmsa-items-center lmsa-justify-center;
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    background: linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--lmsa-section-accent) 20%, var(--background-secondary)),
+      color-mix(in srgb, var(--lmsa-section-accent-secondary) 15%, var(--background-secondary))
+    );
+    color: var(--lmsa-section-accent);
+  }
+
+  .lmsa-support-card-icon svg {
+    width: 18px;
+    height: 18px;
+  }
+
+  .lmsa-support-card-text {
+    @apply lmsa-flex lmsa-min-w-0 lmsa-flex-col;
+  }
+
+  .lmsa-support-card-name {
+    @apply lmsa-font-semibold;
+    color: var(--lmsa-text-primary);
+    font-size: var(--font-ui-small);
+  }
+
+  .lmsa-support-card-desc {
+    color: var(--lmsa-text-faint);
+    font-size: var(--font-ui-smaller);
+  }
+
   /* ── Responsive ────────────────────────────────────────────────────────── */
 
   @media (max-width: 700px) {

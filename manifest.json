@@ -6,5 +6,6 @@
   "description": "AI writing assistant with chat, plan, and edit modes. Connects to local or cloud providers. Features vault-wide RAG retrieval, knowledge graph, agentic tool use, note context, and reusable prompt commands.",
   "author": "Resolve-public",
   "authorUrl": "https://github.com/Resolve-public",
-  "isDesktopOnly": true
+  "isDesktopOnly": true,
+  "fundingUrl": "https://buymeacoffee.com/resolvepublic"
 }

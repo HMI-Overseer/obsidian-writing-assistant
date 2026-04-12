@@ -43,10 +43,14 @@ export function renderRagTab(
     );
 
   // ── Embedding Model ───────────────────────────────────────────────
+  const embeddingItem = new SettingItem(general.bodyEl)
+    .setName("Embedding model")
+    .setDesc("Encodes vault content as vectors for similarity search.");
+
   const models = plugin.settings.embeddingModels;
   const currentModel = models.find((m) => m.id === rag.activeEmbeddingModelId) ?? null;
 
-  const modelSelector = createModelSelector(general.bodyEl, models, {
+  const modelSelector = createModelSelector(embeddingItem.settingEl, models, {
     getAvailability: (modelId, provider) =>
       plugin.services.modelAvailability.getAvailability(modelId, provider).state,
     refreshLocalModels: async () => {

@@ -3,7 +3,7 @@ import type WritingAssistantChat from "../main";
 import type { CompletionModel, ProviderProfile } from "../shared/types";
 import { getProviderDescriptor, createChatClient } from "../providers/registry";
 import { PROVIDER_DESCRIPTORS } from "../providers/descriptors";
-import { createSettingsSection, createModelSelector } from "./ui";
+import { createSettingsSection, createModelSelector, SettingItem } from "./ui";
 import { getTestSuites } from "./benchmark/testSuites";
 import { runBenchmarkTest, runAllBenchmarks } from "./benchmark/benchmarkRunner";
 import type { BenchmarkTestCase, BenchmarkTestSuite, BenchmarkRunResult } from "./benchmark/types";
@@ -44,7 +44,7 @@ export function renderBenchmarkTab(
   const modelSection = createSettingsSection(
     container,
     "Model Selection",
-    "Choose a completion model to run benchmarks against. The model must be loaded in LM Studio.",
+    "Choose a completion model to run benchmarks against. The model must be loaded.",
     { icon: "target" }
   );
 
@@ -56,7 +56,11 @@ export function renderBenchmarkTab(
     return () => {};
   }
 
-  const selector = createModelSelector(modelSection.bodyEl, models, {
+  const modelItem = new SettingItem(modelSection.bodyEl)
+    .setName("Completion model")
+    .setDesc("The model used to run benchmark tests.");
+
+  const selector = createModelSelector(modelItem.settingEl, models, {
     getAvailability: (modelId, provider) =>
       plugin.services.modelAvailability.getAvailability(modelId, provider).state,
     refreshLocalModels: async () => {

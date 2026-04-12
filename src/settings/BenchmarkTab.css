@@ -9,7 +9,7 @@
   }
 
   .lmsa-benchmark-model-wrap {
-    @apply lmsa-flex lmsa-justify-end;
+    @apply lmsa-flex lmsa-justify-start;
   }
 
   .lmsa-benchmark-model-selector {
@@ -19,9 +19,9 @@
   }
 
   .lmsa-benchmark-model-wrap .lmsa-model-dropdown {
-    left: auto;
-    right: 0;
-    transform-origin: top right;
+    left: 0;
+    right: auto;
+    transform-origin: top left;
   }
 
   /* ------- Setting row ------- */

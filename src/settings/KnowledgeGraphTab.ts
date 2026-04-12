@@ -1,4 +1,3 @@
-import { Setting } from "obsidian";
 import type WritingAssistantChat from "../main";
 import type { GraphBuildState } from "../rag/graph";
 import type { ModelAvailabilityState } from "../shared/types";
@@ -42,13 +41,15 @@ export function renderKnowledgeGraphTab(
       }),
     );
 
-  // ── Extraction model ──────────────────────────────────────────────
-  new Setting(general.bodyEl).setHeading().setName("Extraction");
+  // ── Completion model ──────────────────────────────────────────────
+  const completionItem = new SettingItem(general.bodyEl)
+    .setName("Completion model")
+    .setDesc("Generates structured entity and relationship data from your notes.");
 
   const models = plugin.settings.completionModels;
   const currentModel = models.find((m) => m.id === kg.activeCompletionModelId) ?? null;
 
-  const modelSelector = createModelSelector(general.bodyEl, models, {
+  const modelSelector = createModelSelector(completionItem.settingEl, models, {
     getAvailability: (modelId, provider) =>
       plugin.services.modelAvailability.getAvailability(modelId, provider).state,
     refreshLocalModels: async () => {
@@ -75,12 +76,14 @@ export function renderKnowledgeGraphTab(
   });
 
   // ── Embedding model ───────────────────────────────────────────────
-  new Setting(general.bodyEl).setHeading().setName("Embeddings");
+  const embeddingItem = new SettingItem(general.bodyEl)
+    .setName("Embedding model")
+    .setDesc("Encodes extracted entities as vectors for similarity search.");
 
   const embModels = plugin.settings.embeddingModels;
   const currentEmbModel = embModels.find((m) => m.id === kg.activeEmbeddingModelId) ?? null;
 
-  const embModelSelector = createModelSelector(general.bodyEl, embModels, {
+  const embModelSelector = createModelSelector(embeddingItem.settingEl, embModels, {
     getAvailability: (modelId, provider) =>
       plugin.services.modelAvailability.getAvailability(modelId, provider).state,
     refreshLocalModels: async () => {

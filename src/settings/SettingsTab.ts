@@ -54,12 +54,12 @@ const TAB_META: Record<TabName, TabMeta> = {
     description: "Configure how the plugin talks to LLM providers and how much note context is sent with each request.",
   },
   "Completion Models": {
-    title: "Completion Model Library",
-    description: "Build reusable chat profiles with their own prompts, token budgets, and temperatures.",
+    title: "Completion Model Profiles",
+    description: "Language models that generate text responses in chat.",
   },
   "Embedding Models": {
-    title: "Embedding Models",
-    description: "Prepare model profiles for semantic search and future retrieval workflows inside the plugin.",
+    title: "Embedding Model Profiles",
+    description: "Models that encode text as vectors for semantic search and retrieval.",
   },
   "Retrieval": {
     title: "Retrieval (RAG)",
@@ -78,8 +78,8 @@ const TAB_META: Record<TabName, TabMeta> = {
     description: "Fine tune context sizing and a few maintenance utilities for local-first workflows.",
   },
   "Benchmark": {
-    title: "Edit Outcome Benchmark",
-    description: "Test whether models correctly interpret edit outcome annotations using real LM Studio completions.",
+    title: "Benchmark Models",
+    description: "Run structured tests to measure response quality and consistency for using plugin built-in functionality.",
   },
 };
 

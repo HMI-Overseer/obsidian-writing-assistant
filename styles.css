@@ -3530,6 +3530,7 @@
     position: relative;
     margin: 0px;
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     gap: 1rem;
     padding-left: 0px;
@@ -3577,6 +3578,9 @@
     align-items: center;
     gap: 0.5rem;
 }
+.lmsa-setting-item > .lmsa-settings-model-selector-wrap {
+    flex-basis: 100%;
+  }
 .lmsa-modal .lmsa-setting-item {
     padding-left: 0px;
     padding-right: 0px;
@@ -4159,7 +4163,7 @@
   }
 .lmsa-benchmark-model-wrap {
     display: flex;
-    justify-content: flex-end;
+    justify-content: flex-start;
 }
 .lmsa-benchmark-model-selector {
     margin: 0;
@@ -4167,9 +4171,9 @@
     font-size: var(--font-ui-small);
   }
 .lmsa-benchmark-model-wrap .lmsa-model-dropdown {
-    left: auto;
-    right: 0;
-    transform-origin: top right;
+    left: 0;
+    right: auto;
+    transform-origin: top left;
   }
 /* ------- Setting row ------- */
 .lmsa-benchmark-setting-row {

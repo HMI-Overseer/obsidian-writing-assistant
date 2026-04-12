@@ -151,7 +151,7 @@
   /* ── Setting item ──────────────────────────────────────────────────────── */
 
   .lmsa-setting-item {
-    @apply lmsa-relative lmsa-m-0 lmsa-flex lmsa-items-center lmsa-gap-4 lmsa-px-0 lmsa-py-4;
+    @apply lmsa-relative lmsa-m-0 lmsa-flex lmsa-flex-wrap lmsa-items-center lmsa-gap-4 lmsa-px-0 lmsa-py-4;
   }
 
   /* Gradient separator line between setting items */
@@ -190,6 +190,10 @@
 
   .lmsa-setting-item-control {
     @apply lmsa-flex lmsa-flex-shrink-0 lmsa-items-center lmsa-gap-2;
+  }
+
+  .lmsa-setting-item > .lmsa-settings-model-selector-wrap {
+    flex-basis: 100%;
   }
 
   .lmsa-modal .lmsa-setting-item {

@@ -82,6 +82,7 @@ export class ChatView extends ItemView {
       getContextUpdater: () => this.contextUpdater,
       getLayout: () => this.layout,
       syncConversationUi: () => this.syncConversationUi(),
+      postGenerationSync: () => this.postGenerationSync(),
     });
 
     this.conversation = new ChatConversationController({
@@ -404,6 +405,11 @@ export class ChatView extends ItemView {
     this.composer?.setMode(mode);
   }
 
+  /**
+   * Full conversation sync — re-renders messages from store state and updates
+   * all UI chrome. Used for conversation switches, message deletion, branching,
+   * and other structural changes to the message list.
+   */
   private async syncConversationUi(): Promise<void> {
     if (!this.sessionStore || !this.transcript || !this.composer) return;
 
@@ -411,7 +417,6 @@ export class ChatView extends ItemView {
     const isConversationSwitch = snapshot.activeConversationId !== this.lastRenderedConversationId;
     this.lastRenderedConversationId = snapshot.activeConversationId;
 
-    this.composer.setDraft(snapshot.draft);
     await this.transcript.renderMessages(
       snapshot.messageHistory,
       this.bubbleActions.createCallbacks(),
@@ -435,6 +440,37 @@ export class ChatView extends ItemView {
       }
     }
 
+    await this.syncUiChrome();
+  }
+
+  /**
+   * Lightweight post-generation sync — adopts bubbles that were created
+   * imperatively during the send/generate flow (attaching action toolbars)
+   * and updates UI chrome, WITHOUT re-rendering messages from scratch.
+   */
+  private async postGenerationSync(): Promise<void> {
+    if (!this.sessionStore || !this.transcript) return;
+
+    const snapshot = this.sessionStore.getSnapshot();
+
+    this.transcript.adoptPendingBubbles(
+      snapshot.messageHistory,
+      this.bubbleActions.createCallbacks(),
+    );
+
+    await this.syncUiChrome();
+  }
+
+  /**
+   * Update all non-message UI elements: empty state, header, composer
+   * indicators, model selector, history drawer, and context capacity.
+   */
+  private async syncUiChrome(): Promise<void> {
+    if (!this.sessionStore || !this.transcript || !this.composer) return;
+
+    const snapshot = this.sessionStore.getSnapshot();
+
+    this.composer.setDraft(snapshot.draft);
     this.transcript.setEmptyStateVisible(
       snapshot.messageHistory.length === 0 && !this.orchestrator.getIsGenerating()
     );

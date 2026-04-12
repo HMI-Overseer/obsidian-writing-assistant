@@ -44,7 +44,6 @@ export interface LlmGenerationOptions {
   finalization: FinalizationMode;
   setIsGenerating: (v: boolean) => void;
   setActiveAbortController: (c: AbortController | null) => void;
-  syncConversationUi: () => Promise<void>;
   onCalibrate?: (estimated: number, actual: number) => void;
 }
 
@@ -88,7 +87,6 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
     finalization,
     setIsGenerating,
     setActiveAbortController,
-    syncConversationUi,
     onCalibrate,
   } = options;
 
@@ -253,7 +251,7 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
           rewrittenQuery,
           ...(agenticSteps?.length && { agenticSteps }),
         });
-        transcript.trackManualBubble(finalization.oldMessage.id, assistantBubble);
+        transcript.registerBubble(finalization.oldMessage.id, assistantBubble);
       } else {
         transcript.renderPlainTextContent(assistantBubble, "(no response)");
       }
@@ -300,7 +298,7 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
             provider: activeModel.provider,
             ...(partialSteps?.length && { agenticSteps: partialSteps }),
           });
-          transcript.trackManualBubble(finalization.oldMessage.id, assistantBubble);
+          transcript.registerBubble(finalization.oldMessage.id, assistantBubble);
         } else {
           transcript.renderPlainTextContent(assistantBubble, "Generation stopped.");
           assistantBubble.bodyEl.addClass("is-muted");
@@ -328,7 +326,7 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
       errorMessage.modelId = activeModel.modelId;
       errorMessage.provider = activeModel.provider;
       store.appendMessage(errorMessage);
-      transcript.trackManualBubble(errorMessage.id, assistantBubble);
+      transcript.registerBubble(errorMessage.id, assistantBubble);
       assistantBubble.bodyEl.addClass("is-error");
       transcript.renderPlainTextContent(assistantBubble, errorText);
     }
@@ -337,6 +335,5 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
     await store.persistActiveConversation();
     setIsGenerating(false);
     renderer.destroy();
-    await syncConversationUi();
   }
 }

@@ -112,7 +112,7 @@ export async function finalizeEditResponse(options: FinalizeEditOptions): Promis
   attachUsageToMessage(assistantMessage, modelId, provider, usage);
   store.appendMessage(assistantMessage);
   store.setLastAssistantResponse(fullResponse);
-  transcript.trackManualBubble(assistantMessage.id, bubble);
+  transcript.registerBubble(assistantMessage.id, bubble);
 
   // Render the DiffReviewPanel in the bubble.
   renderDiffPanel(app, owner, store, bubble, proposal);
@@ -177,6 +177,6 @@ async function renderAsNormalMessage(
   if (agenticSteps?.length) assistantMessage.agenticSteps = agenticSteps;
   store.appendMessage(assistantMessage);
   store.setLastAssistantResponse(fullResponse);
-  transcript.trackManualBubble(assistantMessage.id, bubble);
+  transcript.registerBubble(assistantMessage.id, bubble);
   await transcript.renderBubbleContent(bubble, fullResponse);
 }

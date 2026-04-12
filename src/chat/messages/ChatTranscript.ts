@@ -76,26 +76,18 @@ export class ChatTranscript {
 
     for (let i = startIndex; i < messages.length; i++) {
       const message = messages[i];
+      const bubble = this.createBubble(message.role, message.id);
 
-      // Reuse a manually-created bubble (from the send flow) if one exists,
-      // otherwise create a new one. Content is only rendered for new bubbles.
-      const existing = this.bubblesByMessageId.get(message.id);
-      const bubble = existing ?? this.createBubble(message.role, message.id);
-
-      if (!existing) {
-        if (message.role === "assistant" && message.agenticSteps?.length) {
-          AgenticTimeline.render(bubble.timelineEl, message.agenticSteps);
-        }
-
-        if (message.isError) {
-          bubble.bodyEl.addClass("is-error");
-          this.renderPlainTextContent(bubble, message.content);
-        } else {
-          await this.renderBubbleContent(bubble, message.content);
-        }
+      if (message.role === "assistant" && message.agenticSteps?.length) {
+        AgenticTimeline.render(bubble.timelineEl, message.agenticSteps);
       }
 
-      this.bubblesByMessageId.set(message.id, bubble);
+      if (message.isError) {
+        bubble.bodyEl.addClass("is-error");
+        this.renderPlainTextContent(bubble, message.content);
+      } else {
+        await this.renderBubbleContent(bubble, message.content);
+      }
 
       if (actionCallbacks) {
         const isLastAssistant = i === lastAssistantIndex;
@@ -129,8 +121,6 @@ export class ChatTranscript {
         await this.renderBubbleContent(bubble, message.content);
       }
 
-      this.bubblesByMessageId.set(message.id, bubble);
-
       if (actionCallbacks) {
         const isLastAssistant = i === lastAssistantIndex;
         this.attachBubbleActions(bubble, message, isLastAssistant, actionCallbacks);
@@ -143,15 +133,41 @@ export class ChatTranscript {
   }
 
   /**
-   * Register a bubble that was created outside of `renderMessages` (e.g. during
-   * the send flow) so that `incrementalRender` can reuse it instead of creating
-   * a duplicate DOM element. Only registers in `bubblesByMessageId` — the ID is
-   * NOT added to `renderedMessageIds` so that the incremental loop still visits
-   * the message and attaches action toolbars.
+   * Register a bubble that was created outside of `renderMessages` (e.g. by
+   * finalization after the assistant message ID is known). Sets the data
+   * attribute and adds to the lookup map for later adoption.
    */
-  trackManualBubble(messageId: string, bubble: BubbleRefs): void {
+  registerBubble(messageId: string, bubble: BubbleRefs): void {
     bubble.rowEl.dataset.messageId = messageId;
     this.bubblesByMessageId.set(messageId, bubble);
+  }
+
+  /**
+   * Adopt bubbles that were created imperatively during the send/generate flow.
+   * For each message whose bubble exists in `bubblesByMessageId` but is not yet
+   * in `renderedMessageIds`, attach action toolbars. Then update tracking so
+   * that subsequent `renderMessages` calls see the full picture.
+   */
+  adoptPendingBubbles(
+    messages: ConversationMessage[],
+    actionCallbacks: BubbleActionCallbacks,
+  ): void {
+    const renderedSet = new Set(this.renderedMessageIds);
+    const lastAssistantIndex = this.findLastAssistantIndex(messages);
+
+    for (let i = 0; i < messages.length; i++) {
+      const message = messages[i];
+      if (renderedSet.has(message.id)) continue;
+
+      const bubble = this.bubblesByMessageId.get(message.id);
+      if (!bubble) continue;
+
+      const isLastAssistant = i === lastAssistantIndex;
+      this.attachBubbleActions(bubble, message, isLastAssistant, actionCallbacks);
+    }
+
+    this.renderedMessageIds = messages.map((m) => m.id);
+    this.scrollToBottom();
   }
 
   async updateBubbleVersion(
@@ -218,8 +234,14 @@ export class ChatTranscript {
     const bodyEl = columnEl.createDiv({ cls: "lmsa-chat-window-message-body lmsa-ui-card" });
     const contentEl = bodyEl.createDiv({ cls: "lmsa-chat-window-message-content" });
 
+    const refs: BubbleRefs = { role, rowEl, columnEl, chromeEl, timelineEl, bodyEl, contentEl };
+
+    if (messageId) {
+      this.bubblesByMessageId.set(messageId, refs);
+    }
+
     this.scrollToBottom();
-    return { role, rowEl, columnEl, chromeEl, timelineEl, bodyEl, contentEl };
+    return refs;
   }
 
   setEmptyStateVisible(isVisible: boolean): void {

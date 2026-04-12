@@ -84,7 +84,6 @@ export async function regenerateMessage(options: RegenerateOptions): Promise<voi
     finalization: { kind: "replace", oldMessage },
     setIsGenerating,
     setActiveAbortController,
-    syncConversationUi,
     onCalibrate,
   });
 }

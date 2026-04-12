@@ -23,6 +23,7 @@ export type GenerationOrchestratorDeps = {
   getContextUpdater: () => ContextCapacityUpdater | null;
   getLayout: () => ChatLayoutRefs | null;
   syncConversationUi: () => Promise<void>;
+  postGenerationSync: () => Promise<void>;
 };
 
 export class ChatGenerationOrchestrator {
@@ -81,6 +82,7 @@ export class ChatGenerationOrchestrator {
       autoInsertAfterResponse,
       editMode: useEditMode,
     });
+    await this.deps.postGenerationSync();
   }
 
   async regenerate(messageId: string): Promise<void> {
@@ -106,6 +108,7 @@ export class ChatGenerationOrchestrator {
       syncConversationUi: () => this.deps.syncConversationUi(),
       onCalibrate: (est, actual) => this.deps.getContextUpdater()?.calibrate(est, actual),
     });
+    await this.deps.postGenerationSync();
   }
 
   async generateResponse(): Promise<void> {
@@ -172,9 +175,9 @@ export class ChatGenerationOrchestrator {
       setActiveAbortController: (c) => {
         this.activeAbortController = c;
       },
-      syncConversationUi: () => this.deps.syncConversationUi(),
       onCalibrate: (est, actual) => this.deps.getContextUpdater()?.calibrate(est, actual),
     });
+    await this.deps.postGenerationSync();
   }
 
   private setIsGeneratingAndSync(generating: boolean): void {

@@ -84,7 +84,6 @@ export async function sendMessage(options: SendMessageOptions): Promise<void> {
   const userMessage = makeMessage("user", text);
   const userBubble = transcript.createBubble("user", userMessage.id);
   await transcript.renderBubbleContent(userBubble, text);
-  transcript.trackManualBubble(userMessage.id, userBubble);
   store.appendMessage(userMessage);
   transcript.setEmptyStateVisible(false);
 
@@ -102,7 +101,6 @@ export async function sendMessage(options: SendMessageOptions): Promise<void> {
     finalization: { kind: "append", autoInsert: autoInsertAfterResponse },
     setIsGenerating,
     setActiveAbortController,
-    syncConversationUi,
     onCalibrate,
   });
 }

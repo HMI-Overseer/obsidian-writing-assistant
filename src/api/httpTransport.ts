@@ -55,7 +55,8 @@ export function nodeRequest(
       res.on("data", (chunk: Buffer) => (data += chunk.toString()));
       res.on("end", () => {
         if (res.statusCode && res.statusCode >= 400) {
-          reject(new Error(`HTTP ${res.statusCode}: ${data}`));
+          const truncated = data.length > 200 ? data.slice(0, 200) + "…" : data;
+          reject(new Error(`HTTP ${res.statusCode}: ${truncated}`));
           return;
         }
         resolve(data);
@@ -114,7 +115,8 @@ export function nodeRequestWithHeaders(
       res.on("data", (chunk: Buffer) => (data += chunk.toString()));
       res.on("end", () => {
         if (res.statusCode && res.statusCode >= 400) {
-          reject(new Error(`HTTP ${res.statusCode}: ${data}`));
+          const truncated = data.length > 200 ? data.slice(0, 200) + "…" : data;
+          reject(new Error(`HTTP ${res.statusCode}: ${truncated}`));
           return;
         }
         const responseHeaders: Record<string, string> = {};
@@ -153,6 +155,7 @@ export async function fetchRequest(
     headers: { "Content-Type": "application/json", ...headers },
     ...(body ? { body } : {}),
     signal,
+    redirect: "error",
   });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return res.text();

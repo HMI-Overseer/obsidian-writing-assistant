@@ -183,6 +183,7 @@ export async function* streamFetch(
     headers: { "Content-Type": "application/json", ...headers },
     body,
     signal,
+    redirect: "error",
   });
   if (!res.ok) {
     const errorBody = await res.text().catch(() => "");

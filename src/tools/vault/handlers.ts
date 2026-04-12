@@ -102,11 +102,12 @@ async function executeReadFile(
   args: Record<string, unknown>,
   ctx: VaultToolContext,
 ): Promise<ToolResult> {
-  const path = typeof args.path === "string" ? args.path.trim() : "";
-  if (!path) {
+  const rawPath = typeof args.path === "string" ? args.path.trim() : "";
+  if (!rawPath) {
     return { content: "Error: path is required.", isReadOnly: true, isError: true };
   }
 
+  const path = normalizePath(rawPath);
   const file = ctx.app.vault.getFileByPath(path);
   if (!file) {
     return {
@@ -219,6 +220,7 @@ async function executeSearchFiles(
   }
 
   const rawPath = typeof args.path === "string" ? args.path.trim() : "";
+  const scopePath = rawPath ? normalizePath(rawPath) : "";
   const excludePatterns = Array.isArray(args.excludePatterns)
     ? (args.excludePatterns as unknown[]).filter((p): p is string => typeof p === "string")
     : [];
@@ -228,7 +230,7 @@ async function executeSearchFiles(
 
   const matches: string[] = [];
   for (const file of ctx.app.vault.getMarkdownFiles()) {
-    if (rawPath && !file.path.startsWith(rawPath + "/") && file.path !== rawPath) {
+    if (scopePath && !file.path.startsWith(scopePath + "/") && file.path !== scopePath) {
       continue;
     }
     if (!patternRegex.test(file.name)) continue;
@@ -263,11 +265,12 @@ async function executeGetBacklinks(
   args: Record<string, unknown>,
   ctx: VaultToolContext,
 ): Promise<ToolResult> {
-  const path = typeof args.path === "string" ? args.path.trim() : "";
-  if (!path) {
+  const rawPath = typeof args.path === "string" ? args.path.trim() : "";
+  if (!rawPath) {
     return { content: "Error: path is required.", isReadOnly: true, isError: true };
   }
 
+  const path = normalizePath(rawPath);
   const file = ctx.app.vault.getFileByPath(path);
   if (!file) {
     return {
@@ -357,7 +360,7 @@ async function executeGetFrontmatter(
   const results: Record<string, unknown> = {};
   for (const rawPath of paths) {
     if (typeof rawPath !== "string") continue;
-    const p = rawPath.trim();
+    const p = normalizePath(rawPath.trim());
     const file = ctx.app.vault.getFileByPath(p);
     if (!file) {
       results[p] = { error: `No note found at "${p}".` };

@@ -190,7 +190,7 @@ async function resolveUpdateFrontmatter(
     if (setOps.length === 0) return block;
 
     const newInner = setOps.map((op) =>
-      op.value ? `${op.key}: ${op.value}` : `${op.key}:`
+      op.value ? `${op.key}: ${yamlSafeValue(op.value)}` : `${op.key}:`
     );
     const fmBlock = "---\n" + newInner.join("\n") + "\n---";
 
@@ -212,6 +212,18 @@ async function resolveUpdateFrontmatter(
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
+
+/**
+ * Wrap a YAML value in double quotes and escape inner characters when the
+ * value contains characters that could alter YAML structure (colons,
+ * newlines, comment markers, etc.).  Plain safe scalars are returned as-is.
+ */
+function yamlSafeValue(value: string): string {
+  if (/[\n\r:#{}[\],&*?|>!'"%@`]/.test(value) || value !== value.trim()) {
+    return `"${value.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\n/g, "\\n").replace(/\r/g, "\\r")}"`;
+  }
+  return value;
+}
 
 /**
  * Apply frontmatter operations to raw YAML lines, preserving complex
@@ -272,7 +284,7 @@ function applyFrontmatterOperations(
       result.splice(start, end - start);
     } else if (op.action === "set") {
       // Replace the entire key block with a simple key: value line.
-      const newLine = op.value ? `${key}: ${op.value}` : `${key}:`;
+      const newLine = op.value ? `${key}: ${yamlSafeValue(op.value)}` : `${key}:`;
       result.splice(start, end - start, newLine);
     }
   }
@@ -280,7 +292,7 @@ function applyFrontmatterOperations(
   // Append any "set" operations for keys not already in the frontmatter.
   for (const op of operations) {
     if (op.action === "set" && !keysProcessed.has(op.key)) {
-      const newLine = op.value ? `${op.key}: ${op.value}` : `${op.key}:`;
+      const newLine = op.value ? `${op.key}: ${yamlSafeValue(op.value)}` : `${op.key}:`;
       result.push(newLine);
     }
   }

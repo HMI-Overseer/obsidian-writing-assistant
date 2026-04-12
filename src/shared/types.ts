@@ -66,7 +66,6 @@ export interface CustomCommand {
   id: string;
   name: string;
   prompt: string;
-  autoInsert: boolean;
 }
 
 export interface MessageUsage {

@@ -218,7 +218,6 @@ export default class WritingAssistantChat extends Plugin {
           id: command?.id || `command-${index + 1}`,
           name: command?.name || `Command ${index + 1}`,
           prompt: command?.prompt ?? "",
-          autoInsert: Boolean(command?.autoInsert),
         }))
       : [];
 

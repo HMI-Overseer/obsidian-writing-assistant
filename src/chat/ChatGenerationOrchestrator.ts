@@ -1,8 +1,7 @@
 import type { Component } from "obsidian";
 import { Notice } from "obsidian";
-import type { ConversationMessage, CustomCommand } from "../shared/types";
+import type { ConversationMessage } from "../shared/types";
 import type WritingAssistantChat from "../main";
-import { getActiveNoteText } from "../context/noteContext";
 import { createChatClient } from "../providers/registry";
 import type { ChatComposer } from "./composer/ChatComposer";
 import type { ChatSessionStore } from "./conversation/ChatSessionStore";
@@ -176,24 +175,6 @@ export class ChatGenerationOrchestrator {
       syncConversationUi: () => this.deps.syncConversationUi(),
       onCalibrate: (est, actual) => this.deps.getContextUpdater()?.calibrate(est, actual),
     });
-  }
-
-  async runCommand(command: CustomCommand): Promise<void> {
-    const { plugin } = this.deps;
-    const selection = plugin.app.workspace.activeEditor?.editor?.getSelection() ?? "";
-    const noteText =
-      (await getActiveNoteText(plugin.app, plugin.settings.maxContextChars)) ?? "";
-    const prompt = command.prompt
-      .replace(/\{\{selection\}\}/g, selection)
-      .replace(/\{\{note\}\}/g, noteText)
-      .trim();
-
-    if (!prompt) {
-      new Notice("This command produced an empty prompt.");
-      return;
-    }
-
-    await this.send(prompt, command.autoInsert);
   }
 
   private setIsGeneratingAndSync(generating: boolean): void {

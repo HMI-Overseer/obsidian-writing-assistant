@@ -116,9 +116,6 @@ export class ChatView extends ItemView {
       onStopRequest: () => {
         this.orchestrator.stopGeneration();
       },
-      onRunCommand: (command) => {
-        void this.orchestrator.runCommand(command);
-      },
       onModeChange: (mode) => {
         if (this.layout) {
           this.layout.rootEl.dataset.mode = mode;
@@ -137,6 +134,15 @@ export class ChatView extends ItemView {
       onContextToggle: () => {
         this.cachedDocumentContext = null;
         this.contextUpdater?.immediateUpdate(this.buildContextInputs());
+      },
+      getCommands: () => this.plugin.settings.commands,
+      expandCommand: (command) => {
+        const selection = this.app.workspace.activeEditor?.editor?.getSelection() ?? "";
+        const noteText = this.cachedDocumentContext?.content ?? "";
+        return command.prompt
+          .replace(/\{\{selection\}\}/g, selection)
+          .replace(/\{\{note\}\}/g, noteText)
+          .trim();
       },
     });
 
@@ -348,7 +354,6 @@ export class ChatView extends ItemView {
       this.app.workspace.on("active-leaf-change", () => {
         this.updateHeader();
         this.composer?.updateContextChips();
-        this.composer?.renderCommandBar();
         void this.refreshDocumentContext().then(() => {
           this.contextUpdater?.scheduleUpdate(this.buildContextInputs());
         });
@@ -361,7 +366,6 @@ export class ChatView extends ItemView {
 
     await this.sessionStore.restorePersistedState();
     await this.syncConversationUi();
-    this.composer.renderCommandBar();
     await this.modelSelector.refreshAvailability();
     this.refreshComposerIndicators();
 
@@ -444,7 +448,6 @@ export class ChatView extends ItemView {
     this.composer.refreshVisionIndicator(
       this.sessionStore.getResolvedConversationModel()
     );
-    this.composer.renderCommandBar();
     this.modelSelector?.syncActiveModel();
 
     this.profilePopover?.syncVisibility();
@@ -492,6 +495,7 @@ export class ChatView extends ItemView {
     if (this.knowledgePopover?.isOpen()) this.knowledgePopover.close();
     if (this.toolUsePopover?.isOpen()) this.toolUsePopover.close();
     if (!options?.keepHistory && this.historyDrawer?.isOpen()) this.historyDrawer.close();
+    this.composer?.closeSlashSuggester();
   }
 
   private handleWidthChange(width: number): void {

@@ -12,30 +12,48 @@
     }
   }
 
-  /* ── Command bar ─────────────────────────────────────────────────────────── */
+  /* ── Slash-command dropdown ───────────────────────────────────────────────── */
 
-  .lmsa-chat-composer-command-bar {
-    @apply lmsa-relative lmsa-z-[1] lmsa-flex lmsa-flex-col lmsa-gap-2;
+  .lmsa-slash-dropdown {
+    @apply lmsa-absolute lmsa-z-[120] lmsa-overflow-y-auto lmsa-rounded-xl lmsa-border lmsa-border-obsidian-border lmsa-p-1.5;
+    bottom: calc(100% + 4px);
+    left: 0;
+    right: 0;
+    max-height: 240px;
+    background: linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--background-primary) 97%, transparent),
+      color-mix(in srgb, var(--background-secondary) 94%, transparent)
+    );
+    backdrop-filter: blur(22px);
+    -webkit-backdrop-filter: blur(22px);
+    box-shadow:
+      0 -12px 48px rgba(0, 0, 0, 0.18),
+      inset 0 1px 0 rgba(255, 255, 255, 0.04);
   }
 
-  .lmsa-chat-composer-command-bar-label {
-    @apply lmsa-pl-1 lmsa-text-obsidian-muted;
-    font-size: var(--font-ui-smaller);
-    letter-spacing: 0.02em;
+  .lmsa-slash-dropdown-list {
+    @apply lmsa-flex lmsa-flex-col lmsa-gap-0.5;
   }
 
-  .lmsa-chat-composer-command-chips {
-    @apply lmsa-flex lmsa-flex-wrap lmsa-gap-2;
+  .lmsa-slash-dropdown-item {
+    @apply lmsa-flex lmsa-cursor-pointer lmsa-items-center lmsa-gap-2.5 lmsa-rounded-md lmsa-px-2 lmsa-py-1.5;
+    transition: background-color 140ms ease, color 140ms ease;
   }
 
-  .lmsa-chat-composer-command-chip {
-    @apply lmsa-cursor-pointer lmsa-whitespace-nowrap lmsa-rounded-full lmsa-border lmsa-border-obsidian-border lmsa-px-3 lmsa-py-[7px] lmsa-text-obsidian-text;
+  .lmsa-slash-dropdown-item:hover,
+  .lmsa-slash-dropdown-item.is-active {
+    background: color-mix(in srgb, var(--background-modifier-hover) 60%, transparent);
+  }
+
+  .lmsa-slash-dropdown-name {
+    @apply lmsa-whitespace-nowrap lmsa-font-semibold lmsa-text-obsidian-text;
     font-size: var(--font-ui-small);
-    background: color-mix(in srgb, var(--background-secondary) 88%, transparent);
   }
 
-  .lmsa-chat-composer-command-chip:hover {
-    @apply lmsa-bg-[var(--background-modifier-hover)];
+  .lmsa-slash-dropdown-desc {
+    @apply lmsa-min-w-0 lmsa-flex-1 lmsa-truncate lmsa-text-obsidian-muted;
+    font-size: var(--font-ui-smaller);
   }
 
   /* ── Context chips ───────────────────────────────────────────────────────── */

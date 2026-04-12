@@ -5,6 +5,7 @@ import type WritingAssistantChat from "../../main";
 import { shouldUseToolCall } from "../../tools/registry";
 import { getActiveFileName } from "../../context/noteContext";
 import type { ChatLayoutRefs, ChatMode } from "../types";
+import { SlashCommandSuggester } from "./SlashCommandSuggester";
 
 const MODE_OPTIONS: { mode: ChatMode; label: string; icon: string }[] = [
   { mode: "plan", icon: "zap", label: "Plan" },
@@ -22,9 +23,10 @@ type ChatComposerCallbacks = {
   onDraftChange: (draft: string) => void;
   onSendRequest: () => void;
   onStopRequest: () => void;
-  onRunCommand: (command: CustomCommand) => void;
   onModeChange: (mode: ChatMode) => void;
   onContextToggle: () => void;
+  getCommands: () => CustomCommand[];
+  expandCommand: (command: CustomCommand) => string;
 };
 
 export class ChatComposer {
@@ -32,23 +34,45 @@ export class ChatComposer {
   private isSending = false;
   private currentMode: ChatMode = "conversation";
   private modeButtons = new Map<ChatMode, HTMLButtonElement>();
+  private slashSuggester: SlashCommandSuggester;
 
   constructor(
     private readonly app: App,
     private readonly plugin: WritingAssistantChat,
     private readonly refs: Pick<
       ChatLayoutRefs,
-      "commandBarEl" | "contextChipsEl" | "textareaEl" | "modeToggleEl" | "toolUseIndicatorEl" | "toolUsePopoverEl" | "knowledgeIndicatorEl" | "visionIndicatorEl" | "actionBtn"
+      "slashDropdownEl" | "contextChipsEl" | "textareaEl" | "modeToggleEl" | "toolUseIndicatorEl" | "toolUsePopoverEl" | "knowledgeIndicatorEl" | "visionIndicatorEl" | "actionBtn"
     >,
     private readonly callbacks: ChatComposerCallbacks
   ) {
+    this.slashSuggester = new SlashCommandSuggester(
+      this.refs.textareaEl,
+      this.refs.slashDropdownEl,
+      {
+        getCommands: () => this.callbacks.getCommands(),
+        onSelect: (command, triggerStart, triggerEnd) => {
+          const expanded = this.callbacks.expandCommand(command);
+          const text = this.refs.textareaEl.value;
+          const before = text.slice(0, triggerStart);
+          const after = text.slice(triggerEnd);
+          const newText = before + expanded + after;
+          this.setDraft(newText);
+          const cursorPos = triggerStart + expanded.length;
+          this.refs.textareaEl.setSelectionRange(cursorPos, cursorPos);
+          this.refs.textareaEl.focus();
+          this.callbacks.onDraftChange(newText);
+        },
+      },
+    );
+
     this.refs.textareaEl.addEventListener("keydown", (event) => {
       if (
         event.key === "Enter" &&
         !event.shiftKey &&
         !event.ctrlKey &&
         !event.metaKey &&
-        !event.altKey
+        !event.altKey &&
+        !this.slashSuggester.isOpen()
       ) {
         event.preventDefault();
         this.callbacks.onSendRequest();
@@ -57,6 +81,7 @@ export class ChatComposer {
 
     this.refs.textareaEl.addEventListener("input", () => {
       this.autoResizeTextarea();
+      this.slashSuggester.handleInput();
       this.callbacks.onDraftChange(this.refs.textareaEl.value);
     });
 
@@ -213,31 +238,12 @@ export class ChatComposer {
       : "Vision not available");
   }
 
-  renderCommandBar(): void {
-    this.refs.commandBarEl.empty();
-
-    const hasCustomCommands = this.plugin.settings.commands.length > 0;
-    if (!hasCustomCommands) return;
-
-    this.refs.commandBarEl.createEl("div", {
-      cls: "lmsa-chat-composer-command-bar-label",
-      text: "Quick commands",
-    });
-    const chips = this.refs.commandBarEl.createDiv({ cls: "lmsa-chat-composer-command-chips" });
-
-    for (const command of this.plugin.settings.commands) {
-      const chip = chips.createEl("button", {
-        cls: "lmsa-chat-composer-command-chip",
-        text: command.name,
-      });
-      chip.addEventListener("click", () => {
-        this.callbacks.onRunCommand(command);
-      });
-    }
+  closeSlashSuggester(): void {
+    this.slashSuggester.close();
   }
 
   destroy(): void {
-    /* Reserved for future cleanup. */
+    this.slashSuggester.destroy();
   }
 
   private renderModeToggle(): void {

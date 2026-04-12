@@ -19,7 +19,6 @@ export class CommandModal extends Modal {
           id: generateId(),
           name: "",
           prompt: "",
-          autoInsert: false,
         };
   }
 
@@ -51,17 +50,6 @@ export class CommandModal extends Modal {
         text.inputEl.rows = 8;
         text.inputEl.addClass("lmsa-input-full");
       });
-
-    new SettingItem(contentEl)
-      .setName("Auto insert response")
-      .setDesc(
-        "Insert the assistant response into the current note automatically after the command completes."
-      )
-      .addToggle((toggle) =>
-        toggle
-          .setValue(this.command.autoInsert)
-          .onChange((value) => (this.command.autoInsert = value))
-      );
 
     new SettingItem(contentEl)
       .addButton((button) => button.setButtonText("Cancel").onClick(() => this.close()))

@@ -109,8 +109,8 @@ export function createChatLayout(contentEl: HTMLElement): ChatLayoutRefs {
     text: "Loading...",
   });
 
-  const commandBarEl = composer.createDiv({ cls: "lmsa-chat-composer-command-bar" });
   const composerPanel = composer.createDiv({ cls: "lmsa-chat-composer-panel" });
+  const slashDropdownEl = composerPanel.createDiv({ cls: "lmsa-slash-dropdown lmsa-hidden" });
   const contextChipsEl = composerPanel.createDiv({ cls: "lmsa-chat-composer-chips" });
 
   const textareaEl = composerPanel.createEl("textarea", {
@@ -180,7 +180,7 @@ export function createChatLayout(contentEl: HTMLElement): ChatLayoutRefs {
     shellEl: shell,
     messagesEl,
     emptyStateEl,
-    commandBarEl,
+    slashDropdownEl,
     contextChipsEl,
     textareaEl,
     modeToggleEl,

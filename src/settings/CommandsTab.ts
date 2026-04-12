@@ -46,12 +46,6 @@ export function renderCommandsTab(
       const info = row.createDiv({ cls: "lmsa-item-info" });
       info.createDiv({ cls: "lmsa-item-name", text: command.name });
       info.createDiv({ cls: "lmsa-item-sub", text: command.prompt });
-      info.createDiv({
-        cls: "lmsa-item-meta",
-        text: command.autoInsert
-          ? "Auto-inserts into the active note after completion"
-          : "Leaves the response in chat until you insert it manually",
-      });
 
       const actions = row.createDiv({ cls: "lmsa-item-actions" });
       actions

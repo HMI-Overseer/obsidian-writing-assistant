@@ -76,17 +76,23 @@ export class ChatTranscript {
 
     for (let i = startIndex; i < messages.length; i++) {
       const message = messages[i];
-      const bubble = this.createBubble(message.role, message.id);
 
-      if (message.role === "assistant" && message.agenticSteps?.length) {
-        AgenticTimeline.render(bubble.timelineEl, message.agenticSteps);
-      }
+      // Reuse a manually-created bubble (from the send flow) if one exists,
+      // otherwise create a new one. Content is only rendered for new bubbles.
+      const existing = this.bubblesByMessageId.get(message.id);
+      const bubble = existing ?? this.createBubble(message.role, message.id);
 
-      if (message.isError) {
-        bubble.bodyEl.addClass("is-error");
-        this.renderPlainTextContent(bubble, message.content);
-      } else {
-        await this.renderBubbleContent(bubble, message.content);
+      if (!existing) {
+        if (message.role === "assistant" && message.agenticSteps?.length) {
+          AgenticTimeline.render(bubble.timelineEl, message.agenticSteps);
+        }
+
+        if (message.isError) {
+          bubble.bodyEl.addClass("is-error");
+          this.renderPlainTextContent(bubble, message.content);
+        } else {
+          await this.renderBubbleContent(bubble, message.content);
+        }
       }
 
       this.bubblesByMessageId.set(message.id, bubble);
@@ -134,6 +140,18 @@ export class ChatTranscript {
 
   getBubbleForMessage(messageId: string): BubbleRefs | null {
     return this.bubblesByMessageId.get(messageId) ?? null;
+  }
+
+  /**
+   * Register a bubble that was created outside of `renderMessages` (e.g. during
+   * the send flow) so that `incrementalRender` can reuse it instead of creating
+   * a duplicate DOM element. Only registers in `bubblesByMessageId` — the ID is
+   * NOT added to `renderedMessageIds` so that the incremental loop still visits
+   * the message and attaches action toolbars.
+   */
+  trackManualBubble(messageId: string, bubble: BubbleRefs): void {
+    bubble.rowEl.dataset.messageId = messageId;
+    this.bubblesByMessageId.set(messageId, bubble);
   }
 
   async updateBubbleVersion(

@@ -55,6 +55,7 @@ export async function finalizeResponse(
     if (agenticSteps?.length) assistantMessage.agenticSteps = agenticSteps;
     store.appendMessage(assistantMessage);
     store.setLastAssistantResponse(response);
+    transcript.trackManualBubble(assistantMessage.id, bubble);
 
     if (
       !renderer.hasStreamRenderedMarkdown() ||
@@ -92,6 +93,7 @@ export async function finalizeAbortedResponse(
     if (agenticSteps?.length) assistantMessage.agenticSteps = agenticSteps;
     store.appendMessage(assistantMessage);
     store.setLastAssistantResponse(response);
+    transcript.trackManualBubble(assistantMessage.id, bubble);
 
     if (
       !renderer.hasStreamRenderedMarkdown() ||

@@ -253,6 +253,7 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
           rewrittenQuery,
           ...(agenticSteps?.length && { agenticSteps }),
         });
+        transcript.trackManualBubble(finalization.oldMessage.id, assistantBubble);
       } else {
         transcript.renderPlainTextContent(assistantBubble, "(no response)");
       }
@@ -299,6 +300,7 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
             provider: activeModel.provider,
             ...(partialSteps?.length && { agenticSteps: partialSteps }),
           });
+          transcript.trackManualBubble(finalization.oldMessage.id, assistantBubble);
         } else {
           transcript.renderPlainTextContent(assistantBubble, "Generation stopped.");
           assistantBubble.bodyEl.addClass("is-muted");
@@ -326,6 +328,7 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
       errorMessage.modelId = activeModel.modelId;
       errorMessage.provider = activeModel.provider;
       store.appendMessage(errorMessage);
+      transcript.trackManualBubble(errorMessage.id, assistantBubble);
       assistantBubble.bodyEl.addClass("is-error");
       transcript.renderPlainTextContent(assistantBubble, errorText);
     }

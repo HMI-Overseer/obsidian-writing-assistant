@@ -292,7 +292,7 @@ export class ProfileSettingsPopover {
       ".lmsa-params-body input, .lmsa-params-body select, .lmsa-params-body textarea, " +
       ".lmsa-profile-popover-section input, .lmsa-profile-popover-section select",
     );
-    for (const input of inputs) {
+    for (const input of Array.from(inputs)) {
       input.disabled = disabled;
     }
     el.toggleClass("is-default-profile", disabled);

@@ -35,7 +35,7 @@ export class OpenAIClient implements ChatClient {
     if (!models) {
       throw new Error("OpenAI returned an unexpected model list response.");
     }
-    return models;
+    return models.map((m) => ({ id: m.id, name: m.displayName }));
   }
 
   async complete(

@@ -89,6 +89,7 @@ export class ChatView extends ItemView {
       syncConversationUi: () => this.syncConversationUi(),
       refreshAvailability: async () => {
         await this.modelSelector?.refreshAvailability();
+        this.refreshComposerIndicators();
       },
     });
 
@@ -153,6 +154,7 @@ export class ChatView extends ItemView {
         await this.sessionStore.setActiveConversationModel(model);
         await this.syncConversationUi();
         await this.modelSelector?.refreshAvailability();
+        this.refreshComposerIndicators();
       },
     });
 
@@ -361,6 +363,7 @@ export class ChatView extends ItemView {
     await this.syncConversationUi();
     this.composer.renderCommandBar();
     await this.modelSelector.refreshAvailability();
+    this.refreshComposerIndicators();
 
     this.resizeObserver = new ResizeObserver((entries) => {
       const entry = entries[0];
@@ -457,6 +460,17 @@ export class ChatView extends ItemView {
     await this.refreshDocumentContext();
     this.contextUpdater?.immediateUpdate(this.buildContextInputs());
     this.orchestrator.updateGenerateResponseButton(snapshot.messageHistory);
+  }
+
+  private refreshComposerIndicators(): void {
+    if (!this.composer || !this.sessionStore) return;
+    const model = this.sessionStore.getResolvedConversationModel();
+    this.composer.refreshToolUseIndicator(model);
+    this.composer.refreshVisionIndicator(model);
+    this.composer.refreshKnowledgeIndicator(
+      this.plugin.services.ragService.isReady(),
+      this.plugin.services.graphService.isReady(),
+    );
   }
 
   private updateHeader(): void {

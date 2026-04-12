@@ -38,7 +38,7 @@ export function estimateTokenCount(request: ChatRequest, draft?: string): number
   }
 
   for (const turn of request.messages) {
-    totalChars += turn.content.length;
+    totalChars += (turn.content ?? "").length;
   }
 
   if (draft) {

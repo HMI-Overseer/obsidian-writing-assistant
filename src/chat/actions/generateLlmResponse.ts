@@ -170,9 +170,10 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
   const abortController = new AbortController();
   setActiveAbortController(abortController);
 
+  const editRenderer = renderer instanceof EditStreamingRenderer ? renderer : null;
+  const chatRenderer = renderer instanceof StreamingRenderer ? renderer : null;
+
   try {
-    const editRenderer = renderer instanceof EditStreamingRenderer ? renderer : null;
-    const chatRenderer = renderer instanceof StreamingRenderer ? renderer : null;
 
     const maxRounds = apiMessages.documentContext?.filePath
       ? plugin.settings.maxToolRoundsEdit

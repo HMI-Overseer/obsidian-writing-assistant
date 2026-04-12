@@ -271,6 +271,10 @@ export default class WritingAssistantChat extends Plugin {
         typeof data?.editFallbackSystemPromptPrefix === "string"
           ? data.editFallbackSystemPromptPrefix
           : DEFAULT_SETTINGS.editFallbackSystemPromptPrefix,
+      apiKeysDisclaimerAccepted:
+        typeof data?.apiKeysDisclaimerAccepted === "boolean"
+          ? data.apiKeysDisclaimerAccepted
+          : DEFAULT_SETTINGS.apiKeysDisclaimerAccepted,
       agenticMode:
         typeof data?.agenticMode === "boolean"
           ? data.agenticMode

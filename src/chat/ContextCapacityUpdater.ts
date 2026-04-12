@@ -139,7 +139,7 @@ export class ContextCapacityUpdater {
       .map((m) => ({ role: m.role, content: m.content }));
 
     const rawEstimate = estimateTokenCount(
-      { systemPrompt, documentContext, messages: chatTurns },
+      { systemPrompt, documentContext, ragContext: null, messages: chatTurns },
       draft
     );
     const correctedEstimate = Math.round(rawEstimate * this.correctionRatio);

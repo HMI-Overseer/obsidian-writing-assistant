@@ -10,6 +10,8 @@ export function normalizeCompletionModel(
     modelId: model?.modelId ?? "",
     provider: model?.provider ?? "lmstudio",
     ...(model?.contextWindowSize && { contextWindowSize: model.contextWindowSize }),
+    ...(typeof model?.trainedForToolUse === "boolean" && { trainedForToolUse: model.trainedForToolUse }),
+    ...(typeof model?.vision === "boolean" && { vision: model.vision }),
   };
 }
 

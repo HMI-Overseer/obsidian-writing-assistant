@@ -53,7 +53,7 @@ export function renderBenchmarkTab(
       cls: "lmsa-benchmark-empty",
       text: "No completion models configured. Add one in the completion models tab first.",
     });
-    return;
+    return () => {};
   }
 
   const selector = createModelSelector(modelSection.bodyEl, models, {

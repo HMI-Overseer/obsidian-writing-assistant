@@ -1,7 +1,7 @@
 import { TFile } from "obsidian";
 import type { App, TAbstractFile } from "obsidian";
 import type { EmbeddingClient } from "./embeddingClient";
-import type { IndexedChunk, FileIndexMeta, IndexingState } from "./types";
+import type { IndexedChunk, FileIndexMeta, IndexingState, EmbeddingMetadata } from "./types";
 import type { VectorStore } from "./vectorStore";
 import { chunkDocument, fnv1aHash, buildEmbeddingText, preprocessMarkdown, extractWikilinks, extractFolder } from "./chunker";
 
@@ -224,7 +224,7 @@ export class VaultIndexer {
       }
 
       // Extract metadata from raw content before preprocessing strips it.
-      let embeddingMeta;
+      let embeddingMeta: EmbeddingMetadata | undefined;
       if (this.metadataEnrichment) {
         const links = extractWikilinks(content);
         const folder = extractFolder(file.path);

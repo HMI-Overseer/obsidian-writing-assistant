@@ -104,10 +104,6 @@ export function createChatLayout(contentEl: HTMLElement): ChatLayoutRefs {
   const genBtnIcon = generateResponseBtn.createEl("span", { cls: "lmsa-chat-composer-generate-icon" });
   setIcon(genBtnIcon, "sparkles");
   generateResponseBtn.createEl("span", { text: "Generate response" });
-  generateResponseBtn.createEl("span", {
-    cls: "lmsa-chat-composer-generate-loading",
-    text: "Loading...",
-  });
 
   const composerPanel = composer.createDiv({ cls: "lmsa-chat-composer-panel" });
   const contextPickerPopoverEl = composerPanel.createDiv({ cls: "lmsa-context-picker-popover lmsa-hidden" });

@@ -183,12 +183,14 @@
     top: 0;
     transform: translate(-50%, calc(-100% - 10px));
     border: 1px solid rgba(255, 255, 255, 0.3);
-    background: linear-gradient(
+    background-color: transparent !important;
+    background-image: linear-gradient(
       135deg,
       rgba(255, 255, 255, 0.2) 0%,
       rgba(255, 255, 255, 0.08) 50%,
       rgba(255, 255, 255, 0.03) 100%
     );
+    box-shadow: none !important;
     backdrop-filter: url(#lmsa-glass);
     -webkit-backdrop-filter: url(#lmsa-glass);
     transition: all 0.8s cubic-bezier(0.175, 0.885, 0.32, 2.2);
@@ -208,40 +210,6 @@
     height: 14px;
   }
 
-  /* Loading text — hidden by default */
-  .lmsa-chat-composer-generate-loading {
-    display: none;
-  }
-
-  /* Generating state: swap content */
-  .lmsa-chat-composer-generate-btn.is-generating .lmsa-chat-composer-generate-icon,
-  .lmsa-chat-composer-generate-btn.is-generating > span:not(.lmsa-chat-composer-generate-loading) {
-    display: none;
-  }
-
-  .lmsa-chat-composer-generate-btn.is-generating .lmsa-chat-composer-generate-loading {
-    display: inline-block;
-    font-weight: 500;
-    font-size: var(--font-ui-small);
-    background: linear-gradient(
-      90deg,
-      var(--text-normal) 0%,
-      var(--text-normal) 40%,
-      rgba(255, 255, 255, 0.9) 50%,
-      var(--text-normal) 60%,
-      var(--text-normal) 100%
-    );
-    background-size: 200% 100%;
-    -webkit-background-clip: text;
-    background-clip: text;
-    -webkit-text-fill-color: transparent;
-    animation: lmsa-shimmer-sweep 2s ease-in-out infinite;
-  }
-
-  .lmsa-chat-composer-generate-btn.is-generating {
-    pointer-events: none;
-    cursor: default;
-  }
 
   /* ── Composer wrapper ────────────────────────────────────────────────────── */
 

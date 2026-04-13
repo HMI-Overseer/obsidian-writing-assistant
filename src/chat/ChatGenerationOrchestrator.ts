@@ -191,13 +191,11 @@ export class ChatGenerationOrchestrator {
     if (!btn) return;
 
     const shouldShow =
+      !this.isGenerating &&
       messages.length > 0 &&
-      (this.isGenerating ||
-        messages[messages.length - 1].role === "user" ||
+      (messages[messages.length - 1].role === "user" ||
         messages[messages.length - 1].isError === true);
 
     btn.toggleClass("lmsa-hidden", !shouldShow);
-    btn.toggleClass("is-generating", this.isGenerating);
-    btn.toggleAttribute("disabled", this.isGenerating);
   }
 }

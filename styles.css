@@ -454,12 +454,14 @@
     top: 0;
     transform: translate(-50%, calc(-100% - 10px));
     border: 1px solid rgba(255, 255, 255, 0.3);
-    background: linear-gradient(
+    background-color: transparent !important;
+    background-image: linear-gradient(
       135deg,
       rgba(255, 255, 255, 0.2) 0%,
       rgba(255, 255, 255, 0.08) 50%,
       rgba(255, 255, 255, 0.03) 100%
     );
+    box-shadow: none !important;
     backdrop-filter: url(#lmsa-glass);
     -webkit-backdrop-filter: url(#lmsa-glass);
     transition: all 0.8s cubic-bezier(0.175, 0.885, 0.32, 2.2);
@@ -475,37 +477,6 @@
 .lmsa-chat-composer-generate-icon svg {
     width: 14px;
     height: 14px;
-  }
-/* Loading text — hidden by default */
-.lmsa-chat-composer-generate-loading {
-    display: none;
-  }
-/* Generating state: swap content */
-.lmsa-chat-composer-generate-btn.is-generating .lmsa-chat-composer-generate-icon,
-  .lmsa-chat-composer-generate-btn.is-generating > span:not(.lmsa-chat-composer-generate-loading) {
-    display: none;
-  }
-.lmsa-chat-composer-generate-btn.is-generating .lmsa-chat-composer-generate-loading {
-    display: inline-block;
-    font-weight: 500;
-    font-size: var(--font-ui-small);
-    background: linear-gradient(
-      90deg,
-      var(--text-normal) 0%,
-      var(--text-normal) 40%,
-      rgba(255, 255, 255, 0.9) 50%,
-      var(--text-normal) 60%,
-      var(--text-normal) 100%
-    );
-    background-size: 200% 100%;
-    -webkit-background-clip: text;
-    background-clip: text;
-    -webkit-text-fill-color: transparent;
-    animation: lmsa-shimmer-sweep 2s ease-in-out infinite;
-  }
-.lmsa-chat-composer-generate-btn.is-generating {
-    pointer-events: none;
-    cursor: default;
   }
 /* ── Composer wrapper ────────────────────────────────────────────────────── */
 .lmsa-chat-composer {
@@ -867,12 +838,17 @@
 .lmsa-chat-window-message-body.is-streaming::after {
     content: "";
     display: inline-block;
-    width: 8px;
-    height: 8px;
-    margin-left: 8px;
-    border-radius: 999px;
-    background: var(--lmsa-mode-accent);
-    animation: lmsa-pulse 0.9s ease-in-out infinite;
+    width: 24px;
+    aspect-ratio: 2;
+    vertical-align: middle;
+    margin-left: 6px;
+    --_g: no-repeat radial-gradient(circle closest-side, var(--lmsa-mode-accent) 90%, transparent);
+    background:
+      var(--_g) 0% 50%,
+      var(--_g) 50% 50%,
+      var(--_g) 100% 50%;
+    background-size: calc(100% / 3) 50%;
+    animation: lmsa-dot-bounce 1s infinite linear;
   }
 .lmsa-chat-window-message-body.is-error {
     background: color-mix(in srgb, var(--background-modifier-error) 65%, transparent);
@@ -5450,16 +5426,21 @@
     width: auto;
     }
 }
-@keyframes lmsa-pulse {
-  0%,
-  100% {
-    opacity: 0.25;
-    transform: scale(0.85);
+@keyframes lmsa-dot-bounce {
+  20% {
+    background-position: 0% 0%, 50% 50%, 100% 50%;
   }
 
-  50% {
-    opacity: 1;
-    transform: scale(1);
+  40% {
+    background-position: 0% 100%, 50% 0%, 100% 50%;
+  }
+
+  60% {
+    background-position: 0% 50%, 50% 100%, 100% 0%;
+  }
+
+  80% {
+    background-position: 0% 50%, 50% 50%, 100% 100%;
   }
 }
 @keyframes lmsa-drawer-fade {
@@ -5471,15 +5452,6 @@
   to {
     opacity: 1;
     transform: translateY(0) scale(1);
-  }
-}
-@keyframes lmsa-shimmer-sweep {
-  0% {
-    background-position: 200% center;
-  }
-
-  100% {
-    background-position: -200% center;
   }
 }
 @keyframes lmsa-chat-header-meta-attention {

@@ -308,15 +308,17 @@ export class ChatComposer {
       const iconEl = btn.createEl("span", { cls: "lmsa-chat-composer-mode-toggle-icon" });
       setIcon(iconEl, icon);
       btn.createEl("span", { text: label });
-      if (mode === this.currentMode) {
-        btn.addClass("is-active");
-      }
       btn.addEventListener("click", () => this.setMode(mode));
       this.modeButtons.set(mode, btn);
     }
+
+    this.refs.modeToggleEl.createDiv({ cls: "lmsa-chat-composer-mode-slider" });
+    this.syncModeToggle();
   }
 
   private syncModeToggle(): void {
+    const activeIndex = MODE_OPTIONS.findIndex((o) => o.mode === this.currentMode);
+    this.refs.modeToggleEl.dataset.activeIndex = String(activeIndex);
     for (const [mode, btn] of this.modeButtons) {
       btn.toggleClass("is-active", mode === this.currentMode);
     }

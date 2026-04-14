@@ -69,7 +69,7 @@
   /* ── Composer panel ──────────────────────────────────────────────────────── */
 
   .lmsa-chat-composer-panel {
-    @apply lmsa-relative lmsa-z-[1] lmsa-overflow-visible lmsa-rounded-[20px] lmsa-border lmsa-border-obsidian-border lmsa-px-[14px] lmsa-pb-3 lmsa-pt-[14px];
+    @apply lmsa-relative lmsa-z-[1] lmsa-overflow-visible lmsa-rounded-[10px] lmsa-border lmsa-border-obsidian-border lmsa-px-[14px] lmsa-pb-1.5 lmsa-pt-[14px];
     background: linear-gradient(
       180deg,
       color-mix(in srgb, var(--background-primary) 92%, transparent),
@@ -248,20 +248,25 @@
   /* ── Mode toggle ─────────────────────────────────────────────────────────── */
 
   .lmsa-chat-composer-mode-toggle {
-    @apply lmsa-inline-flex lmsa-flex-none;
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+    @apply lmsa-relative lmsa-inline-flex lmsa-flex-none lmsa-overflow-hidden;
+    border-radius: 999px;
+    border: 1px solid var(--background-modifier-border);
   }
 
   .lmsa-chat-composer-mode-toggle-btn {
-    @apply lmsa-relative lmsa-inline-flex lmsa-cursor-pointer lmsa-items-center lmsa-gap-1.5 lmsa-px-3 lmsa-py-1.5;
+    @apply lmsa-relative lmsa-z-10 lmsa-inline-flex lmsa-cursor-pointer lmsa-items-center lmsa-justify-center lmsa-gap-1.5 lmsa-px-3 lmsa-py-1.5;
+    flex: 1 1 0px;
     font-size: var(--font-ui-smaller);
     font-weight: 500;
     line-height: 1.25;
     color: var(--text-muted);
-    background: color-mix(in srgb, var(--background-primary) 90%, var(--background-secondary));
-    border: 1px solid var(--background-modifier-border);
-    border-radius: 0;
-    transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease;
+    background: transparent !important;
+    border: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    outline: none;
+    appearance: none;
+    transition: color 0.15s ease;
   }
 
   .lmsa-chat-composer-mode-toggle-icon {
@@ -273,36 +278,43 @@
     height: 12px;
   }
 
-  .lmsa-chat-composer-mode-toggle-btn + .lmsa-chat-composer-mode-toggle-btn {
-    margin-left: -1px;
-  }
-
-  .lmsa-chat-composer-mode-toggle-btn:first-child {
-    border-radius: 6px 0 0 6px;
-  }
-
-  .lmsa-chat-composer-mode-toggle-btn:last-child {
-    border-radius: 0 6px 6px 0;
-  }
-
   .lmsa-chat-composer-mode-toggle-btn:hover {
-    background: var(--background-modifier-hover);
     color: var(--text-normal);
-    z-index: 1;
   }
 
-  /* Active state inherits --lmsa-mode-accent from .lmsa-root[data-mode] */
   .lmsa-chat-composer-mode-toggle-btn.is-active {
-    background: color-mix(in srgb, var(--lmsa-mode-accent) 15%, var(--background-primary));
-    border-color: color-mix(in srgb, var(--lmsa-mode-accent) 45%, var(--background-modifier-border));
     color: var(--lmsa-mode-accent);
-    z-index: 1;
   }
 
   .lmsa-chat-composer-mode-toggle-btn:focus-visible {
     outline: none;
     box-shadow: 0 0 0 3px color-mix(in srgb, var(--lmsa-mode-accent) 20%, transparent);
-    z-index: 2;
+    z-index: 12;
+  }
+
+  /* Sliding pill indicator */
+  .lmsa-chat-composer-mode-slider {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: calc(100% / 3);
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--lmsa-mode-accent) 15%, var(--background-primary));
+    transition: transform 200ms ease-out, background 400ms ease;
+    pointer-events: none;
+  }
+
+  .lmsa-chat-composer-mode-toggle[data-active-index="0"] .lmsa-chat-composer-mode-slider {
+    transform: translateX(0);
+  }
+
+  .lmsa-chat-composer-mode-toggle[data-active-index="1"] .lmsa-chat-composer-mode-slider {
+    transform: translateX(100%);
+  }
+
+  .lmsa-chat-composer-mode-toggle[data-active-index="2"] .lmsa-chat-composer-mode-slider {
+    transform: translateX(200%);
   }
 
   /* ── Tool indicator ──────────────────────────────────────────────────────── */

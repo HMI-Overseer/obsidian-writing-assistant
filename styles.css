@@ -239,6 +239,10 @@
     height: 100%;
     font-size: var(--font-ui-small);
 
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+    padding-top: 0 !important;
+
     /* Mode accent — overridden per data-mode */
     --lmsa-mode-accent: var(--interactive-accent);
 
@@ -484,6 +488,7 @@
     display: flex;
     flex-direction: column;
     gap: 0.625rem;
+    padding: 0 12px;
 }
 /* ── Collapsed overlay ───────────────────────────────────────────────────── */
 .lmsa-collapsed-overlay {

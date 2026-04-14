@@ -6,6 +6,10 @@
     height: 100%;
     font-size: var(--font-ui-small);
 
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+    padding-top: 0 !important;
+
     /* Mode accent — overridden per data-mode */
     --lmsa-mode-accent: var(--interactive-accent);
 
@@ -215,6 +219,7 @@
 
   .lmsa-chat-composer {
     @apply lmsa-relative lmsa-flex lmsa-flex-col lmsa-gap-2.5;
+    padding: 0 12px;
   }
 
   /* ── Collapsed overlay ───────────────────────────────────────────────────── */

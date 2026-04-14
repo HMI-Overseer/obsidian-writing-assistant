@@ -116,7 +116,7 @@ export function createChatLayout(contentEl: HTMLElement): ChatLayoutRefs {
 
   const textareaEl = composerPanel.createEl("textarea", {
     cls: "lmsa-chat-composer-textarea",
-    attr: { placeholder: "Send a message to the model...", rows: "2" },
+    attr: { placeholder: "Send a message to the model...", rows: "1" },
   }) as HTMLTextAreaElement;
 
   const composerFooter = composerPanel.createDiv({ cls: "lmsa-chat-composer-footer" });

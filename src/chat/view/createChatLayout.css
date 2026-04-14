@@ -214,7 +214,7 @@
   /* ── Composer wrapper ────────────────────────────────────────────────────── */
 
   .lmsa-chat-composer {
-    @apply lmsa-relative lmsa-flex lmsa-flex-col lmsa-gap-2.5 lmsa-px-[18px] lmsa-pb-[18px];
+    @apply lmsa-relative lmsa-flex lmsa-flex-col lmsa-gap-2.5;
   }
 
   /* ── Collapsed overlay ───────────────────────────────────────────────────── */

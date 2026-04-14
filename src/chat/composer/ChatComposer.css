@@ -392,17 +392,24 @@
   /* ── Send button ─────────────────────────────────────────────────────────── */
 
   .lmsa-chat-composer-send-btn {
-    @apply lmsa-flex lmsa-flex-none lmsa-items-center lmsa-justify-center lmsa-border-none lmsa-font-semibold;
-    width: 36px;
-    height: 36px;
+    @apply lmsa-flex lmsa-flex-none lmsa-cursor-pointer lmsa-items-center lmsa-justify-center lmsa-border-none;
+    width: 34px;
+    height: 34px;
     padding: 0;
-    border-radius: 50%;
-    background: var(--interactive-accent);
-    color: var(--text-on-accent);
+    border-radius: 10px;
+    background: transparent !important;
+    color: var(--text-muted);
+    box-shadow: none !important;
+    outline: none;
+    appearance: none;
+    min-height: unset;
+    transition: background 120ms ease, color 120ms ease;
   }
 
   .lmsa-chat-composer-send-btn:hover:not(:disabled) {
-    background: var(--interactive-accent-hover);
+    background: color-mix(in srgb, var(--background-modifier-hover) 60%, transparent) !important;
+    color: var(--text-normal);
+    box-shadow: none !important;
   }
 
   .lmsa-chat-composer-send-btn svg {
@@ -411,9 +418,7 @@
   }
 
   .lmsa-chat-composer-send-btn.is-stop {
-    background: transparent;
     color: var(--text-error);
-    border: 1px solid color-mix(in srgb, var(--text-error) 40%, var(--background-modifier-border));
   }
 
   .lmsa-chat-composer-send-btn.is-stop:hover {

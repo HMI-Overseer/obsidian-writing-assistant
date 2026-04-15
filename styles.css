@@ -1905,7 +1905,7 @@
     gap: 0.375rem;
     padding-left: 0.25rem;
     padding-right: 0.25rem;
-    padding-bottom: 0.25rem;
+    padding-bottom: 0 !important;
 }
 /* Only add bottom breathing room when actual context chips are present */
 .lmsa-chat-composer-chips:has(.lmsa-chat-composer-chip) {
@@ -2369,8 +2369,8 @@
     flex: none;
     align-items: center;
     justify-content: center;
-    width: 20px;
-    height: 20px;
+    width: 25px;
+    height: 25px;
     min-height: 0;
     padding: 0;
     border-radius: 50%;

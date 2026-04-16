@@ -195,6 +195,31 @@
     max-width: 100%;
     overflow-x: auto;
   }
+
+  /* ── Attachment gallery (user bubbles) ─────────────────────────────────── */
+
+  .lmsa-chat-window-attachment-gallery {
+    @apply lmsa-flex lmsa-flex-wrap lmsa-gap-2 lmsa-mb-2;
+  }
+
+  .lmsa-chat-window-attachment-thumb {
+    @apply lmsa-overflow-hidden lmsa-rounded-lg;
+    border: 1px solid var(--background-modifier-border);
+    max-width: 200px;
+  }
+
+  .lmsa-chat-window-attachment-img {
+    display: block;
+    max-width: 100%;
+    max-height: 200px;
+    border-radius: inherit;
+    cursor: pointer;
+    transition: opacity 120ms ease;
+  }
+
+  .lmsa-chat-window-attachment-img:hover {
+    opacity: 0.85;
+  }
 }
 
 @media (max-width: 700px) {

@@ -1,4 +1,4 @@
-import type { ConversationMessage } from "../shared/types";
+import type { Attachment, ConversationMessage } from "../shared/types";
 
 export type ChatMode = "plan" | "conversation" | "edit";
 
@@ -7,6 +7,7 @@ export type BubbleRole = "user" | "assistant";
 
 export type BubbleRenderOptions = {
   preserveStreaming?: boolean;
+  attachments?: Attachment[];
 };
 
 export type BubbleRefs = {
@@ -36,6 +37,8 @@ export type ChatLayoutRefs = {
   knowledgeIndicatorEl: HTMLElement;
   knowledgePopoverEl: HTMLElement;
   visionIndicatorEl: HTMLElement;
+  attachBtn: HTMLButtonElement;
+  attachmentsEl: HTMLElement;
   actionBtn: HTMLButtonElement;
   modelSelectorBtn: HTMLElement;
   modelSelectorLabelEl: HTMLElement;

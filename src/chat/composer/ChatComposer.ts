@@ -1,11 +1,13 @@
-import { setIcon } from "obsidian";
+import { Notice, setIcon } from "obsidian";
 import type { App } from "obsidian";
-import type { CompletionModel } from "../../shared/types";
+import type { Attachment, CompletionModel, ImageMimeType } from "../../shared/types";
 import type WritingAssistantChat from "../../main";
 import { shouldUseToolCall } from "../../tools/registry";
 import { getActiveFileName } from "../../context/noteContext";
 import type { ExtraContextItem } from "../../shared/chatRequest";
 import type { ChatLayoutRefs, ChatMode } from "../types";
+import { generateId } from "../../utils";
+import { MAX_IMAGE_SIZE_BYTES, SUPPORTED_IMAGE_TYPES } from "../../constants";
 
 const MODE_OPTIONS: { mode: ChatMode; label: string; icon: string }[] = [
   { mode: "plan", icon: "zap", label: "Plan" },
@@ -35,12 +37,18 @@ export class ChatComposer {
    */
   private activeNoteAttached: boolean;
   private extraContextItems: ExtraContextItem[] = [];
+  private stagedAttachments: Attachment[] = [];
   private isSending = false;
   private currentMode: ChatMode = "conversation";
   private modeButtons = new Map<ChatMode, HTMLButtonElement>();
   private readonly handleKeydown: (event: KeyboardEvent) => void;
   private readonly handleInput: () => void;
   private readonly handleActionClick: () => void;
+  private readonly handlePaste: (event: ClipboardEvent) => void;
+  private readonly handleDragOver: (event: DragEvent) => void;
+  private readonly handleDragLeave: () => void;
+  private readonly handleDrop: (event: DragEvent) => void;
+  private readonly handleAttachClick: () => void;
 
   constructor(
     private readonly app: App,
@@ -54,6 +62,8 @@ export class ChatComposer {
       | "toolUsePopoverEl"
       | "knowledgeIndicatorEl"
       | "visionIndicatorEl"
+      | "attachBtn"
+      | "attachmentsEl"
       | "actionBtn"
     >,
     private readonly callbacks: ChatComposerCallbacks
@@ -89,6 +99,63 @@ export class ChatComposer {
       }
     };
     this.refs.actionBtn.addEventListener("click", this.handleActionClick);
+
+    // Image attachment handlers
+    this.handlePaste = (event: ClipboardEvent) => {
+      const files = event.clipboardData?.files;
+      if (!files || files.length === 0) return;
+      const imageFiles = Array.from(files).filter((f) => SUPPORTED_IMAGE_TYPES.has(f.type));
+      if (imageFiles.length === 0) return;
+      event.preventDefault();
+      this.processImageFiles(imageFiles);
+    };
+    this.refs.textareaEl.addEventListener("paste", this.handlePaste);
+
+    this.handleDragOver = (event: DragEvent) => {
+      event.preventDefault();
+      event.stopPropagation();
+      const composerPanel = this.refs.textareaEl.parentElement;
+      composerPanel?.addClass("is-dragover");
+    };
+    this.handleDragLeave = () => {
+      const composerPanel = this.refs.textareaEl.parentElement;
+      composerPanel?.removeClass("is-dragover");
+    };
+    this.handleDrop = (event: DragEvent) => {
+      event.preventDefault();
+      event.stopPropagation();
+      const composerPanel = this.refs.textareaEl.parentElement;
+      composerPanel?.removeClass("is-dragover");
+      const files = event.dataTransfer?.files;
+      if (!files || files.length === 0) return;
+      const imageFiles = Array.from(files).filter((f) => SUPPORTED_IMAGE_TYPES.has(f.type));
+      if (imageFiles.length === 0) return;
+      this.processImageFiles(imageFiles);
+    };
+    const composerPanel = this.refs.textareaEl.parentElement;
+    if (composerPanel) {
+      composerPanel.addEventListener("dragover", this.handleDragOver);
+      composerPanel.addEventListener("dragleave", this.handleDragLeave);
+      composerPanel.addEventListener("drop", this.handleDrop);
+    }
+
+    this.handleAttachClick = () => {
+      if (!this.canAttachImages()) {
+        new Notice("The active model does not support image input.");
+        return;
+      }
+      const input = document.createElement("input");
+      input.type = "file";
+      input.accept = "image/jpeg,image/png,image/gif,image/webp";
+      input.multiple = true;
+      input.addEventListener("change", () => {
+        if (input.files && input.files.length > 0) {
+          this.processImageFiles(Array.from(input.files));
+        }
+      });
+      input.click();
+    };
+    this.refs.attachBtn.addEventListener("click", this.handleAttachClick);
 
     this.renderModeToggle();
   }
@@ -163,13 +230,40 @@ export class ChatComposer {
 
   /**
    * Reset context to the default state for a new conversation:
-   * re-apply the auto-attach setting, clear manual vault-note items.
+   * re-apply the auto-attach setting, clear manual vault-note items and attachments.
    */
   resetContextForNewConversation(): void {
     this.activeNoteAttached =
       this.plugin.settings.includeNoteContext && !!this.app.workspace.getActiveFile();
     this.extraContextItems = [];
+    this.stagedAttachments = [];
     this.updateContextChips();
+    this.renderAttachmentPreviews();
+  }
+
+  // ---------------------------------------------------------------------------
+  // Image attachments
+  // ---------------------------------------------------------------------------
+
+  getAttachments(): Attachment[] {
+    return [...this.stagedAttachments];
+  }
+
+  clearAttachments(): void {
+    this.stagedAttachments = [];
+    this.renderAttachmentPreviews();
+  }
+
+  /**
+   * Updates the attach button visibility based on the active model's vision capability.
+   */
+  refreshAttachButton(activeModel: CompletionModel | null): void {
+    const supportsVision = activeModel
+      ? (activeModel.vision
+        ?? this.plugin.services.modelAvailability.getVision(activeModel.modelId)
+        ?? false)
+      : false;
+    this.refs.attachBtn.toggleClass("lmsa-hidden", !supportsVision);
   }
 
   updateContextChips(): void {
@@ -278,6 +372,14 @@ export class ChatComposer {
     this.refs.textareaEl.removeEventListener("keydown", this.handleKeydown);
     this.refs.textareaEl.removeEventListener("input", this.handleInput);
     this.refs.actionBtn.removeEventListener("click", this.handleActionClick);
+    this.refs.textareaEl.removeEventListener("paste", this.handlePaste);
+    this.refs.attachBtn.removeEventListener("click", this.handleAttachClick);
+    const composerPanel = this.refs.textareaEl.parentElement;
+    if (composerPanel) {
+      composerPanel.removeEventListener("dragover", this.handleDragOver);
+      composerPanel.removeEventListener("dragleave", this.handleDragLeave);
+      composerPanel.removeEventListener("drop", this.handleDrop);
+    }
   }
 
   private renderChip(icon: string, label: string, onRemove: () => void): void {
@@ -294,6 +396,77 @@ export class ChatComposer {
       event.stopPropagation();
       onRemove();
     });
+  }
+
+  /**
+   * Whether the active model supports image attachments.
+   * Derived from the attach button visibility, which is kept in sync with the
+   * full vision resolution chain (CompletionModel.vision ?? ModelAvailabilityService).
+   */
+  canAttachImages(): boolean {
+    return !this.refs.attachBtn.hasClass("lmsa-hidden");
+  }
+
+  private processImageFiles(files: File[]): void {
+    if (!this.canAttachImages()) {
+      new Notice("The active model does not support image input.");
+      return;
+    }
+
+    for (const file of files) {
+      if (!SUPPORTED_IMAGE_TYPES.has(file.type)) {
+        new Notice(`Unsupported image format: ${file.type}`);
+        continue;
+      }
+      if (file.size > MAX_IMAGE_SIZE_BYTES) {
+        new Notice(`Image too large: ${file.name}. Maximum size is 20 MB.`);
+        continue;
+      }
+
+      const reader = new FileReader();
+      reader.onload = () => {
+        const dataUrl = reader.result as string;
+        // Strip the "data:image/...;base64," prefix
+        const base64 = dataUrl.split(",")[1];
+        if (!base64) return;
+
+        const attachment: Attachment = {
+          type: "image",
+          id: generateId(),
+          mimeType: file.type as ImageMimeType,
+          data: base64,
+          fileName: file.name,
+        };
+        this.stagedAttachments.push(attachment);
+        this.renderAttachmentPreviews();
+      };
+      reader.readAsDataURL(file);
+    }
+  }
+
+  private renderAttachmentPreviews(): void {
+    this.refs.attachmentsEl.empty();
+    for (const attachment of this.stagedAttachments) {
+      if (attachment.type === "image") {
+        const thumbEl = this.refs.attachmentsEl.createDiv({ cls: "lmsa-chat-composer-attachment" });
+        thumbEl.createEl("img", {
+          cls: "lmsa-chat-composer-attachment-img",
+          attr: {
+            src: `data:${attachment.mimeType};base64,${attachment.data}`,
+            alt: attachment.fileName ?? "Image attachment",
+          },
+        });
+        const removeBtn = thumbEl.createEl("button", {
+          cls: "lmsa-chat-composer-attachment-remove",
+          attr: { "aria-label": "Remove attachment" },
+        });
+        setIcon(removeBtn, "x");
+        removeBtn.addEventListener("click", () => {
+          this.stagedAttachments = this.stagedAttachments.filter((a) => a.id !== attachment.id);
+          this.renderAttachmentPreviews();
+        });
+      }
+    }
   }
 
   private renderModeToggle(): void {

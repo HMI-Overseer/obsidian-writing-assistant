@@ -1,9 +1,44 @@
 import type { EditProposal, AppliedEditRecord } from "../editing/editTypes";
 import type { ToolCall } from "../tools/types";
 
+// ---------------------------------------------------------------------------
+// Attachments
+// ---------------------------------------------------------------------------
+
+/** MIME types accepted for image attachments. */
+export type ImageMimeType = "image/jpeg" | "image/png" | "image/gif" | "image/webp";
+
+/** An image attached to a user message. */
+export interface ImageAttachment {
+  type: "image";
+  /** Unique ID for DOM keying and removal. */
+  id: string;
+  /** MIME type of the image. */
+  mimeType: ImageMimeType;
+  /** Base64-encoded image data (no data-URI prefix). */
+  data: string;
+  /** Original file name, if known. Used for display/alt text. */
+  fileName?: string;
+}
+
+/**
+ * A file attachment on a user message.
+ * Discriminated union — extend with `| DocumentAttachment` etc. later.
+ */
+export type Attachment = ImageAttachment;
+
+// ---------------------------------------------------------------------------
+// OpenAI multipart content
+// ---------------------------------------------------------------------------
+
+/** A single part in an OpenAI multipart content array. */
+export type OpenAIContentPart =
+  | { type: "text"; text: string }
+  | { type: "image_url"; image_url: { url: string } };
+
 export interface Message {
   role: "system" | "user" | "assistant" | "tool";
-  content: string | null;
+  content: string | OpenAIContentPart[] | null;
   /** For tool result messages (OpenAI format). */
   tool_call_id?: string;
   /** For assistant messages with tool calls (OpenAI format). */
@@ -150,6 +185,8 @@ export interface ConversationMessage {
   toolCalls?: ToolCall[];
   /** Agentic tool-call timeline for this response. Stored for display; never sent to the API. */
   agenticSteps?: AgenticStep[];
+  /** File attachments on user messages (images, future: documents). */
+  attachments?: Attachment[];
 }
 
 /**

@@ -19,12 +19,20 @@ export async function validateSendRequest(
   if (isGenerating || modelSelector.isCheckingStatus()) return null;
 
   const text = (promptOverride ?? composer.getDraft()).trim();
-  if (!text) return null;
+  const hasAttachments = composer.getAttachments().length > 0;
+  if (!text && !hasAttachments) return null;
 
   const activeModel = store.getResolvedConversationModel();
   if (!activeModel?.modelId) {
     new Notice(
       "No model selected. Choose a saved profile in the chat selector or add one in settings."
+    );
+    return null;
+  }
+
+  if (hasAttachments && !composer.canAttachImages()) {
+    new Notice(
+      "The active model does not support image input. Remove attachments or switch to a vision-capable model."
     );
     return null;
   }

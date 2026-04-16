@@ -1,4 +1,4 @@
-import type { AnthropicCacheSettings } from "./types";
+import type { AnthropicCacheSettings, Attachment } from "./types";
 import type { CanonicalToolDefinition } from "../tools/types";
 
 /** A context item manually attached by the user via the context picker. */
@@ -36,6 +36,8 @@ export interface ChatTurn {
   toolCallId?: string;
   /** For assistant turns that contain tool calls: the tool calls made. */
   toolCalls?: Array<{ id: string; name: string; arguments: Record<string, unknown> }>;
+  /** File attachments (images, future: documents). Only present on user turns. */
+  attachments?: Attachment[];
 }
 
 /** Graph entities and relationships relevant to a retrieved document. */

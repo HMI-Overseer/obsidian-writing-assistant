@@ -111,6 +111,9 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
     completionModelId: activeModel.modelId,
     profileSystemPrompt: activeProfile.systemPrompt,
     disableBuiltinSystemPrompts: activeProfile.disableBuiltinSystemPrompts,
+    supportsVision: activeModel.vision
+      ?? plugin.services.modelAvailability.getVision(activeModel.modelId)
+      ?? false,
   });
 
   const ragSources = apiMessages.ragContext?.map(

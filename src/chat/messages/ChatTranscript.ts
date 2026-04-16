@@ -1,5 +1,5 @@
 import { type App, Component, MarkdownRenderer, setIcon } from "obsidian";
-import type { ConversationMessage } from "../../shared/types";
+import type { Attachment, ConversationMessage } from "../../shared/types";
 import type { BubbleRefs, BubbleRenderOptions, ChatLayoutRefs } from "../types";
 import { BubbleActionToolbar } from "./BubbleActionToolbar";
 import { BubbleVersionNav } from "./BubbleVersionNav";
@@ -86,7 +86,7 @@ export class ChatTranscript {
         bubble.bodyEl.addClass("is-error");
         this.renderPlainTextContent(bubble, message.content);
       } else {
-        await this.renderBubbleContent(bubble, message.content);
+        await this.renderBubbleContent(bubble, message.content, { attachments: message.attachments });
       }
 
       if (actionCallbacks) {
@@ -118,7 +118,7 @@ export class ChatTranscript {
         bubble.bodyEl.addClass("is-error");
         this.renderPlainTextContent(bubble, message.content);
       } else {
-        await this.renderBubbleContent(bubble, message.content);
+        await this.renderBubbleContent(bubble, message.content, { attachments: message.attachments });
       }
 
       if (actionCallbacks) {
@@ -290,7 +290,36 @@ export class ChatTranscript {
       return;
     }
 
+    // Render image attachments above the text for user bubbles.
+    if (options.attachments?.length) {
+      this.clearBubbleMarkdownRender(bubble.contentEl);
+      bubble.contentEl.empty();
+      bubble.contentEl.removeClass("lmsa-chat-window-message-content--markdown");
+      bubble.contentEl.addClass("lmsa-chat-window-message-content--plain");
+      this.renderAttachmentGallery(bubble.contentEl, options.attachments);
+      if (text) {
+        bubble.contentEl.createEl("span", { text });
+      }
+      return;
+    }
+
     this.renderPlainTextContent(bubble, text);
+  }
+
+  private renderAttachmentGallery(containerEl: HTMLElement, attachments: Attachment[]): void {
+    const galleryEl = containerEl.createDiv({ cls: "lmsa-chat-window-attachment-gallery" });
+    for (const attachment of attachments) {
+      if (attachment.type === "image") {
+        const thumbEl = galleryEl.createDiv({ cls: "lmsa-chat-window-attachment-thumb" });
+        thumbEl.createEl("img", {
+          cls: "lmsa-chat-window-attachment-img",
+          attr: {
+            src: `data:${attachment.mimeType};base64,${attachment.data}`,
+            alt: attachment.fileName ?? "Image attachment",
+          },
+        });
+      }
+    }
   }
 
   private isNearBottom(): boolean {

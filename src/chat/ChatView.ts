@@ -136,6 +136,9 @@ export class ChatView extends ItemView {
         this.composer?.refreshVisionIndicator(
           this.sessionStore?.getResolvedConversationModel() ?? null
         );
+        this.composer?.refreshAttachButton(
+          this.sessionStore?.getResolvedConversationModel() ?? null
+        );
       },
       onContextToggle: () => {
         this.cachedDocumentContext = null;
@@ -502,6 +505,9 @@ export class ChatView extends ItemView {
     this.composer.refreshVisionIndicator(
       this.sessionStore.getResolvedConversationModel()
     );
+    this.composer.refreshAttachButton(
+      this.sessionStore.getResolvedConversationModel()
+    );
     this.modelSelector?.syncActiveModel();
 
     this.profilePopover?.syncVisibility();
@@ -524,6 +530,7 @@ export class ChatView extends ItemView {
     const model = this.sessionStore.getResolvedConversationModel();
     this.composer.refreshToolUseIndicator(model);
     this.composer.refreshVisionIndicator(model);
+    this.composer.refreshAttachButton(model);
     this.composer.refreshKnowledgeIndicator(
       this.plugin.services.ragService.isReady(),
       this.plugin.services.graphService.isReady(),

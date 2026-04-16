@@ -1,5 +1,6 @@
 import { MAX_CONVERSATIONS } from "../../constants";
 import type {
+  Attachment,
   ChatHistory,
   Conversation,
   ConversationMeta,
@@ -152,6 +153,17 @@ export function normalizeConversation(raw: Record<string, unknown>): Conversatio
           }
           if (Array.isArray(message.agenticSteps)) {
             base.agenticSteps = message.agenticSteps as ConversationMessage["agenticSteps"];
+          }
+          if (Array.isArray(message.attachments)) {
+            const valid = (message.attachments as unknown[]).filter(
+              (a): a is Attachment =>
+                !!a &&
+                typeof a === "object" &&
+                typeof (a as Record<string, unknown>).type === "string" &&
+                typeof (a as Record<string, unknown>).id === "string" &&
+                typeof (a as Record<string, unknown>).data === "string",
+            );
+            if (valid.length > 0) base.attachments = valid;
           }
 
           return base;

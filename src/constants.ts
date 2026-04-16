@@ -15,6 +15,11 @@ export const MAX_CONVERSATIONS = 50;
 export const CONTEXT_WARNING_THRESHOLD = 0.80;
 export const CONTEXT_DANGER_THRESHOLD = 0.95;
 
+export const MAX_IMAGE_SIZE_BYTES = 20 * 1024 * 1024; // 20 MB
+export const SUPPORTED_IMAGE_TYPES: ReadonlySet<string> = new Set([
+  "image/jpeg", "image/png", "image/gif", "image/webp",
+]);
+
 export const DEFAULT_CHAT_HISTORY: ChatHistory = {
   conversations: [],
   activeConversationId: null,

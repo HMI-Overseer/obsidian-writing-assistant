@@ -1,4 +1,4 @@
-import type { Message, SamplingParams } from "../shared/types";
+import type { Message, OpenAIContentPart, SamplingParams } from "../shared/types";
 import type { ChatRequest } from "../shared/chatRequest";
 import type { ChatClient } from "./chatClient";
 import type { CompletionResult, StreamResult, UsageResult, StopReason } from "./usageTypes";
@@ -193,6 +193,21 @@ export class OpenAIClient implements ChatClient {
           content: turn.content ?? "",
           tool_call_id: turn.toolCallId,
         });
+      } else if (turn.role === "user" && turn.attachments?.length) {
+        // User turn with image attachments: build multipart content array.
+        const parts: OpenAIContentPart[] = [];
+        for (const attachment of turn.attachments) {
+          if (attachment.type === "image") {
+            parts.push({
+              type: "image_url",
+              image_url: { url: `data:${attachment.mimeType};base64,${attachment.data}` },
+            });
+          }
+        }
+        if (turn.content) {
+          parts.push({ type: "text", text: turn.content });
+        }
+        messages.push({ role: "user", content: parts });
       } else {
         messages.push({ role: turn.role as "system" | "user" | "assistant", content: turn.content ?? "" });
       }
@@ -201,10 +216,7 @@ export class OpenAIClient implements ChatClient {
     if (request.ragContext && request.ragContext.length > 0 && messages.length > 0) {
       const lastIdx = messages.length - 1;
       if (messages[lastIdx].role === "user") {
-        messages[lastIdx] = {
-          ...messages[lastIdx],
-          content: messages[lastIdx].content + "\n\n" + formatRagContext(request.ragContext),
-        };
+        appendTextToOpenAIMessage(messages[lastIdx], formatRagContext(request.ragContext));
       }
     }
 
@@ -248,6 +260,18 @@ function extractUsage(json: Record<string, unknown>): UsageResult | null {
     return { inputTokens, outputTokens };
   }
   return null;
+}
+
+/**
+ * Appends a text segment to an OpenAI user message, handling both
+ * plain-string and multipart content-array formats.
+ */
+function appendTextToOpenAIMessage(message: Message, text: string): void {
+  if (typeof message.content === "string") {
+    message.content = message.content + "\n\n" + text;
+  } else if (Array.isArray(message.content)) {
+    (message.content as OpenAIContentPart[]).push({ type: "text", text });
+  }
 }
 
 function mapOpenAIStopReason(raw: string | undefined): StopReason {

@@ -8,6 +8,7 @@ const DEFAULT_MAX_TOKENS = 4096;
 /** Content block types used in Anthropic messages. */
 export type AnthropicContentBlock =
   | { type: "text"; text: string }
+  | { type: "image"; source: { type: "base64"; media_type: string; data: string } }
   | { type: "tool_use"; id: string; name: string; input: Record<string, unknown> }
   | { type: "tool_result"; tool_use_id: string; content: string };
 
@@ -80,6 +81,21 @@ export function buildAnthropicMessages(
       } else {
         messages.push({ role: "user", content: [block] });
       }
+    } else if (turn.role === "user" && turn.attachments?.length) {
+      // User turn with image attachments: build a content-block array.
+      const blocks: AnthropicContentBlock[] = [];
+      for (const attachment of turn.attachments) {
+        if (attachment.type === "image") {
+          blocks.push({
+            type: "image",
+            source: { type: "base64", media_type: attachment.mimeType, data: attachment.data },
+          });
+        }
+      }
+      if (turn.content) {
+        blocks.push({ type: "text", text: turn.content });
+      }
+      messages.push({ role: "user", content: blocks });
     } else {
       messages.push({ role: turn.role as "user" | "assistant", content: turn.content ?? "" });
     }
@@ -90,10 +106,7 @@ export function buildAnthropicMessages(
   if (request.ragContext && request.ragContext.length > 0 && messages.length > 0) {
     const lastIdx = messages.length - 1;
     if (messages[lastIdx].role === "user") {
-      messages[lastIdx] = {
-        ...messages[lastIdx],
-        content: messages[lastIdx].content + "\n\n" + formatRagContext(request.ragContext),
-      };
+      appendTextToUserMessage(messages[lastIdx], formatRagContext(request.ragContext));
     }
   }
 
@@ -157,4 +170,16 @@ export function buildAnthropicPayload(
   // minP and repeatPenalty are intentionally omitted — Anthropic does not support them.
 
   return JSON.stringify(body);
+}
+
+/**
+ * Appends a text segment to a user message, handling both plain-string
+ * and content-block-array formats.
+ */
+function appendTextToUserMessage(message: AnthropicMessage, text: string): void {
+  if (typeof message.content === "string") {
+    message.content = message.content + "\n\n" + text;
+  } else if (Array.isArray(message.content)) {
+    (message.content as AnthropicContentBlock[]).push({ type: "text", text });
+  }
 }

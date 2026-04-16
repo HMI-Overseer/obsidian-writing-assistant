@@ -31,6 +31,8 @@ export interface PrepareMessagesOptions {
   activeProvider?: ProviderOption;
   /** Per-model capabilities (LM Studio). */
   modelCapabilities?: { trainedForToolUse?: boolean };
+  /** Whether the active model supports vision (image input). */
+  supportsVision?: boolean;
   /** Chat client for internal LLM calls (query rewriting). */
   chatClient?: ChatClient;
   /** Completion model ID for internal LLM calls. */
@@ -59,6 +61,7 @@ export async function prepareApiMessages(
     completionModelId,
     profileSystemPrompt = "",
     disableBuiltinSystemPrompts = false,
+    supportsVision = false,
   } = options;
 
   const editMode = mode === "edit";
@@ -117,6 +120,7 @@ export async function prepareApiMessages(
       content: editMode && message.editProposal
         ? formatEditMessageContent(message)
         : message.content,
+      ...(supportsVision && message.attachments?.length && { attachments: message.attachments }),
     }));
 
   // Retrieve RAG context based on the latest user message.

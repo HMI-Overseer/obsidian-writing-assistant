@@ -73,7 +73,9 @@ export async function sendMessage(options: SendMessageOptions): Promise<void> {
     await syncConversationUi();
   }
 
+  const pendingAttachments = composer.getAttachments();
   composer.clearDraft();
+  composer.clearAttachments();
   store.setDraft("");
   setIsGenerating(true);
 
@@ -82,8 +84,11 @@ export async function sendMessage(options: SendMessageOptions): Promise<void> {
   }
 
   const userMessage = makeMessage("user", text);
+  if (pendingAttachments.length > 0) {
+    userMessage.attachments = pendingAttachments;
+  }
   const userBubble = transcript.createBubble("user", userMessage.id);
-  await transcript.renderBubbleContent(userBubble, text);
+  await transcript.renderBubbleContent(userBubble, text, { attachments: userMessage.attachments });
   store.appendMessage(userMessage);
   transcript.setEmptyStateVisible(false);
 

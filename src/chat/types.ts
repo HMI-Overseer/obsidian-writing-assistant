@@ -37,7 +37,6 @@ export type ChatLayoutRefs = {
   knowledgeIndicatorEl: HTMLElement;
   knowledgePopoverEl: HTMLElement;
   visionIndicatorEl: HTMLElement;
-  attachBtn: HTMLButtonElement;
   attachmentsEl: HTMLElement;
   actionBtn: HTMLButtonElement;
   modelSelectorBtn: HTMLElement;

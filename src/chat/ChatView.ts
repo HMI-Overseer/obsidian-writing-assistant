@@ -136,7 +136,7 @@ export class ChatView extends ItemView {
         this.composer?.refreshVisionIndicator(
           this.sessionStore?.getResolvedConversationModel() ?? null
         );
-        this.composer?.refreshAttachButton(
+        this.composer?.refreshVisionSupport(
           this.sessionStore?.getResolvedConversationModel() ?? null
         );
       },
@@ -338,6 +338,10 @@ export class ChatView extends ItemView {
       onAddVaultNote: (filePath, fileName) => {
         this.composer?.addExtraContextItem({ filePath, fileName });
       },
+      canAttachImages: () => this.composer?.canAttachImages() ?? false,
+      onAttachImage: () => {
+        this.composer?.openImagePicker();
+      },
       onBeforeOpen: () => {
         if (this.knowledgePopover?.isOpen()) this.knowledgePopover.close();
         if (this.toolUsePopover?.isOpen()) this.toolUsePopover.close();
@@ -505,7 +509,7 @@ export class ChatView extends ItemView {
     this.composer.refreshVisionIndicator(
       this.sessionStore.getResolvedConversationModel()
     );
-    this.composer.refreshAttachButton(
+    this.composer.refreshVisionSupport(
       this.sessionStore.getResolvedConversationModel()
     );
     this.modelSelector?.syncActiveModel();
@@ -530,7 +534,7 @@ export class ChatView extends ItemView {
     const model = this.sessionStore.getResolvedConversationModel();
     this.composer.refreshToolUseIndicator(model);
     this.composer.refreshVisionIndicator(model);
-    this.composer.refreshAttachButton(model);
+    this.composer.refreshVisionSupport(model);
     this.composer.refreshKnowledgeIndicator(
       this.plugin.services.ragService.isReady(),
       this.plugin.services.graphService.isReady(),

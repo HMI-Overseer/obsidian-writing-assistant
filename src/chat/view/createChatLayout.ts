@@ -163,11 +163,6 @@ export function createChatLayout(contentEl: HTMLElement): ChatLayoutRefs {
   setIcon(knowledgeIndicatorEl, "database");
   const visionIndicatorEl = composerFooterActions.createDiv({ cls: "lmsa-chat-composer-vision-indicator" });
   setIcon(visionIndicatorEl, "eye");
-  const attachBtn = composerFooterActions.createEl("button", {
-    cls: "lmsa-chat-composer-attach-btn lmsa-hidden",
-    attr: { "aria-label": "Attach image" },
-  }) as HTMLButtonElement;
-  setIcon(attachBtn, "paperclip");
   const modeToggleEl = composerFooterActions.createDiv({ cls: "lmsa-chat-composer-mode-toggle" });
 
   const actionBtn = composerFooterActions.createEl("button", {
@@ -196,7 +191,6 @@ export function createChatLayout(contentEl: HTMLElement): ChatLayoutRefs {
     knowledgeIndicatorEl,
     knowledgePopoverEl,
     visionIndicatorEl,
-    attachBtn,
     attachmentsEl,
     actionBtn,
     modelSelectorBtn: headerMetaBtn,

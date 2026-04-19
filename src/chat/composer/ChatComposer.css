@@ -209,34 +209,6 @@
     background: color-mix(in srgb, var(--lmsa-mode-accent) 6%, var(--background-primary)) !important;
   }
 
-  /* ── Attach button ──────────────────────────────────────────────────────── */
-
-  .lmsa-chat-composer-attach-btn {
-    @apply lmsa-inline-flex lmsa-cursor-pointer lmsa-items-center lmsa-justify-center lmsa-border-none;
-    width: 28px;
-    height: 28px;
-    padding: 0;
-    border-radius: 7px;
-    border: 1px solid var(--background-modifier-border) !important;
-    background: transparent !important;
-    color: var(--text-muted);
-    box-shadow: none !important;
-    outline: none;
-    appearance: none;
-    min-height: unset;
-    transition: color 0.15s ease, border-color 0.15s ease;
-  }
-
-  .lmsa-chat-composer-attach-btn:hover {
-    color: var(--text-normal);
-    border-color: color-mix(in srgb, var(--text-muted) 45%, var(--background-modifier-border)) !important;
-  }
-
-  .lmsa-chat-composer-attach-btn svg {
-    width: 14px;
-    height: 14px;
-  }
-
   /* ── Textarea ────────────────────────────────────────────────────────────── */
 
   .lmsa-chat-composer-textarea {
@@ -511,9 +483,6 @@
 
   @container lmsa-composer-footer (max-width: 420px) {
     .lmsa-chat-composer-vision-indicator {
-      display: none;
-    }
-    .lmsa-chat-composer-attach-btn {
       display: none;
     }
   }

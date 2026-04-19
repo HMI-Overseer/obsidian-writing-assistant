@@ -7,6 +7,8 @@ export type ContextPickerPopoverCallbacks = {
   getActiveFileName: () => string | null;
   onAddActiveNote: () => void;
   onAddVaultNote: (filePath: string, fileName: string) => void;
+  canAttachImages: () => boolean;
+  onAttachImage: () => void;
   onBeforeOpen?: () => void;
 };
 
@@ -134,6 +136,22 @@ export class ContextPickerPopover {
     vaultRow.addEventListener("click", () => {
       this.enterSearchMode();
     });
+
+    // ── "Attach image" row (only when the active model supports vision) ──────
+    if (this.callbacks.canAttachImages()) {
+      const imageRow = el.createDiv({ cls: "lmsa-context-picker-row" });
+
+      const imageIcon = imageRow.createEl("span", { cls: "lmsa-context-picker-row-icon" });
+      setIcon(imageIcon, "image");
+
+      const imageLabel = imageRow.createEl("span", { cls: "lmsa-context-picker-row-label" });
+      imageLabel.createEl("span", { cls: "lmsa-context-picker-row-title", text: "Attach image" });
+
+      imageRow.addEventListener("click", () => {
+        this.close();
+        this.callbacks.onAttachImage();
+      });
+    }
   }
 
   private enterSearchMode(): void {

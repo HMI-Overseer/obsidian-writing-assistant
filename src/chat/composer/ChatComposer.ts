@@ -38,6 +38,7 @@ export class ChatComposer {
   private activeNoteAttached: boolean;
   private extraContextItems: ExtraContextItem[] = [];
   private stagedAttachments: Attachment[] = [];
+  private supportsVision = false;
   private isSending = false;
   private currentMode: ChatMode = "conversation";
   private modeButtons = new Map<ChatMode, HTMLButtonElement>();
@@ -48,7 +49,6 @@ export class ChatComposer {
   private readonly handleDragOver: (event: DragEvent) => void;
   private readonly handleDragLeave: () => void;
   private readonly handleDrop: (event: DragEvent) => void;
-  private readonly handleAttachClick: () => void;
 
   constructor(
     private readonly app: App,
@@ -62,7 +62,6 @@ export class ChatComposer {
       | "toolUsePopoverEl"
       | "knowledgeIndicatorEl"
       | "visionIndicatorEl"
-      | "attachBtn"
       | "attachmentsEl"
       | "actionBtn"
     >,
@@ -139,25 +138,28 @@ export class ChatComposer {
       composerPanel.addEventListener("drop", this.handleDrop);
     }
 
-    this.handleAttachClick = () => {
-      if (!this.canAttachImages()) {
-        new Notice("The active model does not support image input.");
-        return;
-      }
-      const input = document.createElement("input");
-      input.type = "file";
-      input.accept = "image/jpeg,image/png,image/gif,image/webp";
-      input.multiple = true;
-      input.addEventListener("change", () => {
-        if (input.files && input.files.length > 0) {
-          this.processImageFiles(Array.from(input.files));
-        }
-      });
-      input.click();
-    };
-    this.refs.attachBtn.addEventListener("click", this.handleAttachClick);
-
     this.renderModeToggle();
+  }
+
+  /**
+   * Opens a file picker for the user to select images.
+   * Called from the context picker popover's "Attach image" option.
+   */
+  openImagePicker(): void {
+    if (!this.canAttachImages()) {
+      new Notice("The active model does not support image input.");
+      return;
+    }
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = "image/jpeg,image/png,image/gif,image/webp";
+    input.multiple = true;
+    input.addEventListener("change", () => {
+      if (input.files && input.files.length > 0) {
+        this.processImageFiles(Array.from(input.files));
+      }
+    });
+    input.click();
   }
 
   getMode(): ChatMode {
@@ -255,15 +257,15 @@ export class ChatComposer {
   }
 
   /**
-   * Updates the attach button visibility based on the active model's vision capability.
+   * Updates the internal vision-support state based on the active model's capability.
+   * Called alongside the vision indicator refresh so image attachment stays in sync.
    */
-  refreshAttachButton(activeModel: CompletionModel | null): void {
-    const supportsVision = activeModel
+  refreshVisionSupport(activeModel: CompletionModel | null): void {
+    this.supportsVision = activeModel
       ? (activeModel.vision
         ?? this.plugin.services.modelAvailability.getVision(activeModel.modelId)
         ?? false)
       : false;
-    this.refs.attachBtn.toggleClass("lmsa-hidden", !supportsVision);
   }
 
   updateContextChips(): void {
@@ -373,7 +375,6 @@ export class ChatComposer {
     this.refs.textareaEl.removeEventListener("input", this.handleInput);
     this.refs.actionBtn.removeEventListener("click", this.handleActionClick);
     this.refs.textareaEl.removeEventListener("paste", this.handlePaste);
-    this.refs.attachBtn.removeEventListener("click", this.handleAttachClick);
     const composerPanel = this.refs.textareaEl.parentElement;
     if (composerPanel) {
       composerPanel.removeEventListener("dragover", this.handleDragOver);
@@ -400,11 +401,11 @@ export class ChatComposer {
 
   /**
    * Whether the active model supports image attachments.
-   * Derived from the attach button visibility, which is kept in sync with the
-   * full vision resolution chain (CompletionModel.vision ?? ModelAvailabilityService).
+   * Kept in sync via refreshVisionSupport() using the full vision resolution chain
+   * (CompletionModel.vision ?? ModelAvailabilityService).
    */
   canAttachImages(): boolean {
-    return !this.refs.attachBtn.hasClass("lmsa-hidden");
+    return this.supportsVision;
   }
 
   private processImageFiles(files: File[]): void {

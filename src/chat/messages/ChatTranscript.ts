@@ -1,6 +1,9 @@
-import { type App, Component, MarkdownRenderer, setIcon } from "obsidian";
+import { setIcon } from "obsidian";
+import type { App, Component } from "obsidian";
 import type { Attachment, ConversationMessage } from "../../shared/types";
 import type { BubbleRefs, BubbleRenderOptions, ChatLayoutRefs } from "../types";
+import type { MarkdownBubbleRenderer } from "../rendering/MarkdownBubbleRenderer";
+import { MarkdownItBubbleRenderer } from "../rendering/MarkdownItBubbleRenderer";
 import { BubbleActionToolbar } from "./BubbleActionToolbar";
 import { BubbleVersionNav } from "./BubbleVersionNav";
 import { renderUsageBadge } from "./UsageBadge";
@@ -19,16 +22,20 @@ export type BubbleActionCallbacks = {
 const AUTO_SCROLL_BOTTOM_THRESHOLD_PX = 10;
 
 export class ChatTranscript {
-  private bubbleRenderChildren = new Map<HTMLElement, Component>();
   private bubblesByMessageId = new Map<string, BubbleRefs>();
   private renderedMessageIds: string[] = [];
   private shouldAutoScroll = true;
+  private readonly markdownRenderer: MarkdownBubbleRenderer;
 
   constructor(
     private readonly owner: Component,
     private readonly app: App,
-    private readonly refs: Pick<ChatLayoutRefs, "messagesEl" | "emptyStateEl">
+    private readonly refs: Pick<ChatLayoutRefs, "messagesEl" | "emptyStateEl">,
+    markdownRenderer?: MarkdownBubbleRenderer
   ) {
+    this.markdownRenderer =
+      markdownRenderer ??
+      new MarkdownItBubbleRenderer();
     this.owner.registerDomEvent(this.refs.messagesEl, "scroll", () => {
       this.shouldAutoScroll = this.isNearBottom();
     });
@@ -257,7 +264,7 @@ export class ChatTranscript {
   }
 
   clear(): void {
-    this.clearAllBubbleMarkdownRenders();
+    this.markdownRenderer.clearAll();
     this.bubblesByMessageId.clear();
     this.renderedMessageIds = [];
     this.refs.messagesEl.empty();
@@ -265,11 +272,11 @@ export class ChatTranscript {
   }
 
   destroy(): void {
-    this.clearAllBubbleMarkdownRenders();
+    this.markdownRenderer.clearAll();
   }
 
   renderPlainTextContent(bubble: BubbleRefs, text: string): void {
-    this.clearBubbleMarkdownRender(bubble.contentEl);
+    this.markdownRenderer.clear(bubble.contentEl);
     bubble.contentEl.empty();
     bubble.contentEl.removeClass("lmsa-chat-window-message-content--markdown");
     bubble.contentEl.addClass("lmsa-chat-window-message-content--plain");
@@ -286,25 +293,26 @@ export class ChatTranscript {
       bubble.bodyEl.removeClass("is-streaming");
     }
 
-    if (bubble.role === "assistant") {
-      await this.renderAssistantMarkdown(bubble, text, options);
-      return;
-    }
-
-    // Render image attachments above the text for user bubbles.
     if (options.attachments?.length) {
-      this.clearBubbleMarkdownRender(bubble.contentEl);
-      bubble.contentEl.empty();
-      bubble.contentEl.removeClass("lmsa-chat-window-message-content--markdown");
-      bubble.contentEl.addClass("lmsa-chat-window-message-content--plain");
-      this.renderAttachmentGallery(bubble.contentEl, options.attachments);
-      if (text) {
-        bubble.contentEl.createEl("span", { text });
+      const markdownHostEl = this.prepareBubbleContentWithAttachments(bubble, options.attachments);
+      if (!text) return;
+
+      try {
+        await this.markdownRenderer.render(markdownHostEl, text);
+      } catch {
+        this.prepareBubbleContentWithAttachments(bubble, options.attachments).setText(text);
       }
       return;
     }
 
-    this.renderPlainTextContent(bubble, text);
+    bubble.contentEl.removeClass("lmsa-chat-window-message-content--plain");
+    bubble.contentEl.addClass("lmsa-chat-window-message-content--markdown");
+
+    try {
+      await this.markdownRenderer.render(bubble.contentEl, text);
+    } catch {
+      this.renderPlainTextContent(bubble, text);
+    }
   }
 
   private renderAttachmentGallery(containerEl: HTMLElement, attachments: Attachment[]): void {
@@ -323,6 +331,18 @@ export class ChatTranscript {
     }
   }
 
+  private prepareBubbleContentWithAttachments(
+    bubble: BubbleRefs,
+    attachments: Attachment[]
+  ): HTMLElement {
+    this.markdownRenderer.clear(bubble.contentEl);
+    bubble.contentEl.empty();
+    bubble.contentEl.removeClass("lmsa-chat-window-message-content--plain");
+    bubble.contentEl.addClass("lmsa-chat-window-message-content--markdown");
+    this.renderAttachmentGallery(bubble.contentEl, attachments);
+    return bubble.contentEl.createDiv({ cls: "lmsa-chat-window-message-markdown-host" });
+  }
+
   private isNearBottom(): boolean {
     const distanceFromBottom =
       this.refs.messagesEl.scrollHeight -
@@ -331,78 +351,6 @@ export class ChatTranscript {
 
     return distanceFromBottom <= AUTO_SCROLL_BOTTOM_THRESHOLD_PX;
   }
-
-  private clearBubbleMarkdownRender(contentEl: HTMLElement): void {
-    const child = this.bubbleRenderChildren.get(contentEl);
-    if (!child) return;
-
-    this.owner.removeChild(child);
-    this.bubbleRenderChildren.delete(contentEl);
-  }
-
-  private clearAllBubbleMarkdownRenders(): void {
-    for (const child of this.bubbleRenderChildren.values()) {
-      this.owner.removeChild(child);
-    }
-
-    this.bubbleRenderChildren.clear();
-  }
-
-  private getMarkdownSourcePath(): string {
-    return this.app.workspace.getActiveFile()?.path ?? "";
-  }
-
-  private async renderAssistantMarkdown(
-    bubble: BubbleRefs,
-    text: string,
-    options: BubbleRenderOptions = {}
-  ): Promise<void> {
-    const renderVersion = Number(bubble.contentEl.dataset.lmsaRenderVersion ?? "0") + 1;
-    bubble.contentEl.dataset.lmsaRenderVersion = String(renderVersion);
-
-    this.clearBubbleMarkdownRender(bubble.contentEl);
-    bubble.bodyEl.removeClass("is-error", "is-muted");
-    if (!options.preserveStreaming) {
-      bubble.bodyEl.removeClass("is-streaming");
-    }
-    bubble.contentEl.empty();
-    bubble.contentEl.removeClass("lmsa-chat-window-message-content--plain");
-    bubble.contentEl.addClass("lmsa-chat-window-message-content--markdown");
-
-    const renderChild = new Component();
-    this.owner.addChild(renderChild);
-    this.bubbleRenderChildren.set(bubble.contentEl, renderChild);
-
-    try {
-      await MarkdownRenderer.render(
-        this.app,
-        text,
-        bubble.contentEl,
-        this.getMarkdownSourcePath(),
-        renderChild
-      );
-    } catch {
-      if (this.bubbleRenderChildren.get(bubble.contentEl) === renderChild) {
-        this.bubbleRenderChildren.delete(bubble.contentEl);
-      }
-      this.owner.removeChild(renderChild);
-      this.renderPlainTextContent(bubble, text);
-      return;
-    }
-
-    const isCurrentRender =
-      this.bubbleRenderChildren.get(bubble.contentEl) === renderChild &&
-      bubble.contentEl.dataset.lmsaRenderVersion === String(renderVersion) &&
-      bubble.contentEl.isConnected;
-
-    if (!isCurrentRender) {
-      if (this.bubbleRenderChildren.get(bubble.contentEl) === renderChild) {
-        this.bubbleRenderChildren.delete(bubble.contentEl);
-      }
-      this.owner.removeChild(renderChild);
-    }
-  }
-
   private findLastAssistantIndex(messages: ConversationMessage[]): number {
     for (let i = messages.length - 1; i >= 0; i--) {
       if (messages[i].role === "assistant") return i;

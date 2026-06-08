@@ -1,0 +1,36 @@
+import { describe, expect, test } from "vitest";
+import {
+  normalizeMessageMarkdown,
+  renderMessageMarkdownToHtml,
+} from "../../../src/chat/rendering/messageMarkdown";
+
+describe("normalizeMessageMarkdown", () => {
+  test("normalizes newlines without altering content", () => {
+    expect(normalizeMessageMarkdown("A\r\n\u200B```md\r\ntext\r\n```"))
+      .toBe("A\n\u200B```md\ntext\n```");
+  });
+});
+
+describe("renderMessageMarkdownToHtml", () => {
+  test("adds safe attributes to rendered links", () => {
+    const html = renderMessageMarkdownToHtml("[Docs](https://example.com)");
+
+    expect(html).toContain('target="_blank"');
+    expect(html).toContain('rel="noopener noreferrer nofollow"');
+  });
+
+  test("renders fenced code blocks with chat chrome", () => {
+    const html = renderMessageMarkdownToHtml("```ts\nconst value = 1;\n```");
+
+    expect(html).toContain('class="lmsa-md-codeblock"');
+    expect(html).toContain('class="lmsa-md-codeblock-language">ts<');
+    expect(html).toContain("const value = 1;");
+  });
+
+  test("wraps tables for horizontal scrolling", () => {
+    const html = renderMessageMarkdownToHtml("| A | B |\n| --- | --- |\n| 1 | 2 |");
+
+    expect(html).toContain('class="lmsa-md-table-wrap"');
+    expect(html).toContain("<table>");
+  });
+});

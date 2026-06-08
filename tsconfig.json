@@ -13,5 +13,5 @@
     "noFallthroughCasesInSwitch": true,
     "lib": ["DOM", "ES2018"]
   },
-  "include": ["src/**/*.ts"]
+  "include": ["src/**/*.ts", "src/**/*.d.ts"]
 }

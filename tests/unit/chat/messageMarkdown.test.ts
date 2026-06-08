@@ -15,8 +15,8 @@ describe("renderMessageMarkdownToHtml", () => {
   test("adds safe attributes to rendered links", () => {
     const html = renderMessageMarkdownToHtml("[Docs](https://example.com)");
 
-    expect(html).toContain('target="_blank"');
-    expect(html).toContain('rel="noopener noreferrer nofollow"');
+    expect(html).toContain('data-lmsa-link-href="https://example.com"');
+    expect(html).toContain('rel="nofollow"');
   });
 
   test("renders fenced code blocks with chat chrome", () => {

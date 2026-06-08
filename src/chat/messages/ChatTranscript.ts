@@ -60,6 +60,7 @@ export class ChatTranscript {
   private canIncrementalUpdate(newIds: string[]): boolean {
     if (this.renderedMessageIds.length === 0) return false;
     if (this.renderedMessageIds.length > newIds.length) return false;
+    if (this.renderedMessageIds.length === newIds.length) return false;
 
     for (let i = 0; i < this.renderedMessageIds.length; i++) {
       if (this.renderedMessageIds[i] !== newIds[i]) return false;

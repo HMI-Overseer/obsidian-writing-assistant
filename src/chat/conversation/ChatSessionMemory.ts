@@ -70,6 +70,22 @@ export class ChatSessionMemory {
     if (!message) return false;
 
     message.content = newContent;
+
+    if (message.versions?.length) {
+      const activeVersionIndex = message.activeVersionIndex ?? message.versions.length - 1;
+      const activeVersion = message.versions[activeVersionIndex];
+      if (activeVersion) {
+        activeVersion.content = newContent;
+      }
+    }
+
+    if (message.role === "assistant") {
+      const lastAssistant = [...this.messageHistory].reverse().find((m) => m.role === "assistant");
+      if (lastAssistant?.id === messageId) {
+        this.lastAssistantResponse = newContent;
+      }
+    }
+
     return true;
   }
 

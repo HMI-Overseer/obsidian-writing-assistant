@@ -285,6 +285,10 @@ export default class WritingAssistantChat extends Plugin {
         typeof data?.includeNoteContext === "boolean"
           ? data.includeNoteContext
           : DEFAULT_SETTINGS.includeNoteContext,
+      includeLocalAttachmentsAsContext:
+        typeof data?.includeLocalAttachmentsAsContext === "boolean"
+          ? data.includeLocalAttachmentsAsContext
+          : DEFAULT_SETTINGS.includeLocalAttachmentsAsContext,
       maxContextChars:
         typeof data?.maxContextChars === "number"
           ? data.maxContextChars

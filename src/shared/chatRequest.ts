@@ -1,4 +1,4 @@
-import type { AnthropicCacheSettings, Attachment } from "./types";
+import type { AnthropicCacheSettings, Attachment, ImageMimeType } from "./types";
 import type { CanonicalToolDefinition } from "../tools/types";
 
 /** A context item manually attached by the user via the context picker. */
@@ -55,6 +55,15 @@ export interface RagContextBlock {
   graphContext?: GraphContextAnnotation;
 }
 
+/** A local image embedded in an attached note, resolved for vision-capable models. */
+export interface NoteImageContextItem {
+  noteFilePath: string;
+  imageFilePath: string;
+  fileName: string;
+  mimeType: ImageMimeType;
+  data: string;
+}
+
 /**
  * Provider-independent chat completion request.
  * Produced by the chat domain, consumed by provider-specific clients.
@@ -76,4 +85,6 @@ export interface ChatRequest {
   tools?: CanonicalToolDefinition[] | null;
   /** Additional context notes manually attached by the user. */
   additionalContextItems?: AdditionalContextItem[];
+  /** Local image embeds resolved from attached notes for vision-capable models only. */
+  noteImageContext?: NoteImageContextItem[];
 }

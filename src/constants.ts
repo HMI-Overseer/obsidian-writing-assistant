@@ -1,6 +1,7 @@
 import type { ChatHistory, KnowledgeGraphSettings, PluginSettings, ProviderOption, ProviderProfile, RagSettings } from "./shared/types";
 import { EDIT_SYSTEM_PROMPT } from "./editing/regexEditSystemPrompt";
 import { TOOL_EDIT_SYSTEM_PROMPT } from "./tools/editing/systemPrompt";
+import type { ImageMimeType } from "./shared/types";
 
 export const VIEW_TYPE_CHAT = "writing-assistant-chat";
 
@@ -19,6 +20,16 @@ export const MAX_IMAGE_SIZE_BYTES = 20 * 1024 * 1024; // 20 MB
 export const SUPPORTED_IMAGE_TYPES: ReadonlySet<string> = new Set([
   "image/jpeg", "image/png", "image/gif", "image/webp",
 ]);
+export const SUPPORTED_IMAGE_MIME_BY_EXTENSION: Readonly<Record<string, ImageMimeType>> = {
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  png: "image/png",
+  gif: "image/gif",
+  webp: "image/webp",
+};
+export const MAX_NOTE_CONTEXT_IMAGES = 4;
+export const MAX_NOTE_CONTEXT_IMAGE_SIZE_BYTES = 5 * 1024 * 1024; // 5 MB
+export const MAX_NOTE_CONTEXT_TOTAL_BYTES = 12 * 1024 * 1024; // 12 MB
 
 export const DEFAULT_CHAT_HISTORY: ChatHistory = {
   conversations: [],
@@ -86,6 +97,7 @@ export const DEFAULT_SETTINGS: PluginSettings = {
     openai: { apiKey: "", baseUrl: "https://api.openai.com/v1" },
   },
   includeNoteContext: true,
+  includeLocalAttachmentsAsContext: false,
   maxContextChars: 12000,
   providerProfiles: [],
   activeProfileIds: { ...DEFAULT_ACTIVE_PROFILE_IDS },

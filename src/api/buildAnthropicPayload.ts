@@ -1,5 +1,5 @@
 import type { SamplingParams, AnthropicCacheSettings } from "../shared/types";
-import type { ChatRequest } from "../shared/chatRequest";
+import type { ChatRequest, NoteImageContextItem } from "../shared/chatRequest";
 import type { AnthropicTool } from "../tools/formatters/anthropic";
 import { formatRagContext } from "../rag/formatContext";
 
@@ -101,6 +101,13 @@ export function buildAnthropicMessages(
     }
   }
 
+  if (request.noteImageContext?.length && messages.length > 0) {
+    const lastIdx = messages.length - 1;
+    if (messages[lastIdx].role === "user") {
+      appendNoteImageContextToUserMessage(messages[lastIdx], request.noteImageContext);
+    }
+  }
+
   // Inject RAG context after conversation history to preserve cache prefix.
   // Appended to the last user message so earlier messages remain cache-stable.
   if (request.ragContext && request.ragContext.length > 0 && messages.length > 0) {
@@ -182,4 +189,33 @@ function appendTextToUserMessage(message: AnthropicMessage, text: string): void 
   } else if (Array.isArray(message.content)) {
     (message.content as AnthropicContentBlock[]).push({ type: "text", text });
   }
+}
+
+function appendNoteImageContextToUserMessage(
+  message: AnthropicMessage,
+  images: NoteImageContextItem[],
+): void {
+  const blocks = ensureAnthropicUserBlocks(message);
+  for (const image of images) {
+    blocks.push({
+      type: "text",
+      text: `Embedded image from attached note (${image.noteFilePath}): ${image.fileName}`,
+    });
+    blocks.push({
+      type: "image",
+      source: { type: "base64", media_type: image.mimeType, data: image.data },
+    });
+  }
+}
+
+function ensureAnthropicUserBlocks(message: AnthropicMessage): AnthropicContentBlock[] {
+  if (Array.isArray(message.content)) {
+    return message.content as AnthropicContentBlock[];
+  }
+  const blocks: AnthropicContentBlock[] = [];
+  if (typeof message.content === "string" && message.content) {
+    blocks.push({ type: "text", text: message.content });
+  }
+  message.content = blocks;
+  return blocks;
 }

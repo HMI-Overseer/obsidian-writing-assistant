@@ -100,6 +100,30 @@ describe("buildAnthropicMessages", () => {
       { role: "assistant", content: "Hello" },
     ]);
   });
+
+  test("appends note image context to the user message", () => {
+    const { messages } = buildAnthropicMessages(
+      makeRequest({
+        messages: [{ role: "user", content: "Describe this note." }],
+        noteImageContext: [{
+          noteFilePath: "notes/story.md",
+          imageFilePath: "Assets/map.png",
+          fileName: "map.png",
+          mimeType: "image/png",
+          data: "AQID",
+        }],
+      })
+    );
+
+    expect(messages).toEqual([{
+      role: "user",
+      content: [
+        { type: "text", text: "Describe this note." },
+        { type: "text", text: "Embedded image from attached note (notes/story.md): map.png" },
+        { type: "image", source: { type: "base64", media_type: "image/png", data: "AQID" } },
+      ],
+    }]);
+  });
 });
 
 describe("buildAnthropicHeaders", () => {

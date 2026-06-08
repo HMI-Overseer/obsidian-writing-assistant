@@ -299,6 +299,7 @@ export interface KnowledgeGraphSettings {
 export interface PluginSettings {
   providerSettings: ProviderSettingsMap;
   includeNoteContext: boolean;
+  includeLocalAttachmentsAsContext: boolean;
   maxContextChars: number;
   completionModels: CompletionModel[];
   embeddingModels: EmbeddingModel[];

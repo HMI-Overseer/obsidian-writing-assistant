@@ -1,6 +1,7 @@
 import type { ConversationMessage, PluginSettings, ProviderOption } from "../../shared/types";
 import type { AdditionalContextItem, ChatRequest, ChatTurn, DocumentContext, ExtraContextItem, RagContextBlock } from "../../shared/chatRequest";
-import { getActiveNoteText, getFullNoteContent } from "../../context/noteContext";
+import { getFullNoteContent } from "../../context/noteContext";
+import { resolveNoteImageContext } from "../../context/noteImageContext";
 import { shouldUseToolCall } from "../../tools/registry";
 import { ALL_EDIT_TOOLS, EDIT_TOOL_NAMES } from "../../tools/editing/definition";
 import { buildEditToolSystemPrompt } from "../../tools/editing/systemPrompt";
@@ -9,7 +10,7 @@ import { THINK_TOOL } from "../../tools/think/definition";
 import { buildVaultToolSystemPrompt } from "../../tools/vault/systemPrompt";
 import type { CanonicalToolDefinition } from "../../tools/types";
 import type { ChatMode } from "../types";
-import type { App } from "obsidian";
+import type { App, TFile } from "obsidian";
 import type { ChatSessionStore } from "../conversation/ChatSessionStore";
 import type { RagService } from "../../rag";
 import type { ChatClient } from "../../api/chatClient";
@@ -70,8 +71,11 @@ export async function prepareApiMessages(
   const useEditTools = editMode && settings.agenticMode && modelCanUseTools && settings.preferToolUse;
 
   const systemPrompt = composeSystemPrompt(mode, useEditTools, settings, profileSystemPrompt);
+  const shouldIncludeNoteImages =
+    settings.includeLocalAttachmentsAsContext && supportsVision;
 
   let documentContext: DocumentContext | null = null;
+  const noteImageSources: Array<{ file: TFile; rawContent: string }> = [];
 
   if (editMode && activeNoteAttached) {
     const noteData = await getFullNoteContent(app);
@@ -81,17 +85,27 @@ export async function prepareApiMessages(
         content: noteData.content,
         isFull: true,
       };
+      const file = app.workspace.getActiveFile();
+      if (shouldIncludeNoteImages && file) {
+        noteImageSources.push({ file, rawContent: noteData.content });
+      }
     }
   } else if (activeNoteAttached) {
     const file = app.workspace.getActiveFile();
     if (file) {
-      const text = await getActiveNoteText(app, maxContextChars);
+      const raw = await app.vault.read(file);
+      const text = raw.length > maxContextChars
+        ? raw.slice(0, maxContextChars) + "\n\n[...note truncated...]"
+        : raw;
       if (text) {
         documentContext = {
           filePath: file.path,
           content: text,
           isFull: false,
         };
+      }
+      if (shouldIncludeNoteImages) {
+        noteImageSources.push({ file, rawContent: raw });
       }
     }
   }
@@ -108,9 +122,16 @@ export async function prepareApiMessages(
         ? raw.slice(0, maxContextChars) + "\n\n[...note truncated...]"
         : raw;
       resolved.push({ filePath: item.filePath, fileName: item.fileName, content });
+      if (shouldIncludeNoteImages) {
+        noteImageSources.push({ file, rawContent: raw });
+      }
     }
     if (resolved.length > 0) additionalContextItems = resolved;
   }
+
+  const noteImageContext = shouldIncludeNoteImages && noteImageSources.length > 0
+    ? await resolveNoteImageContext(app, noteImageSources)
+    : undefined;
 
   const messages: ChatTurn[] = store
     .getSnapshot()
@@ -200,7 +221,16 @@ export async function prepareApiMessages(
     ? profileSystemPrompt
     : systemPrompt + groundingNote + vaultGuidance + editGuidance;
 
-  return { systemPrompt: finalSystemPrompt, documentContext, ragContext, rewrittenQuery, messages, tools, additionalContextItems };
+  return {
+    systemPrompt: finalSystemPrompt,
+    documentContext,
+    ragContext,
+    rewrittenQuery,
+    messages,
+    tools,
+    additionalContextItems,
+    ...(noteImageContext?.length ? { noteImageContext } : {}),
+  };
 }
 
 /**

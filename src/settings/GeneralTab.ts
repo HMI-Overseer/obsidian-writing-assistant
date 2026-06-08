@@ -54,6 +54,18 @@ export function renderGeneralTab(container: HTMLElement, plugin: WritingAssistan
       })
     );
 
+  new SettingItem(context.bodyEl)
+    .setName("Include local attachments as context when supported")
+    .setDesc(
+      "When a note is attached and the active model supports vision, send supported local image embeds from that note as extra context."
+    )
+    .addToggle((toggle) =>
+      toggle.setValue(plugin.settings.includeLocalAttachmentsAsContext).onChange(async (value) => {
+        plugin.settings.includeLocalAttachmentsAsContext = value;
+        await plugin.saveSettings();
+      })
+    );
+
   // ── Support ─────────────────────────────────────────────────────────
   const support = createSettingsSection(
     container,

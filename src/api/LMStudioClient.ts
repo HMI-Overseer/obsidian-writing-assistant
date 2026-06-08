@@ -1,5 +1,5 @@
 import type { Message, OpenAIContentPart, SamplingParams } from "../shared/types";
-import type { ChatRequest } from "../shared/chatRequest";
+import type { ChatRequest, NoteImageContextItem } from "../shared/chatRequest";
 import type { ChatClient } from "./chatClient";
 import type { CompletionResult, StreamResult, UsageResult, StopReason } from "./usageTypes";
 import type { ToolCall } from "../tools/types";
@@ -287,6 +287,13 @@ export class LMStudioClient implements ChatClient {
       }
     }
 
+    if (request.noteImageContext?.length && messages.length > 0) {
+      const lastIdx = messages.length - 1;
+      if (messages[lastIdx].role === "user") {
+        appendNoteImageContextToOpenAIMessage(messages[lastIdx], request.noteImageContext);
+      }
+    }
+
     // RAG context is appended to the last user message (not a system message)
     // to prevent prompt injection from retrieved content being treated as instructions.
     if (request.ragContext && request.ragContext.length > 0 && messages.length > 0) {
@@ -310,6 +317,35 @@ function appendTextToOpenAIMessage(message: Message, text: string): void {
   } else if (Array.isArray(message.content)) {
     (message.content as OpenAIContentPart[]).push({ type: "text", text });
   }
+}
+
+function appendNoteImageContextToOpenAIMessage(
+  message: Message,
+  images: NoteImageContextItem[],
+): void {
+  const parts = ensureOpenAIUserParts(message);
+  for (const image of images) {
+    parts.push({
+      type: "text",
+      text: `Embedded image from attached note (${image.noteFilePath}): ${image.fileName}`,
+    });
+    parts.push({
+      type: "image_url",
+      image_url: { url: `data:${image.mimeType};base64,${image.data}` },
+    });
+  }
+}
+
+function ensureOpenAIUserParts(message: Message): OpenAIContentPart[] {
+  if (Array.isArray(message.content)) {
+    return message.content as OpenAIContentPart[];
+  }
+  const parts: OpenAIContentPart[] = [];
+  if (typeof message.content === "string" && message.content) {
+    parts.push({ type: "text", text: message.content });
+  }
+  message.content = parts;
+  return parts;
 }
 
 function mapOpenAIStopReason(raw: string | undefined): StopReason {

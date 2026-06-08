@@ -188,9 +188,45 @@
   }
 
   .lmsa-command-category-label {
-    @apply lmsa-text-xs lmsa-font-semibold lmsa-uppercase lmsa-tracking-wide;
-    color: var(--lmsa-text-secondary);
-    padding: 4px 0 2px;
+    @apply lmsa-flex lmsa-items-center lmsa-gap-3 lmsa-text-xs lmsa-font-semibold lmsa-uppercase lmsa-tracking-wide;
+    color: color-mix(in srgb, var(--lmsa-section-accent) 34%, var(--lmsa-text-primary));
+    letter-spacing: 0.14em;
+    margin: 14px 0 6px;
+    text-shadow: 0 0 10px color-mix(in srgb, var(--lmsa-section-accent) 12%, transparent);
+  }
+
+  .lmsa-command-category-label::before {
+    content: "";
+    width: 18px;
+    height: 2px;
+    border-radius: 999px;
+    background: linear-gradient(
+      90deg,
+      var(--lmsa-section-accent),
+      color-mix(in srgb, var(--lmsa-section-accent-secondary) 72%, var(--lmsa-section-accent))
+    );
+    box-shadow: 0 0 12px color-mix(in srgb, var(--lmsa-section-accent) 22%, transparent);
+  }
+
+  .lmsa-command-category-label::after {
+    content: "";
+    flex: 1;
+    height: 1px;
+    min-width: 48px;
+    background: linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--lmsa-section-accent) 30%, transparent),
+      color-mix(in srgb, var(--lmsa-section-accent-secondary) 16%, transparent),
+      transparent
+    );
+  }
+
+  .lmsa-command-category-label:first-child {
+    margin-top: 4px;
+  }
+  
+  .lmsa-command-category-label + .lmsa-item-row::before {
+    display: none;
   }
 
   /* ── Icon picker section (stacked layout so grid spans full width) ───── */

@@ -36,7 +36,7 @@ export class ChatTranscript {
   ) {
     this.markdownRenderer =
       markdownRenderer ??
-      new MarkdownItBubbleRenderer();
+      new MarkdownItBubbleRenderer(this.app);
     this.owner.registerDomEvent(this.refs.messagesEl, "scroll", () => {
       this.shouldAutoScroll = this.isNearBottom();
     });

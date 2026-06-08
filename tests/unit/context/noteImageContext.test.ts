@@ -14,27 +14,24 @@ function makeFile(path: string) {
 }
 
 describe("extractEmbeddedImageRefs", () => {
-  test("preserves embed order across wikilinks and markdown images", () => {
+  test("extracts only Obsidian image embeds", () => {
     const refs = extractEmbeddedImageRefs(
       "Before ![[map.png|400]] middle ![Scene](images/scene.webp) after"
     );
 
     expect(refs).toEqual([
-      { kind: "wikilink", target: "map.png" },
-      { kind: "markdown", target: "images/scene.webp" },
+      { target: "map.png" },
     ]);
   });
 });
 
 describe("resolveNoteImageContext", () => {
-  test("resolves local note images, skips remote links, and de-duplicates repeats", async () => {
+  test("resolves only Obsidian local image embeds and de-duplicates repeats", async () => {
     const noteFile = makeFile("notes/Story.md");
     const mapFile = makeFile("notes/map.png");
-    const sceneFile = makeFile("notes/images/scene.webp");
 
     const binaryByPath = new Map<string, Uint8Array>([
       [mapFile.path, new Uint8Array([1, 2, 3])],
-      [sceneFile.path, new Uint8Array([4, 5, 6])],
     ]);
 
     const app = {
@@ -42,19 +39,12 @@ describe("resolveNoteImageContext", () => {
         getFirstLinkpathDest: (linkpath: string, sourcePath: string) => {
           if (sourcePath !== noteFile.path) return null;
           if (linkpath === "map.png") return mapFile;
-          if (linkpath === "images/scene.webp") return sceneFile;
-          if (linkpath === "notes/images/scene.webp") return sceneFile;
           return null;
         },
       },
       vault: {
         readBinary: async (file: { path: string }) =>
           binaryByPath.get(file.path)?.buffer ?? new ArrayBuffer(0),
-        getFileByPath: (path: string) => {
-          if (path === mapFile.path) return mapFile;
-          if (path === sceneFile.path) return sceneFile;
-          return null;
-        },
       },
     };
 
@@ -75,13 +65,6 @@ describe("resolveNoteImageContext", () => {
         fileName: "map.png",
         mimeType: "image/png",
         data: "AQID",
-      },
-      {
-        noteFilePath: "notes/Story.md",
-        imageFilePath: "notes/images/scene.webp",
-        fileName: "scene.webp",
-        mimeType: "image/webp",
-        data: "BAUG",
       },
     ]);
   });

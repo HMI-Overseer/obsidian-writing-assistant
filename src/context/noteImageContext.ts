@@ -1,4 +1,4 @@
-import { normalizePath, type App, type TFile } from "obsidian";
+import type { App, TFile } from "obsidian";
 import {
   MAX_NOTE_CONTEXT_IMAGES,
   MAX_NOTE_CONTEXT_IMAGE_SIZE_BYTES,
@@ -12,12 +12,9 @@ interface NoteImageSource {
   rawContent: string;
 }
 
-type NoteImageRef =
-  | { kind: "wikilink"; target: string }
-  | { kind: "markdown"; target: string };
+type NoteImageRef = { target: string };
 
-const EMBED_RE = /!\[\[([^\]]+)\]\]|!\[[^\]]*\]\(([^)]+)\)/g;
-const REMOTE_URL_RE = /^(?:[a-z][a-z0-9+.-]*:|\/\/)/i;
+const EMBED_RE = /!\[\[([^\]]+)\]\]/g;
 
 export async function resolveNoteImageContext(
   app: App,
@@ -64,51 +61,17 @@ export function extractEmbeddedImageRefs(rawContent: string): NoteImageRef[] {
 
   for (const match of rawContent.matchAll(EMBED_RE)) {
     const wikiTarget = match[1]?.trim();
-    if (wikiTarget) {
-      const target = wikiTarget.split("|", 1)[0]?.split("#", 1)[0]?.trim();
-      if (target) refs.push({ kind: "wikilink", target });
-      continue;
-    }
-
-    const markdownTarget = match[2]?.trim();
-    if (!markdownTarget) continue;
-    refs.push({ kind: "markdown", target: unwrapAngleBrackets(markdownTarget) });
+    if (!wikiTarget) continue;
+    const target = wikiTarget.split("|", 1)[0]?.split("#", 1)[0]?.trim();
+    if (target) refs.push({ target });
   }
 
   return refs;
 }
 
 function resolveEmbeddedImageFile(app: App, sourceFile: TFile, ref: NoteImageRef): TFile | null {
-  if (ref.kind === "wikilink") {
-    const file = app.metadataCache.getFirstLinkpathDest(ref.target, sourceFile.path);
-    return file && getImageMimeType(file) ? file : null;
-  }
-
-  const href = safeDecodeUri(ref.target.trim());
-  if (!href || REMOTE_URL_RE.test(href)) return null;
-
-  const pathOnly = href.split(/[?#]/, 1)[0]?.trim();
-  if (!pathOnly) return null;
-
-  const candidates = new Set<string>([
-    pathOnly,
-    pathOnly.replace(/^\/+/, ""),
-  ]);
-
-  if (sourceFile.parent?.path) {
-    candidates.add(normalizePath(`${sourceFile.parent.path}/${pathOnly}`));
-    candidates.add(normalizePath(`${sourceFile.parent.path}/${pathOnly.replace(/^\/+/, "")}`));
-  }
-
-  for (const candidate of candidates) {
-    const file = app.metadataCache.getFirstLinkpathDest(candidate, sourceFile.path)
-      ?? app.vault.getFileByPath(normalizePath(candidate));
-    if (file && getImageMimeType(file)) {
-      return file;
-    }
-  }
-
-  return null;
+  const file = app.metadataCache.getFirstLinkpathDest(ref.target, sourceFile.path);
+  return file && getImageMimeType(file) ? file : null;
 }
 
 function getImageMimeType(file: TFile): NoteImageContextItem["mimeType"] | null {
@@ -122,18 +85,4 @@ function arrayBufferToBase64(buffer: ArrayBuffer): string {
     binary += String.fromCharCode(bytes[i]);
   }
   return btoa(binary);
-}
-
-function unwrapAngleBrackets(value: string): string {
-  return value.startsWith("<") && value.endsWith(">")
-    ? value.slice(1, -1)
-    : value;
-}
-
-function safeDecodeUri(value: string): string {
-  try {
-    return decodeURIComponent(value);
-  } catch {
-    return value;
-  }
 }

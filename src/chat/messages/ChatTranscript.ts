@@ -9,6 +9,7 @@ import { BubbleVersionNav } from "./BubbleVersionNav";
 import { renderUsageBadge } from "./UsageBadge";
 import { renderRagSources } from "./RagSourcesList";
 import { AgenticTimeline } from "./AgenticTimeline";
+import { ImagePreviewModal } from "./ImagePreviewModal";
 
 export type BubbleActionCallbacks = {
   onCopy: (messageId: string) => void;
@@ -319,13 +320,25 @@ export class ChatTranscript {
     const galleryEl = containerEl.createDiv({ cls: "lmsa-chat-window-attachment-gallery" });
     for (const attachment of attachments) {
       if (attachment.type === "image") {
-        const thumbEl = galleryEl.createDiv({ cls: "lmsa-chat-window-attachment-thumb" });
+        const imageSrc = `data:${attachment.mimeType};base64,${attachment.data}`;
+        const imageAlt = attachment.fileName ?? "Image attachment";
+        const thumbEl = galleryEl.createEl("button", {
+          cls: "lmsa-chat-window-attachment-thumb",
+          attr: {
+            type: "button",
+            "aria-label": `Open ${imageAlt}`,
+          },
+        });
         thumbEl.createEl("img", {
           cls: "lmsa-chat-window-attachment-img",
           attr: {
-            src: `data:${attachment.mimeType};base64,${attachment.data}`,
-            alt: attachment.fileName ?? "Image attachment",
+            src: imageSrc,
+            alt: imageAlt,
           },
+        });
+
+        thumbEl.addEventListener("click", () => {
+          new ImagePreviewModal(this.app, imageSrc, imageAlt, attachment.fileName).open();
         });
       }
     }

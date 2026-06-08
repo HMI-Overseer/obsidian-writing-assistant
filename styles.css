@@ -4397,6 +4397,10 @@
     background: color-mix(in srgb, var(--lmsa-section-accent) 14%, transparent);
     color: color-mix(in srgb, var(--lmsa-section-accent) 74%, var(--lmsa-text-primary));
   }
+.lmsa-model-state-badge.is-user-created {
+    background: color-mix(in srgb, var(--lmsa-section-accent-secondary) 14%, transparent);
+    color: color-mix(in srgb, var(--lmsa-section-accent-secondary) 68%, var(--lmsa-text-primary));
+  }
 .lmsa-command-category-label {
     display: flex;
     align-items: center;
@@ -4455,9 +4459,10 @@
   }
 /* ── Icon picker grid ────────────────────────────────────────────────── */
 .lmsa-icon-picker-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(36px, 1fr));
-    gap: 4px;
+    display: flex;
+    flex-wrap: wrap;
+    align-content: flex-start;
+    gap: 8px;
   }
 .lmsa-icon-picker-cell {
     display: inline-flex;

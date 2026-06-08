@@ -64,6 +64,11 @@ export function renderCommandsTab(
 
   const renderList = () => {
     customListEl.empty();
+    customListEl.createDiv({
+      cls: "lmsa-command-category-label",
+      text: "Custom commands",
+    });
+
     if (settings.commands.length === 0) {
       customListEl.createEl("p", {
         cls: "lmsa-empty-state",
@@ -81,7 +86,12 @@ export function renderCommandsTab(
       }
 
       const info = row.createDiv({ cls: "lmsa-item-info" });
-      info.createDiv({ cls: "lmsa-item-name", text: command.name });
+      const header = info.createDiv({ cls: "lmsa-live-model-header" });
+      header.createDiv({
+        cls: "lmsa-model-state-badge is-user-created",
+        text: "User-created",
+      });
+      header.createDiv({ cls: "lmsa-item-name", text: command.name });
       info.createDiv({ cls: "lmsa-item-sub", text: command.prompt });
 
       const actions = row.createDiv({ cls: "lmsa-item-actions" });

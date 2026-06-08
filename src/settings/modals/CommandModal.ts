@@ -6,7 +6,7 @@ import { generateId } from "../../utils";
 
 /** Curated palette of writing-relevant Lucide icons. */
 const COMMAND_ICON_PALETTE = [
-  "wand", "scissors", "pencil", "pen-line", "eraser",
+  "wand", "scissors", "pencil", "highlighter", "eraser",
   "spell-check", "type", "text", "file-text", "book-open",
   "lightbulb", "sparkles", "star", "eye", "message-circle",
   "list", "arrow-right", "minimize-2", "unfold-vertical", "replace",
@@ -28,6 +28,7 @@ export class CommandModal extends Modal {
           id: generateId(),
           name: "",
           prompt: "",
+          icon: "wand",
         };
   }
 

@@ -180,7 +180,11 @@ export function renderCardStatus(
   }
 }
 
-export function renderSummary(summaryEl: HTMLElement, stats: SummaryStats): void {
+export function renderSummary(
+  summaryEl: HTMLElement,
+  stats: SummaryStats,
+  scopeLabel?: string,
+): void {
   summaryEl.empty();
 
   if (stats.totalTests === 0) {
@@ -189,6 +193,9 @@ export function renderSummary(summaryEl: HTMLElement, stats: SummaryStats): void
   }
 
   const headlineEl = summaryEl.createDiv({ cls: "lmsa-benchmark-summary-headline" });
+  if (scopeLabel) {
+    headlineEl.createSpan({ cls: "lmsa-benchmark-summary-scope", text: `${scopeLabel}: ` });
+  }
   headlineEl.createSpan({
     cls: stats.allTestsPerfect ? "lmsa-benchmark-summary--pass" : "lmsa-benchmark-summary--mixed",
     text: `${stats.testsFullyPassed}/${stats.totalTests} tests fully passed`,
@@ -200,7 +207,7 @@ export function renderSummary(summaryEl: HTMLElement, stats: SummaryStats): void
 }
 
 export function renderSuiteSummary(summaryEl: HTMLElement, stats: SuiteSummaryStats): void {
-  renderSummary(summaryEl, stats);
+  renderSummary(summaryEl, stats, "This suite");
 
   if (stats.controlResult) {
     const { passCount, totalCount } = stats.controlResult;

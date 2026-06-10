@@ -22,6 +22,7 @@ import {
   renderSuiteSummary,
   renderProgressSummary,
 } from "./benchmark/BenchmarkRenderers";
+import { assessPace, PACE_ADVICE } from "./benchmark/pace";
 import {
   buildBenchmarkReport,
   buildHistoryEntry,
@@ -213,6 +214,14 @@ export function renderBenchmarkTab(
     })();
   });
 
+  // Pace warning banner — shown when iterations of the current run trend slow.
+  const paceWarningEl = suitesSection.bodyEl.createDiv({
+    cls: "lmsa-benchmark-warning lmsa-hidden",
+  });
+  const paceWarningIconEl = paceWarningEl.createSpan({ cls: "lmsa-benchmark-warning-icon" });
+  setIcon(paceWarningIconEl, "alert-triangle");
+  const paceWarningTextEl = paceWarningEl.createSpan({ cls: "lmsa-benchmark-warning-text" });
+
   // -----------------------------------------------------------------------
   // Tab bar & test cards
   // -----------------------------------------------------------------------
@@ -360,8 +369,11 @@ export function renderBenchmarkTab(
     });
   }
 
-  const globalSummaryEl = suitesSection.bodyEl.createDiv({ cls: "lmsa-benchmark-summary" });
-  globalSummaryEl.setText("Run tests to see results.");
+  // Cross-suite summary — hidden until there is progress or results to show,
+  // so it doesn't duplicate the per-suite placeholder.
+  const globalSummaryEl = suitesSection.bodyEl.createDiv({
+    cls: "lmsa-benchmark-summary lmsa-hidden",
+  });
 
   function switchToSuite(suiteId: string): void {
     const prev = suiteRefs.get(activeSuiteId);
@@ -383,6 +395,25 @@ export function renderBenchmarkTab(
 
   let globalCompletedIterations = 0;
   let globalTotalIterations = 0;
+
+  /** Iteration durations of the current run, for pace assessment. */
+  let runDurations: number[] = [];
+
+  function resetPaceTracking(): void {
+    runDurations = [];
+    paceWarningEl.addClass("lmsa-hidden");
+  }
+
+  /** Shows the slow-model warning once the run's iterations trend slow. */
+  function trackIterationPace(durationMs: number): void {
+    runDurations.push(durationMs);
+    const pace = assessPace(runDurations);
+    if (!pace.slow) return;
+    paceWarningTextEl.setText(
+      `Iterations are averaging ${(pace.avgMs / 1000).toFixed(1)}s with this model. ${PACE_ADVICE}`
+    );
+    paceWarningEl.removeClass("lmsa-hidden");
+  }
 
   // -----------------------------------------------------------------------
   // Execution helpers
@@ -457,11 +488,17 @@ export function renderBenchmarkTab(
 
   function refreshGlobalSummary(): void {
     if (isRunning && globalTotalIterations > 0) {
+      globalSummaryEl.removeClass("lmsa-hidden");
       renderProgressSummary(globalSummaryEl, globalCompletedIterations, globalTotalIterations);
       return;
     }
     const stats = computeSummaryStats(allTestCases, results);
-    renderSummary(globalSummaryEl, stats);
+    if (stats.totalTests === 0) {
+      globalSummaryEl.addClass("lmsa-hidden");
+      return;
+    }
+    globalSummaryEl.removeClass("lmsa-hidden");
+    renderSummary(globalSummaryEl, stats, "All suites");
   }
 
   function setCardError(testId: string, aborted: boolean, message?: string): void {
@@ -562,6 +599,7 @@ export function renderBenchmarkTab(
     setRunningState(true);
     abortController = new AbortController();
     errorNoticedThisRun = false;
+    resetPaceTracking();
 
     globalCompletedIterations = 0;
     globalTotalIterations = iterationCount;
@@ -581,7 +619,8 @@ export function renderBenchmarkTab(
         tc,
         iterationCount,
         buildSamplingParams(profile),
-        (_testId, _iter) => {
+        (_testId, iter) => {
+          trackIterationPace(iter.durationMs);
           globalCompletedIterations++;
           updateCardProgress(tc.id, globalCompletedIterations, iterationCount);
           refreshGlobalSummary();
@@ -607,6 +646,7 @@ export function renderBenchmarkTab(
     setRunningState(true);
     abortController = new AbortController();
     errorNoticedThisRun = false;
+    resetPaceTracking();
 
     globalCompletedIterations = 0;
     globalTotalIterations = suite.testCases.length * iterationCount;
@@ -636,7 +676,8 @@ export function renderBenchmarkTab(
           refreshSuiteSummary(suite);
           refreshGlobalSummary();
         },
-        (testId, _iter) => {
+        (testId, iter) => {
+          trackIterationPace(iter.durationMs);
           const prev = iterTracker.get(testId) ?? 0;
           iterTracker.set(testId, prev + 1);
           updateCardProgress(testId, prev + 1, iterationCount);
@@ -673,6 +714,7 @@ export function renderBenchmarkTab(
     setRunningState(true);
     abortController = new AbortController();
     errorNoticedThisRun = false;
+    resetPaceTracking();
 
     globalCompletedIterations = 0;
     globalTotalIterations = allTestCases.length * iterationCount;
@@ -704,7 +746,8 @@ export function renderBenchmarkTab(
             refreshSuiteSummary(suite);
             refreshGlobalSummary();
           },
-          (testId, _iter) => {
+          (testId, iter) => {
+            trackIterationPace(iter.durationMs);
             const prev = iterTracker.get(testId) ?? 0;
             iterTracker.set(testId, prev + 1);
             updateCardProgress(testId, prev + 1, iterationCount);

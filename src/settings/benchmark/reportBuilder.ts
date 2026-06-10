@@ -3,6 +3,7 @@ import type {
   BenchmarkHistoryTestResult,
   BenchmarkRunConditions,
 } from "../../shared/types";
+import { PACE_ADVICE, SLOW_AVG_ITERATION_MS } from "./pace";
 import type { BenchmarkRunResult } from "./types";
 
 /** One suite's worth of results, paired with control flags, ready for reporting. */
@@ -74,6 +75,21 @@ function formatScore(score: ScoreTally): string {
   return `${score.passed}/${score.total} (${pct}%)`;
 }
 
+/** Iteration-weighted average duration across all results (controls included — speed is speed). */
+function averageIterationMs(results: { avgDurationMs: number; totalCount: number }[]): number | null {
+  let totalMs = 0;
+  let iterations = 0;
+  for (const r of results) {
+    totalMs += r.avgDurationMs * r.totalCount;
+    iterations += r.totalCount;
+  }
+  return iterations > 0 ? totalMs / iterations : null;
+}
+
+function formatAvgIteration(ms: number | null): string {
+  return ms === null ? "—" : formatSeconds(ms);
+}
+
 // ---------------------------------------------------------------------------
 // History entry
 // ---------------------------------------------------------------------------
@@ -141,12 +157,23 @@ export function buildBenchmarkReport(
   lines.push(`| Plugin version | ${cell(conditions.pluginVersion)} |`);
   lines.push("");
 
-  // --- Overall score ---
+  // --- Overall score & pace ---
   const allResults = sections.flatMap((s) =>
     s.results.map(({ result, isControl }) => ({ ...result, isControl }))
   );
   lines.push(`**Overall score: ${formatScore(tallyScore(allResults))}** (iterations passed, control tests excluded)`);
   lines.push("");
+
+  const avgIterationMs = averageIterationMs(allResults);
+  if (avgIterationMs !== null) {
+    lines.push(`**Average iteration duration: ${formatSeconds(avgIterationMs)}**`);
+    lines.push("");
+    if (avgIterationMs > SLOW_AVG_ITERATION_MS) {
+      lines.push("> [!warning] Slow responses");
+      lines.push(`> Iterations averaged ${formatSeconds(avgIterationMs)}. ${PACE_ADVICE}`);
+      lines.push("");
+    }
+  }
 
   // --- Per-suite results ---
   for (const section of sections) {
@@ -161,8 +188,10 @@ export function buildBenchmarkReport(
       const name = isControl ? `${result.testName} *(control)*` : result.testName;
       const passed = result.totalCount > 0 ? `${result.passCount}/${result.totalCount}` : "—";
       const duration = result.totalCount > 0 ? formatSeconds(result.avgDurationMs) : "—";
-      const notes = result.error ? `Error: ${result.error}` : "";
-      lines.push(`| ${cell(name)} | ${passed} | ${duration} | ${cell(notes)} |`);
+      const notes: string[] = [];
+      if (result.error) notes.push(`Error: ${result.error}`);
+      if (result.totalCount > 0 && result.avgDurationMs > SLOW_AVG_ITERATION_MS) notes.push("Slow");
+      lines.push(`| ${cell(name)} | ${passed} | ${duration} | ${cell(notes.join("; "))} |`);
     }
     lines.push("");
 
@@ -189,16 +218,18 @@ export function buildBenchmarkReport(
   if (previous.length > 0) {
     lines.push("## Previous runs");
     lines.push("");
-    lines.push("| Date | Model | Profile | Sampling | Score |");
-    lines.push("| --- | --- | --- | --- | --- |");
+    lines.push("| Date | Model | Profile | Sampling | Score | Avg iteration |");
+    lines.push("| --- | --- | --- | --- | --- | --- |");
     for (const entry of previous) {
       const score = formatScore(tallyScore(entry.results));
+      const avgIteration = formatAvgIteration(averageIterationMs(entry.results));
       lines.push(
         `| ${formatTimestamp(entry.conditions.timestamp)} ` +
         `| ${cell(entry.conditions.modelName)} ` +
         `| ${cell(entry.conditions.profileName)} ` +
         `| ${cell(formatSamplingParams(entry.conditions))} ` +
-        `| ${score} |`
+        `| ${score} ` +
+        `| ${avgIteration} |`
       );
     }
     lines.push("");

@@ -187,4 +187,37 @@ describe("buildBenchmarkReport", () => {
     const report = buildBenchmarkReport(conditions, makeSections(), []);
     expect(report).toContain("a\\|b");
   });
+
+  it("reports the average iteration duration", () => {
+    const report = buildBenchmarkReport(makeConditions(), makeSections(), []);
+    expect(report).toContain("**Average iteration duration: 1.0s**");
+  });
+
+  it("omits the slow-responses warning for fast runs", () => {
+    const report = buildBenchmarkReport(makeConditions(), makeSections(), []);
+    expect(report).not.toContain("[!warning] Slow responses");
+  });
+
+  it("adds a slow-responses callout and per-test notes for slow runs", () => {
+    const slowResult = { ...makeResult("t1", 3, 3), avgDurationMs: 25_000 };
+    const sections: SuiteReportSection[] = [
+      { suiteId: "s", suiteName: "S", results: [{ result: slowResult, isControl: false }] },
+    ];
+    const report = buildBenchmarkReport(makeConditions(), sections, []);
+
+    expect(report).toContain("[!warning] Slow responses");
+    expect(report).toContain("consider a smaller model or a lower-bit quantization");
+    expect(report).toContain("| Test t1 | 3/3 | 25.0s | Slow |");
+  });
+
+  it("includes an average iteration column in previous runs", () => {
+    const previousEntry = buildHistoryEntry(
+      makeConditions({ modelName: "Llama 3 8B", timestamp: TIMESTAMP - 86_400_000 }),
+      makeSections(),
+    );
+    const report = buildBenchmarkReport(makeConditions(), makeSections(), [previousEntry]);
+
+    expect(report).toContain("| Date | Model | Profile | Sampling | Score | Avg iteration |");
+    expect(report).toMatch(/\| Llama 3 8B \|.*\| 1\.0s \|/);
+  });
 });

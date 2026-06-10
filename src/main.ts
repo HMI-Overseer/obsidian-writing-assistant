@@ -1,6 +1,8 @@
 import type { MenuItem, WorkspaceLeaf } from "obsidian";
 import { Notice, Plugin } from "obsidian";
 import type {
+  BenchmarkHistoryEntry,
+  BenchmarkSettings,
   ChatHistory,
   CompletionModel,
   CustomCommand,
@@ -14,10 +16,12 @@ import type {
 } from "./shared/types";
 import {
   DEFAULT_ACTIVE_PROFILE_IDS,
+  DEFAULT_BENCHMARK_SETTINGS,
   DEFAULT_CHAT_HISTORY,
   DEFAULT_KNOWLEDGE_GRAPH_SETTINGS,
   DEFAULT_RAG_SETTINGS,
   DEFAULT_SETTINGS,
+  MAX_BENCHMARK_HISTORY,
   VIEW_TYPE_CHAT,
 } from "./constants";
 import { ChatView } from "./chat";
@@ -43,6 +47,28 @@ function normalizeKnowledgeGraphSettings(raw: unknown): KnowledgeGraphSettings {
     excludePatterns: Array.isArray(data.excludePatterns)
       ? data.excludePatterns.filter((p): p is string => typeof p === "string")
       : [...DEFAULT_KNOWLEDGE_GRAPH_SETTINGS.excludePatterns],
+  };
+}
+
+function normalizeBenchmarkSettings(raw: unknown): BenchmarkSettings {
+  const data = (typeof raw === "object" && raw !== null ? raw : {}) as Partial<BenchmarkSettings>;
+  const history = Array.isArray(data.history)
+    ? data.history
+        .filter(
+          (e): e is BenchmarkHistoryEntry =>
+            typeof e === "object" && e !== null &&
+            typeof (e as BenchmarkHistoryEntry).id === "string" &&
+            typeof (e as BenchmarkHistoryEntry).conditions === "object" &&
+            Array.isArray((e as BenchmarkHistoryEntry).results)
+        )
+        .slice(0, MAX_BENCHMARK_HISTORY)
+    : [];
+  return {
+    reportFolder:
+      typeof data.reportFolder === "string" && data.reportFolder.trim().length > 0
+        ? data.reportFolder
+        : DEFAULT_BENCHMARK_SETTINGS.reportFolder,
+    history,
   };
 }
 
@@ -347,6 +373,7 @@ export default class WritingAssistantChat extends Plugin {
         typeof data?.maxToolRoundsChat === "number"
           ? data.maxToolRoundsChat
           : DEFAULT_SETTINGS.maxToolRoundsChat,
+      benchmark: normalizeBenchmarkSettings(data?.benchmark),
     };
   }
 

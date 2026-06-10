@@ -1,18 +1,27 @@
 import type { ChatClient } from "../../api/chatClient";
+import type { CompletionResult } from "../../api/usageTypes";
 import type { AnthropicCacheSettings, CompletionModel, SamplingParams } from "../../shared/types";
-import type { ChatRequest, ChatTurn } from "../../shared/chatRequest";
-import type { ToolCall } from "../../tools/types";
+import type { ChatRequest } from "../../shared/chatRequest";
 import type { BenchmarkTestCase, BenchmarkRunResult, BenchmarkIterationResult } from "./types";
 
-/** Maximum read-only tool rounds before forcing finalization. */
-const MAX_TOOL_ROUNDS = 5;
+function isAbortError(err: unknown): boolean {
+  return err instanceof Error && err.name === "AbortError";
+}
+
+function errorMessage(err: unknown): string {
+  return err instanceof Error ? err.message : String(err);
+}
 
 /**
  * Runs a single test case for N iterations, returning aggregate results.
  * Invokes `onIteration` after each individual iteration completes.
  *
- * When the test case includes tool definitions, the runner executes a
- * multi-round tool loop that handles write tool calls and plain text responses.
+ * Each iteration is a single completion request — benchmark tests evaluate the
+ * model's first response (text or tool calls), mirroring the single-turn
+ * scenarios the test cases describe.
+ *
+ * A request error stops the remaining iterations and is recorded on
+ * `result.error`; iterations completed before the error are kept.
  */
 export async function runBenchmarkTest(
   client: ChatClient,
@@ -24,7 +33,7 @@ export async function runBenchmarkTest(
   signal?: AbortSignal,
   cacheSettings?: AnthropicCacheSettings,
 ): Promise<BenchmarkRunResult> {
-  const baseRequest: ChatRequest = {
+  const request: ChatRequest = {
     systemPrompt: testCase.systemPromptSuffix,
     documentContext: {
       filePath: "test-document.md",
@@ -40,22 +49,28 @@ export async function runBenchmarkTest(
   };
 
   if (cacheSettings?.enabled) {
-    baseRequest.anthropicCacheSettings = cacheSettings;
+    request.anthropicCacheSettings = cacheSettings;
   }
 
   const iterations: BenchmarkIterationResult[] = [];
+  let runError: string | undefined;
 
   for (let i = 0; i < iterationCount; i++) {
     if (signal?.aborted) break;
 
     const start = Date.now();
-    const { text, toolCalls } = await runWithToolLoop(
-      client, model.modelId, params, baseRequest, testCase.document, signal,
-    );
+    let completion: CompletionResult;
+    try {
+      completion = await client.complete(request, model.modelId, params, signal);
+    } catch (err) {
+      if (!isAbortError(err)) runError = errorMessage(err);
+      break;
+    }
     const durationMs = Date.now() - start;
-    const result = testCase.evaluate(text, testCase, toolCalls);
+    const toolCalls = completion.toolCalls ?? null;
+    const result = testCase.evaluate(completion.text, testCase, toolCalls);
 
-    const iterResult: BenchmarkIterationResult = { iteration: i + 1, result, rawResponse: text, toolCalls, durationMs };
+    const iterResult: BenchmarkIterationResult = { iteration: i + 1, result, rawResponse: completion.text, toolCalls, durationMs };
     iterations.push(iterResult);
     onIteration?.(testCase.id, iterResult);
   }
@@ -71,12 +86,16 @@ export async function runBenchmarkTest(
     passCount,
     totalCount: iterations.length,
     avgDurationMs: iterations.length > 0 ? totalDuration / iterations.length : 0,
+    error: runError,
   };
 }
 
 /**
  * Runs all test cases sequentially (each for N iterations).
  * Invokes `onTestComplete` after all iterations of a test finish.
+ *
+ * A failing test does not stop the run: its error is recorded on the result
+ * and the remaining tests still execute. Only an abort stops the run early.
  */
 export async function runAllBenchmarks(
   client: ChatClient,
@@ -100,58 +119,4 @@ export async function runAllBenchmarks(
   }
 
   return results;
-}
-
-// ---------------------------------------------------------------------------
-// Tool loop
-// ---------------------------------------------------------------------------
-
-interface ToolLoopResult {
-  text: string;
-  toolCalls: ToolCall[] | null;
-}
-
-/**
- * Executes a single-shot or multi-round completion loop.
- * The loop continues until the model produces write tool calls,
- * plain text, or the round limit is reached.
- */
-async function runWithToolLoop(
-  client: ChatClient,
-  modelId: string,
-  params: SamplingParams,
-  baseRequest: ChatRequest,
-  _document: string,
-  signal?: AbortSignal,
-): Promise<ToolLoopResult> {
-  // No tools defined — single-shot completion.
-  if (!baseRequest.tools || baseRequest.tools.length === 0) {
-    const result = await client.complete(baseRequest, modelId, params, signal);
-    return { text: result.text, toolCalls: result.toolCalls ?? null };
-  }
-
-  const toolLoopTurns: ChatTurn[] = [];
-  let allWriteToolCalls: ToolCall[] = [];
-  let fullText = "";
-
-  for (let round = 0; round <= MAX_TOOL_ROUNDS; round++) {
-    if (signal?.aborted) break;
-
-    const request: ChatRequest = {
-      ...baseRequest,
-      messages: [...baseRequest.messages, ...toolLoopTurns],
-    };
-
-    const result = await client.complete(request, modelId, params, signal);
-    fullText += result.text;
-    const toolCalls = result.toolCalls ?? null;
-
-    if (!toolCalls || toolCalls.length === 0) break;
-
-    allWriteToolCalls = [...allWriteToolCalls, ...toolCalls];
-    break;
-  }
-
-  const finalToolCalls = allWriteToolCalls.length > 0 ? allWriteToolCalls : null;
-  return { text: fullText, toolCalls: finalToolCalls };
 }

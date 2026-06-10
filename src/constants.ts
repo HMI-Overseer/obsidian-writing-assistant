@@ -1,4 +1,4 @@
-import type { ChatHistory, KnowledgeGraphSettings, PluginSettings, ProviderOption, ProviderProfile, RagSettings } from "./shared/types";
+import type { BenchmarkSettings, ChatHistory, KnowledgeGraphSettings, PluginSettings, ProviderOption, ProviderProfile, RagSettings } from "./shared/types";
 import { EDIT_SYSTEM_PROMPT } from "./editing/regexEditSystemPrompt";
 import { TOOL_EDIT_SYSTEM_PROMPT } from "./tools/editing/systemPrompt";
 import type { ImageMimeType } from "./shared/types";
@@ -65,6 +65,14 @@ export const DEFAULT_PLAN_SYSTEM_PROMPT_PREFIX = DEFAULT_CHAT_SYSTEM_PROMPT_PREF
 export const DEFAULT_MAX_TOOL_ROUNDS_EDIT = 5;
 export const DEFAULT_MAX_TOOL_ROUNDS_CHAT = 20;
 
+/** Maximum persisted benchmark runs. Oldest entries are dropped beyond this. */
+export const MAX_BENCHMARK_HISTORY = 50;
+
+export const DEFAULT_BENCHMARK_SETTINGS: BenchmarkSettings = {
+  reportFolder: "Benchmarks",
+  history: [],
+};
+
 export const DEFAULT_ACTIVE_PROFILE_IDS: Record<ProviderOption, string> = {
   lmstudio: "lmstudio-default",
   anthropic: "anthropic-default",
@@ -118,4 +126,5 @@ export const DEFAULT_SETTINGS: PluginSettings = {
   preferToolUse: false,
   maxToolRoundsEdit: DEFAULT_MAX_TOOL_ROUNDS_EDIT,
   maxToolRoundsChat: DEFAULT_MAX_TOOL_ROUNDS_CHAT,
+  benchmark: { ...DEFAULT_BENCHMARK_SETTINGS },
 };

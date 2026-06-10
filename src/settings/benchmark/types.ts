@@ -72,6 +72,11 @@ export interface BenchmarkRunResult {
   totalCount: number;
   /** Average duration across all iterations. */
   avgDurationMs: number;
+  /**
+   * Set when the run stopped on a request/transport error. Iterations completed
+   * before the error are kept, so a partial result is still reportable.
+   */
+  error?: string;
 }
 
 export interface BenchmarkTestSuite {

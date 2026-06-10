@@ -65,6 +65,21 @@
     outline: none;
   }
 
+  .lmsa-benchmark-setting-input--wide {
+    width: 200px;
+    text-align: left;
+  }
+
+  .lmsa-benchmark-error {
+    border-radius: 8px;
+    border: 1px solid var(--lmsa-status-error);
+    background: color-mix(in srgb, var(--lmsa-status-error) 8%, var(--lmsa-surface-base));
+    padding: 8px 12px;
+    margin-bottom: 8px;
+    font-size: var(--font-ui-smaller);
+    color: var(--lmsa-text-primary);
+  }
+
   /* ------- Buttons ------- */
 
   .lmsa-benchmark-btn {

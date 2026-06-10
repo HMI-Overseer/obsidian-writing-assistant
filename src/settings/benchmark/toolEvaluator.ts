@@ -11,10 +11,6 @@ function formatToolCall(tc: ToolCall): string {
   return `${tc.name}(${preview})`;
 }
 
-function getEditCalls(toolCalls: ToolCall[]): ToolCall[] {
-  return toolCalls;
-}
-
 function noToolCallsResult(response: string): BenchmarkResult {
   return {
     passed: false,
@@ -41,21 +37,12 @@ export function evaluateBasicToolCall(
   }
 
   const evidence = toolCalls.map(formatToolCall);
-  const editCalls = getEditCalls(toolCalls);
 
-  if (editCalls.length === 0) {
-    return {
-      passed: false,
-      reason: "Model produced tool calls but none were edit tools (only read-only calls).",
-      evidence,
-    };
-  }
-
-  const applyEdits = editCalls.filter((tc) => tc.name === "propose_edit");
+  const applyEdits = toolCalls.filter((tc) => tc.name === "propose_edit");
   if (applyEdits.length === 0) {
     return {
       passed: false,
-      reason: `Model used edit tools (${editCalls.map((tc) => tc.name).join(", ")}) but not propose_edit.`,
+      reason: `Model used ${toolCalls.map((tc) => tc.name).join(", ")} but not propose_edit.`,
       evidence,
     };
   }
@@ -96,10 +83,9 @@ export function evaluateCorrectToolSelection(
   }
 
   const evidence = toolCalls.map(formatToolCall);
-  const editCalls = getEditCalls(toolCalls);
 
-  const usesFrontmatterTool = editCalls.some((tc) => tc.name === "update_frontmatter");
-  const usesApplyEdit = editCalls.some((tc) => tc.name === "propose_edit");
+  const usesFrontmatterTool = toolCalls.some((tc) => tc.name === "update_frontmatter");
+  const usesApplyEdit = toolCalls.some((tc) => tc.name === "propose_edit");
 
   if (usesFrontmatterTool && !usesApplyEdit) {
     return {
@@ -127,7 +113,7 @@ export function evaluateCorrectToolSelection(
 
   return {
     passed: false,
-    reason: `Model used ${editCalls.map((tc) => tc.name).join(", ")} — expected update_frontmatter.`,
+    reason: `Model used ${toolCalls.map((tc) => tc.name).join(", ")} — expected update_frontmatter.`,
     evidence,
   };
 }
@@ -159,41 +145,45 @@ export function evaluateSearchPrecision(
   const targetPhrase = "thatched rooftops";
   const maxSearchLength = 200;
 
-  for (const tc of applyEdits) {
-    const search = tc.arguments.search;
-    if (typeof search !== "string") continue;
+  // Judge every propose_edit call: any single precise call targeting the phrase passes.
+  const searches = applyEdits
+    .map((tc) => tc.arguments.search)
+    .filter((s): s is string => typeof s === "string");
 
-    const containsTarget = search.toLowerCase().includes(targetPhrase);
-    const isShort = search.length <= maxSearchLength;
-
-    evidence.push(`Search length: ${search.length} chars (max ${maxSearchLength})`);
-
-    if (containsTarget && isShort) {
-      return {
-        passed: true,
-        reason: `Search text is precise (${search.length} chars) and contains the target phrase.`,
-        evidence,
-      };
-    }
-
-    if (!containsTarget) {
-      return {
-        passed: false,
-        reason: `Search text does not contain "${targetPhrase}".`,
-        evidence,
-      };
-    }
-
+  if (searches.length === 0) {
     return {
       passed: false,
-      reason: `Search text is too long (${search.length} chars, max ${maxSearchLength}). The model included too much context.`,
+      reason: "propose_edit calls did not have valid string search arguments.",
+      evidence,
+    };
+  }
+
+  for (const search of searches) {
+    evidence.push(`Search length: ${search.length} chars (max ${maxSearchLength})`);
+  }
+
+  const onTarget = searches.filter((s) => s.toLowerCase().includes(targetPhrase));
+
+  if (onTarget.length === 0) {
+    return {
+      passed: false,
+      reason: `No propose_edit search text contains "${targetPhrase}".`,
+      evidence,
+    };
+  }
+
+  const precise = onTarget.find((s) => s.length <= maxSearchLength);
+  if (precise) {
+    return {
+      passed: true,
+      reason: `Search text is precise (${precise.length} chars) and contains the target phrase.`,
       evidence,
     };
   }
 
   return {
     passed: false,
-    reason: "propose_edit calls did not have valid string search arguments.",
+    reason: `Search text targeting the phrase is too long (min ${Math.min(...onTarget.map((s) => s.length))} chars, max allowed ${maxSearchLength}). The model included too much context.`,
     evidence,
   };
 }
@@ -212,19 +202,18 @@ export function evaluateMultipleEdits(
   }
 
   const evidence = toolCalls.map(formatToolCall);
-  const editCalls = getEditCalls(toolCalls);
 
-  if (editCalls.length >= 3) {
+  if (toolCalls.length >= 3) {
     return {
       passed: true,
-      reason: `Model produced ${editCalls.length} edit tool calls for 3 requested changes.`,
+      reason: `Model produced ${toolCalls.length} edit tool calls for 3 requested changes.`,
       evidence,
     };
   }
 
   return {
     passed: false,
-    reason: `Model produced only ${editCalls.length} edit tool call(s) — expected at least 3 for 3 distinct changes.`,
+    reason: `Model produced only ${toolCalls.length} edit tool call(s) — expected at least 3 for 3 distinct changes.`,
     evidence,
   };
 }

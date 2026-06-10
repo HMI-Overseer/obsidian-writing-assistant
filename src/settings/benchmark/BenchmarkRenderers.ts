@@ -91,6 +91,12 @@ export function renderCardResults(
   resultsContainerEl.createDiv({ cls: "lmsa-benchmark-section-header" })
     .createEl("strong", { text: "Results" });
 
+  if (result.error) {
+    const errorEl = resultsContainerEl.createDiv({ cls: "lmsa-benchmark-error" });
+    errorEl.createEl("strong", { text: "Run stopped early: " });
+    errorEl.createSpan({ text: result.error });
+  }
+
   for (const iter of result.iterations) {
     const iterEl = resultsContainerEl.createDiv({ cls: "lmsa-benchmark-iteration" });
 
@@ -150,6 +156,16 @@ export function renderCardStatus(
 
   const { passCount, totalCount, avgDurationMs } = result;
   const avgStr = (avgDurationMs / 1000).toFixed(1);
+
+  if (result.error) {
+    statusEl.addClass("is-failed");
+    statusEl.setAttr("title", result.error);
+    statusEl.setText(
+      totalCount > 0 ? `${passCount}/${totalCount} passed — stopped on error` : "Error"
+    );
+    return;
+  }
+  statusEl.removeAttribute("title");
 
   if (passCount === totalCount) {
     statusEl.addClass("is-passed");

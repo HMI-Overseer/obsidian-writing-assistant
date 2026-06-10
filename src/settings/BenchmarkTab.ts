@@ -1,6 +1,11 @@
-import { setIcon } from "obsidian";
+import { Notice, setIcon } from "obsidian";
 import type WritingAssistantChat from "../main";
-import type { CompletionModel, ProviderProfile } from "../shared/types";
+import type {
+  BenchmarkRunConditions,
+  CompletionModel,
+  ProviderProfile,
+} from "../shared/types";
+import { MAX_BENCHMARK_HISTORY } from "../constants";
 import { getProviderDescriptor, createChatClient } from "../providers/registry";
 import { PROVIDER_DESCRIPTORS } from "../providers/descriptors";
 import { createSettingsSection, createModelSelector, SettingItem } from "./ui";
@@ -17,6 +22,13 @@ import {
   renderSuiteSummary,
   renderProgressSummary,
 } from "./benchmark/BenchmarkRenderers";
+import {
+  buildBenchmarkReport,
+  buildHistoryEntry,
+  buildReportFileName,
+} from "./benchmark/reportBuilder";
+import type { SuiteReportSection } from "./benchmark/reportBuilder";
+import { writeBenchmarkReport } from "./benchmark/reportWriter";
 import { ProfileSettingsPopover } from "../chat/models/ProfileSettingsPopover";
 import { buildSamplingParams } from "../chat/finalization/buildSamplingParams";
 import { getActiveProfile, getProfilesForProvider, generateProfileId } from "../shared/profileUtils";
@@ -36,6 +48,8 @@ export function renderBenchmarkTab(
   const suites = getTestSuites();
   const allTestCases = suites.flatMap((s) => s.testCases);
   const results = new Map<string, BenchmarkRunResult>();
+  let lastRunConditions: BenchmarkRunConditions | null = null;
+  let errorNoticedThisRun = false;
 
   // -----------------------------------------------------------------------
   // Model selection
@@ -43,7 +57,7 @@ export function renderBenchmarkTab(
 
   const modelSection = createSettingsSection(
     container,
-    "Model Selection",
+    "Model selection",
     "Choose a completion model to run benchmarks against. The model must be loaded.",
     { icon: "target" }
   );
@@ -141,8 +155,13 @@ export function renderBenchmarkTab(
   // Test suites section
   // -----------------------------------------------------------------------
 
-  const suitesSection = createSettingsSection(container, "Test Suites", undefined, {
+  const suitesSection = createSettingsSection(container, "Test suites", undefined, {
     icon: "flask-conical",
+  });
+
+  const exportBtn = suitesSection.headerActionsEl.createEl("button", {
+    cls: "lmsa-benchmark-btn lmsa-benchmark-btn--export",
+    text: "Export report",
   });
 
   const runAllBtn = suitesSection.headerActionsEl.createEl("button", {
@@ -173,6 +192,25 @@ export function renderBenchmarkTab(
     if (!Number.isNaN(parsed) && parsed >= 1 && parsed <= 20) {
       iterationCount = parsed;
     }
+  });
+
+  // Report folder setting
+  const folderRow = suitesSection.bodyEl.createDiv({ cls: "lmsa-benchmark-setting-row" });
+  const folderInfo = folderRow.createDiv({ cls: "lmsa-benchmark-setting-info" });
+  folderInfo.createEl("span", { cls: "lmsa-benchmark-setting-name", text: "Report folder" });
+  folderInfo.createEl("span", {
+    cls: "lmsa-benchmark-setting-desc",
+    text: "Vault folder where exported benchmark reports are created.",
+  });
+  const folderInput = folderRow.createEl("input", {
+    cls: "lmsa-benchmark-setting-input lmsa-benchmark-setting-input--wide",
+    attr: { type: "text", placeholder: "Benchmarks", value: plugin.settings.benchmark.reportFolder },
+  }) as HTMLInputElement;
+  folderInput.addEventListener("change", () => {
+    void (async () => {
+      plugin.settings.benchmark.reportFolder = folderInput.value.trim() || "Benchmarks";
+      await plugin.saveSettings();
+    })();
   });
 
   // -----------------------------------------------------------------------
@@ -353,6 +391,7 @@ export function renderBenchmarkTab(
   function setRunningState(running: boolean): void {
     isRunning = running;
     runAllBtn.toggleClass("is-disabled", running);
+    exportBtn.toggleClass("is-disabled", running);
     abortBtn.toggleClass("lmsa-hidden", !running);
     profileSettingsBtn.disabled = running;
 
@@ -425,7 +464,7 @@ export function renderBenchmarkTab(
     renderSummary(globalSummaryEl, stats);
   }
 
-  function setCardError(testId: string, aborted: boolean): void {
+  function setCardError(testId: string, aborted: boolean, message?: string): void {
     const refs = getCardRefs(testId);
     if (refs) {
       refs.statusEl.empty();
@@ -433,8 +472,86 @@ export function renderBenchmarkTab(
       refs.statusEl.removeClass("is-running", "is-passed", "is-mixed");
       refs.statusEl.addClass("is-failed");
       refs.statusEl.setText(aborted ? "Aborted" : "Error");
+      if (message) refs.statusEl.setAttr("title", message);
     }
   }
+
+  // -----------------------------------------------------------------------
+  // Run conditions, history & export
+  // -----------------------------------------------------------------------
+
+  function buildRunConditions(model: CompletionModel, profile: ProviderProfile): BenchmarkRunConditions {
+    return {
+      provider: model.provider,
+      modelId: model.modelId,
+      modelName: model.name,
+      profileName: profile.name,
+      samplingParams: buildSamplingParams(profile),
+      pluginVersion: plugin.manifest.version,
+      timestamp: Date.now(),
+      iterationCount,
+    };
+  }
+
+  /** Collects current results into report sections, optionally limited to the given test IDs. */
+  function collectSections(testIds?: Set<string>): SuiteReportSection[] {
+    return suites
+      .map((suite) => ({
+        suiteId: suite.id,
+        suiteName: suite.name,
+        results: suite.testCases.flatMap((tc) => {
+          if (testIds && !testIds.has(tc.id)) return [];
+          const result = results.get(tc.id);
+          return result ? [{ result, isControl: tc.isControl ?? false }] : [];
+        }),
+      }))
+      .filter((section) => section.results.length > 0);
+  }
+
+  /** Persists a condensed history entry for a completed (non-aborted) suite or full run. */
+  async function persistHistory(conditions: BenchmarkRunConditions, testIds: Set<string>): Promise<void> {
+    const entry = buildHistoryEntry(conditions, collectSections(testIds));
+    if (entry.results.length === 0) return;
+    const history = plugin.settings.benchmark.history;
+    history.unshift(entry);
+    if (history.length > MAX_BENCHMARK_HISTORY) history.length = MAX_BENCHMARK_HISTORY;
+    await plugin.saveSettings();
+  }
+
+  /** Surfaces the first request error of a run as a Notice (cards show the rest). */
+  function maybeNoticeError(result: BenchmarkRunResult): void {
+    if (!result.error || errorNoticedThisRun) return;
+    errorNoticedThisRun = true;
+    new Notice(`Benchmark test "${result.testName}" failed: ${result.error}`);
+  }
+
+  async function exportReport(): Promise<void> {
+    if (isRunning) return;
+    if (results.size === 0 || !lastRunConditions) {
+      new Notice("Run benchmarks before exporting a report.");
+      return;
+    }
+    const content = buildBenchmarkReport(
+      lastRunConditions,
+      collectSections(),
+      plugin.settings.benchmark.history,
+    );
+    try {
+      const file = await writeBenchmarkReport(
+        plugin.app,
+        plugin.settings.benchmark.reportFolder,
+        buildReportFileName(lastRunConditions),
+        content,
+      );
+      new Notice(`Benchmark report saved to ${file.path}`);
+    } catch (err) {
+      new Notice(`Could not save benchmark report: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
+
+  exportBtn.addEventListener("click", () => {
+    void exportReport();
+  });
 
   // -----------------------------------------------------------------------
   // Run handlers
@@ -444,6 +561,7 @@ export function renderBenchmarkTab(
     if (!selectedModel) return;
     setRunningState(true);
     abortController = new AbortController();
+    errorNoticedThisRun = false;
 
     globalCompletedIterations = 0;
     globalTotalIterations = iterationCount;
@@ -456,6 +574,7 @@ export function renderBenchmarkTab(
     try {
       const client = createChatClient(selectedModel.provider, plugin.settings.providerSettings);
       const profile = getActiveProfile(plugin.settings, selectedModel.provider);
+      lastRunConditions = buildRunConditions(selectedModel, profile);
       const result = await runBenchmarkTest(
         client,
         selectedModel,
@@ -471,8 +590,10 @@ export function renderBenchmarkTab(
         profile.anthropicCacheSettings,
       );
       updateCard(tc.id, result);
+      maybeNoticeError(result);
     } catch (err) {
-      setCardError(tc.id, err instanceof Error && err.name === "AbortError");
+      const aborted = err instanceof Error && err.name === "AbortError";
+      setCardError(tc.id, aborted, aborted ? undefined : String(err instanceof Error ? err.message : err));
     } finally {
       abortController = null;
       setRunningState(false);
@@ -485,6 +606,7 @@ export function renderBenchmarkTab(
     if (!selectedModel) return;
     setRunningState(true);
     abortController = new AbortController();
+    errorNoticedThisRun = false;
 
     globalCompletedIterations = 0;
     globalTotalIterations = suite.testCases.length * iterationCount;
@@ -496,9 +618,11 @@ export function renderBenchmarkTab(
     }
     refreshGlobalSummary();
 
+    const completedThisRun = new Set<string>();
     try {
       const client = createChatClient(selectedModel.provider, plugin.settings.providerSettings);
       const profile = getActiveProfile(plugin.settings, selectedModel.provider);
+      lastRunConditions = buildRunConditions(selectedModel, profile);
       await runAllBenchmarks(
         client,
         selectedModel,
@@ -506,7 +630,9 @@ export function renderBenchmarkTab(
         iterationCount,
         buildSamplingParams(profile),
         (result, _index) => {
+          completedThisRun.add(result.testId);
           updateCard(result.testId, result);
+          maybeNoticeError(result);
           refreshSuiteSummary(suite);
           refreshGlobalSummary();
         },
@@ -520,9 +646,18 @@ export function renderBenchmarkTab(
         abortController.signal,
         profile.anthropicCacheSettings,
       );
-    } catch {
+      if (abortController.signal.aborted) {
+        for (const tc of suite.testCases) {
+          if (!completedThisRun.has(tc.id)) setCardError(tc.id, true);
+        }
+      } else if (lastRunConditions) {
+        await persistHistory(lastRunConditions, completedThisRun);
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      new Notice(`Benchmark run failed: ${message}`);
       for (const tc of suite.testCases) {
-        if (!results.has(tc.id)) setCardError(tc.id, true);
+        if (!completedThisRun.has(tc.id)) setCardError(tc.id, false, message);
       }
     } finally {
       abortController = null;
@@ -537,6 +672,7 @@ export function renderBenchmarkTab(
     if (isRunning || !selectedModel) return;
     setRunningState(true);
     abortController = new AbortController();
+    errorNoticedThisRun = false;
 
     globalCompletedIterations = 0;
     globalTotalIterations = allTestCases.length * iterationCount;
@@ -548,9 +684,11 @@ export function renderBenchmarkTab(
     }
     refreshGlobalSummary();
 
+    const completedThisRun = new Set<string>();
     try {
       const client = createChatClient(selectedModel.provider, plugin.settings.providerSettings);
       const profile = getActiveProfile(plugin.settings, selectedModel.provider);
+      lastRunConditions = buildRunConditions(selectedModel, profile);
       for (const suite of suites) {
         if (abortController.signal.aborted) break;
         await runAllBenchmarks(
@@ -560,7 +698,9 @@ export function renderBenchmarkTab(
           iterationCount,
           buildSamplingParams(profile),
           (result, _index) => {
+            completedThisRun.add(result.testId);
             updateCard(result.testId, result);
+            maybeNoticeError(result);
             refreshSuiteSummary(suite);
             refreshGlobalSummary();
           },
@@ -575,9 +715,18 @@ export function renderBenchmarkTab(
           profile.anthropicCacheSettings,
         );
       }
-    } catch {
+      if (abortController.signal.aborted) {
+        for (const tc of allTestCases) {
+          if (!completedThisRun.has(tc.id)) setCardError(tc.id, true);
+        }
+      } else if (lastRunConditions) {
+        await persistHistory(lastRunConditions, completedThisRun);
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      new Notice(`Benchmark run failed: ${message}`);
       for (const tc of allTestCases) {
-        if (!results.has(tc.id)) setCardError(tc.id, true);
+        if (!completedThisRun.has(tc.id)) setCardError(tc.id, false, message);
       }
     } finally {
       abortController = null;

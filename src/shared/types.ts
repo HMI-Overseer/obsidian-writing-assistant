@@ -296,6 +296,46 @@ export interface KnowledgeGraphSettings {
   excludePatterns: string[];
 }
 
+/** Snapshot of the conditions a benchmark run executed under. Makes runs comparable later. */
+export interface BenchmarkRunConditions {
+  provider: ProviderOption;
+  modelId: string;
+  modelName: string;
+  profileName: string;
+  samplingParams: SamplingParams;
+  pluginVersion: string;
+  /** Unix epoch ms when the run started. */
+  timestamp: number;
+  iterationCount: number;
+}
+
+/** Condensed per-test outcome stored in benchmark history. Raw responses are never persisted. */
+export interface BenchmarkHistoryTestResult {
+  testId: string;
+  testName: string;
+  suiteId: string;
+  passCount: number;
+  totalCount: number;
+  avgDurationMs: number;
+  isControl: boolean;
+  /** Present when the test aborted with a request/transport error. */
+  error?: string;
+}
+
+/** A persisted benchmark run: conditions plus condensed results. */
+export interface BenchmarkHistoryEntry {
+  id: string;
+  conditions: BenchmarkRunConditions;
+  results: BenchmarkHistoryTestResult[];
+}
+
+export interface BenchmarkSettings {
+  /** Vault folder where exported benchmark reports are created. */
+  reportFolder: string;
+  /** Recent benchmark runs, newest first, capped at MAX_BENCHMARK_HISTORY. */
+  history: BenchmarkHistoryEntry[];
+}
+
 export interface PluginSettings {
   providerSettings: ProviderSettingsMap;
   includeNoteContext: boolean;
@@ -335,4 +375,6 @@ export interface PluginSettings {
   maxToolRoundsEdit: number;
   /** Maximum read-only tool rounds in chat/plan mode (multi-hop vault retrieval). */
   maxToolRoundsChat: number;
+  /** Benchmark report folder and persisted run history. */
+  benchmark: BenchmarkSettings;
 }

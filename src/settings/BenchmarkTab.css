@@ -444,6 +444,59 @@
     margin-bottom: 2px;
   }
 
+  /* ------- Evaluator check list ------- */
+
+  .lmsa-benchmark-check-list {
+    margin: 4px 0 0 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .lmsa-benchmark-check {
+    @apply lmsa-flex lmsa-items-start lmsa-gap-2;
+    margin-bottom: 2px;
+  }
+
+  .lmsa-benchmark-check-icon {
+    @apply lmsa-flex lmsa-shrink-0 lmsa-items-center;
+    margin-top: 2px;
+  }
+
+  .lmsa-benchmark-check-icon svg {
+    width: 12px;
+    height: 12px;
+  }
+
+  .lmsa-benchmark-check.is-passed .lmsa-benchmark-check-icon {
+    color: var(--lmsa-status-success);
+  }
+
+  .lmsa-benchmark-check.is-failed .lmsa-benchmark-check-icon {
+    color: var(--lmsa-status-error);
+  }
+
+  .lmsa-benchmark-check.is-warning .lmsa-benchmark-check-icon {
+    color: var(--lmsa-status-warning);
+  }
+
+  .lmsa-benchmark-check-label {
+    color: var(--lmsa-text-primary);
+    font-weight: 500;
+  }
+
+  .lmsa-benchmark-check.is-failed .lmsa-benchmark-check-label {
+    color: var(--lmsa-status-error);
+  }
+
+  .lmsa-benchmark-check-detail {
+    color: var(--lmsa-text-secondary);
+  }
+
+  .lmsa-benchmark-check-optional {
+    color: var(--lmsa-text-faint);
+    font-style: italic;
+  }
+
   .lmsa-benchmark-response-block {
     @apply lmsa-mt-2 lmsa-overflow-x-auto lmsa-rounded-lg lmsa-p-3;
     background: var(--lmsa-surface-raised);

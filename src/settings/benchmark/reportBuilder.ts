@@ -200,7 +200,13 @@ export function buildBenchmarkReport(
         ? []
         : result.iterations
             .filter((it) => !it.result.passed)
-            .map((it) => ({ testName: result.testName, iteration: it.iteration, reason: it.result.reason }))
+            .map((it) => ({
+              testName: result.testName,
+              iteration: it.iteration,
+              reason: it.result.reason,
+              failedChecks: (it.result.checks ?? []).filter((c) => !c.passed && c.required),
+              evidence: it.result.evidence,
+            }))
     );
 
     if (failures.length > 0) {
@@ -208,6 +214,12 @@ export function buildBenchmarkReport(
       lines.push("");
       for (const f of failures) {
         lines.push(`- **${f.testName}** (iteration ${f.iteration}): ${f.reason}`);
+        for (const c of f.failedChecks) {
+          lines.push(`    - ✗ ${c.label}${c.detail ? ` — ${c.detail}` : ""}`);
+        }
+        for (const e of f.evidence) {
+          lines.push(`    - ${e}`);
+        }
       }
       lines.push("");
     }

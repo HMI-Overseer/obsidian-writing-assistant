@@ -1,6 +1,8 @@
+import { setIcon } from "obsidian";
 import type {
   BenchmarkMessage,
   BenchmarkRunResult,
+  EvaluationCheck,
   EvaluationCriteria,
 } from "./types";
 import type { SummaryStats, SuiteSummaryStats } from "./BenchmarkSummary";
@@ -83,6 +85,31 @@ export function renderConversationPreview(container: HTMLElement, messages: Benc
 // Results renderer (per-card, after run)
 // ---------------------------------------------------------------------------
 
+/** Renders one ✓/✗ row per evaluator check. Failed optional checks render as warnings. */
+function renderChecks(container: HTMLElement, checks: EvaluationCheck[]): void {
+  const checksEl = container.createDiv({ cls: "lmsa-benchmark-detail-section" });
+  checksEl.createEl("strong", { text: "Checks:" });
+  const list = checksEl.createEl("ul", { cls: "lmsa-benchmark-check-list" });
+
+  for (const c of checks) {
+    const li = list.createEl("li", { cls: "lmsa-benchmark-check" });
+    const state = c.passed ? "is-passed" : c.required ? "is-failed" : "is-warning";
+    li.addClass(state);
+
+    const iconEl = li.createSpan({ cls: "lmsa-benchmark-check-icon" });
+    setIcon(iconEl, c.passed ? "check" : c.required ? "x" : "alert-triangle");
+
+    const bodyEl = li.createSpan({ cls: "lmsa-benchmark-check-body" });
+    bodyEl.createSpan({ cls: "lmsa-benchmark-check-label", text: c.label });
+    if (c.detail) {
+      bodyEl.createSpan({ cls: "lmsa-benchmark-check-detail", text: ` — ${c.detail}` });
+    }
+    if (!c.required && !c.passed) {
+      bodyEl.createSpan({ cls: "lmsa-benchmark-check-optional", text: " (informational)" });
+    }
+  }
+}
+
 export function renderCardResults(
   resultsContainerEl: HTMLElement,
   result: BenchmarkRunResult,
@@ -112,6 +139,10 @@ export function renderCardResults(
     const reasonEl = iterEl.createDiv({ cls: "lmsa-benchmark-detail-section" });
     reasonEl.createEl("strong", { text: "Evaluation: " });
     reasonEl.createSpan({ text: iter.result.reason });
+
+    if (iter.result.checks?.length) {
+      renderChecks(iterEl, iter.result.checks);
+    }
 
     if (iter.result.evidence.length > 0) {
       const evidenceEl = iterEl.createDiv({ cls: "lmsa-benchmark-detail-section" });

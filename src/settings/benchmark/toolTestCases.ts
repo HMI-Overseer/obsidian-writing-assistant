@@ -12,7 +12,7 @@ import type { BenchmarkTestCase } from "./types";
 // Fixture: simple document for tool-call tests
 // =========================================================================
 
-const TOOL_TEST_DOC = `---
+export const TOOL_TEST_DOC = `---
 title: The Blacksmith's Forge
 tags: [fiction, draft]
 status: in-progress
@@ -54,10 +54,12 @@ export function getToolTestCases(): BenchmarkTestCase[] {
       ],
       evaluate: evaluateBasicToolCall,
       criteria: {
-        expectedOutcome: "Model produces at least one propose_edit tool call with valid search and replace arguments.",
+        expectedOutcome:
+          "Model produces at least one propose_edit call with valid arguments whose search text matches the document and covers the requested phrase.",
         targetKeywords: ["twelve feet tall"],
         targetLabel: "Text to edit in commission section",
-        notes: "Tests that the model uses tool calls instead of outputting raw SEARCH/REPLACE blocks.",
+        notes:
+          "Tests that the model uses tool calls instead of raw SEARCH/REPLACE blocks. Search arguments are resolved against the document with the real diff engine.",
       },
     },
     {
@@ -93,7 +95,8 @@ export function getToolTestCases(): BenchmarkTestCase[] {
       ],
       evaluate: evaluateSearchPrecision,
       criteria: {
-        expectedOutcome: "Model's propose_edit search text is under 200 characters and contains the target phrase.",
+        expectedOutcome:
+          "Model's propose_edit search text is under 200 characters, contains the target phrase, and matches the document.",
         targetKeywords: ["thatched rooftops"],
         targetLabel: "Target phrase in evening section",
         notes: "Search text should be short (target + a few surrounding lines for context), not a full section or document.",
@@ -108,13 +111,16 @@ export function getToolTestCases(): BenchmarkTestCase[] {
       systemPromptSuffix: TOOL_EDIT_SYSTEM_PROMPT,
       tools: ALL_EDIT_TOOLS,
       messages: [
-        { role: "user", content: "Make these three changes: (1) change 'twelve' to 'fourteen' in the title, (2) change 'white-hot' to 'cherry-red' in morning routine, (3) change 'thatched' to 'slate' in the evening section." },
+        { role: "user", content: "Make these three changes: (1) change 'twelve feet tall' to 'fourteen feet tall' in the commission section, (2) change 'white-hot' to 'cherry-red' in morning routine, (3) change 'thatched' to 'slate' in the evening section." },
       ],
       evaluate: evaluateMultipleEdits,
       criteria: {
-        expectedOutcome: "Model produces at least 3 edit tool calls (propose_edit), one for each requested change.",
+        expectedOutcome:
+          "Model produces at least 3 propose_edit calls whose search texts match the document, together covering all three replacements.",
         targetKeywords: ["fourteen", "cherry-red", "slate"],
         targetLabel: "Three distinct replacements",
+        notes:
+          "The commission section is the only place 'twelve feet tall' appears, but 'twelve' alone also appears elsewhere — search texts must be precise enough to disambiguate.",
       },
     },
   ];

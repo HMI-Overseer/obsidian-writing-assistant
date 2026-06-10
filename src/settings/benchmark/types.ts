@@ -18,6 +18,22 @@ export interface EvaluationCriteria {
   notes?: string;
 }
 
+/** A contiguous fixture-document region, located by its exact text. */
+export interface DocRegion {
+  /** Human label, e.g. "rejected fountain paragraph". */
+  label: string;
+  /** Exact substring of the fixture document. Located by offset at evaluation time. */
+  text: string;
+}
+
+/** Ground-truth region spec for edit tests: where edits must land and where they must not. */
+export interface EditRegionSpec {
+  /** Region the model is expected to edit. */
+  target: DocRegion;
+  /** Regions the model must leave untouched (accepted or out-of-scope content). */
+  forbidden: DocRegion[];
+}
+
 export interface BenchmarkTestCase {
   id: string;
   name: string;
@@ -32,6 +48,8 @@ export interface BenchmarkTestCase {
   tools?: CanonicalToolDefinition[];
   /** Evaluates the model's response and returns a pass/fail result. */
   evaluate: (response: string, testCase: BenchmarkTestCase, toolCalls?: ToolCall[] | null) => BenchmarkResult;
+  /** Ground-truth document regions for edit-block tests. Drives region-overlap evaluation. */
+  regions?: EditRegionSpec;
   /** Declarative evaluation criteria displayed in the UI. */
   criteria?: EvaluationCriteria;
   /** If true, this test is a control — expected to fail or be unreliable. */
@@ -43,11 +61,28 @@ export interface BenchmarkMessage {
   content: string;
 }
 
+/** A single named check performed by an evaluator. */
+export interface EvaluationCheck {
+  id: string;
+  /** What was verified, phrased as a passing statement (e.g., "All blocks match the document"). */
+  label: string;
+  passed: boolean;
+  /**
+   * Whether a failure fails the whole test. Informational checks (false) surface
+   * quality signals — e.g. "matched exactly vs. fuzzily" — without affecting the verdict.
+   */
+  required: boolean;
+  /** Outcome explanation — especially what actually happened on failure. */
+  detail?: string;
+}
+
 export interface BenchmarkResult {
   passed: boolean;
   reason: string;
   /** Relevant snippets extracted from the model's response as evidence. */
   evidence: string[];
+  /** Granular checks behind the verdict, in evaluation order. */
+  checks?: EvaluationCheck[];
 }
 
 /** Result of a single iteration of a single test. */

@@ -1,6 +1,7 @@
 import type { Message, OpenAIContentPart, SamplingParams } from "../shared/types";
-import type { ChatRequest, NoteImageContextItem } from "../shared/chatRequest";
+import type { ChatRequest } from "../shared/chatRequest";
 import type { ChatClient } from "./chatClient";
+import { appendNoteImageContextToOpenAIMessage, appendTextToOpenAIMessage } from "./openAiMessageContent";
 import type { CompletionResult, StreamResult, UsageResult, StopReason } from "./usageTypes";
 import type { ToolCall } from "../tools/types";
 import { formatOpenAITools } from "../tools/formatters/openai";
@@ -267,47 +268,6 @@ function extractUsage(json: Record<string, unknown>): UsageResult | null {
     return { inputTokens, outputTokens };
   }
   return null;
-}
-
-/**
- * Appends a text segment to an OpenAI user message, handling both
- * plain-string and multipart content-array formats.
- */
-function appendTextToOpenAIMessage(message: Message, text: string): void {
-  if (typeof message.content === "string") {
-    message.content = message.content + "\n\n" + text;
-  } else if (Array.isArray(message.content)) {
-    (message.content as OpenAIContentPart[]).push({ type: "text", text });
-  }
-}
-
-function appendNoteImageContextToOpenAIMessage(
-  message: Message,
-  images: NoteImageContextItem[],
-): void {
-  const parts = ensureOpenAIUserParts(message);
-  for (const image of images) {
-    parts.push({
-      type: "text",
-      text: `Embedded image from attached note (${image.noteFilePath}): ${image.fileName}`,
-    });
-    parts.push({
-      type: "image_url",
-      image_url: { url: `data:${image.mimeType};base64,${image.data}` },
-    });
-  }
-}
-
-function ensureOpenAIUserParts(message: Message): OpenAIContentPart[] {
-  if (Array.isArray(message.content)) {
-    return message.content as OpenAIContentPart[];
-  }
-  const parts: OpenAIContentPart[] = [];
-  if (typeof message.content === "string" && message.content) {
-    parts.push({ type: "text", text: message.content });
-  }
-  message.content = parts;
-  return parts;
 }
 
 function mapOpenAIStopReason(raw: string | undefined): StopReason {

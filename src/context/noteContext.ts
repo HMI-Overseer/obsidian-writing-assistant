@@ -2,6 +2,13 @@
 
 const MAX_CONTEXT_CHARS = 12000;
 
+/** Truncate note content to the context budget, marking the cut point. */
+export function truncateNoteText(content: string, maxContextChars: number): string {
+  return content.length > maxContextChars
+    ? content.slice(0, maxContextChars) + "\n\n[...note truncated...]"
+    : content;
+}
+
 export async function getActiveNoteText(
   app: App,
   maxContextChars: number = MAX_CONTEXT_CHARS
@@ -10,9 +17,7 @@ export async function getActiveNoteText(
   if (!file) return null;
 
   const content = await app.vault.read(file);
-  return content.length > maxContextChars
-    ? content.slice(0, maxContextChars) + "\n\n[...note truncated...]"
-    : content;
+  return truncateNoteText(content, maxContextChars);
 }
 
 export async function getActiveNoteContext(

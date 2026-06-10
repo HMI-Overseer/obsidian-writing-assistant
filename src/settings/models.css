@@ -182,12 +182,22 @@
     opacity: 0.85;
   }
 
-  .lmsa-model-state-badge.is-builtin {
+  .lmsa-command-header {
+    @apply lmsa-flex lmsa-flex-wrap lmsa-items-center lmsa-gap-2;
+  }
+
+  .lmsa-command-badge {
+    @apply lmsa-inline-flex lmsa-flex-none lmsa-items-center lmsa-rounded-full lmsa-px-2.5 lmsa-py-1 lmsa-text-xs lmsa-font-semibold;
+    background: color-mix(in srgb, var(--background-modifier-hover) 84%, transparent);
+    color: var(--lmsa-text-primary);
+  }
+
+  .lmsa-command-badge.is-builtin {
     background: color-mix(in srgb, var(--lmsa-section-accent) 14%, transparent);
     color: color-mix(in srgb, var(--lmsa-section-accent) 74%, var(--lmsa-text-primary));
   }
 
-  .lmsa-model-state-badge.is-user-created {
+  .lmsa-command-badge.is-user-created {
     background: color-mix(in srgb, var(--lmsa-section-accent-secondary) 14%, transparent);
     color: color-mix(in srgb, var(--lmsa-section-accent-secondary) 68%, var(--lmsa-text-primary));
   }

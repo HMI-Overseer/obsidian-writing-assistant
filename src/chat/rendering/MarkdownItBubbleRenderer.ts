@@ -2,12 +2,21 @@ import { Notice, type App } from "obsidian";
 import type { MarkdownBubbleRenderer } from "./MarkdownBubbleRenderer";
 import { renderMessageMarkdownToHtml } from "./messageMarkdown";
 
+const EXTERNAL_HREF_RE = /^(?:[a-z][a-z0-9+.-]*:|\/\/)/i;
+
 export class MarkdownItBubbleRenderer implements MarkdownBubbleRenderer {
   constructor(private readonly app: App) {}
 
   async render(contentEl: HTMLElement, text: string): Promise<void> {
+    // markdown-it runs with html disabled and all token content escaped, but the
+    // string is still adopted through an inert DOMParser document rather than
+    // assigned via innerHTML so no markup is ever parsed in the live document.
+    const doc = new DOMParser().parseFromString(
+      renderMessageMarkdownToHtml(text),
+      "text/html"
+    );
     contentEl.empty();
-    contentEl.innerHTML = renderMessageMarkdownToHtml(text);
+    contentEl.append(...Array.from(doc.body.childNodes));
     this.attachCopyHandlers(contentEl);
     this.attachLinkHandlers(contentEl);
   }
@@ -25,7 +34,14 @@ export class MarkdownItBubbleRenderer implements MarkdownBubbleRenderer {
 
         const rawHref = link.dataset.lmsaLinkHref ?? link.getAttribute("href") ?? "";
         const vaultHref = this.resolveVaultHref(rawHref);
-        if (!vaultHref) return;
+        if (!vaultHref) {
+          // External links are intentionally never opened: AI-generated URLs
+          // have no provenance, so the safe behavior is a brief explanation.
+          if (EXTERNAL_HREF_RE.test(rawHref.trim())) {
+            new Notice("External links in chat responses are disabled for safety.");
+          }
+          return;
+        }
 
         void this.app.workspace.openLinkText(vaultHref, this.getSourcePath()).catch(() => {
           new Notice(`Could not open file reference: ${vaultHref}`);
@@ -60,7 +76,7 @@ export class MarkdownItBubbleRenderer implements MarkdownBubbleRenderer {
   private resolveVaultHref(rawHref: string): string | null {
     const href = rawHref.trim();
     if (!href || href.startsWith("#")) return null;
-    if (/^(?:[a-z][a-z0-9+.-]*:|\/\/)/i.test(href)) return null;
+    if (EXTERNAL_HREF_RE.test(href)) return null;
 
     const sourcePath = this.getSourcePath();
     const decodedHref = this.safeDecodeUri(href);

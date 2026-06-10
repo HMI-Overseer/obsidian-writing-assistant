@@ -48,9 +48,9 @@ export function renderCommandsTab(
       setIcon(iconEl, command.icon ?? "wand");
 
       const info = row.createDiv({ cls: "lmsa-item-info" });
-      const header = info.createDiv({ cls: "lmsa-live-model-header" });
+      const header = info.createDiv({ cls: "lmsa-command-header" });
       header.createDiv({
-        cls: "lmsa-model-state-badge is-builtin",
+        cls: "lmsa-command-badge is-builtin",
         text: "Built-in",
       });
       header.createDiv({ cls: "lmsa-item-name", text: command.name });
@@ -86,9 +86,9 @@ export function renderCommandsTab(
       }
 
       const info = row.createDiv({ cls: "lmsa-item-info" });
-      const header = info.createDiv({ cls: "lmsa-live-model-header" });
+      const header = info.createDiv({ cls: "lmsa-command-header" });
       header.createDiv({
-        cls: "lmsa-model-state-badge is-user-created",
+        cls: "lmsa-command-badge is-user-created",
         text: "User-created",
       });
       header.createDiv({ cls: "lmsa-item-name", text: command.name });

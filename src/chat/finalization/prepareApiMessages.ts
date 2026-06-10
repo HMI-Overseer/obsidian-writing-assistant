@@ -1,6 +1,6 @@
 import type { ConversationMessage, PluginSettings, ProviderOption } from "../../shared/types";
 import type { AdditionalContextItem, ChatRequest, ChatTurn, DocumentContext, ExtraContextItem, RagContextBlock } from "../../shared/chatRequest";
-import { getFullNoteContent } from "../../context/noteContext";
+import { getFullNoteContent, truncateNoteText } from "../../context/noteContext";
 import { resolveNoteImageContext } from "../../context/noteImageContext";
 import { shouldUseToolCall } from "../../tools/registry";
 import { ALL_EDIT_TOOLS, EDIT_TOOL_NAMES } from "../../tools/editing/definition";
@@ -94,9 +94,7 @@ export async function prepareApiMessages(
     const file = app.workspace.getActiveFile();
     if (file) {
       const raw = await app.vault.read(file);
-      const text = raw.length > maxContextChars
-        ? raw.slice(0, maxContextChars) + "\n\n[...note truncated...]"
-        : raw;
+      const text = truncateNoteText(raw, maxContextChars);
       if (text) {
         documentContext = {
           filePath: file.path,
@@ -118,9 +116,7 @@ export async function prepareApiMessages(
       const file = app.vault.getFileByPath(item.filePath);
       if (!file) continue;
       const raw = await app.vault.read(file);
-      const content = raw.length > maxContextChars
-        ? raw.slice(0, maxContextChars) + "\n\n[...note truncated...]"
-        : raw;
+      const content = truncateNoteText(raw, maxContextChars);
       resolved.push({ filePath: item.filePath, fileName: item.fileName, content });
       if (shouldIncludeNoteImages) {
         noteImageSources.push({ file, rawContent: raw });

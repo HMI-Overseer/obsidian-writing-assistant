@@ -138,6 +138,9 @@
 
   .lmsa-chat-window-messages {
     @apply lmsa-flex lmsa-h-full lmsa-flex-col lmsa-gap-[18px] lmsa-overflow-y-auto lmsa-px-[18px] lmsa-pb-6 lmsa-pt-2.5;
+    /* No horizontal scrollbar — wide content scrolls inside its own wrapper
+       (code blocks, tables); everything else wraps or clips. */
+    overflow-x: hidden;
     scrollbar-gutter: stable;
     transition: opacity 180ms ease;
   }

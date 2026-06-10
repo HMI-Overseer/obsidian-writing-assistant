@@ -14,7 +14,10 @@ const CONVERSATIONS_DIR = "conversations";
 export class ConversationStorage {
   private dirCreated = false;
 
-  constructor(private readonly app: App) {}
+  constructor(
+    private readonly app: App,
+    private readonly pluginDir: string,
+  ) {}
 
   async load(id: string): Promise<Conversation | null> {
     try {
@@ -53,7 +56,7 @@ export class ConversationStorage {
   }
 
   private dirPath(): string {
-    return `${this.app.vault.configDir}/plugins/writing-assistant-chat/${CONVERSATIONS_DIR}`;
+    return `${this.pluginDir}/${CONVERSATIONS_DIR}`;
   }
 
   private async ensureDir(): Promise<void> {

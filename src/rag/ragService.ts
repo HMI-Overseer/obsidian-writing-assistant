@@ -59,7 +59,10 @@ export class RagService {
   private maxContextChars = 6000;
   private graphService: GraphService | null = null;
 
-  constructor(app: App) {
+  constructor(
+    app: App,
+    private readonly pluginDir: string,
+  ) {
     this.app = app;
   }
 
@@ -352,8 +355,7 @@ export class RagService {
   }
 
   private getIndexPath(): string {
-    const pluginDir = `${this.app.vault.configDir}/plugins/writing-assistant-chat`;
-    return `${pluginDir}/${INDEX_FILE}`;
+    return `${this.pluginDir}/${INDEX_FILE}`;
   }
 
   private async loadIndex(): Promise<void> {

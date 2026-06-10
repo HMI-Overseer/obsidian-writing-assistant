@@ -27,7 +27,8 @@ import { ChatHistoryDrawer } from "./view/ChatHistoryDrawer";
 import { createChatLayout } from "./view/createChatLayout";
 
 const NO_MODEL_SELECTED_LABEL = "No model selected";
-const MIN_VIEW_WIDTH_PX = 300;
+/** Below this width the "widen the panel" overlay replaces the chat. */
+const MIN_VIEW_WIDTH_PX = 190;
 
 export class ChatView extends ItemView {
   plugin: WritingAssistantChat;
@@ -568,6 +569,9 @@ export class ChatView extends ItemView {
 
     const isCollapsed = width < MIN_VIEW_WIDTH_PX;
     this.layout.rootEl.toggleClass("is-collapsed", isCollapsed);
+
+    // Width changes alter text wrapping; re-measure the composer height.
+    this.composer?.refreshHeight();
 
     if (isCollapsed && this.historyDrawer?.isOpen()) {
       this.historyDrawer.close();

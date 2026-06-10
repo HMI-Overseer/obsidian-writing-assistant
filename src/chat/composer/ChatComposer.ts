@@ -481,7 +481,7 @@ export class ChatComposer {
       });
       const iconEl = btn.createEl("span", { cls: "lmsa-chat-composer-mode-toggle-icon" });
       setIcon(iconEl, icon);
-      btn.createEl("span", { text: label });
+      btn.createEl("span", { cls: "lmsa-chat-composer-mode-toggle-label", text: label });
       btn.addEventListener("click", () => this.setMode(mode));
       this.modeButtons.set(mode, btn);
     }
@@ -498,8 +498,15 @@ export class ChatComposer {
     }
   }
 
+  /** Re-measure the textarea height after the view's size changes. */
+  refreshHeight(): void {
+    this.autoResizeTextarea();
+  }
+
   private autoResizeTextarea(): void {
     this.refs.textareaEl.setCssStyles({ height: "auto" });
+    // scrollHeight is 0 while the view is not laid out (e.g. hidden sidebar)
+    if (this.refs.textareaEl.scrollHeight === 0) return;
     this.refs.textareaEl.setCssStyles({ height: `${this.refs.textareaEl.scrollHeight}px` });
   }
 }

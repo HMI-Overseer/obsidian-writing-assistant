@@ -139,7 +139,9 @@ export default class WritingAssistantChat extends Plugin {
 
   async onload(): Promise<void> {
     await this.loadSettings();
-    this.services = new ServiceContainer(this.app, () => this.settings);
+    const pluginDir =
+      this.manifest.dir ?? `${this.app.vault.configDir}/plugins/${this.manifest.id}`;
+    this.services = new ServiceContainer(this.app, () => this.settings, pluginDir);
     await this.services.initialize();
 
     this.registerView(VIEW_TYPE_CHAT, (leaf: WorkspaceLeaf) => new ChatView(leaf, this));

@@ -1,10 +1,4 @@
 @layer components {
-  /* ── Wrapper for positioning ──────────────────────────────────────── */
-
-  .lmsa-chat-composer-tool-wrap {
-    @apply lmsa-flex;
-  }
-
   .lmsa-chat-composer-tool-indicator {
     cursor: pointer;
   }

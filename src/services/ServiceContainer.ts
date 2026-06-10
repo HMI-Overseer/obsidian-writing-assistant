@@ -21,18 +21,21 @@ export class ServiceContainer {
   readonly graphService: GraphService;
 
   constructor(
-    app: App,
+    private readonly app: App,
     private readonly getSettings: () => PluginSettings,
+    private readonly pluginDir: string,
   ) {
-    this.conversationStorage = new ConversationStorage(app);
+    this.conversationStorage = new ConversationStorage(app, pluginDir);
     this.modelAvailability = new ModelAvailabilityService(
       () => this.getSettings().providerSettings,
     );
-    this.ragService = new RagService(app);
-    this.graphService = new GraphService(app);
+    this.ragService = new RagService(app, pluginDir);
+    this.graphService = new GraphService(app, pluginDir);
   }
 
   async initialize(): Promise<void> {
+    await this.migrateLegacyDataDir();
+
     const s = this.getSettings();
 
     // PluginSettings uses shared/types variants; services expect rag-specific
@@ -74,5 +77,46 @@ export class ServiceContainer {
   destroy(): void {
     this.ragService.destroy();
     this.graphService.destroy();
+  }
+
+  /**
+   * Older builds wrote data to a hardcoded `plugins/writing-assistant-chat`
+   * folder. Move it to the actual install folder before services load from disk.
+   */
+  private async migrateLegacyDataDir(): Promise<void> {
+    const legacyDir = `${this.app.vault.configDir}/plugins/writing-assistant-chat`;
+    if (legacyDir === this.pluginDir) return;
+
+    const adapter = this.app.vault.adapter;
+    try {
+      if (!(await adapter.exists(legacyDir))) return;
+
+      for (const file of ["rag-index.json", "rag-knowledge-graph.json"]) {
+        const from = `${legacyDir}/${file}`;
+        const to = `${this.pluginDir}/${file}`;
+        if ((await adapter.exists(from)) && !(await adapter.exists(to))) {
+          await adapter.rename(from, to);
+        }
+      }
+
+      const fromDir = `${legacyDir}/conversations`;
+      const toDir = `${this.pluginDir}/conversations`;
+      if (await adapter.exists(fromDir)) {
+        if (!(await adapter.exists(toDir))) {
+          await adapter.rename(fromDir, toDir);
+        } else {
+          const listing = await adapter.list(fromDir);
+          for (const filePath of listing.files) {
+            const name = filePath.slice(filePath.lastIndexOf("/") + 1);
+            const target = `${toDir}/${name}`;
+            if (!(await adapter.exists(target))) {
+              await adapter.rename(filePath, target);
+            }
+          }
+        }
+      }
+    } catch {
+      // Non-fatal — data stays in the legacy folder and services start empty.
+    }
   }
 }

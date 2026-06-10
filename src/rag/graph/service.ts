@@ -34,7 +34,10 @@ export class GraphService {
   private configuredModelId: string | null = null;
   private configuredEmbeddingModelId: string | null = null;
 
-  constructor(app: App) {
+  constructor(
+    app: App,
+    private readonly pluginDir: string,
+  ) {
     this.app = app;
   }
 
@@ -290,8 +293,7 @@ export class GraphService {
   }
 
   private getGraphPath(): string {
-    const pluginDir = `${this.app.vault.configDir}/plugins/writing-assistant-chat`;
-    return `${pluginDir}/${GRAPH_FILE}`;
+    return `${this.pluginDir}/${GRAPH_FILE}`;
   }
 
   private async loadGraph(): Promise<void> {

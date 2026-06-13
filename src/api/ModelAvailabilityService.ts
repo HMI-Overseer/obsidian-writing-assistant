@@ -2,6 +2,7 @@ import type { ModelAvailabilityState, ProviderSettingsMap } from "../shared/type
 import type { ModelCandidateResult } from "./types";
 import { LMStudioModelsService } from "./LMStudioModelsService";
 import { AnthropicModelsService } from "./AnthropicModelsService";
+import { ClaudeCodeModelsService } from "./ClaudeCodeModelsService";
 import { getProviderDescriptor } from "../providers/registry";
 import type { ProviderOption } from "../shared/types";
 
@@ -18,6 +19,7 @@ export class ModelAvailabilityService {
   private availabilityMap = new Map<string, ModelAvailabilityInfo>();
   private lmService: LMStudioModelsService | null = null;
   private anthropicService: AnthropicModelsService | null = null;
+  private claudeCodeService: ClaudeCodeModelsService | null = null;
   private lastFetchedAt = 0;
   private lastLmBaseUrl = "";
   private lastLmBypassCors = true;
@@ -98,12 +100,22 @@ export class ModelAvailabilityService {
     return this.anthropicService;
   }
 
+  getClaudeCodeService(): ClaudeCodeModelsService {
+    if (!this.claudeCodeService) {
+      this.claudeCodeService = new ClaudeCodeModelsService();
+    }
+    return this.claudeCodeService;
+  }
+
   async discoverCompletionCandidates(
     provider: ProviderOption,
     options: { forceRefresh?: boolean; signal?: AbortSignal } = {},
   ): Promise<ModelCandidateResult> {
     if (provider === "anthropic") {
       return this.getAnthropicService().getCompletionCandidates(options);
+    }
+    if (provider === "claudecode") {
+      return this.getClaudeCodeService().getCompletionCandidates(options);
     }
     return this.getLMStudioService().getCompletionCandidates(options);
   }

@@ -5,6 +5,7 @@ import type { ModelCandidateResult, ModelDigest } from "../api/types";
 import type WritingAssistantChat from "../main";
 import type { ProviderOption } from "../shared/types";
 import { getProviderDescriptor } from "../providers/registry";
+import { CLAUDE_CODE_SETUP_URL } from "../services/ClaudeCodeService";
 import { createSettingsSection, SettingItem } from "./ui";
 
 type BaseModel = { id: string; name: string; modelId: string; provider: ProviderOption };
@@ -42,6 +43,7 @@ const PROVIDER_LABELS: Record<ProviderOption, string> = {
   lmstudio: "LM Studio",
   openai: "OpenAI",
   anthropic: "Anthropic",
+  claudecode: "Claude Code",
 };
 
 export function renderModelProfileTab<T extends BaseModel>(
@@ -218,6 +220,38 @@ export function renderModelProfileTab<T extends BaseModel>(
     text: "Support for this provider is coming soon.",
   });
 
+  // Claude Code: install/auth status (no API key — uses the user's logged-in CLI session)
+  const claudecodeConnectionEl = providerContentEl.createDiv({ cls: "lmsa-provider-connection" });
+  const claudecodeStatusEl = claudecodeConnectionEl.createEl("p", {
+    cls: "lmsa-settings-section-desc",
+    text: "Checking for Claude Code…",
+  });
+  claudecodeConnectionEl.createEl("p", {
+    cls: "lmsa-settings-section-desc",
+    text: "Runs through your existing Claude Code session — this plugin never asks for or stores a password or API key.",
+  });
+  claudecodeConnectionEl.createEl("a", {
+    text: "Install or set up Claude Code",
+    attr: { href: CLAUDE_CODE_SETUP_URL, target: "_blank", rel: "noopener" },
+  });
+
+  let claudecodeChecking = false;
+  const refreshClaudeCodeStatus = async () => {
+    if (claudecodeChecking) return;
+    claudecodeChecking = true;
+    claudecodeStatusEl.setText("Checking for Claude Code…");
+    try {
+      const detection = await plugin.services.claudeCode.detect();
+      claudecodeStatusEl.setText(
+        detection.installed
+          ? `Detected${detection.version ? `: ${detection.version}` : ""}.`
+          : "Not found. Install Claude Code and make sure the `claude` command is on your PATH.",
+      );
+    } finally {
+      claudecodeChecking = false;
+    }
+  };
+
   // ── Shared discovery UI ───────────────────────────────────────────────
 
   const discoveryEl = providerContentEl.createDiv({ cls: "lmsa-discovery-container" });
@@ -367,6 +401,8 @@ export function renderModelProfileTab<T extends BaseModel>(
       selected !== "anthropic" || config.kind !== "embedding",
     );
     openaiPlaceholderEl.toggleClass("lmsa-hidden", selected !== "openai");
+    claudecodeConnectionEl.toggleClass("lmsa-hidden", selected !== "claudecode");
+    if (selected === "claudecode") void refreshClaudeCodeStatus();
 
     // Shared discovery block — visible when provider has a fetcher
     discoveryEl.toggleClass("lmsa-hidden", !hasFetcher);

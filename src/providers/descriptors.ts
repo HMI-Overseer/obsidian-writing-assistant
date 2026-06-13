@@ -67,8 +67,36 @@ const openai: ProviderDescriptor = {
   requiresBaseUrl: true,
 };
 
+const claudecode: ProviderDescriptor = {
+  id: "claudecode",
+  label: "Claude Code",
+  kind: "cloud",
+  billingModel: "per-token",
+  authType: "none",
+  defaultContextStrategy: "on-change",
+  // Claude Code takes no sampling parameters — it runs its own agent harness.
+  supportedParams: {
+    temperature: false,
+    maxTokens: false,
+    topP: false,
+    topK: false,
+    minP: false,
+    repeatPenalty: false,
+    reasoning: false,
+  },
+  supportsModelDiscovery: true,
+  // Claude Code is tool-centric, so it reports as tool-capable. NOTE: it receives
+  // the plugin's tools through the in-process MCP server, NOT via request.tools —
+  // `prepareApiMessages` deliberately skips attaching CanonicalToolDefinition tools
+  // for this provider so the plugin's own tool loop/timeline stays out of the way.
+  supportsToolUse: true,
+  defaultBaseUrl: null,
+  requiresBaseUrl: false,
+};
+
 export const PROVIDER_DESCRIPTORS: Record<ProviderOption, ProviderDescriptor> = {
   lmstudio,
   anthropic,
   openai,
+  claudecode,
 };

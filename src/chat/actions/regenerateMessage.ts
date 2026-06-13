@@ -70,7 +70,14 @@ export async function regenerateMessage(options: RegenerateOptions): Promise<voi
   await store.persistActiveConversation();
   await syncConversationUi();
 
-  const client = createChatClient(activeModel.provider, plugin.settings.providerSettings);
+  const client = createChatClient(
+    activeModel.provider,
+    plugin.settings.providerSettings,
+    await plugin.services.claudeCode.getRuntime(activeModel.provider, {
+      editMode,
+      activeFilePath: plugin.app.workspace.getActiveFile()?.path,
+    }),
+  );
 
   await generateLlmResponse({
     plugin,

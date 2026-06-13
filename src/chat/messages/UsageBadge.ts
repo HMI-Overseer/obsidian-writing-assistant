@@ -29,6 +29,20 @@ export function renderUsageBadge(
       text: `${formatTokenCount(usage.inputTokens)} in \u00b7 ${formatTokenCount(usage.outputTokens)} out`,
     });
 
+    // Prompt-cache figures, shown only for cache-capable providers (Anthropic,
+    // Claude Code report these fields). A "0 cache read" is itself the signal
+    // that a turn missed the cache and reprocessed its prefix from scratch.
+    if (usage.cacheReadInputTokens !== undefined) {
+      const writeSuffix =
+        usage.cacheCreationInputTokens && usage.cacheCreationInputTokens > 0
+          ? ` · ${formatTokenCount(usage.cacheCreationInputTokens)} cache write`
+          : "";
+      badgeEl.createSpan({
+        cls: "lmsa-chat-window-usage-cache",
+        text: `${formatTokenCount(usage.cacheReadInputTokens)} cache read${writeSuffix}`,
+      });
+    }
+
     if (usage.estimatedCostUsd !== null && usage.estimatedCostUsd !== undefined && usage.estimatedCostUsd > 0) {
       badgeEl.createSpan({
         cls: "lmsa-chat-window-usage-cost",

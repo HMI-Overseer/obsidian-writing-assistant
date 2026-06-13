@@ -21,6 +21,7 @@ import type { MessageUsage } from "../../shared/types";
 import { runToolLoop } from "./toolLoop";
 import type { VaultToolContext, ToolExecutionContext } from "./toolLoop";
 import { AgenticTimeline } from "../messages/AgenticTimeline";
+import { extractToolInput } from "../../tools/metadata";
 import { CONTEXT_DANGER_THRESHOLD } from "../../constants";
 
 /**
@@ -153,10 +154,25 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
     ? new EditStreamingRenderer(assistantBubble, transcript, { useToolMode })
     : new StreamingRenderer(assistantBubble, transcript);
 
-  // Create an agentic timeline when tools are included in the request.
-  const timeline = apiMessages.tools?.length
+  // Two distinct agentic shapes feed the timeline:
+  //  - pluginAgentic: the plugin runs its own tool loop (tools attached to the
+  //    request). Deltas are buffered per round and only the final round reaches
+  //    the bubble; the timeline is driven by the loop's callbacks, created eagerly.
+  //  - claudeCodeAgentic: Claude Code runs its loop internally over MCP. Its text
+  //    streams straight to the bubble (no buffering) and the timeline is driven by
+  //    the service's tool-lifecycle events — created lazily on the first tool call
+  //    so tool-less turns (the common case) don't render an empty timeline.
+  const pluginAgentic = !!apiMessages.tools?.length;
+  const claudeCodeAgentic =
+    activeModel.provider === "claudecode" && plugin.settings.agenticMode;
+  // pluginTimeline is the eager instance the tool-loop callbacks write to (const,
+  // so they narrow cleanly). `timeline` tracks whichever instance exists for
+  // finalization — it starts as pluginTimeline and is filled lazily on the
+  // Claude Code path when its first MCP tool call arrives.
+  const pluginTimeline = pluginAgentic
     ? new AgenticTimeline(assistantBubble.timelineEl)
     : null;
+  let timeline: AgenticTimeline | null = pluginTimeline;
 
   const vaultToolContext: VaultToolContext = {
     app: plugin.app,
@@ -181,7 +197,28 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
       ? plugin.settings.maxToolRoundsEdit
       : plugin.settings.maxToolRoundsChat;
 
-    const agenticMode = !!timeline;
+    // Only the plugin-owned tool loop buffers deltas; Claude Code streams live.
+    const agenticMode = pluginAgentic;
+
+    // Claude Code's tools fire inside its subprocess over MCP, not through the
+    // tool loop — route those lifecycle events into the same timeline, created on
+    // first use so tool-less turns stay clean.
+    if (claudeCodeAgentic) {
+      plugin.services.claudeCode.setToolListener((event) => {
+        const tl = timeline ?? (timeline = new AgenticTimeline(assistantBubble.timelineEl));
+        if (event.phase === "start") {
+          tl.addPendingToolCall(event.toolName);
+        } else {
+          tl.addStep({
+            type: "tool_call",
+            round: 0,
+            toolName: event.toolName,
+            toolInput: extractToolInput({ name: event.toolName, arguments: event.args }),
+            toolArgs: event.args,
+          });
+        }
+      });
+    }
 
     const { writeToolCalls, usage: finalUsage } = await runToolLoop(
       client,
@@ -199,15 +236,19 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
           if (editRenderer) editRenderer.beginNewRound();
           else chatRenderer?.beginNewRound();
         },
-        onToolCallStreaming: timeline ? (name) => timeline.addPendingToolCall(name) : undefined,
-        onStepRecorded: timeline ? (step) => timeline.addStep(step) : undefined,
-        onReasoningDelta: timeline ? (delta) => timeline.addReasoningDelta(delta) : undefined,
-        onReasoningRoundFinished: timeline
+        // These callbacks fire from the plugin's own tool loop only. For Claude
+        // Code the loop runs a single pass with no tool calls, and the timeline is
+        // driven by the MCP listener below — so they stay unset there to avoid
+        // mirroring the streamed answer text into the timeline as reasoning.
+        onToolCallStreaming: pluginTimeline ? (name) => pluginTimeline.addPendingToolCall(name) : undefined,
+        onStepRecorded: pluginTimeline ? (step) => pluginTimeline.addStep(step) : undefined,
+        onReasoningDelta: pluginTimeline ? (delta) => pluginTimeline.addReasoningDelta(delta) : undefined,
+        onReasoningRoundFinished: pluginTimeline
           ? (committed, round) => {
               if (committed) {
-                timeline.commitLiveReasoning(round);
+                pluginTimeline.commitLiveReasoning(round);
               } else {
-                timeline.discardLiveReasoning();
+                pluginTimeline.discardLiveReasoning();
               }
             }
           : undefined,
@@ -229,6 +270,13 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
 
     const agenticSteps = timeline?.getSteps();
 
+    // Claude Code runs its tools internally, so its edit proposals arrive via the
+    // MCP server (collected on the service) rather than through the tool loop.
+    const ccEdits = activeModel.provider === "claudecode"
+      ? plugin.services.claudeCode.takeCollectedEdits()
+      : [];
+    const effectiveWriteToolCalls = ccEdits.length > 0 ? ccEdits : writeToolCalls;
+
     if (editMode && renderer instanceof EditStreamingRenderer) {
       await finalizeEditResponse({
         app: plugin.app,
@@ -241,7 +289,7 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
         modelId: activeModel.modelId,
         provider: activeModel.provider,
         usage: finalUsage,
-        toolCalls: writeToolCalls,
+        toolCalls: effectiveWriteToolCalls,
         agenticSteps,
       });
     } else if (finalization.kind === "replace") {
@@ -335,6 +383,7 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
       transcript.renderPlainTextContent(assistantBubble, errorText);
     }
   } finally {
+    plugin.services.claudeCode.setToolListener(null);
     setActiveAbortController(null);
     await store.persistActiveConversation();
     setIsGenerating(false);

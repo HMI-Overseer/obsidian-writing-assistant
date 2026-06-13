@@ -6,6 +6,7 @@ import { ConversationStorage } from "../chat/conversation/ConversationStorage";
 import { ModelAvailabilityService } from "../api";
 import { RagService } from "../rag";
 import { GraphService } from "../rag/graph";
+import { ClaudeCodeService } from "./ClaudeCodeService";
 
 /**
  * Owns construction and lifecycle of all runtime services.
@@ -19,6 +20,7 @@ export class ServiceContainer {
   readonly modelAvailability: ModelAvailabilityService;
   readonly ragService: RagService;
   readonly graphService: GraphService;
+  readonly claudeCode: ClaudeCodeService;
 
   constructor(
     private readonly app: App,
@@ -31,6 +33,7 @@ export class ServiceContainer {
     );
     this.ragService = new RagService(app, pluginDir);
     this.graphService = new GraphService(app, pluginDir);
+    this.claudeCode = new ClaudeCodeService(app, getSettings, () => this.ragService);
   }
 
   async initialize(): Promise<void> {
@@ -77,6 +80,7 @@ export class ServiceContainer {
   destroy(): void {
     this.ragService.destroy();
     this.graphService.destroy();
+    this.claudeCode.destroy();
   }
 
   /**

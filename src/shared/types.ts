@@ -45,7 +45,7 @@ export interface Message {
   tool_calls?: Array<{ id: string; type: "function"; function: { name: string; arguments: string } }>;
 }
 
-export type ProviderOption = "lmstudio" | "openai" | "anthropic";
+export type ProviderOption = "lmstudio" | "openai" | "anthropic" | "claudecode";
 
 export type ModelAvailabilityState = "loaded" | "unloaded" | "unknown" | "cloud";
 
@@ -256,10 +256,19 @@ export interface OpenAIProviderSettings {
   baseUrl: string;
 }
 
+export interface ClaudeCodeProviderSettings {
+  /**
+   * Optional explicit path to the `claude` binary. Empty = resolve from PATH.
+   * Not a secret — authentication uses the user's existing `claude` login session.
+   */
+  claudePath: string;
+}
+
 export interface ProviderSettingsMap {
   lmstudio: LMStudioProviderSettings;
   anthropic: AnthropicProviderSettings;
   openai: OpenAIProviderSettings;
+  claudecode: ClaudeCodeProviderSettings;
 }
 
 /** RAG-specific settings. */

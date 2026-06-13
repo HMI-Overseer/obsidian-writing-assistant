@@ -129,10 +129,15 @@ function normalizeProviderSettingsMap(
         ? saved.openai.baseUrl
         : defaults.openai.baseUrl,
     },
+    claudecode: {
+      claudePath: typeof saved?.claudecode?.claudePath === "string"
+        ? saved.claudecode.claudePath
+        : defaults.claudecode.claudePath,
+    },
   };
 }
 
-const VALID_PROVIDERS = new Set<string>(["lmstudio", "openai", "anthropic"]);
+const VALID_PROVIDERS = new Set<string>(["lmstudio", "openai", "anthropic", "claudecode"]);
 
 function normalizeProviderProfiles(raw: unknown): ProviderProfile[] {
   if (!Array.isArray(raw)) return [];

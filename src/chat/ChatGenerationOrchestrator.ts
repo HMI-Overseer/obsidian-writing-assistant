@@ -157,7 +157,14 @@ export class ChatGenerationOrchestrator {
     if (store.getSnapshot().messageHistory.length === 0) return;
 
     const editMode = composer.getMode() === "edit";
-    const client = createChatClient(activeModel.provider, this.deps.plugin.settings.providerSettings);
+    const client = createChatClient(
+      activeModel.provider,
+      this.deps.plugin.settings.providerSettings,
+      await this.deps.plugin.services.claudeCode.getRuntime(activeModel.provider, {
+        editMode,
+        activeFilePath: this.deps.plugin.app.workspace.getActiveFile()?.path,
+      }),
+    );
 
     this.setIsGeneratingAndSync(true);
 

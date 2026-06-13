@@ -77,6 +77,7 @@ export const DEFAULT_ACTIVE_PROFILE_IDS: Record<ProviderOption, string> = {
   lmstudio: "lmstudio-default",
   anthropic: "anthropic-default",
   openai: "openai-default",
+  claudecode: "claudecode-default",
 };
 
 export function makeDefaultProfile(provider: ProviderOption): ProviderProfile {
@@ -103,6 +104,7 @@ export const DEFAULT_SETTINGS: PluginSettings = {
     lmstudio: { baseUrl: "http://localhost:1234/v1", bypassCors: true },
     anthropic: { apiKey: "" },
     openai: { apiKey: "", baseUrl: "https://api.openai.com/v1" },
+    claudecode: { claudePath: "" },
   },
   includeNoteContext: true,
   includeLocalAttachmentsAsContext: false,

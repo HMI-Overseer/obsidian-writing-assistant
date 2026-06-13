@@ -18,12 +18,15 @@ export function attachUsageToMessage(
   if (modelId) message.modelId = modelId;
   if (provider) message.provider = provider;
   if (usage) {
+    // Prefer a provider-reported cost (e.g. Claude Code's total_cost_usd); fall
+    // back to the token-based estimate for providers with a known price table.
+    const costUsd = usage.costUsd ?? (modelId ? estimateCost(modelId, usage) ?? undefined : undefined);
     message.usage = {
       inputTokens: usage.inputTokens,
       outputTokens: usage.outputTokens,
       ...(usage.cacheCreationInputTokens !== undefined && { cacheCreationInputTokens: usage.cacheCreationInputTokens }),
       ...(usage.cacheReadInputTokens !== undefined && { cacheReadInputTokens: usage.cacheReadInputTokens }),
-      ...(modelId && { estimatedCostUsd: estimateCost(modelId, usage) ?? undefined }),
+      ...(costUsd !== undefined && { estimatedCostUsd: costUsd }),
     };
   }
 }

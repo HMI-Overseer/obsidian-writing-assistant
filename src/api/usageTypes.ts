@@ -8,6 +8,13 @@ export interface UsageResult {
   cacheCreationInputTokens?: number;
   /** Tokens read from cache (Anthropic only). */
   cacheReadInputTokens?: number;
+  /**
+   * Actual cost (USD) reported directly by the provider, when available.
+   * Claude Code supplies this from its `total_cost_usd` result field; preferred
+   * over the token-based `estimateCost()` since the plugin has no price table
+   * for a subscription-billed harness.
+   */
+  costUsd?: number;
 }
 
 /** Why the model stopped generating. */

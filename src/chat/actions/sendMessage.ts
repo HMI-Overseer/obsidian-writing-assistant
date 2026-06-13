@@ -92,7 +92,14 @@ export async function sendMessage(options: SendMessageOptions): Promise<void> {
   store.appendMessage(userMessage);
   transcript.setEmptyStateVisible(false);
 
-  const client = createChatClient(activeModel.provider, plugin.settings.providerSettings);
+  const client = createChatClient(
+    activeModel.provider,
+    plugin.settings.providerSettings,
+    await plugin.services.claudeCode.getRuntime(activeModel.provider, {
+      editMode: composer.getMode() === "edit",
+      activeFilePath: plugin.app.workspace.getActiveFile()?.path,
+    }),
+  );
 
   await generateLlmResponse({
     plugin,

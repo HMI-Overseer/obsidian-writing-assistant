@@ -66,9 +66,16 @@ export async function prepareApiMessages(
   } = options;
 
   const editMode = mode === "edit";
+  // Claude Code reports as tool-capable, but it bridges the plugin's tools via its
+  // own MCP server and runs its own agent loop — so the plugin never attaches
+  // CanonicalToolDefinition tools (request.tools) or spins up its tool loop/timeline
+  // for it. When agentic is on, Claude Code retrieves through MCP itself.
+  const isClaudeCode = activeProvider === "claudecode";
   const modelCanUseTools = !!activeProvider && shouldUseToolCall(activeProvider, modelCapabilities);
-  const useVaultTools = settings.agenticMode && modelCanUseTools;
-  const useEditTools = editMode && settings.agenticMode && modelCanUseTools && settings.preferToolUse;
+  const usePluginTools = modelCanUseTools && !isClaudeCode;
+  const useVaultTools = settings.agenticMode && usePluginTools;
+  const useEditTools = editMode && settings.agenticMode && usePluginTools && settings.preferToolUse;
+  const claudeCodeRetrievesViaMcp = isClaudeCode && settings.agenticMode;
 
   const systemPrompt = composeSystemPrompt(mode, useEditTools, settings, profileSystemPrompt);
   const shouldIncludeNoteImages =
@@ -144,9 +151,12 @@ export async function prepareApiMessages(
   // Skipped when vault tools are active — in agentic mode the model controls
   // retrieval itself via semantic_search. Pre-injecting context causes the model
   // to answer from the warm-start content and never call the tool.
+  // Also skipped for agentic Claude Code: it retrieves through the plugin's MCP
+  // tools, so pre-injecting would duplicate context and discourage it from
+  // searching. A non-agentic Claude Code run has no tools, so RAG still helps.
   let ragContext: RagContextBlock[] | null = null;
   let rewrittenQuery: string | undefined;
-  if (!editMode && !useVaultTools && ragService?.isReady()) {
+  if (!editMode && !useVaultTools && !claudeCodeRetrievesViaMcp && ragService?.isReady()) {
     const lastUserMessage = [...messages].reverse().find((m: ChatTurn) => m.role === "user");
     if (lastUserMessage?.content) {
       let retrievalQuery = lastUserMessage.content;

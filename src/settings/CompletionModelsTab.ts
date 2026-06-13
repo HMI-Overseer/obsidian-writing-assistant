@@ -54,6 +54,7 @@ export function renderCompletionModelsTab(
     fetchCandidates: {
       lmstudio: (opts) => plugin.services.modelAvailability.discoverCompletionCandidates("lmstudio", opts),
       anthropic: (opts) => plugin.services.modelAvailability.discoverCompletionCandidates("anthropic", opts),
+      claudecode: (opts) => plugin.services.modelAvailability.discoverCompletionCandidates("claudecode", opts),
     },
   });
 }

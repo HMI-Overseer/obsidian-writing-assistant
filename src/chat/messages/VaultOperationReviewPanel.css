@@ -153,6 +153,12 @@
     padding: 2px 8px;
   }
 
+  .lmsa-vault-ops-header-note {
+    font-size: var(--font-ui-smaller);
+    font-weight: 400;
+    color: var(--text-faint);
+  }
+
   /* ------- Footer ------- */
 
   .lmsa-vault-ops-footer {
@@ -161,5 +167,37 @@
 
   .lmsa-vault-ops-footer .is-hidden {
     display: none;
+  }
+
+  /* ------- Historical (superseded by a later turn) ------- */
+
+  /* A superseded batch stays for reference + undo, but recedes: muted, compact,
+     no loud per-op cards competing with the live turn (Finding B / §3-B). */
+  .lmsa-vault-ops-panel.is-historical {
+    opacity: 0.75;
+  }
+
+  .lmsa-vault-ops-panel.is-historical .lmsa-vault-op-row {
+    border-color: transparent;
+    background: transparent;
+    padding: 2px 0;
+  }
+
+  .lmsa-vault-ops-panel.is-historical .lmsa-vault-op-badge {
+    display: none;
+  }
+
+  /* Undo demoted to a quiet, secondary affordance, not a primary button. */
+  .lmsa-vault-ops-undo-btn--quiet {
+    background: transparent;
+    box-shadow: none;
+    font-size: var(--font-ui-smaller);
+    color: var(--text-muted);
+    padding: 2px 8px;
+  }
+
+  .lmsa-vault-ops-undo-btn--quiet:hover {
+    color: var(--text-normal);
+    background: var(--background-modifier-hover);
   }
 }

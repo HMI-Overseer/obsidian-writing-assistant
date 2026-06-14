@@ -14,8 +14,8 @@
 
 import type { App } from "obsidian";
 import type { AppliedVaultOpRecord, VaultOperation } from "./types";
-import { orderOps, preflight, type Conflict } from "./plan";
-import { applyOperation, makeDiskSnapshot } from "./apply";
+import { orderOps, preflight, fingerprintsMatch, type Conflict } from "./plan";
+import { applyOperation, diskFingerprint, diskState, makeDiskSnapshot } from "./apply";
 
 /** A reviewable op paired with its id, so the result can record opId → inverse. */
 export interface BatchOp {
@@ -63,11 +63,30 @@ export async function applyVaultOpBatch(app: App, batch: BatchOp[]): Promise<Bat
   return { ok: true, conflicts: [], applied };
 }
 
-/** Undo an applied batch: replay the recorded inverses in reverse order (§7.4). */
+export interface UndoResult {
+  ok: boolean;
+  failures: string[];
+  /** True when the drift guard refused undo before touching disk (vault unchanged). */
+  refused?: boolean;
+}
+
+/**
+ * Undo an applied batch: replay the recorded inverses in reverse order (§7.4).
+ *
+ * Runs the op-type-aware drift guard first (§3-B amendment 3): replaying the
+ * inverse of a stale trash or move can resurrect or clobber files in a way a
+ * content-diff undo cannot, so any drift refuses the whole undo *before* writing
+ * anything — strictly safer than the always-replay it replaces.
+ */
 export async function undoVaultOpBatch(
   app: App,
   record: AppliedVaultOpRecord,
-): Promise<{ ok: boolean; failures: string[] }> {
+): Promise<UndoResult> {
+  const drift = guardVaultUndo(app, record);
+  if (drift.length > 0) {
+    return { ok: false, refused: true, failures: drift };
+  }
+
   const failures: string[] = [];
   for (let i = record.applied.length - 1; i >= 0; i--) {
     try {
@@ -77,6 +96,67 @@ export async function undoVaultOpBatch(
     }
   }
   return { ok: failures.length === 0, failures };
+}
+
+/**
+ * Op-type-aware drift guard for undo (§3-B amendment 3). Undo applies each
+ * recorded *inverse*; if the vault drifted since apply, replaying it can destroy
+ * or resurrect newer state. Returns the human reasons undo must be refused —
+ * empty ⇒ safe to proceed. The check is keyed to the inverse's kind because the
+ * danger differs: undoing a trash (re-creating a file) or a move is categorically
+ * riskier than restoring content.
+ */
+export function guardVaultUndo(app: App, record: AppliedVaultOpRecord): string[] {
+  const reasons: string[] = [];
+  for (const { inverse } of record.applied) {
+    switch (inverse.kind) {
+      case "create": {
+        // Undo of a trash: re-create the file. If something occupies the path
+        // again, the original slot was taken — don't resurrect over it.
+        if (diskState(app, inverse.path) !== "absent") {
+          reasons.push(`"${inverse.path}" exists again — won't recreate it over the current file.`);
+        }
+        break;
+      }
+      case "trash": {
+        // Undo of a create / createDir: trash what we made. Already gone ⇒ nothing
+        // to undo (not a conflict). A folder inverse carries an empty snapshot and
+        // a zero fingerprint, so check by existence only; a real file must still
+        // match the fingerprint captured at apply, or we'd trash newer edits.
+        const state = diskState(app, inverse.path);
+        if (state === "absent") break;
+        if (inverse.snapshot !== "" || state === "file") {
+          if (!fingerprintsMatch(diskFingerprint(app, inverse.path), inverse.expect)) {
+            reasons.push(`"${inverse.path}" changed since it was created — won't trash your edits.`);
+          }
+        }
+        break;
+      }
+      case "overwrite": {
+        // Undo of an overwrite: restore prior content. Refuse if the file changed
+        // since we overwrote it, or we'd clobber the newer version.
+        if (!fingerprintsMatch(diskFingerprint(app, inverse.path), inverse.expect)) {
+          reasons.push(`"${inverse.path}" changed since it was overwritten — won't clobber it.`);
+        }
+        break;
+      }
+      case "move": {
+        // Undo of a move: move it back. The file must still be at the moved-to
+        // location, and its original spot must be free.
+        if (diskState(app, inverse.from) !== "file") {
+          reasons.push(`"${inverse.from}" is no longer there to move back.`);
+        }
+        if (diskState(app, inverse.to) !== "absent") {
+          reasons.push(`"${inverse.to}" exists again — won't overwrite it to undo a move.`);
+        }
+        break;
+      }
+      case "createDir":
+        // Never produced as an inverse (inverseOf returns trash or null); ignore.
+        break;
+    }
+  }
+  return reasons;
 }
 
 /** Best-effort rollback: replay inverses of what was applied, in reverse. */

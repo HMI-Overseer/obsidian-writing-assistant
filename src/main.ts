@@ -107,12 +107,21 @@ function normalizeRagSettings(raw: unknown): RagSettings {
 
 const VALID_GATES = new Set<Gate>(["auto", "ask", "deny"]);
 
+/**
+ * One class's gate, tolerant of both the three-way value and the short-lived
+ * binary model. A valid gate string is taken as-is; a saved boolean from the
+ * binary era migrates as `false` ⇒ `deny` (tool removed) and `true` ⇒ `ask`
+ * (enabled + reviewed — the binary `true` never auto-applied), so no one's
+ * "off" choice silently becomes "review".
+ */
 function normalizeGate(raw: unknown, fallback: Gate): Gate {
-  return typeof raw === "string" && VALID_GATES.has(raw as Gate) ? (raw as Gate) : fallback;
+  if (typeof raw === "string" && VALID_GATES.has(raw as Gate)) return raw as Gate;
+  if (typeof raw === "boolean") return raw ? "ask" : "deny";
+  return fallback;
 }
 
 function normalizeVaultOpPolicy(raw: unknown): VaultOpPolicy {
-  const data = (typeof raw === "object" && raw !== null ? raw : {}) as Partial<VaultOpPolicy>;
+  const data = (typeof raw === "object" && raw !== null ? raw : {}) as Record<string, unknown>;
   const d = DEFAULT_VAULT_OP_POLICY;
   return {
     create: normalizeGate(data.create, d.create),

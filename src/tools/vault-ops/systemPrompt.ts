@@ -26,7 +26,7 @@ export function buildVaultOpToolSystemPrompt(tools: CanonicalToolDefinition[]): 
     : "";
 
   return `## Vault operations
-These tools change the vault itself — creating, overwriting, moving, or trashing whole notes. Nothing is written to disk while you work: each call queues an operation that is shown to the user for review and applied only once approved. Issue the complete set of changes you intend, then explain them.
+These tools change the vault itself — creating, overwriting, moving, or trashing whole notes. Nothing is written to disk while you work: each call queues an operation that is shown to the user for review before it takes effect. Issue the complete set of changes you intend, then explain them.
 
 ## When to use them
 ${strategyLines}

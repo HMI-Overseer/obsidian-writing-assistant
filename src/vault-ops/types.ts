@@ -55,6 +55,14 @@ export interface VaultOperationProposal {
    * when both channels fire, so it is never shown twice). Mirrors EditProposal.prose.
    */
   prose?: string;
+  /**
+   * Set once a later user turn supersedes this proposal (Finding B / §3-B). A
+   * proposal is *live* only during the turn that created it; the next user message
+   * marks it historical, so the panel renders a locked, compact variant instead of
+   * a live footer competing with the current turn. Undo stays *possible* on a
+   * historical applied batch — it just stops being a primary affordance.
+   */
+  historical?: boolean;
 }
 
 /** Record of an applied batch; undo = apply inverses in reverse (§2.3, §7.4). */

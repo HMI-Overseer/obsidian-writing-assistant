@@ -221,3 +221,82 @@ describe("undoVaultOpBatch", () => {
     expect(vault.files.get("Old.md")?.content).toBe("keepme");
   });
 });
+
+describe("undoVaultOpBatch drift guard (§3-B amendment 3)", () => {
+  it("refuses to undo a create when the created file changed since apply", async () => {
+    const vault = makeVault();
+    const apply = await applyVaultOpBatch(vault.app, [
+      { id: "a", op: { kind: "create", path: "New.md", content: "v1" } },
+    ]);
+    // Simulate the user editing the file after it was created.
+    await vault.app.vault.process(vault.app.vault.getFileByPath("New.md")!, () => "v2 edited");
+
+    const undo = await undoVaultOpBatch(vault.app, {
+      proposalId: "p",
+      applied: apply.applied,
+      appliedAt: 0,
+    });
+
+    expect(undo.ok).toBe(false);
+    expect(undo.refused).toBe(true);
+    expect(vault.files.has("New.md")).toBe(true); // not trashed — edits preserved.
+  });
+
+  it("refuses to undo a trash when the path is occupied again", async () => {
+    const vault = makeVault();
+    const expect0 = vault.seedFile("Old.md", "keepme");
+    const apply = await applyVaultOpBatch(vault.app, [
+      { id: "t", op: { kind: "trash", path: "Old.md", expect: expect0, snapshot: "keepme" } },
+    ]);
+    expect(apply.ok).toBe(true);
+    // A new file now lives at the trashed path.
+    vault.seedFile("Old.md", "different file");
+
+    const undo = await undoVaultOpBatch(vault.app, {
+      proposalId: "p",
+      applied: apply.applied,
+      appliedAt: 0,
+    });
+
+    expect(undo.refused).toBe(true);
+    expect(vault.files.get("Old.md")?.content).toBe("different file"); // not resurrected over.
+  });
+
+  it("refuses to undo a move when the destination is occupied again", async () => {
+    const vault = makeVault();
+    const expect0 = vault.seedFile("Inbox/D.md", "body");
+    const apply = await applyVaultOpBatch(vault.app, [
+      { id: "m", op: { kind: "move", from: "Inbox/D.md", to: "Done/D.md", expect: expect0 } },
+    ]);
+    expect(apply.ok).toBe(true);
+    // The original location was filled by something else after the move.
+    vault.seedFile("Inbox/D.md", "new occupant");
+
+    const undo = await undoVaultOpBatch(vault.app, {
+      proposalId: "p",
+      applied: apply.applied,
+      appliedAt: 0,
+    });
+
+    expect(undo.refused).toBe(true);
+    expect(vault.files.get("Inbox/D.md")?.content).toBe("new occupant");
+    expect(vault.files.has("Done/D.md")).toBe(true); // moved file untouched.
+  });
+
+  it("still undoes cleanly when nothing drifted", async () => {
+    const vault = makeVault();
+    const apply = await applyVaultOpBatch(vault.app, [
+      { id: "a", op: { kind: "create", path: "Clean.md", content: "hi" } },
+    ]);
+
+    const undo = await undoVaultOpBatch(vault.app, {
+      proposalId: "p",
+      applied: apply.applied,
+      appliedAt: 0,
+    });
+
+    expect(undo.ok).toBe(true);
+    expect(undo.refused).toBeUndefined();
+    expect(vault.files.has("Clean.md")).toBe(false);
+  });
+});

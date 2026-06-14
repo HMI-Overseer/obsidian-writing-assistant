@@ -316,6 +316,17 @@
     transition: border-color 140ms ease, box-shadow 140ms ease;
   }
 
+  /* A native <select> paints its own disclosure arrow inside the right padding
+     box. The shared rule above uses the same 12px right padding as a text input
+     (which has no arrow), so the chevron overlaps short labels like "Ask" /
+     "Auto" and they read as clipped. Reserve room for the arrow and keep a floor
+     width so short-label boxes don't collapse under it. Inputs/textareas keep
+     the tighter padding. Fixes every settings dropdown at once. */
+  .lmsa-settings-root select {
+    padding-right: 28px;
+    min-width: 6ch;
+  }
+
   .lmsa-settings-root input[type="text"]:focus,
   .lmsa-settings-root input[type="number"]:focus,
   .lmsa-settings-root textarea:focus,

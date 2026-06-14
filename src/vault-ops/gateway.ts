@@ -7,8 +7,22 @@
 
 import type { VaultOperation, VaultOpClass } from "./types";
 
+/**
+ * The fate of a single op (§5). Each class carries one of these as its policy,
+ * and `resolveGate` returns one per op:
+ *   - `deny`  — the tool is removed entirely; the model is never offered it.
+ *   - `ask`   — the op is queued and waits for an explicit click to apply.
+ *   - `auto`  — the op auto-applies (still shown, still undoable), bounded by
+ *               `scopes` + `maxAutoOps`.
+ */
 export type Gate = "auto" | "ask" | "deny";
 
+/**
+ * The approval policy. Each class carries a three-way {@link Gate} the user sets
+ * in settings ("Auto-apply" / "Ask" / "Deny"). `scopes` and `maxAutoOps` are the
+ * defense-in-depth behind any `auto` choice: out-of-scope or over-budget auto
+ * ops downgrade to `ask`, never the reverse.
+ */
 export interface VaultOpPolicy {
   create: Gate;
   overwrite: Gate;
@@ -22,17 +36,17 @@ export interface VaultOpPolicy {
 }
 
 /**
- * Conservative default policy (spec §11): every destructive class asks, nothing
- * auto-applies outside review; only the idempotent `createDir` is `auto`. Phase 4
- * lifts this onto `PluginSettings.vaultOpPolicy` and the settings UI; finalization
- * falls back to it until then.
+ * Conservative default policy (spec §11): every class is reviewed (`ask`) and
+ * nothing auto-applies on a fresh install — including the idempotent `createDir`.
+ * A user who wants an autonomous drafting loop opts in by setting a class to
+ * `auto` (optionally confined with `scopes`).
  */
 export const DEFAULT_VAULT_OP_POLICY: VaultOpPolicy = {
   create: "ask",
   overwrite: "ask",
   move: "ask",
   trash: "ask",
-  createDir: "auto",
+  createDir: "ask",
   scopes: [],
   maxAutoOps: 20,
 };

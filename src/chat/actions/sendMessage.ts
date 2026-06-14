@@ -8,6 +8,7 @@ import type { ChatModelSelector } from "../models/ChatModelSelector";
 import { makeMessage } from "../conversation/conversationUtils";
 import { validateSendRequest } from "./validateSendRequest";
 import { generateLlmResponse } from "./generateLlmResponse";
+import { supersedePriorProposals } from "./supersedePriorProposals";
 import { snapshotNoteAttachments } from "../../context/noteAttachment";
 
 export type SendMessageOptions = {
@@ -56,20 +57,11 @@ export async function sendMessage(options: SendMessageOptions): Promise<void> {
 
   const { text, activeModel } = validated;
 
-  // Reject any pending hunks from previous edit proposals.
+  // A new user turn supersedes every prior proposal (both channels): pending work
+  // is rejected (interjection = implicit rejection) and applied vault batches go
+  // historical. See supersedePriorProposals — scoped to this user-message boundary.
   const history = store.getSnapshot().messageHistory;
-  let proposalChanged = false;
-  for (const msg of history) {
-    if (msg.editProposal) {
-      for (const hunk of msg.editProposal.hunks) {
-        if (hunk.status === "pending") {
-          hunk.status = "rejected";
-          proposalChanged = true;
-        }
-      }
-    }
-  }
-  if (proposalChanged) {
+  if (supersedePriorProposals(history)) {
     await store.persistActiveConversation();
     await syncConversationUi();
   }

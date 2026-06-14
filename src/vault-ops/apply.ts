@@ -96,7 +96,9 @@ export async function applyOperation(
     }
     case "trash": {
       const path = normalizePath(op.path);
-      const file = app.vault.getFileByPath(path);
+      // getAbstractFileByPath (not getFileByPath) so undo of a createDir, whose
+      // inverse trashes a *folder*, finds its target instead of throwing.
+      const file = app.vault.getAbstractFileByPath(path);
       if (!file) throw new Error(`trash target "${op.path}" no longer exists.`);
       // fileManager.trashFile honors the user's deleted-files preference — never vault.delete.
       await app.fileManager.trashFile(file);

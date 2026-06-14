@@ -55,8 +55,9 @@ export class VaultOperationReviewPanel {
     this.render();
 
     // Fresh finalization only: apply auto-gated ops once. Historical re-renders
-    // pass autoApply=false (and carry an existingRecord) so nothing re-applies.
-    if (this.autoApply && !existingRecord) {
+    // pass autoApply=false (and carry an existingRecord) so nothing re-applies;
+    // the historical guard is belt-and-braces.
+    if (this.autoApply && !existingRecord && !this.proposal.historical) {
       const autoOps = this.proposal.ops.filter((o) => o.gate === "auto" && o.status === "pending");
       if (autoOps.length > 0) void this.applyOps(autoOps);
     }
@@ -69,6 +70,7 @@ export class VaultOperationReviewPanel {
   private render(): void {
     this.containerEl.empty();
     this.containerEl.addClass("lmsa-vault-ops-panel");
+    this.containerEl.toggleClass("is-historical", !!this.proposal.historical);
 
     this.renderHeader();
     this.renderProse();
@@ -85,6 +87,12 @@ export class VaultOperationReviewPanel {
       cls: "lmsa-vault-ops-header-title",
       text: `Vault operations (${count})`,
     });
+    if (this.proposal.historical) {
+      headerEl.createSpan({
+        cls: "lmsa-vault-ops-header-note",
+        text: "· superseded",
+      });
+    }
   }
 
   private renderProse(): void {
@@ -118,16 +126,25 @@ export class VaultOperationReviewPanel {
     });
     lineEl.createSpan({ cls: "lmsa-vault-op-summary", text: op.summary });
 
-    if (op.op.kind === "move" && typeof op.linkImpact === "number") {
+    // A row rejected on a historical proposal was cancelled by the interjection,
+    // not skipped by hand — say so, and drop the (now irrelevant) details/preview.
+    if (this.proposal.historical && op.status === "rejected") {
       bodyEl.createDiv({
         cls: "lmsa-vault-op-detail",
-        text:
-          op.linkImpact === 0
-            ? "No backlinks to update"
-            : `Updates ${op.linkImpact} backlink${op.linkImpact === 1 ? "" : "s"}`,
+        text: "Cancelled — you moved on before applying",
       });
+    } else {
+      if (op.op.kind === "move" && typeof op.linkImpact === "number") {
+        bodyEl.createDiv({
+          cls: "lmsa-vault-op-detail",
+          text:
+            op.linkImpact === 0
+              ? "No backlinks to update"
+              : `Updates ${op.linkImpact} backlink${op.linkImpact === 1 ? "" : "s"}`,
+        });
+      }
+      if (!this.proposal.historical) this.renderContentPreview(bodyEl, op.op);
     }
-    this.renderContentPreview(bodyEl, op.op);
 
     const actionsEl = rowEl.createDiv({ cls: "lmsa-vault-op-actions" });
 
@@ -157,10 +174,13 @@ export class VaultOperationReviewPanel {
     });
     this.applyButton.addEventListener("click", () => void this.handleApply());
 
+    // Historical batches demote Undo to a quiet, secondary affordance so it no
+    // longer competes with the current turn (Finding B / §3-B); it stays usable.
     this.undoButton = footerEl.createEl("button", {
       cls: "lmsa-vault-ops-undo-btn",
-      text: "Undo",
+      text: this.proposal.historical ? "Undo these changes" : "Undo",
     });
+    this.undoButton.toggleClass("lmsa-vault-ops-undo-btn--quiet", !!this.proposal.historical);
     this.undoButton.addEventListener("click", () => void this.handleUndo());
 
     this.refreshFooter();
@@ -268,6 +288,12 @@ export class VaultOperationReviewPanel {
     try {
       const record = this.appliedRecord;
       const result = await undoVaultOpBatch(this.app, record);
+      if (result.refused) {
+        // The drift guard refused before touching disk — vault unchanged, so leave
+        // the applied state (and its Undo) intact rather than falsely clearing it.
+        new Notice(`Can't undo — ${result.failures[0] ?? "the vault changed since this was applied"}.`);
+        return;
+      }
       if (!result.ok) {
         new Notice(`Some operations could not be undone: ${result.failures[0] ?? "unknown error"}`);
       }

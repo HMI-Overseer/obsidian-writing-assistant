@@ -24,7 +24,7 @@ export interface PreflightResult {
   conflicts: Conflict[];
 }
 
-function fingerprintsMatch(live: TargetFingerprint | null, expect: TargetFingerprint): boolean {
+export function fingerprintsMatch(live: TargetFingerprint | null, expect: TargetFingerprint): boolean {
   return live !== null && live.mtime === expect.mtime && live.size === expect.size;
 }
 

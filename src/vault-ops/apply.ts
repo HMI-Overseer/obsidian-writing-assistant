@@ -25,6 +25,19 @@ export function diskState(app: App, path: string): PathState {
   return "absent";
 }
 
+/**
+ * True when `path` is an empty folder (no children). Non-folders — files or
+ * absent paths — count as empty, so the only `false` is a folder that has
+ * gained contents. Used by the undo drift guard: a `createDir` is always made
+ * empty, so any children present at undo time are drift and must block the
+ * "trash the folder" inverse from deleting them (Finding E).
+ */
+export function folderIsEmpty(app: App, path: string): boolean {
+  const file = app.vault.getAbstractFileByPath(normalizePath(path));
+  if (!(file instanceof TFolder)) return true;
+  return file.children.length === 0;
+}
+
 /** Live {mtime,size} for a file's conflict guard; null if absent or a folder. */
 export function diskFingerprint(app: App, path: string): TargetFingerprint | null {
   const file = app.vault.getFileByPath(normalizePath(path));

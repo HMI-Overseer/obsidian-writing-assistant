@@ -173,6 +173,13 @@ export interface AgenticStep {
   round: number;
   /** For tool_call: the tool name identifier (e.g. "semantic_search"). */
   toolName?: string;
+  /**
+   * For tool_call: the model's tool-call id. Tags the rendered step element so a
+   * later pass can find it by id — e.g. the vault-op review attaching inline
+   * approve/decline to its write step (a {@link ReviewableVaultOp} carries the
+   * same id as `sourceToolCallId`).
+   */
+  toolCallId?: string;
   /** For tool_call: a human-readable display string of the key argument (e.g. the search query or file path). */
   toolInput?: string;
   /** For tool_call: the full arguments object sent by the model. Used for timeline expansion. */

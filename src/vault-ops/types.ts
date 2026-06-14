@@ -42,6 +42,14 @@ export interface ReviewableVaultOp {
   summary: string;
   /** move only: backlinks that will be rewritten (from metadataCache). */
   linkImpact?: number;
+  /**
+   * The id of the model tool call this op came from. Links the op to its
+   * {@link AgenticStep} timeline step (same id as `AgenticStep.toolCallId`), so
+   * the review attaches inline approve/decline to that step rather than a separate
+   * panel. Absent for ops with no surfaced tool-call step (e.g. the Claude Code
+   * MCP path), which fall back to a synthetic step row.
+   */
+  sourceToolCallId?: string;
 }
 
 /** A per-turn batch of vault ops (§2.3), parallel to EditProposal. */

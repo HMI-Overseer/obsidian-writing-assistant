@@ -299,6 +299,7 @@ export async function runToolLoop(
         type: "tool_call",
         round,
         toolName: tc.name,
+        toolCallId: tc.id,
         toolInput: extractToolInput(tc),
         toolArgs: tc.arguments,
       });

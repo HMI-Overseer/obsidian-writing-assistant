@@ -77,6 +77,21 @@ describe("toVaultOperations", () => {
     expect(errors).toHaveLength(1);
   });
 
+  test("sources are index-aligned with ops, skipping dropped calls", () => {
+    // t2 (missing move source) drops out; sources must still line up with ops so
+    // each op links back to the tool call (and timeline step) it came from.
+    const { ops, sources } = toVaultOperations(
+      [
+        call("write_file", { path: "a.md", content: "x" }, "t1"),
+        call("move_file", { from: "missing.md", to: "b.md" }, "t2"),
+        call("create_directory", { path: "Dir" }, "t3"),
+      ],
+      probes(),
+    );
+    expect(ops.map((o) => o.kind)).toEqual(["create", "createDir"]);
+    expect(sources).toEqual(["t1", "t3"]);
+  });
+
   describe("truncation guard (§6 1a)", () => {
     test("refuses a trailing write_file when generation hit max_tokens", () => {
       const { ops, errors } = toVaultOperations(

@@ -23,6 +23,16 @@ function makeVault() {
   const folderFor = (path: string): TFolder => {
     const d = new TFolder();
     d.path = path;
+    // Populate children so folderIsEmpty() can see contents added under the folder.
+    const prefix = path === "" ? "" : `${path}/`;
+    const isDirectChild = (p: string) =>
+      p.startsWith(prefix) && p.slice(prefix.length).indexOf("/") === -1;
+    for (const f of files.keys()) {
+      if (isDirectChild(f)) d.children.push(fileFor(f));
+    }
+    for (const sub of folders) {
+      if (sub !== path && isDirectChild(sub)) d.children.push(folderFor(sub));
+    }
     return d;
   };
 
@@ -68,8 +78,17 @@ function makeVault() {
         }
         return Promise.resolve();
       },
-      trashFile(file: TFile) {
-        files.delete(normalizePath(file.path));
+      trashFile(file: TFile | TFolder) {
+        const p = normalizePath(file.path);
+        // Mirror Obsidian: trashing a folder takes its whole subtree.
+        if (folders.has(p)) {
+          folders.delete(p);
+          const prefix = `${p}/`;
+          for (const f of [...files.keys()]) if (f.startsWith(prefix)) files.delete(f);
+          for (const d of [...folders]) if (d.startsWith(prefix)) folders.delete(d);
+        } else {
+          files.delete(p);
+        }
         return Promise.resolve();
       },
     },
@@ -281,6 +300,46 @@ describe("undoVaultOpBatch drift guard (§3-B amendment 3)", () => {
     expect(undo.refused).toBe(true);
     expect(vault.files.get("Inbox/D.md")?.content).toBe("new occupant");
     expect(vault.files.has("Done/D.md")).toBe(true); // moved file untouched.
+  });
+
+  it("refuses to undo a createDir when the folder is no longer empty (Finding E)", async () => {
+    const vault = makeVault();
+    const apply = await applyVaultOpBatch(vault.app, [
+      { id: "d", op: { kind: "createDir", path: "Test Folder" } },
+    ]);
+    expect(apply.ok).toBe(true);
+    expect(vault.folders.has("Test Folder")).toBe(true);
+    // A later turn adds a file inside the folder.
+    vault.seedFile("Test Folder/note.md", "user content");
+
+    const undo = await undoVaultOpBatch(vault.app, {
+      proposalId: "p",
+      applied: apply.applied,
+      appliedAt: 0,
+    });
+
+    expect(undo.ok).toBe(false);
+    expect(undo.refused).toBe(true);
+    expect(vault.folders.has("Test Folder")).toBe(true); // folder kept...
+    expect(vault.files.has("Test Folder/note.md")).toBe(true); // ...and its contents preserved.
+  });
+
+  it("undoes a createDir when the folder is still empty (Finding E)", async () => {
+    const vault = makeVault();
+    const apply = await applyVaultOpBatch(vault.app, [
+      { id: "d", op: { kind: "createDir", path: "Empty Folder" } },
+    ]);
+    expect(apply.ok).toBe(true);
+
+    const undo = await undoVaultOpBatch(vault.app, {
+      proposalId: "p",
+      applied: apply.applied,
+      appliedAt: 0,
+    });
+
+    expect(undo.ok).toBe(true);
+    expect(undo.refused).toBeUndefined();
+    expect(vault.folders.has("Empty Folder")).toBe(false); // empty folder removed cleanly.
   });
 
   it("still undoes cleanly when nothing drifted", async () => {

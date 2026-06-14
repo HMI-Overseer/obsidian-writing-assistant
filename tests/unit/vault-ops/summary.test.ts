@@ -1,5 +1,13 @@
 import { describe, it, expect } from "vitest";
-import { formatBytes, summarizeOp, gateBadgeLabel } from "../../../src/vault-ops/summary";
+import {
+  formatBytes,
+  summarizeOp,
+  gateBadgeLabel,
+  opPrimaryPath,
+  commonAncestorDir,
+  describeOpInHierarchy,
+  opDetailText,
+} from "../../../src/vault-ops/summary";
 import type { VaultOperation } from "../../../src/vault-ops/types";
 
 const FP = { mtime: 1, size: 2 };
@@ -53,5 +61,84 @@ describe("gateBadgeLabel", () => {
     expect(gateBadgeLabel("auto")).toBe("Auto");
     expect(gateBadgeLabel("ask")).toBe("Review");
     expect(gateBadgeLabel("deny")).toBe("Denied");
+  });
+});
+
+describe("opPrimaryPath", () => {
+  it("returns the path for non-move ops", () => {
+    expect(opPrimaryPath({ kind: "create", path: "A/B.md", content: "x" })).toBe("A/B.md");
+    expect(opPrimaryPath({ kind: "createDir", path: "A/B" })).toBe("A/B");
+  });
+
+  it("returns the destination for a move", () => {
+    expect(opPrimaryPath({ kind: "move", from: "Inbox/D.md", to: "C/D.md", expect: FP })).toBe(
+      "C/D.md",
+    );
+  });
+});
+
+describe("commonAncestorDir", () => {
+  it("returns the shared leading directory", () => {
+    expect(commonAncestorDir(["A/B/x.md", "A/B/y.md", "A/B/C/z.md"])).toBe("A/B");
+  });
+
+  it("returns '' when paths share no leading folder", () => {
+    expect(commonAncestorDir(["A/x.md", "B/y.md"])).toBe("");
+  });
+
+  it("matches whole segments only, not name prefixes", () => {
+    expect(commonAncestorDir(["Ab/x.md", "Abc/y.md"])).toBe("");
+  });
+
+  it("ignores leaf names when computing the directory", () => {
+    // Two files directly under "A" share directory "A", not "A/x".
+    expect(commonAncestorDir(["A/x.md", "A/y.md"])).toBe("A");
+  });
+
+  it("returns '' for an empty list", () => {
+    expect(commonAncestorDir([])).toBe("");
+  });
+});
+
+describe("describeOpInHierarchy", () => {
+  it("strips the root prefix and reports depth", () => {
+    const op: VaultOperation = { kind: "create", path: "A/B/C/note.md", content: "x" };
+    expect(describeOpInHierarchy(op, "A/B")).toEqual({
+      relativePath: "C/note.md",
+      leaf: "note.md",
+      depth: 1,
+    });
+  });
+
+  it("treats a root-level op as depth 0", () => {
+    const op: VaultOperation = { kind: "createDir", path: "A/B" };
+    expect(describeOpInHierarchy(op, "A")).toEqual({
+      relativePath: "B",
+      leaf: "B",
+      depth: 0,
+    });
+  });
+
+  it("keeps the full path when there is no shared root", () => {
+    const op: VaultOperation = { kind: "create", path: "X/y.md", content: "x" };
+    expect(describeOpInHierarchy(op, "")).toEqual({
+      relativePath: "X/y.md",
+      leaf: "y.md",
+      depth: 1,
+    });
+  });
+});
+
+describe("opDetailText", () => {
+  it("describes each op kind with a muted detail", () => {
+    expect(opDetailText({ kind: "create", path: "A.md", content: "hi" })).toBe("new file · 2 B");
+    expect(opDetailText({ kind: "overwrite", path: "A.md", content: "abc", expect: FP })).toBe(
+      "overwrite · 3 B",
+    );
+    expect(opDetailText({ kind: "createDir", path: "A/B" })).toBe("new folder");
+    expect(opDetailText({ kind: "move", from: "Inbox/D.md", to: "C/D.md", expect: FP })).toBe(
+      "moved from Inbox/D.md",
+    );
+    expect(opDetailText({ kind: "trash", path: "Old.md", expect: FP, snapshot: "x" })).toBe("trash");
   });
 });

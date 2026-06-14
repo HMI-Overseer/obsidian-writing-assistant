@@ -33,6 +33,9 @@ export interface ConversionError {
 
 export interface ConversionResult {
   ops: VaultOperation[];
+  /** Source tool-call id per op, index-aligned with `ops` — links each op back
+   *  to the model tool call (and thus its timeline step) it came from. */
+  sources: string[];
   errors: ConversionError[];
 }
 
@@ -45,12 +48,18 @@ export function toVaultOperations(
   options: { stoppedForMaxTokens?: boolean } = {},
 ): ConversionResult {
   const ops: VaultOperation[] = [];
+  const sources: string[] = [];
   const errors: ConversionError[] = [];
   const lastIndex = toolCalls.length - 1;
 
   toolCalls.forEach((tc, index) => {
     const fail = (error: string) =>
       errors.push({ toolCallId: tc.id, toolName: tc.name, error });
+    // Keep `ops` and `sources` index-aligned: every emit records the source tc.id.
+    const emit = (op: VaultOperation) => {
+      ops.push(op);
+      sources.push(tc.id);
+    };
 
     switch (tc.name) {
       case "write_file": {
@@ -67,27 +76,27 @@ export function toVaultOperations(
         const v = validateWriteFile(tc.arguments, probes.resolve);
         if (!v.ok) return fail(v.error);
         if (probes.resolve(v.args.path) === "file") {
-          ops.push({
+          emit({
             kind: "overwrite",
             path: v.args.path,
             content: v.args.content,
             expect: probes.fingerprint(v.args.path) ?? MISSING_FINGERPRINT,
           });
         } else {
-          ops.push({ kind: "create", path: v.args.path, content: v.args.content });
+          emit({ kind: "create", path: v.args.path, content: v.args.content });
         }
         return;
       }
       case "create_directory": {
         const v = validateCreateDirectory(tc.arguments, probes.resolve);
         if (!v.ok) return fail(v.error);
-        ops.push({ kind: "createDir", path: v.args.path });
+        emit({ kind: "createDir", path: v.args.path });
         return;
       }
       case "move_file": {
         const v = validateMoveFile(tc.arguments, probes.resolve);
         if (!v.ok) return fail(v.error);
-        ops.push({
+        emit({
           kind: "move",
           from: v.args.from,
           to: v.args.to,
@@ -98,7 +107,7 @@ export function toVaultOperations(
       case "trash_file": {
         const v = validateTrashFile(tc.arguments, probes.resolve);
         if (!v.ok) return fail(v.error);
-        ops.push({
+        emit({
           kind: "trash",
           path: v.args.path,
           expect: probes.fingerprint(v.args.path) ?? MISSING_FINGERPRINT,
@@ -111,5 +120,5 @@ export function toVaultOperations(
     }
   });
 
-  return { ops, errors };
+  return { ops, sources, errors };
 }

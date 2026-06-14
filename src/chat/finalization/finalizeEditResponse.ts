@@ -1,8 +1,9 @@
 import {
   type App,
-  type Component,
   type MetadataCache,
   type TFile,
+  Component,
+  MarkdownRenderer,
   Notice,
   normalizePath,
 } from "obsidian";
@@ -27,9 +28,9 @@ import type { ChatSessionStore } from "../conversation/ChatSessionStore";
 import type { ChatTranscript } from "../messages/ChatTranscript";
 import { DiffReviewPanel, type DiffPanelCallbacks } from "../messages/DiffReviewPanel";
 import {
-  VaultOperationReviewPanel,
-  type VaultOpPanelCallbacks,
-} from "../messages/VaultOperationReviewPanel";
+  VaultReviewTimelineView,
+  type VaultReviewCallbacks,
+} from "../messages/vaultReviewTimeline";
 import type { BubbleRefs } from "../types";
 import type { EditStreamingRenderer } from "../streaming/EditStreamingRenderer";
 import type WritingAssistantChat from "../../main";
@@ -60,11 +61,11 @@ export interface FinalizeEditOptions {
 /**
  * Post-generation handler for edit mode.
  *
- * Partitions the model's write tool calls into two channels and renders up to two
- * review panels in the bubble (spec §6):
+ * Partitions the model's write tool calls into two channels and renders their
+ * reviews in the bubble (spec §6):
  *   - the **edit channel** (active-document-bound) → an {@link EditProposal} / DiffReviewPanel;
- *   - the **vault-op channel** (whole-vault) → a {@link VaultOperationProposal} /
- *     VaultOperationReviewPanel — needs no active file.
+ *   - the **vault-op channel** (whole-vault) → a {@link VaultOperationProposal}, folded onto
+ *     the timeline tool-call steps by {@link VaultReviewTimelineView} — needs no active file.
  *
  * Falls back to a plain message ONLY when both channels are empty — so a pure
  * file-ops turn (e.g. "create a new note" with no document open) is no longer
@@ -221,7 +222,7 @@ async function buildVaultOpProposal(
     readContent: (p) => snapshots.get(normalizePath(p)) ?? null,
   };
 
-  const { ops, errors } = toVaultOperations(vaultOpCalls, probes, { stoppedForMaxTokens });
+  const { ops, sources, errors } = toVaultOperations(vaultOpCalls, probes, { stoppedForMaxTokens });
   for (const e of errors) {
     console.error(`[vault-op] Skipping ${e.toolName} (${e.toolCallId}): ${e.error}`);
   }
@@ -229,9 +230,9 @@ async function buildVaultOpProposal(
 
   let autoSoFar = 0;
   const reviewable: ReviewableVaultOp[] = [];
-  for (const op of ops) {
+  ops.forEach((op, i) => {
     const gate = resolveGate(op, policy, autoSoFar);
-    if (gate === "deny") continue; // denied tools are filtered upstream (Phase 4); guard anyway.
+    if (gate === "deny") return; // denied tools are filtered upstream (Phase 4); guard anyway.
     if (gate === "auto") autoSoFar++;
     const reviewableOp: ReviewableVaultOp = {
       id: generateId(),
@@ -239,10 +240,11 @@ async function buildVaultOpProposal(
       gate,
       status: "pending",
       summary: summarizeOp(op),
+      sourceToolCallId: sources[i],
     };
     if (op.kind === "move") reviewableOp.linkImpact = backlinkCount(app, op.from);
     reviewable.push(reviewableOp);
-  }
+  });
   if (reviewable.length === 0) return null;
 
   return {
@@ -254,9 +256,16 @@ async function buildVaultOpProposal(
 }
 
 /**
- * Render the edit and/or vault-op review panels for a message into its bubble.
- * Used both at finalization and when re-rendering historical messages — each
- * channel gets its own container so they coexist (spec §6, "up to two panels").
+ * Render the edit and/or vault-op review for a message into its bubble.
+ *
+ * The two channels live in different regions of the bubble (Finding C re-open / §7):
+ *   - the **edit channel** stays in the body card (`contentEl`) as a DiffReviewPanel,
+ *     which is a genuine inline diff and carries its own prose;
+ *   - the **vault-op channel** is folded into the agentic timeline: the vault ops
+ *     *are* tool calls, already shown as timeline steps, so {@link VaultReviewTimelineView}
+ *     decorates those steps with inline approve/decline rather than rendering a separate
+ *     panel. Its prose renders into the body card, so the card holds prose and the rail
+ *     holds the (now interactive) tool-call steps.
  */
 export function renderProposalPanels(
   app: App,
@@ -269,6 +278,8 @@ export function renderProposalPanels(
   bubble.contentEl.empty();
   bubble.contentEl.removeClass("lmsa-message-content--plain", "lmsa-message-content--markdown");
 
+  // --- Body card: the edit panel (with its own prose), or — for a vault-only
+  // turn — the vault proposal's prose, since its review lives in the timeline. ---
   if (message.editProposal) {
     const editContainer = bubble.contentEl.createDiv();
     new DiffReviewPanel(
@@ -279,20 +290,32 @@ export function renderProposalPanels(
       makeEditCallbacks(store, message.editProposal),
       message.appliedEdit,
     );
+  } else if (message.vaultOpProposal?.prose) {
+    renderProseInto(app, owner, bubble.contentEl, message.vaultOpProposal.prose);
   }
 
+  // --- Timeline: fold the vault review onto the tool-call steps in place. ---
   if (message.vaultOpProposal) {
-    const opsContainer = bubble.contentEl.createDiv();
-    new VaultOperationReviewPanel(
-      opsContainer,
+    new VaultReviewTimelineView({
+      timelineEl: bubble.timelineEl,
       app,
-      owner,
-      message.vaultOpProposal,
-      makeVaultOpCallbacks(store, message.vaultOpProposal),
-      message.appliedVaultOps,
-      opts?.autoApplyVaultOps ?? false,
-    );
+      proposal: message.vaultOpProposal,
+      callbacks: makeVaultOpCallbacks(store, message.vaultOpProposal),
+      existingRecord: message.appliedVaultOps,
+      autoApply: opts?.autoApplyVaultOps ?? false,
+    });
   }
+}
+
+/** Render assistant prose as markdown, with a child component for cleanup. */
+function renderProseInto(app: App, owner: Component, el: HTMLElement, prose: string): void {
+  const proseEl = el.createDiv({ cls: "lmsa-chat-window-message-content--markdown" });
+  const renderChild = new Component();
+  owner.addChild(renderChild);
+  const sourcePath = app.workspace.getActiveFile()?.path ?? "";
+  void MarkdownRenderer.render(app, prose, proseEl, sourcePath, renderChild).catch(() => {
+    proseEl.setText(prose);
+  });
 }
 
 function makeEditCallbacks(store: ChatSessionStore, proposal: EditProposal): DiffPanelCallbacks {
@@ -326,7 +349,7 @@ function makeEditCallbacks(store: ChatSessionStore, proposal: EditProposal): Dif
 function makeVaultOpCallbacks(
   store: ChatSessionStore,
   proposal: VaultOperationProposal,
-): VaultOpPanelCallbacks {
+): VaultReviewCallbacks {
   const find = (id: string) =>
     store.getSnapshot().messageHistory.find((m) => m.vaultOpProposal?.id === id);
   return {

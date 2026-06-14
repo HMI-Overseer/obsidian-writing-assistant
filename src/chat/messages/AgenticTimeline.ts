@@ -8,6 +8,11 @@ import { TOOL_ICONS, TOOL_LABELS } from "../../tools/metadata";
  * Created before the response bubble during streaming. Steps are added one by
  * one as the tool loop progresses. Stored steps are re-rendered statically
  * when loading historical messages.
+ *
+ * Tool-call steps that carry a `toolCallId` tag their element with
+ * `data-tool-call-id`, so a later pass can find a step by id and decorate it —
+ * e.g. the vault-op review attaching inline approve/decline to write steps
+ * (see `vaultReviewTimeline.ts`). The timeline itself stays domain-agnostic.
  */
 export class AgenticTimeline {
   private readonly steps: AgenticStep[] = [];
@@ -76,6 +81,7 @@ export class AgenticTimeline {
         const { stepEl, detailEl } = pending;
         if (queue.length === 0) this.pendingToolCallEls.delete(step.toolName);
         stepEl.classList.remove("lmsa-agentic-timeline-step--pending");
+        if (step.toolCallId) stepEl.dataset.toolCallId = step.toolCallId;
         if (step.toolInput) {
           detailEl.textContent = step.toolInput;
         } else {
@@ -176,6 +182,7 @@ export class AgenticTimeline {
     const stepEl = this.listEl.createDiv({
       cls: `lmsa-agentic-timeline-step lmsa-agentic-timeline-step--${step.type}`,
     });
+    if (step.toolCallId) stepEl.dataset.toolCallId = step.toolCallId;
 
     const dotEl = stepEl.createDiv({ cls: "lmsa-agentic-timeline-dot" });
     setIcon(dotEl, step.type === "tool_call"

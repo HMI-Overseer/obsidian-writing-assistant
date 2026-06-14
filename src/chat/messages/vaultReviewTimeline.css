@@ -1,0 +1,130 @@
+/* -----------------------------------------------------------------------
+ * Vault review folded into the agentic timeline (Finding C re-open / §7).
+ * The vault ops are tool-call steps; the review lives *on* those steps —
+ * inline approve/decline + a status-tinted dot — with one turn-level footer
+ * for "Approve all" / "Undo". No separate card or panel.
+ * ----------------------------------------------------------------------- */
+
+@layer components {
+  /* ── Status on the step dot (state, not class) ──────────────────── */
+
+  .lmsa-agentic-timeline-step.is-vault-awaiting .lmsa-agentic-timeline-dot {
+    color: var(--interactive-accent);
+    border-color: color-mix(in srgb, var(--interactive-accent) 60%, var(--background-modifier-border));
+    background: color-mix(in srgb, var(--interactive-accent) 12%, var(--background-primary));
+  }
+
+  .lmsa-agentic-timeline-step.is-vault-applied .lmsa-agentic-timeline-dot {
+    color: var(--text-success);
+    border-color: color-mix(in srgb, var(--text-success) 55%, var(--background-modifier-border));
+    background: color-mix(in srgb, var(--text-success) 12%, var(--background-primary));
+  }
+
+  .lmsa-agentic-timeline-step.is-vault-failed .lmsa-agentic-timeline-dot {
+    color: var(--text-error);
+    border-color: color-mix(in srgb, var(--text-error) 55%, var(--background-modifier-border));
+    background: color-mix(in srgb, var(--text-error) 12%, var(--background-primary));
+  }
+
+  .lmsa-agentic-timeline-step.is-vault-cancelled {
+    opacity: 0.6;
+  }
+
+  /* ── Inline per-step controls (sit after the step's name + path) ── */
+
+  .lmsa-vault-step-controls {
+    @apply lmsa-inline-flex lmsa-items-center lmsa-gap-1;
+    align-self: center;
+  }
+
+  .lmsa-vault-step-btn {
+    @apply lmsa-inline-flex lmsa-cursor-pointer lmsa-items-center lmsa-gap-1 lmsa-rounded-md lmsa-border lmsa-border-obsidian-border lmsa-bg-transparent;
+    padding: 1px 7px;
+    font-size: var(--font-ui-smaller);
+    color: var(--text-muted);
+    transition: all 0.1s ease;
+  }
+
+  .lmsa-vault-step-btn:disabled {
+    opacity: 0.5;
+    cursor: default;
+  }
+
+  .lmsa-vault-step-btn-icon {
+    @apply lmsa-inline-flex lmsa-items-center;
+  }
+
+  .lmsa-vault-step-btn-icon svg {
+    width: 12px;
+    height: 12px;
+  }
+
+  .lmsa-vault-step-btn--approve {
+    color: var(--interactive-accent);
+    border-color: color-mix(in srgb, var(--interactive-accent) 45%, var(--background-modifier-border));
+  }
+
+  .lmsa-vault-step-btn--approve:hover:not(:disabled) {
+    background: var(--interactive-accent);
+    color: var(--text-on-accent);
+    border-color: var(--interactive-accent);
+  }
+
+  /* Decline is icon-only and quiet until hovered. */
+  .lmsa-vault-step-btn--decline {
+    padding: 1px 5px;
+  }
+
+  .lmsa-vault-step-btn--decline:hover:not(:disabled) {
+    color: var(--text-error);
+    border-color: color-mix(in srgb, var(--text-error) 50%, var(--background-modifier-border));
+    background: color-mix(in srgb, var(--text-error) 10%, transparent);
+  }
+
+  /* Resolved-state label (Applied / Declined / auto / Cancelled). */
+  .lmsa-vault-step-state {
+    font-size: var(--font-ui-smaller);
+    color: var(--text-faint);
+  }
+
+  .lmsa-vault-step-state.is-error {
+    color: var(--text-error);
+  }
+
+  /* ── Turn-level footer (outside the collapsible list, stays visible) ── */
+
+  .lmsa-vault-review-footer {
+    @apply lmsa-flex lmsa-items-center lmsa-gap-2;
+    margin-top: 6px;
+    padding-left: 26px;
+  }
+
+  .lmsa-vault-review-footer-btn {
+    @apply lmsa-cursor-pointer lmsa-rounded-lg lmsa-border lmsa-border-obsidian-border lmsa-bg-transparent;
+    padding: 3px 12px;
+    font-size: var(--font-ui-small);
+    color: var(--text-muted);
+    transition: all 0.1s ease;
+  }
+
+  .lmsa-vault-review-footer-btn:hover:not(:disabled) {
+    background: var(--background-modifier-hover);
+    color: var(--text-normal);
+  }
+
+  .lmsa-vault-review-footer-btn:disabled {
+    opacity: 0.5;
+    cursor: default;
+  }
+
+  /* ── Fallback rows (ops with no matching live step, e.g. Claude Code) ── */
+
+  /* Reuses the timeline list look but without a second connector line. */
+  .lmsa-vault-review-fallback {
+    margin-top: 2px;
+  }
+
+  .lmsa-vault-review-fallback::before {
+    display: none;
+  }
+}

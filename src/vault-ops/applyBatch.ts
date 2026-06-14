@@ -15,7 +15,13 @@
 import type { App } from "obsidian";
 import type { AppliedVaultOpRecord, VaultOperation } from "./types";
 import { orderOps, preflight, fingerprintsMatch, type Conflict } from "./plan";
-import { applyOperation, diskFingerprint, diskState, makeDiskSnapshot } from "./apply";
+import {
+  applyOperation,
+  diskFingerprint,
+  diskState,
+  folderIsEmpty,
+  makeDiskSnapshot,
+} from "./apply";
 
 /** A reviewable op paired with its id, so the result can record opId → inverse. */
 export interface BatchOp {
@@ -120,11 +126,24 @@ export function guardVaultUndo(app: App, record: AppliedVaultOpRecord): string[]
       }
       case "trash": {
         // Undo of a create / createDir: trash what we made. Already gone ⇒ nothing
-        // to undo (not a conflict). A folder inverse carries an empty snapshot and
-        // a zero fingerprint, so check by existence only; a real file must still
-        // match the fingerprint captured at apply, or we'd trash newer edits.
+        // to undo (not a conflict).
         const state = diskState(app, inverse.path);
         if (state === "absent") break;
+        if (state === "dir") {
+          // Undo of a createDir trashes the folder — and Obsidian's trash takes the
+          // whole subtree. The folder was created empty, so any contents now are
+          // files the user added afterwards; trashing them would be silent data
+          // loss (Finding E). Refuse rather than delete what's inside.
+          if (!folderIsEmpty(app, inverse.path)) {
+            reasons.push(
+              `"${inverse.path}" is no longer empty — won't trash it and delete what's inside.`,
+            );
+          }
+          break;
+        }
+        // A real file must still match the fingerprint captured at apply, or we'd
+        // trash newer edits. (A folder inverse carries an empty snapshot and a zero
+        // fingerprint, so it never reaches this content check.)
         if (inverse.snapshot !== "" || state === "file") {
           if (!fingerprintsMatch(diskFingerprint(app, inverse.path), inverse.expect)) {
             reasons.push(`"${inverse.path}" changed since it was created — won't trash your edits.`);

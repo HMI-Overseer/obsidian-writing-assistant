@@ -76,6 +76,7 @@ export async function regenerateMessage(options: RegenerateOptions): Promise<voi
     await plugin.services.claudeCode.getRuntime(activeModel.provider, {
       editMode,
       activeFilePath: plugin.app.workspace.getActiveFile()?.path,
+      conversationId: store.getActiveConversationId() ?? undefined,
     }),
   );
 

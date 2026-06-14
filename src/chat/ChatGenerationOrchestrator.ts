@@ -163,6 +163,7 @@ export class ChatGenerationOrchestrator {
       await this.deps.plugin.services.claudeCode.getRuntime(activeModel.provider, {
         editMode,
         activeFilePath: this.deps.plugin.app.workspace.getActiveFile()?.path,
+        conversationId: store.getActiveConversationId() ?? undefined,
       }),
     );
 

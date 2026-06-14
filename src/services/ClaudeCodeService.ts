@@ -2,8 +2,15 @@ import type { App } from "obsidian";
 import { FileSystemAdapter } from "obsidian";
 import { execFile } from "child_process";
 import type { PluginSettings, ProviderOption } from "../shared/types";
-import type { ClaudeCodeRuntime } from "../api/ClaudeCodeClient";
+import type { ClaudeCodeRuntime, SdkSessionTurnInput } from "../api/ClaudeCodeClient";
 import { resolveClaudeBinary } from "../api/claudeCodeProcess";
+import { isSdkAvailable } from "../api/sdk/claudeAgentSdk";
+import type { Options } from "../api/sdk/claudeAgentSdk";
+import { createVaultSdkMcpServer } from "../api/sdk/sdkMcpServer";
+import { buildSdkOptions } from "../api/sdk/sdkQueryEngine";
+import { SdkSessionRegistry } from "../api/sdk/sdkSession";
+import type { SessionConfig } from "../api/harnessSession";
+import { isCliVersionCompatible } from "../api/sdkVersionGuard";
 import type { RagService } from "../rag/ragService";
 import type { CanonicalToolDefinition, ToolCall, ToolResult } from "../tools/types";
 import { ALL_VAULT_TOOLS, VAULT_TOOL_NAMES } from "../tools/vault/definition";
@@ -18,6 +25,14 @@ export interface ClaudeCodeDetection {
   installed: boolean;
   /** Version string from `claude --version`, when detected. */
   version?: string;
+  /** Whether the bundled Agent SDK linked correctly at runtime. */
+  sdkAvailable: boolean;
+  /**
+   * Whether the installed CLI's version is compatible with the bundled SDK.
+   * The SDK-backed session path gates on this; when false it falls back to the
+   * legacy one-shot CLI path. False when the CLI is missing or unparseable.
+   */
+  sdkCompatible: boolean;
 }
 
 /**
@@ -36,6 +51,12 @@ export interface ClaudeCodeRunOptions {
   editMode?: boolean;
   /** Vault-relative path of the active note (edit target + search relevance). */
   activeFilePath?: string;
+  /**
+   * Conversation id — keys the persistent SDK session (Model B). When present and
+   * the SDK path is usable, turns reuse one live `claude` process per conversation
+   * for context retention + incremental caching. Absent ⇒ stateless one-shot.
+   */
+  conversationId?: string;
 }
 
 /** Official Claude Code install / setup documentation. */
@@ -46,8 +67,10 @@ const MCP_SERVER_NAME = "writing_assistant";
 
 /**
  * Owns Claude Code runtime concerns: the vault root used as the subprocess
- * working directory, probing the binary for the settings UI, and the in-process
- * MCP server that exposes the plugin's toolstack to the `claude` subprocess.
+ * working directory, probing the binary for the settings UI, and the MCP server
+ * that exposes the plugin's toolstack to Claude Code. On the SDK path that server
+ * is an in-process {@link createVaultSdkMcpServer} instance; on the legacy
+ * fallback path (incompatible CLI) it is the loopback-HTTP {@link VaultMcpServer}.
  *
  * Edit handling: Claude Code runs its own agent loop, so its edit-tool calls
  * arrive at the MCP server during the run rather than through the plugin's tool
@@ -58,6 +81,10 @@ const MCP_SERVER_NAME = "writing_assistant";
  */
 export class ClaudeCodeService {
   private mcpServer: VaultMcpServer | null = null;
+  /** Per-conversation registry of live SDK sessions (Model B). Disposed on unload. */
+  private readonly sessionRegistry = new SdkSessionRegistry();
+  /** Memoized SDK usability (SDK linked + CLI version-compatible). Probed once. */
+  private sdkUsable: Promise<boolean> | null = null;
   private collectingEdits = false;
   private collectedEdits: ToolCall[] = [];
   private editTargetPath = "";
@@ -96,28 +123,130 @@ export class ClaudeCodeService {
 
     const settings = this.getSettings();
     this.collectedEdits = [];
-
-    // Agentic mode off → run Claude Code as a pure analyst with no tools, matching
-    // the agentic toggle's "no tools used" semantics. The vault grounding (and any
-    // edits) require the MCP bridge, which only loads when agentic mode is on.
-    if (!settings.agenticMode) {
-      this.collectingEdits = false;
-      return { vaultRoot: this.vaultRoot };
-    }
+    const useSdk = await this.isSdkUsable();
+    const agentic = settings.agenticMode;
 
     // Structured edit tools follow the same gate as the API providers: edit mode +
-    // preferToolUse. Otherwise only the read tools are exposed.
-    this.collectingEdits = (options.editMode ?? false) && settings.preferToolUse;
+    // preferToolUse, and only meaningful in agentic mode (analyst runs tool-less).
+    this.collectingEdits = agentic && (options.editMode ?? false) && settings.preferToolUse;
     this.editTargetPath = options.activeFilePath ?? "";
 
+    // SDK path with a conversation id → persistent per-conversation session
+    // (Model B): one live `claude` process reused across turns for context
+    // retention + incremental caching. The session bakes the current agentic/edit
+    // config; config drift cold-rebuilds it (see harnessSession.isSessionUsable).
+    if (useSdk && options.conversationId) {
+      const conversationId = options.conversationId;
+      return {
+        vaultRoot: this.vaultRoot,
+        useSdk,
+        sdkSession: {
+          conversationId,
+          run: (input) => this.runSessionTurn(conversationId, input, agentic),
+        },
+      };
+    }
+
+    // SDK path without a conversation id (e.g. complete()) → stateless one-shot
+    // with an in-process MCP server, rebuilt per turn so the advertised tool set
+    // reflects the current edit-mode gate.
+    if (useSdk) {
+      return {
+        vaultRoot: this.vaultRoot,
+        useSdk,
+        ...(agentic
+          ? {
+              sdkMcp: {
+                server: createVaultSdkMcpServer(MCP_SERVER_NAME, this.createToolProvider()),
+                serverName: MCP_SERVER_NAME,
+              },
+            }
+          : {}),
+      };
+    }
+
+    // Agentic mode off on the legacy path → pure analyst with no tools.
+    if (!agentic) return { vaultRoot: this.vaultRoot, useSdk };
+
+    // Fallback path (incompatible/missing CLI): the legacy loopback-HTTP bridge.
     const handle = await this.ensureMcpServer();
     return {
       vaultRoot: this.vaultRoot,
+      useSdk,
       mcp: {
         configJson: buildMcpConfigJson(MCP_SERVER_NAME, handle),
         allowedTools: `mcp__${MCP_SERVER_NAME}`,
       },
     };
+  }
+
+  /**
+   * Runs one turn through the conversation's persistent SDK session, minting it on
+   * first use (or after invalidation) and reusing it otherwise. Builds the session
+   * config the reuse predicate gates on, plus the option factory that bakes the
+   * in-process MCP server when a fresh session is needed.
+   */
+  private runSessionTurn(
+    conversationId: string,
+    input: SdkSessionTurnInput,
+    agentic: boolean,
+  ): AsyncGenerator<string> {
+    const toolNames = agentic
+      ? this.createToolProvider().listTools().map((definition) => definition.name)
+      : [];
+    const cfg: SessionConfig = {
+      model: input.model,
+      systemPrompt: input.systemPrompt,
+      reasoning: input.reasoning ?? "off",
+      editMode: this.collectingEdits,
+      agenticMode: agentic,
+      toolNames,
+    };
+
+    const command = this.command;
+    const vaultRoot = this.vaultRoot;
+    const buildOptions = (abortController: AbortController): Options => {
+      const sdkMcp = agentic
+        ? {
+            server: createVaultSdkMcpServer(MCP_SERVER_NAME, this.createToolProvider()),
+            serverName: MCP_SERVER_NAME,
+          }
+        : undefined;
+      return buildSdkOptions(
+        {
+          model: input.model,
+          systemPrompt: input.systemPrompt,
+          reasoning: input.reasoning,
+          claudePath: command,
+          vaultRoot,
+          sdkMcp,
+        },
+        abortController,
+      );
+    };
+
+    return this.sessionRegistry.runTurn(conversationId, {
+      cfg,
+      turns: input.turns,
+      fullPrompt: input.fullPrompt,
+      deltaPrompt: input.deltaPrompt,
+      buildOptions,
+      signal: input.signal,
+      onResult: input.onResult,
+    });
+  }
+
+  /**
+   * Whether to drive Claude Code through the Agent SDK: the SDK must have linked
+   * at runtime and the installed CLI must be version-compatible with it. Probed
+   * once (the `--version` exec is memoized) and reused for the session — the
+   * settings UI's {@link detect} runs the same check independently.
+   */
+  private isSdkUsable(): Promise<boolean> {
+    if (!this.sdkUsable) {
+      this.sdkUsable = this.detect().then((d) => d.sdkAvailable && d.sdkCompatible);
+    }
+    return this.sdkUsable;
   }
 
   /**
@@ -138,13 +267,20 @@ export class ClaudeCodeService {
 
   /** Probes `claude --version` to report install status for the settings panel. */
   detect(): Promise<ClaudeCodeDetection> {
+    const sdkAvailable = isSdkAvailable();
     return new Promise((resolve) => {
       execFile(this.command, ["--version"], { windowsHide: true }, (error, stdout) => {
         if (error) {
-          resolve({ installed: false });
+          resolve({ installed: false, sdkAvailable, sdkCompatible: false });
           return;
         }
-        resolve({ installed: true, version: stdout.toString().trim() || undefined });
+        const version = stdout.toString().trim() || undefined;
+        resolve({
+          installed: true,
+          version,
+          sdkAvailable,
+          sdkCompatible: sdkAvailable && isCliVersionCompatible(version),
+        });
       });
     });
   }
@@ -209,6 +345,8 @@ export class ClaudeCodeService {
   }
 
   destroy(): void {
+    // Kill every live SDK process — the §1 "don't leak processes" rule.
+    this.sessionRegistry.disposeAll();
     this.mcpServer?.stop();
     this.mcpServer = null;
   }

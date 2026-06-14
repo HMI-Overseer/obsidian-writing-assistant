@@ -9,34 +9,29 @@ import {
   resolveClaudeBinary,
   type ClaudeCodeResultUsage,
 } from "./claudeCodeProcess";
+import { streamSdkTurn, thinkingBudget, DISALLOWED_NATIVE_TOOLS } from "./sdk/sdkQueryEngine";
+import type { McpSdkServerConfigWithInstance } from "./sdk/claudeAgentSdk";
+import type { SessionTurn } from "./harnessSession";
+
+export { thinkingBudget };
 
 /**
- * Claude Code's built-in tools, removed from the model's context via
- * `--disallowedTools` so it can only call the plugin's MCP tools. `dontAsk`
- * permission mode also denies any tool not explicitly allowed, so this list need
- * not be exhaustive against future built-ins — it just keeps the common ones out
- * of context entirely.
+ * One turn's input to the persistent-session path. The client builds both prompt
+ * forms (it can't know which the session will use) and the transcript turns for the
+ * reuse/linearity check; the service decides reuse vs cold rebuild and runs it.
  */
-const DISALLOWED_NATIVE_TOOLS =
-  "Bash,Edit,Write,Read,Grep,Glob,WebFetch,WebSearch,NotebookEdit,Task,TodoWrite,BashOutput,KillShell,SlashCommand,ExitPlanMode";
-
-/**
- * Extended-thinking budget (tokens) for each reasoning level, passed to the CLI
- * as `MAX_THINKING_TOKENS`. Thinking is emitted before the visible answer, so a
- * non-zero budget delays the first user-facing token — we keep it at 0 unless
- * the profile explicitly asks for reasoning, which keeps time-to-first-token low.
- */
-const THINKING_BUDGET_BY_LEVEL: Record<NonNullable<SamplingParams["reasoning"]>, number> = {
-  off: 0,
-  low: 4096,
-  medium: 10000,
-  high: 24000,
-  on: 10000,
-};
-
-/** Maps the profile's reasoning level to a `MAX_THINKING_TOKENS` budget (0 when unset). */
-export function thinkingBudget(reasoning: SamplingParams["reasoning"]): number {
-  return reasoning ? THINKING_BUDGET_BY_LEVEL[reasoning] : 0;
+export interface SdkSessionTurnInput {
+  /** Full transcript prompt — sent on a cold mint. */
+  fullPrompt: string;
+  /** New user turn only — sent on reuse (the live session holds the rest). */
+  deltaPrompt: string;
+  model: string;
+  systemPrompt: string;
+  reasoning: SamplingParams["reasoning"];
+  /** Full live transcript including the new user turn (drives the reuse check). */
+  turns: SessionTurn[];
+  signal?: AbortSignal;
+  onResult?: (result: ClaudeCodeResultUsage) => void;
 }
 
 /**
@@ -47,8 +42,30 @@ export interface ClaudeCodeRuntime {
   /** Subprocess working directory — the vault root. */
   vaultRoot?: string;
   /**
-   * In-process MCP server connection. When present, Claude Code is launched with
-   * all native tools disabled and bridged to the plugin's toolstack instead.
+   * Whether to drive Claude Code through the Agent SDK. False when the installed
+   * CLI is missing or version-incompatible with the bundled SDK — the client then
+   * falls back to the legacy one-shot `claude --print` path (the always-lit floor).
+   */
+  useSdk: boolean;
+  /**
+   * Persistent per-conversation SDK session (Model B). Present on the SDK path when
+   * a conversation id is available; the client routes each turn through it for
+   * context retention + incremental caching. Absent ⇒ stateless one-shot.
+   */
+  sdkSession?: {
+    conversationId: string;
+    run: (input: SdkSessionTurnInput) => AsyncGenerator<string>;
+  };
+  /**
+   * In-process SDK MCP server bridging the plugin's toolstack. Present on the
+   * stateless one-shot SDK path (no conversation id) when agentic mode is on;
+   * absent ⇒ Claude Code runs as a pure analyst.
+   */
+  sdkMcp?: { server: McpSdkServerConfigWithInstance; serverName: string };
+  /**
+   * Legacy loopback-HTTP MCP bridge, used only on the fallback path. When present,
+   * Claude Code is launched with all native tools disabled and bridged to the
+   * plugin's toolstack instead.
    */
   mcp?: {
     /** JSON config string passed to `--mcp-config` describing the localhost server. */
@@ -62,16 +79,17 @@ export interface ClaudeCodeRuntime {
  * Drives the Claude Code CLI (`claude`) as a chat provider.
  *
  * Claude Code runs its own agent loop and (when an MCP runtime is supplied) uses
- * the plugin's tools through an in-process MCP server. This client spawns the
- * subprocess, streams its line-delimited JSON, and maps it onto the
- * provider-agnostic {@link ChatClient} contract. From the caller's perspective it
- * behaves like any other client: it streams text and resolves `toolCalls: null`,
- * so the plugin's own tool loop runs a single pass and exits.
+ * the plugin's tools through an in-process MCP server. On the SDK path this client
+ * delegates each turn to the official Agent SDK ({@link ./sdk/sdkQueryEngine});
+ * on the fallback path it spawns the legacy one-shot subprocess. Either way it maps
+ * the result onto the provider-agnostic {@link ChatClient} contract: it streams
+ * text and resolves `toolCalls: null`, so the plugin's own tool loop runs a single
+ * pass and exits.
  */
 export class ClaudeCodeClient implements ChatClient {
   constructor(
     private readonly claudePath: string,
-    private readonly runtime: ClaudeCodeRuntime = {},
+    private readonly runtime: ClaudeCodeRuntime = { useSdk: false },
   ) {}
 
   async complete(
@@ -80,21 +98,11 @@ export class ClaudeCodeClient implements ChatClient {
     params: SamplingParams,
     signal?: AbortSignal,
   ): Promise<CompletionResult> {
-    const { args, prompt } = this.buildInvocation(request, model);
     let captured: ClaudeCodeResultUsage | null = null;
     const parts: string[] = [];
 
-    const deltas = streamClaudeCode({
-      command: this.command,
-      args,
-      cwd: this.runtime.vaultRoot,
-      env: this.buildEnv(params),
-      prompt,
-      signal,
-      onEvent: (json) => {
-        const result = extractClaudeCodeResult(json);
-        if (result) captured = result;
-      },
+    const deltas = this.runTurn(request, model, params, signal, (result) => {
+      captured = result;
     });
 
     for await (const delta of deltas) parts.push(delta);
@@ -114,8 +122,6 @@ export class ClaudeCodeClient implements ChatClient {
     signal?: AbortSignal,
     _onToolCallStreaming?: (index: number, name: string) => void,
   ): StreamResult {
-    const { args, prompt } = this.buildInvocation(request, model);
-
     let captured: ClaudeCodeResultUsage | null = null;
     let resolveUsage!: (value: UsageResult | null) => void;
     let resolveToolCalls!: (value: ToolCall[] | null) => void;
@@ -125,17 +131,8 @@ export class ClaudeCodeClient implements ChatClient {
     const toolCalls = new Promise<ToolCall[] | null>((r) => { resolveToolCalls = r; });
     const stopReason = new Promise<StopReason>((r) => { resolveStopReason = r; });
 
-    const rawDeltas = streamClaudeCode({
-      command: this.command,
-      args,
-      cwd: this.runtime.vaultRoot,
-      env: this.buildEnv(params),
-      prompt,
-      signal,
-      onEvent: (json) => {
-        const result = extractClaudeCodeResult(json);
-        if (result) captured = result;
-      },
+    const rawDeltas = this.runTurn(request, model, params, signal, (result) => {
+      captured = result;
     });
 
     // Mirror the AnthropicClient contract: deferred promises resolve only after
@@ -155,18 +152,73 @@ export class ClaudeCodeClient implements ChatClient {
     return { deltas: wrappedDeltas(), usage, toolCalls, stopReason };
   }
 
+  /**
+   * Runs one turn: through the persistent session when available (context
+   * retention + caching), else the stateless SDK engine, else the legacy one-shot
+   * subprocess on the version-mismatch fallback.
+   */
+  private runTurn(
+    request: ChatRequest,
+    model: string,
+    params: SamplingParams,
+    signal: AbortSignal | undefined,
+    onResult: (result: ClaudeCodeResultUsage) => void,
+  ): AsyncGenerator<string> {
+    const prompt = buildClaudeCodePrompt(request);
+
+    if (this.runtime.sdkSession) {
+      return this.runtime.sdkSession.run({
+        fullPrompt: prompt,
+        deltaPrompt: buildDeltaPrompt(request),
+        model,
+        systemPrompt: request.systemPrompt,
+        reasoning: params.reasoning,
+        turns: request.messages.map((turn) => ({ role: turn.role, content: turn.content })),
+        signal,
+        onResult,
+      });
+    }
+
+    if (this.runtime.useSdk) {
+      return streamSdkTurn({
+        prompt,
+        model,
+        systemPrompt: request.systemPrompt,
+        reasoning: params.reasoning,
+        claudePath: this.command,
+        vaultRoot: this.runtime.vaultRoot,
+        sdkMcp: this.runtime.sdkMcp,
+        signal,
+        onResult,
+      });
+    }
+
+    return streamClaudeCode({
+      command: this.command,
+      args: this.buildLegacyArgs(request, model),
+      cwd: this.runtime.vaultRoot,
+      env: this.buildLegacyEnv(params),
+      prompt,
+      signal,
+      onEvent: (json) => {
+        const result = extractClaudeCodeResult(json);
+        if (result) onResult(result);
+      },
+    });
+  }
+
   private get command(): string {
     return resolveClaudeBinary(this.claudePath);
   }
 
   /**
-   * Subprocess environment, inherited from the plugin's process plus speed
+   * Legacy subprocess environment, inherited from the plugin's process plus speed
    * tuning. `*_NONESSENTIAL_*` mute the CLI's boot-time update checks, telemetry,
    * and background model calls (the dominant cold-start tax), and
-   * `MAX_THINKING_TOKENS` gates extended thinking on the profile's reasoning
-   * level so the first visible token isn't delayed by silent thinking.
+   * `MAX_THINKING_TOKENS` gates extended thinking on the profile's reasoning level
+   * so the first visible token isn't delayed by silent thinking.
    */
-  private buildEnv(params: SamplingParams): NodeJS.ProcessEnv {
+  private buildLegacyEnv(params: SamplingParams): NodeJS.ProcessEnv {
     return {
       ...process.env,
       CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC:
@@ -177,8 +229,8 @@ export class ClaudeCodeClient implements ChatClient {
     };
   }
 
-  /** Builds the CLI args + the stdin prompt for a request. */
-  private buildInvocation(request: ChatRequest, model: string): { args: string[]; prompt: string } {
+  /** Builds the legacy one-shot CLI args for a request. */
+  private buildLegacyArgs(request: ChatRequest, model: string): string[] {
     const args = [
       "--print",
       "--output-format", "stream-json",
@@ -202,7 +254,7 @@ export class ClaudeCodeClient implements ChatClient {
       args.push(
         "--strict-mcp-config",
         "--mcp-config", this.runtime.mcp.configJson,
-        "--disallowedTools", DISALLOWED_NATIVE_TOOLS,
+        "--disallowedTools", DISALLOWED_NATIVE_TOOLS.join(","),
         "--permission-mode", "dontAsk",
         "--allowedTools", this.runtime.mcp.allowedTools,
       );
@@ -211,7 +263,7 @@ export class ClaudeCodeClient implements ChatClient {
       args.push("--tools", "");
     }
 
-    return { args, prompt: buildClaudeCodePrompt(request) };
+    return args;
   }
 }
 
@@ -271,4 +323,17 @@ function renderTurn(turn: ChatTurn): string {
   if (turn.content === null || turn.content === "") return "";
   const speaker = turn.role === "assistant" ? "Assistant" : "User";
   return `${speaker}: ${turn.content}`;
+}
+
+/**
+ * The delta prompt sent when a persistent session is reused: only the new user
+ * turn's text. The session already holds the prior conversation in memory, so
+ * re-sending the transcript (or the context blocks, which are re-grounded via MCP)
+ * would defeat the point. Falls back to the full prompt if the last turn isn't a
+ * user message — reuse won't fire in that case, but the value must still be valid.
+ */
+export function buildDeltaPrompt(request: ChatRequest): string {
+  const last = request.messages[request.messages.length - 1];
+  if (last && last.role === "user" && last.content) return last.content;
+  return buildClaudeCodePrompt(request);
 }

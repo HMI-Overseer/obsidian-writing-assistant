@@ -317,8 +317,15 @@ export class ChatTranscript {
   }
 
   private renderAttachmentGallery(containerEl: HTMLElement, attachments: Attachment[]): void {
+    // Note snapshots embed their own images, so don't double-render those in the
+    // gallery — only directly attached images get thumbnails.
+    const galleryAttachments = attachments.filter(
+      (a) => a.type === "note" || (a.type === "image" && !a.sourceNotePath),
+    );
+    if (galleryAttachments.length === 0) return;
+
     const galleryEl = containerEl.createDiv({ cls: "lmsa-chat-window-attachment-gallery" });
-    for (const attachment of attachments) {
+    for (const attachment of galleryAttachments) {
       if (attachment.type === "image") {
         const imageSrc = `data:${attachment.mimeType};base64,${attachment.data}`;
         const imageAlt = attachment.fileName ?? "Image attachment";
@@ -339,6 +346,13 @@ export class ChatTranscript {
 
         thumbEl.addEventListener("click", () => {
           new ImagePreviewModal(this.app, imageSrc, imageAlt, attachment.fileName).open();
+        });
+      } else if (attachment.type === "note") {
+        const chipEl = galleryEl.createDiv({ cls: "lmsa-chat-window-attachment-note" });
+        setIcon(chipEl.createEl("span", { cls: "lmsa-chat-window-attachment-note-icon" }), "file-text");
+        chipEl.createEl("span", {
+          cls: "lmsa-chat-window-attachment-note-label",
+          text: attachment.truncated ? `${attachment.fileName} · truncated` : attachment.fileName,
         });
       }
     }

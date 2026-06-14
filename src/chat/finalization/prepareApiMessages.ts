@@ -81,7 +81,12 @@ export async function prepareApiMessages(
   const shouldIncludeNoteImages =
     settings.includeLocalAttachmentsAsContext && supportsVision;
 
+  // Chat/plan mode attaches notes as frozen snapshots on the user turn (see
+  // snapshotNoteAttachments) — they ride message.attachments below, not the
+  // system prefix. Only edit mode still sends a live document/extra notes here,
+  // re-read each turn because the diff engine matches against the current file.
   let documentContext: DocumentContext | null = null;
+  let additionalContextItems: AdditionalContextItem[] | undefined;
   const noteImageSources: Array<{ file: TFile; rawContent: string }> = [];
 
   if (editMode && activeNoteAttached) {
@@ -97,27 +102,9 @@ export async function prepareApiMessages(
         noteImageSources.push({ file, rawContent: noteData.content });
       }
     }
-  } else if (activeNoteAttached) {
-    const file = app.workspace.getActiveFile();
-    if (file) {
-      const raw = await app.vault.read(file);
-      const text = truncateNoteText(raw, maxContextChars);
-      if (text) {
-        documentContext = {
-          filePath: file.path,
-          content: text,
-          isFull: false,
-        };
-      }
-      if (shouldIncludeNoteImages) {
-        noteImageSources.push({ file, rawContent: raw });
-      }
-    }
   }
 
-  // Resolve extra vault-note items attached via the context picker.
-  let additionalContextItems: AdditionalContextItem[] | undefined;
-  if (extraContextItems.length > 0) {
+  if (editMode && extraContextItems.length > 0) {
     const resolved: AdditionalContextItem[] = [];
     for (const item of extraContextItems) {
       const file = app.vault.getFileByPath(item.filePath);
@@ -136,16 +123,28 @@ export async function prepareApiMessages(
     ? await resolveNoteImageContext(app, noteImageSources)
     : undefined;
 
+  // The active file is excluded from RAG retrieval. In edit mode it's the
+  // documentContext; in chat mode the note now lives in an attachment, so read
+  // the current active file directly.
+  const activeFilePath = documentContext?.filePath ?? app.workspace.getActiveFile()?.path;
+
   const messages: ChatTurn[] = store
     .getSnapshot()
     .messageHistory.filter((message) => !message.isError)
-    .map((message) => ({
-      role: message.role as "user" | "assistant",
-      content: editMode && message.editProposal
-        ? formatEditMessageContent(message)
-        : message.content,
-      ...(supportsVision && message.attachments?.length && { attachments: message.attachments }),
-    }));
+    .map((message) => {
+      // Note snapshots always travel with the turn; image attachments only go to
+      // vision-capable models.
+      const attachments = message.attachments?.filter(
+        (a) => a.type !== "image" || supportsVision,
+      );
+      return {
+        role: message.role as "user" | "assistant",
+        content: editMode && message.editProposal
+          ? formatEditMessageContent(message)
+          : message.content,
+        ...(attachments?.length ? { attachments } : {}),
+      };
+    });
 
   // Retrieve RAG context based on the latest user message.
   // Skipped when vault tools are active — in agentic mode the model controls
@@ -171,7 +170,7 @@ export async function prepareApiMessages(
           rewrittenQuery = retrievalQuery;
         }
       }
-      ragContext = await ragService.retrieve(retrievalQuery, documentContext?.filePath);
+      ragContext = await ragService.retrieve(retrievalQuery, activeFilePath);
     }
   }
 

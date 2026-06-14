@@ -66,6 +66,31 @@ describe("estimateTokenCount", () => {
     expect(result).toBe(Math.ceil(expectedChars / 4));
   });
 
+  test("counts note attachment text but not image attachments", () => {
+    const request = makeRequest({
+      messages: [{
+        role: "user",
+        content: "Q",
+        attachments: [
+          {
+            type: "note",
+            id: "n1",
+            filePath: "a.md",
+            fileName: "a.md",
+            content: "E".repeat(120),
+            truncated: false,
+            mtimeSnapshot: 1,
+          },
+          { type: "image", id: "i1", mimeType: "image/png", data: "Z".repeat(500) },
+        ],
+      }],
+    });
+    const result = estimateTokenCount(request);
+    // 1 (content) + note: filePath.length + 120 + 30; image excluded.
+    const expectedChars = 1 + ("a.md".length + 120 + 30);
+    expect(result).toBe(Math.ceil(expectedChars / 4));
+  });
+
   test("rounds up to nearest integer", () => {
     // 5 chars / 4 = 1.25 → should be 2
     const request = makeRequest({ systemPrompt: "Hello" });

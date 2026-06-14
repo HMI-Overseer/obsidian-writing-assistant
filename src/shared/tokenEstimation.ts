@@ -39,6 +39,13 @@ export function estimateTokenCount(request: ChatRequest, draft?: string): number
 
   for (const turn of request.messages) {
     totalChars += (turn.content ?? "").length;
+    // Note snapshots live in the conversation now — count their text. Image
+    // attachments are excluded (their token cost is tile-based, not char-based).
+    for (const attachment of turn.attachments ?? []) {
+      if (attachment.type === "note") {
+        totalChars += attachment.filePath.length + attachment.content.length + 30;
+      }
+    }
   }
 
   if (draft) {

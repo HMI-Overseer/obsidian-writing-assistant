@@ -177,7 +177,9 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
   const vaultToolContext: VaultToolContext = {
     app: plugin.app,
     ragService: plugin.services.ragService,
-    activeFilePath: apiMessages.documentContext?.filePath,
+    // Edit mode carries the active note in documentContext; in chat mode the note
+    // moved into a message attachment, so fall back to the current active file.
+    activeFilePath: apiMessages.documentContext?.filePath ?? plugin.app.workspace.getActiveFile()?.path,
   };
 
   const editToolContext: ToolExecutionContext | undefined =

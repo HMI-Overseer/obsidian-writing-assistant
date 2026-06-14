@@ -136,7 +136,11 @@ export class ContextCapacityUpdater {
 
     const chatTurns = messages
       .filter((m) => !m.isError)
-      .map((m) => ({ role: m.role, content: m.content }));
+      .map((m) => ({
+        role: m.role,
+        content: m.content,
+        ...(m.attachments?.length ? { attachments: m.attachments } : {}),
+      }));
 
     const rawEstimate = estimateTokenCount(
       { systemPrompt, documentContext, ragContext: null, messages: chatTurns },

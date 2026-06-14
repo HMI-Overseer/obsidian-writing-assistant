@@ -2,6 +2,12 @@ import type { Message, OpenAIContentPart, SamplingParams } from "../shared/types
 import type { ChatRequest } from "../shared/chatRequest";
 import type { ChatClient } from "./chatClient";
 import { appendNoteImageContextToOpenAIMessage, appendTextToOpenAIMessage } from "./openAiMessageContent";
+import {
+  formatAdditionalContextItem,
+  formatDocumentContext,
+  formatNoteAttachment,
+  noteImageLabel,
+} from "./contextFormatting";
 import type { CompletionResult, StreamResult, UsageResult, StopReason } from "./usageTypes";
 import type { ToolCall } from "../tools/types";
 import { formatOpenAITools } from "../tools/formatters/openai";
@@ -158,25 +164,6 @@ export class OpenAIClient implements ChatClient {
       messages.push({ role: "system", content: request.systemPrompt });
     }
 
-    if (request.documentContext) {
-      const label = request.documentContext.isFull
-        ? `Document to edit (${request.documentContext.filePath})`
-        : `Current note (${request.documentContext.filePath})`;
-      messages.push({
-        role: "system",
-        content: `---\n${label}:\n${request.documentContext.content}`,
-      });
-    }
-
-    if (request.additionalContextItems) {
-      for (const item of request.additionalContextItems) {
-        messages.push({
-          role: "system",
-          content: `---\nContext note (${item.filePath}):\n${item.content}`,
-        });
-      }
-    }
-
     for (const turn of request.messages) {
       if (turn.role === "assistant" && turn.toolCalls && turn.toolCalls.length > 0) {
         messages.push({
@@ -195,22 +182,49 @@ export class OpenAIClient implements ChatClient {
           tool_call_id: turn.toolCallId,
         });
       } else if (turn.role === "user" && turn.attachments?.length) {
-        // User turn with image attachments: build multipart content array.
+        // User turn with attachments: build multipart content array. Note
+        // snapshots and embedded images follow the user's text, frozen on this turn.
         const parts: OpenAIContentPart[] = [];
+        if (turn.content) {
+          parts.push({ type: "text", text: turn.content });
+        }
+        for (const attachment of turn.attachments) {
+          if (attachment.type === "note") {
+            parts.push({ type: "text", text: formatNoteAttachment(attachment) });
+          }
+        }
         for (const attachment of turn.attachments) {
           if (attachment.type === "image") {
+            if (attachment.sourceNotePath) {
+              parts.push({
+                type: "text",
+                text: noteImageLabel(attachment.sourceNotePath, attachment.fileName ?? "image"),
+              });
+            }
             parts.push({
               type: "image_url",
               image_url: { url: `data:${attachment.mimeType};base64,${attachment.data}` },
             });
           }
         }
-        if (turn.content) {
-          parts.push({ type: "text", text: turn.content });
-        }
         messages.push({ role: "user", content: parts });
       } else {
         messages.push({ role: turn.role as "system" | "user" | "assistant", content: turn.content ?? "" });
+      }
+    }
+
+    // Edit-mode live context (document under edit + extra notes) appended to the
+    // latest user message — kept out of the system messages so it stays in the
+    // conversation.
+    if (messages.length > 0 && messages[messages.length - 1].role === "user") {
+      const last = messages[messages.length - 1];
+      if (request.documentContext) {
+        appendTextToOpenAIMessage(last, formatDocumentContext(request.documentContext));
+      }
+      if (request.additionalContextItems) {
+        for (const item of request.additionalContextItems) {
+          appendTextToOpenAIMessage(last, formatAdditionalContextItem(item));
+        }
       }
     }
 

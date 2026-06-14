@@ -8,6 +8,7 @@ import type { ChatModelSelector } from "../models/ChatModelSelector";
 import { makeMessage } from "../conversation/conversationUtils";
 import { validateSendRequest } from "./validateSendRequest";
 import { generateLlmResponse } from "./generateLlmResponse";
+import { snapshotNoteAttachments } from "../../context/noteAttachment";
 
 export type SendMessageOptions = {
   plugin: WritingAssistantChat;
@@ -74,8 +75,27 @@ export async function sendMessage(options: SendMessageOptions): Promise<void> {
   }
 
   const pendingAttachments = composer.getAttachments();
+
+  // Chat/plan mode: freeze the attached notes (and their embedded images) into a
+  // point-in-time snapshot bound to this user turn, so they stay cache-stable in
+  // history instead of being re-read into the system prefix every send. Edit mode
+  // keeps its live document — handled downstream in prepareApiMessages.
+  const supportsVision =
+    validated.activeModel.vision
+    ?? plugin.services.modelAvailability.getVision(validated.activeModel.modelId)
+    ?? false;
+  const noteAttachments = editMode
+    ? []
+    : await snapshotNoteAttachments(plugin.app, {
+        activeNoteAttached: composer.isActiveNoteAttached(),
+        extraContextItems: composer.getExtraContextItems(),
+        maxContextChars: plugin.settings.maxContextChars,
+        includeImages: plugin.settings.includeLocalAttachmentsAsContext && supportsVision,
+      });
+
   composer.clearDraft();
   composer.clearAttachments();
+  if (!editMode) composer.clearAttachedNotes();
   store.setDraft("");
   setIsGenerating(true);
 
@@ -84,8 +104,9 @@ export async function sendMessage(options: SendMessageOptions): Promise<void> {
   }
 
   const userMessage = makeMessage("user", text);
-  if (pendingAttachments.length > 0) {
-    userMessage.attachments = pendingAttachments;
+  const allAttachments = [...pendingAttachments, ...noteAttachments];
+  if (allAttachments.length > 0) {
+    userMessage.attachments = allAttachments;
   }
   const userBubble = transcript.createBubble("user", userMessage.id);
   await transcript.renderBubbleContent(userBubble, text, { attachments: userMessage.attachments });

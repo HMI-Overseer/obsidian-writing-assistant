@@ -231,6 +231,19 @@ export class ChatComposer {
   }
 
   /**
+   * Clear the attached notes after a send. Chat/plan mode freezes a point-in-time
+   * snapshot into the sent message (see snapshotNoteAttachments), so the live
+   * attachment is consumed once per send — re-attach via the context picker to
+   * send an updated snapshot. Does not touch staged images (handled separately).
+   */
+  clearAttachedNotes(): void {
+    this.activeNoteAttached = false;
+    this.extraContextItems = [];
+    this.updateContextChips();
+    this.callbacks.onContextToggle();
+  }
+
+  /**
    * Reset context to the default state for a new conversation:
    * re-apply the auto-attach setting, clear manual vault-note items and attachments.
    */

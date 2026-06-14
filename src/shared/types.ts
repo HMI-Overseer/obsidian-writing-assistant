@@ -19,13 +19,40 @@ export interface ImageAttachment {
   data: string;
   /** Original file name, if known. Used for display/alt text. */
   fileName?: string;
+  /**
+   * Set when this image was embedded in an attached note (vs. user-pasted).
+   * Lets clients emit a provenance label and keeps note images frozen in the
+   * same snapshot as the note text. Absent for directly attached images.
+   */
+  sourceNotePath?: string;
+}
+
+/**
+ * A point-in-time snapshot of a vault note attached to a user message.
+ * Frozen at send time so it stays cache-stable in conversation history,
+ * rather than being re-read into the system prefix every turn.
+ */
+export interface NoteAttachment {
+  type: "note";
+  /** Unique ID for DOM keying and removal. */
+  id: string;
+  /** File path within the vault at snapshot time. */
+  filePath: string;
+  /** Display name of the note. */
+  fileName: string;
+  /** Note content captured at send time (may be truncated to the char budget). */
+  content: string;
+  /** Whether the snapshot hit the char budget and was truncated. */
+  truncated: boolean;
+  /** `TFile.stat.mtime` at snapshot time. Drives the composer's "changed since sent" badge. */
+  mtimeSnapshot: number;
 }
 
 /**
  * A file attachment on a user message.
- * Discriminated union — extend with `| DocumentAttachment` etc. later.
+ * Discriminated union — extend with further attachment kinds later.
  */
-export type Attachment = ImageAttachment;
+export type Attachment = ImageAttachment | NoteAttachment;
 
 // ---------------------------------------------------------------------------
 // OpenAI multipart content
@@ -185,7 +212,7 @@ export interface ConversationMessage {
   toolCalls?: ToolCall[];
   /** Agentic tool-call timeline for this response. Stored for display; never sent to the API. */
   agenticSteps?: AgenticStep[];
-  /** File attachments on user messages (images, future: documents). */
+  /** File attachments on user messages (images and note snapshots). */
   attachments?: Attachment[];
 }
 

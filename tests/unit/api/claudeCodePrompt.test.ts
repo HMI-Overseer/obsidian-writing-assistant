@@ -55,6 +55,29 @@ describe("buildClaudeCodePrompt", () => {
     expect(prompt).toContain("Beta");
   });
 
+  it("renders a note snapshot attached to a user turn", () => {
+    const prompt = buildClaudeCodePrompt(
+      makeRequest({
+        messages: [{
+          role: "user",
+          content: "About this note",
+          attachments: [{
+            type: "note",
+            id: "n1",
+            filePath: "notes/topic.md",
+            fileName: "topic.md",
+            content: "Frozen body",
+            truncated: false,
+            mtimeSnapshot: 1,
+          }],
+        }],
+      }),
+    );
+    expect(prompt).toContain("User: About this note");
+    expect(prompt).toContain("Attached note (notes/topic.md):");
+    expect(prompt).toContain("Frozen body");
+  });
+
   it("skips empty and null turns", () => {
     const prompt = buildClaudeCodePrompt(
       makeRequest({

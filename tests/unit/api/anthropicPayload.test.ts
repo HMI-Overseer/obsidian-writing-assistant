@@ -63,7 +63,7 @@ describe("buildAnthropicMessages", () => {
     expect(system).toBe("You are helpful.");
   });
 
-  test("includes document context in system text", () => {
+  test("keeps document context out of the system block (cache prefix stays stable)", () => {
     const { system } = buildAnthropicMessages(
       makeRequest({
         systemPrompt: "Be concise.",
@@ -71,19 +71,81 @@ describe("buildAnthropicMessages", () => {
       })
     );
     expect(typeof system).toBe("string");
-    expect(system).toContain("Be concise.");
-    expect(system).toContain("Current note (note.md)");
-    expect(system).toContain("Some content");
+    expect(system).toBe("Be concise.");
+    expect(system).not.toContain("Some content");
+  });
+
+  test("appends the live document context to the last user message", () => {
+    const { messages } = buildAnthropicMessages(
+      makeRequest({
+        messages: [{ role: "user", content: "Help" }],
+        documentContext: { filePath: "note.md", content: "Some content", isFull: false },
+      })
+    );
+    expect(messages[0].content).toContain("Help");
+    expect(messages[0].content).toContain("Current note (note.md)");
+    expect(messages[0].content).toContain("Some content");
   });
 
   test("uses 'Document to edit' label when isFull is true", () => {
-    const { system } = buildAnthropicMessages(
+    const { messages } = buildAnthropicMessages(
       makeRequest({
-        systemPrompt: "",
+        messages: [{ role: "user", content: "Edit this" }],
         documentContext: { filePath: "doc.md", content: "Full doc", isFull: true },
       })
     );
-    expect(system).toContain("Document to edit (doc.md)");
+    expect(messages[0].content).toContain("Document to edit (doc.md)");
+  });
+
+  test("emits a note attachment as a text block on its own user turn", () => {
+    const { messages } = buildAnthropicMessages(
+      makeRequest({
+        messages: [{
+          role: "user",
+          content: "What about this?",
+          attachments: [{
+            type: "note",
+            id: "n1",
+            filePath: "notes/topic.md",
+            fileName: "topic.md",
+            content: "Note body",
+            truncated: false,
+            mtimeSnapshot: 123,
+          }],
+        }],
+      })
+    );
+    expect(messages).toEqual([{
+      role: "user",
+      content: [
+        { type: "text", text: "What about this?" },
+        { type: "text", text: "---\nAttached note (notes/topic.md):\nNote body" },
+      ],
+    }]);
+  });
+
+  test("labels images embedded in an attached note with provenance", () => {
+    const { messages } = buildAnthropicMessages(
+      makeRequest({
+        messages: [{
+          role: "user",
+          content: "See note",
+          attachments: [{
+            type: "image",
+            id: "i1",
+            mimeType: "image/png",
+            data: "AQID",
+            fileName: "map.png",
+            sourceNotePath: "notes/topic.md",
+          }],
+        }],
+      })
+    );
+    expect(messages[0].content).toEqual([
+      { type: "text", text: "See note" },
+      { type: "text", text: "Embedded image from attached note (notes/topic.md): map.png" },
+      { type: "image", source: { type: "base64", media_type: "image/png", data: "AQID" } },
+    ]);
   });
 
   test("maps conversation turns to Anthropic message format", () => {

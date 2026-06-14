@@ -292,6 +292,30 @@
     @apply lmsa-flex lmsa-flex-wrap lmsa-gap-2 lmsa-mb-2;
   }
 
+  .lmsa-chat-window-attachment-note {
+    @apply lmsa-inline-flex lmsa-items-center lmsa-gap-1.5 lmsa-flex-none lmsa-rounded-lg;
+    padding: 0.25rem 0.55rem;
+    border: 1px solid var(--background-modifier-border);
+    background: var(--background-secondary);
+    color: var(--text-muted);
+    font-size: var(--font-ui-smaller);
+    line-height: 1.2;
+    max-width: 200px;
+  }
+
+  .lmsa-chat-window-attachment-note-icon {
+    @apply lmsa-flex lmsa-items-center;
+  }
+
+  .lmsa-chat-window-attachment-note-icon svg {
+    width: 0.85em;
+    height: 0.85em;
+  }
+
+  .lmsa-chat-window-attachment-note-label {
+    @apply lmsa-truncate;
+  }
+
   .lmsa-chat-window-attachment-thumb {
     @apply lmsa-relative lmsa-block lmsa-flex-none lmsa-overflow-hidden lmsa-rounded-lg;
     padding: 0;

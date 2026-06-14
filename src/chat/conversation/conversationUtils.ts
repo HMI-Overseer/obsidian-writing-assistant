@@ -155,14 +155,7 @@ export function normalizeConversation(raw: Record<string, unknown>): Conversatio
             base.agenticSteps = message.agenticSteps as ConversationMessage["agenticSteps"];
           }
           if (Array.isArray(message.attachments)) {
-            const valid = (message.attachments as unknown[]).filter(
-              (a): a is Attachment =>
-                !!a &&
-                typeof a === "object" &&
-                typeof (a as Record<string, unknown>).type === "string" &&
-                typeof (a as Record<string, unknown>).id === "string" &&
-                typeof (a as Record<string, unknown>).data === "string",
-            );
+            const valid = (message.attachments as unknown[]).filter(isValidAttachment);
             if (valid.length > 0) base.attachments = valid;
           }
 
@@ -204,6 +197,19 @@ export function createBranchConversation(
   branch.parentConversationId = source.id;
   branch.branchFromMessageId = branchMessageId;
   return branch;
+}
+
+/**
+ * Validate a persisted attachment, discriminating on `type`:
+ * `image` requires base64 `data`, `note` requires snapshot `content`.
+ */
+function isValidAttachment(value: unknown): value is Attachment {
+  if (!value || typeof value !== "object") return false;
+  const a = value as Record<string, unknown>;
+  if (typeof a.id !== "string") return false;
+  if (a.type === "image") return typeof a.data === "string";
+  if (a.type === "note") return typeof a.content === "string";
+  return false;
 }
 
 function isValidEditProposal(value: unknown): boolean {

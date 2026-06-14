@@ -2,6 +2,12 @@ import type { SamplingParams, AnthropicCacheSettings } from "../shared/types";
 import type { ChatRequest, NoteImageContextItem } from "../shared/chatRequest";
 import type { AnthropicTool } from "../tools/formatters/anthropic";
 import { formatRagContext } from "../rag/formatContext";
+import {
+  formatAdditionalContextItem,
+  formatDocumentContext,
+  formatNoteAttachment,
+  noteImageLabel,
+} from "./contextFormatting";
 
 const DEFAULT_MAX_TOKENS = 4096;
 
@@ -34,26 +40,10 @@ export function buildAnthropicMessages(
   request: ChatRequest,
   cacheSettings?: AnthropicCacheSettings
 ): { system: AnthropicSystem; messages: AnthropicMessage[] } {
-  const systemParts: string[] = [];
-
-  if (request.systemPrompt) {
-    systemParts.push(request.systemPrompt);
-  }
-
-  if (request.documentContext) {
-    const label = request.documentContext.isFull
-      ? `Document to edit (${request.documentContext.filePath})`
-      : `Current note (${request.documentContext.filePath})`;
-    systemParts.push(`---\n${label}:\n${request.documentContext.content}`);
-  }
-
-  if (request.additionalContextItems) {
-    for (const item of request.additionalContextItems) {
-      systemParts.push(`---\nContext note (${item.filePath}):\n${item.content}`);
-    }
-  }
-
-  const systemText = systemParts.join("\n\n");
+  // The system block holds only the stable prompt — it carries the cache
+  // breakpoint. All note/document context lives in the conversation (after the
+  // breakpoint) so editing the note never voids the cached prefix.
+  const systemText = request.systemPrompt ?? "";
 
   const messages: AnthropicMessage[] = [];
   for (const turn of request.messages) {
@@ -82,22 +72,48 @@ export function buildAnthropicMessages(
         messages.push({ role: "user", content: [block] });
       }
     } else if (turn.role === "user" && turn.attachments?.length) {
-      // User turn with image attachments: build a content-block array.
+      // User turn with attachments: build a content-block array. Note snapshots
+      // and embedded images follow the user's text; both are frozen on this turn.
       const blocks: AnthropicContentBlock[] = [];
+      if (turn.content) {
+        blocks.push({ type: "text", text: turn.content });
+      }
+      for (const attachment of turn.attachments) {
+        if (attachment.type === "note") {
+          blocks.push({ type: "text", text: formatNoteAttachment(attachment) });
+        }
+      }
       for (const attachment of turn.attachments) {
         if (attachment.type === "image") {
+          if (attachment.sourceNotePath) {
+            blocks.push({
+              type: "text",
+              text: noteImageLabel(attachment.sourceNotePath, attachment.fileName ?? "image"),
+            });
+          }
           blocks.push({
             type: "image",
             source: { type: "base64", media_type: attachment.mimeType, data: attachment.data },
           });
         }
       }
-      if (turn.content) {
-        blocks.push({ type: "text", text: turn.content });
-      }
       messages.push({ role: "user", content: blocks });
     } else {
       messages.push({ role: turn.role as "user" | "assistant", content: turn.content ?? "" });
+    }
+  }
+
+  // Edit-mode live context (document under edit + extra notes) is re-sent each
+  // turn and appended to the latest user message, after the cache breakpoint.
+  if (messages.length > 0 && messages[messages.length - 1].role === "user") {
+    const last = messages[messages.length - 1];
+    if (request.documentContext) {
+      appendTextToUserMessage(last, formatDocumentContext(request.documentContext));
+    }
+    if (request.additionalContextItems) {
+      for (const item of request.additionalContextItems) {
+        appendTextToUserMessage(last, formatAdditionalContextItem(item));
+      }
     }
   }
 

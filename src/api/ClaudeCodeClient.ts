@@ -1,6 +1,7 @@
 import type { SamplingParams } from "../shared/types";
 import type { ChatRequest, ChatTurn } from "../shared/chatRequest";
 import type { ChatClient } from "./chatClient";
+import { formatNoteAttachment } from "./contextFormatting";
 import type { ToolCall } from "../tools/types";
 import type { CompletionResult, StreamResult, StopReason, UsageResult } from "./usageTypes";
 import {
@@ -320,9 +321,23 @@ export function buildClaudeCodePrompt(request: ChatRequest): string {
 }
 
 function renderTurn(turn: ChatTurn): string {
-  if (turn.content === null || turn.content === "") return "";
+  const body = renderTurnBody(turn);
+  if (!body) return "";
   const speaker = turn.role === "assistant" ? "Assistant" : "User";
-  return `${speaker}: ${turn.content}`;
+  return `${speaker}: ${body}`;
+}
+
+/**
+ * A turn's text body: its content plus any frozen note snapshots. Images can't
+ * cross Claude Code's stdin, so only note attachments are rendered.
+ */
+function renderTurnBody(turn: ChatTurn): string {
+  const parts: string[] = [];
+  if (turn.content) parts.push(turn.content);
+  for (const att of turn.attachments ?? []) {
+    if (att.type === "note") parts.push(formatNoteAttachment(att));
+  }
+  return parts.join("\n\n");
 }
 
 /**
@@ -334,6 +349,9 @@ function renderTurn(turn: ChatTurn): string {
  */
 export function buildDeltaPrompt(request: ChatRequest): string {
   const last = request.messages[request.messages.length - 1];
-  if (last && last.role === "user" && last.content) return last.content;
+  if (last && last.role === "user") {
+    const body = renderTurnBody(last);
+    if (body) return body;
+  }
   return buildClaudeCodePrompt(request);
 }

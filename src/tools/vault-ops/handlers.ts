@@ -48,9 +48,9 @@ export function executeVaultOpTool(call: ToolCall, ctx: VaultOpContext): ToolRes
     case "create_directory": {
       const v = validateCreateDirectory(call.arguments, resolve);
       if (!v.ok) return fail("create_directory", v.error);
-      if (resolve(v.args.path) === "dir") {
-        return queued(`Folder "${v.args.path}" already exists — no change needed`);
-      }
+      // Already a folder: a benign, non-error acknowledgement — no review row
+      // is emitted for it at finalization (conversion drops the satisfied op).
+      if ("satisfied" in v) return { content: v.message, isReadOnly: false };
       return queued(`New folder "${v.args.path}"`);
     }
     case "move_file": {

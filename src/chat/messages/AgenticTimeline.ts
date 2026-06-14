@@ -54,6 +54,9 @@ export class AgenticTimeline {
     const stepEl = this.listEl.createDiv({
       cls: `lmsa-agentic-timeline-step lmsa-agentic-timeline-step--tool_call lmsa-agentic-timeline-step--pending`,
     });
+    // Tag the tool name so a later pass can bind to it positionally if its
+    // tool-call id is missing (vault review fallback — see vaultReviewTimeline.ts).
+    stepEl.dataset.toolName = toolName;
     const dotEl = stepEl.createDiv({ cls: "lmsa-agentic-timeline-dot" });
     setIcon(dotEl, TOOL_ICONS[toolName] ?? "wrench");
     const bodyEl = stepEl.createDiv({ cls: "lmsa-agentic-timeline-step-body" });
@@ -183,6 +186,7 @@ export class AgenticTimeline {
       cls: `lmsa-agentic-timeline-step lmsa-agentic-timeline-step--${step.type}`,
     });
     if (step.toolCallId) stepEl.dataset.toolCallId = step.toolCallId;
+    if (step.type === "tool_call" && step.toolName) stepEl.dataset.toolName = step.toolName;
 
     const dotEl = stepEl.createDiv({ cls: "lmsa-agentic-timeline-dot" });
     setIcon(dotEl, step.type === "tool_call"

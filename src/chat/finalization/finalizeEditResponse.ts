@@ -222,7 +222,9 @@ async function buildVaultOpProposal(
     readContent: (p) => snapshots.get(normalizePath(p)) ?? null,
   };
 
-  const { ops, sources, errors } = toVaultOperations(vaultOpCalls, probes, { stoppedForMaxTokens });
+  const { ops, sources, satisfied, errors } = toVaultOperations(vaultOpCalls, probes, {
+    stoppedForMaxTokens,
+  });
   for (const e of errors) {
     console.error(`[vault-op] Skipping ${e.toolName} (${e.toolCallId}): ${e.error}`);
   }
@@ -231,14 +233,18 @@ async function buildVaultOpProposal(
   let autoSoFar = 0;
   const reviewable: ReviewableVaultOp[] = [];
   ops.forEach((op, i) => {
-    const gate = resolveGate(op, policy, autoSoFar);
+    // Already-satisfied no-ops (e.g. create_directory on an existing folder) are
+    // informational only: never gated, never applied — shown on their step as a
+    // muted "already exists" note.
+    const isSatisfied = satisfied[i];
+    const gate = isSatisfied ? "auto" : resolveGate(op, policy, autoSoFar);
     if (gate === "deny") return; // denied tools are filtered upstream (Phase 4); guard anyway.
-    if (gate === "auto") autoSoFar++;
+    if (gate === "auto" && !isSatisfied) autoSoFar++;
     const reviewableOp: ReviewableVaultOp = {
       id: generateId(),
       op,
       gate,
-      status: "pending",
+      status: isSatisfied ? "satisfied" : "pending",
       summary: summarizeOp(op),
       sourceToolCallId: sources[i],
     };

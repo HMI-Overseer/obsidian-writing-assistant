@@ -62,6 +62,18 @@ describe("toVaultOperations", () => {
     expect(ops).toEqual([{ kind: "createDir", path: "Dir" }]);
   });
 
+  test("create_directory on an existing folder → flagged no-op, no error (idempotent)", () => {
+    const { ops, satisfied, errors } = toVaultOperations(
+      [call("create_directory", { path: "Dir" })],
+      probes({ Dir: "dir" }),
+    );
+    // Emitted (so the timeline can show "already exists") but flagged satisfied
+    // so finalization marks it informational and it is never applied.
+    expect(ops).toEqual([{ kind: "createDir", path: "Dir" }]);
+    expect(satisfied).toEqual([true]);
+    expect(errors).toHaveLength(0);
+  });
+
   test("validation failures become self-correcting errors, not ops", () => {
     const { ops, errors } = toVaultOperations(
       [call("move_file", { from: "missing.md", to: "b.md" })],

@@ -18,6 +18,15 @@ const OP_KIND_ICONS: Record<VaultOperation["kind"], string> = {
   trash: "trash-2",
 };
 
+/** Tool name behind each op kind — for the positional fallback (`data-tool-name`). */
+const TOOL_NAME_BY_KIND: Record<VaultOperation["kind"], string> = {
+  create: "write_file",
+  overwrite: "write_file",
+  createDir: "create_directory",
+  move: "move_file",
+  trash: "trash_file",
+};
+
 /**
  * Folds a {@link VaultOperationProposal} into the agentic timeline (Finding C
  * re-open / §7): the vault ops are tool calls, already shown as timeline steps,
@@ -61,6 +70,7 @@ function statusClass(status: VaultOpStatus, historical: boolean): string {
     case "applied": return "is-vault-applied";
     case "failed": return "is-vault-failed";
     case "rejected": return "is-vault-cancelled";
+    case "satisfied": return "is-vault-satisfied";
     default: return "is-vault-awaiting";
   }
 }
@@ -70,6 +80,7 @@ const ALL_STATE_CLASSES = [
   "is-vault-applied",
   "is-vault-failed",
   "is-vault-cancelled",
+  "is-vault-satisfied",
 ];
 
 export class VaultReviewTimelineView {
@@ -115,21 +126,55 @@ export class VaultReviewTimelineView {
   }
 
   private paint(): void {
+    // Per-paint state for step matching: a cursor per tool name (which ordinal of
+    // that tool we're on) and the set of steps already claimed, so two ops never
+    // decorate the same row.
+    const cursors = new Map<string, number>();
+    const used = new Set<HTMLElement>();
     for (const op of this.opts.proposal.ops) {
-      this.decorateStep(this.locateStep(op), op);
+      this.decorateStep(this.locateStep(op, cursors, used), op);
     }
     this.paintFooter();
   }
 
-  /** Find the timeline step for an op, or lazily create a synthetic stand-in. */
-  private locateStep(op: ReviewableVaultOp): HTMLElement {
+  /**
+   * Find the timeline step for an op, or lazily create a synthetic stand-in.
+   * Primary match is by tool-call id (`sourceToolCallId` === `data-tool-call-id`).
+   * Belt-and-braces (§1): if the id is missing or unmatched, bind to the Nth live
+   * tool-call step of the same tool name, so any future id gap degrades to the
+   * right row rather than a synthetic duplicate.
+   */
+  private locateStep(
+    op: ReviewableVaultOp,
+    cursors: Map<string, number>,
+    used: Set<HTMLElement>,
+  ): HTMLElement {
+    const toolName = TOOL_NAME_BY_KIND[op.op.kind];
+    const ordinal = cursors.get(toolName) ?? 0;
+    cursors.set(toolName, ordinal + 1);
+
     const id = op.sourceToolCallId;
     if (id) {
       const el = this.opts.timelineEl.querySelector<HTMLElement>(
         `[data-tool-call-id="${CSS.escape(id)}"]`,
       );
-      if (el) return el;
+      if (el) {
+        used.add(el);
+        return el;
+      }
     }
+
+    const candidates = Array.from(
+      this.opts.timelineEl.querySelectorAll<HTMLElement>(
+        `.lmsa-agentic-timeline-step--tool_call[data-tool-name="${CSS.escape(toolName)}"]`,
+      ),
+    ).filter((el) => !el.closest(".lmsa-vault-review-fallback"));
+    const positional = candidates[ordinal];
+    if (positional && !used.has(positional)) {
+      used.add(positional);
+      return positional;
+    }
+
     return this.ensureSyntheticStep(op);
   }
 
@@ -166,6 +211,9 @@ export class VaultReviewTimelineView {
       stepEl.querySelector<HTMLElement>(".lmsa-agentic-timeline-step-body") ?? stepEl;
     bodyEl.querySelector(":scope > .lmsa-vault-step-controls")?.remove();
     const controls = bodyEl.createDiv({ cls: "lmsa-vault-step-controls" });
+    // A tool-call step with args carries a row-level click-to-expand handler;
+    // approving/declining must not also toggle that, so stop clicks here.
+    controls.addEventListener("click", (e) => e.stopPropagation());
     this.renderControls(controls, op, historical);
   }
 
@@ -191,11 +239,16 @@ export class VaultReviewTimelineView {
           text: `${op.linkImpact} backlink${op.linkImpact === 1 ? "" : "s"}`,
         });
       }
+      // Primary "needs you" signal: an inline label in the detail type scale,
+      // tinted with the edit-mode accent (§3). The approve/decline that follow
+      // are quiet icon-only affordances, not buttons (§4).
+      controls.createSpan({ cls: "lmsa-vault-step-pending", text: "pending approval" });
+
       const approve = controls.createEl("button", {
         cls: "lmsa-vault-step-btn lmsa-vault-step-btn--approve",
+        attr: { "aria-label": "Approve" },
       });
-      setIcon(approve.createSpan({ cls: "lmsa-vault-step-btn-icon" }), "check");
-      approve.createSpan({ text: "Approve" });
+      setIcon(approve, "check");
       approve.disabled = this.isProcessing;
       approve.addEventListener("click", () => void this.applyOps([op]));
 
@@ -203,7 +256,7 @@ export class VaultReviewTimelineView {
         cls: "lmsa-vault-step-btn lmsa-vault-step-btn--decline",
         attr: { "aria-label": "Decline" },
       });
-      setIcon(decline.createSpan({ cls: "lmsa-vault-step-btn-icon" }), "x");
+      setIcon(decline, "x");
       decline.disabled = this.isProcessing;
       decline.addEventListener("click", () => this.skip(op.id));
       return;
@@ -214,6 +267,13 @@ export class VaultReviewTimelineView {
       return;
     }
 
+    if (op.status === "satisfied") {
+      controls.createSpan({
+        cls: "lmsa-vault-step-state",
+        text: op.op.kind === "createDir" ? "Directory already exists" : "Already exists",
+      });
+      return;
+    }
     if (op.status === "applied") {
       controls.createSpan({
         cls: "lmsa-vault-step-state",
@@ -250,9 +310,10 @@ export class VaultReviewTimelineView {
 
     if (showApproveAll) {
       const approveAll = footer.createEl("button", {
-        cls: "lmsa-vault-review-footer-btn mod-cta",
-        text: `Approve all remaining (${appliable.length})`,
+        cls: "lmsa-vault-review-footer-btn lmsa-vault-review-footer-btn--approve",
       });
+      setIcon(approveAll.createSpan({ cls: "lmsa-vault-review-footer-btn-icon" }), "check");
+      approveAll.createSpan({ text: `Approve all remaining (${appliable.length})` });
       approveAll.disabled = this.isProcessing;
       approveAll.addEventListener("click", () => void this.applyOps(appliable));
     }
@@ -260,8 +321,9 @@ export class VaultReviewTimelineView {
     if (hasApplied) {
       const undo = footer.createEl("button", {
         cls: "lmsa-vault-review-footer-btn",
-        text: "Undo",
       });
+      setIcon(undo.createSpan({ cls: "lmsa-vault-review-footer-btn-icon" }), "undo-2");
+      undo.createSpan({ text: "Undo" });
       undo.disabled = this.isProcessing;
       undo.addEventListener("click", () => void this.undo());
     }

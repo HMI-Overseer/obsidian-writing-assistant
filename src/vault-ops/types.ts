@@ -30,7 +30,15 @@ export type VaultOperation =
 /** The class an op is gated by — identical to its `kind` (§5). */
 export type VaultOpClass = VaultOperation["kind"];
 
-export type VaultOpStatus = "pending" | "accepted" | "rejected" | "applied" | "failed";
+export type VaultOpStatus =
+  | "pending"
+  | "accepted"
+  | "rejected"
+  | "applied"
+  | "failed"
+  /** An already-satisfied no-op (e.g. create_directory on an existing folder):
+   *  surfaced on its timeline step as an informational note, never applied. */
+  | "satisfied";
 
 /** A single reviewable op in a proposal (§2.3). "deny" never reaches here. */
 export interface ReviewableVaultOp {

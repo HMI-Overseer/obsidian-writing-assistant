@@ -44,6 +44,12 @@ describe("validateCreateDirectory", () => {
   test("rejects a path that is a file", () => {
     expect(validateCreateDirectory({ path: "a.md" }, resolveWith({ "a.md": "file" })).ok).toBe(false);
   });
+
+  test("treats an existing folder as already satisfied, not an error", () => {
+    const result = validateCreateDirectory({ path: "Dir" }, resolveWith({ Dir: "dir" }));
+    expect(result.ok).toBe(true);
+    expect("satisfied" in result && result.satisfied).toBe(true);
+  });
 });
 
 describe("validateMoveFile", () => {

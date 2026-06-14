@@ -44,8 +44,14 @@ export interface ClaudeCodeDetection {
  * same agentic timeline the API providers populate through their own tool loop.
  */
 export type ClaudeCodeToolEvent =
-  | { phase: "start"; toolName: string }
-  | { phase: "end"; toolName: string; args: Record<string, unknown>; isError: boolean };
+  | { phase: "start"; toolName: string; toolCallId: string }
+  | {
+      phase: "end";
+      toolName: string;
+      args: Record<string, unknown>;
+      isError: boolean;
+      toolCallId: string;
+    };
 
 /** Options for a single Claude Code run, set just before the subprocess is spawned. */
 export interface ClaudeCodeRunOptions {
@@ -328,21 +334,35 @@ export class ClaudeCodeService {
         // loop internally, so this MCP hook is the only place we see its calls).
         // The `end` event fires in finally so a thrown tool never leaves a stuck
         // pending placeholder in the timeline.
-        this.toolListener?.({ phase: "start", toolName: call.name });
+        //
+        // One id per call, minted here and threaded into both the timeline step
+        // (via the events) and any collected vault op (via executeTool), so the
+        // review binds its approve/decline to the *same* row rather than a
+        // synthetic duplicate (vault-review-timeline-refinements §1).
+        const toolCallId = call.id || generateId();
+        this.toolListener?.({ phase: "start", toolName: call.name, toolCallId });
         let isError = true;
         try {
-          const result = await this.executeTool(call);
+          const result = await this.executeTool(call, toolCallId);
           isError = result.isError ?? false;
           return result;
         } finally {
-          this.toolListener?.({ phase: "end", toolName: call.name, args: call.arguments, isError });
+          this.toolListener?.({
+            phase: "end",
+            toolName: call.name,
+            args: call.arguments,
+            isError,
+            toolCallId,
+          });
         }
       },
     };
   }
 
-  /** Routes one MCP tool call to the matching plugin executor (vault or edit). */
-  private async executeTool(call: ToolCall): Promise<ToolResult> {
+  /** Routes one MCP tool call to the matching plugin executor (vault or edit).
+   *  `toolCallId` is the id minted in `callTool`; reused for the collected vault
+   *  op so it shares the id of its timeline step (review binding, §1). */
+  private async executeTool(call: ToolCall, toolCallId: string): Promise<ToolResult> {
     if (VAULT_TOOL_NAMES.has(call.name)) {
       return executeVaultTool(call, {
         app: this.app,
@@ -372,7 +392,7 @@ export class ClaudeCodeService {
       const overlay = buildPendingOverlay(this.app, this.collectedVaultOps);
       const result = executeVaultOpTool(call, { app: this.app, overlay });
       if (!result.isError) {
-        this.collectedVaultOps.push({ id: generateId(), name: call.name, arguments: call.arguments });
+        this.collectedVaultOps.push({ id: toolCallId, name: call.name, arguments: call.arguments });
       }
       return result;
     }

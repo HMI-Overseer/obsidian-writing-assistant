@@ -27,6 +27,16 @@ export interface WriteFileArgs {
 export interface CreateDirectoryArgs {
   path: string;
 }
+
+/**
+ * `create_directory` has a third outcome the others don't: the folder already
+ * exists, so there is nothing to create — neither an error nor a reviewable op
+ * (idempotency guard). `satisfied` carries a benign message for the model.
+ */
+export type CreateDirectoryResult =
+  | ValidationOk<CreateDirectoryArgs>
+  | { ok: true; satisfied: true; path: string; message: string }
+  | ValidationErr;
 export interface MoveFileArgs {
   from: string;
   to: string;
@@ -54,12 +64,22 @@ export function validateWriteFile(
 export function validateCreateDirectory(
   args: Record<string, unknown>,
   resolve: ResolvePath,
-): ValidationResult<CreateDirectoryArgs> {
+): CreateDirectoryResult {
   if (typeof args.path !== "string" || args.path.trim() === "") {
     return err("path must be a non-empty string.");
   }
-  if (resolve(args.path) === "file") {
+  const state = resolve(args.path);
+  if (state === "file") {
     return err(`"${args.path}" is a file — choose a folder path.`);
+  }
+  if (state === "dir") {
+    // Already a folder — not applied; tell the model it's done, calmly.
+    return {
+      ok: true,
+      satisfied: true,
+      path: args.path,
+      message: `"${args.path}" already exists — nothing to create.`,
+    };
   }
   return ok({ path: args.path });
 }

@@ -8,10 +8,12 @@
 @layer components {
   /* ── Status on the step dot (state, not class) ──────────────────── */
 
+  /* Awaiting: a softened dot tint — the "pending approval" label is now the
+     primary "needs you" signal (§3), so the dot only whispers. */
   .lmsa-agentic-timeline-step.is-vault-awaiting .lmsa-agentic-timeline-dot {
-    color: var(--interactive-accent);
-    border-color: color-mix(in srgb, var(--interactive-accent) 60%, var(--background-modifier-border));
-    background: color-mix(in srgb, var(--interactive-accent) 12%, var(--background-primary));
+    color: var(--lmsa-mode-accent);
+    border-color: color-mix(in srgb, var(--lmsa-mode-accent) 40%, var(--background-modifier-border));
+    background: color-mix(in srgb, var(--lmsa-mode-accent) 8%, var(--background-primary));
   }
 
   .lmsa-agentic-timeline-step.is-vault-applied .lmsa-agentic-timeline-dot {
@@ -30,6 +32,14 @@
     opacity: 0.6;
   }
 
+  /* Satisfied no-op (e.g. folder already exists): a neutral, unremarkable dot —
+     it isn't an error and needs nothing from the user. */
+  .lmsa-agentic-timeline-step.is-vault-satisfied .lmsa-agentic-timeline-dot {
+    color: var(--text-muted);
+    border-color: var(--background-modifier-border);
+    background: var(--background-primary);
+  }
+
   /* ── Inline per-step controls (sit after the step's name + path) ── */
 
   .lmsa-vault-step-controls {
@@ -37,48 +47,55 @@
     align-self: center;
   }
 
-  .lmsa-vault-step-btn {
-    @apply lmsa-inline-flex lmsa-cursor-pointer lmsa-items-center lmsa-gap-1 lmsa-rounded-md lmsa-border lmsa-border-obsidian-border lmsa-bg-transparent;
-    padding: 1px 7px;
-    font-size: var(--font-ui-smaller);
-    color: var(--text-muted);
-    transition: all 0.1s ease;
+  /* "pending approval" — detail type scale, edit-mode accent (§3). Inherits the
+     timeline font size; only the colour distinguishes it from the path detail. */
+  .lmsa-vault-step-pending {
+    color: var(--lmsa-mode-accent);
+    margin-right: 2px;
   }
 
-  .lmsa-vault-step-btn:disabled {
+  /* Approve / Decline are quiet icon-only affordances, not buttons (§4): the
+     established subtle recipe (cf. BubbleActionToolbar) — transparent, no chrome,
+     muted, with only a hover wash. Obsidian's base button styling is reset so it
+     can't reintroduce the chunky look. */
+  .lmsa-vault-step-controls .lmsa-vault-step-btn {
+    @apply lmsa-inline-flex lmsa-cursor-pointer lmsa-items-center lmsa-justify-center lmsa-rounded-md lmsa-border-none lmsa-bg-transparent lmsa-p-0;
+    box-shadow: none;
+    outline: none;
+    appearance: none;
+    min-height: unset;
+    width: 20px;
+    height: 20px;
+    font: inherit;
+    line-height: 1;
+    color: var(--text-faint);
+    transition: background 120ms ease, color 120ms ease;
+  }
+
+  .lmsa-vault-step-controls .lmsa-vault-step-btn:hover:not(:disabled) {
+    background: var(--background-modifier-hover);
+  }
+
+  .lmsa-vault-step-controls .lmsa-vault-step-btn:focus-visible {
+    box-shadow: 0 0 0 2px var(--lmsa-mode-accent);
+  }
+
+  .lmsa-vault-step-controls .lmsa-vault-step-btn:disabled {
     opacity: 0.5;
     cursor: default;
   }
 
-  .lmsa-vault-step-btn-icon {
-    @apply lmsa-inline-flex lmsa-items-center;
+  .lmsa-vault-step-controls .lmsa-vault-step-btn svg {
+    width: 14px;
+    height: 14px;
   }
 
-  .lmsa-vault-step-btn-icon svg {
-    width: 12px;
-    height: 12px;
+  .lmsa-vault-step-controls .lmsa-vault-step-btn--approve:hover:not(:disabled) {
+    color: var(--lmsa-mode-accent);
   }
 
-  .lmsa-vault-step-btn--approve {
-    color: var(--interactive-accent);
-    border-color: color-mix(in srgb, var(--interactive-accent) 45%, var(--background-modifier-border));
-  }
-
-  .lmsa-vault-step-btn--approve:hover:not(:disabled) {
-    background: var(--interactive-accent);
-    color: var(--text-on-accent);
-    border-color: var(--interactive-accent);
-  }
-
-  /* Decline is icon-only and quiet until hovered. */
-  .lmsa-vault-step-btn--decline {
-    padding: 1px 5px;
-  }
-
-  .lmsa-vault-step-btn--decline:hover:not(:disabled) {
+  .lmsa-vault-step-controls .lmsa-vault-step-btn--decline:hover:not(:disabled) {
     color: var(--text-error);
-    border-color: color-mix(in srgb, var(--text-error) 50%, var(--background-modifier-border));
-    background: color-mix(in srgb, var(--text-error) 10%, transparent);
   }
 
   /* Resolved-state label (Applied / Declined / auto / Cancelled). */
@@ -94,27 +111,59 @@
   /* ── Turn-level footer (outside the collapsible list, stays visible) ── */
 
   .lmsa-vault-review-footer {
-    @apply lmsa-flex lmsa-items-center lmsa-gap-2;
-    margin-top: 6px;
-    padding-left: 26px;
+    @apply lmsa-flex lmsa-items-center lmsa-gap-1;
+    margin-top: 4px;
+    padding-left: 22px;
   }
 
-  .lmsa-vault-review-footer-btn {
-    @apply lmsa-cursor-pointer lmsa-rounded-lg lmsa-border lmsa-border-obsidian-border lmsa-bg-transparent;
-    padding: 3px 12px;
-    font-size: var(--font-ui-small);
+  /* Transparent icon+text affordances, matching the chat bubble action bar (edit /
+     regenerate) — no border or fill at rest, just a hover wash. Obsidian's base
+     button chrome is reset so it can't reintroduce a chunky look. */
+  .lmsa-vault-review-footer .lmsa-vault-review-footer-btn {
+    @apply lmsa-inline-flex lmsa-cursor-pointer lmsa-items-center lmsa-gap-1 lmsa-rounded-md lmsa-border-none lmsa-bg-transparent;
+    box-shadow: none;
+    outline: none;
+    appearance: none;
+    min-height: unset;
+    padding: 2px 6px;
+    font: inherit;
+    font-size: var(--font-ui-smaller);
+    line-height: 1;
     color: var(--text-muted);
-    transition: all 0.1s ease;
+    transition: background 120ms ease, color 120ms ease;
   }
 
-  .lmsa-vault-review-footer-btn:hover:not(:disabled) {
+  .lmsa-vault-review-footer .lmsa-vault-review-footer-btn:hover:not(:disabled) {
     background: var(--background-modifier-hover);
     color: var(--text-normal);
   }
 
-  .lmsa-vault-review-footer-btn:disabled {
+  .lmsa-vault-review-footer .lmsa-vault-review-footer-btn:focus-visible {
+    box-shadow: 0 0 0 2px var(--lmsa-mode-accent);
+  }
+
+  .lmsa-vault-review-footer .lmsa-vault-review-footer-btn:disabled {
     opacity: 0.5;
     cursor: default;
+  }
+
+  .lmsa-vault-review-footer .lmsa-vault-review-footer-btn-icon {
+    @apply lmsa-inline-flex lmsa-items-center;
+  }
+
+  .lmsa-vault-review-footer .lmsa-vault-review-footer-btn-icon svg {
+    width: 13px;
+    height: 13px;
+  }
+
+  /* "Approve all" reads as the affirmative action via a quiet accent tint. */
+  .lmsa-vault-review-footer .lmsa-vault-review-footer-btn--approve {
+    color: var(--lmsa-mode-accent);
+  }
+
+  .lmsa-vault-review-footer .lmsa-vault-review-footer-btn--approve:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--lmsa-mode-accent) 12%, transparent);
+    color: var(--lmsa-mode-accent);
   }
 
   /* ── Fallback rows (ops with no matching live step, e.g. Claude Code) ── */

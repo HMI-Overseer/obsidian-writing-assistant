@@ -221,6 +221,9 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
             toolName: event.toolName,
             toolInput: extractToolInput({ name: event.toolName, arguments: event.args }),
             toolArgs: event.args,
+            // Same id the vault op carries (minted in ClaudeCodeService.callTool),
+            // so the review binds approve/decline to this step (§1).
+            toolCallId: event.toolCallId,
           });
         }
       });

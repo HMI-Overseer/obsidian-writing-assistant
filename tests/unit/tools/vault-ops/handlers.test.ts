@@ -93,7 +93,8 @@ describe("executeVaultOpTool", () => {
         overlay: NO_OVERLAY,
       });
       expect(result.isError).toBeUndefined();
-      expect(result.content).toContain("no change needed");
+      expect(result.content).toContain("already exists");
+      expect(result.content).toContain("nothing to create");
     });
 
     it("errors when the path is a file", () => {

@@ -13,6 +13,7 @@ import type { ToolCall } from "../tools/types";
 import { formatOpenAITools } from "../tools/formatters/openai";
 import { normalizeModelList } from "./modelNormalization";
 import { requestJson } from "./httpTransport";
+import { generateId } from "../utils";
 import { isRecord } from "./parsing";
 import { streamFetch } from "./streamingTransport";
 import { buildCompletionPayload } from "./buildPayload";
@@ -140,7 +141,10 @@ export class OpenAIClient implements ChatClient {
         for (const [, pending] of pendingToolCalls) {
           try {
             completedToolCalls.push({
-              id: pending.id,
+              // A model that streams a tool call without an id would otherwise
+              // leave the echoed tool_call_id empty and break the review's
+              // step↔op id match — mint one so it's always non-empty (§1).
+              id: pending.id || generateId(),
               name: pending.name,
               arguments: JSON.parse(pending.argChunks.join("")),
             });

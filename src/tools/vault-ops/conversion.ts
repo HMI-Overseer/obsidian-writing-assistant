@@ -36,6 +36,10 @@ export interface ConversionResult {
   /** Source tool-call id per op, index-aligned with `ops` — links each op back
    *  to the model tool call (and thus its timeline step) it came from. */
   sources: string[];
+  /** Index-aligned with `ops`: true where the op is an already-satisfied no-op
+   *  (e.g. create_directory on an existing folder). Such ops are shown on their
+   *  timeline step as an informational note and are never applied. */
+  satisfied: boolean[];
   errors: ConversionError[];
 }
 
@@ -49,16 +53,19 @@ export function toVaultOperations(
 ): ConversionResult {
   const ops: VaultOperation[] = [];
   const sources: string[] = [];
+  const satisfied: boolean[] = [];
   const errors: ConversionError[] = [];
   const lastIndex = toolCalls.length - 1;
 
   toolCalls.forEach((tc, index) => {
     const fail = (error: string) =>
       errors.push({ toolCallId: tc.id, toolName: tc.name, error });
-    // Keep `ops` and `sources` index-aligned: every emit records the source tc.id.
-    const emit = (op: VaultOperation) => {
+    // Keep `ops`, `sources`, and `satisfied` index-aligned: every emit records
+    // the source tc.id and whether the op is an already-satisfied no-op.
+    const emit = (op: VaultOperation, isSatisfied = false) => {
       ops.push(op);
       sources.push(tc.id);
+      satisfied.push(isSatisfied);
     };
 
     switch (tc.name) {
@@ -90,6 +97,12 @@ export function toVaultOperations(
       case "create_directory": {
         const v = validateCreateDirectory(tc.arguments, probes.resolve);
         if (!v.ok) return fail(v.error);
+        // Folder already exists (idempotency guard): emit a flagged no-op so the
+        // timeline can show "directory already exists" — but it is never applied.
+        if ("satisfied" in v) {
+          emit({ kind: "createDir", path: v.path }, true);
+          return;
+        }
         emit({ kind: "createDir", path: v.args.path });
         return;
       }
@@ -120,5 +133,5 @@ export function toVaultOperations(
     }
   });
 
-  return { ops, sources, errors };
+  return { ops, sources, satisfied, errors };
 }

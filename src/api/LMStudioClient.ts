@@ -19,6 +19,7 @@ import { isRecord } from "./parsing";
 import { streamNode, streamFetch } from "./streamingTransport";
 import { buildCompletionPayload } from "./buildPayload";
 import { formatRagContext } from "../rag/formatContext";
+import { generateId } from "../utils";
 
 // Re-export for consumers that import from this file
 export { normalizeLMStudioBaseUrl } from "./urlResolution";
@@ -214,7 +215,10 @@ export class LMStudioClient implements ChatClient {
         for (const [, pending] of pendingToolCalls) {
           try {
             completedToolCalls.push({
-              id: pending.id,
+              // A local model that streams a tool call without an id would
+              // otherwise leave the echoed tool_call_id empty and break the
+              // review's step↔op id match — mint one so it's always non-empty (§1).
+              id: pending.id || generateId(),
               name: pending.name,
               arguments: JSON.parse(pending.argChunks.join("")),
             });

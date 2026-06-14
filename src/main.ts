@@ -24,6 +24,7 @@ import {
   MAX_BENCHMARK_HISTORY,
   VIEW_TYPE_CHAT,
 } from "./constants";
+import { DEFAULT_VAULT_OP_POLICY, type Gate, type VaultOpPolicy } from "./vault-ops/gateway";
 import { ChatView } from "./chat";
 import { BUILTIN_COMMAND_CATEGORIES, expandCommandTemplate } from "./commands";
 import { getActiveNoteText } from "./context/noteContext";
@@ -101,6 +102,31 @@ function normalizeRagSettings(raw: unknown): RagSettings {
       typeof data.metadataEnrichment === "boolean"
         ? data.metadataEnrichment
         : DEFAULT_RAG_SETTINGS.metadataEnrichment,
+  };
+}
+
+const VALID_GATES = new Set<Gate>(["auto", "ask", "deny"]);
+
+function normalizeGate(raw: unknown, fallback: Gate): Gate {
+  return typeof raw === "string" && VALID_GATES.has(raw as Gate) ? (raw as Gate) : fallback;
+}
+
+function normalizeVaultOpPolicy(raw: unknown): VaultOpPolicy {
+  const data = (typeof raw === "object" && raw !== null ? raw : {}) as Partial<VaultOpPolicy>;
+  const d = DEFAULT_VAULT_OP_POLICY;
+  return {
+    create: normalizeGate(data.create, d.create),
+    overwrite: normalizeGate(data.overwrite, d.overwrite),
+    move: normalizeGate(data.move, d.move),
+    trash: normalizeGate(data.trash, d.trash),
+    createDir: normalizeGate(data.createDir, d.createDir),
+    scopes: Array.isArray(data.scopes)
+      ? data.scopes.filter((s): s is string => typeof s === "string")
+      : [...d.scopes],
+    maxAutoOps:
+      typeof data.maxAutoOps === "number" && data.maxAutoOps >= 0
+        ? Math.floor(data.maxAutoOps)
+        : d.maxAutoOps,
   };
 }
 
@@ -379,6 +405,7 @@ export default class WritingAssistantChat extends Plugin {
           ? data.maxToolRoundsChat
           : DEFAULT_SETTINGS.maxToolRoundsChat,
       benchmark: normalizeBenchmarkSettings(data?.benchmark),
+      vaultOpPolicy: normalizeVaultOpPolicy(data?.vaultOpPolicy),
     };
   }
 

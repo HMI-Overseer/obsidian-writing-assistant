@@ -1,7 +1,8 @@
+import type { App } from "obsidian";
 import type { ChatClient } from "../../api/chatClient";
 import type { ChatRequest, ChatTurn } from "../../shared/chatRequest";
 import type { AgenticStep, SamplingParams } from "../../shared/types";
-import type { ToolCall } from "../../tools/types";
+import type { ToolCall, ToolResult } from "../../tools/types";
 import type { UsageResult, StopReason } from "../../api/usageTypes";
 import { VAULT_TOOL_NAMES } from "../../tools/vault/definition";
 import { executeVaultTool } from "../../tools/vault/handlers";
@@ -9,15 +10,23 @@ import type { VaultToolContext } from "../../tools/vault/handlers";
 import { EDIT_TOOL_NAMES } from "../../tools/editing/definition";
 import { executeEditTool } from "../../tools/editing/handlers";
 import type { ToolExecutionContext } from "../../tools/editing/handlers";
+import { VAULT_OPS_TOOL_NAMES } from "../../tools/vault-ops/definition";
+import { executeVaultOpTool, buildPendingOverlay } from "../../tools/vault-ops/handlers";
 import { THINK_TOOL_NAME } from "../../tools/think/definition";
 import { extractToolInput } from "../../tools/metadata";
 
 export type { VaultToolContext, ToolExecutionContext };
 
+/** Context for in-loop vault-op execution; the overlay is rebuilt per round. */
+export interface VaultOpToolContext {
+  app: App;
+}
+
 /** All tool names that execute inside the tool loop (results feed back to the model). */
 const ALL_LOOP_TOOL_NAMES = new Set([
   ...VAULT_TOOL_NAMES,
   ...EDIT_TOOL_NAMES,
+  ...VAULT_OPS_TOOL_NAMES,
   THINK_TOOL_NAME,
 ]);
 
@@ -51,6 +60,12 @@ export interface ToolLoopResult {
   writeToolCalls: ToolCall[] | null;
   /** Final usage from the last round that reported usage. */
   usage: UsageResult | null;
+  /**
+   * Stop reason of the most recent round that contributed write tool calls — the
+   * round whose trailing write_file the truncation guard inspects (spec §6 1a).
+   * Null when no round produced write calls.
+   */
+  writeStopReason: StopReason | null;
 }
 
 /**
@@ -78,6 +93,7 @@ export async function runToolLoop(
   agenticMode: boolean,
   vaultToolContext?: VaultToolContext,
   editToolContext?: ToolExecutionContext,
+  vaultOpToolContext?: VaultOpToolContext,
 ): Promise<ToolLoopResult> {
   const toolLoopTurns: ChatTurn[] = [];
   let allWriteToolCalls: ToolCall[] = [];
@@ -87,6 +103,8 @@ export async function runToolLoop(
   let calibrated = false;
   // Set to true once a cap-hit synthesis pass has been injected.
   let capHit = false;
+  // Stop reason of the latest round that accumulated write calls (truncation guard, §6 1a).
+  let writeStopReason: StopReason | null = null;
 
   for (let round = 0; ; round++) {
     const requestMessages = [...baseRequest.messages, ...toolLoopTurns];
@@ -155,6 +173,7 @@ export async function runToolLoop(
     const unknownCalls = toolCalls.filter((tc) => !ALL_LOOP_TOOL_NAMES.has(tc.name));
     if (unknownCalls.length > 0) {
       allWriteToolCalls = [...allWriteToolCalls, ...unknownCalls];
+      writeStopReason = stopReason;
     }
 
     // Collect edit tool calls for finalization (they execute in the loop AND
@@ -162,6 +181,18 @@ export async function runToolLoop(
     const editCalls = loopCalls.filter((tc) => EDIT_TOOL_NAMES.has(tc.name));
     if (editCalls.length > 0) {
       allWriteToolCalls = [...allWriteToolCalls, ...editCalls];
+      writeStopReason = stopReason;
+    }
+
+    // Vault-op calls execute in the loop AND accumulate for finalization, just
+    // like edits (spec §3). The pending overlay (§4) is seeded from vault ops
+    // accumulated in PRIOR rounds — captured before this round's are appended —
+    // so a later round's move_file sees an earlier round's write_file.
+    const priorVaultOpCalls = allWriteToolCalls.filter((tc) => VAULT_OPS_TOOL_NAMES.has(tc.name));
+    const vaultOpCalls = loopCalls.filter((tc) => VAULT_OPS_TOOL_NAMES.has(tc.name));
+    if (vaultOpCalls.length > 0) {
+      allWriteToolCalls = [...allWriteToolCalls, ...vaultOpCalls];
+      writeStopReason = stopReason;
     }
 
     // Cap reached: push terminal error results to keep history valid, then let
@@ -207,6 +238,12 @@ export async function runToolLoop(
       toolCalls: loopCalls.map((tc) => ({ id: tc.id, name: tc.name, arguments: tc.arguments })),
     });
 
+    // Overlay built once per round from prior rounds' vault ops (§4).
+    const vaultOpOverlay =
+      vaultOpToolContext && vaultOpCalls.length > 0
+        ? buildPendingOverlay(vaultOpToolContext.app, priorVaultOpCalls)
+        : null;
+
     // Execute all tools in parallel.
     const results = await Promise.all([
       ...vaultCalls.map(async (tc) => {
@@ -228,6 +265,22 @@ export async function runToolLoop(
           };
         }
         return { tc, result: await executeEditTool(tc, editToolContext) };
+      }),
+      ...vaultOpCalls.map((tc) => {
+        callbacks.onToolStatus?.(tc.name);
+        if (!vaultOpToolContext || !vaultOpOverlay) {
+          const result: ToolResult = {
+            content: "Vault operation context unavailable.",
+            isReadOnly: false,
+            isError: true,
+          };
+          return { tc, result };
+        }
+        const result = executeVaultOpTool(tc, {
+          app: vaultOpToolContext.app,
+          overlay: vaultOpOverlay,
+        });
+        return { tc, result };
       }),
       // think is a no-op: returns empty content so the model continues reasoning.
       ...thinkCalls.map((tc) => ({
@@ -258,6 +311,7 @@ export async function runToolLoop(
   return {
     writeToolCalls: allWriteToolCalls.length > 0 ? allWriteToolCalls : null,
     usage: finalUsage,
+    writeStopReason,
   };
 }
 

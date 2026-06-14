@@ -138,6 +138,14 @@ export function normalizeConversation(raw: Record<string, unknown>): Conversatio
             base.appliedEdit = message.appliedEdit as ConversationMessage["appliedEdit"];
           }
 
+          // Preserve vault-op proposal and applied records if present and valid
+          if (isValidVaultOpProposal(message.vaultOpProposal)) {
+            base.vaultOpProposal = message.vaultOpProposal as ConversationMessage["vaultOpProposal"];
+          }
+          if (isValidAppliedVaultOpRecord(message.appliedVaultOps)) {
+            base.appliedVaultOps = message.appliedVaultOps as ConversationMessage["appliedVaultOps"];
+          }
+
           // Preserve per-message model identity and usage
           if (typeof message.modelId === "string") base.modelId = message.modelId;
           if (typeof message.provider === "string") base.provider = message.provider as ConversationMessage["provider"];
@@ -233,6 +241,22 @@ function isValidAppliedEditRecord(value: unknown): boolean {
     typeof obj.targetFilePath === "string" &&
     Array.isArray(obj.appliedHunkIds)
   );
+}
+
+function isValidVaultOpProposal(value: unknown): boolean {
+  if (!value || typeof value !== "object") return false;
+  const obj = value as Record<string, unknown>;
+  return (
+    typeof obj.id === "string" &&
+    typeof obj.createdAt === "number" &&
+    Array.isArray(obj.ops)
+  );
+}
+
+function isValidAppliedVaultOpRecord(value: unknown): boolean {
+  if (!value || typeof value !== "object") return false;
+  const obj = value as Record<string, unknown>;
+  return typeof obj.proposalId === "string" && Array.isArray(obj.applied);
 }
 
 export function formatRelativeDate(timestamp: number): string {

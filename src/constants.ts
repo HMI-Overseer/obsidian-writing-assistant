@@ -1,6 +1,7 @@
 import type { BenchmarkSettings, ChatHistory, KnowledgeGraphSettings, PluginSettings, ProviderOption, ProviderProfile, RagSettings } from "./shared/types";
 import { EDIT_SYSTEM_PROMPT } from "./editing/regexEditSystemPrompt";
 import { TOOL_EDIT_SYSTEM_PROMPT } from "./tools/editing/systemPrompt";
+import { DEFAULT_VAULT_OP_POLICY } from "./vault-ops/gateway";
 import type { ImageMimeType } from "./shared/types";
 
 export const VIEW_TYPE_CHAT = "writing-assistant-chat";
@@ -129,4 +130,5 @@ export const DEFAULT_SETTINGS: PluginSettings = {
   maxToolRoundsEdit: DEFAULT_MAX_TOOL_ROUNDS_EDIT,
   maxToolRoundsChat: DEFAULT_MAX_TOOL_ROUNDS_CHAT,
   benchmark: { ...DEFAULT_BENCHMARK_SETTINGS },
+  vaultOpPolicy: { ...DEFAULT_VAULT_OP_POLICY, scopes: [...DEFAULT_VAULT_OP_POLICY.scopes] },
 };

@@ -17,6 +17,8 @@ import { ALL_VAULT_TOOLS, VAULT_TOOL_NAMES } from "../tools/vault/definition";
 import { executeVaultTool } from "../tools/vault/handlers";
 import { ALL_EDIT_TOOLS, EDIT_TOOL_NAMES } from "../tools/editing/definition";
 import { executeEditTool } from "../tools/editing/handlers";
+import { allowedVaultOpsTools, VAULT_OPS_TOOL_NAMES } from "../tools/vault-ops/definition";
+import { executeVaultOpTool, buildPendingOverlay } from "../tools/vault-ops/handlers";
 import { VaultMcpServer, type McpServerHandle, type McpToolProvider } from "../mcp/VaultMcpServer";
 import { generateId } from "../utils";
 
@@ -87,6 +89,8 @@ export class ClaudeCodeService {
   private sdkUsable: Promise<boolean> | null = null;
   private collectingEdits = false;
   private collectedEdits: ToolCall[] = [];
+  /** Vault-op calls Claude Code made this run, surfaced to the same review panel. */
+  private collectedVaultOps: ToolCall[] = [];
   private editTargetPath = "";
   /** Per-run sink for tool-lifecycle events. The chat UI serializes generation
    *  (one run at a time), so a single listener slot is sufficient. */
@@ -123,6 +127,7 @@ export class ClaudeCodeService {
 
     const settings = this.getSettings();
     this.collectedEdits = [];
+    this.collectedVaultOps = [];
     const useSdk = await this.isSdkUsable();
     const agentic = settings.agenticMode;
 
@@ -265,6 +270,13 @@ export class ClaudeCodeService {
     return edits;
   }
 
+  /** Returns and clears the vault-op calls Claude Code made during the last run. */
+  takeCollectedVaultOps(): ToolCall[] {
+    const ops = this.collectedVaultOps;
+    this.collectedVaultOps = [];
+    return ops;
+  }
+
   /** Probes `claude --version` to report install status for the settings panel. */
   detect(): Promise<ClaudeCodeDetection> {
     const sdkAvailable = isSdkAvailable();
@@ -300,8 +312,17 @@ export class ClaudeCodeService {
    */
   private createToolProvider(): McpToolProvider {
     return {
+      // When collecting writes, advertise the full write surface alongside reads:
+      // the edit channel plus the vault-op tools the policy leaves usable (deny
+      // detaches a class, spec §5, §9). Same catalogue the API providers receive.
       listTools: (): CanonicalToolDefinition[] =>
-        this.collectingEdits ? [...ALL_VAULT_TOOLS, ...ALL_EDIT_TOOLS] : ALL_VAULT_TOOLS,
+        this.collectingEdits
+          ? [
+              ...ALL_VAULT_TOOLS,
+              ...ALL_EDIT_TOOLS,
+              ...allowedVaultOpsTools(this.getSettings().vaultOpPolicy),
+            ]
+          : ALL_VAULT_TOOLS,
       callTool: async (call: ToolCall): Promise<ToolResult> => {
         // Surface tool activity to the chat UI's timeline (Claude Code runs its
         // loop internally, so this MCP hook is the only place we see its calls).
@@ -338,6 +359,20 @@ export class ClaudeCodeService {
       const result = await executeEditTool(call, { app: this.app, filePath: this.editTargetPath });
       if (!result.isError) {
         this.collectedEdits.push({ id: generateId(), name: call.name, arguments: call.arguments });
+      }
+      return result;
+    }
+    if (VAULT_OPS_TOOL_NAMES.has(call.name)) {
+      if (!this.collectingEdits) {
+        return { content: `Vault operations are not available in this mode: ${call.name}`, isReadOnly: false, isError: true };
+      }
+      // Validate against disk overlaid with this run's prior vault ops (spec §4),
+      // so a later move_file sees an earlier write_file. Nothing touches disk here
+      // — the collected calls build the review panel's proposal after the run.
+      const overlay = buildPendingOverlay(this.app, this.collectedVaultOps);
+      const result = executeVaultOpTool(call, { app: this.app, overlay });
+      if (!result.isError) {
+        this.collectedVaultOps.push({ id: generateId(), name: call.name, arguments: call.arguments });
       }
       return result;
     }

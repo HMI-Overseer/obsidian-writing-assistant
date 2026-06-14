@@ -6,6 +6,8 @@ import { shouldUseToolCall } from "../../tools/registry";
 import { ALL_EDIT_TOOLS, EDIT_TOOL_NAMES } from "../../tools/editing/definition";
 import { buildEditToolSystemPrompt } from "../../tools/editing/systemPrompt";
 import { ALL_VAULT_TOOLS, CORE_VAULT_TOOLS, VAULT_TOOL_NAMES } from "../../tools/vault/definition";
+import { allowedVaultOpsTools, VAULT_OPS_TOOL_NAMES } from "../../tools/vault-ops/definition";
+import { buildVaultOpToolSystemPrompt } from "../../tools/vault-ops/systemPrompt";
 import { THINK_TOOL } from "../../tools/think/definition";
 import { buildVaultToolSystemPrompt } from "../../tools/vault/systemPrompt";
 import type { CanonicalToolDefinition } from "../../tools/types";
@@ -201,9 +203,12 @@ export async function prepareApiMessages(
 
   let tools: CanonicalToolDefinition[] | undefined;
   if (useEditTools) {
-    // Edit mode: focused document task — core vault tools for context lookup only.
+    // Edit mode: focused document task — core vault tools for context lookup only,
+    // plus the vault-op write channel (create/move/trash whole notes), with any
+    // deny-classed op filtered out by policy (spec §5).
     const editTools = ALL_EDIT_TOOLS;
-    tools = [...CORE_VAULT_TOOLS, ...editTools, ...(useThinkTool ? [THINK_TOOL] : [])];
+    const vaultOpTools = allowedVaultOpsTools(settings.vaultOpPolicy);
+    tools = [...CORE_VAULT_TOOLS, ...editTools, ...vaultOpTools, ...(useThinkTool ? [THINK_TOOL] : [])];
   } else if (useVaultTools) {
     tools = [...ALL_VAULT_TOOLS, ...(useThinkTool ? [THINK_TOOL] : [])];
   }
@@ -222,9 +227,13 @@ export async function prepareApiMessages(
   const vaultGuidance = useVaultTools ? "\n\n" + buildVaultToolSystemPrompt(activeVaultTools) : "";
   const activeEditTools = (tools ?? []).filter((t) => EDIT_TOOL_NAMES.has(t.name));
   const editGuidance = useEditTools ? "\n\n" + buildEditToolSystemPrompt(activeEditTools) : "";
+  const activeVaultOpTools = (tools ?? []).filter((t) => VAULT_OPS_TOOL_NAMES.has(t.name));
+  const vaultOpGuidance = activeVaultOpTools.length > 0
+    ? "\n\n" + buildVaultOpToolSystemPrompt(activeVaultOpTools)
+    : "";
   const finalSystemPrompt = disableBuiltinSystemPrompts
     ? profileSystemPrompt
-    : systemPrompt + groundingNote + vaultGuidance + editGuidance;
+    : systemPrompt + groundingNote + vaultGuidance + editGuidance + vaultOpGuidance;
 
   return {
     systemPrompt: finalSystemPrompt,

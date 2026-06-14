@@ -13,7 +13,7 @@ import { ChatGenerationOrchestrator } from "./ChatGenerationOrchestrator";
 import { ChatConversationController } from "./ChatConversationController";
 import type { ContextInputs } from "./ContextCapacityUpdater";
 import { ContextCapacityUpdater } from "./ContextCapacityUpdater";
-import { renderDiffPanel } from "./finalization/finalizeEditResponse";
+import { renderProposalPanels } from "./finalization/finalizeEditResponse";
 import { ChatComposer } from "./composer/ChatComposer";
 import { ContextPickerPopover } from "./composer/ContextPickerPopover";
 import { KnowledgePopover } from "./composer/KnowledgePopover";
@@ -446,19 +446,14 @@ export class ChatView extends ItemView {
       isConversationSwitch
     );
 
-    // Re-render DiffReviewPanels for historical messages with edit proposals
+    // Re-render review panels for historical messages with edit or vault-op
+    // proposals. autoApply is omitted (false) so applied auto vault ops do not
+    // re-run on a conversation switch — only the persisted applied record renders.
     for (const message of snapshot.messageHistory) {
-      if (message.editProposal) {
+      if (message.editProposal || message.vaultOpProposal) {
         const bubble = this.transcript.getBubbleForMessage(message.id);
         if (bubble) {
-          renderDiffPanel(
-            this.app,
-            this,
-            this.sessionStore,
-            bubble,
-            message.editProposal,
-            message.appliedEdit
-          );
+          renderProposalPanels(this.app, this, this.sessionStore, bubble, message);
         }
       }
     }

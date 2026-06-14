@@ -1,0 +1,165 @@
+/* -----------------------------------------------------------------------
+ * VaultOperationReviewPanel — checklist UI for a VaultOperationProposal
+ * ----------------------------------------------------------------------- */
+
+@layer components {
+  .lmsa-vault-ops-panel {
+    @apply lmsa-flex lmsa-flex-col lmsa-gap-3;
+  }
+
+  /* ------- Header ------- */
+
+  .lmsa-vault-ops-header {
+    @apply lmsa-flex lmsa-items-center lmsa-gap-1.5;
+    font-size: var(--font-ui-small);
+    font-weight: 600;
+    color: var(--text-normal);
+  }
+
+  .lmsa-vault-ops-header-icon {
+    @apply lmsa-inline-flex lmsa-items-center;
+    color: var(--text-muted);
+  }
+
+  .lmsa-vault-ops-header-icon svg {
+    width: 14px;
+    height: 14px;
+  }
+
+  /* ------- Prose ------- */
+
+  .lmsa-vault-ops-prose {
+    font-size: var(--font-ui-small);
+    color: var(--text-muted);
+    line-height: 1.5;
+  }
+
+  .lmsa-vault-ops-prose p:first-child {
+    margin-top: 0;
+  }
+
+  .lmsa-vault-ops-prose p:last-child {
+    margin-bottom: 0;
+  }
+
+  /* ------- Op list ------- */
+
+  .lmsa-vault-ops-list {
+    @apply lmsa-flex lmsa-flex-col lmsa-gap-1.5;
+  }
+
+  .lmsa-vault-op-row {
+    @apply lmsa-flex lmsa-items-start lmsa-gap-2;
+    padding: 6px 8px;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: var(--radius-s);
+    background: var(--background-primary);
+  }
+
+  .lmsa-vault-op-row.is-rejected {
+    opacity: 0.55;
+  }
+
+  .lmsa-vault-op-row.is-applied {
+    border-color: var(--background-modifier-success);
+  }
+
+  .lmsa-vault-op-row.is-failed {
+    border-color: var(--background-modifier-error);
+  }
+
+  .lmsa-vault-op-status-icon {
+    @apply lmsa-inline-flex lmsa-items-center;
+    margin-top: 1px;
+    color: var(--text-muted);
+  }
+
+  .lmsa-vault-op-status-icon svg {
+    width: 15px;
+    height: 15px;
+  }
+
+  .lmsa-vault-op-row.is-applied .lmsa-vault-op-status-icon {
+    color: var(--text-success);
+  }
+
+  .lmsa-vault-op-row.is-failed .lmsa-vault-op-status-icon {
+    color: var(--text-error);
+  }
+
+  .lmsa-vault-op-body {
+    @apply lmsa-flex lmsa-flex-col lmsa-gap-1;
+    flex: 1;
+    min-width: 0;
+  }
+
+  .lmsa-vault-op-line {
+    @apply lmsa-flex lmsa-items-center lmsa-gap-2;
+    flex-wrap: wrap;
+  }
+
+  .lmsa-vault-op-badge {
+    font-size: var(--font-ui-smaller);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    padding: 1px 6px;
+    border-radius: var(--radius-s);
+    color: var(--text-on-accent);
+    background: var(--text-muted);
+  }
+
+  .lmsa-vault-op-badge--auto {
+    background: var(--interactive-accent);
+  }
+
+  .lmsa-vault-op-badge--ask {
+    background: var(--text-warning);
+    color: var(--text-on-accent);
+  }
+
+  .lmsa-vault-op-summary {
+    font-size: var(--font-ui-small);
+    color: var(--text-normal);
+    word-break: break-word;
+  }
+
+  .lmsa-vault-op-detail {
+    font-size: var(--font-ui-smaller);
+    color: var(--text-muted);
+  }
+
+  .lmsa-vault-op-preview summary {
+    font-size: var(--font-ui-smaller);
+    color: var(--text-accent);
+    cursor: pointer;
+  }
+
+  .lmsa-vault-op-preview-pre {
+    margin-top: 4px;
+    max-height: 240px;
+    overflow: auto;
+    font-size: var(--font-ui-smaller);
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+
+  .lmsa-vault-op-actions {
+    @apply lmsa-flex lmsa-items-center;
+  }
+
+  .lmsa-vault-op-skip-btn {
+    font-size: var(--font-ui-smaller);
+    padding: 2px 8px;
+  }
+
+  /* ------- Footer ------- */
+
+  .lmsa-vault-ops-footer {
+    @apply lmsa-flex lmsa-items-center lmsa-gap-2;
+  }
+
+  .lmsa-vault-ops-footer .is-hidden {
+    display: none;
+  }
+}

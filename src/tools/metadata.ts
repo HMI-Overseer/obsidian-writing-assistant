@@ -19,6 +19,10 @@ export const TOOL_ICONS: Record<string, string> = {
   get_frontmatter: "file-code",
   propose_edit: "pencil",
   update_frontmatter: "file-code-2",
+  write_file: "file-plus",
+  create_directory: "folder-plus",
+  move_file: "file-symlink",
+  trash_file: "trash-2",
   think: "brain",
 };
 
@@ -34,6 +38,10 @@ export const TOOL_LABELS: Record<string, string> = {
   get_frontmatter: "Read frontmatter",
   propose_edit: "Proposed edit",
   update_frontmatter: "Updated frontmatter",
+  write_file: "Wrote file",
+  create_directory: "Created folder",
+  move_file: "Moved file",
+  trash_file: "Trashed file",
   think: "Thought",
 };
 
@@ -49,6 +57,10 @@ export const TOOL_STATUS_LABELS: Record<string, string> = {
   get_frontmatter: "Reading frontmatter...",
   propose_edit: "Composing edit...",
   update_frontmatter: "Updating frontmatter...",
+  write_file: "Writing file...",
+  create_directory: "Creating folder...",
+  move_file: "Moving file...",
+  trash_file: "Trashing file...",
   think: "Thinking...",
 };
 
@@ -68,6 +80,13 @@ export function extractToolInput(
     case "get_frontmatter": return Array.isArray(args.paths) ? `${args.paths.length} note(s)` : undefined;
     case "propose_edit": return typeof args.explanation === "string" ? args.explanation : undefined;
     case "update_frontmatter": return typeof args.explanation === "string" ? args.explanation : undefined;
+    case "write_file": return typeof args.path === "string" ? args.path : undefined;
+    case "create_directory": return typeof args.path === "string" ? args.path : undefined;
+    case "move_file":
+      return typeof args.from === "string" && typeof args.to === "string"
+        ? `${args.from} → ${args.to}`
+        : undefined;
+    case "trash_file": return typeof args.path === "string" ? args.path : undefined;
     case "think": return typeof args.thought === "string" ? args.thought : undefined;
     default: return undefined;
   }

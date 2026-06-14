@@ -8,6 +8,22 @@ export interface JsonSchemaProperty {
   enum?: string[];
 }
 
+/**
+ * MCP-standard tool annotations (see docs/architecture/vault-write-tools.md §2.1).
+ * Declared on the definition so the approval gateway can classify a tool's risk
+ * *before* a call runs. Not sent in the API body — gateway / metadata only.
+ */
+export interface ToolAnnotations {
+  /** Executes immediately, no gate (all vault read tools). */
+  readOnlyHint?: boolean;
+  /** Overwrite / move / trash — hard gate. */
+  destructiveHint?: boolean;
+  /** create_directory — soft gate (no-op if the folder already exists). */
+  idempotentHint?: boolean;
+  /** Reserved; unused here. */
+  openWorldHint?: boolean;
+}
+
 /** Provider-agnostic tool definition. */
 export interface CanonicalToolDefinition {
   name: string;
@@ -29,6 +45,11 @@ export interface CanonicalToolDefinition {
    * Not sent to the API — system-prompt generation only.
    */
   errorGuidance?: string;
+  /**
+   * MCP-standard risk annotations. Drive the vault-op approval gateway (§5);
+   * not sent to the API.
+   */
+  annotations?: ToolAnnotations;
 }
 
 /** A parsed tool call from a model response. */

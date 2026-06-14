@@ -1,4 +1,6 @@
 import type { EditProposal, AppliedEditRecord } from "../editing/editTypes";
+import type { VaultOperationProposal, AppliedVaultOpRecord } from "../vault-ops/types";
+import type { VaultOpPolicy } from "../vault-ops/gateway";
 import type { ToolCall } from "../tools/types";
 
 // ---------------------------------------------------------------------------
@@ -196,6 +198,10 @@ export interface ConversationMessage {
   editProposal?: EditProposal;
   /** Present after edits from this message have been applied. */
   appliedEdit?: AppliedEditRecord;
+  /** Present when this assistant message contains vault-operation proposals (spec §2.3, §6). */
+  vaultOpProposal?: VaultOperationProposal;
+  /** Present after vault ops from this message have been applied (undo = inverses in reverse). */
+  appliedVaultOps?: AppliedVaultOpRecord;
   /** The actual model ID sent to the API (e.g., "claude-sonnet-4-20250514"). */
   modelId?: string;
   /** The provider that generated this message. */
@@ -413,4 +419,6 @@ export interface PluginSettings {
   maxToolRoundsChat: number;
   /** Benchmark report folder and persisted run history. */
   benchmark: BenchmarkSettings;
+  /** Approval policy for vault write operations (create/overwrite/move/trash/createDir). */
+  vaultOpPolicy: VaultOpPolicy;
 }

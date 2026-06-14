@@ -19,7 +19,7 @@ import { estimateCost } from "../../api/pricing";
 import type { UsageResult } from "../../api/usageTypes";
 import type { MessageUsage } from "../../shared/types";
 import { runToolLoop } from "./toolLoop";
-import type { VaultToolContext, ToolExecutionContext } from "./toolLoop";
+import type { VaultToolContext, ToolExecutionContext, VaultOpToolContext } from "./toolLoop";
 import { AgenticTimeline } from "../messages/AgenticTimeline";
 import { extractToolInput } from "../../tools/metadata";
 import { CONTEXT_DANGER_THRESHOLD } from "../../constants";
@@ -187,6 +187,10 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
       ? { app: plugin.app, filePath: apiMessages.documentContext?.filePath ?? "" }
       : undefined;
 
+  // Vault ops operate on arbitrary paths, so they need only the app; the loop
+  // rebuilds the pending overlay per round (spec §3–4).
+  const vaultOpToolContext: VaultOpToolContext = { app: plugin.app };
+
   const abortController = new AbortController();
   setActiveAbortController(abortController);
 
@@ -222,7 +226,7 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
       });
     }
 
-    const { writeToolCalls, usage: finalUsage } = await runToolLoop(
+    const { writeToolCalls, usage: finalUsage, writeStopReason } = await runToolLoop(
       client,
       apiMessages,
       activeModel.modelId,
@@ -265,6 +269,7 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
       agenticMode,
       vaultToolContext,
       editToolContext,
+      vaultOpToolContext,
     );
 
     await renderer.flush();
@@ -272,12 +277,18 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
 
     const agenticSteps = timeline?.getSteps();
 
-    // Claude Code runs its tools internally, so its edit proposals arrive via the
-    // MCP server (collected on the service) rather than through the tool loop.
-    const ccEdits = activeModel.provider === "claudecode"
-      ? plugin.services.claudeCode.takeCollectedEdits()
+    // Claude Code runs its tools internally, so its write proposals (edits and
+    // vault ops) arrive via the MCP server (collected on the service) rather than
+    // through the tool loop. Both channels surface to the same finalizer, which
+    // partitions them back apart by tool name.
+    const isClaudeCode = activeModel.provider === "claudecode";
+    const ccWriteToolCalls = isClaudeCode
+      ? [
+          ...plugin.services.claudeCode.takeCollectedEdits(),
+          ...plugin.services.claudeCode.takeCollectedVaultOps(),
+        ]
       : [];
-    const effectiveWriteToolCalls = ccEdits.length > 0 ? ccEdits : writeToolCalls;
+    const effectiveWriteToolCalls = ccWriteToolCalls.length > 0 ? ccWriteToolCalls : writeToolCalls;
 
     if (editMode && renderer instanceof EditStreamingRenderer) {
       await finalizeEditResponse({
@@ -293,6 +304,7 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
         usage: finalUsage,
         toolCalls: effectiveWriteToolCalls,
         agenticSteps,
+        stoppedForMaxTokens: writeStopReason === "max_tokens",
       });
     } else if (finalization.kind === "replace") {
       const response = chatRenderer?.getCurrentRoundResponse() ?? "";

@@ -9,8 +9,9 @@ import { renderGeneralTab } from "./GeneralTab";
 import { renderRagTab } from "./RagTab";
 import { renderKnowledgeGraphTab } from "./KnowledgeGraphTab";
 import { renderBenchmarkTab } from "./BenchmarkTab";
+import { renderVaultOpsTab } from "./VaultOpsTab";
 
-type TabName = "General" | "Completion Models" | "Embedding Models" | "Retrieval" | "Knowledge Graph" | "Commands" | "Advanced" | "Benchmark";
+type TabName = "General" | "Completion Models" | "Embedding Models" | "Retrieval" | "Knowledge Graph" | "Commands" | "Vault Operations" | "Advanced" | "Benchmark";
 
 type NavItem = { tab: TabName; rail: string; icon: string };
 type NavGroup = { label: string; items: NavItem[] };
@@ -26,9 +27,10 @@ const NAV_GROUPS: NavGroup[] = [
     { tab: "Knowledge Graph",  rail: "Graph", icon: "git-fork" },
   ]},
   { label: "Config", items: [
-    { tab: "Commands",  rail: "Commands",  icon: "terminal" },
-    { tab: "Advanced",  rail: "Advanced",  icon: "sliders-horizontal" },
-    { tab: "Benchmark", rail: "Benchmark", icon: "flask-conical" },
+    { tab: "Commands",         rail: "Commands",  icon: "terminal" },
+    { tab: "Vault Operations", rail: "Vault ops", icon: "shield-check" },
+    { tab: "Advanced",         rail: "Advanced",  icon: "sliders-horizontal" },
+    { tab: "Benchmark",        rail: "Benchmark", icon: "flask-conical" },
   ]},
 ];
 
@@ -44,6 +46,7 @@ const TAB_SLUGS: Record<TabName, string> = {
   "Retrieval": "retrieval",
   "Knowledge Graph": "knowledge-graph",
   "Commands": "commands",
+  "Vault Operations": "vault-operations",
   "Advanced": "advanced",
   "Benchmark": "benchmark",
 };
@@ -72,6 +75,10 @@ const TAB_META: Record<TabName, TabMeta> = {
   "Commands": {
     title: "Quick Commands",
     description: "Create reusable prompt shortcuts that can pull from the current selection or the active note.",
+  },
+  "Vault Operations": {
+    title: "Vault Operations",
+    description: "Control how the assistant is allowed to create, overwrite, move, and trash notes across your vault.",
   },
   "Advanced": {
     title: "Advanced Controls",
@@ -176,6 +183,9 @@ export class WritingAssistantSettingTab extends PluginSettingTab {
         break;
       case "Commands":
         renderCommandsTab(content, this.plugin, refresh);
+        break;
+      case "Vault Operations":
+        renderVaultOpsTab(content, this.plugin);
         break;
       case "Advanced":
         renderAdvancedTab(content, this.plugin);

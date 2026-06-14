@@ -43,7 +43,18 @@ export function renderUsageBadge(
       });
     }
 
-    if (usage.estimatedCostUsd !== null && usage.estimatedCostUsd !== undefined && usage.estimatedCostUsd > 0) {
+    // Claude Code runs on a subscription, so per-message cost is meaningless —
+    // show the plan instead of a calculated price.
+    if (provider === "claudecode") {
+      badgeEl.createSpan({
+        cls: "lmsa-chat-window-usage-cost",
+        text: "Subscription",
+      });
+    } else if (
+      usage.estimatedCostUsd !== null &&
+      usage.estimatedCostUsd !== undefined &&
+      usage.estimatedCostUsd > 0
+    ) {
       badgeEl.createSpan({
         cls: "lmsa-chat-window-usage-cost",
         text: formatCost(usage.estimatedCostUsd),

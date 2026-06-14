@@ -313,7 +313,7 @@ export class VaultReviewTimelineView {
         cls: "lmsa-vault-review-footer-btn lmsa-vault-review-footer-btn--approve",
       });
       setIcon(approveAll.createSpan({ cls: "lmsa-vault-review-footer-btn-icon" }), "check");
-      approveAll.createSpan({ text: `Approve all remaining (${appliable.length})` });
+      approveAll.createSpan({ text: "Approve all remaining" });
       approveAll.disabled = this.isProcessing;
       approveAll.addEventListener("click", () => void this.applyOps(appliable));
     }

@@ -143,14 +143,18 @@
     text-decoration-style: dotted;
   }
 
+  /* No card: a quiet left rule marks the detail as nested under the step, so it
+     sits on the timeline background seamlessly instead of in a boxed panel.
+     `order: 1` keeps it last in the body's flex-wrap, so expanding drops it
+     *below* any inline controls (e.g. vault approve/decline) rather than shoving
+     them down. */
   .lmsa-agentic-timeline-step-expand {
     display: none;
+    order: 1;
     width: 100%;
     margin-top: 4px;
-    padding: 6px 8px;
-    background: var(--background-secondary);
-    border-radius: var(--radius-s);
-    border: 1px solid var(--background-modifier-border);
+    padding: 2px 0 2px 10px;
+    border-left: 2px solid var(--background-modifier-border);
     font-size: var(--font-ui-smaller);
   }
 
@@ -176,9 +180,8 @@
 
   .lmsa-agentic-timeline-arg-value {
     margin: 0;
-    padding: 4px 6px;
-    background: var(--background-primary);
-    border-radius: var(--radius-s);
+    padding: 0;
+    background: transparent;
     color: var(--text-normal);
     white-space: pre-wrap;
     word-break: break-word;

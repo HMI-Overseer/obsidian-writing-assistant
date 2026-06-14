@@ -72,10 +72,6 @@
     transition: background 120ms ease, color 120ms ease;
   }
 
-  .lmsa-vault-step-controls .lmsa-vault-step-btn:hover:not(:disabled) {
-    background: var(--background-modifier-hover);
-  }
-
   .lmsa-vault-step-controls .lmsa-vault-step-btn:focus-visible {
     box-shadow: 0 0 0 2px var(--lmsa-mode-accent);
   }
@@ -112,8 +108,10 @@
 
   .lmsa-vault-review-footer {
     @apply lmsa-flex lmsa-items-center lmsa-gap-1;
-    margin-top: 4px;
-    padding-left: 22px;
+    margin-top: 0px;
+    /* Pull in so the leading icon sits under the timeline's dot rail (~8px),
+       countering the button's own left padding, rather than floating right. */
+    padding-left: 2px;
   }
 
   /* Transparent icon+text affordances, matching the chat bubble action bar (edit /
@@ -156,13 +154,11 @@
     height: 13px;
   }
 
-  /* "Approve all" reads as the affirmative action via a quiet accent tint. */
-  .lmsa-vault-review-footer .lmsa-vault-review-footer-btn--approve {
-    color: var(--lmsa-mode-accent);
-  }
-
+  /* "Approve all" is text-only: muted at rest like the other footer actions, and
+     on hover the text alone shifts to the accent — no background wash, so nothing
+     reads as a button outline. */
   .lmsa-vault-review-footer .lmsa-vault-review-footer-btn--approve:hover:not(:disabled) {
-    background: color-mix(in srgb, var(--lmsa-mode-accent) 12%, transparent);
+    background: transparent;
     color: var(--lmsa-mode-accent);
   }
 

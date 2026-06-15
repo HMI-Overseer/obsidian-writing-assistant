@@ -1,10 +1,10 @@
 /**
- * The apply executor (spec §7.3) — the only place vault ops touch disk.
+ * The apply executor — the only place vault ops touch disk.
  *
  * Thin and integration-tested: the pure planners (gateway, plan) decide *what*
  * and *in what order*; this module performs the real `vault.*` / `fileManager.*`
  * calls and gathers the InverseContext each op's inverse needs (pre-overwrite
- * content, post-apply fingerprints), so undo is just replaying inverses (§7.4).
+ * content, post-apply fingerprints), so undo is just replaying inverses.
  */
 
 import type { App } from "obsidian";
@@ -65,8 +65,8 @@ export function makeDiskSnapshot(app: App): DiskSnapshot {
 // ---------------------------------------------------------------------------
 
 /**
- * Apply one vault operation against the live vault and return its inverse
- * (spec §7.3, §7.4). Inverse context is gathered here — pre-overwrite content
+ * Apply one vault operation against the live vault and return its inverse.
+ * Inverse context is gathered here — pre-overwrite content
  * and post-apply fingerprints — and fed to the pure `inverseOf`.
  *
  * Throws if the operation cannot proceed (e.g. a target vanished after
@@ -124,7 +124,7 @@ export async function applyOperation(
 // Helpers
 // ---------------------------------------------------------------------------
 
-/** Ensure a file's parent folder exists, creating missing ancestors (§7.3). */
+/** Ensure a file's parent folder exists, creating missing ancestors. */
 async function ensureParentFolder(app: App, filePath: string): Promise<void> {
   const parent = parentOf(filePath);
   if (parent) await ensureFolder(app, parent);

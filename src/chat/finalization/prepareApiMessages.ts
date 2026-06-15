@@ -205,7 +205,7 @@ export async function prepareApiMessages(
   if (useEditTools) {
     // Edit mode: focused document task — core vault tools for context lookup only,
     // plus the vault-op write channel (create/move/trash whole notes), with any
-    // deny-classed op filtered out by policy (spec §5).
+    // deny-classed op filtered out by policy (ADR-0003).
     const editTools = ALL_EDIT_TOOLS;
     const vaultOpTools = allowedVaultOpsTools(settings.vaultOpPolicy);
     tools = [...CORE_VAULT_TOOLS, ...editTools, ...vaultOpTools, ...(useThinkTool ? [THINK_TOOL] : [])];

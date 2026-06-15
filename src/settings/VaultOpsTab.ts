@@ -4,7 +4,7 @@ import { DEFAULT_VAULT_OP_POLICY } from "../vault-ops/gateway";
 import { createSettingsSection, SettingItem } from "./ui";
 
 /**
- * "Vault operations" settings (spec §11) — the approval policy surface for the
+ * "Vault operations" settings (ADR-0003) — the approval policy surface for the
  * write channel. One Auto-apply/Ask/Deny control per operation class, a scope
  * list of folder prefixes eligible for auto-apply, and the `maxAutoOps` circuit
  * breaker.

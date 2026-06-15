@@ -2,7 +2,7 @@ import type { CanonicalToolDefinition } from "../types";
 
 /**
  * Generate the vault-operation system prompt addendum from the active tool list
- * (spec §12). Mirrors {@link buildVaultToolSystemPrompt}: the strategy and error
+ * Mirrors {@link buildVaultToolSystemPrompt}: the strategy and error
  * sections are derived entirely from each tool's `strategyHint`/`errorGuidance`,
  * so the prompt stays accurate when a class is denied and its tool is filtered out.
  *

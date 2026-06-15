@@ -54,7 +54,7 @@ export interface FinalizeEditOptions {
   toolCalls?: ToolCall[] | null;
   /** Agentic step timeline from the tool loop. Attached to the saved message; never sent to the API. */
   agenticSteps?: AgenticStep[];
-  /** True when generation stopped for max_tokens — arms the write_file truncation guard (spec §6 1a). */
+  /** True when generation stopped for max_tokens — arms the write_file truncation guard. */
   stoppedForMaxTokens?: boolean;
 }
 
@@ -62,7 +62,7 @@ export interface FinalizeEditOptions {
  * Post-generation handler for edit mode.
  *
  * Partitions the model's write tool calls into two channels and renders their
- * reviews in the bubble (spec §6):
+ * reviews in the bubble:
  *   - the **edit channel** (active-document-bound) → an {@link EditProposal} / DiffReviewPanel;
  *   - the **vault-op channel** (whole-vault) → a {@link VaultOperationProposal}, folded onto
  *     the timeline tool-call steps by {@link VaultReviewTimelineView} — needs no active file.
@@ -186,7 +186,7 @@ interface ExtendedMetadataCache extends MetadataCache {
   getBacklinksForFile(file: TFile): { data: Record<string, unknown[]> };
 }
 
-/** Number of notes that link to a file — the `linkImpact` shown for move ops (§6). */
+/** Number of notes that link to a file — the `linkImpact` shown for move ops. */
 function backlinkCount(app: App, path: string): number {
   const file = app.vault.getFileByPath(normalizePath(path));
   if (!file) return 0;
@@ -195,7 +195,7 @@ function backlinkCount(app: App, path: string): number {
 }
 
 /**
- * Convert vault-op tool calls into a reviewable proposal (spec §6 steps 1–4):
+ * Convert vault-op tool calls into a reviewable proposal:
  * convert → capture fingerprints/snapshots → resolveGate (threading the per-turn
  * auto count) → summarize. Returns null when nothing converts.
  */
@@ -207,7 +207,7 @@ async function buildVaultOpProposal(
   policy: VaultOpPolicy,
 ): Promise<VaultOperationProposal | null> {
   // Pre-read trash snapshots (async) so the pure conversion can stay synchronous;
-  // a trashed file's snapshot is what its inverse re-creates on undo (§7.4).
+  // a trashed file's snapshot is what its inverse re-creates on undo.
   const snapshots = new Map<string, string>();
   for (const tc of vaultOpCalls) {
     if (tc.name === "trash_file" && typeof tc.arguments.path === "string") {
@@ -264,7 +264,7 @@ async function buildVaultOpProposal(
 /**
  * Render the edit and/or vault-op review for a message into its bubble.
  *
- * The two channels live in different regions of the bubble (Finding C re-open / §7):
+ * The two channels live in different regions of the bubble (Finding C re-open):
  *   - the **edit channel** stays in the body card (`contentEl`) as a DiffReviewPanel,
  *     which is a genuine inline diff and carries its own prose;
  *   - the **vault-op channel** is folded into the agentic timeline: the vault ops

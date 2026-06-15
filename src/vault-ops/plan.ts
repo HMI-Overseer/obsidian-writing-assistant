@@ -1,6 +1,6 @@
 /**
  * Apply planning: pre-flight, dependency ordering, and inverse derivation
- * (spec §7.1, §7.2, §7.4). Pure — disk state is injected as plain data, so
+ * (ADR-0006). Pure — disk state is injected as plain data, so
  * every correctness decision is unit-testable without a vault.
  */
 
@@ -29,7 +29,7 @@ export function fingerprintsMatch(live: TargetFingerprint | null, expect: Target
 }
 
 /**
- * Authoritative pre-flight (§7.1): re-resolve every op against live disk.
+ * Authoritative pre-flight: re-resolve every op against live disk.
  * Any conflict ⇒ the batch aborts and nothing is written. This is the real
  * safety guarantee; in-loop validation is only a courtesy to the model.
  */
@@ -76,7 +76,7 @@ const KIND_PRIORITY: Record<VaultOperation["kind"], number> = {
 };
 
 /**
- * Deterministic dependency order (§7.2): createDir → create/overwrite → move →
+ * Deterministic dependency order: createDir → create/overwrite → move →
  * trash, with explicit edges where one op's path is under another's created
  * folder, or a move's source is a freshly created/overwritten file. A small
  * topological sort (Kahn's) with a (priority, index) tiebreak for determinism.
@@ -159,7 +159,7 @@ export interface InverseContext {
 const ZERO_FINGERPRINT: TargetFingerprint = { mtime: 0, size: 0 };
 
 /**
- * Each op's inverse is itself a VaultOperation (§7.4); undo applies inverses in
+ * Each op's inverse is itself a VaultOperation (ADR-0005); undo applies inverses in
  * reverse. Returns null when there is nothing to undo (idempotent createDir
  * that found the folder already present).
  */

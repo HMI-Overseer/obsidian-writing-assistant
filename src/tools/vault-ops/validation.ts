@@ -1,10 +1,10 @@
 /**
- * Lenient, overlay-aware in-loop validation for vault-op tool calls (spec §4).
+ * Lenient, overlay-aware in-loop validation for vault-op tool calls.
  *
  * Catches what the model can fix *now* (bad types, an overwrite of a folder, a
  * move whose destination already exists) and returns a self-correcting error in
  * the established style. The *authoritative* check is the apply-time pre-flight
- * (plan.ts §7); these validators are a courtesy to the model. Pure: existence is
+ * (plan.ts); these validators are a courtesy to the model. Pure: existence is
  * resolved through an injected resolver (overlay ?? disk).
  */
 
@@ -118,7 +118,7 @@ export function validateTrashFile(
     return err(`"${args.path}" does not exist.`);
   }
   if (state === "dir") {
-    // Files-only in v1 — folder removal is too blunt for an agent (spec §13).
+    // Files-only in v1 — folder removal is too blunt for an agent.
     return err(`"${args.path}" is a folder — trash_file targets files only.`);
   }
   return ok({ path: args.path });

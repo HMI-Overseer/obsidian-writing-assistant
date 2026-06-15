@@ -9,7 +9,7 @@ export interface JsonSchemaProperty {
 }
 
 /**
- * MCP-standard tool annotations (see docs/architecture/vault-write-tools.md §2.1).
+ * MCP-standard tool annotations (ADR-0003; see docs/reference/architecture/vault-write-tools.md).
  * Declared on the definition so the approval gateway can classify a tool's risk
  * *before* a call runs. Not sent in the API body — gateway / metadata only.
  */
@@ -46,7 +46,7 @@ export interface CanonicalToolDefinition {
    */
   errorGuidance?: string;
   /**
-   * MCP-standard risk annotations. Drive the vault-op approval gateway (§5);
+   * MCP-standard risk annotations. Drive the vault-op approval gateway;
    * not sent to the API.
    */
   annotations?: ToolAnnotations;

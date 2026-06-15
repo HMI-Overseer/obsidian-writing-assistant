@@ -205,7 +205,7 @@ export interface ConversationMessage {
   editProposal?: EditProposal;
   /** Present after edits from this message have been applied. */
   appliedEdit?: AppliedEditRecord;
-  /** Present when this assistant message contains vault-operation proposals (spec §2.3, §6). */
+  /** Present when this assistant message contains vault-operation proposals (ADR-0002). */
   vaultOpProposal?: VaultOperationProposal;
   /** Present after vault ops from this message have been applied (undo = inverses in reverse). */
   appliedVaultOps?: AppliedVaultOpRecord;

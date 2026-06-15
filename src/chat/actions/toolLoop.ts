@@ -62,7 +62,7 @@ export interface ToolLoopResult {
   usage: UsageResult | null;
   /**
    * Stop reason of the most recent round that contributed write tool calls — the
-   * round whose trailing write_file the truncation guard inspects (spec §6 1a).
+   * round whose trailing write_file the truncation guard inspects.
    * Null when no round produced write calls.
    */
   writeStopReason: StopReason | null;
@@ -103,7 +103,7 @@ export async function runToolLoop(
   let calibrated = false;
   // Set to true once a cap-hit synthesis pass has been injected.
   let capHit = false;
-  // Stop reason of the latest round that accumulated write calls (truncation guard, §6 1a).
+  // Stop reason of the latest round that accumulated write calls (truncation guard).
   let writeStopReason: StopReason | null = null;
 
   for (let round = 0; ; round++) {
@@ -185,7 +185,7 @@ export async function runToolLoop(
     }
 
     // Vault-op calls execute in the loop AND accumulate for finalization, just
-    // like edits (spec §3). The pending overlay (§4) is seeded from vault ops
+    // like edits. The pending overlay is seeded from vault ops
     // accumulated in PRIOR rounds — captured before this round's are appended —
     // so a later round's move_file sees an earlier round's write_file.
     const priorVaultOpCalls = allWriteToolCalls.filter((tc) => VAULT_OPS_TOOL_NAMES.has(tc.name));
@@ -238,7 +238,7 @@ export async function runToolLoop(
       toolCalls: loopCalls.map((tc) => ({ id: tc.id, name: tc.name, arguments: tc.arguments })),
     });
 
-    // Overlay built once per round from prior rounds' vault ops (§4).
+    // Overlay built once per round from prior rounds' vault ops.
     const vaultOpOverlay =
       vaultOpToolContext && vaultOpCalls.length > 0
         ? buildPendingOverlay(vaultOpToolContext.app, priorVaultOpCalls)

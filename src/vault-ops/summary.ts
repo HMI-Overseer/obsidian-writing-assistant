@@ -1,5 +1,5 @@
 /**
- * Pure presentation helpers for vault ops (spec §2.3, §6) — turn a
+ * Pure presentation helpers for vault ops — turn a
  * VaultOperation into the human summary shown in the review panel checklist.
  * No Obsidian, no disk, so they are unit-testable.
  */

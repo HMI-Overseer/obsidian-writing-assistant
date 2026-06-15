@@ -188,7 +188,7 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
       : undefined;
 
   // Vault ops operate on arbitrary paths, so they need only the app; the loop
-  // rebuilds the pending overlay per round (spec §3–4).
+  // rebuilds the pending overlay per round.
   const vaultOpToolContext: VaultOpToolContext = { app: plugin.app };
 
   const abortController = new AbortController();
@@ -222,7 +222,7 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
             toolInput: extractToolInput({ name: event.toolName, arguments: event.args }),
             toolArgs: event.args,
             // Same id the vault op carries (minted in ClaudeCodeService.callTool),
-            // so the review binds approve/decline to this step (§1).
+            // so the review binds approve/decline to this step.
             toolCallId: event.toolCallId,
           });
         }

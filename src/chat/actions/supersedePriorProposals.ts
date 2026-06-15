@@ -1,7 +1,7 @@
 import type { ConversationMessage } from "../../shared/types";
 
 /**
- * Finalise every prior proposal at a user-turn boundary (Finding B / spec §3-B).
+ * Finalise every prior proposal at a user-turn boundary (Finding B).
  *
  * A proposal is *live* only during the turn that created it; the next **user**
  * message supersedes it under one law applied to both channels:
@@ -20,7 +20,7 @@ import type { ConversationMessage } from "../../shared/types";
  *
  * **Invariant:** this MUST run only at user-message boundaries, never per
  * tool-loop round — otherwise an agentic multi-round turn would cancel its own
- * earlier proposals (§3-B). Both the API providers and the Claude Code provider
+ * earlier proposals. Both the API providers and the Claude Code provider
  * route a user turn through `sendMessage`, so calling it there covers both.
  *
  * @returns whether anything changed, so the caller can persist + re-render.

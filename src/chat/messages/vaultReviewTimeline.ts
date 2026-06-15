@@ -29,7 +29,7 @@ const TOOL_NAME_BY_KIND: Record<VaultOperation["kind"], string> = {
 
 /**
  * Folds a {@link VaultOperationProposal} into the agentic timeline (Finding C
- * re-open / §7): the vault ops are tool calls, already shown as timeline steps,
+ * re-open): the vault ops are tool calls, already shown as timeline steps,
  * so the review lives *on those steps* rather than in a separate panel. Each
  * ask-gated step gains inline Approve / Decline; approving applies that op
  * immediately and the step flips to applied. Auto-gated ops apply on mount. A
@@ -140,7 +140,7 @@ export class VaultReviewTimelineView {
   /**
    * Find the timeline step for an op, or lazily create a synthetic stand-in.
    * Primary match is by tool-call id (`sourceToolCallId` === `data-tool-call-id`).
-   * Belt-and-braces (§1): if the id is missing or unmatched, bind to the Nth live
+   * Belt-and-braces: if the id is missing or unmatched, bind to the Nth live
    * tool-call step of the same tool name, so any future id gap degrades to the
    * right row rather than a synthetic duplicate.
    */
@@ -240,8 +240,8 @@ export class VaultReviewTimelineView {
         });
       }
       // Primary "needs you" signal: an inline label in the detail type scale,
-      // tinted with the edit-mode accent (§3). The approve/decline that follow
-      // are quiet icon-only affordances, not buttons (§4).
+      // tinted with the edit-mode accent. The approve/decline that follow
+      // are quiet icon-only affordances, not buttons.
       controls.createSpan({ cls: "lmsa-vault-step-pending", text: "pending approval" });
 
       const approve = controls.createEl("button", {
@@ -330,7 +330,7 @@ export class VaultReviewTimelineView {
   }
 
   // -----------------------------------------------------------------------
-  // Actions — mirror the batch orchestrator (spec §7); pre-flight, ordering,
+  // Actions — mirror the batch orchestrator (ADR-0006); pre-flight, ordering,
   // and drift-guarded undo all hold because Apply/Undo route through it.
   // -----------------------------------------------------------------------
 

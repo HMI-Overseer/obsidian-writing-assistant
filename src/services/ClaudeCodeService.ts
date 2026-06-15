@@ -320,7 +320,7 @@ export class ClaudeCodeService {
     return {
       // When collecting writes, advertise the full write surface alongside reads:
       // the edit channel plus the vault-op tools the policy leaves usable (deny
-      // detaches a class, spec §5, §9). Same catalogue the API providers receive.
+      // detaches a class, ADR-0003). Same catalogue the API providers receive.
       listTools: (): CanonicalToolDefinition[] =>
         this.collectingEdits
           ? [
@@ -338,7 +338,7 @@ export class ClaudeCodeService {
         // One id per call, minted here and threaded into both the timeline step
         // (via the events) and any collected vault op (via executeTool), so the
         // review binds its approve/decline to the *same* row rather than a
-        // synthetic duplicate (vault-review-timeline-refinements §1).
+        // synthetic duplicate (vault-review-timeline-refinements).
         const toolCallId = call.id || generateId();
         this.toolListener?.({ phase: "start", toolName: call.name, toolCallId });
         let isError = true;
@@ -361,7 +361,7 @@ export class ClaudeCodeService {
 
   /** Routes one MCP tool call to the matching plugin executor (vault or edit).
    *  `toolCallId` is the id minted in `callTool`; reused for the collected vault
-   *  op so it shares the id of its timeline step (review binding, §1). */
+   *  op so it shares the id of its timeline step (review binding). */
   private async executeTool(call: ToolCall, toolCallId: string): Promise<ToolResult> {
     if (VAULT_TOOL_NAMES.has(call.name)) {
       return executeVaultTool(call, {
@@ -386,7 +386,7 @@ export class ClaudeCodeService {
       if (!this.collectingEdits) {
         return { content: `Vault operations are not available in this mode: ${call.name}`, isReadOnly: false, isError: true };
       }
-      // Validate against disk overlaid with this run's prior vault ops (spec §4),
+      // Validate against disk overlaid with this run's prior vault ops,
       // so a later move_file sees an earlier write_file. Nothing touches disk here
       // — the collected calls build the review panel's proposal after the run.
       const overlay = buildPendingOverlay(this.app, this.collectedVaultOps);
@@ -400,7 +400,7 @@ export class ClaudeCodeService {
   }
 
   destroy(): void {
-    // Kill every live SDK process — the §1 "don't leak processes" rule.
+    // Kill every live SDK process — the "don't leak processes" rule.
     this.sessionRegistry.disposeAll();
     this.mcpServer?.stop();
     this.mcpServer = null;

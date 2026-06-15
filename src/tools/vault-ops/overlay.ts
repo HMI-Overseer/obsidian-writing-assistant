@@ -1,8 +1,8 @@
 /**
- * The pending overlay (spec §4): a virtual vault view that overlays disk state
+ * The pending overlay: a virtual vault view that overlays disk state
  * with the ops accumulated so far this turn, so a later round's `move_file A→B`
  * sees an earlier round's `write_file A`. Makes in-loop validation smart; it is
- * NOT the safety guarantee — pre-flight (plan.ts §7) is. Pure.
+ * NOT the safety guarantee — pre-flight (plan.ts) is. Pure.
  */
 
 import type { PathState, VaultOperation } from "../../vault-ops/types";
@@ -38,7 +38,7 @@ export function buildOverlay(ops: VaultOperation[]): PendingOverlay {
   return overlay;
 }
 
-/** Resolve a path's state: overlay first, then disk (§4). */
+/** Resolve a path's state: overlay first, then disk. */
 export function makeResolver(
   overlay: PendingOverlay,
   diskState: (path: string) => PathState,

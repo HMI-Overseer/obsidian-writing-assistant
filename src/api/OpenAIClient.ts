@@ -143,7 +143,7 @@ export class OpenAIClient implements ChatClient {
             completedToolCalls.push({
               // A model that streams a tool call without an id would otherwise
               // leave the echoed tool_call_id empty and break the review's
-              // step↔op id match — mint one so it's always non-empty (§1).
+              // step↔op id match — mint one so it's always non-empty.
               id: pending.id || generateId(),
               name: pending.name,
               arguments: JSON.parse(pending.argChunks.join("")),

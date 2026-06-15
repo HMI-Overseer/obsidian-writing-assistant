@@ -13,9 +13,9 @@ import {
 } from "./validation";
 
 /**
- * Context for in-loop vault-op execution (spec §3). Vault ops operate on
+ * Context for in-loop vault-op execution. Vault ops operate on
  * arbitrary paths, so unlike edit tools they need no active file — only the app
- * and the per-turn pending overlay (§4), rebuilt each round from accumulated ops.
+ * and the per-turn pending overlay, rebuilt each round from accumulated ops.
  */
 export interface VaultOpContext {
   app: App;
@@ -26,9 +26,9 @@ export interface VaultOpContext {
  * Execute a vault-op tool inside the tool loop and return a result for the model.
  *
  * Mirrors `executeEditTool`: vault ops are *validated only* in the loop (lenient,
- * overlay-aware — §4) so the model gets immediate, self-correcting feedback and
+ * overlay-aware) so the model gets immediate, self-correcting feedback and
  * can recover within the turn. Nothing touches disk here; the proposal is built
- * and applied at finalization (spec §0, §6). Pre-flight (plan.ts §7) is the real
+ * and applied at finalization. Pre-flight (plan.ts) is the real
  * safety guarantee — these validators are a courtesy to the model.
  */
 export function executeVaultOpTool(call: ToolCall, ctx: VaultOpContext): ToolResult {
@@ -69,7 +69,7 @@ export function executeVaultOpTool(call: ToolCall, ctx: VaultOpContext): ToolRes
 }
 
 /**
- * Build the per-turn pending overlay (spec §4) from vault-op calls accumulated
+ * Build the per-turn pending overlay from vault-op calls accumulated
  * in prior rounds, so a later round's `move_file A→B` sees an earlier round's
  * `write_file A`. Calls are converted progressively, each against the overlay
  * built from the ops before it, so dependent ops chain correctly.

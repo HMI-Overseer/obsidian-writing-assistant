@@ -1,5 +1,5 @@
 /**
- * The approval gateway — the whole authorization argument (spec §5).
+ * The approval gateway — the whole authorization argument (ADR-0003).
  *
  * `resolveGate` is a total predicate with no "probably fine" branch, pure with
  * no Obsidian and no disk. This is the single most important seam to get right.
@@ -8,7 +8,7 @@
 import type { VaultOperation, VaultOpClass } from "./types";
 
 /**
- * The fate of a single op (§5). Each class carries one of these as its policy,
+ * The fate of a single op. Each class carries one of these as its policy,
  * and `resolveGate` returns one per op:
  *   - `deny`  — the tool is removed entirely; the model is never offered it.
  *   - `ask`   — the op is queued and waits for an explicit click to apply.
@@ -36,7 +36,7 @@ export interface VaultOpPolicy {
 }
 
 /**
- * Conservative default policy (spec §11): every class is reviewed (`ask`) and
+ * Conservative default policy: every class is reviewed (`ask`) and
  * nothing auto-applies on a fresh install — including the idempotent `createDir`.
  * A user who wants an autonomous drafting loop opts in by setting a class to
  * `auto` (optionally confined with `scopes`).
@@ -79,7 +79,7 @@ function trimSlashes(value: string): string {
 }
 
 /**
- * Decide one operation's fate (§5). `autoSoFar` is the count of ops already
+ * Decide one operation's fate. `autoSoFar` is the count of ops already
  * resolved to "auto" this turn. Both downgrades only ever *tighten*:
  * out-of-scope auto→ask, count auto→ask. "deny" short-circuits.
  */

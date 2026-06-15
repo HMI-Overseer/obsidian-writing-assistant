@@ -1,7 +1,7 @@
 /**
  * Core data model for the vault write surface.
  *
- * See docs/architecture/vault-write-tools.md §2. These types are portable —
+ * See docs/reference/architecture/vault-write-tools.md. These types are portable —
  * no Obsidian imports — so the pure planners (gateway, plan) and validators
  * can be unit-tested with no vault.
  */
@@ -9,7 +9,7 @@
 /** Disk/overlay existence state for a normalized path. */
 export type PathState = "file" | "dir" | "absent";
 
-/** Conflict guard captured at proposal time, re-checked at apply (§2.2). */
+/** Conflict guard captured at proposal time, re-checked at apply. */
 export interface TargetFingerprint {
   mtime: number;
   size: number;
@@ -27,7 +27,7 @@ export type VaultOperation =
   | { kind: "move"; from: string; to: string; expect: TargetFingerprint }
   | { kind: "trash"; path: string; expect: TargetFingerprint; snapshot: string };
 
-/** The class an op is gated by — identical to its `kind` (§5). */
+/** The class an op is gated by — identical to its `kind` (ADR-0003). */
 export type VaultOpClass = VaultOperation["kind"];
 
 export type VaultOpStatus =
@@ -40,7 +40,7 @@ export type VaultOpStatus =
    *  surfaced on its timeline step as an informational note, never applied. */
   | "satisfied";
 
-/** A single reviewable op in a proposal (§2.3). "deny" never reaches here. */
+/** A single reviewable op in a proposal. "deny" never reaches here. */
 export interface ReviewableVaultOp {
   id: string;
   op: VaultOperation;
@@ -60,7 +60,7 @@ export interface ReviewableVaultOp {
   sourceToolCallId?: string;
 }
 
-/** A per-turn batch of vault ops (§2.3), parallel to EditProposal. */
+/** A per-turn batch of vault ops (ADR-0002), parallel to EditProposal. */
 export interface VaultOperationProposal {
   id: string;
   ops: ReviewableVaultOp[];
@@ -72,7 +72,7 @@ export interface VaultOperationProposal {
    */
   prose?: string;
   /**
-   * Set once a later user turn supersedes this proposal (Finding B / §3-B). A
+   * Set once a later user turn supersedes this proposal (Finding B). A
    * proposal is *live* only during the turn that created it; the next user message
    * marks it historical, so the panel renders a locked, compact variant instead of
    * a live footer competing with the current turn. Undo stays *possible* on a
@@ -81,7 +81,7 @@ export interface VaultOperationProposal {
   historical?: boolean;
 }
 
-/** Record of an applied batch; undo = apply inverses in reverse (§2.3, §7.4). */
+/** Record of an applied batch; undo = apply inverses in reverse (ADR-0005). */
 export interface AppliedVaultOpRecord {
   proposalId: string;
   applied: Array<{ opId: string; inverse: VaultOperation }>;

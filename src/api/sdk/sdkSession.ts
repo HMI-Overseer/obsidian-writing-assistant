@@ -18,7 +18,7 @@ import type { Options, Query, SDKMessage, SDKUserMessage } from "./claudeAgentSd
  * One long-lived SDK `query()` per conversation, driven in streaming-input mode so
  * the `claude` process stays alive between turns, retains context in memory, and
  * caches incrementally (the win one-shot processes can't give —
- * `docs/architecture/claude-code-provider.md` §7.2). The session lives only in
+ * `docs/reference/architecture/claude-code-provider.md`). The session lives only in
  * process memory (`persistSession: false`), never on disk, so it's zero-footprint
  * and a process restart simply loses it → the next turn cold-rebuilds.
  *
@@ -148,7 +148,7 @@ export class SdkSession {
    * True when the last turn ended on a clean `interrupt()` (abort that preserved the
    * live process). The registry reads this to keep the session for reuse instead of
    * disposing it — any *other* error leaves the session tail indeterminate and
-   * disposes (`docs/architecture/claude-code-sdk-refactor-plan.md` §6).
+   * disposes (`docs/work/plans/claude-code-sdk-refactor-plan.md`).
    */
   get wasInterruptedCleanly(): boolean {
     return this.interruptedCleanly;
@@ -157,7 +157,7 @@ export class SdkSession {
   /**
    * True when the session compacted its context to a summary mid-turn. The plugin
    * transcript stays authoritative, so the registry invalidates the session after
-   * the turn and the next turn cold-rebuilds (compaction → desync guard, §6).
+   * the turn and the next turn cold-rebuilds (compaction → desync guard).
    */
   get needsInvalidation(): boolean {
     return this.compacted;

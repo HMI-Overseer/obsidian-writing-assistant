@@ -1,10 +1,10 @@
 /**
- * Convert vault-op tool calls into VaultOperations (spec §6 step 1).
+ * Convert vault-op tool calls into VaultOperations.
  *
  * `write_file` resolves to `create` or `overwrite` from path existence — the
  * model never sets a flag. Destructive ops capture their TargetFingerprint and
  * trash captures a content snapshot for its inverse. Pure: existence and disk
- * reads are injected as probes. Includes the max_tokens truncation guard (§6 1a).
+ * reads are injected as probes. Includes the max_tokens truncation guard.
  */
 
 import type { ToolCall } from "../types";
@@ -70,7 +70,7 @@ export function toVaultOperations(
 
     switch (tc.name) {
       case "write_file": {
-        // Truncation guard (§6 1a): a write_file whose generation hit max_tokens
+        // Truncation guard: a write_file whose generation hit max_tokens
         // may carry a partial file — refuse rather than persist a truncated note.
         // Truncation, not size, is the real hazard, so there is no size cap.
         if (options.stoppedForMaxTokens && index === lastIndex) {

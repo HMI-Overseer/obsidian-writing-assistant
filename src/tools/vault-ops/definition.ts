@@ -3,12 +3,12 @@ import type { VaultOpPolicy } from "../../vault-ops/gateway";
 import type { VaultOpClass } from "../../vault-ops/types";
 
 // ---------------------------------------------------------------------------
-// Vault-operation tools — produce a VaultOperationProposal for review (spec §8).
+// Vault-operation tools — produce a VaultOperationProposal for review.
 //
-// Each tool carries MCP `annotations` (the gateway reads them, spec §2.1) plus
+// Each tool carries MCP `annotations` (the gateway reads them, ADR-0003) plus
 // strategyHint / errorGuidance for the system prompt. They never touch disk in
 // the loop: a call appends an intent to a per-turn proposal, applied only once
-// gated and pre-flighted (spec §0).
+// gated and pre-flighted.
 // ---------------------------------------------------------------------------
 
 export const WRITE_FILE_TOOL: CanonicalToolDefinition = {
@@ -129,7 +129,7 @@ export const VAULT_OPS_TOOL_NAMES = new Set(ALL_VAULT_OPS_TOOLS.map((t) => t.nam
 /**
  * Policy classes each tool can resolve to. `write_file` maps to *two* classes —
  * it picks `create` or `overwrite` at apply time from whether the path exists
- * (spec §2.2) — so it stays usable as long as either is allowed.
+ * (ADR-0004) — so it stays usable as long as either is allowed.
  */
 const TOOL_POLICY_CLASSES: Record<string, VaultOpClass[]> = {
   write_file: ["create", "overwrite"],
@@ -139,7 +139,7 @@ const TOOL_POLICY_CLASSES: Record<string, VaultOpClass[]> = {
 };
 
 /**
- * The vault-op tools a policy leaves usable (spec §5): a `deny`-classed tool is
+ * The vault-op tools a policy leaves usable: a `deny`-classed tool is
  * detached from the active set so the model is never offered a capability it
  * can't use — the same mechanism that drops `semantic_search` when its index is
  * cold. A tool is dropped only when *every* class it can resolve to is denied, so

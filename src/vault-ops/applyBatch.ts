@@ -1,13 +1,13 @@
 /**
- * Batch apply & undo orchestration (spec §7) — the bridge between the review
+ * Batch apply & undo orchestration (ADR-0006) — the bridge between the review
  * panel and the disk-touching executor. It composes the pure planners
  * (`orderOps`, `preflight`, `inverseOf`) with `apply.ts`:
  *
- *   1. order ops into a deterministic dependency order (§7.2),
+ *   1. order ops into a deterministic dependency order,
  *   2. re-resolve every op against live disk — any conflict aborts the whole
- *      batch and nothing is written (§7.1, the real safety guarantee),
+ *      batch and nothing is written (the real safety guarantee),
  *   3. apply in order, recording each op's inverse; if an op throws mid-batch
- *      (a race that beat pre-flight) roll back the applied ops in reverse (§7.4).
+ *      (a race that beat pre-flight) roll back the applied ops in reverse.
  *
  * Undo replays the recorded inverses in reverse — there is no bespoke undo path.
  */
@@ -31,7 +31,7 @@ export interface BatchOp {
 
 export interface BatchApplyResult {
   ok: boolean;
-  /** Pre-flight conflicts (§7.1). Non-empty ⇒ nothing was written. */
+  /** Pre-flight conflicts. Non-empty ⇒ nothing was written. */
   conflicts: Conflict[];
   /** Applied ops with their inverses, in apply order (undo walks this in reverse). */
   applied: Array<{ opId: string; inverse: VaultOperation }>;
@@ -40,7 +40,7 @@ export interface BatchApplyResult {
 }
 
 /**
- * Apply a batch of accepted ops all-or-nothing (§7.1–7.4). On a pre-flight
+ * Apply a batch of accepted ops all-or-nothing. On a pre-flight
  * conflict nothing is written; on a mid-batch throw the applied ops are rolled
  * back via their inverses before returning.
  */
@@ -77,9 +77,9 @@ export interface UndoResult {
 }
 
 /**
- * Undo an applied batch: replay the recorded inverses in reverse order (§7.4).
+ * Undo an applied batch: replay the recorded inverses in reverse order (ADR-0005).
  *
- * Runs the op-type-aware drift guard first (§3-B amendment 3): replaying the
+ * Runs the op-type-aware drift guard first (Finding B, amendment 3): replaying the
  * inverse of a stale trash or move can resurrect or clobber files in a way a
  * content-diff undo cannot, so any drift refuses the whole undo *before* writing
  * anything — strictly safer than the always-replay it replaces.
@@ -105,7 +105,7 @@ export async function undoVaultOpBatch(
 }
 
 /**
- * Op-type-aware drift guard for undo (§3-B amendment 3). Undo applies each
+ * Op-type-aware drift guard for undo (Finding B, amendment 3). Undo applies each
  * recorded *inverse*; if the vault drifted since apply, replaying it can destroy
  * or resurrect newer state. Returns the human reasons undo must be refused —
  * empty ⇒ safe to proceed. The check is keyed to the inverse's kind because the

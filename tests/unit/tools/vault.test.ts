@@ -55,6 +55,7 @@ function makeCtx(overrides: {
         getRoot: vi.fn(() => root),
         getAbstractFileByPath: vi.fn((path: string) => abstractFiles[path] ?? null),
         read: vi.fn((file: TFile) => Promise.resolve(fileContents[file.path] ?? "")),
+        cachedRead: vi.fn((file: TFile) => Promise.resolve(fileContents[file.path] ?? "")),
       },
       metadataCache: {
         getFileCache: vi.fn((file: TFile) => fileCaches[file.path] ?? null),
@@ -251,6 +252,185 @@ describe("search_files", () => {
     const ctx = makeCtx({});
     const result = await executeVaultTool(tc("search_files", {}), ctx);
     expect(result.isError).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// search_content
+// ---------------------------------------------------------------------------
+
+describe("search_content", () => {
+  test("finds a literal string in note bodies with path:line:snippet", async () => {
+    const a = makeFile("Characters/Will.md");
+    const b = makeFile("Scenes/Act1.md");
+    const ctx = makeCtx({
+      files: [a, b],
+      fileContents: {
+        "Characters/Will.md": "Will is brave.\nHe carries a sword.",
+        "Scenes/Act1.md": "The sword glints.\nNo mention here.",
+      },
+    });
+
+    const result = await executeVaultTool(tc("search_content", { query: "sword" }), ctx);
+
+    expect(result.isReadOnly).toBe(true);
+    expect(result.isError).toBeUndefined();
+    expect(result.content).toContain("Characters/Will.md:2: He carries a sword.");
+    expect(result.content).toContain("Scenes/Act1.md:1: The sword glints.");
+  });
+
+  test("is case-insensitive by default and case-sensitive on request", async () => {
+    const a = makeFile("note.md");
+    const ctx = makeCtx({ files: [a], fileContents: { "note.md": "The TODO marker." } });
+
+    const insensitive = await executeVaultTool(tc("search_content", { query: "todo" }), ctx);
+    expect(insensitive.content).toContain("note.md:1");
+
+    const sensitive = await executeVaultTool(
+      tc("search_content", { query: "todo", caseSensitive: true }),
+      ctx,
+    );
+    expect(sensitive.content).toContain("No matches found");
+  });
+
+  test("supports regex matching when regex is true", async () => {
+    const a = makeFile("note.md");
+    const ctx = makeCtx({ files: [a], fileContents: { "note.md": "Chapter 12 begins." } });
+
+    const result = await executeVaultTool(
+      tc("search_content", { query: "Chapter \\d+", regex: true }),
+      ctx,
+    );
+    expect(result.content).toContain("note.md:1");
+  });
+
+  test("returns a correctable error for an invalid regex", async () => {
+    const a = makeFile("note.md");
+    const ctx = makeCtx({ files: [a], fileContents: { "note.md": "anything" } });
+
+    const result = await executeVaultTool(
+      tc("search_content", { query: "(unclosed", regex: true }),
+      ctx,
+    );
+    expect(result.isError).toBe(true);
+    expect(result.content).toContain("Error:");
+  });
+
+  test("restricts the scan to the given path", async () => {
+    const a = makeFile("Characters/Will.md");
+    const b = makeFile("Scenes/Act1.md");
+    const ctx = makeCtx({
+      files: [a, b],
+      fileContents: {
+        "Characters/Will.md": "shared token",
+        "Scenes/Act1.md": "shared token",
+      },
+    });
+
+    const result = await executeVaultTool(
+      tc("search_content", { query: "shared", path: "Characters" }),
+      ctx,
+    );
+    expect(result.content).toContain("Characters/Will.md");
+    expect(result.content).not.toContain("Scenes/Act1.md");
+  });
+
+  test("respects excludePatterns", async () => {
+    const a = makeFile("Will.md");
+    const b = makeFile("Will-draft.md");
+    const ctx = makeCtx({
+      files: [a, b],
+      fileContents: { "Will.md": "token", "Will-draft.md": "token" },
+    });
+
+    const result = await executeVaultTool(
+      tc("search_content", { query: "token", excludePatterns: ["*draft*"] }),
+      ctx,
+    );
+    expect(result.content).toContain("Will.md:1");
+    expect(result.content).not.toContain("Will-draft.md");
+  });
+
+  test("reports no matches without erroring", async () => {
+    const a = makeFile("note.md");
+    const ctx = makeCtx({ files: [a], fileContents: { "note.md": "nothing relevant" } });
+    const result = await executeVaultTool(tc("search_content", { query: "absent" }), ctx);
+    expect(result.isError).toBeUndefined();
+    expect(result.content).toContain("No matches found");
+  });
+
+  test("returns error when query is missing", async () => {
+    const ctx = makeCtx({});
+    const result = await executeVaultTool(tc("search_content", {}), ctx);
+    expect(result.isError).toBe(true);
+  });
+
+  test("reports total match count when results are truncated", async () => {
+    const body = Array.from({ length: 60 }, (_, i) => `line ${i} has token`).join("\n");
+    const a = makeFile("big.md");
+    const ctx = makeCtx({ files: [a], fileContents: { "big.md": body } });
+
+    const result = await executeVaultTool(tc("search_content", { query: "token" }), ctx);
+
+    expect(result.content).toContain("showing first 50 of 60");
+    expect(result.content).toContain("Showing 50 of 60 matches");
+  });
+
+  test("includes surrounding lines when contextLines is set", async () => {
+    const a = makeFile("note.md");
+    const ctx = makeCtx({
+      files: [a],
+      fileContents: { "note.md": "first para\nsecond has token\nthird para" },
+    });
+
+    const result = await executeVaultTool(
+      tc("search_content", { query: "token", contextLines: 1 }),
+      ctx,
+    );
+
+    expect(result.content).toContain("[note.md]");
+    expect(result.content).toContain("first para");
+    expect(result.content).toContain("> 2: second has token");
+    expect(result.content).toContain("third para");
+  });
+
+  test("merges overlapping context windows so shared lines print once", async () => {
+    const a = makeFile("note.md");
+    const ctx = makeCtx({
+      files: [a],
+      // lines: 0 p0, 1 token one, 2 p2, 3 token two, 4 p4
+      fileContents: { "note.md": "p0\ntoken one\np2\ntoken two\np4" },
+    });
+
+    const result = await executeVaultTool(
+      tc("search_content", { query: "token", contextLines: 2 }),
+      ctx,
+    );
+
+    // contextLines 2 makes the two windows overlap and merge into one hunk;
+    // the shared line "p2" must appear exactly once (no separator, no dupes).
+    expect(result.content.split("p2").length - 1).toBe(1);
+    expect(result.content).toContain("> 2: token one");
+    expect(result.content).toContain("> 4: token two");
+    expect(result.content).not.toContain("--");
+  });
+
+  test("clamps contextLines to the supported maximum", async () => {
+    const a = makeFile("note.md");
+    const body = Array.from({ length: 30 }, (_, i) => (i === 15 ? "the token here" : `p${i}`)).join(
+      "\n",
+    );
+    const ctx = makeCtx({ files: [a], fileContents: { "note.md": body } });
+
+    const result = await executeVaultTool(
+      tc("search_content", { query: "token", contextLines: 999 }),
+      ctx,
+    );
+
+    // Clamped to 5: lines 11..21 (p10..p20 around match at line 16) — not the whole note.
+    expect(result.content).toContain("> 16: the token here");
+    expect(result.content).toContain("p10");
+    expect(result.content).not.toContain("p9");
   });
 });
 

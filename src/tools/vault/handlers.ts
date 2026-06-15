@@ -43,6 +43,8 @@ export async function executeVaultTool(
       return executeDirectoryTree(toolCall.arguments, ctx);
     case "search_files":
       return executeSearchFiles(toolCall.arguments, ctx);
+    case "search_content":
+      return executeSearchContent(toolCall.arguments, ctx);
     case "get_backlinks":
       return executeGetBacklinks(toolCall.arguments, ctx);
     case "find_notes_by_tag":
@@ -259,6 +261,198 @@ function globToRegex(pattern: string): RegExp {
   const escaped = pattern.replace(/[.+^${}()|[\]\\]/g, "\\$&");
   const regexStr = escaped.replace(/\*/g, ".*").replace(/\?/g, ".");
   return new RegExp(`^${regexStr}$`, "i");
+}
+
+/** Cap matches shown by search_content so a broad pattern can't flood context. */
+const MAX_CONTENT_HITS = 50;
+/** Window (chars) kept around a match when the matching line is long. */
+const SNIPPET_WINDOW = 120;
+/** Upper bound on the contextLines argument, so one hit can't pull in a whole note. */
+const MAX_CONTEXT_LINES = 5;
+
+async function executeSearchContent(
+  args: Record<string, unknown>,
+  ctx: VaultToolContext,
+): Promise<ToolResult> {
+  const query = typeof args.query === "string" ? args.query.trim() : "";
+  if (!query) {
+    return { content: "Error: query is required.", isReadOnly: true, isError: true };
+  }
+
+  const useRegex = args.regex === true;
+  const caseSensitive = args.caseSensitive === true;
+  const contextLines =
+    typeof args.contextLines === "number" && Number.isFinite(args.contextLines)
+      ? Math.min(MAX_CONTEXT_LINES, Math.max(0, Math.floor(args.contextLines)))
+      : 0;
+  const rawPath = typeof args.path === "string" ? args.path.trim() : "";
+  const scopePath = rawPath ? normalizePath(rawPath) : "";
+  const excludePatterns = Array.isArray(args.excludePatterns)
+    ? (args.excludePatterns as unknown[]).filter((p): p is string => typeof p === "string")
+    : [];
+  const excludeRegexes = excludePatterns.map(globToRegex);
+
+  // Build the per-line matcher. Regex is opt-in and validated up front so a
+  // malformed pattern is a correctable error, not a thrown scan. No `g` flag,
+  // so each exec() searches the line from the start — first match per line.
+  let matcher: (line: string) => number;
+  if (useRegex) {
+    let rx: RegExp;
+    try {
+      rx = new RegExp(query, caseSensitive ? "" : "i");
+    } catch (e) {
+      const reason = e instanceof Error ? e.message : "invalid pattern";
+      return {
+        content: `Error: invalid regex "${query}": ${reason}. Fix the pattern or set regex to false.`,
+        isReadOnly: true,
+        isError: true,
+      };
+    }
+    matcher = (line) => {
+      const m = rx.exec(line);
+      return m ? m.index : -1;
+    };
+  } else {
+    const needle = caseSensitive ? query : query.toLowerCase();
+    matcher = (line) => (caseSensitive ? line : line.toLowerCase()).indexOf(needle);
+  }
+
+  // Collect snippets up to the display cap, but keep counting *every* match so
+  // the model gets an honest "showing N of M" when the result set overflows —
+  // the signal it needs to decide whether to narrow or just read what it got.
+  const blocks: string[] = [];
+  let totalMatches = 0;
+  let shownMatches = 0;
+
+  for (const file of ctx.app.vault.getMarkdownFiles()) {
+    if (scopePath && !file.path.startsWith(scopePath + "/") && file.path !== scopePath) {
+      continue;
+    }
+    if (excludeRegexes.some((rx) => rx.test(file.name) || rx.test(file.path))) continue;
+
+    // cachedRead keeps the scan off the user's edit hot path.
+    const content = await ctx.app.vault.cachedRead(file);
+    const lines = content.split("\n");
+
+    const fileMatches: { line: number; col: number }[] = [];
+    for (let i = 0; i < lines.length; i++) {
+      const idx = matcher(lines[i]);
+      if (idx < 0) continue;
+      totalMatches++;
+      if (shownMatches < MAX_CONTENT_HITS) {
+        fileMatches.push({ line: i, col: idx });
+        shownMatches++;
+      }
+    }
+
+    if (fileMatches.length > 0) {
+      blocks.push(renderFileMatches(file.path, lines, fileMatches, contextLines));
+    }
+  }
+
+  if (totalMatches === 0) {
+    const scope = rawPath ? ` in "${rawPath}"` : "";
+    return {
+      content: `No matches found for ${useRegex ? "pattern" : "text"} "${query}"${scope}.`,
+      isReadOnly: true,
+    };
+  }
+
+  const truncated = totalMatches > shownMatches;
+  const kind = useRegex ? "pattern" : "text";
+  const header = truncated
+    ? `Matches for ${kind} "${query}" — showing first ${shownMatches} of ${totalMatches}:`
+    : `Matches for ${kind} "${query}" (${totalMatches}):`;
+  const footer = truncated
+    ? `\n\n[Showing ${shownMatches} of ${totalMatches} matches — narrow the query or scope with path to see the rest.]`
+    : "";
+  const joiner = contextLines > 0 ? "\n\n" : "\n";
+  return { content: `${header}\n${blocks.join(joiner)}${footer}`, isReadOnly: true };
+}
+
+/**
+ * Render one file's matches. With no context, each match is a single
+ * `path:line: snippet` line (grep default). With contextLines > 0, surrounding
+ * lines are shown — and overlapping windows are merged into one hunk per file,
+ * so a model gets the sentence before/after without a follow-up read_file and
+ * shared context is never printed twice.
+ */
+function renderFileMatches(
+  path: string,
+  lines: string[],
+  matches: { line: number; col: number }[],
+  contextLines: number,
+): string {
+  if (contextLines === 0) {
+    return matches
+      .map((m) => `${path}:${m.line + 1}: ${makeSnippet(lines[m.line], m.col)}`)
+      .join("\n");
+  }
+
+  const colByLine = new Map(matches.map((m) => [m.line, m.col]));
+  const ranges = mergeContextRanges(matches.map((m) => m.line), lines.length, contextLines);
+
+  const hunks = ranges.map(([start, end]) => {
+    const rendered: string[] = [];
+    for (let i = start; i <= end; i++) {
+      const col = colByLine.get(i);
+      const isMatch = col !== undefined;
+      const text = isMatch ? makeSnippet(lines[i], col) : clipLine(lines[i]);
+      rendered.push(`${isMatch ? ">" : " "} ${i + 1}: ${text}`);
+    }
+    return rendered.join("\n");
+  });
+
+  return `[${path}]\n${hunks.join("\n  --\n")}`;
+}
+
+/**
+ * Expand each match into a [start, end] line window and merge overlapping or
+ * adjacent windows, so shared context is never printed twice.
+ */
+function mergeContextRanges(
+  matchLines: number[],
+  totalLines: number,
+  context: number,
+): [number, number][] {
+  const sorted = [...matchLines].sort((a, b) => a - b);
+  const ranges: [number, number][] = [];
+  for (const ln of sorted) {
+    const start = Math.max(0, ln - context);
+    const end = Math.min(totalLines - 1, ln + context);
+    const last = ranges[ranges.length - 1];
+    if (last && start <= last[1] + 1) {
+      last[1] = Math.max(last[1], end);
+    } else {
+      ranges.push([start, end]);
+    }
+  }
+  return ranges;
+}
+
+/**
+ * Trim a matching line to a readable snippet, windowing around the match when
+ * the line is long so a hit never dumps a whole paragraph into context.
+ */
+function makeSnippet(line: string, matchIndex: number): string {
+  const trimmed = line.trim();
+  if (trimmed.length <= SNIPPET_WINDOW * 2) return trimmed;
+
+  // Re-locate the match within the trimmed line to window around it.
+  const leadingWs = line.length - line.trimStart().length;
+  const idxInTrimmed = Math.max(0, matchIndex - leadingWs);
+  const start = Math.max(0, idxInTrimmed - SNIPPET_WINDOW);
+  const end = Math.min(trimmed.length, idxInTrimmed + SNIPPET_WINDOW);
+  const prefix = start > 0 ? "…" : "";
+  const suffix = end < trimmed.length ? "…" : "";
+  return `${prefix}${trimmed.slice(start, end)}${suffix}`;
+}
+
+/** Trim a context line and cap its length so a long paragraph stays bounded. */
+function clipLine(line: string): string {
+  const trimmed = line.trim();
+  const max = SNIPPET_WINDOW * 2;
+  return trimmed.length <= max ? trimmed : `${trimmed.slice(0, max)}…`;
 }
 
 async function executeGetBacklinks(

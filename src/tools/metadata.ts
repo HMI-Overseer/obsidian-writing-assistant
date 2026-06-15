@@ -14,6 +14,7 @@ export const TOOL_ICONS: Record<string, string> = {
   list_directory: "folder",
   directory_tree: "folder-tree",
   search_files: "file-search",
+  search_content: "text-search",
   get_backlinks: "link",
   find_notes_by_tag: "tag",
   get_frontmatter: "file-code",
@@ -33,6 +34,7 @@ export const TOOL_LABELS: Record<string, string> = {
   list_directory: "Listed folder",
   directory_tree: "Explored tree",
   search_files: "Searched files",
+  search_content: "Searched content",
   get_backlinks: "Found backlinks",
   find_notes_by_tag: "Found notes by tag",
   get_frontmatter: "Read frontmatter",
@@ -52,6 +54,7 @@ export const TOOL_STATUS_LABELS: Record<string, string> = {
   list_directory: "Listing folder...",
   directory_tree: "Exploring tree...",
   search_files: "Searching files...",
+  search_content: "Searching content...",
   get_backlinks: "Finding backlinks...",
   find_notes_by_tag: "Finding notes by tag...",
   get_frontmatter: "Reading frontmatter...",
@@ -75,6 +78,7 @@ export function extractToolInput(
     case "list_directory": return typeof args.path === "string" ? args.path : undefined;
     case "directory_tree": return typeof args.path === "string" ? args.path : undefined;
     case "search_files": return typeof args.pattern === "string" ? args.pattern : undefined;
+    case "search_content": return typeof args.query === "string" ? args.query : undefined;
     case "get_backlinks": return typeof args.path === "string" ? args.path : undefined;
     case "find_notes_by_tag": return typeof args.tag === "string" ? args.tag : undefined;
     case "get_frontmatter": return Array.isArray(args.paths) ? `${args.paths.length} note(s)` : undefined;

@@ -9,12 +9,17 @@ export const PROPOSE_EDIT_TOOL: CanonicalToolDefinition = {
   description:
     "Propose a targeted search-and-replace edit to the document. " +
     "The edit is shown to the user for review before being applied. " +
+    "The document must already contain the search text — for an empty or brand-new note, " +
+    "use write_file to set its initial content instead. " +
     "Use one call per distinct change — multiple changes require multiple propose_edit calls.",
   strategyHint:
     "targeted search/replace for prose changes. Requires exact text from the document — " +
-    "use read_file first if the document content is not already in context.",
+    "use read_file first if the document content is not already in context. " +
+    "For an empty document there is nothing to match; use write_file instead.",
   errorGuidance:
-    "If the search text was not found, re-read the document with read_file and match the exact text including whitespace.",
+    "If the search text was not found because the document is empty, switch to write_file to set " +
+    "its initial content. Otherwise re-read the document with read_file and match the exact text " +
+    "including whitespace.",
   parameters: {
     type: "object",
     properties: {

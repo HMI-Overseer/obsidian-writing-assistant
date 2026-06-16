@@ -51,6 +51,16 @@ export type VaultReviewCallbacks = {
   onApplied: (record: AppliedVaultOpRecord) => void;
   /** Every applied op was undone (clear the applied record). */
   onUndone: () => void;
+  /**
+   * An op reached a terminal user decision — `applied` (approved) or `declined`.
+   * Only the live in-loop mount sets this: it resolves the pending tool-result
+   * promise the model is blocked on (in-loop-tool-approval-blocking-flow). Fired
+   * only once an op's {@link VaultOpStatus} actually becomes terminal, so the tool
+   * result never asserts an outcome this view doesn't already hold. A failed apply
+   * leaves the op pending (retryable) and does NOT fire — the model stays blocked
+   * until the user retries or declines.
+   */
+  onOpResolved?: (opId: string, disposition: "applied" | "declined") => void;
 };
 
 export interface VaultReviewTimelineOptions {
@@ -359,6 +369,7 @@ export class VaultReviewTimelineView {
       this.mergeAppliedRecord(result.applied);
       this.opts.callbacks.onOpsChanged(this.opts.proposal);
       if (this.appliedRecord) this.opts.callbacks.onApplied(this.appliedRecord);
+      for (const r of toApply) this.opts.callbacks.onOpResolved?.(r.id, "applied");
     } catch (error) {
       new Notice(`Failed to apply vault operations: ${messageOf(error)}`);
     } finally {
@@ -374,6 +385,7 @@ export class VaultReviewTimelineView {
     op.status = "rejected";
     this.paint();
     this.opts.callbacks.onOpsChanged(this.opts.proposal);
+    this.opts.callbacks.onOpResolved?.(op.id, "declined");
   }
 
   private async undo(): Promise<void> {

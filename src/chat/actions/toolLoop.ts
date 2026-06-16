@@ -14,12 +14,19 @@ import { VAULT_OPS_TOOL_NAMES } from "../../tools/vault-ops/definition";
 import { executeVaultOpTool, buildPendingOverlay } from "../../tools/vault-ops/handlers";
 import { THINK_TOOL_NAME } from "../../tools/think/definition";
 import { extractToolInput } from "../../tools/metadata";
+import type { LiveVaultReview } from "./liveVaultReview";
 
 export type { VaultToolContext, ToolExecutionContext };
 
-/** Context for in-loop vault-op execution; the overlay is rebuilt per round. */
+/**
+ * Context for in-loop vault-op execution. When `liveReview` is present, `ask`-gated
+ * ops suspend the loop until the user approves/declines and the tool result carries
+ * the real disposition (in-loop-tool-approval-blocking-flow). Without it the loop
+ * falls back to the legacy synchronous validate-only path.
+ */
 export interface VaultOpToolContext {
   app: App;
+  liveReview?: LiveVaultReview;
 }
 
 /** All tool names that execute inside the tool loop (results feed back to the model). */
@@ -238,63 +245,43 @@ export async function runToolLoop(
       toolCalls: loopCalls.map((tc) => ({ id: tc.id, name: tc.name, arguments: tc.arguments })),
     });
 
-    // Overlay built once per round from prior rounds' vault ops.
-    const vaultOpOverlay =
-      vaultOpToolContext && vaultOpCalls.length > 0
-        ? buildPendingOverlay(vaultOpToolContext.app, priorVaultOpCalls)
-        : null;
-
-    // Execute all tools in parallel.
-    const results = await Promise.all([
-      ...vaultCalls.map(async (tc) => {
-        callbacks.onToolStatus?.(tc.name);
-        if (!vaultToolContext) {
-          return {
-            tc,
-            result: { content: "Vault tool context unavailable.", isReadOnly: true, isError: true },
-          };
-        }
-        return { tc, result: await executeVaultTool(tc, vaultToolContext) };
-      }),
-      ...editCalls.map(async (tc) => {
-        callbacks.onToolStatus?.(tc.name);
-        if (!editToolContext) {
-          return {
-            tc,
-            result: { content: "Edit tool context unavailable.", isReadOnly: false, isError: true },
-          };
-        }
-        return { tc, result: await executeEditTool(tc, editToolContext) };
-      }),
-      ...vaultOpCalls.map((tc) => {
-        callbacks.onToolStatus?.(tc.name);
-        if (!vaultOpToolContext || !vaultOpOverlay) {
-          const result: ToolResult = {
-            content: "Vault operation context unavailable.",
-            isReadOnly: false,
-            isError: true,
-          };
-          return { tc, result };
-        }
-        const result = executeVaultOpTool(tc, {
-          app: vaultOpToolContext.app,
-          overlay: vaultOpOverlay,
-        });
-        return { tc, result };
-      }),
-      // think is a no-op: returns empty content so the model continues reasoning.
-      ...thinkCalls.map((tc) => ({
-        tc,
-        result: { content: "", isReadOnly: true as const },
-      })),
+    // Read-only / edit / think tools and the (possibly suspending) vault ops run
+    // concurrently. Vault-op steps are recorded BEFORE resolving so their timeline
+    // rows (with data-tool-call-id) exist for the live review to decorate with
+    // approve/decline; the review may then block this round until the user decides.
+    const [otherResults, vaultOpResults] = await Promise.all([
+      Promise.all([
+        ...vaultCalls.map(async (tc) => {
+          callbacks.onToolStatus?.(tc.name);
+          if (!vaultToolContext) {
+            return {
+              tc,
+              result: { content: "Vault tool context unavailable.", isReadOnly: true, isError: true },
+            };
+          }
+          return { tc, result: await executeVaultTool(tc, vaultToolContext) };
+        }),
+        ...editCalls.map(async (tc) => {
+          callbacks.onToolStatus?.(tc.name);
+          if (!editToolContext) {
+            return {
+              tc,
+              result: { content: "Edit tool context unavailable.", isReadOnly: false, isError: true },
+            };
+          }
+          return { tc, result: await executeEditTool(tc, editToolContext) };
+        }),
+        // think is a no-op: returns empty content so the model continues reasoning.
+        ...thinkCalls.map((tc) => ({
+          tc,
+          result: { content: "", isReadOnly: true as const } as ToolResult,
+        })),
+      ]),
+      resolveVaultOps(),
     ]);
 
-    for (const { tc, result } of results) {
-      toolLoopTurns.push({
-        role: "tool",
-        content: result.content,
-        toolCallId: tc.id,
-      });
+    for (const { tc, result } of otherResults) {
+      toolLoopTurns.push({ role: "tool", content: result.content, toolCallId: tc.id });
       callbacks.onStepRecorded?.({
         type: "tool_call",
         round,
@@ -304,9 +291,53 @@ export async function runToolLoop(
         toolArgs: tc.arguments,
       });
     }
+    // Vault-op steps were already recorded before resolution — push results only.
+    for (const { tc, result } of vaultOpResults) {
+      toolLoopTurns.push({ role: "tool", content: result.content, toolCallId: tc.id });
+    }
 
     previousRoundsText = fullText;
     callbacks.onNewRound?.();
+
+    /**
+     * Resolve this round's vault-op calls. Records each op's timeline step first,
+     * then routes to the live review (suspends on `ask` ops, returns real
+     * dispositions) or the legacy synchronous validate-only fallback.
+     */
+    async function resolveVaultOps(): Promise<Array<{ tc: ToolCall; result: ToolResult }>> {
+      if (vaultOpCalls.length === 0) return [];
+      for (const tc of vaultOpCalls) {
+        callbacks.onToolStatus?.(tc.name);
+        callbacks.onStepRecorded?.({
+          type: "tool_call",
+          round,
+          toolName: tc.name,
+          toolCallId: tc.id,
+          toolInput: extractToolInput(tc),
+          toolArgs: tc.arguments,
+        });
+      }
+      if (vaultOpToolContext?.liveReview) {
+        return vaultOpToolContext.liveReview.resolveRound(vaultOpCalls, stopReason === "max_tokens");
+      }
+      // Fallback: no live review — validate only (overlay seeded from prior rounds).
+      const overlay = vaultOpToolContext
+        ? buildPendingOverlay(vaultOpToolContext.app, priorVaultOpCalls)
+        : null;
+      return vaultOpCalls.map((tc) => {
+        if (!vaultOpToolContext || !overlay) {
+          return {
+            tc,
+            result: {
+              content: "Vault operation context unavailable.",
+              isReadOnly: false,
+              isError: true,
+            } as ToolResult,
+          };
+        }
+        return { tc, result: executeVaultOpTool(tc, { app: vaultOpToolContext.app, overlay }) };
+      });
+    }
   }
 
   return {

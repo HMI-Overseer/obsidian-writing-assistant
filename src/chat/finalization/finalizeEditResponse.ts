@@ -19,6 +19,7 @@ import { diskState, diskFingerprint, readContentOrNull } from "../../vault-ops/a
 import { resolveGate, type VaultOpPolicy } from "../../vault-ops/gateway";
 import { summarizeOp } from "../../vault-ops/summary";
 import type {
+  AppliedVaultOpRecord,
   ReviewableVaultOp,
   VaultOperationProposal,
 } from "../../vault-ops/types";
@@ -56,6 +57,15 @@ export interface FinalizeEditOptions {
   agenticSteps?: AgenticStep[];
   /** True when generation stopped for max_tokens — arms the write_file truncation guard. */
   stoppedForMaxTokens?: boolean;
+  /**
+   * A vault-op proposal already built and (partly) resolved in-loop by
+   * {@link LiveVaultReview} (in-loop-tool-approval-blocking-flow). When present,
+   * finalization persists it as-is instead of re-deriving one — the gate is
+   * already resolved and ops are already applied/declined, so no re-apply happens.
+   */
+  prebuiltVaultOpProposal?: VaultOperationProposal;
+  /** The applied record (auto + approved ops) for {@link prebuiltVaultOpProposal}. */
+  prebuiltVaultOpRecord?: AppliedVaultOpRecord;
 }
 
 /**
@@ -75,6 +85,7 @@ export async function finalizeEditResponse(options: FinalizeEditOptions): Promis
   const {
     app, owner, store, transcript, bubble, renderer, plugin, modelId, provider, usage,
     toolCalls, agenticSteps, stoppedForMaxTokens,
+    prebuiltVaultOpProposal, prebuiltVaultOpRecord,
   } = options;
 
   const fullResponse = renderer.getFullResponse();
@@ -108,8 +119,15 @@ export async function finalizeEditResponse(options: FinalizeEditOptions): Promis
   // --- Vault-op channel: builds a proposal with no active file required. ---
   // The prose belongs to the edit panel when both channels fire (so it never shows
   // twice); otherwise the vault-op panel renders it.
+  //
+  // A prebuilt proposal from the in-loop review (LiveVaultReview) is persisted
+  // as-is: its gate is already resolved and its ops already applied/declined, so we
+  // must NOT re-derive or re-apply. We only graft the turn's prose onto it.
   let vaultOpProposal: VaultOperationProposal | null = null;
-  if (vaultOpCalls.length > 0) {
+  if (prebuiltVaultOpProposal) {
+    vaultOpProposal = prebuiltVaultOpProposal;
+    if (!editProposal && prose && !vaultOpProposal.prose) vaultOpProposal.prose = prose;
+  } else if (vaultOpCalls.length > 0) {
     vaultOpProposal = await buildVaultOpProposal(
       app,
       vaultOpCalls,
@@ -132,6 +150,7 @@ export async function finalizeEditResponse(options: FinalizeEditOptions): Promis
   const assistantMessage = makeMessage("assistant", fullResponse);
   if (editProposal) assistantMessage.editProposal = editProposal;
   if (vaultOpProposal) assistantMessage.vaultOpProposal = vaultOpProposal;
+  if (prebuiltVaultOpRecord) assistantMessage.appliedVaultOps = prebuiltVaultOpRecord;
   if (hasToolCalls) assistantMessage.toolCalls = toolCalls;
   if (agenticSteps?.length) assistantMessage.agenticSteps = agenticSteps;
   attachUsageToMessage(assistantMessage, modelId, provider, usage);
@@ -139,8 +158,12 @@ export async function finalizeEditResponse(options: FinalizeEditOptions): Promis
   store.setLastAssistantResponse(fullResponse);
   transcript.registerBubble(assistantMessage.id, bubble);
 
-  // Render the review panel(s). Fresh finalization auto-applies auto-gated vault ops.
-  renderProposalPanels(app, owner, store, bubble, assistantMessage, { autoApplyVaultOps: true });
+  // Render the review panel(s). A prebuilt (in-loop) proposal is already resolved
+  // and applied, so don't auto-apply again; a freshly-derived proposal auto-applies
+  // its auto-gated ops on mount.
+  renderProposalPanels(app, owner, store, bubble, assistantMessage, {
+    autoApplyVaultOps: !prebuiltVaultOpProposal,
+  });
 }
 
 /**

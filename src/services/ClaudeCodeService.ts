@@ -24,6 +24,7 @@ import { executeEditTool } from "../tools/editing/handlers";
 import { allowedVaultOpsTools, VAULT_OPS_TOOL_NAMES } from "../tools/vault-ops/definition";
 import { executeVaultOpTool, buildPendingOverlay } from "../tools/vault-ops/handlers";
 import { VaultMcpServer, type McpServerHandle, type McpToolProvider } from "../mcp/VaultMcpServer";
+import type { LiveVaultReview } from "../chat/actions/liveVaultReview";
 import { generateId } from "../utils";
 
 /** Result of probing the local `claude` binary for the settings panel. */
@@ -105,6 +106,10 @@ export class ClaudeCodeService {
   /** Per-run sink for tool-lifecycle events. The chat UI serializes generation
    *  (one run at a time), so a single listener slot is sufficient. */
   private toolListener: ((event: ClaudeCodeToolEvent) => void) | null = null;
+  /** Per-run in-loop review coordinator. When set, vault-op calls suspend on the
+   *  user's approve/decline and return the real disposition rather than collecting
+   *  for a post-run panel (in-loop-tool-approval-blocking-flow). */
+  private liveReview: LiveVaultReview | null = null;
 
   constructor(
     private readonly app: App,
@@ -273,6 +278,15 @@ export class ClaudeCodeService {
     this.toolListener = listener;
   }
 
+  /**
+   * Registers (or clears, with null) the in-loop vault-op review for the current
+   * run. Set just before generation starts and cleared in its `finally` so a
+   * coordinator never leaks across runs.
+   */
+  setLiveReview(review: LiveVaultReview | null): void {
+    this.liveReview = review;
+  }
+
   /** Returns and clears the edit-tool calls Claude Code made during the last run. */
   takeCollectedEdits(): ToolCall[] {
     const edits = this.collectedEdits;
@@ -397,9 +411,15 @@ export class ClaudeCodeService {
       if (!this.collectingEdits) {
         return { content: `Vault operations are not available in this mode: ${call.name}`, isReadOnly: false, isError: true };
       }
-      // Validate against disk overlaid with this run's prior vault ops,
-      // so a later move_file sees an earlier write_file. Nothing touches disk here
-      // — the collected calls build the review panel's proposal after the run.
+      // Live in-loop review: suspend on an `ask` op until the user approves or
+      // declines, returning the real disposition as this call's result. The SDK
+      // runs `permissionMode="dontAsk"`, so the plugin owns permission here.
+      if (this.liveReview) {
+        return this.liveReview.resolveOne(call, toolCallId);
+      }
+      // Fallback (no live review wired): validate against disk overlaid with this
+      // run's prior vault ops so a later move_file sees an earlier write_file.
+      // Nothing touches disk; the collected calls build a post-run review panel.
       const overlay = buildPendingOverlay(this.app, this.collectedVaultOps);
       const result = executeVaultOpTool(call, { app: this.app, overlay });
       if (!result.isError) {

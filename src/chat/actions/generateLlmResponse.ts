@@ -20,6 +20,7 @@ import type { UsageResult } from "../../api/usageTypes";
 import type { MessageUsage } from "../../shared/types";
 import { runToolLoop } from "./toolLoop";
 import type { VaultToolContext, ToolExecutionContext, VaultOpToolContext } from "./toolLoop";
+import { LiveVaultReview } from "./liveVaultReview";
 import { AgenticTimeline } from "../messages/AgenticTimeline";
 import { extractToolInput } from "../../tools/metadata";
 import { CONTEXT_DANGER_THRESHOLD } from "../../constants";
@@ -187,12 +188,24 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
       ? { app: plugin.app, filePath: apiMessages.documentContext?.filePath ?? "" }
       : undefined;
 
-  // Vault ops operate on arbitrary paths, so they need only the app; the loop
-  // rebuilds the pending overlay per round.
-  const vaultOpToolContext: VaultOpToolContext = { app: plugin.app };
+  // The in-loop review coordinator: owns the live vault-op proposal, mounts the
+  // review on the streaming timeline, applies auto ops, and suspends the loop on
+  // ask-gated ops until the user decides (in-loop-tool-approval-blocking-flow).
+  const liveReview = new LiveVaultReview({
+    app: plugin.app,
+    timelineEl: assistantBubble.timelineEl,
+    policy: plugin.settings.vaultOpPolicy,
+  });
+
+  // Vault ops operate on arbitrary paths, so they need only the app + the live
+  // review; the coordinator rebuilds the pending overlay per round.
+  const vaultOpToolContext: VaultOpToolContext = { app: plugin.app, liveReview };
 
   const abortController = new AbortController();
   setActiveAbortController(abortController);
+  // Abort (stop button, or a new user turn superseding this one) must resolve any
+  // op parked on the user, or a suspended loop would hang forever on the await.
+  abortController.signal.addEventListener("abort", () => liveReview.cancelPending());
 
   const editRenderer = renderer instanceof EditStreamingRenderer ? renderer : null;
   const chatRenderer = renderer instanceof StreamingRenderer ? renderer : null;
@@ -210,6 +223,7 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
     // tool loop — route those lifecycle events into the same timeline, created on
     // first use so tool-less turns stay clean.
     if (claudeCodeAgentic) {
+      plugin.services.claudeCode.setLiveReview(liveReview);
       plugin.services.claudeCode.setToolListener((event) => {
         const tl = timeline ?? (timeline = new AgenticTimeline(assistantBubble.timelineEl));
         if (event.phase === "start") {
@@ -308,6 +322,8 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
         toolCalls: effectiveWriteToolCalls,
         agenticSteps,
         stoppedForMaxTokens: writeStopReason === "max_tokens",
+        prebuiltVaultOpProposal: liveReview.getProposal() ?? undefined,
+        prebuiltVaultOpRecord: liveReview.getAppliedRecord() ?? undefined,
       });
     } else if (finalization.kind === "replace") {
       const response = chatRenderer?.getCurrentRoundResponse() ?? "";
@@ -358,6 +374,8 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
           modelId: activeModel.modelId,
           provider: activeModel.provider,
           agenticSteps: partialSteps,
+          prebuiltVaultOpProposal: liveReview.getProposal() ?? undefined,
+          prebuiltVaultOpRecord: liveReview.getAppliedRecord() ?? undefined,
         });
       } else if (finalization.kind === "replace") {
         const response = chatRenderer?.getCurrentRoundResponse() ?? "";
@@ -401,6 +419,9 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
     }
   } finally {
     plugin.services.claudeCode.setToolListener(null);
+    plugin.services.claudeCode.setLiveReview(null);
+    // Resolve any op still parked on the user so no await leaks past the turn.
+    liveReview.cancelPending();
     setActiveAbortController(null);
     await store.persistActiveConversation();
     setIsGenerating(false);

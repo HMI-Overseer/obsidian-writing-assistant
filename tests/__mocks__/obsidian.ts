@@ -8,6 +8,7 @@ export class PluginSettingTab {}
 export class ItemView {
   contentEl = document.createElement("div");
 }
+export class MarkdownView {}
 export class Modal {}
 export class Component {}
 export class Notice {}

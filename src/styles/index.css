@@ -23,6 +23,7 @@
 @import "../chat/messages/DiffHunkView.css";
 @import "../chat/messages/DiffReviewPanel.css";
 @import "../chat/messages/vaultReviewTimeline.css";
+@import "../editing/inlineDiff/inlineDiff.css";
 
 /* Settings — tokens first, then layout + components */
 @import "../settings/tokens.css";

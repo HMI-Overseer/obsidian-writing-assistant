@@ -28,6 +28,8 @@ import { DEFAULT_VAULT_OP_POLICY, type Gate, type VaultOpPolicy } from "./vault-
 import { ChatView } from "./chat";
 import { BUILTIN_COMMAND_CATEGORIES, expandCommandTemplate } from "./commands";
 import { getActiveNoteText } from "./context/noteContext";
+import { InlineDiffManager } from "./editing/inlineDiff/InlineDiffManager";
+import { inlineDiffExtension } from "./editing/inlineDiff/inlineDiffState";
 import { normalizeChatHistory } from "./chat/conversation/conversationUtils";
 import { normalizeCompletionModel, normalizeEmbeddingModel } from "./shared/normalizeModels";
 import { WritingAssistantSettingTab } from "./settings/SettingsTab";
@@ -202,6 +204,7 @@ function normalizeActiveProfileIds(raw: unknown): Record<ProviderOption, string>
 export default class WritingAssistantChat extends Plugin {
   settings!: PluginSettings;
   services!: ServiceContainer;
+  inlineDiff!: InlineDiffManager;
 
   async onload(): Promise<void> {
     await this.loadSettings();
@@ -209,6 +212,12 @@ export default class WritingAssistantChat extends Plugin {
       this.manifest.dir ?? `${this.app.vault.configDir}/plugins/${this.manifest.id}`;
     this.services = new ServiceContainer(this.app, () => this.settings, pluginDir);
     await this.services.initialize();
+
+    // In-note diff overlay: a CM6 extension renders pending edit proposals inline
+    // in the active editor, sharing the same EditReviewController as the chat panel.
+    this.inlineDiff = new InlineDiffManager(this.app);
+    this.registerEditorExtension(inlineDiffExtension);
+    for (const ref of this.inlineDiff.workspaceEvents()) this.registerEvent(ref);
 
     this.registerView(VIEW_TYPE_CHAT, (leaf: WorkspaceLeaf) => new ChatView(leaf, this));
 
@@ -312,6 +321,7 @@ export default class WritingAssistantChat extends Plugin {
   }
 
   onunload(): void {
+    this.inlineDiff.destroy();
     this.services.destroy();
     // Obsidian handles view cleanup automatically on plugin unload.
     // Detaching leaves here would reset their position on reload.

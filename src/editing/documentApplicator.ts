@@ -72,3 +72,59 @@ export async function applyHunksLive(
 
   return { preContent, postContent, appliedHunkIds: appliedIds, appliedOffsets };
 }
+
+export interface LiveUndoResult {
+  /** True when the replacement was found and reversed. */
+  undone: boolean;
+  /** The document content after reversal, or null when the undo could not be performed. */
+  restoredContent: string | null;
+}
+
+/**
+ * Reverse a single applied hunk: find the replacement text in the live document
+ * and restore the original matched text in its place.
+ *
+ * Re-anchors before mutating — prefers the tracked offset where the replacement
+ * was inserted (accurate even when identical text appears elsewhere), falling
+ * back to `indexOf`. Returns `undone: false` without modifying the file when the
+ * replacement can no longer be located (the document drifted past recovery).
+ *
+ * Uses `matchedText` (what was actually in the document) rather than `searchText`
+ * (what the model provided) — these differ on whitespace-normalized matches.
+ */
+export async function undoHunkLive(
+  app: App,
+  targetFilePath: string,
+  hunk: DiffHunk,
+  trackedOffset?: number
+): Promise<LiveUndoResult> {
+  const file = app.vault.getFileByPath(targetFilePath);
+  if (!file) return { undone: false, restoredContent: null };
+
+  const replaceText = hunk.resolvedEdit.editBlock.replaceText;
+  const originalText = hunk.resolvedEdit.matchedText;
+
+  let undone = false;
+  let restored: string | null = null;
+
+  await app.vault.process(file, (currentContent) => {
+    // Prefer the tracked offset for accuracy; fall back to indexOf.
+    let idx = -1;
+    if (
+      trackedOffset !== undefined &&
+      currentContent.slice(trackedOffset, trackedOffset + replaceText.length) === replaceText
+    ) {
+      idx = trackedOffset;
+    } else {
+      idx = currentContent.indexOf(replaceText);
+    }
+
+    if (idx === -1) return currentContent;
+
+    restored = currentContent.slice(0, idx) + originalText + currentContent.slice(idx + replaceText.length);
+    undone = true;
+    return restored;
+  });
+
+  return { undone, restoredContent: restored };
+}

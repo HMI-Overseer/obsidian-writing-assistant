@@ -27,7 +27,12 @@ import { generateId } from "../../utils";
 import { makeMessage } from "../conversation/conversationUtils";
 import type { ChatSessionStore } from "../conversation/ChatSessionStore";
 import type { ChatTranscript } from "../messages/ChatTranscript";
-import { DiffReviewPanel, type DiffPanelCallbacks } from "../messages/DiffReviewPanel";
+import { DiffReviewPanel } from "../messages/DiffReviewPanel";
+import {
+  EditReviewController,
+  type EditReviewCallbacks,
+} from "../../editing/EditReviewController";
+import type { InlineDiffManager } from "../../editing/inlineDiff/InlineDiffManager";
 import {
   VaultReviewTimelineView,
   type VaultReviewCallbacks,
@@ -161,7 +166,7 @@ export async function finalizeEditResponse(options: FinalizeEditOptions): Promis
   // Render the review panel(s). A prebuilt (in-loop) proposal is already resolved
   // and applied, so don't auto-apply again; a freshly-derived proposal auto-applies
   // its auto-gated ops on mount.
-  renderProposalPanels(app, owner, store, bubble, assistantMessage, {
+  renderProposalPanels(app, owner, store, bubble, assistantMessage, plugin.inlineDiff, {
     autoApplyVaultOps: !prebuiltVaultOpProposal,
   });
 }
@@ -302,6 +307,7 @@ export function renderProposalPanels(
   store: ChatSessionStore,
   bubble: BubbleRefs,
   message: ConversationMessage,
+  inlineDiff: InlineDiffManager,
   opts?: { autoApplyVaultOps?: boolean },
 ): void {
   bubble.contentEl.empty();
@@ -310,15 +316,17 @@ export function renderProposalPanels(
   // --- Body card: the edit panel (with its own prose), or — for a vault-only
   // turn — the vault proposal's prose, since its review lives in the timeline. ---
   if (message.editProposal) {
-    const editContainer = bubble.contentEl.createDiv();
-    new DiffReviewPanel(
-      editContainer,
+    // One controller owns the proposal's review; both the chat panel and the
+    // in-note overlay are pure views over it, routing every mutation through it.
+    const controller = new EditReviewController(
       app,
-      owner,
       message.editProposal,
       makeEditCallbacks(store, message.editProposal),
       message.appliedEdit,
     );
+    const editContainer = bubble.contentEl.createDiv();
+    new DiffReviewPanel(editContainer, app, owner, controller);
+    inlineDiff.attach(controller);
   } else if (message.vaultOpProposal?.prose) {
     renderProseInto(app, owner, bubble.contentEl, message.vaultOpProposal.prose);
   }
@@ -347,7 +355,7 @@ function renderProseInto(app: App, owner: Component, el: HTMLElement, prose: str
   });
 }
 
-function makeEditCallbacks(store: ChatSessionStore, proposal: EditProposal): DiffPanelCallbacks {
+function makeEditCallbacks(store: ChatSessionStore, proposal: EditProposal): EditReviewCallbacks {
   const find = (id: string) =>
     store.getSnapshot().messageHistory.find((m) => m.editProposal?.id === id);
   return {

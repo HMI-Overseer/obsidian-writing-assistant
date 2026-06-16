@@ -453,7 +453,14 @@ export class ChatView extends ItemView {
       if (message.editProposal || message.vaultOpProposal) {
         const bubble = this.transcript.getBubbleForMessage(message.id);
         if (bubble) {
-          renderProposalPanels(this.app, this, this.sessionStore, bubble, message);
+          renderProposalPanels(
+            this.app,
+            this,
+            this.sessionStore,
+            bubble,
+            message,
+            this.plugin.inlineDiff,
+          );
         }
       }
     }

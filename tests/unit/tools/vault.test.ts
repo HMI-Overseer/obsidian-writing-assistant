@@ -3,6 +3,9 @@ import { TFile, TFolder } from "obsidian";
 import { executeVaultTool } from "../../../src/tools/vault/handlers";
 import type { VaultToolContext } from "../../../src/tools/vault/handlers";
 import type { ToolCall } from "../../../src/tools/types";
+import { RagRetrievalError } from "../../../src/rag/ragService";
+import type { RagAvailability } from "../../../src/rag/ragService";
+import type { RagContextBlock } from "../../../src/shared/chatRequest";
 
 // ---------------------------------------------------------------------------
 // Mock builders
@@ -32,7 +35,8 @@ function makeCtx(overrides: {
   tags?: Record<string, number>;
   root?: TFolder;
   abstractFiles?: Record<string, TFile | TFolder>;
-  ragReady?: boolean;
+  ragAvailability?: RagAvailability;
+  ragRetrieve?: (query: string, activeFilePath?: string) => Promise<RagContextBlock[] | null>;
 }): VaultToolContext {
   const {
     files = [],
@@ -42,7 +46,8 @@ function makeCtx(overrides: {
     tags = {},
     root = makeFolder(""),
     abstractFiles = {},
-    ragReady = false,
+    ragAvailability = "no-backend",
+    ragRetrieve = () => Promise.resolve([]),
   } = overrides;
 
   const fileMap = new Map(files.map((f) => [f.path, f]));
@@ -64,8 +69,9 @@ function makeCtx(overrides: {
       },
     } as unknown as import("obsidian").App,
     ragService: {
-      isReady: vi.fn(() => ragReady),
-      retrieve: vi.fn(() => Promise.resolve([])),
+      isReady: vi.fn(() => ragAvailability === "ready"),
+      availability: vi.fn(() => ragAvailability),
+      retrieve: vi.fn(ragRetrieve),
     } as unknown as import("../../../src/rag/ragService").RagService,
   };
 }
@@ -616,6 +622,81 @@ describe("get_frontmatter", () => {
     const ctx = makeCtx({});
     const result = await executeVaultTool(tc("get_frontmatter", { paths: [] }), ctx);
     expect(result.isError).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// semantic_search
+// ---------------------------------------------------------------------------
+
+describe("semantic_search", () => {
+  test("returns error when query is missing", async () => {
+    const ctx = makeCtx({ ragAvailability: "ready" });
+    const result = await executeVaultTool(tc("semantic_search", {}), ctx);
+    expect(result.isError).toBe(true);
+    expect(result.content).toContain("Error:");
+  });
+
+  test("no embedding backend: errors and points at search_content, not 'build the index'", async () => {
+    const ctx = makeCtx({ ragAvailability: "no-backend" });
+    const result = await executeVaultTool(tc("semantic_search", { query: "test" }), ctx);
+
+    expect(result.isError).toBe(true);
+    expect(result.content).toContain("no embedding model is configured");
+    expect(result.content).toContain("search_content");
+    // Must NOT prescribe the impossible recovery for a pure cloud user.
+    expect(result.content).not.toContain("Build index");
+  });
+
+  test("configured but empty index: errors and nudges to build the index", async () => {
+    const ctx = makeCtx({ ragAvailability: "index-empty" });
+    const result = await executeVaultTool(tc("semantic_search", { query: "test" }), ctx);
+
+    expect(result.isError).toBe(true);
+    expect(result.content).toContain("Build index");
+    expect(result.content).toContain("search_content");
+  });
+
+  test("unreachable backend: surfaces a failure to run, NOT an empty vault", async () => {
+    const ctx = makeCtx({
+      ragAvailability: "ready",
+      ragRetrieve: () => Promise.reject(new RagRetrievalError("Embedding response contained no data.")),
+    });
+    const result = await executeVaultTool(tc("semantic_search", { query: "test" }), ctx);
+
+    expect(result.isError).toBe(true);
+    expect(result.content).toContain("unreachable");
+    // The defect this guards against: never report "no results" for a run that failed.
+    expect(result.content).not.toContain("No results found");
+  });
+
+  test("ready with no matches: reports empty result without erroring", async () => {
+    const ctx = makeCtx({ ragAvailability: "ready", ragRetrieve: () => Promise.resolve([]) });
+    const result = await executeVaultTool(tc("semantic_search", { query: "ghost" }), ctx);
+
+    expect(result.isError).toBeUndefined();
+    expect(result.content).toContain('No results found for query: "ghost"');
+  });
+
+  test("ready with matches: renders file paths, scores, and content", async () => {
+    const ctx = makeCtx({
+      ragAvailability: "ready",
+      ragRetrieve: () =>
+        Promise.resolve([
+          {
+            filePath: "Characters/Will.md",
+            headingPath: "Background",
+            content: "Will trained as a smith.",
+            score: 0.912,
+          },
+        ]),
+    });
+    const result = await executeVaultTool(tc("semantic_search", { query: "Will" }), ctx);
+
+    expect(result.isError).toBeUndefined();
+    expect(result.content).toContain("Characters/Will.md > Background");
+    expect(result.content).toContain("0.912");
+    expect(result.content).toContain("Will trained as a smith.");
   });
 });
 

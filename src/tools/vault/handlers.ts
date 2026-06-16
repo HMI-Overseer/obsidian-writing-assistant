@@ -10,8 +10,10 @@ interface ExtendedMetadataCache extends MetadataCache {
   getTags(): Record<string, number>;
 }
 import type { ToolCall, ToolResult } from "../types";
+import type { RagContextBlock } from "../../shared/chatRequest";
+import { RagRetrievalError } from "../../rag/ragService";
 import type { RagService } from "../../rag/ragService";
-import { VAULT_TOOL_NAMES } from "./definition";
+import { VAULT_TOOL_NAMES, SEMANTIC_SEARCH_UNAVAILABLE_MESSAGE } from "./definition";
 
 export interface VaultToolContext {
   app: App;
@@ -73,15 +75,34 @@ async function executeSearchVault(
     return { content: "Error: query is required.", isReadOnly: true, isError: true };
   }
 
-  if (!ctx.ragService.isReady()) {
+  // Branch the "can't run" cases on the exact reason, so the model is never told
+  // the vault is empty when search merely couldn't run, and never pointed at a
+  // recovery it can't perform (e.g. "build the index" for a no-backend user).
+  const availability = ctx.ragService.availability();
+  if (availability !== "ready") {
     return {
-      content: "Vault index is not available. The RAG index may not be built yet.",
+      content: SEMANTIC_SEARCH_UNAVAILABLE_MESSAGE[availability],
       isReadOnly: true,
       isError: true,
     };
   }
 
-  const results = await ctx.ragService.retrieve(query, ctx.activeFilePath);
+  let results: RagContextBlock[] | null;
+  try {
+    results = await ctx.ragService.retrieve(query, ctx.activeFilePath);
+  } catch (e) {
+    // A live backend that failed at call time — a failure to run, reported as such
+    // (isError) rather than laundered into "found nothing".
+    if (e instanceof RagRetrievalError) {
+      return {
+        content: SEMANTIC_SEARCH_UNAVAILABLE_MESSAGE.unreachable,
+        isReadOnly: true,
+        isError: true,
+      };
+    }
+    throw e;
+  }
+
   if (!results || results.length === 0) {
     return {
       content: `No results found for query: "${query}"`,

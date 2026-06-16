@@ -13,6 +13,31 @@ import { boostByGraphRelevance, annotateBlockWithGraph } from "./graph/retrieval
 
 const INDEX_FILE = "rag-index.json";
 
+/**
+ * Why semantic search can or cannot run, computed synchronously (no network probe):
+ * - `no-backend`  — no embedding model configured; there is no index and none can be built.
+ * - `index-empty` — a backend is configured but nothing has been indexed yet.
+ * - `ready`       — a backend is configured and an index is present.
+ *
+ * The fourth real state — a *live* backend that is currently unreachable — is not
+ * here, because it is only knowable by actually hitting it. It surfaces as a thrown
+ * {@link RagRetrievalError} from {@link RagService.retrieve}, not from this enum.
+ */
+export type RagAvailability = "ready" | "no-backend" | "index-empty";
+
+/**
+ * Thrown by {@link RagService.retrieve} when a backend is configured and an index
+ * exists, but the embedding request itself failed (model stopped/unloaded, endpoint
+ * down). This is a *failure to run*, deliberately distinct from an empty result set —
+ * callers must not treat it as "the vault has nothing."
+ */
+export class RagRetrievalError extends Error {
+  constructor(message = "Embedding request failed.") {
+    super(message);
+    this.name = "RagRetrievalError";
+  }
+}
+
 /** Create an EmbeddingClient for the given model. Shared by RagService and GraphService. */
 export function createEmbeddingClient(
   model: EmbeddingModel,
@@ -74,6 +99,18 @@ export class RagService {
   /** Whether the store has been set up (even if empty). */
   isConfigured(): boolean {
     return this.store !== null && this.retriever !== null;
+  }
+
+  /**
+   * Why semantic search can or cannot run right now, without a network probe.
+   * The single readiness signal both advertising routes (in-app tool list and the
+   * Claude Code MCP bridge) and the tool handler read from, so they cannot drift.
+   * Does not detect a configured-but-unreachable backend — see {@link RagRetrievalError}.
+   */
+  availability(): RagAvailability {
+    if (!this.isConfigured()) return "no-backend";
+    if (this.getChunkCount() === 0) return "index-empty";
+    return "ready";
   }
 
   getIndexingState(): IndexingState {
@@ -241,7 +278,9 @@ export class RagService {
 
   /**
    * Retrieve relevant context for a user query.
-   * Returns null if RAG is not ready, or an empty array on failure.
+   * Returns null if RAG is not ready or the query matched nothing. Throws
+   * {@link RagRetrievalError} when the embedding backend is unreachable — a
+   * failure to run, which callers must not confuse with an empty result.
    *
    * Applies two-layer filtering after retrieval:
    * 1. Score gap detection — cuts off results after a large relevance drop.
@@ -310,12 +349,15 @@ export class RagService {
       }
 
       return blocks;
-    } catch {
+    } catch (e) {
+      // Embedding/transport failure — NOT an empty vault. The Notice is the
+      // user's channel; the thrown error is the model's, so a tool result can
+      // say "could not run" instead of laundering it into "found nothing".
       if (!this.embeddingErrorShown) {
         new Notice("Could not reach embedding model. Skipping retrieval.");
         this.embeddingErrorShown = true;
       }
-      return null;
+      throw new RagRetrievalError(e instanceof Error ? e.message : undefined);
     }
   }
 

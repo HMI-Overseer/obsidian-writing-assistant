@@ -4,6 +4,12 @@ import {
   UPDATE_FRONTMATTER_TOOL,
   ALL_EDIT_TOOLS,
 } from "../../../src/tools/editing/definition";
+import {
+  ALL_VAULT_TOOLS,
+  CORE_VAULT_TOOLS,
+  filterSemanticSearchByAvailability,
+  SEMANTIC_SEARCH_UNAVAILABLE_MESSAGE,
+} from "../../../src/tools/vault/definition";
 import { toolCallsToEditBlocks } from "../../../src/tools/editing/conversion";
 import type { ToolCall } from "../../../src/tools/types";
 
@@ -34,6 +40,46 @@ describe("ALL_EDIT_TOOLS", () => {
     const names = ALL_EDIT_TOOLS.map((t) => t.name);
     expect(names).toContain("propose_edit");
     expect(names).toContain("update_frontmatter");
+  });
+});
+
+describe("filterSemanticSearchByAvailability", () => {
+  test("keeps semantic_search only when availability is 'ready'", () => {
+    const ready = filterSemanticSearchByAvailability(ALL_VAULT_TOOLS, "ready");
+    expect(ready.map((t) => t.name)).toContain("semantic_search");
+  });
+
+  test.each(["no-backend", "index-empty"] as const)(
+    "drops semantic_search when availability is '%s'",
+    (availability) => {
+      const filtered = filterSemanticSearchByAvailability(ALL_VAULT_TOOLS, availability);
+      expect(filtered.map((t) => t.name)).not.toContain("semantic_search");
+      // The lexical fallback must survive so the model still has a content search.
+      expect(filtered.map((t) => t.name)).toContain("search_content");
+    },
+  );
+
+  test("does not mutate the input array", () => {
+    const before = ALL_VAULT_TOOLS.length;
+    filterSemanticSearchByAvailability(ALL_VAULT_TOOLS, "no-backend");
+    expect(ALL_VAULT_TOOLS).toHaveLength(before);
+    expect(CORE_VAULT_TOOLS.map((t) => t.name)).toContain("semantic_search");
+  });
+});
+
+describe("SEMANTIC_SEARCH_UNAVAILABLE_MESSAGE", () => {
+  test("every reason points the model at the lexical fallback", () => {
+    for (const message of Object.values(SEMANTIC_SEARCH_UNAVAILABLE_MESSAGE)) {
+      expect(message).toContain("search_content");
+    }
+  });
+
+  test("no-backend does not prescribe building an index (the impossible recovery)", () => {
+    expect(SEMANTIC_SEARCH_UNAVAILABLE_MESSAGE["no-backend"]).not.toContain("Build index");
+  });
+
+  test("unreachable explicitly distinguishes a failure to run from an empty result", () => {
+    expect(SEMANTIC_SEARCH_UNAVAILABLE_MESSAGE.unreachable).toMatch(/failure to run/i);
   });
 });
 

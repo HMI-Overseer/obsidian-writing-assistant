@@ -13,7 +13,11 @@ import type { SessionConfig } from "../api/harnessSession";
 import { isCliVersionCompatible } from "../api/sdkVersionGuard";
 import type { RagService } from "../rag/ragService";
 import type { CanonicalToolDefinition, ToolCall, ToolResult } from "../tools/types";
-import { ALL_VAULT_TOOLS, VAULT_TOOL_NAMES } from "../tools/vault/definition";
+import {
+  ALL_VAULT_TOOLS,
+  VAULT_TOOL_NAMES,
+  filterSemanticSearchByAvailability,
+} from "../tools/vault/definition";
 import { executeVaultTool } from "../tools/vault/handlers";
 import { ALL_EDIT_TOOLS, EDIT_TOOL_NAMES } from "../tools/editing/definition";
 import { executeEditTool } from "../tools/editing/handlers";
@@ -321,14 +325,21 @@ export class ClaudeCodeService {
       // When collecting writes, advertise the full write surface alongside reads:
       // the edit channel plus the vault-op tools the policy leaves usable (deny
       // detaches a class, ADR-0003). Same catalogue the API providers receive.
-      listTools: (): CanonicalToolDefinition[] =>
-        this.collectingEdits
+      listTools: (): CanonicalToolDefinition[] => {
+        const tools = this.collectingEdits
           ? [
               ...ALL_VAULT_TOOLS,
               ...ALL_EDIT_TOOLS,
               ...allowedVaultOpsTools(this.getSettings().vaultOpPolicy),
             ]
-          : ALL_VAULT_TOOLS,
+          : [...ALL_VAULT_TOOLS];
+        // Gate semantic_search the same way the in-app path does, via the shared
+        // predicate — so a setup that can never embed a query (no backend / empty
+        // index) is not offered the tool over this route either. Previously the
+        // bridge shipped it unconditionally, which is where the silent failure came
+        // from (semantic-search-silent-embedding-failure.md §3-A).
+        return filterSemanticSearchByAvailability(tools, this.getRagService().availability());
+      },
       callTool: async (call: ToolCall): Promise<ToolResult> => {
         // Surface tool activity to the chat UI's timeline (Claude Code runs its
         // loop internally, so this MCP hook is the only place we see its calls).

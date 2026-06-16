@@ -5,7 +5,12 @@ import { resolveNoteImageContext } from "../../context/noteImageContext";
 import { shouldUseToolCall } from "../../tools/registry";
 import { ALL_EDIT_TOOLS, EDIT_TOOL_NAMES } from "../../tools/editing/definition";
 import { buildEditToolSystemPrompt } from "../../tools/editing/systemPrompt";
-import { ALL_VAULT_TOOLS, CORE_VAULT_TOOLS, VAULT_TOOL_NAMES } from "../../tools/vault/definition";
+import {
+  ALL_VAULT_TOOLS,
+  CORE_VAULT_TOOLS,
+  VAULT_TOOL_NAMES,
+  filterSemanticSearchByAvailability,
+} from "../../tools/vault/definition";
 import { allowedVaultOpsTools, VAULT_OPS_TOOL_NAMES } from "../../tools/vault-ops/definition";
 import { buildVaultOpToolSystemPrompt } from "../../tools/vault-ops/systemPrompt";
 import { THINK_TOOL } from "../../tools/think/definition";
@@ -172,7 +177,14 @@ export async function prepareApiMessages(
           rewrittenQuery = retrievalQuery;
         }
       }
-      ragContext = await ragService.retrieve(retrievalQuery, activeFilePath);
+      // Pre-injection is best-effort: if the embedding backend is unreachable,
+      // retrieve() throws. Degrade silently to no context here — the in-loop
+      // semantic_search tool is the surface that reports the failure to the model.
+      try {
+        ragContext = await ragService.retrieve(retrievalQuery, activeFilePath);
+      } catch {
+        ragContext = null;
+      }
     }
   }
 
@@ -213,11 +225,13 @@ export async function prepareApiMessages(
     tools = [...ALL_VAULT_TOOLS, ...(useThinkTool ? [THINK_TOOL] : [])];
   }
 
-  // semantic_search requires a built RAG index. Remove it when unavailable so
-  // the model is forced to use structural tools instead of burning rounds on
-  // guaranteed failures.
-  if (tools && !ragService?.isReady()) {
-    tools = tools.filter((t) => t.name !== "semantic_search");
+  // semantic_search can only run with a live embedding backend and a built index.
+  // Drop it otherwise so the model uses structural tools instead of burning rounds
+  // on guaranteed failures. Same predicate + helper the Claude Code MCP bridge uses,
+  // so the two advertising routes can't drift apart (the original defect).
+  if (tools) {
+    const availability = ragService?.availability() ?? "no-backend";
+    tools = filterSemanticSearchByAvailability(tools, availability);
   }
 
   // Build tool guidance from the filtered tool lists so the system prompt

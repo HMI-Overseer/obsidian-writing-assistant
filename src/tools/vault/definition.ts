@@ -1,4 +1,5 @@
 import type { CanonicalToolDefinition } from "../types";
+import type { RagAvailability } from "../../rag/ragService";
 
 export const READ_FILE_TOOL: CanonicalToolDefinition = {
   name: "read_file",
@@ -156,7 +157,11 @@ export const SEARCH_VAULT_TOOL: CanonicalToolDefinition = {
     "Use this when you need information from the vault that wasn't in the initial context, " +
     "or to follow up on references found in previous results.",
   strategyHint: "find notes by meaning when you know what you need but not where it lives",
-  errorGuidance: "Retry with a rephrased or more specific query. Never repeat the same query exactly.",
+  errorGuidance:
+    "If the result says semantic search could not run (no embedding backend, no index, or an " +
+    "unreachable model), do NOT rephrase or retry — follow that result's instructions, which means " +
+    "switching to search_content for an exact-string lookup. Only when it actually ran and returned " +
+    "no results should you retry once with a more specific query; never repeat the same query exactly.",
   parameters: {
     type: "object",
     properties: {
@@ -284,3 +289,62 @@ export const VAULT_TOOL_NAMES = new Set([
   "find_notes_by_tag",
   "get_frontmatter",
 ]);
+
+/**
+ * The ways `semantic_search` can be unavailable. Extends the static
+ * {@link RagAvailability} states (minus `ready`) with `unreachable` — a
+ * configured, indexed backend that fails at *call* time (model stopped/unloaded,
+ * endpoint down), which no synchronous check can see.
+ */
+export type SemanticSearchUnavailableReason =
+  | Exclude<RagAvailability, "ready">
+  | "unreachable";
+
+/**
+ * Model-facing message for each way `semantic_search` is unavailable — the contract
+ * the model reasons from and relays to the user. Each names, in order: (1) the exact
+ * condition that is true, (2) why it blocks semantic search, (3) what the user must do
+ * to fix it (with the literal Settings path), and (4) what to do right now instead.
+ * No hedging ("may", "might"): a failure to run is reported as a failure, never as an
+ * empty vault. Kept here so the handler and any future UI surface read one source.
+ * See docs/work/issues/semantic-search-silent-embedding-failure.md §6.
+ */
+export const SEMANTIC_SEARCH_UNAVAILABLE_MESSAGE: Record<
+  SemanticSearchUnavailableReason,
+  string
+> = {
+  "no-backend":
+    'Semantic search did not run: no embedding model is configured, so this vault has no ' +
+    "semantic index and one cannot be built. Semantic search needs an embedding model to turn " +
+    "notes into vectors; without one it is permanently unavailable, not merely empty. To enable " +
+    "it, add an embedding model under Settings → Embedding Model Profiles, then select it " +
+    "under Settings → Retrieval (RAG). For now, use search_content to find an exact word or " +
+    "phrase, and list_directory / read_file to navigate by structure.",
+  "index-empty":
+    "Semantic search did not run: an embedding model is configured, but the index has never been " +
+    "built, so there is nothing to search. This does NOT mean the vault is empty. Build it once " +
+    "with 'Build index' under Settings → Retrieval (RAG). Until that finishes, use " +
+    "search_content to find an exact word or phrase.",
+  unreachable:
+    "Semantic search did not run: the embedding model is configured and an index exists, but the " +
+    "embedding request failed — the model is unreachable (it may be stopped, unloaded, or the " +
+    "endpoint is down). This is a failure to run, NOT an empty result — do not conclude the " +
+    "vault lacks this content. Check that the embedding model is running and reachable to restore " +
+    "semantic search. Right now, use search_content for an exact-string lookup.",
+};
+
+/**
+ * Drop `semantic_search` from a tool list when the embedding backend cannot serve a
+ * query. Shared by both advertising routes — the in-app tool list
+ * ({@link ../../chat/finalization/prepareApiMessages}) and the Claude Code MCP bridge
+ * ({@link ../../services/ClaudeCodeService}) — so they cannot gate it differently and
+ * drift apart, which is the defect that produced the silent-failure symptom.
+ * See docs/work/issues/semantic-search-silent-embedding-failure.md §3-A/B, §4.
+ */
+export function filterSemanticSearchByAvailability(
+  tools: CanonicalToolDefinition[],
+  availability: RagAvailability,
+): CanonicalToolDefinition[] {
+  if (availability === "ready") return tools;
+  return tools.filter((t) => t.name !== "semantic_search");
+}

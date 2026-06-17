@@ -80,6 +80,16 @@ export class EditReviewController {
     if (this.appliedRecord) {
       return this.appliedRecord.appliedHunkIds.includes(hunkId) ? "applied" : "skipped";
     }
+    return this.liveHunkView(hunkId);
+  }
+
+  /**
+   * How a hunk renders from its live status alone, ignoring any applied record.
+   * The in-loop live panel uses this so a still-pending hunk stays interactive
+   * even after an earlier hunk in the same turn was applied (the record-first
+   * {@link initialHunkView} would lock it as skipped — correct only on restore).
+   */
+  liveHunkView(hunkId: string): InitialHunkView {
     const status = this.getStatus(hunkId);
     if (status === "accepted") return "applied";
     if (status === "rejected") return "skipped";

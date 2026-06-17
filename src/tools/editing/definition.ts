@@ -7,22 +7,31 @@ import type { CanonicalToolDefinition } from "../types";
 export const PROPOSE_EDIT_TOOL: CanonicalToolDefinition = {
   name: "propose_edit",
   description:
-    "Propose a targeted search-and-replace edit to the document. " +
+    "Propose a targeted search-and-replace edit to a note. " +
+    "Always pass `path` — the vault-relative path of the note to change (the one shown as the " +
+    "document to edit, or the path you read with read_file). " +
     "The edit is shown to the user for review before being applied. " +
-    "The document must already contain the search text — for an empty or brand-new note, " +
+    "The note must already contain the search text — for an empty or brand-new note, " +
     "use write_file to set its initial content instead. " +
-    "Use one call per distinct change — multiple changes require multiple propose_edit calls.",
+    "Use one call per distinct change; a single turn edits one file — edit other files in later turns.",
   strategyHint:
-    "targeted search/replace for prose changes. Requires exact text from the document — " +
-    "use read_file first if the document content is not already in context. " +
+    "targeted search/replace for prose changes in a specific note (`path`). Requires exact text " +
+    "from that note — use read_file first if its content is not already in context. " +
     "For an empty document there is nothing to match; use write_file instead.",
   errorGuidance:
+    "If `path` is missing or the file is not found, supply the correct vault-relative path. " +
     "If the search text was not found because the document is empty, switch to write_file to set " +
     "its initial content. Otherwise re-read the document with read_file and match the exact text " +
     "including whitespace.",
   parameters: {
     type: "object",
     properties: {
+      path: {
+        type: "string",
+        description:
+          "Vault-relative path of the note to edit (e.g. \"Lore/The Fold.md\"). " +
+          "Use the path of the document under edit or the file you read with read_file.",
+      },
       search: {
         type: "string",
         description:
@@ -43,23 +52,30 @@ export const PROPOSE_EDIT_TOOL: CanonicalToolDefinition = {
         description: "Brief explanation of what this edit does and why.",
       },
     },
-    required: ["search", "replace"],
+    required: ["path", "search", "replace"],
   },
 };
 
 export const UPDATE_FRONTMATTER_TOOL: CanonicalToolDefinition = {
   name: "update_frontmatter",
   description:
-    "Add, update, or remove YAML frontmatter properties. Put ALL changes into one call. " +
+    "Add, update, or remove YAML frontmatter properties of a note. Always pass `path` — the " +
+    "vault-relative path of the note to change. Put ALL changes into one call. " +
     "Each operation must use action 'set' or 'remove'. Skip properties you want to leave as-is. " +
     "If the document has no frontmatter, a new block will be created.",
   strategyHint:
-    "add, update, or remove YAML frontmatter properties. Batch all changes into a single call.",
+    "add, update, or remove YAML frontmatter properties of a specific note (`path`). Batch all changes into a single call.",
   errorGuidance:
+    "If `path` is missing or the file is not found, supply the correct vault-relative path. " +
     "If operations are invalid, check the key names and action values (must be 'set' or 'remove').",
   parameters: {
     type: "object",
     properties: {
+      path: {
+        type: "string",
+        description:
+          "Vault-relative path of the note whose frontmatter to edit (e.g. \"Lore/The Fold.md\").",
+      },
       operations: {
         type: "array",
         description: "List of frontmatter changes to apply. Include ALL changes in one call.",
@@ -88,7 +104,7 @@ export const UPDATE_FRONTMATTER_TOOL: CanonicalToolDefinition = {
         description: "Brief explanation of the change.",
       },
     },
-    required: ["operations"],
+    required: ["path", "operations"],
   },
 };
 

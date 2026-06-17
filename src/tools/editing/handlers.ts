@@ -1,4 +1,4 @@
-import type { App, TFile } from "obsidian";
+import { type App, type TFile, normalizePath } from "obsidian";
 import type { EditBlock } from "../../editing/editTypes";
 import type { ToolCall, ToolResult } from "../types";
 import { EDIT_TOOL_NAMES } from "./definition";
@@ -43,14 +43,15 @@ export async function executeEditTool(
 }
 
 /**
- * Resolve the target file for edit operations. Uses the pre-set filePath
- * from document context when available, otherwise falls back to the
- * currently active file in the workspace.
+ * Resolve the target file for edit operations from the tool call's `path`
+ * argument, falling back to the document-context path then the active file.
+ * The `path` is the model's explicit target (propose-edit-in-loop-blocking-review).
  */
-function resolveTargetFile(ctx: ToolExecutionContext) {
-  if (ctx.filePath) {
-    const file = ctx.app.vault.getFileByPath(ctx.filePath);
-    if (file) return { file, path: ctx.filePath };
+function resolveTargetFile(ctx: ToolExecutionContext, path?: string) {
+  const candidate = path || ctx.filePath;
+  if (candidate) {
+    const file = ctx.app.vault.getFileByPath(normalizePath(candidate));
+    if (file) return { file, path: file.path };
   }
   const active = ctx.app.workspace.getActiveFile();
   if (active) return { file: active, path: active.path };
@@ -71,10 +72,12 @@ async function executeProposeEdit(
     return { content: "search text must not be empty.", isReadOnly: false, isError: true };
   }
 
-  const target = resolveTargetFile(ctx);
+  const target = resolveTargetFile(ctx, v.args.path);
   if (!target) {
     return {
-      content: "No active document. Open the file you want to edit, or use read_file to inspect it first.",
+      content:
+        "No target note. Pass `path` (the vault-relative path of the note to edit), " +
+        "or open the file you want to edit.",
       isReadOnly: false,
       isError: true,
     };

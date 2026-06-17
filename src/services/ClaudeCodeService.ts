@@ -399,8 +399,19 @@ export class ClaudeCodeService {
       if (!this.collectingEdits) {
         return { content: `Editing is not available in this mode: ${call.name}`, isReadOnly: false, isError: true };
       }
-      // Validate + acknowledge now (so Claude Code can self-correct), and stash
-      // the call so the diff panel can render it after the run.
+      // Live in-loop review: suspend on the edit until the user accepts/declines and
+      // return the real disposition, mirroring vault ops (resolveEditOne). The diff
+      // proposal is built in-loop, so finalization persists it via getEditProposal();
+      // the collected call is only for the message's tool-call record.
+      if (this.liveReview) {
+        const result = await this.liveReview.resolveEditOne(call, toolCallId);
+        if (!result.isError) {
+          this.collectedEdits.push({ id: generateId(), name: call.name, arguments: call.arguments });
+        }
+        return result;
+      }
+      // Fallback (no live review wired): validate + acknowledge now (so Claude Code
+      // can self-correct), and stash the call so the diff panel renders after the run.
       const result = await executeEditTool(call, { app: this.app, filePath: this.editTargetPath });
       if (!result.isError) {
         this.collectedEdits.push({ id: generateId(), name: call.name, arguments: call.arguments });

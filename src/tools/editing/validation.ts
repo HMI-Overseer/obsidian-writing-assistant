@@ -27,6 +27,8 @@ function err(error: string): ValidationErr {
 // ---------------------------------------------------------------------------
 
 export interface ProposeEditArgs {
+  /** Vault-relative path of the note to edit. Required by the tool; enforced at execution. */
+  path?: string;
   search: string;
   replace: string;
   explanation?: string;
@@ -39,6 +41,8 @@ export interface FrontmatterOperation {
 }
 
 export interface UpdateFrontmatterArgs {
+  /** Vault-relative path of the note to edit. Required by the tool; enforced at execution. */
+  path?: string;
   operations: FrontmatterOperation[];
   explanation?: string;
 }
@@ -57,6 +61,7 @@ export function validateProposeEdit(
     return err("replace must be a string. Got: " + typeof args.replace);
   }
   return ok({
+    path: typeof args.path === "string" ? args.path : undefined,
     search: args.search,
     replace: typeof args.replace === "string" ? args.replace : "",
     explanation: typeof args.explanation === "string" ? args.explanation : undefined,
@@ -102,6 +107,7 @@ export function validateUpdateFrontmatter(
   }
 
   return ok({
+    path: typeof args.path === "string" ? args.path : undefined,
     operations: validated,
     explanation: typeof args.explanation === "string" ? args.explanation : undefined,
   });

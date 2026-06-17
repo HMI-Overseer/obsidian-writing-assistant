@@ -29,6 +29,13 @@ export interface VaultOpPolicy {
   move: Gate;
   trash: Gate;
   createDir: Gate;
+  /**
+   * In-document edits (`propose_edit` and `update_frontmatter`). Edits are vault
+   * ops too (a file mutation), gated like the rest: `deny` removes the edit tools,
+   * `ask` blocks on review (today's behaviour), `auto` applies the hunk in-loop —
+   * including on a non-active file. See docs/work/issues/propose-edit-in-loop-blocking-review.md.
+   */
+  edit: Gate;
   /** Folder prefixes eligible for "auto"; empty ⇒ whole vault. */
   scopes: string[];
   /** Circuit breaker: once this many auto ops accrue in a turn, the rest downgrade to ask. */
@@ -47,6 +54,7 @@ export const DEFAULT_VAULT_OP_POLICY: VaultOpPolicy = {
   move: "ask",
   trash: "ask",
   createDir: "ask",
+  edit: "ask",
   scopes: [],
   maxAutoOps: 20,
 };
@@ -91,6 +99,25 @@ export function resolveGate(
   const base = policy[classOf(op)];
   if (base === "deny") return "deny";
   if (!inScope(targetPaths(op), policy.scopes)) return "ask";
+  if (base === "auto" && autoSoFar >= policy.maxAutoOps) return "ask";
+  return base;
+}
+
+/**
+ * Decide an in-document edit's fate. Edits are vault ops but not part of the
+ * {@link VaultOperation} union (their apply path is the EditReviewController), so
+ * they gate by file path against the same `edit` policy, scope, and auto-budget
+ * downgrades as {@link resolveGate}. The same `autoSoFar` budget is threaded
+ * across both channels so a turn's auto operations are counted together.
+ */
+export function resolveEditGate(
+  policy: VaultOpPolicy,
+  filePath: string,
+  autoSoFar: number,
+): Gate {
+  const base = policy.edit;
+  if (base === "deny") return "deny";
+  if (!inScope([filePath], policy.scopes)) return "ask";
   if (base === "auto" && autoSoFar >= policy.maxAutoOps) return "ask";
   return base;
 }

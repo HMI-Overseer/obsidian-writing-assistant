@@ -10,6 +10,14 @@ export type DiffHunkCallbacks = {
   onReject: (hunkId: string) => void;
   onUndo: (hunkId: string) => void;
   onModeChange: (mode: DiffMode) => void;
+  /** Open the edited note at this hunk's location (the in-hunk filename link). */
+  onOpenFile: (evt: MouseEvent) => void;
+};
+
+/** Display metadata for a hunk that isn't part of the diff itself. */
+export type DiffHunkMeta = {
+  /** The target note's filename, rendered as an internal link in the hunk header. */
+  fileName: string;
 };
 
 /**
@@ -32,6 +40,7 @@ export class DiffHunkView {
     parent: HTMLElement,
     private readonly hunk: DiffHunk,
     private readonly callbacks: DiffHunkCallbacks,
+    private readonly meta: DiffHunkMeta,
     initialMode: DiffMode = "split"
   ) {
     this.diffMode = initialMode;
@@ -131,6 +140,18 @@ export class DiffHunkView {
     const locationText =
       startLine === endLine ? `Line ${startLine}` : `Lines ${startLine}–${endLine}`;
     metaEl.createSpan({ cls: "lmsa-chat-window-diff-hunk-location", text: locationText });
+
+    // File + location sit together as one unit: the filename is an internal link
+    // the user clicks to open the note at this hunk (concern B).
+    const fileLink = metaEl.createEl("a", {
+      cls: "lmsa-chat-window-diff-hunk-file internal-link",
+      text: this.meta.fileName,
+      attr: { href: "#", "aria-label": `Open ${this.meta.fileName} at line ${startLine}` },
+    });
+    fileLink.addEventListener("click", (evt) => {
+      evt.preventDefault();
+      this.callbacks.onOpenFile(evt);
+    });
 
     const statusEl = metaEl.createSpan({ cls: "lmsa-chat-window-diff-hunk-confidence" });
     this.renderConfidenceLabel(statusEl, confidence);

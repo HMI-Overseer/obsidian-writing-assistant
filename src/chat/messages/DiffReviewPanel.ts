@@ -1,4 +1,4 @@
-import { type App, Component, MarkdownRenderer, setIcon } from "obsidian";
+import { type App, Component, Keymap, MarkdownRenderer } from "obsidian";
 import type { EditReviewController, HunkReviewChange } from "../../editing/EditReviewController";
 import { DiffHunkView } from "./DiffHunkView";
 import type { DiffMode } from "./DiffHunkView";
@@ -16,19 +16,31 @@ import type { DiffMode } from "./DiffHunkView";
 export class DiffReviewPanel {
   private readonly hunkViews = new Map<string, DiffHunkView>();
   private diffMode: DiffMode = "split";
+  private readonly unsubscribe: () => void;
+  /** Live (in-loop) panels render by hunk status; durable panels honor the applied record. */
+  private readonly live: boolean;
 
   constructor(
     private readonly containerEl: HTMLElement,
     private readonly app: App,
     private readonly owner: Component,
-    private readonly controller: EditReviewController
+    private readonly controller: EditReviewController,
+    opts?: { live?: boolean }
   ) {
+    this.live = opts?.live ?? false;
     this.render();
     // The subscription shares the controller's lifetime: when this panel is
-    // re-rendered, renderProposalPanels builds a new controller and detaches the
-    // old one from the InlineDiffManager, leaving panel + controller an isolated
-    // cycle for GC. No explicit teardown needed.
-    this.controller.subscribe((change) => this.onChange(change));
+    // re-rendered at finalization, renderProposalPanels builds a new controller and
+    // detaches the old one from the InlineDiffManager, leaving panel + controller an
+    // isolated cycle for GC. The in-loop live review keeps one controller and
+    // re-renders the panel per round, so it calls {@link destroy} first to drop the
+    // stale subscription.
+    this.unsubscribe = this.controller.subscribe((change) => this.onChange(change));
+  }
+
+  /** Drop the controller subscription (for callers that re-render over a kept controller). */
+  destroy(): void {
+    this.unsubscribe();
   }
 
   // -----------------------------------------------------------------------
@@ -39,21 +51,9 @@ export class DiffReviewPanel {
     this.containerEl.empty();
     this.containerEl.addClass("lmsa-chat-window-diff-panel");
 
-    this.renderHeader();
     this.renderProse();
     this.renderHunks();
     this.applyInitialStates();
-  }
-
-  private renderHeader(): void {
-    const headerEl = this.containerEl.createDiv({ cls: "lmsa-chat-window-diff-header" });
-
-    const fileEl = headerEl.createDiv({ cls: "lmsa-chat-window-diff-target-file" });
-    const fileIcon = fileEl.createSpan({ cls: "lmsa-chat-window-diff-file-icon" });
-    setIcon(fileIcon, "file-text");
-    const path = this.controller.targetFilePath;
-    const fileName = path.split("/").pop() ?? path;
-    fileEl.createSpan({ text: fileName });
   }
 
   private renderProse(): void {
@@ -73,6 +73,9 @@ export class DiffReviewPanel {
   private renderHunks(): void {
     const hunksContainer = this.containerEl.createDiv({ cls: "lmsa-chat-window-diff-hunks" });
 
+    const path = this.controller.targetFilePath;
+    const fileName = path.split("/").pop() ?? path;
+
     for (const hunk of this.controller.proposal.hunks) {
       const view = new DiffHunkView(
         hunksContainer,
@@ -82,11 +85,27 @@ export class DiffReviewPanel {
           onReject: (id) => this.controller.reject(id),
           onUndo: (id) => void this.controller.undo(id),
           onModeChange: (mode) => this.handleModeChange(mode),
+          onOpenFile: (evt) => this.openTargetFile(evt, hunk.resolvedEdit.startLine),
         },
+        { fileName },
         this.diffMode
       );
       this.hunkViews.set(hunk.id, view);
     }
+  }
+
+  /**
+   * Open the edited note at the hunk's line (concern B), honoring mod-click. The
+   * target lights up the same controller's overlay, so accepting there resolves
+   * the very review shown here.
+   */
+  private openTargetFile(evt: MouseEvent, startLine: number): void {
+    void this.app.workspace.openLinkText(
+      this.controller.targetFilePath,
+      "",
+      Keymap.isModEvent(evt),
+      { eState: { line: Math.max(0, startLine - 1) } },
+    );
   }
 
   /** Reflect persisted state (applied / skipped) onto freshly-rendered hunks. */
@@ -94,7 +113,9 @@ export class DiffReviewPanel {
     for (const hunk of this.controller.proposal.hunks) {
       const view = this.hunkViews.get(hunk.id);
       if (!view) continue;
-      const state = this.controller.initialHunkView(hunk.id);
+      const state = this.live
+        ? this.controller.liveHunkView(hunk.id)
+        : this.controller.initialHunkView(hunk.id);
       if (state === "applied") {
         view.setAppliedWithUndo();
       } else if (state === "skipped") {

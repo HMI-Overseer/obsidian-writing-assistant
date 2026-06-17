@@ -7,29 +7,6 @@
     @apply lmsa-flex lmsa-flex-col lmsa-gap-3;
   }
 
-  /* ------- Header ------- */
-
-  .lmsa-chat-window-diff-header {
-    @apply lmsa-flex lmsa-flex-wrap lmsa-items-center lmsa-gap-2;
-  }
-
-  .lmsa-chat-window-diff-target-file {
-    @apply lmsa-flex lmsa-items-center lmsa-gap-1.5;
-    font-size: var(--font-ui-small);
-    font-weight: 600;
-    color: var(--text-normal);
-  }
-
-  .lmsa-chat-window-diff-file-icon {
-    @apply lmsa-inline-flex lmsa-items-center;
-    color: var(--text-muted);
-  }
-
-  .lmsa-chat-window-diff-file-icon svg {
-    width: 14px;
-    height: 14px;
-  }
-
   /* ------- Prose ------- */
 
   .lmsa-chat-window-diff-prose {
@@ -50,5 +27,15 @@
 
   .lmsa-chat-window-diff-hunks {
     @apply lmsa-flex lmsa-flex-col lmsa-gap-2.5;
+  }
+
+  /* In-loop live edit review host (mounted in the bubble body during the tool
+   * loop; finalize re-renders the durable panel and removes this). */
+  .lmsa-edit-review-live:empty {
+    display: none;
+  }
+
+  .lmsa-edit-review-live:not(:empty) {
+    @apply lmsa-mt-3;
   }
 }

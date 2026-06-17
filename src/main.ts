@@ -131,6 +131,7 @@ function normalizeVaultOpPolicy(raw: unknown): VaultOpPolicy {
     move: normalizeGate(data.move, d.move),
     trash: normalizeGate(data.trash, d.trash),
     createDir: normalizeGate(data.createDir, d.createDir),
+    edit: normalizeGate(data.edit, d.edit),
     scopes: Array.isArray(data.scopes)
       ? data.scopes.filter((s): s is string => typeof s === "string")
       : [...d.scopes],

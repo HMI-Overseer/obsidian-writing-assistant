@@ -190,11 +190,27 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
 
   // The in-loop review coordinator: owns the live vault-op proposal, mounts the
   // review on the streaming timeline, applies auto ops, and suspends the loop on
-  // ask-gated ops until the user decides (in-loop-tool-approval-blocking-flow).
+  // ask-gated ops until the user decides (in-loop-tool-approval-blocking-flow). In
+  // edit mode it also owns the edit channel, rendering the live diff in this host
+  // (propose-edit-in-loop-blocking-review).
+  const editReviewHost = editMode
+    ? assistantBubble.bodyEl.createDiv({ cls: "lmsa-edit-review-live" })
+    : null;
   const liveReview = new LiveVaultReview({
     app: plugin.app,
     timelineEl: assistantBubble.timelineEl,
     policy: plugin.settings.vaultOpPolicy,
+    ...(editReviewHost && {
+      edit: {
+        host: editReviewHost,
+        owner,
+        inlineDiff: plugin.inlineDiff,
+        resolveOptions: {
+          contextLines: plugin.settings.diffContextLines,
+          minConfidence: plugin.settings.diffMinMatchConfidence,
+        },
+      },
+    }),
   });
 
   // Vault ops operate on arbitrary paths, so they need only the app + the live
@@ -308,6 +324,9 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
     const effectiveWriteToolCalls = ccWriteToolCalls.length > 0 ? ccWriteToolCalls : writeToolCalls;
 
     if (editMode && renderer instanceof EditStreamingRenderer) {
+      // Drop the transient in-loop edit panel so it can't double up with the
+      // durable one finalize renders into the message body.
+      liveReview.detachEditPanel();
       await finalizeEditResponse({
         app: plugin.app,
         owner,
@@ -324,6 +343,8 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
         stoppedForMaxTokens: writeStopReason === "max_tokens",
         prebuiltVaultOpProposal: liveReview.getProposal() ?? undefined,
         prebuiltVaultOpRecord: liveReview.getAppliedRecord() ?? undefined,
+        prebuiltEditProposal: liveReview.getEditProposal() ?? undefined,
+        prebuiltEditRecord: liveReview.getEditAppliedRecord() ?? undefined,
       });
     } else if (finalization.kind === "replace") {
       const response = chatRenderer?.getCurrentRoundResponse() ?? "";
@@ -363,6 +384,7 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
     if (isAbortError(error)) {
       const partialSteps = timeline?.getSteps();
       if (editMode && renderer instanceof EditStreamingRenderer) {
+        liveReview.detachEditPanel();
         await finalizeEditResponse({
           app: plugin.app,
           owner,
@@ -376,6 +398,8 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
           agenticSteps: partialSteps,
           prebuiltVaultOpProposal: liveReview.getProposal() ?? undefined,
           prebuiltVaultOpRecord: liveReview.getAppliedRecord() ?? undefined,
+          prebuiltEditProposal: liveReview.getEditProposal() ?? undefined,
+          prebuiltEditRecord: liveReview.getEditAppliedRecord() ?? undefined,
         });
       } else if (finalization.kind === "replace") {
         const response = chatRenderer?.getCurrentRoundResponse() ?? "";

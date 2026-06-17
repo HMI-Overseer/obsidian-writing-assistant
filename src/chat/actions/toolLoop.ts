@@ -245,11 +245,11 @@ export async function runToolLoop(
       toolCalls: loopCalls.map((tc) => ({ id: tc.id, name: tc.name, arguments: tc.arguments })),
     });
 
-    // Read-only / edit / think tools and the (possibly suspending) vault ops run
-    // concurrently. Vault-op steps are recorded BEFORE resolving so their timeline
-    // rows (with data-tool-call-id) exist for the live review to decorate with
-    // approve/decline; the review may then block this round until the user decides.
-    const [otherResults, vaultOpResults] = await Promise.all([
+    // Read-only / think tools and the (possibly suspending) vault ops and edits run
+    // concurrently. Vault-op and edit steps are recorded BEFORE resolving so their
+    // timeline rows exist while the review blocks this round until the user decides;
+    // both channels return the *real* disposition as the tool result.
+    const [otherResults, vaultOpResults, editResults] = await Promise.all([
       Promise.all([
         ...vaultCalls.map(async (tc) => {
           callbacks.onToolStatus?.(tc.name);
@@ -261,16 +261,6 @@ export async function runToolLoop(
           }
           return { tc, result: await executeVaultTool(tc, vaultToolContext) };
         }),
-        ...editCalls.map(async (tc) => {
-          callbacks.onToolStatus?.(tc.name);
-          if (!editToolContext) {
-            return {
-              tc,
-              result: { content: "Edit tool context unavailable.", isReadOnly: false, isError: true },
-            };
-          }
-          return { tc, result: await executeEditTool(tc, editToolContext) };
-        }),
         // think is a no-op: returns empty content so the model continues reasoning.
         ...thinkCalls.map((tc) => ({
           tc,
@@ -278,6 +268,7 @@ export async function runToolLoop(
         })),
       ]),
       resolveVaultOps(),
+      resolveEdits(),
     ]);
 
     for (const { tc, result } of otherResults) {
@@ -291,8 +282,8 @@ export async function runToolLoop(
         toolArgs: tc.arguments,
       });
     }
-    // Vault-op steps were already recorded before resolution — push results only.
-    for (const { tc, result } of vaultOpResults) {
+    // Vault-op and edit steps were already recorded before resolution — push results only.
+    for (const { tc, result } of [...vaultOpResults, ...editResults]) {
       toolLoopTurns.push({ role: "tool", content: result.content, toolCallId: tc.id });
     }
 
@@ -337,6 +328,46 @@ export async function runToolLoop(
         }
         return { tc, result: executeVaultOpTool(tc, { app: vaultOpToolContext.app, overlay }) };
       });
+    }
+
+    /**
+     * Resolve this round's edit calls. Records each edit's timeline step first, then
+     * routes to the live review (resolves in-loop with the real three-tier resolver,
+     * blocks on `ask` edits, returns real dispositions) or the legacy synchronous
+     * validate-only fallback when no live review is available.
+     */
+    async function resolveEdits(): Promise<Array<{ tc: ToolCall; result: ToolResult }>> {
+      if (editCalls.length === 0) return [];
+      for (const tc of editCalls) {
+        callbacks.onToolStatus?.(tc.name);
+        callbacks.onStepRecorded?.({
+          type: "tool_call",
+          round,
+          toolName: tc.name,
+          toolCallId: tc.id,
+          toolInput: extractToolInput(tc),
+          toolArgs: tc.arguments,
+        });
+      }
+      if (vaultOpToolContext?.liveReview) {
+        return vaultOpToolContext.liveReview.resolveEdits(editCalls);
+      }
+      // Fallback: no live review — validate-only acknowledge (legacy non-blocking path).
+      return Promise.all(
+        editCalls.map(async (tc) => {
+          if (!editToolContext) {
+            return {
+              tc,
+              result: {
+                content: "Edit tool context unavailable.",
+                isReadOnly: false,
+                isError: true,
+              } as ToolResult,
+            };
+          }
+          return { tc, result: await executeEditTool(tc, editToolContext) };
+        }),
+      );
     }
   }
 

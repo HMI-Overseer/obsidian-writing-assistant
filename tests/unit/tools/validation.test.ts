@@ -31,6 +31,18 @@ describe("validateProposeEdit", () => {
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error).toContain("search must be a string");
   });
+
+  test("parses the optional path argument", () => {
+    const result = validateProposeEdit({ path: "Lore/The Fold.md", search: "old", replace: "new" });
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.args.path).toBe("Lore/The Fold.md");
+  });
+
+  test("leaves path undefined when omitted (host enforces it)", () => {
+    const result = validateProposeEdit({ search: "old", replace: "new" });
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.args.path).toBeUndefined();
+  });
 });
 
 describe("validateUpdateFrontmatter", () => {

@@ -50,6 +50,11 @@ export function renderVaultOpsTab(container: HTMLElement, plugin: WritingAssista
     "Creating a folder. Idempotent — does nothing if it already exists.",
     "createDir"
   );
+  renderGateSetting(
+    approvals.bodyEl, plugin, "Edit document",
+    "Targeted in-document changes and frontmatter updates (propose_edit, update_frontmatter). Ask shows the diff and waits; Auto-apply lands the edit without a click — even on a note you don't have open.",
+    "edit"
+  );
 
   const limits = createSettingsSection(
     container,
@@ -94,7 +99,7 @@ export function renderVaultOpsTab(container: HTMLElement, plugin: WritingAssista
     });
 }
 
-type GateClass = keyof Pick<VaultOpPolicy, "create" | "overwrite" | "move" | "trash" | "createDir">;
+type GateClass = keyof Pick<VaultOpPolicy, "create" | "overwrite" | "move" | "trash" | "createDir" | "edit">;
 
 const GATE_OPTIONS: ReadonlyArray<{ value: Gate; label: string }> = [
   { value: "ask", label: "Ask" },

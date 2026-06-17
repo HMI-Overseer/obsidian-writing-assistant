@@ -64,6 +64,7 @@ export function toolCallsToEditBlocks(toolCalls: ToolCall[]): EditBlock[] {
  */
 function mergeUpdateFrontmatterCalls(calls: ToolCall[]): EditBlock | null {
   const allOperations: FrontmatterOperation[] = [];
+  let targetPath: string | undefined;
 
   for (const tc of calls) {
     const v = validateUpdateFrontmatter(tc.arguments);
@@ -71,6 +72,7 @@ function mergeUpdateFrontmatterCalls(calls: ToolCall[]): EditBlock | null {
       console.error(`[tool] Skipping update_frontmatter (${tc.id}): ${v.error}`);
       continue;
     }
+    if (!targetPath && v.args.path) targetPath = v.args.path;
     allOperations.push(...v.args.operations);
   }
 
@@ -89,12 +91,19 @@ function mergeUpdateFrontmatterCalls(calls: ToolCall[]): EditBlock | null {
     searchText: "",
     replaceText: "",
     rawBlock: `[tool_call:${calls[0].id}]`,
+    ...(targetPath ? { targetPath } : {}),
     toolName: "update_frontmatter" as const,
     toolArgs: { operations: dedupedOperations },
   };
 }
 
-function convertToolCallToEditBlock(tc: ToolCall): EditBlock | null {
+/**
+ * Convert a single edit tool call into an EditBlock. Unlike
+ * {@link toolCallsToEditBlocks}, this does NOT merge multiple update_frontmatter
+ * calls — it keeps one call → one block so the in-loop review can return one
+ * disposition per tool call (the loop's one-result-per-call contract).
+ */
+export function convertToolCallToEditBlock(tc: ToolCall): EditBlock | null {
   switch (tc.name) {
     case "propose_edit": {
       const v = validateProposeEdit(tc.arguments);
@@ -107,6 +116,7 @@ function convertToolCallToEditBlock(tc: ToolCall): EditBlock | null {
         searchText: normalizeEscapes(v.args.search),
         replaceText: normalizeEscapes(v.args.replace),
         rawBlock: `[tool_call:${tc.id}]`,
+        ...(v.args.path ? { targetPath: v.args.path } : {}),
       };
     }
     case "update_frontmatter": {
@@ -120,6 +130,7 @@ function convertToolCallToEditBlock(tc: ToolCall): EditBlock | null {
         searchText: "", // Resolved later via current frontmatter extraction
         replaceText: "", // Resolved later via applying operations
         rawBlock: `[tool_call:${tc.id}]`,
+        ...(v.args.path ? { targetPath: v.args.path } : {}),
         toolName: "update_frontmatter" as const,
         toolArgs: { operations: v.args.operations },
       };
@@ -131,6 +142,7 @@ function convertToolCallToEditBlock(tc: ToolCall): EditBlock | null {
         searchText: normalizeEscapes(tc.arguments.search),
         replaceText: normalizeEscapes(tc.arguments.replace),
         rawBlock: `[tool_call:${tc.id}]`,
+        ...(typeof tc.arguments.path === "string" ? { targetPath: tc.arguments.path } : {}),
       };
   }
 }

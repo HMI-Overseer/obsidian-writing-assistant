@@ -91,3 +91,37 @@ export function dispositionMessage(
       return `Generation stopped before you decided — ${target(op)} is still pending review.`;
   }
 }
+
+/** Which edit tool produced the disposition — shapes the model-facing wording. */
+export type EditOpKind = "edit" | "frontmatter";
+
+/**
+ * Build the tool-result message for a resolved in-document edit. Edits share the
+ * vault-op {@link VaultOpDisposition} vocabulary (the model never sees a second
+ * dialect) but read in edit terms. `failed` carries the honest reason — for a
+ * confidence-0 no-match this is the self-correction prompt the model acts on.
+ */
+export function editDispositionMessage(
+  kind: EditOpKind,
+  filePath: string,
+  disposition: VaultOpDisposition,
+  reason?: string,
+): string {
+  const tool = kind === "frontmatter" ? "update_frontmatter" : "propose_edit";
+  const what = kind === "frontmatter" ? "frontmatter update" : "edit";
+  const t = `"${filePath}"`;
+  switch (disposition) {
+    case "auto-applied":
+      return `Applied ${what} to ${t} (auto-applied).`;
+    case "applied":
+      return `Applied ${what} to ${t}.`;
+    case "declined":
+      return `Declined by user — ${what} to ${t} was not applied.`;
+    case "failed":
+      return `${tool} did not apply to ${t}: ${reason ?? "the edit could not be resolved"}.`;
+    case "satisfied":
+      return `${t} already matches; nothing to change.`;
+    case "cancelled":
+      return `Generation stopped before you decided — ${what} to ${t} is still pending review.`;
+  }
+}

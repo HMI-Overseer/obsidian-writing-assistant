@@ -16,11 +16,12 @@ import type { ToolCall } from "../../../src/tools/types";
 describe("PROPOSE_EDIT_TOOL", () => {
   test("has correct name and required params", () => {
     expect(PROPOSE_EDIT_TOOL.name).toBe("propose_edit");
-    expect(PROPOSE_EDIT_TOOL.parameters.required).toEqual(["search", "replace"]);
+    expect(PROPOSE_EDIT_TOOL.parameters.required).toEqual(["path", "search", "replace"]);
   });
 
-  test("has search, replace, and explanation properties", () => {
+  test("has path, search, replace, and explanation properties", () => {
     const props = PROPOSE_EDIT_TOOL.parameters.properties;
+    expect(props.path).toBeDefined();
     expect(props.search).toBeDefined();
     expect(props.replace).toBeDefined();
     expect(props.explanation).toBeDefined();
@@ -28,9 +29,10 @@ describe("PROPOSE_EDIT_TOOL", () => {
 });
 
 describe("UPDATE_FRONTMATTER_TOOL", () => {
-  test("has correct name and requires operations", () => {
+  test("has correct name and requires path + operations", () => {
     expect(UPDATE_FRONTMATTER_TOOL.name).toBe("update_frontmatter");
-    expect(UPDATE_FRONTMATTER_TOOL.parameters.required).toEqual(["operations"]);
+    expect(UPDATE_FRONTMATTER_TOOL.parameters.required).toEqual(["path", "operations"]);
+    expect(UPDATE_FRONTMATTER_TOOL.parameters.properties.path).toBeDefined();
   });
 });
 
@@ -133,6 +135,25 @@ describe("toolCallsToEditBlocks", () => {
 
   test("returns empty array for empty input", () => {
     expect(toolCallsToEditBlocks([])).toEqual([]);
+  });
+
+  test("threads the path argument onto the block's targetPath", () => {
+    const toolCalls: ToolCall[] = [
+      {
+        id: "tc_1",
+        name: "propose_edit",
+        arguments: { path: "Lore/The Fold.md", search: "a", replace: "b" },
+      },
+      {
+        id: "tc_2",
+        name: "update_frontmatter",
+        arguments: { path: "Lore/The Fold.md", operations: [{ key: "tags", value: "x", action: "set" }] },
+      },
+    ];
+
+    const blocks = toolCallsToEditBlocks(toolCalls);
+    expect(blocks[0].targetPath).toBe("Lore/The Fold.md");
+    expect(blocks[1].targetPath).toBe("Lore/The Fold.md");
   });
 
   test("normalizes literal \\n escape sequences in propose_edit arguments", () => {

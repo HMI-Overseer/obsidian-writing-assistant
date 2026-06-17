@@ -1,5 +1,11 @@
 import { describe, test, expect } from "vitest";
-import { classOf, inScope, resolveGate, targetPaths } from "../../../src/vault-ops/gateway";
+import {
+  classOf,
+  inScope,
+  resolveEditGate,
+  resolveGate,
+  targetPaths,
+} from "../../../src/vault-ops/gateway";
 import type { VaultOpPolicy } from "../../../src/vault-ops/gateway";
 import type { VaultOperation } from "../../../src/vault-ops/types";
 
@@ -11,6 +17,7 @@ const basePolicy: VaultOpPolicy = {
   move: "ask",
   trash: "deny",
   createDir: "auto",
+  edit: "ask",
   scopes: [],
   maxAutoOps: 20,
 };
@@ -82,5 +89,28 @@ describe("resolveGate", () => {
     const policy: VaultOpPolicy = { ...basePolicy, overwrite: "ask", scopes: ["AI drafts"] };
     const op: VaultOperation = { kind: "overwrite", path: "AI drafts/a.md", content: "x", expect: FP };
     expect(resolveGate(op, policy, 0)).toBe("ask");
+  });
+});
+
+describe("resolveEditGate", () => {
+  test("returns the base edit gate when in scope and under the cap", () => {
+    expect(resolveEditGate({ ...basePolicy, edit: "ask" }, "Story.md", 0)).toBe("ask");
+    expect(resolveEditGate({ ...basePolicy, edit: "auto" }, "Story.md", 0)).toBe("auto");
+  });
+
+  test("deny short-circuits regardless of scope/count", () => {
+    expect(resolveEditGate({ ...basePolicy, edit: "deny" }, "Story.md", 0)).toBe("deny");
+  });
+
+  test("out-of-scope downgrades auto→ask", () => {
+    const policy = { ...basePolicy, edit: "auto" as const, scopes: ["AI drafts"] };
+    expect(resolveEditGate(policy, "AI drafts/a.md", 0)).toBe("auto");
+    expect(resolveEditGate(policy, "elsewhere/a.md", 0)).toBe("ask");
+  });
+
+  test("shares the per-turn auto budget — count past maxAutoOps downgrades auto→ask", () => {
+    const policy = { ...basePolicy, edit: "auto" as const, maxAutoOps: 2 };
+    expect(resolveEditGate(policy, "Story.md", 1)).toBe("auto");
+    expect(resolveEditGate(policy, "Story.md", 2)).toBe("ask");
   });
 });

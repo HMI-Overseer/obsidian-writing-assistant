@@ -4,6 +4,11 @@ export interface EditBlock {
   searchText: string;
   replaceText: string;
   rawBlock: string;
+  /**
+   * Vault-relative path of the note this edit targets, from the tool call's `path`
+   * argument. Absent for regex-parsed blocks (which target the active document).
+   */
+  targetPath?: string;
   /** For structure-aware tools, the originating tool name. */
   toolName?: "update_frontmatter";
   /** Tool-specific arguments needed for resolution (e.g., heading text, line number). */

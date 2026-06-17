@@ -11,7 +11,7 @@ import { parseEditBlocks } from "../../editing/parseEditBlocks";
 import { toolCallsToEditBlocks } from "../../tools/editing/conversion";
 import { resolveStructuralEditBlocks } from "../../tools/editing/handlers";
 import { resolveEdits, buildHunks } from "../../editing/diffEngine";
-import type { EditBlock, EditProposal } from "../../editing/editTypes";
+import type { AppliedEditRecord, EditBlock, EditProposal } from "../../editing/editTypes";
 import { EDIT_TOOL_NAMES } from "../../tools/editing/definition";
 import { VAULT_OPS_TOOL_NAMES } from "../../tools/vault-ops/definition";
 import { toVaultOperations, type ConversionProbes } from "../../tools/vault-ops/conversion";
@@ -71,6 +71,15 @@ export interface FinalizeEditOptions {
   prebuiltVaultOpProposal?: VaultOperationProposal;
   /** The applied record (auto + approved ops) for {@link prebuiltVaultOpProposal}. */
   prebuiltVaultOpRecord?: AppliedVaultOpRecord;
+  /**
+   * An edit proposal already built and (partly) resolved in-loop by
+   * {@link LiveVaultReview} (propose-edit-in-loop-blocking-review). When present,
+   * finalization persists it as-is instead of re-resolving the edit blocks — the
+   * hunks already carry their accepted/rejected status and applied content.
+   */
+  prebuiltEditProposal?: EditProposal;
+  /** The applied edit record (auto + accepted hunks) for {@link prebuiltEditProposal}. */
+  prebuiltEditRecord?: AppliedEditRecord;
 }
 
 /**
@@ -91,6 +100,7 @@ export async function finalizeEditResponse(options: FinalizeEditOptions): Promis
     app, owner, store, transcript, bubble, renderer, plugin, modelId, provider, usage,
     toolCalls, agenticSteps, stoppedForMaxTokens,
     prebuiltVaultOpProposal, prebuiltVaultOpRecord,
+    prebuiltEditProposal, prebuiltEditRecord,
   } = options;
 
   const fullResponse = renderer.getFullResponse();
@@ -115,10 +125,20 @@ export async function finalizeEditResponse(options: FinalizeEditOptions): Promis
     prose = parsed.prose;
   }
 
-  const file = app.workspace.getActiveFile();
+  // A prebuilt proposal from the in-loop review is persisted as-is: its hunks are
+  // already resolved against the document and carry their accept/reject status, so
+  // we must NOT re-resolve. We only graft the turn's prose onto it.
   let editProposal: EditProposal | null = null;
-  if (file && blocks.length > 0) {
-    editProposal = await buildEditProposal(app, plugin, file.path, blocks, prose);
+  if (prebuiltEditProposal) {
+    editProposal = prebuiltEditProposal;
+    if (prose && !editProposal.prose) editProposal.prose = prose;
+  } else if (blocks.length > 0) {
+    // Prefer the model's explicit `path` (tool-call edits); fall back to the active
+    // file for regex-parsed edit blocks, which have no path and target the open note.
+    const targetPath = blocks.find((b) => b.targetPath)?.targetPath ?? app.workspace.getActiveFile()?.path;
+    if (targetPath) {
+      editProposal = await buildEditProposal(app, plugin, targetPath, blocks, prose);
+    }
   }
 
   // --- Vault-op channel: builds a proposal with no active file required. ---
@@ -154,6 +174,7 @@ export async function finalizeEditResponse(options: FinalizeEditOptions): Promis
   // Save the message with whichever proposals are present.
   const assistantMessage = makeMessage("assistant", fullResponse);
   if (editProposal) assistantMessage.editProposal = editProposal;
+  if (prebuiltEditRecord) assistantMessage.appliedEdit = prebuiltEditRecord;
   if (vaultOpProposal) assistantMessage.vaultOpProposal = vaultOpProposal;
   if (prebuiltVaultOpRecord) assistantMessage.appliedVaultOps = prebuiltVaultOpRecord;
   if (hasToolCalls) assistantMessage.toolCalls = toolCalls;

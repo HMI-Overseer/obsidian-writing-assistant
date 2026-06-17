@@ -218,7 +218,9 @@ export async function prepareApiMessages(
     // Edit mode: focused document task — core vault tools for context lookup only,
     // plus the vault-op write channel (create/move/trash whole notes), with any
     // deny-classed op filtered out by policy (ADR-0003).
-    const editTools = ALL_EDIT_TOOLS;
+    // Edits are a gated vault op: "Deny" removes the edit tools entirely so the
+    // model is never offered them (a real read-only policy).
+    const editTools = settings.vaultOpPolicy.edit === "deny" ? [] : ALL_EDIT_TOOLS;
     const vaultOpTools = allowedVaultOpsTools(settings.vaultOpPolicy);
     tools = [...CORE_VAULT_TOOLS, ...editTools, ...vaultOpTools, ...(useThinkTool ? [THINK_TOOL] : [])];
   } else if (useVaultTools) {

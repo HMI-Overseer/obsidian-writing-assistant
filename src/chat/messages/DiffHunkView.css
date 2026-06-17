@@ -47,6 +47,19 @@
     font-weight: 500;
   }
 
+  /* Filename rendered as an internal link, sitting right after the location so
+   * file + location + change read as one unit (concern B). */
+  .lmsa-chat-window-diff-hunk-file {
+    color: var(--text-accent);
+    font-weight: 500;
+    text-decoration: none;
+    cursor: pointer;
+  }
+
+  .lmsa-chat-window-diff-hunk-file:hover {
+    text-decoration: underline;
+  }
+
   .lmsa-chat-window-diff-hunk-confidence {
     color: var(--text-faint);
   }

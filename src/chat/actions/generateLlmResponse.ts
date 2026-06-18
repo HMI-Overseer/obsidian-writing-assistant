@@ -263,6 +263,7 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
       client,
       apiMessages,
       activeModel.modelId,
+      activeModel.provider,
       buildSamplingParams(activeProfile),
       abortController.signal,
       {

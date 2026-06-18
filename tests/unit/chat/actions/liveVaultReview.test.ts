@@ -137,6 +137,68 @@ describe("LiveVaultReview", () => {
     expect(result.isError).toBeFalsy();
   });
 
+  it("strands ops inside a declined folder as failed, naming the prerequisite", async () => {
+    const review = new LiveVaultReview({
+      app: makeApp(),
+      timelineEl: TIMELINE_EL,
+      policy: POLICY(), // everything ask-gated
+    });
+
+    const pending = review.resolveRound([
+      { id: "d1", name: "create_directory", arguments: { path: "Drafts" } },
+      writeCall("c1", "Drafts/A.md"),
+      writeCall("c2", "Drafts/B.md"),
+    ]);
+    await flush();
+    expect(captured.proposalOps).toHaveLength(3);
+
+    // Decline the folder. Honor the onOpResolved contract: the timeline flips the
+    // op's status to terminal *before* reporting it.
+    const dirOp = captured.proposalOps[0];
+    dirOp.status = "rejected";
+    captured.callbacks?.onOpResolved?.(dirOp.id, "declined");
+
+    const results = await pending;
+    expect(results[0].result.content).toBe('Declined by user — "Drafts" was not changed.');
+    // Both writes-into-the-folder fail, naming the declined prerequisite.
+    expect(results[1].result.isError).toBe(true);
+    expect(results[1].result.content).toContain("nowhere to put");
+    expect(results[1].result.content).toContain("Drafts/A.md");
+    expect(results[2].result.isError).toBe(true);
+    expect(results[2].result.content).toContain("Drafts/B.md");
+    // Nothing was applied — the dependents never reached disk.
+    expect(review.getAppliedRecord()).toBeNull();
+  });
+
+  it("leaves a sibling op outside the declined folder decidable", async () => {
+    const review = new LiveVaultReview({
+      app: makeApp(),
+      timelineEl: TIMELINE_EL,
+      policy: POLICY(),
+    });
+
+    const pending = review.resolveRound([
+      { id: "d1", name: "create_directory", arguments: { path: "Drafts" } },
+      writeCall("c1", "Drafts/A.md"),
+      writeCall("c2", "Notes/Keep.md"),
+    ]);
+    await flush();
+
+    const dirOp = captured.proposalOps[0];
+    dirOp.status = "rejected";
+    captured.callbacks?.onOpResolved?.(dirOp.id, "declined");
+
+    // The independent op is untouched by propagation — still awaiting its own decision.
+    const sibling = captured.proposalOps[2];
+    expect(sibling.status).toBe("pending");
+    sibling.status = "applied";
+    captured.callbacks?.onOpResolved?.(sibling.id, "applied");
+
+    const results = await pending;
+    expect(results[1].result.isError).toBe(true); // inside Drafts — stranded
+    expect(results[2].result.content).toBe('Created "Notes/Keep.md".'); // outside — applied
+  });
+
   it("cancelPending resolves a parked op as cancelled (no hung await)", async () => {
     const review = new LiveVaultReview({
       app: makeApp(),

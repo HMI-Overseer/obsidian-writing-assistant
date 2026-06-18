@@ -71,6 +71,16 @@ export interface VaultReviewTimelineOptions {
   existingRecord?: AppliedVaultOpRecord;
   /** Fresh finalization only: apply auto-gated ops once on mount. */
   autoApply?: boolean;
+  /**
+   * In-loop live mount only: surface ask-gated ops **one at a time**
+   * (ask-ops-resolve-as-batch-not-sequential). Only the first awaiting ask op
+   * carries Approve / Decline; the rest read "waiting for the previous step", and
+   * the "Approve all remaining" footer is suppressed. The user thus decides each op
+   * before the next is offered, so an early decline can strand the dependent ops
+   * (failed with a reason) before they're ever approved. The finalized review mounts
+   * with this off, so the durable surface keeps its batch affordances.
+   */
+  serial?: boolean;
 }
 
 /** Per-status state class on the step element — drives the dot tint (state, not class). */
@@ -100,6 +110,8 @@ export class VaultReviewTimelineView {
   private readonly syntheticSteps = new Map<string, HTMLElement>();
   private fallbackListEl: HTMLElement | null = null;
   private footerEl: HTMLElement | null = null;
+  /** Serial mode: the one ask op currently offered for decision (recomputed per paint). */
+  private activeAskOpId: string | null = null;
 
   constructor(private readonly opts: VaultReviewTimelineOptions) {
     this.appliedRecord = opts.existingRecord ?? null;
@@ -136,6 +148,14 @@ export class VaultReviewTimelineView {
   }
 
   private paint(): void {
+    // Serial mode offers exactly one ask op at a time: the first still-awaiting one
+    // in proposal order. Recomputed each paint so deciding it surfaces the next.
+    this.activeAskOpId = this.opts.serial
+      ? this.opts.proposal.ops.find(
+          (o) => o.gate === "ask" && (o.status === "pending" || o.status === "accepted"),
+        )?.id ?? null
+      : null;
+
     // Per-paint state for step matching: a cursor per tool name (which ordinal of
     // that tool we're on) and the set of steps already claimed, so two ops never
     // decorate the same row.
@@ -243,6 +263,15 @@ export class VaultReviewTimelineView {
     }
 
     if (awaiting && op.gate === "ask") {
+      // Serial mode: only the active op is decidable; the rest wait their turn, so
+      // a dependent op can't be approved before its prerequisite is decided.
+      if (this.opts.serial && op.id !== this.activeAskOpId) {
+        controls.createSpan({
+          cls: "lmsa-vault-step-state",
+          text: "waiting for the previous step",
+        });
+        return;
+      }
       if (op.op.kind === "move" && typeof op.linkImpact === "number" && op.linkImpact > 0) {
         controls.createSpan({
           cls: "lmsa-vault-step-state",
@@ -312,7 +341,8 @@ export class VaultReviewTimelineView {
 
     const appliable = this.appliableOps();
     const hasApplied = !!this.appliedRecord && this.appliedRecord.applied.length > 0;
-    const showApproveAll = appliable.length >= 2;
+    // Serial mode offers ops one at a time, so a batch "Approve all" would defeat it.
+    const showApproveAll = !this.opts.serial && appliable.length >= 2;
     if (!showApproveAll && !hasApplied) return;
 
     const footer = this.opts.timelineEl.createDiv({ cls: "lmsa-vault-review-footer" });

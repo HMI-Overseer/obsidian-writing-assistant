@@ -174,14 +174,19 @@ export class LiveVaultReview {
       return entries.filter((e): e is Extract<Entry, { kind: "ask" }> => e.kind === "ask");
     });
 
-    await Promise.all(
-      askEntries.map(async (e) => {
-        const parked = this.pending.get(e.reviewable.id);
-        if (!parked) return;
-        const { disposition, reason } = await parked.promise;
-        results.set(e.call.id, dispoResult(e.reviewable.op, disposition, reason));
-      }),
-    );
+    // Resolve `ask` ops **serially**, in proposal order
+    // (ask-ops-resolve-as-batch-not-sequential): the user decides one before the
+    // next is offered (the timeline mounts `serial`), and a decline propagates to
+    // dependent ops via {@link handleResolved} → {@link propagateDeclines}, failing
+    // them with a reason naming the declined prerequisite. Parked references are
+    // captured up front so an op failed by propagation (which clears it from
+    // `pending`) is still collected here.
+    const parkedEntries = askEntries.map((e) => ({ e, parked: this.pending.get(e.reviewable.id) }));
+    for (const { e, parked } of parkedEntries) {
+      if (!parked) continue;
+      const { disposition, reason } = await parked.promise;
+      results.set(e.call.id, dispoResult(e.reviewable.op, disposition, reason));
+    }
 
     return calls.map((c) => ({ tc: c, result: results.get(c.id) ?? cancelledFallback(c) }));
   }
@@ -572,6 +577,50 @@ export class LiveVaultReview {
     if (!parked) return;
     this.pending.delete(opId);
     parked.resolve({ disposition });
+    // A declined folder (or one already stranded) leaves nowhere for the ops that
+    // were going to write inside it — fail those before they can be approved.
+    if (disposition === "declined") this.propagateDeclines();
+  }
+
+  /**
+   * Strand the dependents of a declined/failed `create_directory`
+   * (ask-ops-resolve-as-batch-not-sequential). Any still-awaiting `ask` op whose
+   * destination would live inside a folder that will not be created this turn is
+   * failed in place, with a reason naming the missing prerequisite, so the model
+   * reads an honest `failed` (not a silent landing elsewhere) and can self-correct.
+   *
+   * Forward, transitive pass: a failed nested `create_directory` is itself added to
+   * the missing set, so a declined `A/` also strands `A/B/` and anything under it.
+   * Only fires under serial resolution, where the prerequisite is always decided
+   * before its dependents are offered — so this never overrides a user approval.
+   */
+  private propagateDeclines(): void {
+    const missingDirs = new Set(
+      this.proposal.ops
+        .filter(
+          (o) => o.op.kind === "createDir" && (o.status === "rejected" || o.status === "failed"),
+        )
+        .map((o) => normalizePath((o.op as Extract<VaultOperation, { kind: "createDir" }>).path)),
+    );
+    if (missingDirs.size === 0) return;
+
+    let changed = false;
+    for (const o of this.proposal.ops) {
+      if (o.gate !== "ask" || (o.status !== "pending" && o.status !== "accepted")) continue;
+      if (o.op.kind === "trash") continue;
+      const dest = destinationPath(o.op);
+      const blocker = [...missingDirs].find((dir) => isWithinDir(dest, dir));
+      if (!blocker) continue;
+
+      const reason = `the folder "${blocker}" was declined, so there is nowhere to put "${dest}"`;
+      o.status = "failed";
+      const parked = this.pending.get(o.id);
+      this.pending.delete(o.id);
+      parked?.resolve({ disposition: "failed", reason });
+      if (o.op.kind === "createDir") missingDirs.add(normalizePath(o.op.path));
+      changed = true;
+    }
+    if (changed) this.remount();
   }
 
   // --- Edit channel helpers ----------------------------------------------
@@ -661,6 +710,10 @@ export class LiveVaultReview {
       callbacks,
       existingRecord: this.appliedRecord ?? undefined,
       autoApply: false,
+      // Live mount serializes ask approval: one op offered at a time, so an early
+      // decline strands its dependents before they're approved (the next round's
+      // proposal then sees the real disposition).
+      serial: true,
     });
   }
 
@@ -741,4 +794,29 @@ function editError(
 /** A parked edit cancelled before the user decided (abort / new turn). */
 function editCancelled(kind: EditOpKind, path: string): ToolResult {
   return { content: editDispositionMessage(kind, path, "cancelled"), isReadOnly: false };
+}
+
+/**
+ * The vault path an op writes to — the location that must live under an existing
+ * folder for the op to make sense. `trash` has no created destination, so it never
+ * depends on a freshly-created folder (callers exclude it before asking).
+ */
+function destinationPath(op: VaultOperation): string {
+  switch (op.kind) {
+    case "create":
+    case "overwrite":
+    case "createDir":
+      return op.path;
+    case "move":
+      return op.to;
+    case "trash":
+      return op.path;
+  }
+}
+
+/** True when `path` lies strictly inside directory `dir` (a child, not the dir itself). */
+function isWithinDir(path: string, dir: string): boolean {
+  const p = normalizePath(path);
+  const d = normalizePath(dir);
+  return p !== d && p.startsWith(`${d}/`);
 }

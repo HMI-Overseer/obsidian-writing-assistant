@@ -1,7 +1,7 @@
 import type { App } from "obsidian";
 import type { ChatClient } from "../../api/chatClient";
 import type { ChatRequest, ChatTurn } from "../../shared/chatRequest";
-import type { AgenticStep, SamplingParams } from "../../shared/types";
+import type { AgenticStep, ProviderOption, SamplingParams } from "../../shared/types";
 import type { ToolCall, ToolResult } from "../../tools/types";
 import type { UsageResult, StopReason } from "../../api/usageTypes";
 import { VAULT_TOOL_NAMES } from "../../tools/vault/definition";
@@ -94,6 +94,7 @@ export async function runToolLoop(
   client: ChatClient,
   baseRequest: ChatRequest,
   model: string,
+  provider: ProviderOption,
   params: SamplingParams,
   signal: AbortSignal,
   callbacks: ToolLoopCallbacks,
@@ -164,7 +165,19 @@ export async function runToolLoop(
     const hasToolCalls = toolCalls !== null && toolCalls.length > 0;
 
     // Detect failed tool calls: model stopped but produced nothing useful.
-    checkForFailedToolCall(hasToolCalls, roundText, stopReason);
+    checkForFailedToolCall({
+      hasToolCalls,
+      roundText,
+      stopReason,
+      round,
+      maxRounds,
+      usage,
+      model,
+      provider,
+      agenticMode,
+      toolCount: baseRequest.tools?.length ?? 0,
+      mode: baseRequest.documentContext ? "edit" : "chat",
+    });
 
     if (!hasToolCalls || !toolCalls) {
       // Final round — flush buffered text to the bubble.
@@ -379,28 +392,130 @@ export async function runToolLoop(
   };
 }
 
-function checkForFailedToolCall(
-  hasToolCalls: boolean,
-  roundText: string,
-  stopReason: StopReason,
-): void {
+export interface FailedRoundContext {
+  hasToolCalls: boolean;
+  roundText: string;
+  stopReason: StopReason;
+  /** Zero-based round index; surfaced 1-based in the message. */
+  round: number;
+  /** The configured round cap, surfaced as "round X of Y". */
+  maxRounds: number;
+  /** This round's usage, when the provider reported it. */
+  usage: UsageResult | null;
+  /** The model id, so the message names what to swap out. */
+  model: string;
+  /** Which backend ran the turn — the first thing a bug report needs. */
+  provider: ProviderOption;
+  /** Whether tools were attached / the agent loop was active this turn. */
+  agenticMode: boolean;
+  /** How many tools were advertised to the model. */
+  toolCount: number;
+  /** Edit vs chat — derived from whether a live document rode the request. */
+  mode: "edit" | "chat";
+}
+
+/**
+ * A round ended with no tool calls and no usable text. Rather than the old
+ * one-size-fits-all message, classify *why* — raw tool-call markup, a `tool_use`
+ * stop with nothing parseable, a genuinely empty turn, or reasoning-only output —
+ * then render a multi-line block (summary, cause, fix, and a copyable diagnostics
+ * section) via {@link formatFailedRoundMessage}. Each failure mode is
+ * distinguishable in practice and points at a different fix, so collapsing them
+ * hid the signal; the diagnostics exist to be pasted verbatim into a bug report.
+ *
+ * A clean `end_turn` after a productive round is *not* a failure: a terse local
+ * model (e.g. Gemma) that did its tool work in an earlier round often emits an
+ * empty final turn with nothing to add. This surfaces especially on regeneration,
+ * where the re-issued ops resolve as "already satisfied" and leave nothing to
+ * summarize. Treating that as fatal threw the user a scary error on a turn that
+ * actually succeeded — so an empty `end_turn` past round 0 ends the loop quietly.
+ */
+export function checkForFailedToolCall(ctx: FailedRoundContext): void {
+  const { hasToolCalls, roundText, stopReason, round, usage } = ctx;
   if (hasToolCalls) return;
 
   const textContent = roundText.trim();
-  const looksLikeFailedToolCall =
-    !textContent
-    || textContent.startsWith("[TOOL_CALLS]")
-    || textContent.startsWith("[TOOL_REQUEST]")
-    || (stopReason === "tool_use");
+  const outputTokens = usage?.outputTokens ?? null;
 
-  if (looksLikeFailedToolCall) {
-    const preview = textContent
-      ? ` Raw output: "${textContent.slice(0, 200)}${textContent.length > 200 ? "…" : ""}"`
-      : " The model produced no output.";
-    throw new Error(
-      "The model attempted a tool call but failed to generate valid output." +
-      preview +
-      " Try regenerating or switching to a more capable model."
-    );
+  const isMarkup =
+    textContent.startsWith("[TOOL_CALLS]") || textContent.startsWith("[TOOL_REQUEST]");
+
+  // The loop only reaches round > 0 by way of a prior tool round, so a clean
+  // end_turn here means the model finished after doing its work — complete, even
+  // if it added no closing prose. (Round 0 empty stays a failure: the model
+  // answered nothing at all.) Markup / tool_use still fall through as failures.
+  if (stopReason === "end_turn" && !isMarkup && round > 0) return;
+
+  const isFailure = !textContent || isMarkup || stopReason === "tool_use";
+  if (!isFailure) return;
+
+  let cause: string;
+  let recovery: string;
+  if (isMarkup) {
+    cause = "It emitted raw tool-call markup as plain text instead of a structured tool call, so no call could be parsed.";
+    recovery =
+      "This model's tool-call format isn't being recognized by the provider — switch to a model with native tool-calling, or turn tools off for this request.";
+  } else if (stopReason === "tool_use") {
+    cause = 'The provider reported a tool call (stop reason "tool_use") but returned no parseable call.';
+    recovery = "The tool-call payload was malformed or empty — regenerate, or switch to a more capable model.";
+  } else if (outputTokens && outputTokens > 0) {
+    cause = `It generated ${outputTokens} token${outputTokens === 1 ? "" : "s"} but none were text content (likely reasoning-only output with an empty final message).`;
+    recovery =
+      "If this is a reasoning model it may have spent the turn thinking without answering — regenerate, or use a model that emits a final message.";
+  } else if (stopReason === "max_tokens") {
+    cause = "It hit the output token limit before producing any text.";
+    recovery = "Raise the max output tokens for this model, or shorten the conversation.";
+  } else {
+    cause = "It returned an empty response with no text and no tool calls.";
+    recovery =
+      "The context may be too long, the request may have been cut off, or the model may be overloaded — regenerate, shorten the conversation, or switch models.";
   }
+
+  throw new Error(formatFailedRoundMessage(ctx, cause, recovery, textContent, outputTokens));
+}
+
+/**
+ * Render the failure as a multi-line block: a one-line summary, the classified
+ * cause and suggested fix, then a labelled diagnostics section the user can copy
+ * verbatim into a bug report. Errors render in a `white-space: pre-wrap` bubble,
+ * so the line breaks survive; the same text is also useful pasted into a console
+ * or issue. Keep every field on its own line — this exists to be reported.
+ */
+function formatFailedRoundMessage(
+  ctx: FailedRoundContext,
+  cause: string,
+  recovery: string,
+  textContent: string,
+  outputTokens: number | null,
+): string {
+  const inputTokens = ctx.usage?.inputTokens ?? null;
+  const tokenLine = (n: number | null): string => (n === null ? "unknown" : String(n));
+
+  const diagnostics: Array<[string, string]> = [
+    ["Provider", ctx.provider],
+    ["Model", ctx.model],
+    ["Round", `${ctx.round + 1} of ${ctx.maxRounds + 1}`],
+    ["Stop reason", ctx.stopReason],
+    ["Output tokens", tokenLine(outputTokens)],
+    ["Input tokens", tokenLine(inputTokens)],
+    ["Mode", ctx.mode],
+    ["Agentic", ctx.agenticMode ? "on" : "off"],
+    ["Tools attached", String(ctx.toolCount)],
+  ];
+  if (textContent) {
+    const preview = textContent.slice(0, 300).replace(/\s+/g, " ");
+    diagnostics.push(["Raw output", `"${preview}${textContent.length > 300 ? "…" : ""}"`]);
+  }
+
+  const diagnosticsBlock = diagnostics.map(([label, value]) => `  ${label}: ${value}`).join("\n");
+
+  return [
+    "The model returned no usable response.",
+    "",
+    `What happened: ${cause}`,
+    `Try this: ${recovery}`,
+    "",
+    "Diagnostics (copy this when reporting the issue):",
+    diagnosticsBlock,
+  ].join("\n");
 }

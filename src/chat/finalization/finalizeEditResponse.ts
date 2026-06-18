@@ -1,9 +1,8 @@
 import {
   type App,
+  type Component,
   type MetadataCache,
   type TFile,
-  Component,
-  MarkdownRenderer,
   Notice,
   normalizePath,
 } from "obsidian";
@@ -28,6 +27,7 @@ import { makeMessage } from "../conversation/conversationUtils";
 import type { ChatSessionStore } from "../conversation/ChatSessionStore";
 import type { ChatTranscript } from "../messages/ChatTranscript";
 import { EditReviewTimelineView } from "../messages/editReviewTimeline";
+import { MarkdownItBubbleRenderer } from "../rendering/MarkdownItBubbleRenderer";
 import {
   EditReviewController,
   type EditReviewCallbacks,
@@ -342,7 +342,7 @@ export function renderProposalPanels(
   // channel does (finalize assigns prose to the edit proposal first). ---
   if (message.editProposal) {
     if (message.editProposal.prose) {
-      renderProseInto(app, owner, bubble.contentEl, message.editProposal.prose);
+      renderProseInto(app, bubble.contentEl, message.editProposal.prose);
     }
     // One controller owns the proposal's review; the timeline view and the in-note
     // overlay are pure views over it, routing every mutation through it.
@@ -355,7 +355,7 @@ export function renderProposalPanels(
     new EditReviewTimelineView({ timelineEl: bubble.timelineEl, app, controller });
     inlineDiff.attach(controller);
   } else if (message.vaultOpProposal?.prose) {
-    renderProseInto(app, owner, bubble.contentEl, message.vaultOpProposal.prose);
+    renderProseInto(app, bubble.contentEl, message.vaultOpProposal.prose);
   }
 
   // --- Timeline: fold the vault review onto the tool-call steps in place. ---
@@ -371,15 +371,14 @@ export function renderProposalPanels(
   }
 }
 
-/** Render assistant prose as markdown, with a child component for cleanup. */
-function renderProseInto(app: App, owner: Component, el: HTMLElement, prose: string): void {
+/**
+ * Render assistant prose through the same markdown-it pipeline as chat bubbles, so
+ * code blocks, links, and copy buttons render identically here — rather than via
+ * Obsidian's MarkdownRenderer, which produced inconsistent fenced-code output.
+ */
+function renderProseInto(app: App, el: HTMLElement, prose: string): void {
   const proseEl = el.createDiv({ cls: "lmsa-chat-window-message-content--markdown" });
-  const renderChild = new Component();
-  owner.addChild(renderChild);
-  const sourcePath = app.workspace.getActiveFile()?.path ?? "";
-  void MarkdownRenderer.render(app, prose, proseEl, sourcePath, renderChild).catch(() => {
-    proseEl.setText(prose);
-  });
+  void new MarkdownItBubbleRenderer(app).render(proseEl, prose);
 }
 
 function makeEditCallbacks(store: ChatSessionStore, proposal: EditProposal): EditReviewCallbacks {

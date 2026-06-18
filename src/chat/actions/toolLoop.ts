@@ -7,6 +7,7 @@ import type { UsageResult, StopReason } from "../../api/usageTypes";
 import { VAULT_TOOL_NAMES } from "../../tools/vault/definition";
 import { executeVaultTool } from "../../tools/vault/handlers";
 import type { VaultToolContext } from "../../tools/vault/handlers";
+import { toolFailure } from "../../tools/toolFailure";
 import { EDIT_TOOL_NAMES } from "../../tools/editing/definition";
 import { executeEditTool } from "../../tools/editing/handlers";
 import type { ToolExecutionContext } from "../../tools/editing/handlers";
@@ -256,7 +257,7 @@ export async function runToolLoop(
           if (!vaultToolContext) {
             return {
               tc,
-              result: { content: "Vault tool context unavailable.", isReadOnly: true, isError: true },
+              result: toolFailure({ kind: "unavailable", what: "vault tool context unavailable" }),
             };
           }
           return { tc, result: await executeVaultTool(tc, vaultToolContext) };
@@ -319,11 +320,11 @@ export async function runToolLoop(
         if (!vaultOpToolContext || !overlay) {
           return {
             tc,
-            result: {
-              content: "Vault operation context unavailable.",
+            result: toolFailure({
+              kind: "unavailable",
+              what: "vault operation context unavailable",
               isReadOnly: false,
-              isError: true,
-            } as ToolResult,
+            }),
           };
         }
         return { tc, result: executeVaultOpTool(tc, { app: vaultOpToolContext.app, overlay }) };
@@ -358,11 +359,11 @@ export async function runToolLoop(
           if (!editToolContext) {
             return {
               tc,
-              result: {
-                content: "Edit tool context unavailable.",
+              result: toolFailure({
+                kind: "unavailable",
+                what: "edit tool context unavailable",
                 isReadOnly: false,
-                isError: true,
-              } as ToolResult,
+              }),
             };
           }
           return { tc, result: await executeEditTool(tc, editToolContext) };

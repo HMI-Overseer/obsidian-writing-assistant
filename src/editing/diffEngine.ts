@@ -1,5 +1,5 @@
 import { generateId } from "../utils";
-import type { EditBlock, ResolvedEdit, DiffHunk } from "./editTypes";
+import type { EditBlock, ResolvedEdit, DiffHunk, MatchType } from "./editTypes";
 
 /** Options controlling how edits are resolved against a document. */
 export interface ResolveOptions {
@@ -11,6 +11,15 @@ export interface ResolveOptions {
 
 /** Minimum per-line similarity required during fuzzy matching. */
 const LINE_SIMILARITY_THRESHOLD = 0.85;
+
+/**
+ * On a total miss, the closest window must score at least this to count as a
+ * "near miss" — similar text that just fell short, worth a "re-read and copy the
+ * exact wording" nudge rather than a blind re-read. (Pure whitespace differences are
+ * already absorbed by the Tier 2 match, so a near miss is a wording/spelling gap.)
+ * Below this we treat the text as simply absent.
+ */
+const NEAR_MISS_THRESHOLD = 0.5;
 
 const DEFAULT_OPTIONS: ResolveOptions = {
   contextLines: 3,
@@ -83,7 +92,7 @@ function resolveOneBlock(
   // Tier 1: exact match
   const exactOffset = document.indexOf(block.searchText);
   if (exactOffset !== -1) {
-    return buildResolvedEdit(block, document, docLines, exactOffset, block.searchText.length, block.searchText, 1.0, opts);
+    return buildResolvedEdit(block, document, docLines, exactOffset, block.searchText.length, block.searchText, 1.0, "exact", opts);
   }
 
   // Tier 2: whitespace-normalized match
@@ -92,25 +101,27 @@ function resolveOneBlock(
     return buildResolvedEdit(
       block, document, docLines,
       normalizedResult.offset, normalizedResult.length, normalizedResult.matchedText,
-      0.95, opts
+      0.95, "whitespace", opts
     );
   }
 
   // Tier 3: line-level fuzzy match
   const fuzzyResult = findFuzzyLineMatch(block.searchText, docLines, opts.minConfidence);
-  if (fuzzyResult) {
-    const lineOffset = getLineOffset(docLines, fuzzyResult.startLine);
-    const lineEnd = getLineEndOffset(docLines, fuzzyResult.endLine);
+  if (fuzzyResult.match) {
+    const lineOffset = getLineOffset(docLines, fuzzyResult.match.startLine);
+    const lineEnd = getLineEndOffset(docLines, fuzzyResult.match.endLine);
     const matchedText = document.slice(lineOffset, lineEnd);
 
     return buildResolvedEdit(
       block, document, docLines,
       lineOffset, lineEnd - lineOffset, matchedText,
-      fuzzyResult.confidence, opts
+      fuzzyResult.match.confidence, "fuzzy", opts
     );
   }
 
-  // No match found — return an unresolved edit
+  // No match found — return an unresolved edit. `nearMiss` distinguishes "close but
+  // below threshold" (copy the exact wording) from "absent" (re-read), the failure-side
+  // signal the channel otherwise collapses to a flat "no match".
   return {
     id: block.id || generateId(),
     editBlock: block,
@@ -122,6 +133,8 @@ function resolveOneBlock(
     contextBefore: [],
     contextAfter: [],
     confidence: 0,
+    matchType: "none",
+    nearMiss: fuzzyResult.bestScore >= NEAR_MISS_THRESHOLD,
   };
 }
 
@@ -133,6 +146,7 @@ function buildResolvedEdit(
   length: number,
   matchedText: string,
   confidence: number,
+  matchType: MatchType,
   opts: ResolveOptions
 ): ResolvedEdit {
   const startLine = offsetToLine(document, offset);
@@ -158,6 +172,7 @@ function buildResolvedEdit(
     contextBefore,
     contextAfter,
     confidence,
+    matchType,
   };
 }
 
@@ -241,36 +256,47 @@ interface FuzzyLineMatch {
   confidence: number;
 }
 
+/**
+ * Result of the fuzzy scan: the accepted `match` (or null), plus `bestScore` — the
+ * highest whole-window average similarity observed, accepted or not. `bestScore`
+ * feeds the near-miss signal on a total miss: a window that scored well but had one
+ * line below the per-line gate never becomes a match, yet still tells the model "you
+ * were close" rather than "that text is absent."
+ */
+interface FuzzyScanResult {
+  match: FuzzyLineMatch | null;
+  bestScore: number;
+}
+
 function findFuzzyLineMatch(
   searchText: string,
   docLines: string[],
   minConfidence: number
-): FuzzyLineMatch | null {
+): FuzzyScanResult {
   const searchLines = searchText.split("\n").map((l) => l.trim());
-  if (searchLines.length === 0) return null;
+  if (searchLines.length === 0) return { match: null, bestScore: 0 };
 
   let bestMatch: FuzzyLineMatch | null = null;
-  let bestScore = 0;
+  let bestAccepted = 0;
+  let bestObserved = 0;
 
-  // Sliding window over document lines
+  // Sliding window over document lines. We score every window fully (no early break)
+  // so `bestObserved` reflects the closest candidate even when it can't be accepted.
   for (let start = 0; start <= docLines.length - searchLines.length; start++) {
     let totalSimilarity = 0;
     let allAboveThreshold = true;
 
     for (let j = 0; j < searchLines.length; j++) {
       const sim = lineSimilarity(searchLines[j], docLines[start + j].trim());
-      if (sim < LINE_SIMILARITY_THRESHOLD) {
-        allAboveThreshold = false;
-        break;
-      }
+      if (sim < LINE_SIMILARITY_THRESHOLD) allAboveThreshold = false;
       totalSimilarity += sim;
     }
 
-    if (!allAboveThreshold) continue;
-
     const avgSimilarity = totalSimilarity / searchLines.length;
-    if (avgSimilarity > bestScore && avgSimilarity >= minConfidence) {
-      bestScore = avgSimilarity;
+    if (avgSimilarity > bestObserved) bestObserved = avgSimilarity;
+
+    if (allAboveThreshold && avgSimilarity > bestAccepted && avgSimilarity >= minConfidence) {
+      bestAccepted = avgSimilarity;
       bestMatch = {
         startLine: start + 1,
         endLine: start + searchLines.length,
@@ -279,7 +305,7 @@ function findFuzzyLineMatch(
     }
   }
 
-  return bestMatch;
+  return { match: bestMatch, bestScore: bestObserved };
 }
 
 /**

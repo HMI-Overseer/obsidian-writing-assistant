@@ -40,9 +40,12 @@ export interface CanonicalToolDefinition {
    */
   strategyHint?: string;
   /**
-   * What to do when this tool returns an error result.
-   * Shown in the error handling section of the system prompt.
-   * Not sent to the API — system-prompt generation only.
+   * Static, prompt-level *strategy* for when this tool class errors — the general
+   * move, authored once and surfaced in the error-handling section of the system
+   * prompt ({@link ./vault/systemPrompt}). It is the complement of the *situated*
+   * recovery a failed call carries on its result ({@link ToolResult.failure}): the
+   * prompt says the strategy, the result says this call's specific fix. They do not
+   * overlap. Not sent to the API — system-prompt generation only.
    */
   errorGuidance?: string;
   /**
@@ -59,6 +62,53 @@ export interface ToolCall {
   arguments: Record<string, unknown>;
 }
 
+/**
+ * A small, closed vocabulary of failure *kinds* — the machine-readable analogue of
+ * what {@link ../vault-ops/disposition.VaultOpDisposition} is for mutation outcomes.
+ * Its load-bearing use is driving the {@link toolFailure} builder: each kind maps to a
+ * recovery-shaped sentence so every error names what failed *and* what to try next.
+ * That recovery text in `content` is what reaches the model — the feedback loop is
+ * complete without anything reading `kind` off the result. The `kind` is kept on the
+ * result as a cheap typed handle for any future in-loop steering (e.g. don't retry a
+ * `denied` tool); nothing branches on it yet.
+ *
+ * Kept small and exhaustive on purpose (the same discipline as `VaultOpDisposition`):
+ *   - `not-found`     — a named target doesn't exist (a path, note, or folder).
+ *   - `invalid-args`  — the call's arguments are missing or malformed.
+ *   - `no-match`      — the input was valid but nothing matched (an edit's search
+ *                       text, a content query that blocks an action).
+ *   - `ambiguous`     — more than one candidate matched; the call can't choose.
+ *   - `precondition`  — a required state doesn't hold (wrong target, stale snapshot,
+ *                       "this turn already edits another file").
+ *   - `unavailable`   — a capability can't run right now (no embedding backend, cold
+ *                       index, unreachable model, missing execution context).
+ *   - `denied`        — policy forbids the action; retrying is pointless.
+ *   - `failed`        — the action ran but failed to complete (apply/IO error).
+ */
+export type ErrorKind =
+  | "not-found"
+  | "invalid-args"
+  | "no-match"
+  | "ambiguous"
+  | "precondition"
+  | "unavailable"
+  | "denied"
+  | "failed";
+
+/**
+ * Structured failure carried alongside {@link ToolResult.content}. `content` stays
+ * the human/model sentence; `kind` is the stable code a consumer can branch on;
+ * `recovery` is the situated next step the model acts on (also embedded in `content`).
+ * Additive and optional — handlers populate it as they migrate to the contract, and
+ * the MCP bridge flattens it to `content` + `isError`, so untouched paths behave as
+ * before.
+ */
+export interface ToolFailure {
+  kind: ErrorKind;
+  /** One-line, situated, recovery-shaped next step. */
+  recovery?: string;
+}
+
 /** Result returned by a tool handler. */
 export interface ToolResult {
   /** Text content returned to the model. */
@@ -67,4 +117,9 @@ export interface ToolResult {
   isReadOnly: boolean;
   /** Whether the tool execution failed. */
   isError?: boolean;
+  /**
+   * Structured failure detail when `isError` is true. Optional — its absence on an
+   * error result means "not yet migrated to the contract," not "no failure."
+   */
+  failure?: ToolFailure;
 }

@@ -19,6 +19,7 @@ import {
   filterSemanticSearchByAvailability,
 } from "../tools/vault/definition";
 import { executeVaultTool } from "../tools/vault/handlers";
+import { toolFailure } from "../tools/toolFailure";
 import { ALL_EDIT_TOOLS, EDIT_TOOL_NAMES } from "../tools/editing/definition";
 import { executeEditTool } from "../tools/editing/handlers";
 import { allowedVaultOpsTools, VAULT_OPS_TOOL_NAMES } from "../tools/vault-ops/definition";
@@ -397,7 +398,11 @@ export class ClaudeCodeService {
     }
     if (EDIT_TOOL_NAMES.has(call.name)) {
       if (!this.collectingEdits) {
-        return { content: `Editing is not available in this mode: ${call.name}`, isReadOnly: false, isError: true };
+        return toolFailure({
+          kind: "unavailable",
+          what: `editing is not available in this mode (${call.name})`,
+          isReadOnly: false,
+        });
       }
       // Live in-loop review: suspend on the edit until the user accepts/declines and
       // return the real disposition, mirroring vault ops (resolveEditOne). The diff
@@ -420,7 +425,11 @@ export class ClaudeCodeService {
     }
     if (VAULT_OPS_TOOL_NAMES.has(call.name)) {
       if (!this.collectingEdits) {
-        return { content: `Vault operations are not available in this mode: ${call.name}`, isReadOnly: false, isError: true };
+        return toolFailure({
+          kind: "unavailable",
+          what: `vault operations are not available in this mode (${call.name})`,
+          isReadOnly: false,
+        });
       }
       // Live in-loop review: suspend on an `ask` op until the user approves or
       // declines, returning the real disposition as this call's result. The SDK
@@ -438,7 +447,11 @@ export class ClaudeCodeService {
       }
       return result;
     }
-    return { content: `Unknown tool: ${call.name}`, isReadOnly: true, isError: true };
+    return toolFailure({
+      kind: "invalid-args",
+      what: `unknown tool "${call.name}"`,
+      recovery: "call one of the advertised tools instead",
+    });
   }
 
   destroy(): void {

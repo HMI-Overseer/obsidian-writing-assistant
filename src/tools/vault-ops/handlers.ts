@@ -2,6 +2,7 @@ import type { App } from "obsidian";
 import type { ToolCall, ToolResult } from "../types";
 import type { VaultOperation } from "../../vault-ops/types";
 import { diskState } from "../../vault-ops/apply";
+import { toolFailure } from "../toolFailure";
 import { VAULT_OPS_TOOL_NAMES } from "./definition";
 import { buildOverlay, makeResolver, type PendingOverlay } from "./overlay";
 import { toVaultOperations, type ConversionProbes } from "./conversion";
@@ -33,7 +34,7 @@ export interface VaultOpContext {
  */
 export function executeVaultOpTool(call: ToolCall, ctx: VaultOpContext): ToolResult {
   if (!VAULT_OPS_TOOL_NAMES.has(call.name)) {
-    return { content: `Unknown vault operation tool: ${call.name}`, isReadOnly: false, isError: true };
+    return unknownVaultOpTool(call.name);
   }
 
   const resolve = makeResolver(ctx.overlay, (path) => diskState(ctx.app, path));
@@ -64,8 +65,17 @@ export function executeVaultOpTool(call: ToolCall, ctx: VaultOpContext): ToolRes
       return queued(`Trash "${v.args.path}"`);
     }
     default:
-      return { content: `Unknown vault operation tool: ${call.name}`, isReadOnly: false, isError: true };
+      return unknownVaultOpTool(call.name);
   }
+}
+
+function unknownVaultOpTool(name: string): ToolResult {
+  return toolFailure({
+    kind: "invalid-args",
+    what: `unknown vault operation tool "${name}"`,
+    recovery: "call one of the advertised vault operation tools instead",
+    isReadOnly: false,
+  });
 }
 
 /**
@@ -100,5 +110,9 @@ function queued(summary: string): ToolResult {
 }
 
 function fail(tool: string, error: string): ToolResult {
-  return { content: `Invalid ${tool} arguments: ${error}`, isReadOnly: false, isError: true };
+  return toolFailure({
+    kind: "invalid-args",
+    what: `invalid ${tool} arguments: ${error}`,
+    isReadOnly: false,
+  });
 }

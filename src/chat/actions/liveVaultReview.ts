@@ -1,5 +1,5 @@
 import { type App, type Component, type MetadataCache, type TFile, normalizePath } from "obsidian";
-import type { ToolCall, ToolResult } from "../../tools/types";
+import type { ErrorKind, ToolCall, ToolResult } from "../../tools/types";
 import type {
   AppliedVaultOpRecord,
   ReviewableVaultOp,
@@ -29,6 +29,7 @@ import type {
   EditBlock,
   EditProposal,
   EditStatus,
+  MatchType,
 } from "../../editing/editTypes";
 import { resolveEdits } from "../../editing/diffEngine";
 import { EditReviewController } from "../../editing/EditReviewController";
@@ -36,6 +37,7 @@ import type { InlineDiffManager } from "../../editing/inlineDiff/InlineDiffManag
 import { DiffReviewPanel } from "../messages/DiffReviewPanel";
 import { convertToolCallToEditBlock } from "../../tools/editing/conversion";
 import { resolveStructuralEditBlocks } from "../../tools/editing/handlers";
+import { defaultRecovery, trimDot } from "../../tools/toolFailure";
 import { generateId } from "../../utils";
 
 interface ExtendedMetadataCache extends MetadataCache {
@@ -207,18 +209,31 @@ export class LiveVaultReview {
    * call is resolved in-loop with the real three-tier {@link resolveEdits} (not a
    * cheap exact pre-flight), gated by the `edit` policy, and blocks on the user
    * when `ask` — returning the *real* disposition as that call's tool result. A
-   * confidence-0 no-match is reported honestly as `failed` (concern C), never a
-   * silent drop.
+   * no-match is reported honestly as `failed`, never a silent drop.
    */
   async resolveEdits(calls: ToolCall[]): Promise<Array<{ tc: ToolCall; result: ToolResult }>> {
     if (calls.length === 0) return [];
     const deps = this.editDeps;
     if (!deps) {
-      return calls.map((tc) => ({ tc, result: editError(tc, "edit review context unavailable") }));
+      return calls.map((tc) => ({
+        tc,
+        result: editError(
+          tc,
+          "edit review context unavailable",
+          "unavailable",
+          "retry the edit in a new message",
+        ),
+      }));
     }
 
     const results = new Map<string, ToolResult>();
-    type Parked = { callId: string; hunkId: string; kind: EditOpKind; path: string };
+    type Parked = {
+      callId: string;
+      hunkId: string;
+      kind: EditOpKind;
+      path: string;
+      matchType: MatchType;
+    };
 
     // Registration + auto-apply run under the shared lock so the per-turn auto
     // budget and the controller stay consistent with the file-op channel; parking
@@ -236,12 +251,29 @@ export class LiveVaultReview {
           continue;
         }
 
+        // A propose_edit with empty search text would otherwise resolve as a bogus
+        // exact match (indexOf("") === 0) and silently insert at the top of the file.
+        // Frontmatter blocks legitimately carry empty search (insert-at-top), so guard
+        // only the prose edit channel — mirroring the legacy executeProposeEdit check.
+        if (kind === "edit" && block.searchText === "") {
+          results.set(
+            call.id,
+            editError(call, "search text is empty", "invalid-args", "pass the exact text you want to replace"),
+          );
+          continue;
+        }
+
         // The model names its target via the required `path` arg (no active-doc
         // fallback) — so an edit lands on the file it read, not whatever pane is open.
         if (!block.targetPath) {
           results.set(
             call.id,
-            editError(call, "missing required 'path' — pass the vault-relative path of the note to edit"),
+            editError(
+              call,
+              "missing required 'path'",
+              "invalid-args",
+              "pass the vault-relative path of the note to edit",
+            ),
           );
           continue;
         }
@@ -249,7 +281,12 @@ export class LiveVaultReview {
         if (!file) {
           results.set(
             call.id,
-            editError(call, `file not found: "${block.targetPath}" — check the path, or use write_file to create it`),
+            editError(
+              call,
+              `file not found at "${block.targetPath}"`,
+              "not-found",
+              "check the path, or use write_file to create it",
+            ),
           );
           continue;
         }
@@ -261,7 +298,9 @@ export class LiveVaultReview {
             call.id,
             editError(
               call,
-              `this turn already edits "${this.editTargetPath}" — edit "${file.path}" in a separate message`,
+              `this turn already edits "${this.editTargetPath}"`,
+              "precondition",
+              `edit "${file.path}" in a separate message`,
             ),
           );
           continue;
@@ -275,24 +314,26 @@ export class LiveVaultReview {
 
         const resolvedBlock = await this.resolveStructural(block, file.path);
         const [resolved] = resolveEdits([resolvedBlock], docText, deps.resolveOptions);
-        if (!resolved || resolved.confidence === 0) {
-          // Concern C: honest no-match. The model self-corrects on this result.
+        if (!resolved || resolved.matchType === "none") {
+          // Honest no-match — the model self-corrects on this result. `nearMiss` steers
+          // the recovery: a close-but-rejected window is a wording difference (spacing
+          // is already handled by the whitespace tier upstream), so nudge "re-read and
+          // copy exactly"; otherwise the text is simply absent, so nudge "re-read".
+          const recovery = resolved?.nearMiss
+            ? "the closest text was close but not identical — re-read that passage and copy the exact wording, then retry"
+            : "no location matched the search text; re-read the file and retry";
           results.set(call.id, {
-            content: editDispositionMessage(
-              kind,
-              file.path,
-              "failed",
-              "no location matched the search text; re-read the file and retry",
-            ),
+            content: editDispositionMessage(kind, file.path, "failed", recovery, "none"),
             isReadOnly: false,
             isError: true,
+            failure: { kind: "no-match", recovery },
           });
           continue;
         }
 
         const gate = resolveEditGate(this.policy, file.path, this.autoSoFar);
         if (gate === "deny") {
-          results.set(call.id, editError(call, "edits are denied by the current policy"));
+          results.set(call.id, editError(call, "edits are denied by the current policy", "denied"));
           continue;
         }
 
@@ -300,12 +341,13 @@ export class LiveVaultReview {
         const hunk: DiffHunk = { id: generateId(), resolvedEdit: resolved, status: "pending" };
         controller.proposal.hunks.push(hunk);
 
+        const matchType = resolved.matchType;
         if (gate === "auto") {
           this.autoSoFar++;
-          autoApplied.push({ callId: call.id, hunkId: hunk.id, kind, path: file.path });
+          autoApplied.push({ callId: call.id, hunkId: hunk.id, kind, path: file.path, matchType });
         } else {
           this.park(hunk.id);
-          parked.push({ callId: call.id, hunkId: hunk.id, kind, path: file.path });
+          parked.push({ callId: call.id, hunkId: hunk.id, kind, path: file.path, matchType });
         }
       }
 
@@ -314,15 +356,18 @@ export class LiveVaultReview {
       for (const a of autoApplied) {
         await this.editController?.accept(a.hunkId);
         const applied = this.editController?.getStatus(a.hunkId) === "accepted";
+        const reason = applied ? undefined : "the edit could not be applied to the document";
         results.set(a.callId, {
           content: editDispositionMessage(
             a.kind,
             a.path,
             applied ? "auto-applied" : "failed",
-            applied ? undefined : "the edit could not be applied to the document",
+            reason,
+            a.matchType,
           ),
           isReadOnly: false,
           isError: !applied,
+          failure: applied ? undefined : { kind: "failed", recovery: reason },
         });
       }
       if (autoApplied.length > 0) this.renderEditPanel();
@@ -339,9 +384,10 @@ export class LiveVaultReview {
         }
         const { disposition, reason } = await pending.promise;
         results.set(p.callId, {
-          content: editDispositionMessage(p.kind, p.path, disposition, reason),
+          content: editDispositionMessage(p.kind, p.path, disposition, reason, p.matchType),
           isReadOnly: false,
           isError: disposition === "failed",
+          failure: disposition === "failed" ? { kind: "failed", recovery: reason } : undefined,
         });
       }),
     );
@@ -433,10 +479,16 @@ export class LiveVaultReview {
       const found = opByCall.get(call.id);
       if (!found) {
         const error = errByCall.get(call.id) ?? "could not convert operation";
+        const recovery = defaultRecovery("invalid-args");
         entries.push({
           call,
           kind: "error",
-          result: { content: `Invalid ${call.name} arguments: ${error}`, isReadOnly: false, isError: true },
+          result: {
+            content: `Error: invalid ${call.name} arguments — ${trimDot(error)}. ${trimDot(recovery)}.`,
+            isReadOnly: false,
+            isError: true,
+            failure: { kind: "invalid-args", recovery },
+          },
         });
         continue;
       }
@@ -445,10 +497,16 @@ export class LiveVaultReview {
       const gate = isSatisfied ? "auto" : resolveGate(op, this.policy, this.autoSoFar);
       if (gate === "deny") {
         // Denied tools are filtered upstream (Phase 4); guard anyway.
+        const recovery = defaultRecovery("denied");
         entries.push({
           call,
           kind: "error",
-          result: { content: `${call.name} is not permitted by the current policy.`, isReadOnly: false, isError: true },
+          result: {
+            content: `Error: ${call.name} is not permitted by the current policy. ${trimDot(recovery)}.`,
+            isReadOnly: false,
+            isError: true,
+            failure: { kind: "denied", recovery },
+          },
         });
         continue;
       }
@@ -650,6 +708,7 @@ function dispoResult(
     content: dispositionMessage(op, disposition, reason),
     isReadOnly: false,
     isError: disposition === "failed",
+    failure: disposition === "failed" ? { kind: "failed", recovery: reason } : undefined,
   };
 }
 
@@ -658,9 +717,25 @@ function cancelledFallback(call: ToolCall): ToolResult {
   return { content: `${call.name} review was interrupted; still pending.`, isReadOnly: false };
 }
 
-/** An invalid / denied edit call — surfaced as the call's error tool result. */
-function editError(call: ToolCall, reason: string): ToolResult {
-  return { content: `${call.name} could not run: ${reason}.`, isReadOnly: false, isError: true };
+/**
+ * An invalid / denied edit call — surfaced as the call's error tool result. `what`
+ * names the failure; `recovery` is the situated next step, defaulting per kind (via
+ * the shared {@link defaultRecovery}) so every edit error carries one even when the
+ * caller passes none. "Error:" prefix + uniform punctuation match the read channel.
+ */
+function editError(
+  call: ToolCall,
+  what: string,
+  kind: ErrorKind = "invalid-args",
+  recovery?: string,
+): ToolResult {
+  const step = recovery ?? defaultRecovery(kind);
+  return {
+    content: `Error: ${call.name} could not run: ${trimDot(what)}. ${trimDot(step)}.`,
+    isReadOnly: false,
+    isError: true,
+    failure: { kind, recovery: step },
+  };
 }
 
 /** A parked edit cancelled before the user decided (abort / new turn). */

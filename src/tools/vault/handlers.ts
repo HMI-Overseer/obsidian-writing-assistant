@@ -10,6 +10,7 @@ interface ExtendedMetadataCache extends MetadataCache {
   getTags(): Record<string, number>;
 }
 import type { ToolCall, ToolResult } from "../types";
+import { toolFailure } from "../toolFailure";
 import type { RagContextBlock } from "../../shared/chatRequest";
 import { RagRetrievalError } from "../../rag/ragService";
 import type { RagService } from "../../rag/ragService";
@@ -54,11 +55,11 @@ export async function executeVaultTool(
     case "get_frontmatter":
       return executeGetFrontmatter(toolCall.arguments, ctx);
     default:
-      return {
-        content: `Unknown vault tool: ${toolCall.name}`,
-        isReadOnly: true,
-        isError: true,
-      };
+      return toolFailure({
+        kind: "invalid-args",
+        what: `unknown vault tool "${toolCall.name}"`,
+        recovery: "call one of the advertised vault tools instead",
+      });
   }
 }
 
@@ -72,19 +73,21 @@ async function executeSearchVault(
 ): Promise<ToolResult> {
   const query = typeof args.query === "string" ? args.query.trim() : "";
   if (!query) {
-    return { content: "Error: query is required.", isReadOnly: true, isError: true };
+    return toolFailure({ kind: "invalid-args", what: "query is required" });
   }
 
   // Branch the "can't run" cases on the exact reason, so the model is never told
   // the vault is empty when search merely couldn't run, and never pointed at a
-  // recovery it can't perform (e.g. "build the index" for a no-backend user).
+  // recovery it can't perform (e.g. "build the index" for a no-backend user). The
+  // curated message already reads as a full recovery contract, so it passes through
+  // verbatim as `content`; `failure.kind` makes the unavailability machine-readable.
   const availability = ctx.ragService.availability();
   if (availability !== "ready") {
-    return {
+    return toolFailure({
+      kind: "unavailable",
       content: SEMANTIC_SEARCH_UNAVAILABLE_MESSAGE[availability],
-      isReadOnly: true,
-      isError: true,
-    };
+      recovery: "use search_content for an exact-string lookup instead",
+    });
   }
 
   let results: RagContextBlock[] | null;
@@ -94,18 +97,22 @@ async function executeSearchVault(
     // A live backend that failed at call time — a failure to run, reported as such
     // (isError) rather than laundered into "found nothing".
     if (e instanceof RagRetrievalError) {
-      return {
+      return toolFailure({
+        kind: "unavailable",
         content: SEMANTIC_SEARCH_UNAVAILABLE_MESSAGE.unreachable,
-        isReadOnly: true,
-        isError: true,
-      };
+        recovery: "use search_content for an exact-string lookup instead",
+      });
     }
     throw e;
   }
 
   if (!results || results.length === 0) {
+    // Ran fine, found nothing — a valid empty result, not a failure (no `isError`).
+    // Still recovery-shaped per the contract's wording rule.
     return {
-      content: `No results found for query: "${query}"`,
+      content:
+        `No results found for query: "${query}". ` +
+        "Retry once with a more specific query, or use search_content for an exact-string lookup.",
       isReadOnly: true,
     };
   }
@@ -127,17 +134,17 @@ async function executeReadFile(
 ): Promise<ToolResult> {
   const rawPath = typeof args.path === "string" ? args.path.trim() : "";
   if (!rawPath) {
-    return { content: "Error: path is required.", isReadOnly: true, isError: true };
+    return toolFailure({ kind: "invalid-args", what: "path is required" });
   }
 
   const path = normalizePath(rawPath);
   const file = ctx.app.vault.getFileByPath(path);
   if (!file) {
-    return {
-      content: `Error: no note found at path "${path}".`,
-      isReadOnly: true,
-      isError: true,
-    };
+    return toolFailure({
+      kind: "not-found",
+      what: `no note found at path "${path}"`,
+      recovery: "call list_directory or search_files to find the correct path",
+    });
   }
 
   const content = await ctx.app.vault.read(file);
@@ -156,11 +163,11 @@ async function executeListDirectory(
     : ctx.app.vault.getRoot();
 
   if (!folder || !(folder instanceof TFolder)) {
-    return {
-      content: `Error: folder not found at path "${rawPath || "/"}".`,
-      isReadOnly: true,
-      isError: true,
-    };
+    return toolFailure({
+      kind: "not-found",
+      what: `folder not found at path "${rawPath || "/"}"`,
+      recovery: "list a parent folder, or omit path to list the vault root",
+    });
   }
 
   const items: string[] = [];
@@ -191,11 +198,11 @@ async function executeDirectoryTree(
     : ctx.app.vault.getRoot();
 
   if (!folder || !(folder instanceof TFolder)) {
-    return {
-      content: `Error: folder not found at path "${rawPath || "/"}".`,
-      isReadOnly: true,
-      isError: true,
-    };
+    return toolFailure({
+      kind: "not-found",
+      what: `folder not found at path "${rawPath || "/"}"`,
+      recovery: "list a parent folder, or omit path for the whole vault tree",
+    });
   }
 
   const tree = buildDirectoryTree(folder);
@@ -239,7 +246,7 @@ async function executeSearchFiles(
 ): Promise<ToolResult> {
   const rawPattern = typeof args.pattern === "string" ? args.pattern.trim() : "";
   if (!rawPattern) {
-    return { content: "Error: pattern is required.", isReadOnly: true, isError: true };
+    return toolFailure({ kind: "invalid-args", what: "pattern is required" });
   }
 
   const rawPath = typeof args.path === "string" ? args.path.trim() : "";
@@ -266,7 +273,9 @@ async function executeSearchFiles(
   if (matches.length === 0) {
     const scope = rawPath ? `in "${rawPath}"` : "in vault";
     return {
-      content: `No notes found matching pattern "${rawPattern}" ${scope}.`,
+      content:
+        `No notes found matching pattern "${rawPattern}" ${scope}. ` +
+        "Loosen the glob (e.g. *term*), drop the path scope, or use search_content to match on body text.",
       isReadOnly: true,
     };
   }
@@ -297,7 +306,7 @@ async function executeSearchContent(
 ): Promise<ToolResult> {
   const query = typeof args.query === "string" ? args.query.trim() : "";
   if (!query) {
-    return { content: "Error: query is required.", isReadOnly: true, isError: true };
+    return toolFailure({ kind: "invalid-args", what: "query is required" });
   }
 
   const useRegex = args.regex === true;
@@ -323,11 +332,11 @@ async function executeSearchContent(
       rx = new RegExp(query, caseSensitive ? "" : "i");
     } catch (e) {
       const reason = e instanceof Error ? e.message : "invalid pattern";
-      return {
-        content: `Error: invalid regex "${query}": ${reason}. Fix the pattern or set regex to false.`,
-        isReadOnly: true,
-        isError: true,
-      };
+      return toolFailure({
+        kind: "invalid-args",
+        what: `invalid regex "${query}": ${reason}`,
+        recovery: "fix the pattern, or set regex to false for a literal substring search",
+      });
     }
     matcher = (line) => {
       const m = rx.exec(line);
@@ -374,7 +383,9 @@ async function executeSearchContent(
   if (totalMatches === 0) {
     const scope = rawPath ? ` in "${rawPath}"` : "";
     return {
-      content: `No matches found for ${useRegex ? "pattern" : "text"} "${query}"${scope}.`,
+      content:
+        `No matches found for ${useRegex ? "pattern" : "text"} "${query}"${scope}. ` +
+        "Try a shorter or differently-spelled term, drop the path scope, or use semantic_search for a meaning-based lookup.",
       isReadOnly: true,
     };
   }
@@ -482,24 +493,27 @@ async function executeGetBacklinks(
 ): Promise<ToolResult> {
   const rawPath = typeof args.path === "string" ? args.path.trim() : "";
   if (!rawPath) {
-    return { content: "Error: path is required.", isReadOnly: true, isError: true };
+    return toolFailure({ kind: "invalid-args", what: "path is required" });
   }
 
   const path = normalizePath(rawPath);
   const file = ctx.app.vault.getFileByPath(path);
   if (!file) {
-    return {
-      content: `Error: no note found at path "${path}".`,
-      isReadOnly: true,
-      isError: true,
-    };
+    return toolFailure({
+      kind: "not-found",
+      what: `no note found at path "${path}"`,
+      recovery: "call list_directory or search_files to find the correct path",
+    });
   }
 
   const backlinks = (ctx.app.metadataCache as ExtendedMetadataCache).getBacklinksForFile(file);
   const paths = Object.keys(backlinks.data).sort();
 
   if (paths.length === 0) {
-    return { content: `No notes link to "${path}".`, isReadOnly: true };
+    return {
+      content: `No notes link to "${path}". This note has no incoming wikilinks; nothing to follow up.`,
+      isReadOnly: true,
+    };
   }
 
   return {
@@ -514,7 +528,7 @@ async function executeFindNotesByTag(
 ): Promise<ToolResult> {
   const rawTag = typeof args.tag === "string" ? args.tag.trim() : "";
   if (!rawTag) {
-    return { content: "Error: tag is required.", isReadOnly: true, isError: true };
+    return toolFailure({ kind: "invalid-args", what: "tag is required" });
   }
 
   // Normalise to #tag form for comparison.
@@ -549,7 +563,10 @@ async function executeFindNotesByTag(
     const similar = Object.keys(allTags)
       .filter((t) => t.toLowerCase().includes(stem.toLowerCase()))
       .slice(0, 5);
-    const hint = similar.length > 0 ? `\nSimilar tags in vault: ${similar.join(", ")}` : "";
+    const hint =
+      similar.length > 0
+        ? `\nSimilar tags in vault: ${similar.join(", ")} — try one of those.`
+        : " No similar tags exist; call list_directory to discover which tags the vault uses.";
     return {
       content: `No notes found with tag "${normalizedTag}".${hint}`,
       isReadOnly: true,
@@ -569,7 +586,11 @@ async function executeGetFrontmatter(
 ): Promise<ToolResult> {
   const paths = Array.isArray(args.paths) ? args.paths : [];
   if (paths.length === 0) {
-    return { content: "Error: paths array is required.", isReadOnly: true, isError: true };
+    return toolFailure({
+      kind: "invalid-args",
+      what: "a non-empty paths array is required",
+      recovery: "pass one or more vault-relative note paths",
+    });
   }
 
   const results: Record<string, unknown> = {};

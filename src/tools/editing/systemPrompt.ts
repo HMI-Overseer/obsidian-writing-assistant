@@ -44,8 +44,8 @@ export function buildEditToolSystemPrompt(tools: CanonicalToolDefinition[]): str
     .join("\n");
 
   const errorSection = errorEntries
-    ? `\n## Edit error handling\n${errorEntries}\n- After two consecutive errors toward the same goal, stop retrying and tell the user what went wrong.`
-    : "";
+    ? `\n## Edit error handling\nA tool result that begins with "Error:" means the call failed; the rest of the line says why and what to try.\n${errorEntries}\n- After two consecutive errors toward the same goal, stop retrying and tell the user what went wrong.`
+    : `\n## Edit error handling\nA tool result that begins with "Error:" means the call failed; the rest of the line says why and what to try. After two consecutive errors toward the same goal, stop retrying and tell the user what went wrong.`;
 
   return `## Edit tools
 Use the right tool for the task:

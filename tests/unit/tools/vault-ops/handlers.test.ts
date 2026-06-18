@@ -41,7 +41,9 @@ describe("executeVaultOpTool", () => {
     const app = makeApp({});
     const result = executeVaultOpTool(call("delete_everything", {}), { app, overlay: NO_OVERLAY });
     expect(result.isError).toBe(true);
-    expect(result.content).toContain("Unknown vault operation tool");
+    expect(result.content).toMatch(/^Error: /);
+    expect(result.content).toContain('unknown vault operation tool "delete_everything"');
+    expect(result.failure?.kind).toBe("invalid-args");
   });
 
   describe("write_file", () => {

@@ -30,17 +30,19 @@ describe("dispositionMessage", () => {
     expect(dispositionMessage(CREATE, "declined")).toBe('Declined by user — "Notes/Vex.md" was not changed.');
   });
 
-  it("carries the failure reason in lower-case infinitive", () => {
+  it("prefixes 'Error:' and carries the failure reason in lower-case infinitive", () => {
     expect(dispositionMessage(CREATE, "failed", "path exists")).toBe(
-      'Failed to create "Notes/Vex.md": path exists.',
+      'Error: could not create "Notes/Vex.md" — path exists.',
     );
     expect(dispositionMessage(MOVE, "failed", "target busy")).toBe(
-      'Failed to move "a.md" → "b.md": target busy.',
+      'Error: could not move "a.md" → "b.md" — target busy.',
     );
   });
 
   it("falls back to a generic reason when none is given", () => {
-    expect(dispositionMessage(CREATE, "failed")).toBe('Failed to create "Notes/Vex.md": operation failed.');
+    expect(dispositionMessage(CREATE, "failed")).toBe(
+      'Error: could not create "Notes/Vex.md" — the operation failed.',
+    );
   });
 
   it("describes a satisfied directory no-op without asserting a change", () => {
@@ -76,7 +78,7 @@ describe("editDispositionMessage", () => {
     );
   });
 
-  it("names the tool and carries the reason on failure (concern C no-match)", () => {
+  it("prefixes 'Error:', names the tool, and carries the reason on a no-match failure", () => {
     expect(
       editDispositionMessage(
         "edit",
@@ -85,16 +87,40 @@ describe("editDispositionMessage", () => {
         "no location matched the search text; re-read the file and retry",
       ),
     ).toBe(
-      'propose_edit did not apply to "The War.md": no location matched the search text; re-read the file and retry.',
+      'Error: propose_edit did not apply to "The War.md" — no location matched the search text; re-read the file and retry.',
     );
     expect(editDispositionMessage("frontmatter", "The War.md", "failed")).toBe(
-      'update_frontmatter did not apply to "The War.md": the edit could not be resolved.',
+      'Error: update_frontmatter did not apply to "The War.md" — the edit could not be resolved.',
     );
   });
 
   it("reports a cancelled edit as still pending review", () => {
     expect(editDispositionMessage("edit", "The War.md", "cancelled")).toBe(
       'Generation stopped before you decided — edit to "The War.md" is still pending review.',
+    );
+  });
+
+  it("names a non-exact match type on an applied edit so the model learns it was sloppy", () => {
+    expect(editDispositionMessage("edit", "The War.md", "applied", undefined, "fuzzy")).toBe(
+      'Applied edit to "The War.md" (fuzzy match).',
+    );
+    expect(editDispositionMessage("edit", "The War.md", "applied", undefined, "whitespace")).toBe(
+      'Applied edit to "The War.md" (whitespace-corrected match).',
+    );
+  });
+
+  it("combines the auto-applied flag and the match type in one parenthetical", () => {
+    expect(editDispositionMessage("edit", "The War.md", "auto-applied", undefined, "fuzzy")).toBe(
+      'Applied edit to "The War.md" (auto-applied, fuzzy match).',
+    );
+  });
+
+  it("stays quiet about a clean (exact) match — nothing to teach", () => {
+    expect(editDispositionMessage("edit", "The War.md", "applied", undefined, "exact")).toBe(
+      'Applied edit to "The War.md".',
+    );
+    expect(editDispositionMessage("edit", "The War.md", "auto-applied", undefined, "exact")).toBe(
+      'Applied edit to "The War.md" (auto-applied).',
     );
   });
 });

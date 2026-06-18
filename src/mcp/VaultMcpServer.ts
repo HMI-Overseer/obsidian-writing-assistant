@@ -170,6 +170,9 @@ export class VaultMcpServer {
           const name = typeof params?.name === "string" ? params.name : "";
           const args = (params?.arguments as Record<string, unknown> | undefined) ?? {};
           const toolResult = await this.provider.callTool({ id: String(id ?? ""), name, arguments: args });
+          // MCP carries only text + isError, so a structured `failure` is flattened to
+          // its sentence here — the recovery contract still reaches the model via
+          // `content`; the typed kind stays plugin-loop-only (telemetry/UI branching).
           const result = {
             content: [{ type: "text", text: toolResult.content }],
             isError: toolResult.isError ?? false,

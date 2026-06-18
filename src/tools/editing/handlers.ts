@@ -1,6 +1,7 @@
 import { type App, type TFile, normalizePath } from "obsidian";
 import type { EditBlock } from "../../editing/editTypes";
 import type { ToolCall, ToolResult } from "../types";
+import { toolFailure } from "../toolFailure";
 import { EDIT_TOOL_NAMES } from "./definition";
 import { validateProposeEdit, validateUpdateFrontmatter } from "./validation";
 import type { FrontmatterOperation } from "./validation";
@@ -29,7 +30,7 @@ export async function executeEditTool(
   ctx: ToolExecutionContext,
 ): Promise<ToolResult> {
   if (!EDIT_TOOL_NAMES.has(toolCall.name)) {
-    return { content: `Unknown edit tool: ${toolCall.name}`, isReadOnly: false, isError: true };
+    return unknownEditTool(toolCall.name);
   }
 
   switch (toolCall.name) {
@@ -38,8 +39,17 @@ export async function executeEditTool(
     case "update_frontmatter":
       return executeUpdateFrontmatter(toolCall.arguments);
     default:
-      return { content: `Unknown edit tool: ${toolCall.name}`, isReadOnly: false, isError: true };
+      return unknownEditTool(toolCall.name);
   }
+}
+
+function unknownEditTool(name: string): ToolResult {
+  return toolFailure({
+    kind: "invalid-args",
+    what: `unknown edit tool "${name}"`,
+    recovery: "call one of the advertised edit tools instead",
+    isReadOnly: false,
+  });
 }
 
 /**
@@ -64,37 +74,45 @@ async function executeProposeEdit(
 ): Promise<ToolResult> {
   const v = validateProposeEdit(args);
   if (!v.ok) {
-    return { content: `Invalid propose_edit arguments: ${v.error}`, isReadOnly: false, isError: true };
+    return toolFailure({
+      kind: "invalid-args",
+      what: `invalid propose_edit arguments: ${v.error}`,
+      isReadOnly: false,
+    });
   }
 
   const searchText = normalizeEscapes(v.args.search);
   if (!searchText) {
-    return { content: "search text must not be empty.", isReadOnly: false, isError: true };
+    return toolFailure({
+      kind: "invalid-args",
+      what: "search text is empty",
+      recovery: "pass the exact text you want to replace",
+      isReadOnly: false,
+    });
   }
 
   const target = resolveTargetFile(ctx, v.args.path);
   if (!target) {
-    return {
-      content:
-        "No target note. Pass `path` (the vault-relative path of the note to edit), " +
-        "or open the file you want to edit.",
+    return toolFailure({
+      kind: "invalid-args",
+      what: "no target note",
+      recovery:
+        "pass `path` (the vault-relative path of the note to edit), or open the file you want to edit",
       isReadOnly: false,
-      isError: true,
-    };
+    });
   }
 
   const content = await ctx.app.vault.read(target.file);
   const idx = content.indexOf(searchText);
 
   if (idx === -1) {
-    return {
-      content:
-        `Search text not found in "${target.path}". ` +
-        "Ensure the search string matches the document exactly, including whitespace and indentation. " +
-        "Use read_file to verify the current content.",
+    return toolFailure({
+      kind: "no-match",
+      what: `search text not found in "${target.path}"`,
+      recovery:
+        "match the document exactly, including whitespace and indentation, or use read_file to verify the current content",
       isReadOnly: false,
-      isError: true,
-    };
+    });
   }
 
   const lineNumber = content.slice(0, idx).split("\n").length;
@@ -110,11 +128,13 @@ function executeUpdateFrontmatter(
 ): Promise<ToolResult> {
   const v = validateUpdateFrontmatter(args);
   if (!v.ok) {
-    return Promise.resolve({
-      content: `Invalid update_frontmatter arguments: ${v.error}`,
-      isReadOnly: false,
-      isError: true,
-    });
+    return Promise.resolve(
+      toolFailure({
+        kind: "invalid-args",
+        what: `invalid update_frontmatter arguments: ${v.error}`,
+        isReadOnly: false,
+      }),
+    );
   }
 
   const summary = v.args.operations

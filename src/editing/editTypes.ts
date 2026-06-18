@@ -15,6 +15,18 @@ export interface EditBlock {
   toolArgs?: Record<string, unknown>;
 }
 
+/**
+ * How an edit's search text matched the document, in plain words the model can read
+ * directly (not tier numbers or confidence values):
+ *   - `exact`      — found verbatim.
+ *   - `whitespace` — same text, only spacing/indentation differed.
+ *   - `fuzzy`      — close but not identical (the model was sloppy).
+ *   - `none`       — nothing matched.
+ * Mirrors the three resolver tiers in {@link ./diffEngine.resolveEdits}; `fuzzy`/
+ * `whitespace`/`exact` only occur on a match, `none` only on a miss.
+ */
+export type MatchType = "exact" | "whitespace" | "fuzzy" | "none";
+
 /** An EditBlock resolved against the actual document content. */
 export interface ResolvedEdit {
   id: string;
@@ -35,6 +47,14 @@ export interface ResolvedEdit {
   contextAfter: string[];
   /** Match confidence: 1.0 = exact, 0.95 = whitespace-normalized, lower = fuzzy. */
   confidence: number;
+  /** Which resolver tier produced the match, in plain words ({@link MatchType}). */
+  matchType: MatchType;
+  /**
+   * For a `none` match only: true when the closest sliding window was *similar* but
+   * fell below the acceptance threshold — the "you were close, copy the exact wording"
+   * signal vs "that text isn't here, re-read." Absent/false means no near candidate.
+   */
+  nearMiss?: boolean;
 }
 
 export type EditStatus = "pending" | "accepted" | "rejected";

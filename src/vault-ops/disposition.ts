@@ -7,7 +7,9 @@
  * outcome the UI doesn't hold. Pure — no Obsidian, no disk — so it is unit-testable.
  */
 
+import { assertNever } from "../utils";
 import type { VaultOperation } from "./types";
+import type { MatchType } from "../editing/editTypes";
 
 /**
  * The fate of one op as reported back to the model:
@@ -82,13 +84,17 @@ export function dispositionMessage(
     case "declined":
       return `Declined by user — ${target(op)} was not changed.`;
     case "failed":
-      return `Failed to ${actionVerb(op)} ${target(op)}: ${reason ?? "operation failed"}.`;
+      // "Error:" prefix so the model reads this as a failure on the text-only loop
+      // channel, the same signal the read tools and the system prompt rely on.
+      return `Error: could not ${actionVerb(op)} ${target(op)} — ${reason ?? "the operation failed"}.`;
     case "satisfied":
       return op.kind === "createDir"
         ? `Folder ${target(op)} already exists; nothing to do.`
         : `${target(op)} already satisfied; nothing to do.`;
     case "cancelled":
       return `Generation stopped before you decided — ${target(op)} is still pending review.`;
+    default:
+      return assertNever(disposition);
   }
 }
 
@@ -96,32 +102,71 @@ export function dispositionMessage(
 export type EditOpKind = "edit" | "frontmatter";
 
 /**
+ * The match tier, in plain words, for an *applied* edit — the diagnostic the channel
+ * computes and otherwise discards. Returns null for `exact` (a clean match teaches
+ * nothing) and `none` (only reached on failure), so success messages stay quiet
+ * unless the search text was loose enough to be worth tightening next time.
+ */
+function appliedMatchPhrase(matchType: MatchType): string | null {
+  switch (matchType) {
+    case "whitespace":
+      return "whitespace-corrected match";
+    case "fuzzy":
+      return "fuzzy match";
+    case "exact":
+    case "none":
+      return null;
+  }
+}
+
+/**
  * Build the tool-result message for a resolved in-document edit. Edits share the
  * vault-op {@link VaultOpDisposition} vocabulary (the model never sees a second
  * dialect) but read in edit terms. `failed` carries the honest reason — for a
  * confidence-0 no-match this is the self-correction prompt the model acts on.
+ *
+ * When `matchType` is supplied, an *applied* edit names how it matched (e.g.
+ * "(fuzzy match)") so the model learns when its search text was sloppy. The phrase
+ * can never assert a tier the engine didn't produce — it is derived from the same
+ * resolved edit the apply used (one state, two consumers).
  */
 export function editDispositionMessage(
   kind: EditOpKind,
   filePath: string,
   disposition: VaultOpDisposition,
   reason?: string,
+  matchType?: MatchType,
 ): string {
   const tool = kind === "frontmatter" ? "update_frontmatter" : "propose_edit";
   const what = kind === "frontmatter" ? "frontmatter update" : "edit";
   const t = `"${filePath}"`;
+
+  // Compose the trailing "(…)" for an applied edit from the optional auto-applied
+  // flag and the optional match phrase, so the two never collide into "(a) (b)".
+  const appliedSuffix = (autoFlag: boolean): string => {
+    const flags: string[] = [];
+    if (autoFlag) flags.push("auto-applied");
+    const phrase = matchType ? appliedMatchPhrase(matchType) : null;
+    if (phrase) flags.push(phrase);
+    return flags.length > 0 ? ` (${flags.join(", ")})` : "";
+  };
+
   switch (disposition) {
     case "auto-applied":
-      return `Applied ${what} to ${t} (auto-applied).`;
+      return `Applied ${what} to ${t}${appliedSuffix(true)}.`;
     case "applied":
-      return `Applied ${what} to ${t}.`;
+      return `Applied ${what} to ${t}${appliedSuffix(false)}.`;
     case "declined":
       return `Declined by user — ${what} to ${t} was not applied.`;
     case "failed":
-      return `${tool} did not apply to ${t}: ${reason ?? "the edit could not be resolved"}.`;
+      // "Error:" prefix so the model reads this as a failure on the text-only loop
+      // channel, the same signal the read tools and the system prompt rely on.
+      return `Error: ${tool} did not apply to ${t} — ${reason ?? "the edit could not be resolved"}.`;
     case "satisfied":
       return `${t} already matches; nothing to change.`;
     case "cancelled":
       return `Generation stopped before you decided — ${what} to ${t} is still pending review.`;
+    default:
+      return assertNever(disposition);
   }
 }

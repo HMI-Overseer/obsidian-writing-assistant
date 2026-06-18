@@ -22,8 +22,8 @@ export function buildVaultOpToolSystemPrompt(tools: CanonicalToolDefinition[]): 
     .join("\n");
 
   const errorSection = errorEntries
-    ? `\n\n## When an operation is rejected\n${errorEntries}`
-    : "";
+    ? `\n\n## When an operation is rejected\nA tool result that begins with "Error:" means the operation failed; the rest of the line says why and what to try. After two consecutive errors toward the same goal, stop retrying and tell the user what failed and why.\n${errorEntries}`
+    : `\n\n## When an operation is rejected\nA tool result that begins with "Error:" means the operation failed; the rest of the line says why and what to try. After two consecutive errors toward the same goal, stop retrying and tell the user what failed and why.`;
 
   return `## Vault operations
 These tools change the vault itself — creating, overwriting, moving, or trashing whole notes. Nothing is written to disk while you work: each call queues an operation that is shown to the user for review before it takes effect. Issue the complete set of changes you intend, then explain them.

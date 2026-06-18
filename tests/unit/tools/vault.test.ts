@@ -711,3 +711,37 @@ describe("unknown tool", () => {
     expect(result.isReadOnly).toBe(false);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Structured failure contract (ToolResult.failure)
+// ---------------------------------------------------------------------------
+
+describe("failure contract", () => {
+  test("a missing path is invalid-args with a recovery step", async () => {
+    const ctx = makeCtx({});
+    const result = await executeVaultTool(tc("read_file", {}), ctx);
+    expect(result.failure?.kind).toBe("invalid-args");
+    expect(result.failure?.recovery).toBeTruthy();
+  });
+
+  test("a missing note is not-found and points at a way to locate it", async () => {
+    const ctx = makeCtx({});
+    const result = await executeVaultTool(tc("read_file", { path: "Missing.md" }), ctx);
+    expect(result.failure?.kind).toBe("not-found");
+    expect(result.content).toContain("list_directory");
+  });
+
+  test("an unavailable semantic backend is tagged unavailable, not laundered to no-match", async () => {
+    const ctx = makeCtx({ ragAvailability: "no-backend" });
+    const result = await executeVaultTool(tc("semantic_search", { query: "x" }), ctx);
+    expect(result.failure?.kind).toBe("unavailable");
+  });
+
+  test("an empty (but successful) search carries no failure", async () => {
+    const a = makeFile("note.md");
+    const ctx = makeCtx({ files: [a], fileContents: { "note.md": "nothing relevant" } });
+    const result = await executeVaultTool(tc("search_content", { query: "absent" }), ctx);
+    expect(result.isError).toBeUndefined();
+    expect(result.failure).toBeUndefined();
+  });
+});

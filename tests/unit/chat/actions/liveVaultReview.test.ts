@@ -33,7 +33,10 @@ vi.mock("../../../../src/vault-ops/applyBatch", () => ({
   })),
 }));
 
-import { LiveVaultReview } from "../../../../src/chat/actions/liveVaultReview";
+import {
+  LiveVaultReview,
+  type LiveEditReviewDeps,
+} from "../../../../src/chat/actions/liveVaultReview";
 
 function makeApp(existing: { files?: string[]; folders?: string[] } = {}): App {
   const files = new Set((existing.files ?? []).map(normalizePath));
@@ -162,6 +165,33 @@ describe("LiveVaultReview", () => {
 
     expect(result.content).toBe('Folder "Notes" already exists; nothing to do.');
     expect(review.getAppliedRecord()).toBeNull();
+  });
+
+  it("rejects a propose_edit with empty search text instead of matching at offset 0", async () => {
+    // Guards the indexOf("") === 0 footgun: an empty search would otherwise resolve
+    // as a confident exact match and silently insert at the top of the file.
+    const editDeps = {
+      host: {},
+      owner: {},
+      inlineDiff: {},
+      resolveOptions: { contextLines: 3, minConfidence: 0.7 },
+    } as unknown as LiveEditReviewDeps;
+
+    const review = new LiveVaultReview({
+      app: makeApp({ files: ["Notes/A.md"] }),
+      timelineEl: TIMELINE_EL,
+      policy: POLICY({ edit: "auto" }),
+      edit: editDeps,
+    });
+
+    const [{ result }] = await review.resolveEdits([
+      { id: "e1", name: "propose_edit", arguments: { path: "Notes/A.md", search: "", replace: "x" } },
+    ]);
+
+    expect(result.isError).toBe(true);
+    expect(result.failure?.kind).toBe("invalid-args");
+    expect(result.content).toMatch(/^Error: /);
+    expect(result.content).toContain("search text is empty");
   });
 
   it("resolveOne binds the op to the supplied tool-call id (Claude Code path)", async () => {

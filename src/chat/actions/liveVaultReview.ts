@@ -1,4 +1,4 @@
-import { type App, type Component, type MetadataCache, type TFile, normalizePath } from "obsidian";
+import { type App, type MetadataCache, type TFile, normalizePath } from "obsidian";
 import type { ErrorKind, ToolCall, ToolResult } from "../../tools/types";
 import type {
   AppliedVaultOpRecord,
@@ -34,7 +34,7 @@ import type {
 import { resolveEdits } from "../../editing/diffEngine";
 import { EditReviewController } from "../../editing/EditReviewController";
 import type { InlineDiffManager } from "../../editing/inlineDiff/InlineDiffManager";
-import { DiffReviewPanel } from "../messages/DiffReviewPanel";
+import { EditReviewTimelineView } from "../messages/editReviewTimeline";
 import { convertToolCallToEditBlock } from "../../tools/editing/conversion";
 import { resolveStructuralEditBlocks } from "../../tools/editing/handlers";
 import { defaultRecovery, trimDot } from "../../tools/toolFailure";
@@ -59,16 +59,12 @@ interface PendingResolution {
 
 /**
  * Dependencies for the edit channel — present only in edit mode. Edits are vault
- * ops too, but their apply path is the {@link EditReviewController} and their
- * renderer is the {@link DiffReviewPanel} + in-note overlay (not the timeline),
- * so the coordinator needs a host to mount the live diff and the overlay manager
- * to light up the in-note view.
+ * ops too; their apply path is the {@link EditReviewController} and their review now
+ * folds into the agentic timeline via {@link EditReviewTimelineView} (like vault ops),
+ * with the in-note overlay as a second view over the same controller — so the
+ * coordinator needs only the overlay manager and the resolver tuning.
  */
 export interface LiveEditReviewDeps {
-  /** Container (in the bubble body) where the live diff panel mounts during the loop. */
-  host: HTMLElement;
-  /** Owner component for markdown render-child cleanup. */
-  owner: Component;
   /** The shared overlay manager — the second renderer over the same controller. */
   inlineDiff: InlineDiffManager;
   /** Resolver tuning from settings (context lines, min confidence). */
@@ -125,10 +121,10 @@ export class LiveVaultReview {
   private readonly editDeps?: LiveEditReviewDeps;
   /** The single edit proposal accumulated across the turn's rounds, or null until the first hunk. */
   private editProposal: EditProposal | null = null;
-  /** One controller for the whole turn — the single apply owner; the panel re-renders over it. */
+  /** One controller for the whole turn — the single apply owner; the view re-renders over it. */
   private editController: EditReviewController | null = null;
-  /** The live diff panel, re-rendered (destroy + recreate) per round over {@link editController}. */
-  private editPanel: DiffReviewPanel | null = null;
+  /** The live timeline review, re-rendered (destroy + recreate) per round over {@link editController}. */
+  private editTimelineView: EditReviewTimelineView | null = null;
   private editAppliedRecord: AppliedEditRecord | null = null;
   /** The one note this turn edits — fixed by the first resolved edit (one file per turn). */
   private editTargetPath: string | null = null;
@@ -425,14 +421,13 @@ export class LiveVaultReview {
   }
 
   /**
-   * Tear down the in-loop edit panel before finalization re-renders the durable
-   * one in the message body. The proposal/record live on; only the transient
-   * loop-time DOM is removed so it can't double up with the finalized panel.
+   * Drop the in-loop edit timeline view's controller subscription before
+   * finalization mounts the durable one. The proposal/record live on; finalization's
+   * fresh view cleans the loop-time step decorations, so nothing doubles up.
    */
   detachEditPanel(): void {
-    this.editPanel?.destroy();
-    this.editPanel = null;
-    this.editDeps?.host.remove();
+    this.editTimelineView?.destroy();
+    this.editTimelineView = null;
   }
 
   /**
@@ -663,13 +658,15 @@ export class LiveVaultReview {
     return resolved ?? block;
   }
 
-  /** Re-render the live diff panel over the kept controller and refresh the overlay. */
+  /** Re-render the live edit review on the timeline over the kept controller and refresh the overlay. */
   private renderEditPanel(): void {
     const deps = this.editDeps;
     if (!deps || !this.editController) return;
-    this.editPanel?.destroy();
-    deps.host.empty();
-    this.editPanel = new DiffReviewPanel(deps.host, this.app, deps.owner, this.editController, {
+    this.editTimelineView?.destroy();
+    this.editTimelineView = new EditReviewTimelineView({
+      timelineEl: this.timelineEl,
+      app: this.app,
+      controller: this.editController,
       live: true,
     });
     deps.inlineDiff.attach(this.editController);

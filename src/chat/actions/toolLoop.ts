@@ -39,6 +39,12 @@ const ALL_LOOP_TOOL_NAMES = new Set([
   THINK_TOOL_NAME,
 ]);
 
+/** Append a round's prose to the accumulated answer, blank-line separated. */
+function appendAnswerProse(existing: string, addition: string): string {
+  if (!addition.trim()) return existing;
+  return existing ? `${existing}\n\n${addition}` : addition;
+}
+
 /** Callbacks the tool loop uses to interact with the streaming UI. */
 export interface ToolLoopCallbacks {
   /** Called with text that should appear in the chat bubble. In agentic mode this is only called for the final round's text (flushed after the stream ends). */
@@ -54,9 +60,12 @@ export interface ToolLoopCallbacks {
   /** Called with each text delta during streaming for live reasoning display in the timeline. */
   onReasoningDelta?: (delta: string) => void;
   /**
-   * Called when a round ends.
-   * committed=true: the model called tools — keep the live reasoning entry.
-   * committed=false: the model produced a final text response — discard the live entry.
+   * Called when a round ends with reasoning that should stay in the timeline.
+   * committed=true: keep the live reasoning entry (genuine intermediate scratch
+   * before a read-only tool). committed=false: discard it — either because the
+   * round produced no reasoning, or because its prose was answer-track (it
+   * narrated a mutating action / is the final answer) and will be delivered to
+   * the bubble via {@link onDelta} instead.
    */
   onReasoningRoundFinished?: (committed: boolean, round: number) => void;
   /** Called with the first round's usage for token estimation calibration. */
@@ -115,6 +124,13 @@ export async function runToolLoop(
   let capHit = false;
   // Stop reason of the latest round that accumulated write calls (truncation guard).
   let writeStopReason: StopReason | null = null;
+  // Answer-track prose accumulated across rounds: prose that narrates a mutating
+  // action (write/edit/vault-op) plus the final round's prose. This is the
+  // user-facing answer and is flushed to the bubble at the end (agentic mode);
+  // prose that merely precedes a read-only tool stays in the timeline as
+  // reasoning instead. Solves the model saying its piece — e.g. a fenced code
+  // block — alongside a write and having it stranded as plain-text reasoning.
+  let answerProse = "";
 
   // The app, used only to translate absolute paths a model may emit into
   // vault-relative ones (normalizeVaultToolCall). Any context carries it.
@@ -134,9 +150,9 @@ export async function runToolLoop(
     );
 
     // In agentic mode, buffer deltas internally — only the timeline receives
-    // live updates. The bubble gets the text only for the final round (flushed
-    // after we confirm no tool calls follow). In non-agentic mode, deltas flow
-    // directly to the bubble as before.
+    // live updates per round. Answer-track prose is accumulated and flushed to
+    // the bubble once, after the loop. In non-agentic mode, deltas flow directly
+    // to the bubble as they arrive.
     let roundBuffer = "";
     try {
       for await (const delta of streamResult.deltas) {
@@ -148,10 +164,12 @@ export async function runToolLoop(
         callbacks.onReasoningDelta?.(delta);
       }
     } catch (e) {
-      // On abort (or other errors), flush whatever we buffered so partial
-      // text is preserved in the renderer for finalizeAbortedResponse.
-      if (agenticMode && roundBuffer) {
-        callbacks.onDelta(roundBuffer);
+      // On abort (or other errors), flush whatever we have so partial text is
+      // preserved in the renderer for finalizeAbortedResponse: earlier rounds'
+      // answer prose plus this round's partial buffer.
+      if (agenticMode) {
+        const partial = appendAnswerProse(answerProse, roundBuffer);
+        if (partial) callbacks.onDelta(partial);
       }
       throw e;
     }
@@ -191,10 +209,10 @@ export async function runToolLoop(
     });
 
     if (!hasToolCalls || !toolCalls) {
-      // Final round — flush buffered text to the bubble.
-      if (agenticMode && roundBuffer) {
-        callbacks.onDelta(roundBuffer);
-      }
+      // Final round: its prose is the answer (or its tail). Accumulate it and
+      // discard the live reasoning entry — the answer is delivered to the bubble
+      // via the single flush after the loop.
+      answerProse = appendAnswerProse(answerProse, roundText);
       callbacks.onReasoningRoundFinished?.(false, round);
       break;
     }
@@ -227,15 +245,20 @@ export async function runToolLoop(
       writeStopReason = stopReason;
     }
 
+    // Prose that narrates a mutating action (write/edit/vault-op) is part of the
+    // user-facing answer — e.g. "Here's the file I created: ```…```" — not
+    // reasoning. Accumulate it toward the bubble; prose before a read-only tool
+    // stays in the timeline as reasoning (committed below).
+    const roundIsMutating =
+      unknownCalls.length > 0 || editCalls.length > 0 || vaultOpCalls.length > 0;
+
     // Cap reached: push terminal error results to keep history valid, then let
     // the model produce one synthesis response. If it calls tools again after
     // the warning, hard-stop.
     if (capHit || round >= maxRounds) {
       if (capHit) {
         // Model ignored the cap warning and called tools again — hard stop.
-        if (agenticMode && roundBuffer) {
-          callbacks.onDelta(roundBuffer);
-        }
+        answerProse = appendAnswerProse(answerProse, roundText);
         callbacks.onReasoningRoundFinished?.(false, round);
         break;
       }
@@ -258,8 +281,15 @@ export async function runToolLoop(
       continue;
     }
 
-    // Normal intermediate tool execution round — do NOT flush to bubble.
-    callbacks.onReasoningRoundFinished?.(true, round);
+    // Normal intermediate tool execution round. Mutating prose is answer-track
+    // (accumulate, discard its live reasoning); read-only prose is genuine
+    // reasoning (keep it in the timeline).
+    if (roundIsMutating) {
+      answerProse = appendAnswerProse(answerProse, roundText);
+      callbacks.onReasoningRoundFinished?.(false, round);
+    } else {
+      callbacks.onReasoningRoundFinished?.(true, round);
+    }
 
     const vaultCalls = loopCalls.filter((tc) => VAULT_TOOL_NAMES.has(tc.name));
     const thinkCalls = loopCalls.filter((tc) => tc.name === THINK_TOOL_NAME);
@@ -394,6 +424,12 @@ export async function runToolLoop(
         }),
       );
     }
+  }
+
+  // Deliver the accumulated answer to the bubble in one shot. In non-agentic
+  // mode the deltas already streamed live, so there is nothing to flush.
+  if (agenticMode && answerProse) {
+    callbacks.onDelta(answerProse);
   }
 
   return {

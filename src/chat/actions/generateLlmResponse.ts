@@ -191,19 +191,14 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
   // The in-loop review coordinator: owns the live vault-op proposal, mounts the
   // review on the streaming timeline, applies auto ops, and suspends the loop on
   // ask-gated ops until the user decides (in-loop-tool-approval-blocking-flow). In
-  // edit mode it also owns the edit channel, rendering the live diff in this host
-  // (propose-edit-in-loop-blocking-review).
-  const editReviewHost = editMode
-    ? assistantBubble.bodyEl.createDiv({ cls: "lmsa-edit-review-live" })
-    : null;
+  // edit mode it also owns the edit channel, folding the live diff onto the timeline
+  // step like vault ops (propose-edit-in-loop-blocking-review).
   const liveReview = new LiveVaultReview({
     app: plugin.app,
     timelineEl: assistantBubble.timelineEl,
     policy: plugin.settings.vaultOpPolicy,
-    ...(editReviewHost && {
+    ...(editMode && {
       edit: {
-        host: editReviewHost,
-        owner,
         inlineDiff: plugin.inlineDiff,
         resolveOptions: {
           contextLines: plugin.settings.diffContextLines,

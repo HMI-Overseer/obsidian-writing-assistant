@@ -29,21 +29,29 @@ export class DiffHunkView {
 
   private statusEl: HTMLElement;
   private actionsEl: HTMLElement;
-  private acceptBtn: HTMLButtonElement;
-  private rejectBtn: HTMLButtonElement;
+  private acceptBtn: HTMLButtonElement | null = null;
+  private rejectBtn: HTMLButtonElement | null = null;
   private splitBtn: HTMLButtonElement | null = null;
   private unifiedBtn: HTMLButtonElement | null = null;
   private bodyEl: HTMLElement | null = null;
   private diffMode: DiffMode;
+  /**
+   * Whether accept / reject live in this card's header. False when the consumer
+   * surfaces them elsewhere — e.g. the timeline-folded review puts approve/decline
+   * on the tool-call step itself, leaving this card as the pure diff display.
+   */
+  private readonly showReviewControls: boolean;
 
   constructor(
     parent: HTMLElement,
     private readonly hunk: DiffHunk,
     private readonly callbacks: DiffHunkCallbacks,
     private readonly meta: DiffHunkMeta,
-    initialMode: DiffMode = "split"
+    initialMode: DiffMode = "split",
+    opts: { showReviewControls?: boolean } = {}
   ) {
     this.diffMode = initialMode;
+    this.showReviewControls = opts.showReviewControls ?? true;
     this.containerEl = parent.createDiv({ cls: "lmsa-chat-window-diff-hunk" });
     this.containerEl.dataset.status = hunk.status;
     this.containerEl.dataset.hunkId = hunk.id;
@@ -129,8 +137,8 @@ export class DiffHunkView {
   private renderHeader(): {
     statusEl: HTMLElement;
     actionsEl: HTMLElement;
-    acceptBtn: HTMLButtonElement;
-    rejectBtn: HTMLButtonElement;
+    acceptBtn: HTMLButtonElement | null;
+    rejectBtn: HTMLButtonElement | null;
   } {
     const headerEl = this.containerEl.createDiv({ cls: "lmsa-chat-window-diff-hunk-header" });
 
@@ -158,7 +166,11 @@ export class DiffHunkView {
 
     const actionsEl = headerEl.createDiv({ cls: "lmsa-chat-window-diff-hunk-actions" });
     this.renderModeToggle(actionsEl);
-    const { acceptBtn, rejectBtn } = this.renderReviewButtons(actionsEl);
+    // Accept / reject are omitted when the consumer hosts them elsewhere (the
+    // timeline-folded review puts them on the tool-call step).
+    const { acceptBtn, rejectBtn } = this.showReviewControls
+      ? this.renderReviewButtons(actionsEl)
+      : { acceptBtn: null, rejectBtn: null };
 
     return { statusEl, actionsEl, acceptBtn, rejectBtn };
   }
@@ -227,8 +239,8 @@ export class DiffHunkView {
   }
 
   private updateStatusLabel(status: EditStatus): void {
-    this.acceptBtn.toggleClass("is-active", status === "accepted");
-    this.rejectBtn.toggleClass("is-active", status === "rejected");
+    this.acceptBtn?.toggleClass("is-active", status === "accepted");
+    this.rejectBtn?.toggleClass("is-active", status === "rejected");
   }
 
   // -----------------------------------------------------------------------

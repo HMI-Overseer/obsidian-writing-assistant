@@ -21,8 +21,8 @@
 
 /* Diff / Editing */
 @import "../chat/messages/DiffHunkView.css";
-@import "../chat/messages/DiffReviewPanel.css";
 @import "../chat/messages/vaultReviewTimeline.css";
+@import "../chat/messages/editReviewTimeline.css";
 @import "../editing/inlineDiff/inlineDiff.css";
 
 /* Settings — tokens first, then layout + components */

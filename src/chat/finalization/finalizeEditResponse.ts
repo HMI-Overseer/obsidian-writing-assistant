@@ -27,7 +27,7 @@ import { generateId } from "../../utils";
 import { makeMessage } from "../conversation/conversationUtils";
 import type { ChatSessionStore } from "../conversation/ChatSessionStore";
 import type { ChatTranscript } from "../messages/ChatTranscript";
-import { DiffReviewPanel } from "../messages/DiffReviewPanel";
+import { EditReviewTimelineView } from "../messages/editReviewTimeline";
 import {
   EditReviewController,
   type EditReviewCallbacks,
@@ -85,11 +85,12 @@ export interface FinalizeEditOptions {
 /**
  * Post-generation handler for edit mode.
  *
- * Partitions the model's write tool calls into two channels and renders their
- * reviews in the bubble:
- *   - the **edit channel** (active-document-bound) → an {@link EditProposal} / DiffReviewPanel;
- *   - the **vault-op channel** (whole-vault) → a {@link VaultOperationProposal}, folded onto
- *     the timeline tool-call steps by {@link VaultReviewTimelineView} — needs no active file.
+ * Partitions the model's write tool calls into two channels, both folded onto their
+ * timeline tool-call steps:
+ *   - the **edit channel** (active-document-bound) → an {@link EditProposal}, reviewed by
+ *     {@link EditReviewTimelineView};
+ *   - the **vault-op channel** (whole-vault) → a {@link VaultOperationProposal}, reviewed by
+ *     {@link VaultReviewTimelineView} — needs no active file.
  *
  * Falls back to a plain message ONLY when both channels are empty — so a pure
  * file-ops turn (e.g. "create a new note" with no document open) is no longer
@@ -313,14 +314,14 @@ async function buildVaultOpProposal(
 /**
  * Render the edit and/or vault-op review for a message into its bubble.
  *
- * The two channels live in different regions of the bubble (Finding C re-open):
- *   - the **edit channel** stays in the body card (`contentEl`) as a DiffReviewPanel,
- *     which is a genuine inline diff and carries its own prose;
- *   - the **vault-op channel** is folded into the agentic timeline: the vault ops
- *     *are* tool calls, already shown as timeline steps, so {@link VaultReviewTimelineView}
- *     decorates those steps with inline approve/decline rather than rendering a separate
- *     panel. Its prose renders into the body card, so the card holds prose and the rail
- *     holds the (now interactive) tool-call steps.
+ * Both review channels are folded into the agentic timeline — the write calls *are*
+ * tool-call steps, so each review lives *on its step* rather than in a separate panel:
+ *   - the **edit channel** via {@link EditReviewTimelineView} — each hunk decorates its
+ *     `propose_edit` step with an inline status and an expandable diff (accept/reject/undo);
+ *   - the **vault-op channel** via {@link VaultReviewTimelineView} — inline approve/decline.
+ * The body card holds only the turn's prose, so the card reads as text and the rail holds
+ * the interactive steps. The in-note overlay ({@link InlineDiffManager}) is a second view
+ * over the same edit controller.
  */
 export function renderProposalPanels(
   app: App,
@@ -334,19 +335,24 @@ export function renderProposalPanels(
   bubble.contentEl.empty();
   bubble.contentEl.removeClass("lmsa-message-content--plain", "lmsa-message-content--markdown");
 
-  // --- Body card: the edit panel (with its own prose), or — for a vault-only
-  // turn — the vault proposal's prose, since its review lives in the timeline. ---
+  // --- Body card: the turn's prose only. Both review channels now live on the
+  // timeline (edits via EditReviewTimelineView, vault ops via VaultReviewTimelineView),
+  // so the body holds the explanatory text and the rails hold the interactive steps.
+  // Prose belongs to whichever channel carries it; when both fire only the edit
+  // channel does (finalize assigns prose to the edit proposal first). ---
   if (message.editProposal) {
-    // One controller owns the proposal's review; both the chat panel and the
-    // in-note overlay are pure views over it, routing every mutation through it.
+    if (message.editProposal.prose) {
+      renderProseInto(app, owner, bubble.contentEl, message.editProposal.prose);
+    }
+    // One controller owns the proposal's review; the timeline view and the in-note
+    // overlay are pure views over it, routing every mutation through it.
     const controller = new EditReviewController(
       app,
       message.editProposal,
       makeEditCallbacks(store, message.editProposal),
       message.appliedEdit,
     );
-    const editContainer = bubble.contentEl.createDiv();
-    new DiffReviewPanel(editContainer, app, owner, controller);
+    new EditReviewTimelineView({ timelineEl: bubble.timelineEl, app, controller });
     inlineDiff.attach(controller);
   } else if (message.vaultOpProposal?.prose) {
     renderProseInto(app, owner, bubble.contentEl, message.vaultOpProposal.prose);

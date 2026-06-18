@@ -29,7 +29,7 @@ type ReviewListener = (change: HunkReviewChange) => void;
  * behaviour. Mutation flows exclusively through {@link applyHunksLive} and
  * {@link undoHunkLive}.
  *
- * Renderers (the chat {@link DiffReviewPanel} and the in-note CM6 overlay) are
+ * Renderers (the timeline-folded edit review and the in-note CM6 overlay) are
  * pure subscribers: they call {@link accept} / {@link reject} / {@link undo} and
  * react to {@link subscribe} broadcasts. They never mutate the document
  * themselves, so two views over one controller can never disagree about what was

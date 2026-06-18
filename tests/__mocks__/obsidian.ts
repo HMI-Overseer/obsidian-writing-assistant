@@ -52,6 +52,12 @@ export function normalizePath(path: string): string {
   return path.replace(/\\/g, "/").replace(/\/+/g, "/").replace(/(^\/|\/$)/g, "");
 }
 
+export class FileSystemAdapter {
+  getBasePath() {
+    return "";
+  }
+}
+
 export class TFile {
   name = "";
   path = "";

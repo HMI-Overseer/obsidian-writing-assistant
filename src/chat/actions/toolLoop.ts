@@ -15,6 +15,7 @@ import { VAULT_OPS_TOOL_NAMES } from "../../tools/vault-ops/definition";
 import { executeVaultOpTool, buildPendingOverlay } from "../../tools/vault-ops/handlers";
 import { THINK_TOOL_NAME } from "../../tools/think/definition";
 import { extractToolInput } from "../../tools/metadata";
+import { normalizeVaultToolCall } from "../../tools/paths";
 import type { LiveVaultReview } from "./liveVaultReview";
 
 export type { VaultToolContext, ToolExecutionContext };
@@ -115,6 +116,11 @@ export async function runToolLoop(
   // Stop reason of the latest round that accumulated write calls (truncation guard).
   let writeStopReason: StopReason | null = null;
 
+  // The app, used only to translate absolute paths a model may emit into
+  // vault-relative ones (normalizeVaultToolCall). Any context carries it.
+  const app =
+    vaultOpToolContext?.app ?? editToolContext?.app ?? vaultToolContext?.app;
+
   for (let round = 0; ; round++) {
     const requestMessages = [...baseRequest.messages, ...toolLoopTurns];
     const roundRequest = { ...baseRequest, messages: requestMessages };
@@ -151,7 +157,12 @@ export async function runToolLoop(
     }
 
     const usage = await streamResult.usage;
-    const toolCalls = await streamResult.toolCalls;
+    const rawToolCalls = await streamResult.toolCalls;
+    // Translate any absolute paths to vault-relative *once*, here, so every
+    // downstream consumer — overlay, accumulation, finalization, timeline — sees
+    // the same resolved path (tools/paths.ts).
+    const toolCalls =
+      rawToolCalls && app ? rawToolCalls.map((tc) => normalizeVaultToolCall(app, tc)) : rawToolCalls;
     const stopReason = await streamResult.stopReason;
 
     if (usage && callbacks.onCalibrate && !calibrated) {

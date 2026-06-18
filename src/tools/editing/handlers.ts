@@ -52,20 +52,32 @@ function unknownEditTool(name: string): ToolResult {
   });
 }
 
+/** The target file did not resolve. `explicit` distinguishes a bad `path`
+ *  argument (report not-found) from no target at all (ask for a path). */
+type TargetResolution =
+  | { file: TFile; path: string }
+  | { file: null; explicit: boolean };
+
 /**
  * Resolve the target file for edit operations from the tool call's `path`
- * argument, falling back to the document-context path then the active file.
- * The `path` is the model's explicit target (propose-edit-in-loop-blocking-review).
+ * argument. The `path` is the model's explicit target
+ * (propose-edit-in-loop-blocking-review): when it is supplied but does not
+ * resolve, we report not-found rather than silently editing whatever file is
+ * open — an edit must land on the file the model named, never a surprise note.
+ * Only when no `path` is given do we fall back to the document context / active file.
  */
-function resolveTargetFile(ctx: ToolExecutionContext, path?: string) {
-  const candidate = path || ctx.filePath;
-  if (candidate) {
-    const file = ctx.app.vault.getFileByPath(normalizePath(candidate));
+function resolveTargetFile(ctx: ToolExecutionContext, path?: string): TargetResolution {
+  if (path) {
+    const file = ctx.app.vault.getFileByPath(normalizePath(path));
+    return file ? { file, path: file.path } : { file: null, explicit: true };
+  }
+  if (ctx.filePath) {
+    const file = ctx.app.vault.getFileByPath(normalizePath(ctx.filePath));
     if (file) return { file, path: file.path };
   }
   const active = ctx.app.workspace.getActiveFile();
   if (active) return { file: active, path: active.path };
-  return null;
+  return { file: null, explicit: false };
 }
 
 async function executeProposeEdit(
@@ -92,7 +104,17 @@ async function executeProposeEdit(
   }
 
   const target = resolveTargetFile(ctx, v.args.path);
-  if (!target) {
+  if (!target.file) {
+    // An explicit `path` that didn't resolve is a missing file (not a missing
+    // argument) — report it honestly so the model creates it or fixes the path.
+    if (target.explicit) {
+      return toolFailure({
+        kind: "not-found",
+        what: `file not found at "${v.args.path}"`,
+        recovery: "check the path, or use write_file to create the note first",
+        isReadOnly: false,
+      });
+    }
     return toolFailure({
       kind: "invalid-args",
       what: "no target note",

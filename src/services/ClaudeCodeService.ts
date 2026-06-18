@@ -24,6 +24,7 @@ import { ALL_EDIT_TOOLS, EDIT_TOOL_NAMES } from "../tools/editing/definition";
 import { executeEditTool } from "../tools/editing/handlers";
 import { allowedVaultOpsTools, VAULT_OPS_TOOL_NAMES } from "../tools/vault-ops/definition";
 import { executeVaultOpTool, buildPendingOverlay } from "../tools/vault-ops/handlers";
+import { normalizeVaultToolCall } from "../tools/paths";
 import { VaultMcpServer, type McpServerHandle, type McpToolProvider } from "../mcp/VaultMcpServer";
 import type { LiveVaultReview } from "../chat/actions/liveVaultReview";
 import { generateId } from "../utils";
@@ -355,7 +356,7 @@ export class ClaudeCodeService {
         // from (semantic-search-silent-embedding-failure.md §3-A).
         return filterSemanticSearchByAvailability(tools, this.getRagService().availability());
       },
-      callTool: async (call: ToolCall): Promise<ToolResult> => {
+      callTool: async (rawCall: ToolCall): Promise<ToolResult> => {
         // Surface tool activity to the chat UI's timeline (Claude Code runs its
         // loop internally, so this MCP hook is the only place we see its calls).
         // The `end` event fires in finally so a thrown tool never leaves a stuck
@@ -365,6 +366,10 @@ export class ClaudeCodeService {
         // (via the events) and any collected vault op (via executeTool), so the
         // review binds its approve/decline to the *same* row rather than a
         // synthetic duplicate (vault-review-timeline-refinements).
+        //
+        // Translate absolute paths to vault-relative up front so the executor,
+        // the collected op, and the timeline all see the same resolved path.
+        const call = normalizeVaultToolCall(this.app, rawCall);
         const toolCallId = call.id || generateId();
         this.toolListener?.({ phase: "start", toolName: call.name, toolCallId });
         let isError = true;

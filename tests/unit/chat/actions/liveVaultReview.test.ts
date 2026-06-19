@@ -114,6 +114,11 @@ describe("LiveVaultReview", () => {
       const [{ result }] = await review.resolveRound([writeCall(`c-${path}`, path)]);
       expect(result.isError).toBe(true);
       expect(result.content).toContain("outside the vault");
+      // Concise, single self-correcting recovery — no redundant clause and no second
+      // generic recovery stacked on top (the message was trimmed, same meaning).
+      expect(result.content).toContain("vault-relative path");
+      expect(result.content).not.toContain("vault operations can only target");
+      expect(result.content).not.toContain("schema and retry");
     }
 
     // No op was queued for review and nothing was applied.

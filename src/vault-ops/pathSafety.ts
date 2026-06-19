@@ -42,8 +42,5 @@ export function escapesVault(path: string): boolean {
 
 /** Model-facing reason a path was refused, in the self-correcting validator style. */
 export function outsideVaultMessage(path: string): string {
-  return (
-    `"${path}" is outside the vault — vault operations can only target paths ` +
-    "inside the vault. Use a vault-relative path."
-  );
+  return `"${path}" is outside the vault. Use a vault-relative path.`;
 }

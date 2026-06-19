@@ -67,6 +67,9 @@ describe("executeVaultOpTool", () => {
         );
         expect(result.isError).toBe(true);
         expect(result.content).toContain("outside the vault");
+        // Trimmed to a single self-correcting recovery — no doubled generic tail.
+        expect(result.content).toContain("vault-relative path");
+        expect(result.content).not.toContain("schema and retry");
       }
     });
 

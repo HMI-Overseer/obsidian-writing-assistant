@@ -480,15 +480,17 @@ export class LiveVaultReview {
       const found = opByCall.get(call.id);
       if (!found) {
         const error = errByCall.get(call.id) ?? "could not convert operation";
-        const recovery = defaultRecovery("invalid-args");
         entries.push({
           call,
           kind: "error",
           result: {
-            content: `Error: invalid ${call.name} arguments — ${trimDot(error)}. ${trimDot(recovery)}.`,
+            // The validator message is already a self-correcting sentence (e.g. the
+            // out-of-vault reason ends with "Use a vault-relative path"), so don't
+            // stack a second generic recovery on top — that only made it heavier.
+            content: `Error: invalid ${call.name} arguments — ${trimDot(error)}.`,
             isReadOnly: false,
             isError: true,
-            failure: { kind: "invalid-args", recovery },
+            failure: { kind: "invalid-args", recovery: defaultRecovery("invalid-args") },
           },
         });
         continue;

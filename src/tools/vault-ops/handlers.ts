@@ -2,7 +2,7 @@ import type { App } from "obsidian";
 import type { ToolCall, ToolResult } from "../types";
 import type { VaultOperation } from "../../vault-ops/types";
 import { diskState } from "../../vault-ops/apply";
-import { toolFailure } from "../toolFailure";
+import { toolFailure, trimDot } from "../toolFailure";
 import { VAULT_OPS_TOOL_NAMES } from "./definition";
 import { buildOverlay, makeResolver, type PendingOverlay } from "./overlay";
 import { toVaultOperations, type ConversionProbes } from "./conversion";
@@ -110,9 +110,11 @@ function queued(summary: string): ToolResult {
 }
 
 function fail(tool: string, error: string): ToolResult {
+  // The validator message is already self-correcting; pass it as content verbatim so
+  // toolFailure doesn't append a second generic recovery (kept off the model's plate).
   return toolFailure({
     kind: "invalid-args",
-    what: `invalid ${tool} arguments: ${error}`,
+    content: `Error: invalid ${tool} arguments — ${trimDot(error)}.`,
     isReadOnly: false,
   });
 }

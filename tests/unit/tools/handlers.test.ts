@@ -1,5 +1,6 @@
 import { describe, test, expect, vi } from "vitest";
 import {
+  executeEditTool,
   resolveStructuralEditBlocks,
 } from "../../../src/tools/editing/handlers";
 import type { EditBlock } from "../../../src/editing/editTypes";
@@ -156,5 +157,37 @@ describe("resolveStructuralEditBlocks", () => {
     expect(resolved[0].replaceText).toContain("---");
     expect(resolved[0].replaceText).toContain("title: My Note");
     expect(resolved[0].replaceText).toContain("# My Note");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// propose_edit — path boundary
+// ---------------------------------------------------------------------------
+
+describe("executeEditTool — propose_edit path boundary", () => {
+  test("names the boundary for an out-of-vault path, before resolving the target", async () => {
+    const getFileByPath = vi.fn();
+    const getActiveFile = vi.fn();
+    const app = {
+      vault: { getFileByPath, read: vi.fn() },
+      workspace: { getActiveFile },
+    } as unknown as import("obsidian").App;
+
+    for (const path of ["../../escape.md", "C:/Windows/x.md"]) {
+      const result = await executeEditTool(
+        { id: "t", name: "propose_edit", arguments: { path, search: "a", replace: "b" } },
+        { app, filePath: CTX_PATH },
+      );
+      expect(result.isError).toBe(true);
+      expect(result.failure?.kind).toBe("invalid-args");
+      expect(result.content).toContain("outside the vault");
+      // It is a mutation-channel failure, and must not masquerade as "not found".
+      expect(result.isReadOnly).toBe(false);
+      expect(result.content).not.toContain("not found");
+    }
+    // Resolution was short-circuited: neither the explicit lookup nor the
+    // active-file fallback ran for an escaping path.
+    expect(getFileByPath).not.toHaveBeenCalled();
+    expect(getActiveFile).not.toHaveBeenCalled();
   });
 });

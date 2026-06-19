@@ -2,7 +2,7 @@ import { describe, test, expect, vi } from "vitest";
 import { TFile, TFolder } from "obsidian";
 import { executeVaultTool } from "../../../src/tools/vault/handlers";
 import type { VaultToolContext } from "../../../src/tools/vault/handlers";
-import type { ToolCall } from "../../../src/tools/types";
+import type { ToolCall, ToolResult } from "../../../src/tools/types";
 import { RagRetrievalError } from "../../../src/rag/ragService";
 import type { RagAvailability } from "../../../src/rag/ragService";
 import type { RagContextBlock } from "../../../src/shared/chatRequest";
@@ -747,51 +747,79 @@ describe("failure contract", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Path-boundary safety — reads cannot disclose a file outside the vault.
+// Path-boundary safety — reads name the boundary, and never disclose an
+// out-of-vault file.
 //
-// Every read tool resolves its path through Obsidian's index lookups
-// (getFileByPath / getAbstractFileByPath), which only ever return an in-vault
-// file. An out-of-vault path (../, drive letter) is simply not in the index, so
-// it resolves to null → not-found — never read from disk via the adapter. These
-// tests lock that in: a refactor that reached for the adapter (which would escape)
-// would no longer return not-found, and would fail here.
+// An out-of-vault path (../, drive letter) is refused at the boundary BEFORE the
+// index lookup, with the same wording the write channel uses ("outside the vault.
+// Use a vault-relative path.") instead of a dead-end "not found" the model can't
+// resolve by searching. The index lookup (getFileByPath / getAbstractFileByPath)
+// remains behind it as the security backstop — it can only ever return an
+// in-vault file — so non-disclosure is preserved. These tests lock both in: the
+// boundary message AND that the lookup is never reached for an escaping path.
 // ---------------------------------------------------------------------------
 
 describe("path-boundary safety (reads stay inside the vault)", () => {
   const ESCAPING = ["../../etc/passwd", "../secret.md", "C:/Windows/System32/config", "..\\..\\x.md"];
 
-  test("read_file refuses an out-of-vault path as not-found (no disclosure)", async () => {
+  /** A refusal names the boundary (not "not found") and points at a vault-relative retry. */
+  function expectBoundaryRefusal(result: ToolResult) {
+    expect(result.isError).toBe(true);
+    expect(result.failure?.kind).toBe("invalid-args");
+    expect(result.content).toContain("outside the vault");
+    expect(result.content).toContain("vault-relative");
+    expect(result.content).not.toContain("not found");
+  }
+
+  test("read_file names the boundary for an out-of-vault path, never reaching the lookup", async () => {
     const ctx = makeCtx({ files: [makeFile("In/Vault.md")] });
     for (const path of ESCAPING) {
       const result = await executeVaultTool(tc("read_file", { path }), ctx);
-      expect(result.isError).toBe(true);
-      expect(result.failure?.kind).toBe("not-found");
+      expectBoundaryRefusal(result);
     }
+    // Backstop preserved: the index lookup was never even reached for an escaping path.
+    expect(ctx.app.vault.getFileByPath).not.toHaveBeenCalled();
+    expect(ctx.app.vault.read).not.toHaveBeenCalled();
   });
 
-  test("get_backlinks refuses an out-of-vault path as not-found", async () => {
+  test("get_backlinks names the boundary for an out-of-vault path", async () => {
     const ctx = makeCtx({ files: [makeFile("In/Vault.md")] });
     const result = await executeVaultTool(tc("get_backlinks", { path: "../../etc/passwd" }), ctx);
-    expect(result.failure?.kind).toBe("not-found");
+    expectBoundaryRefusal(result);
   });
 
-  test("list_directory / directory_tree refuse an out-of-vault folder as not-found", async () => {
+  test("list_directory / directory_tree name the boundary for an out-of-vault folder", async () => {
     const ctx = makeCtx({ abstractFiles: { In: makeFolder("In") } });
     for (const name of ["list_directory", "directory_tree"]) {
       const result = await executeVaultTool(tc(name, { path: "../.." }), ctx);
-      expect(result.failure?.kind).toBe("not-found");
+      expectBoundaryRefusal(result);
     }
+    expect(ctx.app.vault.getAbstractFileByPath).not.toHaveBeenCalled();
   });
 
-  test("get_frontmatter reports a per-path error for an out-of-vault path, never reads it", async () => {
+  test("search_files / search_content name the boundary for an out-of-vault scope", async () => {
+    const ctx = makeCtx({ files: [makeFile("In/Vault.md")] });
+    expectBoundaryRefusal(
+      await executeVaultTool(tc("search_files", { pattern: "*", path: "../.." }), ctx),
+    );
+    expectBoundaryRefusal(
+      await executeVaultTool(tc("search_content", { query: "x", path: "C:/Windows" }), ctx),
+    );
+    // A scope refusal short-circuits before the vault is scanned.
+    expect(ctx.app.vault.getMarkdownFiles).not.toHaveBeenCalled();
+  });
+
+  test("get_frontmatter reports a per-path boundary error for an out-of-vault path, never reads it", async () => {
     const ctx = makeCtx({ files: [makeFile("In/Vault.md")] });
     const result = await executeVaultTool(
       tc("get_frontmatter", { paths: ["../../secret.md"] }),
       ctx,
     );
-    // The call itself succeeds (per-entry errors), but the out-of-vault path yields
-    // "No note found" rather than any content — it was never resolved to disk.
+    // The call itself succeeds (per-entry errors), but the out-of-vault path names
+    // the boundary rather than "No note found" — it was never resolved to disk.
     expect(result.isError).toBeUndefined();
-    expect(result.content).toContain("No note found");
+    expect(result.content).toContain("outside the vault");
+    expect(result.content).not.toContain("No note found");
+    expect(ctx.app.vault.getFileByPath).not.toHaveBeenCalled();
   });
 });

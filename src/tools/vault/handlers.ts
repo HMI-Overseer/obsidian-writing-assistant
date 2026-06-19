@@ -11,6 +11,8 @@ interface ExtendedMetadataCache extends MetadataCache {
 }
 import type { ToolCall, ToolResult } from "../types";
 import { toolFailure } from "../toolFailure";
+import { refuseOutsideVault } from "../pathBoundary";
+import { escapesVault, outsideVaultMessage } from "../../vault-ops/pathSafety";
 import type { RagContextBlock } from "../../shared/chatRequest";
 import { RagRetrievalError } from "../../rag/ragService";
 import type { RagService } from "../../rag/ragService";
@@ -137,6 +139,12 @@ async function executeReadFile(
     return toolFailure({ kind: "invalid-args", what: "path is required" });
   }
 
+  // Name the vault boundary before the index lookup, so an out-of-vault path is
+  // reported as such instead of a dead-end "not found" (the lookup below stays as
+  // the security backstop — it can only ever resolve an in-vault file).
+  const outside = refuseOutsideVault(rawPath);
+  if (outside) return outside;
+
   const path = normalizePath(rawPath);
   const file = ctx.app.vault.getFileByPath(path);
   if (!file) {
@@ -157,6 +165,13 @@ async function executeListDirectory(
   ctx: VaultToolContext,
 ): Promise<ToolResult> {
   const rawPath = typeof args.path === "string" ? args.path.trim() : "";
+
+  // An out-of-vault folder path is named at the boundary; an omitted path still
+  // lists the vault root.
+  if (rawPath) {
+    const outside = refuseOutsideVault(rawPath);
+    if (outside) return outside;
+  }
 
   const folder = rawPath
     ? ctx.app.vault.getAbstractFileByPath(normalizePath(rawPath))
@@ -192,6 +207,12 @@ async function executeDirectoryTree(
   ctx: VaultToolContext,
 ): Promise<ToolResult> {
   const rawPath = typeof args.path === "string" ? args.path.trim() : "";
+
+  // Boundary first; an omitted path still walks the whole vault tree.
+  if (rawPath) {
+    const outside = refuseOutsideVault(rawPath);
+    if (outside) return outside;
+  }
 
   const folder = rawPath
     ? ctx.app.vault.getAbstractFileByPath(normalizePath(rawPath))
@@ -250,6 +271,12 @@ async function executeSearchFiles(
   }
 
   const rawPath = typeof args.path === "string" ? args.path.trim() : "";
+  // A scope path that escapes the vault is named at the boundary, not laundered
+  // into a silent "no matches".
+  if (rawPath) {
+    const outside = refuseOutsideVault(rawPath);
+    if (outside) return outside;
+  }
   const scopePath = rawPath ? normalizePath(rawPath) : "";
   const excludePatterns = Array.isArray(args.excludePatterns)
     ? (args.excludePatterns as unknown[]).filter((p): p is string => typeof p === "string")
@@ -316,6 +343,12 @@ async function executeSearchContent(
       ? Math.min(MAX_CONTEXT_LINES, Math.max(0, Math.floor(args.contextLines)))
       : 0;
   const rawPath = typeof args.path === "string" ? args.path.trim() : "";
+  // A scope path that escapes the vault is named at the boundary, not laundered
+  // into a silent "no matches".
+  if (rawPath) {
+    const outside = refuseOutsideVault(rawPath);
+    if (outside) return outside;
+  }
   const scopePath = rawPath ? normalizePath(rawPath) : "";
   const excludePatterns = Array.isArray(args.excludePatterns)
     ? (args.excludePatterns as unknown[]).filter((p): p is string => typeof p === "string")
@@ -496,6 +529,9 @@ async function executeGetBacklinks(
     return toolFailure({ kind: "invalid-args", what: "path is required" });
   }
 
+  const outside = refuseOutsideVault(rawPath);
+  if (outside) return outside;
+
   const path = normalizePath(rawPath);
   const file = ctx.app.vault.getFileByPath(path);
   if (!file) {
@@ -596,7 +632,14 @@ async function executeGetFrontmatter(
   const results: Record<string, unknown> = {};
   for (const rawPath of paths) {
     if (typeof rawPath !== "string") continue;
-    const p = normalizePath(rawPath.trim());
+    const trimmed = rawPath.trim();
+    const p = normalizePath(trimmed);
+    // Per-entry boundary message (consistent with this tool's other per-path
+    // errors), so an out-of-vault path names the boundary instead of "not found".
+    if (escapesVault(trimmed)) {
+      results[p] = { error: outsideVaultMessage(trimmed) };
+      continue;
+    }
     const file = ctx.app.vault.getFileByPath(p);
     if (!file) {
       results[p] = { error: `No note found at "${p}".` };

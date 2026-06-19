@@ -2,6 +2,7 @@ import { type App, type TFile, normalizePath } from "obsidian";
 import type { EditBlock } from "../../editing/editTypes";
 import type { ToolCall, ToolResult } from "../types";
 import { toolFailure } from "../toolFailure";
+import { refuseOutsideVault } from "../pathBoundary";
 import { EDIT_TOOL_NAMES } from "./definition";
 import { validateProposeEdit, validateUpdateFrontmatter } from "./validation";
 import type { FrontmatterOperation } from "./validation";
@@ -101,6 +102,14 @@ async function executeProposeEdit(
       recovery: "pass the exact text you want to replace",
       isReadOnly: false,
     });
+  }
+
+  // An explicit out-of-vault `path` is named at the boundary before resolution —
+  // otherwise it reports "not found" and points at write_file, which would itself
+  // be refused for escaping the vault.
+  if (v.args.path) {
+    const outside = refuseOutsideVault(v.args.path, false);
+    if (outside) return outside;
   }
 
   const target = resolveTargetFile(ctx, v.args.path);

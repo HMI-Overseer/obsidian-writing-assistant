@@ -1,0 +1,262 @@
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import fs from "node:fs";
+import os from "node:os";
+import nodePath from "node:path";
+import type { App } from "obsidian";
+import { TFile, TFolder, normalizePath } from "obsidian";
+import { applyVaultOpBatch } from "../../src/vault-ops/applyBatch";
+import { applyOperation } from "../../src/vault-ops/apply";
+import { executeVaultOpTool, buildPendingOverlay } from "../../src/tools/vault-ops/handlers";
+import { normalizeVaultToolCall } from "../../src/tools/paths";
+import type { VaultOperation } from "../../src/vault-ops/types";
+import type { ToolCall } from "../../src/tools/types";
+
+/**
+ * §6.1 — verify the vault-write handler against its **real on-disk resolution**, not
+ * a string-keyed mock.
+ *
+ * The unit tests prove our *model* of the boundary: their `vault.create` writes to a
+ * `Map`, so an escaping path is just an odd Map key — a real escape would never show.
+ * This suite instead backs the vault with **real Node `fs` + `path`** in a throwaway
+ * temp vault, reproducing Obsidian's `FileSystemAdapter` resolution faithfully:
+ * every write resolves via `path.join(vaultRoot, normalizePath(p))` and hits the
+ * actual filesystem. So if the guard's `..`-depth / drive-letter model disagreed
+ * with how `path.join` *actually* collapses a path, an escaping op would create a
+ * real file outside `vaultRoot` and the disk scan below would catch it.
+ *
+ * (The genuine Electron `FileSystemAdapter` class is unavailable outside the Obsidian
+ * runtime, so it cannot be instantiated in CI. Reproducing its documented resolution
+ * with the real `path`/`fs` primitives — and asserting against the real disk — is the
+ * faithful stand-in: the part that was previously only an *assumption* (`path.join`
+ * vs `path.resolve`, `..` handling, drive-letter / UNC quirks) is now executed for
+ * real. The control test below proves the harness genuinely detects an escape, so the
+ * guarded assertions are not vacuous.)
+ *
+ * Layout — the vault sits two levels deep so a `../..` escape lands inside the
+ * sandbox (easy to detect and clean up) rather than polluting the OS temp root:
+ *
+ *   <sandbox>/a/b/vault   ← vaultRoot (the "vault")
+ */
+
+let sandbox: string;
+let vaultRoot: string;
+
+/** A vault App backed by the real filesystem, resolving exactly as the adapter does. */
+function makeRealFsApp(root: string): App {
+  const full = (p: string) => nodePath.join(root, normalizePath(p));
+  return {
+    vault: {
+      adapter: { getBasePath: () => root },
+      getName: () => nodePath.basename(root),
+      getAbstractFileByPath(p: string) {
+        const abs = full(p);
+        if (!fs.existsSync(abs)) return null;
+        const st = fs.statSync(abs);
+        if (st.isDirectory()) {
+          return Object.assign(new TFolder(), { path: normalizePath(p), children: [] });
+        }
+        return Object.assign(new TFile(), {
+          path: normalizePath(p),
+          stat: { mtime: st.mtimeMs, size: st.size },
+        });
+      },
+      getFileByPath(p: string) {
+        const abs = full(p);
+        if (!fs.existsSync(abs) || !fs.statSync(abs).isFile()) return null;
+        const st = fs.statSync(abs);
+        return Object.assign(new TFile(), {
+          path: normalizePath(p),
+          stat: { mtime: st.mtimeMs, size: st.size },
+        });
+      },
+      read(file: TFile) {
+        return Promise.resolve(fs.readFileSync(full(file.path), "utf8"));
+      },
+      create(p: string, content: string) {
+        fs.writeFileSync(full(p), content);
+        return Promise.resolve();
+      },
+      createFolder(p: string) {
+        fs.mkdirSync(full(p), { recursive: true });
+        return Promise.resolve();
+      },
+      process(file: TFile, fn: (c: string) => string) {
+        const abs = full(file.path);
+        const next = fn(fs.readFileSync(abs, "utf8"));
+        fs.writeFileSync(abs, next);
+        return Promise.resolve(next);
+      },
+    },
+    fileManager: {
+      renameFile(file: TFile, to: string) {
+        const dest = full(to);
+        fs.mkdirSync(nodePath.dirname(dest), { recursive: true });
+        fs.renameSync(full(file.path), dest);
+        return Promise.resolve();
+      },
+      trashFile(file: TFile | TFolder) {
+        fs.rmSync(full(file.path), { recursive: true, force: true });
+        return Promise.resolve();
+      },
+    },
+    metadataCache: { getBacklinksForFile: () => ({ data: {} }) },
+  } as unknown as App;
+}
+
+/** Every regular file anywhere under the sandbox that does NOT live under vaultRoot. */
+function filesOutsideVault(): string[] {
+  const escaped: string[] = [];
+  const walk = (dir: string) => {
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      const abs = nodePath.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        walk(abs);
+      } else {
+        const rel = nodePath.relative(vaultRoot, abs);
+        if (rel.startsWith("..") || nodePath.isAbsolute(rel)) escaped.push(abs);
+      }
+    }
+  };
+  walk(sandbox);
+  return escaped;
+}
+
+beforeEach(() => {
+  sandbox = fs.mkdtempSync(nodePath.join(os.tmpdir(), "vault-path-boundary-"));
+  vaultRoot = nodePath.join(sandbox, "a", "b", "vault");
+  fs.mkdirSync(vaultRoot, { recursive: true });
+});
+
+afterEach(() => {
+  fs.rmSync(sandbox, { recursive: true, force: true });
+});
+
+/** Paths the guard MUST refuse (real `..` traversal above root, or a drive letter). */
+const ESCAPING_PATHS = [
+  "../../outside-vault.md",
+  "../../../a/escape.md",
+  "..\\..\\win-escape.md", // backslash traversal — normalizePath converts to "../.."
+  "foo/../../bar.md", // internal "../" plus one that rises above the root
+  "C:/Windows/System32/test.md", // drive-letter absolute
+  "d:\\secrets\\note.md",
+];
+
+/**
+ * Odd shapes the guard intentionally ALLOWS because `path.join` keeps them *inside*
+ * the vault (a leading-slash / UNC / percent-encoded / extended-length form is not a
+ * `..` escape). They must still never resolve outside vaultRoot — verified on disk.
+ */
+const ODD_BUT_CONTAINED_PATHS = [
+  "/leading-slash.md",
+  "\\\\server\\share\\note.md", // UNC-looking — collapses to server/share/note.md inside vault
+  "%2e%2e/%2e%2e/encoded.md", // percent-encoded ".." is NOT decoded by the adapter
+  "trailing.dot./note.md",
+];
+
+describe("vault path-boundary — real-filesystem resolution (§6.1)", () => {
+  it("control: an UNGUARDED adapter write with '../../' really escapes the vault on disk", () => {
+    // Proves the harness genuinely detects a real escape — so the guarded assertions
+    // below are meaningful, not vacuously passing. We call the raw adapter directly,
+    // bypassing every guard; the file must land OUTSIDE vaultRoot.
+    const app = makeRealFsApp(vaultRoot);
+    void app.vault.create("../../control-escape.md", "i escaped");
+
+    const resolved = nodePath.join(vaultRoot, "../../control-escape.md");
+    expect(fs.existsSync(resolved)).toBe(true);
+    expect(filesOutsideVault()).toContain(resolved);
+  });
+
+  it("layer 1 (executeVaultOpTool): refuses every escaping write before any review", () => {
+    const app = makeRealFsApp(vaultRoot);
+    const overlay = buildPendingOverlay(app, []);
+
+    for (const path of ESCAPING_PATHS) {
+      const call: ToolCall = { id: `c-${path}`, name: "write_file", arguments: { path, content: "x" } };
+      const normalized = normalizeVaultToolCall(app, call);
+      const result = executeVaultOpTool(normalized, { app, overlay });
+      expect(result.isError, `should refuse "${path}"`).toBe(true);
+      expect(result.content).toContain("outside the vault");
+    }
+    expect(filesOutsideVault()).toEqual([]); // validation never writes anything anyway.
+  });
+
+  it("layers 2+3 (applyVaultOpBatch → applyOperation): never write an escaping op to disk", async () => {
+    const app = makeRealFsApp(vaultRoot);
+
+    for (const path of ESCAPING_PATHS) {
+      const op: VaultOperation = { kind: "create", path, content: "x" };
+
+      // Layer 2 — pre-flight aborts the batch; nothing is applied.
+      const batch = await applyVaultOpBatch(app, [{ id: "a", op }]);
+      expect(batch.ok, `batch must refuse "${path}"`).toBe(false);
+      expect(
+        batch.conflicts.some((c) => c.reason.includes("outside the vault")),
+        `conflict must name the boundary for "${path}"`,
+      ).toBe(true);
+      expect(batch.applied).toHaveLength(0);
+
+      // Layer 3 — the disk executor throws as its first act, even if reached directly.
+      await expect(applyOperation(app, op), `applyOperation must throw for "${path}"`).rejects.toThrow(
+        /outside the vault/,
+      );
+
+      // The path the adapter WOULD have written to must not exist on disk.
+      expect(fs.existsSync(nodePath.join(vaultRoot, path))).toBe(false);
+    }
+
+    // Nothing escaped the vault root anywhere under the sandbox.
+    expect(filesOutsideVault()).toEqual([]);
+  });
+
+  it("refuses an escaping move endpoint without moving the file out of the vault", async () => {
+    const app = makeRealFsApp(vaultRoot);
+    fs.mkdirSync(nodePath.join(vaultRoot, "Notes"), { recursive: true });
+    fs.writeFileSync(nodePath.join(vaultRoot, "Notes", "A.md"), "body");
+    // Use the file's REAL fingerprint so the conflict guard passes — the *only* thing
+    // that can stop this move is the vault-boundary check, making it the load-bearing
+    // assertion (it would escape on disk if the guard were removed).
+    const st = fs.statSync(nodePath.join(vaultRoot, "Notes", "A.md"));
+
+    const op: VaultOperation = {
+      kind: "move",
+      from: "Notes/A.md",
+      to: "../../../escaped-move.md",
+      expect: { mtime: st.mtimeMs, size: st.size },
+    };
+    const batch = await applyVaultOpBatch(app, [{ id: "m", op }]);
+
+    expect(batch.ok).toBe(false);
+    expect(batch.conflicts.some((c) => c.reason.includes("outside the vault"))).toBe(true);
+    expect(fs.existsSync(nodePath.join(vaultRoot, "Notes", "A.md"))).toBe(true); // source untouched
+    expect(filesOutsideVault()).toEqual([]); // nothing moved out
+  });
+
+  it("allows odd-but-contained shapes to resolve INSIDE the vault, never outside it", async () => {
+    const app = makeRealFsApp(vaultRoot);
+
+    for (const path of ODD_BUT_CONTAINED_PATHS) {
+      const op: VaultOperation = { kind: "create", path, content: "ok" };
+      // These do not escape, so they either apply inside the vault or fail on an
+      // invalid filename — either way they must not write outside vaultRoot. We do
+      // not assert ok/throw (OS-dependent for invalid chars), only the boundary.
+      try {
+        await applyVaultOpBatch(app, [{ id: "o", op }]);
+      } catch {
+        /* an invalid on-disk name is fine — it cannot escape. */
+      }
+    }
+
+    expect(filesOutsideVault()).toEqual([]);
+  });
+
+  it("applies a legitimate in-vault create on the real filesystem (positive control)", async () => {
+    const app = makeRealFsApp(vaultRoot);
+    const op: VaultOperation = { kind: "create", path: "Notes/Welcome.md", content: "hello" };
+
+    const batch = await applyVaultOpBatch(app, [{ id: "g", op }]);
+
+    expect(batch.ok).toBe(true);
+    expect(fs.readFileSync(nodePath.join(vaultRoot, "Notes", "Welcome.md"), "utf8")).toBe("hello");
+    expect(filesOutsideVault()).toEqual([]);
+  });
+});

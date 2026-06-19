@@ -22,6 +22,7 @@ export const WRITE_FILE_TOOL: CanonicalToolDefinition = {
     "Prefer propose_edit for small changes to an existing note.",
   errorGuidance:
     "If the path points at a folder, choose a file path or use create_directory. " +
+    "Paths must be an Obsidian document — a Markdown note (.md) or a canvas (.canvas); other types are refused. " +
     "If the content was cut off by the output limit, re-issue the call with the complete file content.",
   annotations: { destructiveHint: true },
   parameters: {
@@ -30,8 +31,8 @@ export const WRITE_FILE_TOOL: CanonicalToolDefinition = {
       path: {
         type: "string",
         description:
-          "Vault-relative file path including extension (e.g., 'Characters/Vex.md'). " +
-          "Missing parent folders are created automatically.",
+          "Vault-relative path to an Obsidian document — a Markdown note (.md) or a canvas (.canvas), " +
+          "e.g. 'Characters/Vex.md'. Other file types are refused. Missing parent folders are created automatically.",
       },
       content: {
         type: "string",
@@ -72,6 +73,7 @@ export const MOVE_FILE_TOOL: CanonicalToolDefinition = {
     "move or rename a note; backlinks are rewritten automatically. Use to reorganize the vault.",
   errorGuidance:
     "If the destination already exists, choose a new name. " +
+    "The destination must stay an Obsidian document (.md or .canvas) — a move cannot change a note into another file type. " +
     "If the source does not exist, verify the path with list_directory or search_files.",
   annotations: { destructiveHint: true },
   parameters: {
@@ -84,8 +86,8 @@ export const MOVE_FILE_TOOL: CanonicalToolDefinition = {
       to: {
         type: "string",
         description:
-          "Destination vault-relative path (e.g., 'Characters/Vex.md'). " +
-          "Missing parent folders are created automatically.",
+          "Destination vault-relative path — must be an Obsidian document (.md or .canvas), " +
+          "e.g. 'Characters/Vex.md'. Missing parent folders are created automatically.",
       },
     },
     required: ["from", "to"],

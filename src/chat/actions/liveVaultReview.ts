@@ -8,7 +8,8 @@ import type {
 } from "../../vault-ops/types";
 import { diskState, diskFingerprint, readContentOrNull } from "../../vault-ops/apply";
 import { applyVaultOpBatch } from "../../vault-ops/applyBatch";
-import { resolveGate, resolveEditGate, type VaultOpPolicy } from "../../vault-ops/gateway";
+import { resolveGate, resolveEditGate, targetPaths, type VaultOpPolicy } from "../../vault-ops/gateway";
+import { escapesVault, outsideVaultMessage } from "../../vault-ops/pathSafety";
 import { summarizeOp } from "../../vault-ops/summary";
 import {
   dispositionMessage,
@@ -540,6 +541,16 @@ export class LiveVaultReview {
     autoEntries: Array<Extract<Entry, { kind: "auto" }>>,
     results: Map<string, ToolResult>,
   ): Promise<void> {
+    // SECURITY INVARIANT (first-class, defense in depth) — auto-apply must NEVER
+    // write outside the vault. An escaping path is already refused at conversion
+    // (layer 1), pre-flight (layer 2), and the disk executor (layer 3); the
+    // auto-apply orchestrator re-checks the boundary here in its own right, so a
+    // future refactor of the conversion stage cannot open an auto-apply hole. A
+    // single escaping op fails the *whole* auto batch — nothing reaches
+    // applyVaultOpBatch or disk — the conservative all-or-nothing stance for a
+    // safety violation. See docs/work/issues/RESOLVED-vault-path-boundary-out-of-vault-escape.md §6.2.
+    if (this.refuseEscapingAuto(autoEntries, results)) return;
+
     const batch = autoEntries.map((e) => ({ id: e.reviewable.id, op: e.reviewable.op }));
     const res = await applyVaultOpBatch(this.app, batch);
     if (res.ok) {
@@ -555,6 +566,34 @@ export class LiveVaultReview {
         results.set(e.call.id, dispoResult(e.reviewable.op, "failed", reason));
       }
     }
+  }
+
+  /**
+   * The auto-apply layer's own vault-boundary defense (see {@link applyAuto}).
+   * If any auto op's path escapes the vault, fail the *entire* batch in place —
+   * marking every op `failed` with an accurate, model-facing reason and returning
+   * `true` so the caller short-circuits before {@link applyVaultOpBatch} (and thus
+   * disk) is ever reached. The escaping op names its own out-of-vault path; the
+   * rest name the sibling that aborted the batch, so each op reports why it failed.
+   * Returns `false` (no escape) for the normal path.
+   */
+  private refuseEscapingAuto(
+    autoEntries: Array<Extract<Entry, { kind: "auto" }>>,
+    results: Map<string, ToolResult>,
+  ): boolean {
+    const offending = autoEntries.flatMap((e) => targetPaths(e.reviewable.op)).find(escapesVault);
+    if (offending === undefined) return false;
+
+    for (const e of autoEntries) {
+      e.reviewable.status = "failed";
+      const own = targetPaths(e.reviewable.op).find(escapesVault);
+      const reason =
+        own !== undefined
+          ? outsideVaultMessage(own)
+          : `auto-apply aborted: "${offending}" is outside the vault, so nothing in this batch was applied`;
+      results.set(e.call.id, dispoResult(e.reviewable.op, "failed", reason));
+    }
+    return true;
   }
 
   /** Create the parked promise for an `ask` op, keyed by op id. */

@@ -34,6 +34,40 @@ describe("validateWriteFile", () => {
     expect(validateWriteFile({ path: "a.md", content: "x" }, resolveWith({ "a.md": "file" })).ok)
       .toBe(true);
   });
+
+  test("accepts a .canvas document", () => {
+    expect(validateWriteFile({ path: "Board.canvas", content: "{}" }, absent).ok).toBe(true);
+  });
+
+  test("rejects a missing extension with a self-correcting type error", () => {
+    const r = validateWriteFile({ path: "Sandbox/NoExtension", content: "x" }, absent);
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error).toContain("unsupported file type");
+  });
+
+  test("rejects an executable/script type even when the path is in-vault", () => {
+    for (const path of ["Sandbox/run.bat", "x.exe", "page.html", "data.json"]) {
+      const r = validateWriteFile({ path, content: "x" }, absent);
+      expect(r.ok, path).toBe(false);
+      if (!r.ok) expect(r.error).toContain(".md");
+    }
+  });
+
+  test("rejects overwriting an existing non-document file (e.g. plugin .json)", () => {
+    // The extension check applies to overwrite too, so the model cannot clobber a
+    // config/plugin file that happens to live inside the vault.
+    const r = validateWriteFile(
+      { path: ".obsidian/plugins/x/data.json", content: "{}" },
+      resolveWith({ ".obsidian/plugins/x/data.json": "file" }),
+    );
+    expect(r.ok).toBe(false);
+  });
+
+  test("reports a folder path as a folder, not a type error (dir branch wins)", () => {
+    const r = validateWriteFile({ path: "Characters", content: "x" }, resolveWith({ Characters: "dir" }));
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error).toContain("folder");
+  });
 });
 
 describe("validateCreateDirectory", () => {
@@ -73,6 +107,27 @@ describe("validateMoveFile", () => {
   test("rejects identical from/to", () => {
     expect(validateMoveFile({ from: "a.md", to: "a.md" }, resolveWith({ "a.md": "file" })).ok)
       .toBe(false);
+  });
+
+  test("refuses laundering a blessed file into a forbidden type (note.md -> note.bat)", () => {
+    // The whole point of the write_file allowlist would be moot if a move could
+    // rename an allowed file into an executable — so the destination is held to the
+    // same allowlist. This is the invariant: no non-blessed extension ever lands.
+    const r = validateMoveFile({ from: "note.md", to: "note.bat" }, resolveWith({ "note.md": "file" }));
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error).toContain("unsupported file type");
+  });
+
+  test("refuses a move whose destination drops the extension", () => {
+    const r = validateMoveFile({ from: "note.md", to: "Archive/note" }, resolveWith({ "note.md": "file" }));
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error).toContain(".md");
+  });
+
+  test("allows a move between blessed document types (.md -> .canvas)", () => {
+    expect(
+      validateMoveFile({ from: "note.md", to: "board.canvas" }, resolveWith({ "note.md": "file" })).ok,
+    ).toBe(true);
   });
 });
 

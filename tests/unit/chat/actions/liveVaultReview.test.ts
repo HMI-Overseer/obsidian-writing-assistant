@@ -101,6 +101,26 @@ describe("LiveVaultReview", () => {
     expect(review.getProposal()?.ops[0].status).toBe("applied");
   });
 
+  it("fails an out-of-vault write with an explanation and never creates a reviewable op", async () => {
+    // Even configured to auto-apply, a path that escapes the vault must not become an
+    // op — so it can never reach the gate where an accidental approval would write out.
+    const review = new LiveVaultReview({
+      app: makeApp(),
+      timelineEl: TIMELINE_EL,
+      policy: POLICY({ create: "auto" }),
+    });
+
+    for (const path of ["../../outside-vault.md", "C:/Windows/System32/test.md"]) {
+      const [{ result }] = await review.resolveRound([writeCall(`c-${path}`, path)]);
+      expect(result.isError).toBe(true);
+      expect(result.content).toContain("outside the vault");
+    }
+
+    // No op was queued for review and nothing was applied.
+    expect(review.getProposal()).toBeNull();
+    expect(review.getAppliedRecord()).toBeNull();
+  });
+
   it("suspends an ask-gated op until the user approves, then reports applied", async () => {
     const review = new LiveVaultReview({
       app: makeApp(),

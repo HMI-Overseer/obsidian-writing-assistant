@@ -1,6 +1,6 @@
 import { setIcon } from "obsidian";
 import type { AgenticStep } from "../../shared/types";
-import { TOOL_ICONS, TOOL_LABELS } from "../../tools/metadata";
+import { TOOL_ICONS, TOOL_LABELS, isMutatingTool } from "../../tools/metadata";
 
 /**
  * A live-updating timeline of agentic tool calls and reasoning steps.
@@ -49,14 +49,21 @@ export class AgenticTimeline {
   /**
    * Show a pending placeholder for a tool call that has been identified during
    * streaming but hasn't executed yet. Claimed and finalized by `addStep()`.
+   *
+   * `toolCallId` is set when the caller already knows it (the Claude Code path mints
+   * the id before the call runs). Tagging it on the placeholder lets the in-loop vault
+   * review bind approve/decline to this exact step *while it is still pending* — without
+   * it the review falls back to positional matching, which a preceding failed call (a
+   * step with no op) can misalign into a stray synthetic row (vaultReviewTimeline.ts).
    */
-  addPendingToolCall(toolName: string): void {
+  addPendingToolCall(toolName: string, toolCallId?: string): void {
     const stepEl = this.listEl.createDiv({
-      cls: `lmsa-agentic-timeline-step lmsa-agentic-timeline-step--tool_call lmsa-agentic-timeline-step--pending`,
+      cls: toolStepClasses(toolName, "lmsa-agentic-timeline-step--pending"),
     });
     // Tag the tool name so a later pass can bind to it positionally if its
     // tool-call id is missing (vault review fallback — see vaultReviewTimeline.ts).
     stepEl.dataset.toolName = toolName;
+    if (toolCallId) stepEl.dataset.toolCallId = toolCallId;
     const dotEl = stepEl.createDiv({ cls: "lmsa-agentic-timeline-dot" });
     setIcon(dotEl, TOOL_ICONS[toolName] ?? "wrench");
     const bodyEl = stepEl.createDiv({ cls: "lmsa-agentic-timeline-step-body" });
@@ -79,7 +86,14 @@ export class AgenticTimeline {
     if (step.type === "tool_call" && step.toolName) {
       const queue = this.pendingToolCallEls.get(step.toolName);
       if (queue && queue.length > 0) {
-        const pending = queue.shift();
+        // Prefer the placeholder already tagged with this id (the Claude Code path
+        // tags it at `start`), so out-of-order completion can't claim the wrong row;
+        // otherwise FIFO (the plugin path, whose placeholders carry no id yet).
+        const claimIdx = selectClaimIndex(
+          queue.map((p) => p.stepEl.dataset.toolCallId),
+          step.toolCallId,
+        );
+        const [pending] = queue.splice(claimIdx, 1);
         if (!pending) { this.renderStep(step); this.updateSummary(); return; }
         const { stepEl, detailEl } = pending;
         if (queue.length === 0) this.pendingToolCallEls.delete(step.toolName);
@@ -93,6 +107,9 @@ export class AgenticTimeline {
         if (step.toolArgs) {
           this.renderExpandableArgs(stepEl, step.toolArgs);
         }
+        if (step.isError) {
+          this.decorateError(stepEl, step.errorContent ?? "");
+        }
         this.updateSummary();
         return;
       }
@@ -100,6 +117,48 @@ export class AgenticTimeline {
 
     this.renderStep(step);
     this.updateSummary();
+  }
+
+  /**
+   * Attach a tool result to an already-rendered step after it resolves — the vault-op
+   * and edit channels record their step *before* the user decides, so the error state
+   * lands here. Updates the stored step (so {@link getSteps} persists it for history)
+   * and the live DOM, in both directions: an error result decorates the step, a
+   * non-error result strips any decoration so the two never drift.
+   */
+  setStepResult(toolCallId: string, result: { isError?: boolean; content: string }): void {
+    const step = this.steps.find(
+      (s) => s.type === "tool_call" && s.toolCallId === toolCallId,
+    );
+    if (step) {
+      if (result.isError) {
+        step.isError = true;
+        step.errorContent = result.content;
+      } else {
+        delete step.isError;
+        delete step.errorContent;
+      }
+    }
+    const stepEl = this.listEl.querySelector<HTMLElement>(
+      `[data-tool-call-id="${CSS.escape(toolCallId)}"]`,
+    );
+    if (!stepEl) return;
+    if (result.isError) {
+      this.decorateError(stepEl, result.content);
+    } else {
+      this.clearError(stepEl);
+    }
+  }
+
+  /** Remove any error decoration (red class, "Failed" label, error block) from a step. */
+  private clearError(stepEl: HTMLElement): void {
+    stepEl.classList.remove("lmsa-agentic-timeline-step--error");
+    const bodyEl =
+      (stepEl.querySelector(".lmsa-agentic-timeline-step-body") as HTMLElement | null) ?? stepEl;
+    bodyEl.querySelector(":scope > .lmsa-agentic-timeline-step-failed")?.remove();
+    bodyEl
+      .querySelector(":scope > .lmsa-agentic-timeline-step-expand > .lmsa-agentic-timeline-error")
+      ?.remove();
   }
 
   /**
@@ -183,7 +242,10 @@ export class AgenticTimeline {
 
   private renderStep(step: AgenticStep): void {
     const stepEl = this.listEl.createDiv({
-      cls: `lmsa-agentic-timeline-step lmsa-agentic-timeline-step--${step.type}`,
+      cls:
+        step.type === "tool_call"
+          ? toolStepClasses(step.toolName)
+          : "lmsa-agentic-timeline-step lmsa-agentic-timeline-step--reasoning",
     });
     if (step.toolCallId) stepEl.dataset.toolCallId = step.toolCallId;
     if (step.type === "tool_call" && step.toolName) stepEl.dataset.toolName = step.toolName;
@@ -203,6 +265,9 @@ export class AgenticTimeline {
       }
       if (step.toolArgs) {
         this.renderExpandableArgs(stepEl, step.toolArgs);
+      }
+      if (step.isError) {
+        this.decorateError(stepEl, step.errorContent ?? "");
       }
     } else if (step.text) {
       const needsTruncation = step.text.length > 120;
@@ -227,21 +292,92 @@ export class AgenticTimeline {
     stepEl: HTMLElement,
     args: Record<string, unknown>,
   ): void {
-    // Append inside the step body (second child after the dot) so flex layout
-    // keeps the expand block below the label, not beside the dot.
-    const bodyEl = stepEl.querySelector(".lmsa-agentic-timeline-step-body") ?? stepEl;
-    const expandEl = (bodyEl as HTMLElement).createDiv({ cls: "lmsa-agentic-timeline-step-expand" });
-
+    const expandEl = this.ensureExpandBlock(stepEl);
     for (const [key, value] of Object.entries(args)) {
       const entryEl = expandEl.createDiv({ cls: "lmsa-agentic-timeline-arg-entry" });
       entryEl.createSpan({ cls: "lmsa-agentic-timeline-arg-key", text: key });
       const valueStr = typeof value === "string" ? value : JSON.stringify(value, null, 2);
       entryEl.createEl("pre", { cls: "lmsa-agentic-timeline-arg-value", text: valueStr });
     }
-
-    stepEl.classList.add("lmsa-agentic-timeline-step--expandable");
-    stepEl.addEventListener("click", () => {
-      stepEl.classList.toggle("is-expanded");
-    });
   }
+
+  /**
+   * The step's click-to-expand block, created on first use. Appended inside the step
+   * body so the flex layout keeps it below the label (not beside the dot); the toggle
+   * handler is wired once. Shared by the raw-args view and the error block.
+   */
+  private ensureExpandBlock(stepEl: HTMLElement): HTMLElement {
+    const bodyEl =
+      (stepEl.querySelector(".lmsa-agentic-timeline-step-body") as HTMLElement | null) ?? stepEl;
+    let expandEl = bodyEl.querySelector<HTMLElement>(
+      ":scope > .lmsa-agentic-timeline-step-expand",
+    );
+    if (!expandEl) {
+      expandEl = bodyEl.createDiv({ cls: "lmsa-agentic-timeline-step-expand" });
+    }
+    if (!stepEl.classList.contains("lmsa-agentic-timeline-step--expandable")) {
+      stepEl.classList.add("lmsa-agentic-timeline-step--expandable");
+      stepEl.addEventListener("click", () => stepEl.classList.toggle("is-expanded"));
+    }
+    return expandEl;
+  }
+
+  /**
+   * Mark a tool step as failed: a red dot, the exact result returned to the model in
+   * the expand block, and a compact inline "Failed" label.
+   *
+   * The vault/edit review overlay owns the inline state label ("Failed" / "Declined" /
+   * "No match") of any step it controls, so we add our own only when no overlay does:
+   * read-only tools, and mutating failures that never became a reviewable op/hunk
+   * (conversion errors, policy-deny, a no-match edit) — those carry no overlay controls.
+   * The overlay also strips this label when it later claims a step (its decorateStep),
+   * so a historical re-render — where the base paints before the overlay — never doubles.
+   */
+  private decorateError(stepEl: HTMLElement, content: string): void {
+    stepEl.classList.add("lmsa-agentic-timeline-step--error");
+    const bodyEl =
+      (stepEl.querySelector(".lmsa-agentic-timeline-step-body") as HTMLElement | null) ?? stepEl;
+    const reviewed = !!bodyEl.querySelector(
+      ":scope > .lmsa-vault-step-controls, :scope > .lmsa-edit-step-controls",
+    );
+    if (!reviewed && !bodyEl.querySelector(":scope > .lmsa-agentic-timeline-step-failed")) {
+      bodyEl.createSpan({ cls: "lmsa-agentic-timeline-step-failed", text: "Failed" });
+    }
+    if (!content) return; // red dot + label suffice when there is no error text to show.
+    const expandEl = this.ensureExpandBlock(stepEl);
+    // Re-decoration (live result after a historical pre-render) replaces the block.
+    expandEl.querySelector(":scope > .lmsa-agentic-timeline-error")?.remove();
+    const errorEl = expandEl.createDiv({ cls: "lmsa-agentic-timeline-error" });
+    errorEl.createSpan({
+      cls: "lmsa-agentic-timeline-error-label",
+      text: "Error returned to the model",
+    });
+    errorEl.createEl("pre", { cls: "lmsa-agentic-timeline-arg-value", text: content });
+    expandEl.prepend(errorEl); // keep the error above any raw-args entries
+  }
+}
+
+/** Base classes for a tool-call step: the type, the mutating category when applicable, and any extras. */
+export function toolStepClasses(toolName: string | undefined, ...extra: string[]): string {
+  const classes = ["lmsa-agentic-timeline-step", "lmsa-agentic-timeline-step--tool_call"];
+  if (isMutatingTool(toolName)) classes.push("lmsa-agentic-timeline-step--mutating");
+  classes.push(...extra);
+  return classes.join(" ");
+}
+
+/**
+ * Which queued pending placeholder a completing tool call claims. Prefers the one
+ * already tagged with this call's id (the Claude Code path tags placeholders at
+ * `start`), so out-of-order completion can't claim the wrong row; otherwise FIFO
+ * (index 0 — the plugin path, whose placeholders carry no id at streaming time).
+ */
+export function selectClaimIndex(
+  pendingIds: ReadonlyArray<string | undefined>,
+  toolCallId: string | undefined,
+): number {
+  if (toolCallId) {
+    const idx = pendingIds.indexOf(toolCallId);
+    if (idx >= 0) return idx;
+  }
+  return 0;
 }

@@ -9,6 +9,7 @@
  */
 
 import type { PathState } from "../../vault-ops/types";
+import { escapesVault, outsideVaultMessage } from "../../vault-ops/pathSafety";
 
 type ValidationOk<T> = { ok: true; args: T };
 type ValidationErr = { ok: false; error: string };
@@ -52,6 +53,7 @@ export function validateWriteFile(
   if (typeof args.path !== "string" || args.path.trim() === "") {
     return err("path must be a non-empty string.");
   }
+  if (escapesVault(args.path)) return err(outsideVaultMessage(args.path));
   if (typeof args.content !== "string") {
     return err("content must be a string. Got: " + typeof args.content);
   }
@@ -68,6 +70,7 @@ export function validateCreateDirectory(
   if (typeof args.path !== "string" || args.path.trim() === "") {
     return err("path must be a non-empty string.");
   }
+  if (escapesVault(args.path)) return err(outsideVaultMessage(args.path));
   const state = resolve(args.path);
   if (state === "file") {
     return err(`"${args.path}" is a file — choose a folder path.`);
@@ -94,6 +97,8 @@ export function validateMoveFile(
   if (typeof args.to !== "string" || args.to.trim() === "") {
     return err("to must be a non-empty string.");
   }
+  if (escapesVault(args.from)) return err(outsideVaultMessage(args.from));
+  if (escapesVault(args.to)) return err(outsideVaultMessage(args.to));
   if (args.from === args.to) {
     return err("from and to are the same path — nothing to move.");
   }
@@ -113,6 +118,7 @@ export function validateTrashFile(
   if (typeof args.path !== "string" || args.path.trim() === "") {
     return err("path must be a non-empty string.");
   }
+  if (escapesVault(args.path)) return err(outsideVaultMessage(args.path));
   const state = resolve(args.path);
   if (state === "absent") {
     return err(`"${args.path}" does not exist.`);

@@ -6,6 +6,7 @@
 
 import type { PathState, TargetFingerprint, VaultOperation } from "./types";
 import { targetPaths } from "./gateway";
+import { escapesVault, outsideVaultMessage } from "./pathSafety";
 
 /** Live disk, injected as data. The apply executor backs this with the real vault. */
 export interface DiskSnapshot {
@@ -37,6 +38,11 @@ export function preflight(ops: VaultOperation[], disk: DiskSnapshot): PreflightR
   const conflicts: Conflict[] = [];
   ops.forEach((op, index) => {
     const add = (reason: string) => conflicts.push({ index, op, reason });
+    // Vault-boundary guard (authoritative): refuse any op whose path escapes the
+    // vault, so an out-of-vault write can never reach disk even if it slipped past
+    // the in-loop validator. A violation aborts the whole batch — nothing is written.
+    const escaping = targetPaths(op).find((p) => escapesVault(p));
+    if (escaping !== undefined) add(outsideVaultMessage(escaping));
     switch (op.kind) {
       case "create":
         if (disk.state(op.path) !== "absent") add(`"${op.path}" already exists.`);

@@ -12,6 +12,8 @@ import { TFile, TFolder, normalizePath } from "obsidian";
 import type { PathState, TargetFingerprint, VaultOperation } from "./types";
 import type { DiskSnapshot } from "./plan";
 import { inverseOf } from "./plan";
+import { targetPaths } from "./gateway";
+import { escapesVault } from "./pathSafety";
 
 // ---------------------------------------------------------------------------
 // Disk probes — back the pure planners' injected data with the live vault.
@@ -76,6 +78,12 @@ export async function applyOperation(
   app: App,
   op: VaultOperation,
 ): Promise<VaultOperation | null> {
+  // Last line of defense before disk: never resolve a path outside the vault, even
+  // if pre-flight was bypassed. `vault.create`/`renameFile` would otherwise let a
+  // `..`/drive-letter path escape via path.join.
+  for (const p of targetPaths(op)) {
+    if (escapesVault(p)) throw new Error(`refusing to apply "${p}": path is outside the vault.`);
+  }
   switch (op.kind) {
     case "create": {
       const path = normalizePath(op.path);

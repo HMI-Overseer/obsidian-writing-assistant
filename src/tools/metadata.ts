@@ -67,6 +67,26 @@ export const TOOL_STATUS_LABELS: Record<string, string> = {
   think: "Thinking...",
 };
 
+/**
+ * Tools that change the vault or active document — the four vault ops plus the two
+ * edit tools. Mirrors the `destructiveHint` / `idempotentHint` annotations on the
+ * vault-op definitions and the edit-tool channel. Drives the orange "mutating" dot in
+ * the {@link AgenticTimeline}; every other (read-only) tool keeps the default cyan.
+ */
+export const MUTATING_TOOL_NAMES: ReadonlySet<string> = new Set([
+  "write_file",
+  "create_directory",
+  "move_file",
+  "trash_file",
+  "propose_edit",
+  "update_frontmatter",
+]);
+
+/** True when a tool mutates the vault/document (vault op or edit), false for read-only tools. */
+export function isMutatingTool(toolName: string | undefined): boolean {
+  return toolName !== undefined && MUTATING_TOOL_NAMES.has(toolName);
+}
+
 /** Extract a human-readable summary of what a tool call operated on. */
 export function extractToolInput(
   tc: { name: string; arguments: Record<string, unknown> },

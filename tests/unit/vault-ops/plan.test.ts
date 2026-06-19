@@ -55,6 +55,19 @@ describe("preflight", () => {
     expect(result.conflicts).toHaveLength(1);
     expect(result.conflicts[0].index).toBe(0);
   });
+
+  test("refuses any op whose path escapes the vault (authoritative boundary)", () => {
+    const create: VaultOperation = { kind: "create", path: "../../outside.md", content: "x" };
+    const rc = preflight([create], disk({}));
+    expect(rc.ok).toBe(false);
+    expect(rc.conflicts[0].reason).toContain("outside the vault");
+
+    // A move with a safe source but an escaping destination is still refused.
+    const move: VaultOperation = { kind: "move", from: "A.md", to: "../../x.md", expect: FP };
+    const rm = preflight([move], disk({ "A.md": ["file", FP] }));
+    expect(rm.ok).toBe(false);
+    expect(rm.conflicts.some((c) => c.reason.includes("outside the vault"))).toBe(true);
+  });
 });
 
 describe("orderOps", () => {

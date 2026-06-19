@@ -89,7 +89,9 @@ function statusClass(status: VaultOpStatus, historical: boolean): string {
   switch (status) {
     case "applied": return "is-vault-applied";
     case "failed": return "is-vault-failed";
-    case "rejected": return "is-vault-cancelled";
+    // A deliberate user decline reads as red (a "this did not happen" signal),
+    // distinct from the muted "you moved on before applying" cancel above.
+    case "rejected": return "is-vault-rejected";
     case "satisfied": return "is-vault-satisfied";
     default: return "is-vault-awaiting";
   }
@@ -99,6 +101,7 @@ const ALL_STATE_CLASSES = [
   "is-vault-awaiting",
   "is-vault-applied",
   "is-vault-failed",
+  "is-vault-rejected",
   "is-vault-cancelled",
   "is-vault-satisfied",
 ];
@@ -240,6 +243,9 @@ export class VaultReviewTimelineView {
     const bodyEl =
       stepEl.querySelector<HTMLElement>(".lmsa-agentic-timeline-step-body") ?? stepEl;
     bodyEl.querySelector(":scope > .lmsa-vault-step-controls")?.remove();
+    // This step is reviewed, so the overlay owns its state label — drop the base
+    // "Failed" word the timeline may have added (it paints first on a history re-render).
+    bodyEl.querySelector(":scope > .lmsa-agentic-timeline-step-failed")?.remove();
     const controls = bodyEl.createDiv({ cls: "lmsa-vault-step-controls" });
     // A tool-call step with args carries a row-level click-to-expand handler;
     // approving/declining must not also toggle that, so stop clicks here.

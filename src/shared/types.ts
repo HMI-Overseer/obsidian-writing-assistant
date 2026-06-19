@@ -184,6 +184,16 @@ export interface AgenticStep {
   toolInput?: string;
   /** For tool_call: the full arguments object sent by the model. Used for timeline expansion. */
   toolArgs?: Record<string, unknown>;
+  /**
+   * For tool_call: the call's result was an error (failed, user-declined, or
+   * policy-denied). Drives the red timeline dot and reveals {@link errorContent}.
+   */
+  isError?: boolean;
+  /**
+   * For tool_call: the exact tool result returned to the model when {@link isError}.
+   * Shown in the step's expand block so a user can see what the model saw.
+   */
+  errorContent?: string;
   /** For reasoning: the model's prose emitted between tool rounds. */
   text?: string;
 }

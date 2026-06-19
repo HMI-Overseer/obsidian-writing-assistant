@@ -745,3 +745,53 @@ describe("failure contract", () => {
     expect(result.failure).toBeUndefined();
   });
 });
+
+// ---------------------------------------------------------------------------
+// Path-boundary safety — reads cannot disclose a file outside the vault.
+//
+// Every read tool resolves its path through Obsidian's index lookups
+// (getFileByPath / getAbstractFileByPath), which only ever return an in-vault
+// file. An out-of-vault path (../, drive letter) is simply not in the index, so
+// it resolves to null → not-found — never read from disk via the adapter. These
+// tests lock that in: a refactor that reached for the adapter (which would escape)
+// would no longer return not-found, and would fail here.
+// ---------------------------------------------------------------------------
+
+describe("path-boundary safety (reads stay inside the vault)", () => {
+  const ESCAPING = ["../../etc/passwd", "../secret.md", "C:/Windows/System32/config", "..\\..\\x.md"];
+
+  test("read_file refuses an out-of-vault path as not-found (no disclosure)", async () => {
+    const ctx = makeCtx({ files: [makeFile("In/Vault.md")] });
+    for (const path of ESCAPING) {
+      const result = await executeVaultTool(tc("read_file", { path }), ctx);
+      expect(result.isError).toBe(true);
+      expect(result.failure?.kind).toBe("not-found");
+    }
+  });
+
+  test("get_backlinks refuses an out-of-vault path as not-found", async () => {
+    const ctx = makeCtx({ files: [makeFile("In/Vault.md")] });
+    const result = await executeVaultTool(tc("get_backlinks", { path: "../../etc/passwd" }), ctx);
+    expect(result.failure?.kind).toBe("not-found");
+  });
+
+  test("list_directory / directory_tree refuse an out-of-vault folder as not-found", async () => {
+    const ctx = makeCtx({ abstractFiles: { In: makeFolder("In") } });
+    for (const name of ["list_directory", "directory_tree"]) {
+      const result = await executeVaultTool(tc(name, { path: "../.." }), ctx);
+      expect(result.failure?.kind).toBe("not-found");
+    }
+  });
+
+  test("get_frontmatter reports a per-path error for an out-of-vault path, never reads it", async () => {
+    const ctx = makeCtx({ files: [makeFile("In/Vault.md")] });
+    const result = await executeVaultTool(
+      tc("get_frontmatter", { paths: ["../../secret.md"] }),
+      ctx,
+    );
+    // The call itself succeeds (per-entry errors), but the out-of-vault path yields
+    // "No note found" rather than any content — it was never resolved to disk.
+    expect(result.isError).toBeUndefined();
+    expect(result.content).toContain("No note found");
+  });
+});

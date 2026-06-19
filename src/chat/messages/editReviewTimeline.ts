@@ -183,6 +183,9 @@ export class EditReviewTimelineView {
       stepEl.querySelector<HTMLElement>(".lmsa-agentic-timeline-step-body") ?? stepEl;
     bodyEl.querySelector(":scope > .lmsa-edit-step-controls")?.remove();
     bodyEl.querySelector(":scope > .lmsa-edit-timeline-hunk")?.remove();
+    // This step is reviewed, so the overlay owns its state label — drop the base
+    // "Failed" word the timeline may have added (it paints first on a history re-render).
+    bodyEl.querySelector(":scope > .lmsa-agentic-timeline-step-failed")?.remove();
 
     // Approve / decline / undo live inline on the step row (parity with vault ops).
     // Clicks here must not toggle the step's raw-args expand.

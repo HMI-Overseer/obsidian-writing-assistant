@@ -91,6 +91,25 @@
     background: color-mix(in srgb, var(--color-cyan, var(--lmsa-mode-accent)) 10%, var(--background-primary));
   }
 
+  /* Mutating tools (vault ops + edits): orange category tint — the same accent as the
+     "pending approval" label. Defined after --tool_call so it overrides the cyan on the
+     equal-specificity descendant rule; the review overlays' applied/failed states (a
+     later import) override this in turn once an op resolves. */
+  .lmsa-agentic-timeline-step--mutating .lmsa-agentic-timeline-dot {
+    color: var(--lmsa-mode-accent);
+    border-color: color-mix(in srgb, var(--lmsa-mode-accent) 55%, var(--background-modifier-border));
+    background: color-mix(in srgb, var(--lmsa-mode-accent) 10%, var(--background-primary));
+  }
+
+  /* Error: the tool failed or was policy-denied — red, overriding the category and
+     read-only tints. Must stay last of the three so it wins by source order. (The
+     review overlays paint their own red for failed / declined / no-match ops.) */
+  .lmsa-agentic-timeline-step--error .lmsa-agentic-timeline-dot {
+    color: var(--text-error);
+    border-color: color-mix(in srgb, var(--text-error) 55%, var(--background-modifier-border));
+    background: color-mix(in srgb, var(--text-error) 12%, var(--background-primary));
+  }
+
   .lmsa-agentic-timeline-step--reasoning .lmsa-agentic-timeline-dot {
     color: var(--text-faint);
     border-color: var(--background-modifier-border);
@@ -120,6 +139,14 @@
     text-overflow: ellipsis;
     white-space: nowrap;
     max-width: 280px;
+  }
+
+  /* Inline "Failed" marker for an errored read-only tool — the unmissable signal when
+     the step is collapsed (mutating ops show their state via the review controls). */
+  .lmsa-agentic-timeline-step-failed {
+    color: var(--text-error);
+    font-size: var(--font-ui-smaller);
+    font-weight: 500;
   }
 
   /* Pending state: dot pulses while tool arguments are streaming in. */
@@ -160,6 +187,22 @@
 
   .lmsa-agentic-timeline-step.is-expanded .lmsa-agentic-timeline-step-expand {
     display: block;
+  }
+
+  /* The exact tool result returned to the model on failure — sits at the top of the
+     expand block, marked with a red left rule (echoing the neutral one on the expand
+     itself) so it reads as the error nested under the failed step. */
+  .lmsa-agentic-timeline-error {
+    margin-bottom: 6px;
+    padding: 2px 0 2px 8px;
+    border-left: 2px solid var(--text-error);
+  }
+
+  .lmsa-agentic-timeline-error-label {
+    display: block;
+    margin-bottom: 2px;
+    color: var(--text-error);
+    font-weight: 600;
   }
 
   .lmsa-agentic-timeline-arg-entry {

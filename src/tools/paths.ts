@@ -56,8 +56,9 @@ function stripVaultNamePrefix(path: string, vaultName: string | undefined): stri
 /**
  * Translate a model-supplied path into a vault-relative one (see the module
  * doc-comment for the two shapes handled). An absolute path *outside* the vault
- * is returned unchanged so the normal validators judge it (it then fails
- * honestly as not-found rather than landing somewhere unexpected).
+ * is returned unchanged so the normal validators judge it — and the vault-boundary
+ * guard ({@link ../vault-ops/pathSafety.escapesVault}) then refuses it with a
+ * self-correcting error rather than letting it land outside the vault.
  *
  * Comparison is case-insensitive: Windows drive letters and the default macOS
  * filesystem don't distinguish case, so we match loosely but slice from the

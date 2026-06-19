@@ -89,3 +89,47 @@ describe("validateTrashFile", () => {
     expect(validateTrashFile({ path: "Dir" }, resolveWith({ Dir: "dir" })).ok).toBe(false);
   });
 });
+
+describe("vault-boundary rejection (out-of-vault paths fail before the review gate)", () => {
+  const ESCAPING = [
+    "../../outside-vault.md",
+    "..",
+    "a/../../x.md",
+    "C:/Windows/System32/test.md",
+    "C:\\Windows\\System32\\test.md",
+  ];
+
+  test("validateWriteFile rejects each escaping path with a boundary explanation", () => {
+    for (const path of ESCAPING) {
+      const r = validateWriteFile({ path, content: "x" }, absent);
+      expect(r.ok).toBe(false);
+      if (!r.ok) expect(r.error).toContain("outside the vault");
+    }
+  });
+
+  test("validateCreateDirectory rejects an escaping path", () => {
+    const r = validateCreateDirectory({ path: "../escape" }, absent);
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error).toContain("outside the vault");
+  });
+
+  test("validateMoveFile rejects an escaping source or destination", () => {
+    const fromBad = validateMoveFile({ from: "../x.md", to: "B.md" }, absent);
+    expect(fromBad.ok).toBe(false);
+    if (!fromBad.ok) expect(fromBad.error).toContain("outside the vault");
+
+    const toBad = validateMoveFile({ from: "A.md", to: "../../x.md" }, resolveWith({ "A.md": "file" }));
+    expect(toBad.ok).toBe(false);
+    if (!toBad.ok) expect(toBad.error).toContain("outside the vault");
+  });
+
+  test("validateTrashFile rejects an escaping path", () => {
+    const r = validateTrashFile({ path: "../../secret.md" }, resolveWith({}));
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error).toContain("outside the vault");
+  });
+
+  test("still allows an internal .. that stays inside the vault (no over-rejection)", () => {
+    expect(validateWriteFile({ path: "a/../b.md", content: "x" }, absent).ok).toBe(true);
+  });
+});

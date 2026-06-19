@@ -28,6 +28,13 @@
     background: color-mix(in srgb, var(--text-error) 12%, var(--background-primary));
   }
 
+  /* Declined by the user in review — red, like a failure: the op did not happen. */
+  .lmsa-agentic-timeline-step.is-vault-rejected .lmsa-agentic-timeline-dot {
+    color: var(--text-error);
+    border-color: color-mix(in srgb, var(--text-error) 55%, var(--background-modifier-border));
+    background: color-mix(in srgb, var(--text-error) 12%, var(--background-primary));
+  }
+
   .lmsa-agentic-timeline-step.is-vault-cancelled {
     opacity: 0.6;
   }

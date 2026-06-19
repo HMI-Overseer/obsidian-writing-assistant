@@ -238,7 +238,9 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
       plugin.services.claudeCode.setToolListener((event) => {
         const tl = timeline ?? (timeline = new AgenticTimeline(assistantBubble.timelineEl));
         if (event.phase === "start") {
-          tl.addPendingToolCall(event.toolName);
+          // Pass the id so the in-loop vault review binds to this step while it is
+          // still pending (avoids a stray synthetic row — see addPendingToolCall).
+          tl.addPendingToolCall(event.toolName, event.toolCallId);
         } else {
           tl.addStep({
             type: "tool_call",
@@ -249,6 +251,9 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
             // Same id the vault op carries (minted in ClaudeCodeService.callTool),
             // so the review binds approve/decline to this step.
             toolCallId: event.toolCallId,
+            // A failed call (e.g. an edit no-match, which never reaches the review
+            // overlay) flags its step red and reveals the error returned to the model.
+            ...(event.isError && { isError: true, errorContent: event.content }),
           });
         }
       });
@@ -277,6 +282,7 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
         // mirroring the streamed answer text into the timeline as reasoning.
         onToolCallStreaming: pluginTimeline ? (name) => pluginTimeline.addPendingToolCall(name) : undefined,
         onStepRecorded: pluginTimeline ? (step) => pluginTimeline.addStep(step) : undefined,
+        onStepResult: pluginTimeline ? (id, result) => pluginTimeline.setStepResult(id, result) : undefined,
         onReasoningDelta: pluginTimeline ? (delta) => pluginTimeline.addReasoningDelta(delta) : undefined,
         onReasoningRoundFinished: pluginTimeline
           ? (committed, round) => {

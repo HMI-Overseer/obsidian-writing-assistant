@@ -57,6 +57,12 @@ export type ClaudeCodeToolEvent =
       toolName: string;
       args: Record<string, unknown>;
       isError: boolean;
+      /**
+       * The tool result text returned to Claude Code. Surfaced on the timeline step's
+       * error block when `isError`, so a failed call (e.g. an edit's no-match) shows
+       * what the model saw — Claude Code's loop is otherwise opaque to the UI.
+       */
+      content: string;
       toolCallId: string;
     };
 
@@ -373,9 +379,13 @@ export class ClaudeCodeService {
         const toolCallId = call.id || generateId();
         this.toolListener?.({ phase: "start", toolName: call.name, toolCallId });
         let isError = true;
+        // The result text the model received — carried to the timeline so a failed
+        // call shows its error. Defaults cover a thrown executor (no result object).
+        let content = "The tool threw an unexpected error.";
         try {
           const result = await this.executeTool(call, toolCallId);
           isError = result.isError ?? false;
+          content = result.content;
           return result;
         } finally {
           this.toolListener?.({
@@ -383,6 +393,7 @@ export class ClaudeCodeService {
             toolName: call.name,
             args: call.arguments,
             isError,
+            content,
             toolCallId,
           });
         }

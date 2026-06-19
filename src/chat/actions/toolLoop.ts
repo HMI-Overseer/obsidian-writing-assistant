@@ -57,6 +57,12 @@ export interface ToolLoopCallbacks {
   onNewRound?: () => void;
   /** Called after each read-only tool call completes, with a record of what was done. */
   onStepRecorded?: (step: AgenticStep) => void;
+  /**
+   * Called once a vault-op / edit step resolves (it was recorded before the user
+   * decided). Carries the tool result so the timeline can flag failures / declines /
+   * policy-denials and surface the model-facing error text.
+   */
+  onStepResult?: (toolCallId: string, result: { isError?: boolean; content: string }) => void;
   /** Called with each text delta during streaming for live reasoning display in the timeline. */
   onReasoningDelta?: (delta: string) => void;
   /**
@@ -335,11 +341,16 @@ export async function runToolLoop(
         toolCallId: tc.id,
         toolInput: extractToolInput(tc),
         toolArgs: tc.arguments,
+        // The result is in hand here, so a failed read-only tool flags its step
+        // immediately (no separate onStepResult round-trip).
+        ...(result.isError && { isError: true, errorContent: result.content }),
       });
     }
-    // Vault-op and edit steps were already recorded before resolution — push results only.
+    // Vault-op and edit steps were already recorded before resolution — push results,
+    // and report the outcome so the timeline can flag failures / declines / denials.
     for (const { tc, result } of [...vaultOpResults, ...editResults]) {
       toolLoopTurns.push({ role: "tool", content: result.content, toolCallId: tc.id });
+      callbacks.onStepResult?.(tc.id, { isError: result.isError, content: result.content });
     }
 
     previousRoundsText = fullText;

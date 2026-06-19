@@ -58,6 +58,18 @@ describe("executeVaultOpTool", () => {
       expect(result.content).toContain("queued for review");
     });
 
+    it("refuses a path that escapes the vault, returning an error to the model", () => {
+      const app = makeApp({});
+      for (const path of ["../../outside-vault.md", "C:/Windows/System32/test.md"]) {
+        const result = executeVaultOpTool(
+          call("write_file", { path, content: "x" }),
+          { app, overlay: NO_OVERLAY },
+        );
+        expect(result.isError).toBe(true);
+        expect(result.content).toContain("outside the vault");
+      }
+    });
+
     it("acknowledges an existing file as an overwrite", () => {
       const app = makeApp({ "Characters/Vex.md": "file" });
       const result = executeVaultOpTool(

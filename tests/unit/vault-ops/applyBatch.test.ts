@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import type { App } from "obsidian";
 import { TFile, TFolder, normalizePath } from "obsidian";
 import { applyVaultOpBatch, undoVaultOpBatch } from "../../../src/vault-ops/applyBatch";
+import { applyOperation } from "../../../src/vault-ops/apply";
 import type { TargetFingerprint, VaultOperation } from "../../../src/vault-ops/types";
 
 type FileRec = { content: string; mtime: number; size: number };
@@ -159,6 +160,26 @@ describe("applyVaultOpBatch", () => {
 
     expect(result.ok).toBe(false);
     expect(vault.files.get("A.md")?.content).toBe("original");
+  });
+
+  it("refuses to apply an op whose path escapes the vault, and writes nothing", async () => {
+    const { app, files } = makeVault();
+    const op: VaultOperation = { kind: "create", path: "../../outside-vault.md", content: "x" };
+
+    const result = await applyVaultOpBatch(app, [{ id: "a", op }]);
+
+    expect(result.ok).toBe(false);
+    expect(result.conflicts.some((c) => c.reason.includes("outside the vault"))).toBe(true);
+    expect(result.applied).toHaveLength(0);
+    expect(files.size).toBe(0); // nothing escaped the vault onto disk.
+  });
+
+  it("applyOperation itself throws on an escaping path (last line before disk)", async () => {
+    const { app, files } = makeVault();
+    await expect(
+      applyOperation(app, { kind: "create", path: "../../outside-vault.md", content: "x" }),
+    ).rejects.toThrow(/outside the vault/);
+    expect(files.size).toBe(0);
   });
 });
 

@@ -161,15 +161,14 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
   //    the bubble; the timeline is driven by the loop's callbacks, created eagerly.
   //  - claudeCodeAgentic: Claude Code runs its loop internally over MCP. Its text
   //    streams straight to the bubble (no buffering) and the timeline is driven by
-  //    the service's tool-lifecycle events — created lazily on the first tool call
+  //    the service's tool-lifecycle events, created lazily on the first tool call
   //    so tool-less turns (the common case) don't render an empty timeline.
   const pluginAgentic = !!apiMessages.tools?.length;
   const claudeCodeAgentic =
     activeModel.provider === "claudecode" && plugin.settings.agenticMode;
-  // pluginTimeline is the eager instance the tool-loop callbacks write to (const,
-  // so they narrow cleanly). `timeline` tracks whichever instance exists for
-  // finalization — it starts as pluginTimeline and is filled lazily on the
-  // Claude Code path when its first MCP tool call arrives.
+  // pluginTimeline (const, so callbacks narrow cleanly) is the eager instance the
+  // tool-loop writes to. `timeline` is whatever exists at finalization: starts as
+  // pluginTimeline, filled lazily on the Claude Code path at its first MCP tool call.
   const pluginTimeline = pluginAgentic
     ? new AgenticTimeline(assistantBubble.timelineEl)
     : null;
@@ -231,7 +230,7 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
     const agenticMode = pluginAgentic;
 
     // Claude Code's tools fire inside its subprocess over MCP, not through the
-    // tool loop — route those lifecycle events into the same timeline, created on
+    // tool loop, route those lifecycle events into the same timeline, created on
     // first use so tool-less turns stay clean.
     if (claudeCodeAgentic) {
       plugin.services.claudeCode.setLiveReview(liveReview);
@@ -239,7 +238,7 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
         const tl = timeline ?? (timeline = new AgenticTimeline(assistantBubble.timelineEl));
         if (event.phase === "start") {
           // Pass the id so the in-loop vault review binds to this step while it is
-          // still pending (avoids a stray synthetic row — see addPendingToolCall).
+          // still pending (avoids a stray synthetic row, see addPendingToolCall).
           tl.addPendingToolCall(event.toolName, event.toolCallId);
         } else {
           tl.addStep({
@@ -278,7 +277,7 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
         },
         // These callbacks fire from the plugin's own tool loop only. For Claude
         // Code the loop runs a single pass with no tool calls, and the timeline is
-        // driven by the MCP listener below — so they stay unset there to avoid
+        // driven by the MCP listener below, so they stay unset there to avoid
         // mirroring the streamed answer text into the timeline as reasoning.
         onToolCallStreaming: pluginTimeline ? (name) => pluginTimeline.addPendingToolCall(name) : undefined,
         onStepRecorded: pluginTimeline ? (step) => pluginTimeline.addStep(step) : undefined,

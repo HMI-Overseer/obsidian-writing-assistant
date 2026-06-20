@@ -9,7 +9,7 @@ import type { BenchmarkResult, BenchmarkTestCase, EvaluationCheck } from "./type
  *
  * Beyond verifying that the right tool was called with well-formed arguments,
  * every propose_edit search argument is resolved against the fixture document
- * with the real diff engine — a call whose search text would not match the
+ * with the real diff engine, a call whose search text would not match the
  * document fails, exactly as it would in real use.
  */
 
@@ -67,7 +67,7 @@ function pushSearchMatchChecks(
       dead.length === 0,
       dead.length === 0
         ? `${assessments.length}/${assessments.length} searches resolve`
-        : `${dead.length} of ${assessments.length} search(es) would fail to apply — see evidence for the closest-paragraph diagnosis`
+        : `${dead.length} of ${assessments.length} search(es) would fail to apply, see evidence for the closest-paragraph diagnosis`
     )
   );
 
@@ -79,7 +79,7 @@ function pushSearchMatchChecks(
       fuzzy.length === 0,
       fuzzy.length === 0
         ? undefined
-        : `${fuzzy.length} search(es) only matched via fuzzy matching — works, but the model is not quoting the document precisely`,
+        : `${fuzzy.length} search(es) only matched via fuzzy matching, works, but the model is not quoting the document precisely`,
       false
     )
   );
@@ -252,7 +252,7 @@ export function evaluateCorrectToolSelection(
 /**
  * Test: "Search text precision"
  * The propose_edit call targeting the phrase must match the document and be
- * short — not a full section or the whole document.
+ * short, not a full section or the whole document.
  */
 export function evaluateSearchPrecision(
   response: string,
@@ -321,7 +321,7 @@ export function evaluateSearchPrecision(
       precise !== undefined
         ? `${precise.length} chars`
         : matching.length > 0
-          ? `shortest matching search is ${minLength} chars — the model included too much context`
+          ? `shortest matching search is ${minLength} chars, the model included too much context`
           : "no matching search to measure"
     )
   );

@@ -46,7 +46,7 @@ export async function applyHunksLive(
 
     for (const hunk of sortedHunks) {
       // Use matchedText (the actual text found in the document) rather than
-      // searchText (what the model provided) — these can differ when the match
+      // searchText (what the model provided), these can differ when the match
       // was whitespace-normalized or fuzzy.
       const matchedText = hunk.resolvedEdit.matchedText;
       const replaceText = hunk.resolvedEdit.editBlock.replaceText;
@@ -84,13 +84,13 @@ export interface LiveUndoResult {
  * Reverse a single applied hunk: find the replacement text in the live document
  * and restore the original matched text in its place.
  *
- * Re-anchors before mutating — prefers the tracked offset where the replacement
+ * Re-anchors before mutating, prefers the tracked offset where the replacement
  * was inserted (accurate even when identical text appears elsewhere), falling
  * back to `indexOf`. Returns `undone: false` without modifying the file when the
  * replacement can no longer be located (the document drifted past recovery).
  *
  * Uses `matchedText` (what was actually in the document) rather than `searchText`
- * (what the model provided) — these differ on whitespace-normalized matches.
+ * (what the model provided), these differ on whitespace-normalized matches.
  */
 export async function undoHunkLive(
   app: App,

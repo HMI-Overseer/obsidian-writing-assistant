@@ -53,7 +53,7 @@ export function buildGraphContext(
 /**
  * Boost retrieval results whose source files are relevant per the knowledge graph.
  * Formula: score * (1 + relevance * strength), then re-sort descending.
- * Returns a new array — does not mutate the input.
+ * Returns a new array, does not mutate the input.
  */
 export function boostByGraphRelevance(
   results: RetrievalResult[],
@@ -87,7 +87,7 @@ export function annotateBlockWithGraph(
 
   // Only annotate entities that directly matched the query in this file.
   // The 1-hop neighborhood expansion is already used in buildGraphContext for
-  // file relevance boosting — re-expanding here is what causes context explosion.
+  // file relevance boosting, re-expanding here is what causes context explosion.
   const matchedNames = new Set(matchedEntities.map((e) => e.name.trim().toLowerCase()));
   const filtered = fileEntities
     .filter((e) => matchedNames.has(e.name.trim().toLowerCase()))

@@ -11,7 +11,7 @@ function resolveOne(doc: string, searchText: string) {
   return r;
 }
 
-describe("resolveEdits — match type", () => {
+describe("resolveEdits, match type", () => {
   it("labels a verbatim hit as an exact match", () => {
     const r = resolveOne("The quick brown fox.", "quick brown");
     expect(r.matchType).toBe("exact");
@@ -19,14 +19,14 @@ describe("resolveEdits — match type", () => {
   });
 
   it("labels a spacing-only hit as a whitespace match", () => {
-    // Same words, collapsed extra spaces — tier 2.
+    // Same words, collapsed extra spaces, tier 2.
     const r = resolveOne("The quick    brown fox.", "quick brown");
     expect(r.matchType).toBe("whitespace");
   });
 
   it("labels a close-but-not-identical hit as a fuzzy match", () => {
     // Two substitutions across a ~30-char line: above the per-line gate (0.85) but
-    // below the whitespace tier (0.95) — tier 3 fuzzy.
+    // below the whitespace tier (0.95), tier 3 fuzzy.
     const r = resolveOne(
       "The quack brown fix jumps over.",
       "The quick brown fox jumps over.",

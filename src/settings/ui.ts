@@ -2,7 +2,7 @@ import { setIcon } from "obsidian";
 import type { ModelAvailabilityState, ProviderOption } from "../shared/types";
 
 /* ════════════════════════════════════════════════════════════════════════════
- *  Sub-components — lightweight wrappers around native HTML elements
+ *  Sub-components, lightweight wrappers around native HTML elements
  *  that mirror the Obsidian Setting sub-component API surface we use.
  * ════════════════════════════════════════════════════════════════════════ */
 
@@ -150,7 +150,7 @@ export class Dropdown {
 }
 
 /* ════════════════════════════════════════════════════════════════════════════
- *  SettingItem — drop-in replacement for Obsidian's Setting class that
+ *  SettingItem, drop-in replacement for Obsidian's Setting class that
  *  produces lmsa-prefixed DOM instead of setting-item classes.
  * ════════════════════════════════════════════════════════════════════════ */
 
@@ -206,7 +206,7 @@ export class SettingItem {
 }
 
 /* ════════════════════════════════════════════════════════════════════════════
- *  Model selector — custom dropdown with availability status indicators
+ *  Model selector, custom dropdown with availability status indicators
  * ════════════════════════════════════════════════════════════════════════ */
 
 export interface ModelSelectorItem {
@@ -229,7 +229,7 @@ export interface ModelSelectorRefs {
   refreshAvailability: () => Promise<ModelAvailabilityState>;
   /** Flash the selector to draw user attention (e.g. model not loaded). */
   retriggerAttention: () => void;
-  /** Cleanup function — removes the document click listener. */
+  /** Cleanup function, removes the document click listener. */
   destroy: () => void;
 }
 

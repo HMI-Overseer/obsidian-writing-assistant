@@ -6,7 +6,7 @@ import type { ModelsService, ModelsQueryOptions } from "./modelsService";
  *
  * Claude Code selects models by alias (`--model opus|sonnet|haiku|fable`) rather
  * than exposing a discovery endpoint, so this returns a fixed candidate list. No
- * API key or network call is involved — billing goes through the user's Claude
+ * API key or network call is involved, billing goes through the user's Claude
  * Code session.
  */
 
@@ -18,7 +18,7 @@ interface ClaudeCodeModel {
 }
 
 const CLAUDE_CODE_MODELS: ClaudeCodeModel[] = [
-  { alias: "opus", displayName: "Opus (Claude Code)", summary: "Most capable — best for rigorous document review" },
+  { alias: "opus", displayName: "Opus (Claude Code)", summary: "Most capable, best for rigorous document review" },
   { alias: "sonnet", displayName: "Sonnet (Claude Code)", summary: "Balanced speed and capability" },
   { alias: "haiku", displayName: "Haiku (Claude Code)", summary: "Fastest, lightest" },
   { alias: "fable", displayName: "Fable (Claude Code)", summary: "Lightweight, fast" },

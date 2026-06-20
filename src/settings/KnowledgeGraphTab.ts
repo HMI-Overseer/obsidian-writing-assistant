@@ -37,7 +37,7 @@ export function renderKnowledgeGraphTab(
 
   new SettingItem(warning.bodyEl)
     .setName("Benefits")
-    .setDesc("Once built, the graph surfaces connections across notes that are hard to find manually — useful for world-building, story planning, and discovering narrative threads between characters, locations, and events.");
+    .setDesc("Once built, the graph surfaces connections across notes that are hard to find manually, useful for world-building, story planning, and discovering narrative threads between characters, locations, and events.");
 
   const conditionalWrapper = container.createDiv({ cls: "lmsa-kg-conditional" });
 
@@ -256,7 +256,7 @@ export function renderKnowledgeGraphTab(
       }
       progressRow.toggleClass("is-visible", isExtracting);
 
-      // Button visibility — Stop only shown for full-vault builds, not folder builds
+      // Button visibility, Stop only shown for full-vault builds, not folder builds
       const canAct = !!kg.activeCompletionModelId && !!kg.activeEmbeddingModelId;
       buildBtn.buttonEl.toggleClass("is-visible", canAct && !hasGraph && !isExtracting);
       rebuildBtn.buttonEl.toggleClass("is-visible", canAct && hasGraph && !isExtracting);

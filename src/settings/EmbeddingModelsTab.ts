@@ -39,7 +39,7 @@ export function renderEmbeddingModelsTab(
     },
     fetchCandidates: {
       lmstudio: (opts) => plugin.services.modelAvailability.discoverEmbeddingCandidates(opts),
-      // Anthropic has no embedding models — omitted so UI shows the "not available" message
+      // Anthropic has no embedding models, omitted so UI shows the "not available" message
     },
   });
 }

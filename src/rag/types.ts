@@ -32,7 +32,7 @@ export interface FileIndexMeta {
 
 /**
  * Ephemeral metadata used to enrich embedding text at index time.
- * Not stored in the index — computed from vault state during indexing.
+ * Not stored in the index, computed from vault state during indexing.
  */
 export interface EmbeddingMetadata {
   /** Frontmatter tags from the file. */

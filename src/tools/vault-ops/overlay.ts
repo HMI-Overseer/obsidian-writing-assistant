@@ -2,7 +2,7 @@
  * The pending overlay: a virtual vault view that overlays disk state
  * with the ops accumulated so far this turn, so a later round's `move_file A→B`
  * sees an earlier round's `write_file A`. Makes in-loop validation smart; it is
- * NOT the safety guarantee — pre-flight (plan.ts) is. Pure.
+ * NOT the safety guarantee, pre-flight (plan.ts) is. Pure.
  */
 
 import type { PathState, VaultOperation } from "../../vault-ops/types";

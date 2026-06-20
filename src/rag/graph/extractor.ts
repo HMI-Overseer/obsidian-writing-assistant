@@ -10,7 +10,7 @@ import { chunkDocument, fnv1aHash, preprocessMarkdown } from "../chunker";
 /** Number of files to process per batch before yielding to the UI thread. */
 const BATCH_SIZE = 3;
 
-/** Target chunk size for extraction (larger than embedding chunks — LLMs handle more context). */
+/** Target chunk size for extraction (larger than embedding chunks, LLMs handle more context). */
 const EXTRACTION_CHUNK_SIZE = 3000;
 const EXTRACTION_CHUNK_OVERLAP = 200;
 
@@ -264,7 +264,7 @@ export class GraphExtractor {
         if (result.vectors[i]) entities[i].embedding = result.vectors[i];
       }
     } catch {
-      // Non-fatal — entity will be embedded on next build.
+      // Non-fatal, entity will be embedded on next build.
     }
   }
 
@@ -289,7 +289,7 @@ export class GraphExtractor {
       );
       return parseExtractionResponse(result.text);
     } catch {
-      // Individual chunk failures are non-fatal — skip and continue.
+      // Individual chunk failures are non-fatal, skip and continue.
       return null;
     }
   }

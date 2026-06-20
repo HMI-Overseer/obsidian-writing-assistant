@@ -3,19 +3,19 @@
  *
  * The invariant: **no file with a non-blessed extension ever lands in the vault
  * from a model action.** Only the extensions Obsidian treats as first-class text
- * documents are allowed — a Markdown note (`.md`) or an Obsidian canvas
+ * documents are allowed, a Markdown note (`.md`) or an Obsidian canvas
  * (`.canvas`). Everything else is refused with a self-correcting error: a
  * no-extension path (almost always a forgotten `.md`), a non-document type
- * (`.json` plugin data, `.css` snippets, …), and — the reason this is an
- * **allowlist, not a denylist** — any executable/script type (`.bat`, `.exe`,
+ * (`.json` plugin data, `.css` snippets, …), and, the reason this is an
+ * **allowlist, not a denylist**, any executable/script type (`.bat`, `.exe`,
  * `.cmd`, `.ps1`, `.sh`, `.js`, `.html`, …). An allowlist is *closed by default*,
  * so a dangerous type we never thought to block cannot slip through. The plugin
  * has no execute surface, but a model could still land e.g. `run.bat` in the vault
- * that a user later double-clicks — so we refuse to create it at all.
+ * that a user later double-clicks, so we refuse to create it at all.
  *
  * Enforced at every door a model can introduce a new file extension through:
- *  - {@link ../validation.validateWriteFile} — `write_file`'s path (create + overwrite); and
- *  - {@link ../validation.validateMoveFile} — `move_file`'s **destination**, so a move
+ *  - {@link ../validation.validateWriteFile}, `write_file`'s path (create + overwrite); and
+ *  - {@link ../validation.validateMoveFile}, `move_file`'s **destination**, so a move
  *    can't launder a blessed file (`note.md`) into a forbidden type (`note.bat`).
  *
  * Scope: this constrains what the model may **newly write or rename to**. It
@@ -38,7 +38,7 @@ export const WRITABLE_FILE_EXTENSIONS = [".md", ".canvas"] as const;
 export function hasWritableExtension(path: string): boolean {
   const name = path.replace(/\\/g, "/").split("/").pop() ?? "";
   const dot = name.lastIndexOf(".");
-  // dot <= 0 ⇒ no extension at all, or a dotfile with no stem (".md") — neither is
+  // dot <= 0 ⇒ no extension at all, or a dotfile with no stem (".md"), neither is
   // a document the tool should create.
   if (dot <= 0) return false;
   const ext = name.slice(dot).toLowerCase();
@@ -48,7 +48,7 @@ export function hasWritableExtension(path: string): boolean {
 /** Model-facing reason a path's type was refused, in the self-correcting style. */
 export function unsupportedTypeMessage(path: string): string {
   return (
-    `"${path}" has an unsupported file type — only Obsidian documents can be written to the vault. ` +
+    `"${path}" has an unsupported file type, only Obsidian documents can be written to the vault. ` +
     `Use a path ending in ${WRITABLE_FILE_EXTENSIONS.join(" or ")} (for a note, use .md).`
   );
 }

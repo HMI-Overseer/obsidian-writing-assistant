@@ -1,6 +1,6 @@
 /**
  * Apply planning: pre-flight, dependency ordering, and inverse derivation
- * (ADR-0006). Pure — disk state is injected as plain data, so
+ * (ADR-0006). Pure, disk state is injected as plain data, so
  * every correctness decision is unit-testable without a vault.
  */
 
@@ -40,7 +40,7 @@ export function preflight(ops: VaultOperation[], disk: DiskSnapshot): PreflightR
     const add = (reason: string) => conflicts.push({ index, op, reason });
     // Vault-boundary guard (authoritative): refuse any op whose path escapes the
     // vault, so an out-of-vault write can never reach disk even if it slipped past
-    // the in-loop validator. A violation aborts the whole batch — nothing is written.
+    // the in-loop validator. A violation aborts the whole batch, nothing is written.
     const escaping = targetPaths(op).find((p) => escapesVault(p));
     if (escaping !== undefined) add(outsideVaultMessage(escaping));
     switch (op.kind) {
@@ -150,7 +150,7 @@ function trimSlashes(value: string): string {
 }
 
 /**
- * Data captured at apply time that an inverse needs — provided by the executor,
+ * Data captured at apply time that an inverse needs, provided by the executor,
  * kept out of the pure mapping so `inverseOf` stays trivially testable.
  */
 export interface InverseContext {

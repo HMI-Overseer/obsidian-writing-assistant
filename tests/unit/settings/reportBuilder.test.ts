@@ -122,7 +122,7 @@ describe("buildBenchmarkReport", () => {
   it("includes run conditions", () => {
     const report = buildBenchmarkReport(makeConditions(), makeSections(), []);
 
-    expect(report).toContain("# Benchmark report — Qwen 2.5 14B");
+    expect(report).toContain("# Benchmark report, Qwen 2.5 14B");
     expect(report).toContain("| Provider | lmstudio |");
     expect(report).toContain("| Model | qwen2.5-14b-instruct |");
     expect(report).toContain("| Profile | Default |");

@@ -9,7 +9,7 @@ interface ModelPricing {
 
 /**
  * Hardcoded Anthropic pricing (USD per million tokens).
- * Keys are model ID prefixes — the longest matching prefix wins.
+ * Keys are model ID prefixes, the longest matching prefix wins.
  * Updated: 2025-05. Source: https://docs.anthropic.com/en/docs/about-claude/models
  */
 const ANTHROPIC_PRICING: [prefix: string, pricing: ModelPricing][] = [

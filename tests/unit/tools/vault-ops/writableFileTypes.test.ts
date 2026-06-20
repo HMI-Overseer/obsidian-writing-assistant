@@ -12,7 +12,7 @@ describe("hasWritableExtension", () => {
       "Notes/B.md",
       "deep/Folder/note.md",
       "X.MD",
-      "archive.tar.md", // multi-dot — the final extension is what counts
+      "archive.tar.md", // multi-dot, the final extension is what counts
       "Board.canvas",
       "Maps/World.CANVAS",
     ]) {

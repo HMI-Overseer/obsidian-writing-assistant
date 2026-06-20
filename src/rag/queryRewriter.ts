@@ -4,7 +4,7 @@ import type { SamplingParams } from "../shared/types";
 
 /**
  * Maximum number of preceding USER turns to include as context.
- * Only user messages are passed — assistant responses are verbose and
+ * Only user messages are passed, assistant responses are verbose and
  * risk leaking topic words into the rewrite (e.g. "lessons" appearing
  * in an assistant reply about Will's lessons contaminates a follow-up
  * query about his reactive dialogue).
@@ -14,10 +14,10 @@ const HISTORY_WINDOW = 3;
 const REWRITE_SYSTEM_PROMPT = `Rewrite the follow-up message as a standalone search query for semantic similarity search.
 
 Rules:
-- Output ONLY the rewritten query — no explanation, no preamble, no quotes
-- Use the follow-up's topic only — do NOT carry over topics from prior messages
+- Output ONLY the rewritten query, no explanation, no preamble, no quotes
+- Use the follow-up's topic only, do NOT carry over topics from prior messages
 - Resolve pronouns (he/she/his/her/it/they/that/this) to the specific entity from context
-- Keep the query concise — a short phrase or one sentence
+- Keep the query concise, a short phrase or one sentence
 
 Examples:
 Context: "What are the lessons of will"
@@ -55,7 +55,7 @@ export async function rewriteQueryForRetrieval(
   modelId: string,
   signal?: AbortSignal,
 ): Promise<string> {
-  // Only user messages — assistant responses are verbose and risk leaking
+  // Only user messages, assistant responses are verbose and risk leaking
   // topic words into the rewrite (e.g. an answer about "lessons" contaminating
   // a follow-up query about a different topic).
   const userTurns = conversationMessages.filter(
@@ -63,7 +63,7 @@ export async function rewriteQueryForRetrieval(
       m.role === "user" && typeof m.content === "string",
   );
 
-  // First turn — nothing to disambiguate against.
+  // First turn, nothing to disambiguate against.
   if (userTurns.length < 2) return currentQuery;
 
   // Sliding window: the prior user messages (excluding the current one).

@@ -4,7 +4,7 @@ import { DEFAULT_VAULT_OP_POLICY } from "../vault-ops/gateway";
 import { createSettingsSection, SettingItem } from "./ui";
 
 /**
- * "Vault operations" settings (ADR-0003) — the approval policy surface for the
+ * "Vault operations" settings (ADR-0003), the approval policy surface for the
  * write channel. One Auto-apply/Ask/Deny control per operation class, a scope
  * list of folder prefixes eligible for auto-apply, and the `maxAutoOps` circuit
  * breaker.
@@ -21,7 +21,7 @@ export function renderVaultOpsTab(container: HTMLElement, plugin: WritingAssista
   const approvals = createSettingsSection(
     container,
     "Approvals",
-    "Decide how each kind of vault operation is handled. Deny removes the tool entirely; Ask waits for your review; Auto-apply applies it without a click — but every operation is still shown and can be undone.",
+    "Decide how each kind of vault operation is handled. Deny removes the tool entirely; Ask waits for your review; Auto-apply applies it without a click, but every operation is still shown and can be undone.",
     { icon: "shield-check" }
   );
 
@@ -47,12 +47,12 @@ export function renderVaultOpsTab(container: HTMLElement, plugin: WritingAssista
   );
   renderGateSetting(
     approvals.bodyEl, plugin, "Create folder",
-    "Creating a folder. Idempotent — does nothing if it already exists.",
+    "Creating a folder. Idempotent, does nothing if it already exists.",
     "createDir"
   );
   renderGateSetting(
     approvals.bodyEl, plugin, "Edit document",
-    "Targeted in-document changes and frontmatter updates (propose_edit, update_frontmatter). Ask shows the diff and waits; Auto-apply lands the edit without a click — even on a note you don't have open.",
+    "Targeted in-document changes and frontmatter updates (propose_edit, update_frontmatter). Ask shows the diff and waits; Auto-apply lands the edit without a click, even on a note you don't have open.",
     "edit"
   );
 

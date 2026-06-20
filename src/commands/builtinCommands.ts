@@ -14,7 +14,7 @@ export const BUILTIN_COMMAND_CATEGORIES: readonly CommandCategory[] = [
         name: "Tighten",
         icon: "scissors",
         prompt:
-          "Rewrite the following more concisely — cut filler words and redundancy while preserving the meaning and tone:\n\n{{selection}}",
+          "Rewrite the following more concisely, cut filler words and redundancy while preserving the meaning and tone:\n\n{{selection}}",
       },
       {
         id: "builtin-expand",
@@ -28,7 +28,7 @@ export const BUILTIN_COMMAND_CATEGORIES: readonly CommandCategory[] = [
         name: "Fix prose",
         icon: "spell-check",
         prompt:
-          "Fix grammar, spelling, and punctuation in the following text — correct mistakes only, don't restyle:\n\n{{selection}}",
+          "Fix grammar, spelling, and punctuation in the following text, correct mistakes only, don't restyle:\n\n{{selection}}",
       },
       {
         id: "builtin-simplify",
@@ -80,7 +80,7 @@ export const BUILTIN_COMMAND_CATEGORIES: readonly CommandCategory[] = [
         name: "Critique",
         icon: "message-circle",
         prompt:
-          "Give constructive feedback on the following — what works, what doesn't, and specific suggestions for improvement:\n\n{{selection}}",
+          "Give constructive feedback on the following, what works, what doesn't, and specific suggestions for improvement:\n\n{{selection}}",
       },
     ],
   },

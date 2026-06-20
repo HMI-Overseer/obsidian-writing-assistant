@@ -146,7 +146,7 @@ describe("applyVaultOpBatch", () => {
     expect(result.ok).toBe(false);
     expect(result.conflicts.length).toBeGreaterThan(0);
     expect(result.applied).toHaveLength(0);
-    expect(files.has("Fresh.md")).toBe(false); // nothing written — all-or-nothing.
+    expect(files.has("Fresh.md")).toBe(false); // nothing written, all-or-nothing.
   });
 
   it("rejects an overwrite whose fingerprint drifted", async () => {
@@ -279,7 +279,7 @@ describe("undoVaultOpBatch drift guard (§3-B amendment 3)", () => {
 
     expect(undo.ok).toBe(false);
     expect(undo.refused).toBe(true);
-    expect(vault.files.has("New.md")).toBe(true); // not trashed — edits preserved.
+    expect(vault.files.has("New.md")).toBe(true); // not trashed, edits preserved.
   });
 
   it("refuses to undo a trash when the path is occupied again", async () => {

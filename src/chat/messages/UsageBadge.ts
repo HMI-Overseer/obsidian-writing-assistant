@@ -43,7 +43,7 @@ export function renderUsageBadge(
       });
     }
 
-    // Claude Code runs on a subscription, so per-message cost is meaningless —
+    // Claude Code runs on a subscription, so per-message cost is meaningless,
     // show the plan instead of a calculated price.
     if (provider === "claudecode") {
       badgeEl.createSpan({

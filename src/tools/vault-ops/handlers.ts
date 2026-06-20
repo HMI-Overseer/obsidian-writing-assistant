@@ -15,7 +15,7 @@ import {
 
 /**
  * Context for in-loop vault-op execution. Vault ops operate on
- * arbitrary paths, so unlike edit tools they need no active file — only the app
+ * arbitrary paths, so unlike edit tools they need no active file, only the app
  * and the per-turn pending overlay, rebuilt each round from accumulated ops.
  */
 export interface VaultOpContext {
@@ -30,7 +30,7 @@ export interface VaultOpContext {
  * overlay-aware) so the model gets immediate, self-correcting feedback and
  * can recover within the turn. Nothing touches disk here; the proposal is built
  * and applied at finalization. Pre-flight (plan.ts) is the real
- * safety guarantee — these validators are a courtesy to the model.
+ * safety guarantee, these validators are a courtesy to the model.
  */
 export function executeVaultOpTool(call: ToolCall, ctx: VaultOpContext): ToolResult {
   if (!VAULT_OPS_TOOL_NAMES.has(call.name)) {
@@ -49,7 +49,7 @@ export function executeVaultOpTool(call: ToolCall, ctx: VaultOpContext): ToolRes
     case "create_directory": {
       const v = validateCreateDirectory(call.arguments, resolve);
       if (!v.ok) return fail("create_directory", v.error);
-      // Already a folder: a benign, non-error acknowledgement — no review row
+      // Already a folder: a benign, non-error acknowledgement, no review row
       // is emitted for it at finalization (conversion drops the satisfied op).
       if ("satisfied" in v) return { content: v.message, isReadOnly: false };
       return queued(`New folder "${v.args.path}"`);
@@ -114,7 +114,7 @@ function fail(tool: string, error: string): ToolResult {
   // toolFailure doesn't append a second generic recovery (kept off the model's plate).
   return toolFailure({
     kind: "invalid-args",
-    content: `Error: invalid ${tool} arguments — ${trimDot(error)}.`,
+    content: `Error: invalid ${tool} arguments, ${trimDot(error)}.`,
     isReadOnly: false,
   });
 }

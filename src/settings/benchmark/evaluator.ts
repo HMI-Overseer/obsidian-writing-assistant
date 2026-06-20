@@ -58,8 +58,8 @@ function findPairedSentence(units: string[], refs: string[], signals: string[]):
 /**
  * Test: "Awareness of current document state"
  *
- * The response must pair each change with its outcome — the opening change
- * with accepted language and the fountain change with rejected language —
+ * The response must pair each change with its outcome, the opening change
+ * with accepted language and the fountain change with rejected language,
  * within the same sentence or list item, so that merely mentioning the words
  * somewhere in the response doesn't pass.
  */

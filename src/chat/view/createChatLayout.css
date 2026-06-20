@@ -10,10 +10,10 @@
     padding-right: 0 !important;
     padding-top: 0 !important;
 
-    /* Mode accent — overridden per data-mode */
+    /* Mode accent, overridden per data-mode */
     --lmsa-mode-accent: var(--interactive-accent);
 
-    /* Chat hover tokens — derived from mode accent */
+    /* Chat hover tokens, derived from mode accent */
     --lmsa-chat-accent: var(--lmsa-mode-accent);
     --lmsa-chat-border-emphasis: color-mix(in srgb, var(--lmsa-mode-accent) 30%, var(--background-modifier-border));
     --lmsa-chat-glow-ring: color-mix(in srgb, var(--lmsa-mode-accent) 22%, transparent);
@@ -138,7 +138,7 @@
 
   .lmsa-chat-window-messages {
     @apply lmsa-flex lmsa-h-full lmsa-flex-col lmsa-gap-[18px] lmsa-overflow-y-auto lmsa-px-[18px] lmsa-pb-6 lmsa-pt-2.5;
-    /* No horizontal scrollbar — wide content scrolls inside its own wrapper
+    /* No horizontal scrollbar, wide content scrolls inside its own wrapper
        (code blocks, tables); everything else wraps or clips. */
     overflow-x: hidden;
     scrollbar-gutter: stable;

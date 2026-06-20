@@ -37,7 +37,7 @@ export class DiffHunkView {
   private diffMode: DiffMode;
   /**
    * Whether accept / reject live in this card's header. False when the consumer
-   * surfaces them elsewhere — e.g. the timeline-folded review puts approve/decline
+   * surfaces them elsewhere, e.g. the timeline-folded review puts approve/decline
    * on the tool-call step itself, leaving this card as the pure diff display.
    */
   private readonly showReviewControls: boolean;
@@ -244,7 +244,7 @@ export class DiffHunkView {
   }
 
   // -----------------------------------------------------------------------
-  // Body — delegates to unified or side-by-side renderer
+  // Body, delegates to unified or side-by-side renderer
   // -----------------------------------------------------------------------
 
   private renderBody(): void {

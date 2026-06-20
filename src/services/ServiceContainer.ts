@@ -120,7 +120,7 @@ export class ServiceContainer {
         }
       }
     } catch {
-      // Non-fatal — data stays in the legacy folder and services start empty.
+      // Non-fatal, data stays in the legacy folder and services start empty.
     }
   }
 }

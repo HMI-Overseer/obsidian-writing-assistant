@@ -47,7 +47,7 @@ export class ConversationStorage {
         await this.app.vault.adapter.remove(path);
       }
     } catch {
-      // Non-fatal — orphaned files are harmless.
+      // Non-fatal, orphaned files are harmless.
     }
   }
 

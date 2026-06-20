@@ -1,5 +1,5 @@
 /**
- * The apply executor — the only place vault ops touch disk.
+ * The apply executor, the only place vault ops touch disk.
  *
  * Thin and integration-tested: the pure planners (gateway, plan) decide *what*
  * and *in what order*; this module performs the real `vault.*` / `fileManager.*`
@@ -16,7 +16,7 @@ import { targetPaths } from "./gateway";
 import { escapesVault } from "./pathSafety";
 
 // ---------------------------------------------------------------------------
-// Disk probes — back the pure planners' injected data with the live vault.
+// Disk probes, back the pure planners' injected data with the live vault.
 // ---------------------------------------------------------------------------
 
 /** Live existence state for a path. */
@@ -28,8 +28,8 @@ export function diskState(app: App, path: string): PathState {
 }
 
 /**
- * True when `path` is an empty folder (no children). Non-folders — files or
- * absent paths — count as empty, so the only `false` is a folder that has
+ * True when `path` is an empty folder (no children). Non-folders, files or
+ * absent paths, count as empty, so the only `false` is a folder that has
  * gained contents. Used by the undo drift guard: a `createDir` is always made
  * empty, so any children present at undo time are drift and must block the
  * "trash the folder" inverse from deleting them (Finding E).
@@ -63,13 +63,13 @@ export function makeDiskSnapshot(app: App): DiskSnapshot {
 }
 
 // ---------------------------------------------------------------------------
-// Single-op apply — returns the op's inverse (null when there is nothing to undo).
+// Single-op apply, returns the op's inverse (null when there is nothing to undo).
 // ---------------------------------------------------------------------------
 
 /**
  * Apply one vault operation against the live vault and return its inverse.
- * Inverse context is gathered here — pre-overwrite content
- * and post-apply fingerprints — and fed to the pure `inverseOf`.
+ * Inverse context is gathered here, pre-overwrite content
+ * and post-apply fingerprints, and fed to the pure `inverseOf`.
  *
  * Throws if the operation cannot proceed (e.g. a target vanished after
  * pre-flight). The caller (Phase 3 batch applier) rolls back applied ops.
@@ -111,7 +111,7 @@ export async function applyOperation(
       const file = app.vault.getFileByPath(from);
       if (!file) throw new Error(`move source "${op.from}" no longer exists.`);
       await ensureParentFolder(app, to);
-      // fileManager.renameFile rewrites every wikilink/backlink — never vault.rename.
+      // fileManager.renameFile rewrites every wikilink/backlink, never vault.rename.
       await app.fileManager.renameFile(file, to);
       return inverseOf(op, { fingerprint: diskFingerprint(app, to) ?? undefined });
     }
@@ -121,7 +121,7 @@ export async function applyOperation(
       // inverse trashes a *folder*, finds its target instead of throwing.
       const file = app.vault.getAbstractFileByPath(path);
       if (!file) throw new Error(`trash target "${op.path}" no longer exists.`);
-      // fileManager.trashFile honors the user's deleted-files preference — never vault.delete.
+      // fileManager.trashFile honors the user's deleted-files preference, never vault.delete.
       await app.fileManager.trashFile(file);
       return inverseOf(op, {});
     }

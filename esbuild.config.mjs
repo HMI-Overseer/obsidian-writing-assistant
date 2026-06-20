@@ -63,7 +63,7 @@ const context = await esbuild.context({
     ...builtins,
     // The Agent SDK imports node builtins via the `node:` protocol (e.g.
     // `node:module`, `node:fs`). `builtin-modules` lists bare names only, so
-    // externalize the prefixed variants too — Obsidian runs in Electron with
+    // externalize the prefixed variants too, Obsidian runs in Electron with
     // Node integration, so these resolve at runtime like the bare builtins.
     ...builtins.map((m) => `node:${m}`),
   ],

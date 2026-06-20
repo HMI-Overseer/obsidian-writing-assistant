@@ -10,17 +10,17 @@ Desktop only.
 
 ### Three operating modes
 
-- **Conversation** — Back-and-forth chat with your chosen model in a persistent side panel.
-- **Plan** — Outline and brainstorm with tool use support for vault-aware planning.
-- **Edit** — Targeted document editing with diff preview and human review before applying changes.
+- **Conversation**, Back-and-forth chat with your chosen model in a persistent side panel.
+- **Plan**, Outline and brainstorm with tool use support for vault-aware planning.
+- **Edit**, Targeted document editing with diff preview and human review before applying changes.
 
 ### Multi-provider support
 
 Connect to one or more LLM providers:
 
-- **LM Studio** — Local inference via OpenAI-compatible API. No cloud, no API keys, no data leaving your machine.
-- **Anthropic** — Claude models with native API support and prompt caching.
-- **OpenAI** — GPT models via the OpenAI API (or any OpenAI-compatible endpoint).
+- **LM Studio**, Local inference via OpenAI-compatible API. No cloud, no API keys, no data leaving your machine.
+- **Anthropic**, Claude models with native API support and prompt caching.
+- **OpenAI**, GPT models via the OpenAI API (or any OpenAI-compatible endpoint).
 
 Switch between providers and model profiles from the chat panel.
 
@@ -28,12 +28,12 @@ Switch between providers and model profiles from the chat panel.
 
 When enabled, the model can use tools across multiple reasoning rounds:
 
-- **Read file** — Retrieve full content of notes in your vault.
-- **List directory / Directory tree** — Explore vault structure.
-- **Search files** — Glob-based file searching.
-- **Semantic search** — RAG-powered vault retrieval.
-- **Propose edit** — Search-and-replace proposals for prose edits with diff review. This tool will never edit your documents without your explicit consent.
-- **Update frontmatter** — YAML frontmatter management.
+- **Read file**, Retrieve full content of notes in your vault.
+- **List directory / Directory tree**, Explore vault structure.
+- **Search files**, Glob-based file searching.
+- **Semantic search**, RAG-powered vault retrieval.
+- **Propose edit**, Search-and-replace proposals for prose edits with diff review. This tool will never edit your documents without your explicit consent.
+- **Update frontmatter**, YAML frontmatter management.
 
 All vault tools are read-only by default. Edit proposals require explicit approval before applying.
 
@@ -72,9 +72,9 @@ Save multiple configurations per provider, each with its own system prompt, temp
 
 - [Obsidian](https://obsidian.md) v1.12.7 or later (desktop only)
 - At least one LLM provider:
-  - **LM Studio** — [lmstudio.ai](https://lmstudio.ai), running locally with at least one model loaded
-  - **Anthropic** — An API key from [console.anthropic.com](https://console.anthropic.com)
-  - **OpenAI** — An API key from [platform.openai.com](https://platform.openai.com)
+  - **LM Studio**, [lmstudio.ai](https://lmstudio.ai), running locally with at least one model loaded
+  - **Anthropic**, An API key from [console.anthropic.com](https://console.anthropic.com)
+  - **OpenAI**, An API key from [platform.openai.com](https://platform.openai.com)
 
 ---
 
@@ -109,8 +109,8 @@ Save multiple configurations per provider, each with its own system prompt, temp
 
 1. Open **Settings > Writing Assistant Chat**
 2. Choose a provider and configure it:
-   - **LM Studio** — Start the local server (default `http://localhost:1234`) and the plugin will discover loaded models
-   - **Anthropic / OpenAI** — Enter your API key
+   - **LM Studio**, Start the local server (default `http://localhost:1234`) and the plugin will discover loaded models
+   - **Anthropic / OpenAI**, Enter your API key
 3. Add a model profile with your preferred system prompt, temperature, and token limit
 4. Click the chat icon in the ribbon, or run the command **Open writing assistant chat**
 5. Start writing
@@ -162,4 +162,4 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for setup instructions, project structure
 
 ## License
 
-MIT — see [LICENSE](LICENSE) for details.
+MIT, see [LICENSE](LICENSE) for details.

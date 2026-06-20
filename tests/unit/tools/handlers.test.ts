@@ -161,10 +161,10 @@ describe("resolveStructuralEditBlocks", () => {
 });
 
 // ---------------------------------------------------------------------------
-// propose_edit — path boundary
+// propose_edit, path boundary
 // ---------------------------------------------------------------------------
 
-describe("executeEditTool — propose_edit path boundary", () => {
+describe("executeEditTool, propose_edit path boundary", () => {
   test("names the boundary for an out-of-vault path, before resolving the target", async () => {
     const getFileByPath = vi.fn();
     const getActiveFile = vi.fn();

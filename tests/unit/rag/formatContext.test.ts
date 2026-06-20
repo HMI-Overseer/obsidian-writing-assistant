@@ -78,7 +78,7 @@ describe("formatRagContext", () => {
     expect(result).not.toContain("<graph_context>");
   });
 
-  test("renders mixed blocks — some with graphContext, some without", () => {
+  test("renders mixed blocks, some with graphContext, some without", () => {
     const blocks: RagContextBlock[] = [
       { filePath: "a.md", headingPath: "", content: "No graph.", score: 0.9 },
       {
@@ -106,7 +106,7 @@ describe("formatRagContext", () => {
     ];
     const result = formatRagContext(blocks);
 
-    // Sandwich order: [1, 3, 5, 4, 2] — best first, second-best last,
+    // Sandwich order: [1, 3, 5, 4, 2], best first, second-best last,
     // weakest in the middle where LLM attention is lowest.
     const idx1 = result.indexOf("1.md");
     const idx2 = result.indexOf("2.md");

@@ -9,7 +9,7 @@ import { toMcpToolSchema } from "./toolSchema";
  *
  * Claude Code connects as an HTTP MCP client (`--mcp-config`). We answer the
  * JSON-RPC `initialize` / `tools/list` / `tools/call` methods with a single
- * `application/json` response each — no SSE, no session state. The server binds
+ * `application/json` response each, no SSE, no session state. The server binds
  * to loopback on an ephemeral port and requires a per-session bearer token, so no
  * other local process can reach it.
  *
@@ -22,7 +22,7 @@ import { toMcpToolSchema } from "./toolSchema";
 /** Protocol version used if the client doesn't request one. */
 const DEFAULT_PROTOCOL_VERSION = "2025-06-18";
 
-/** Reject request bodies larger than this (defensive — tool args are small). */
+/** Reject request bodies larger than this (defensive, tool args are small). */
 const MAX_BODY_BYTES = 4 * 1024 * 1024;
 
 /** Supplies the tools advertised and executed over MCP. */
@@ -51,7 +51,7 @@ export class VaultMcpServer {
   private endpoint = "";
 
   constructor(
-    /** MCP server key — must match `^[a-zA-Z0-9_-]+$`; becomes the `mcp__<name>__*` tool prefix. */
+    /** MCP server key, must match `^[a-zA-Z0-9_-]+$`; becomes the `mcp__<name>__*` tool prefix. */
     private readonly serverName: string,
     private readonly provider: McpToolProvider,
   ) {}
@@ -171,7 +171,7 @@ export class VaultMcpServer {
           const args = (params?.arguments as Record<string, unknown> | undefined) ?? {};
           const toolResult = await this.provider.callTool({ id: String(id ?? ""), name, arguments: args });
           // MCP carries only text + isError, so a structured `failure` is flattened to
-          // its sentence here — the recovery contract still reaches the model via
+          // its sentence here, the recovery contract still reaches the model via
           // `content`; the typed kind stays plugin-loop-only (telemetry/UI branching).
           const result = {
             content: [{ type: "text", text: toolResult.content }],

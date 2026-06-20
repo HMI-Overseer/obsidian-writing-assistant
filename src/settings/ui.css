@@ -64,7 +64,7 @@
       0 0 0 1px var(--lmsa-tint-20);
   }
 
-  /* Card glow — soft accent-colored aura behind each section */
+  /* Card glow, soft accent-colored aura behind each section */
   .lmsa-settings-section::after {
     content: "";
     @apply lmsa-pointer-events-none lmsa-absolute;
@@ -86,7 +86,7 @@
     opacity: 0.85;
   }
 
-  /* ── Warning section — animated border shimmer ─────────────────────────── */
+  /* ── Warning section, animated border shimmer ─────────────────────────── */
 
   .lmsa-kg-warning {
     border-color: transparent;

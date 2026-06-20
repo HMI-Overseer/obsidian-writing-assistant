@@ -7,7 +7,7 @@ import {
 import type { Conversation, ConversationMessage, MessageUsage } from "../../../src/shared/types";
 
 /**
- * Simulates a JSON round-trip through data.json — the object is serialized
+ * Simulates a JSON round-trip through data.json, the object is serialized
  * then parsed back as a plain object with no type guarantees.
  */
 function jsonRoundTrip<T>(obj: T): unknown {
@@ -36,7 +36,7 @@ function makeConversation(messages: ConversationMessage[]): Conversation {
   };
 }
 
-describe("normalizeConversation — usage field preservation", () => {
+describe("normalizeConversation, usage field preservation", () => {
   test("preserves modelId, provider, and usage on assistant messages", () => {
     const msg: ConversationMessage = {
       id: "msg-1",
@@ -155,7 +155,7 @@ describe("normalizeConversation — usage field preservation", () => {
   });
 });
 
-describe("normalizeChatHistory — metadata index", () => {
+describe("normalizeChatHistory, metadata index", () => {
   test("normalizes conversation metadata entries", () => {
     const raw = jsonRoundTrip({
       conversations: [
@@ -190,7 +190,7 @@ describe("normalizeChatHistory — metadata index", () => {
   });
 });
 
-describe("normalizeConversation — editProposal / appliedEdit validation", () => {
+describe("normalizeConversation, editProposal / appliedEdit validation", () => {
   function makeEditProposal() {
     return {
       id: "ep-1",

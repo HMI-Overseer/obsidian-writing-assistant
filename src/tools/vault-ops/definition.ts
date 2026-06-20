@@ -3,7 +3,7 @@ import type { VaultOpPolicy } from "../../vault-ops/gateway";
 import type { VaultOpClass } from "../../vault-ops/types";
 
 // ---------------------------------------------------------------------------
-// Vault-operation tools — produce a VaultOperationProposal for review.
+// Vault-operation tools, produce a VaultOperationProposal for review.
 //
 // Each tool carries MCP `annotations` (the gateway reads them, ADR-0003) plus
 // strategyHint / errorGuidance for the system prompt. They never touch disk in
@@ -22,7 +22,7 @@ export const WRITE_FILE_TOOL: CanonicalToolDefinition = {
     "Prefer propose_edit for small changes to an existing note.",
   errorGuidance:
     "If the path points at a folder, choose a file path or use create_directory. " +
-    "Paths must be an Obsidian document — a Markdown note (.md) or a canvas (.canvas); other types are refused. " +
+    "Paths must be an Obsidian document, a Markdown note (.md) or a canvas (.canvas); other types are refused. " +
     "If the content was cut off by the output limit, re-issue the call with the complete file content.",
   annotations: { destructiveHint: true },
   parameters: {
@@ -31,7 +31,7 @@ export const WRITE_FILE_TOOL: CanonicalToolDefinition = {
       path: {
         type: "string",
         description:
-          "Vault-relative path to an Obsidian document — a Markdown note (.md) or a canvas (.canvas), " +
+          "Vault-relative path to an Obsidian document, a Markdown note (.md) or a canvas (.canvas), " +
           "e.g. 'Characters/Vex.md'. Other file types are refused. Missing parent folders are created automatically.",
       },
       content: {
@@ -47,7 +47,7 @@ export const CREATE_DIRECTORY_TOOL: CanonicalToolDefinition = {
   name: "create_directory",
   description:
     "Create a folder at a vault-relative path, including any missing parent folders. " +
-    "Idempotent — does nothing if the folder already exists.",
+    "Idempotent, does nothing if the folder already exists.",
   strategyHint: "create a folder before writing notes into it (idempotent).",
   errorGuidance: "If the path points at an existing file, choose a different folder path.",
   annotations: { idempotentHint: true },
@@ -73,7 +73,7 @@ export const MOVE_FILE_TOOL: CanonicalToolDefinition = {
     "move or rename a note; backlinks are rewritten automatically. Use to reorganize the vault.",
   errorGuidance:
     "If the destination already exists, choose a new name. " +
-    "The destination must stay an Obsidian document (.md or .canvas) — a move cannot change a note into another file type. " +
+    "The destination must stay an Obsidian document (.md or .canvas), a move cannot change a note into another file type. " +
     "If the source does not exist, verify the path with list_directory or search_files.",
   annotations: { destructiveHint: true },
   parameters: {
@@ -86,7 +86,7 @@ export const MOVE_FILE_TOOL: CanonicalToolDefinition = {
       to: {
         type: "string",
         description:
-          "Destination vault-relative path — must be an Obsidian document (.md or .canvas), " +
+          "Destination vault-relative path, must be an Obsidian document (.md or .canvas), " +
           "e.g. 'Characters/Vex.md'. Missing parent folders are created automatically.",
       },
     },
@@ -97,12 +97,12 @@ export const MOVE_FILE_TOOL: CanonicalToolDefinition = {
 export const TRASH_FILE_TOOL: CanonicalToolDefinition = {
   name: "trash_file",
   description:
-    "Send a note to trash. Files only — folders are not accepted. " +
+    "Send a note to trash. Files only, folders are not accepted. " +
     "Honors the user's deleted-files preference (system trash or .trash). " +
     "The change is shown to the user for review before it is applied, and can be undone.",
   strategyHint: "send a single note to trash (files only). Honors the user's deleted-files preference.",
   errorGuidance:
-    "If the path is a folder, trash_file does not apply — it targets files only. " +
+    "If the path is a folder, trash_file does not apply, it targets files only. " +
     "If the note does not exist, verify the path first.",
   annotations: { destructiveHint: true },
   parameters: {
@@ -129,9 +129,9 @@ export const ALL_VAULT_OPS_TOOLS: CanonicalToolDefinition[] = [
 export const VAULT_OPS_TOOL_NAMES = new Set(ALL_VAULT_OPS_TOOLS.map((t) => t.name));
 
 /**
- * Policy classes each tool can resolve to. `write_file` maps to *two* classes —
+ * Policy classes each tool can resolve to. `write_file` maps to *two* classes,
  * it picks `create` or `overwrite` at apply time from whether the path exists
- * (ADR-0004) — so it stays usable as long as either is allowed.
+ * (ADR-0004), so it stays usable as long as either is allowed.
  */
 const TOOL_POLICY_CLASSES: Record<string, VaultOpClass[]> = {
   write_file: ["create", "overwrite"],
@@ -143,7 +143,7 @@ const TOOL_POLICY_CLASSES: Record<string, VaultOpClass[]> = {
 /**
  * The vault-op tools a policy leaves usable: a `deny`-classed tool is
  * detached from the active set so the model is never offered a capability it
- * can't use — the same mechanism that drops `semantic_search` when its index is
+ * can't use, the same mechanism that drops `semantic_search` when its index is
  * cold. A tool is dropped only when *every* class it can resolve to is denied, so
  * `write_file` survives whenever either `create` or `overwrite` is allowed.
  */

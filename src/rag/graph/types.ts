@@ -12,7 +12,7 @@ export interface GraphEntity {
   sourceFiles: string[];
   /** Alternate names found across documents. */
   aliases: string[];
-  /** Embedding of "name: description" — in-memory and persisted. Absent when no embedding model was configured at build time. */
+  /** Embedding of "name: description", in-memory and persisted. Absent when no embedding model was configured at build time. */
   embedding?: number[];
 }
 
@@ -64,9 +64,9 @@ export type GraphBuildState =
 /** Knowledge graph settings. */
 export interface KnowledgeGraphSettings {
   enabled: boolean;
-  /** CompletionModel.id — the chat model used for entity extraction. */
+  /** CompletionModel.id, the chat model used for entity extraction. */
   activeCompletionModelId: string | null;
-  /** EmbeddingModel.id — required for generating entity vectors at build time. */
+  /** EmbeddingModel.id, required for generating entity vectors at build time. */
   activeEmbeddingModelId: string | null;
   /** Glob patterns to exclude from graph extraction. */
   excludePatterns: string[];

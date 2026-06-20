@@ -318,7 +318,7 @@ export class ChatTranscript {
 
   private renderAttachmentGallery(containerEl: HTMLElement, attachments: Attachment[]): void {
     // Note snapshots embed their own images, so don't double-render those in the
-    // gallery — only directly attached images get thumbnails.
+    // gallery, only directly attached images get thumbnails.
     const galleryAttachments = attachments.filter(
       (a) => a.type === "note" || (a.type === "image" && !a.sourceNotePath),
     );
@@ -391,7 +391,7 @@ export class ChatTranscript {
     isLastAssistant: boolean,
     callbacks: BubbleActionCallbacks
   ): void {
-    // Usage badge — shown below assistant bubbles before the toolbar.
+    // Usage badge, shown below assistant bubbles before the toolbar.
     if (message.role === "assistant") {
       renderUsageBadge(bubble.rowEl, message.usage, message.modelId, message.provider);
       if (message.ragSources?.length) {

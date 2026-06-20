@@ -1,5 +1,5 @@
 /**
- * The approval gateway — the whole authorization argument (ADR-0003).
+ * The approval gateway, the whole authorization argument (ADR-0003).
  *
  * `resolveGate` is a total predicate with no "probably fine" branch, pure with
  * no Obsidian and no disk. This is the single most important seam to get right.
@@ -10,9 +10,9 @@ import type { VaultOperation, VaultOpClass } from "./types";
 /**
  * The fate of a single op. Each class carries one of these as its policy,
  * and `resolveGate` returns one per op:
- *   - `deny`  — the tool is removed entirely; the model is never offered it.
- *   - `ask`   — the op is queued and waits for an explicit click to apply.
- *   - `auto`  — the op auto-applies (still shown, still undoable), bounded by
+ *   - `deny`, the tool is removed entirely; the model is never offered it.
+ *   - `ask`, the op is queued and waits for an explicit click to apply.
+ *   - `auto`, the op auto-applies (still shown, still undoable), bounded by
  *               `scopes` + `maxAutoOps`.
  */
 export type Gate = "auto" | "ask" | "deny";
@@ -32,7 +32,7 @@ export interface VaultOpPolicy {
   /**
    * In-document edits (`propose_edit` and `update_frontmatter`). Edits are vault
    * ops too (a file mutation), gated like the rest: `deny` removes the edit tools,
-   * `ask` blocks on review (today's behaviour), `auto` applies the hunk in-loop —
+   * `ask` blocks on review (today's behaviour), `auto` applies the hunk in-loop,
    * including on a non-active file. See docs/work/issues/propose-edit-in-loop-blocking-review.md.
    */
   edit: Gate;
@@ -44,7 +44,7 @@ export interface VaultOpPolicy {
 
 /**
  * Conservative default policy: every class is reviewed (`ask`) and
- * nothing auto-applies on a fresh install — including the idempotent `createDir`.
+ * nothing auto-applies on a fresh install, including the idempotent `createDir`.
  * A user who wants an autonomous drafting loop opts in by setting a class to
  * `auto` (optionally confined with `scopes`).
  */
@@ -59,7 +59,7 @@ export const DEFAULT_VAULT_OP_POLICY: VaultOpPolicy = {
   maxAutoOps: 20,
 };
 
-/** Annotation-derived class of an op — identical to its kind. */
+/** Annotation-derived class of an op, identical to its kind. */
 export function classOf(op: VaultOperation): VaultOpClass {
   return op.kind;
 }

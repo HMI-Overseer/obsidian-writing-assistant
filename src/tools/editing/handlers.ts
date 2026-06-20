@@ -23,7 +23,7 @@ export interface ToolExecutionContext {
  *
  * Edit tools are validated and checked against the active document so the model
  * gets immediate feedback (e.g. "search text not found") and can self-correct
- * before the loop ends. The actual diff review happens at finalization — this
+ * before the loop ends. The actual diff review happens at finalization, this
  * function only validates and acknowledges.
  */
 export async function executeEditTool(
@@ -60,12 +60,11 @@ type TargetResolution =
   | { file: null; explicit: boolean };
 
 /**
- * Resolve the target file for edit operations from the tool call's `path`
- * argument. The `path` is the model's explicit target
- * (propose-edit-in-loop-blocking-review): when it is supplied but does not
- * resolve, we report not-found rather than silently editing whatever file is
- * open — an edit must land on the file the model named, never a surprise note.
- * Only when no `path` is given do we fall back to the document context / active file.
+ * Resolve the edit target from the tool call's `path`
+ * (propose-edit-in-loop-blocking-review). Invariant: an explicit `path` must land on
+ * exactly that file, so if it is supplied but does not resolve we report not-found
+ * rather than falling through to the open file. Only an omitted `path` falls back to
+ * the document context / active file.
  */
 function resolveTargetFile(ctx: ToolExecutionContext, path?: string): TargetResolution {
   if (path) {
@@ -104,7 +103,7 @@ async function executeProposeEdit(
     });
   }
 
-  // An explicit out-of-vault `path` is named at the boundary before resolution —
+  // An explicit out-of-vault `path` is named at the boundary before resolution,
   // otherwise it reports "not found" and points at write_file, which would itself
   // be refused for escaping the vault.
   if (v.args.path) {
@@ -115,7 +114,7 @@ async function executeProposeEdit(
   const target = resolveTargetFile(ctx, v.args.path);
   if (!target.file) {
     // An explicit `path` that didn't resolve is a missing file (not a missing
-    // argument) — report it honestly so the model creates it or fixes the path.
+    // argument), report it honestly so the model creates it or fixes the path.
     if (target.explicit) {
       return toolFailure({
         kind: "not-found",
@@ -219,7 +218,6 @@ async function resolveUpdateFrontmatter(
   const content = await app.vault.read(file);
   const cache = app.metadataCache.getFileCache(file);
 
-  // Extract current frontmatter block
   const hasFrontmatter = !!cache?.frontmatterPosition;
 
   if (hasFrontmatter && cache?.frontmatterPosition) {
@@ -239,7 +237,7 @@ async function resolveUpdateFrontmatter(
 
     return { ...block, searchText, replaceText };
   } else {
-    // No existing frontmatter — build a new block from set operations.
+    // No existing frontmatter, build a new block from set operations.
     const setOps = operations.filter((op) => op.action === "set");
     if (setOps.length === 0) return block;
 
@@ -283,9 +281,6 @@ function yamlSafeValue(value: string): string {
  * Apply frontmatter operations to raw YAML lines, preserving complex
  * values (lists, nested objects, multi-line strings) for keys that
  * are not being modified.
- *
- * This replaces the naive parseFrontmatterLines + buildFrontmatterLines
- * approach which dropped non-scalar YAML values.
  */
 function applyFrontmatterOperations(
   innerLines: string[],

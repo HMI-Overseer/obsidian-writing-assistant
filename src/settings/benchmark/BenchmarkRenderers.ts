@@ -1,4 +1,5 @@
 import { setIcon } from "obsidian";
+import { NO_DATA } from "./constants";
 import type {
   BenchmarkMessage,
   BenchmarkRunResult,
@@ -102,7 +103,7 @@ function renderChecks(container: HTMLElement, checks: EvaluationCheck[]): void {
     const bodyEl = li.createSpan({ cls: "lmsa-benchmark-check-body" });
     bodyEl.createSpan({ cls: "lmsa-benchmark-check-label", text: c.label });
     if (c.detail) {
-      bodyEl.createSpan({ cls: "lmsa-benchmark-check-detail", text: ` — ${c.detail}` });
+      bodyEl.createSpan({ cls: "lmsa-benchmark-check-detail", text: `, ${c.detail}` });
     }
     if (!c.required && !c.passed) {
       bodyEl.createSpan({ cls: "lmsa-benchmark-check-optional", text: " (informational)" });
@@ -168,7 +169,7 @@ export function renderCardResults(
     responseEl.createEl("strong", { text: "Model response:" });
     responseEl.createEl("pre", {
       cls: "lmsa-benchmark-response-block",
-      text: iter.rawResponse || "(no text content — tool calls only)",
+      text: iter.rawResponse || "(no text content, tool calls only)",
     });
   }
 }
@@ -192,7 +193,7 @@ export function renderCardStatus(
     statusEl.addClass("is-failed");
     statusEl.setAttr("title", result.error);
     statusEl.setText(
-      totalCount > 0 ? `${passCount}/${totalCount} passed — stopped on error` : "Error"
+      totalCount > 0 ? `${passCount}/${totalCount} passed, stopped on error` : "Error"
     );
     return;
   }
@@ -242,11 +243,11 @@ export function renderSuiteSummary(summaryEl: HTMLElement, stats: SuiteSummarySt
 
   if (stats.controlResult) {
     const { passCount, totalCount } = stats.controlResult;
-    const controlRate = totalCount > 0 ? `${passCount}/${totalCount}` : "—";
+    const controlRate = totalCount > 0 ? `${passCount}/${totalCount}` : NO_DATA;
     const controlText =
       passCount === totalCount
-        ? ` — Control: ${controlRate} passed (annotations may not be needed for this model)`
-        : ` — Control: ${controlRate} passed (annotations provide measurable benefit)`;
+        ? `, Control: ${controlRate} passed (annotations may not be needed for this model)`
+        : `, Control: ${controlRate} passed (annotations provide measurable benefit)`;
     summaryEl.createDiv({
       cls: "lmsa-benchmark-summary-control",
       text: controlText,

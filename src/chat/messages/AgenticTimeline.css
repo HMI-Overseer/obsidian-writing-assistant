@@ -91,7 +91,7 @@
     background: color-mix(in srgb, var(--color-cyan, var(--lmsa-mode-accent)) 10%, var(--background-primary));
   }
 
-  /* Mutating tools (vault ops + edits): orange category tint — the same accent as the
+  /* Mutating tools (vault ops + edits): orange category tint, the same accent as the
      "pending approval" label. Defined after --tool_call so it overrides the cyan on the
      equal-specificity descendant rule; the review overlays' applied/failed states (a
      later import) override this in turn once an op resolves. */
@@ -101,7 +101,7 @@
     background: color-mix(in srgb, var(--lmsa-mode-accent) 10%, var(--background-primary));
   }
 
-  /* Error: the tool failed or was policy-denied — red, overriding the category and
+  /* Error: the tool failed or was policy-denied, red, overriding the category and
      read-only tints. Must stay last of the three so it wins by source order. (The
      review overlays paint their own red for failed / declined / no-match ops.) */
   .lmsa-agentic-timeline-step--error .lmsa-agentic-timeline-dot {
@@ -141,7 +141,7 @@
     max-width: 280px;
   }
 
-  /* Inline "Failed" marker for an errored read-only tool — the unmissable signal when
+  /* Inline "Failed" marker for an errored read-only tool, the unmissable signal when
      the step is collapsed (mutating ops show their state via the review controls). */
   .lmsa-agentic-timeline-step-failed {
     color: var(--text-error);
@@ -189,7 +189,7 @@
     display: block;
   }
 
-  /* The exact tool result returned to the model on failure — sits at the top of the
+  /* The exact tool result returned to the model on failure, sits at the top of the
      expand block, marked with a red left rule (echoing the neutral one on the expand
      itself) so it reads as the error nested under the failed step. */
   .lmsa-agentic-timeline-error {

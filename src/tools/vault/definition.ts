@@ -29,7 +29,7 @@ export const LIST_DIRECTORY_TOOL: CanonicalToolDefinition = {
     "List the immediate contents of a vault folder with [FILE] and [DIR] prefixes. " +
     "Use this to discover what notes and subfolders exist at a specific level. " +
     "Omit path to list the vault root.",
-  strategyHint: "discover immediate children of a folder — use directory_tree for a full subtree",
+  strategyHint: "discover immediate children of a folder, use directory_tree for a full subtree",
   parameters: {
     type: "object",
     properties: {
@@ -100,13 +100,13 @@ export const SEARCH_CONTENT_TOOL: CanonicalToolDefinition = {
   name: "search_content",
   description:
     "Search the bodies of vault notes for an exact string (or, optionally, a regex) and return " +
-    "the matching file path, line number, and a short snippet per hit — not whole notes. " +
+    "the matching file path, line number, and a short snippet per hit, not whole notes. " +
     "Use this to locate a literal token you can name precisely: a heading, a citation key, a " +
-    "person's name, a TODO marker, a phrase to fix. This is lexical search — for meaning-based " +
+    "person's name, a TODO marker, a phrase to fix. This is lexical search, for meaning-based " +
     "retrieval ('what's about X') use semantic_search instead; for the exact string X, use this. " +
     "Unlike semantic_search it needs no index, so it works even when the index is unavailable.",
   strategyHint:
-    "find where an exact string or pattern appears in note bodies (lexical — pair with semantic_search for meaning)",
+    "find where an exact string or pattern appears in note bodies (lexical, pair with semantic_search for meaning)",
   errorGuidance:
     "If the regex is invalid, fix the pattern or set regex to false for a literal substring search.",
   parameters: {
@@ -126,7 +126,7 @@ export const SEARCH_CONTENT_TOOL: CanonicalToolDefinition = {
         type: "boolean",
         description:
           "Treat query as a JavaScript regular expression rather than a literal substring. " +
-          "Defaults to false. Keep patterns simple — a malformed pattern returns an error.",
+          "Defaults to false. Keep patterns simple, a malformed pattern returns an error.",
       },
       caseSensitive: {
         type: "boolean",
@@ -137,7 +137,7 @@ export const SEARCH_CONTENT_TOOL: CanonicalToolDefinition = {
         description:
           "Lines of surrounding context to show before and after each match (like grep -C), 0–5. " +
           "Defaults to 0. In prose a line is usually a whole paragraph, so 1–2 gives the " +
-          "sentence before/after — set this instead of following a hit with read_file.",
+          "sentence before/after, set this instead of following a hit with read_file.",
       },
       excludePatterns: {
         type: "array",
@@ -159,7 +159,7 @@ export const SEARCH_VAULT_TOOL: CanonicalToolDefinition = {
   strategyHint: "find notes by meaning when you know what you need but not where it lives",
   errorGuidance:
     "If the result says semantic search could not run (no embedding backend, no index, or an " +
-    "unreachable model), do NOT rephrase or retry — follow that result's instructions, which means " +
+    "unreachable model), do NOT rephrase or retry, follow that result's instructions, which means " +
     "switching to search_content for an exact-string lookup. Only when it actually ran and returned " +
     "no results should you retry once with a more specific query; never repeat the same query exactly.",
   parameters: {
@@ -168,7 +168,7 @@ export const SEARCH_VAULT_TOOL: CanonicalToolDefinition = {
       query: {
         type: "string",
         description:
-          "The search query. Be specific — include character names, concept names, or " +
+          "The search query. Be specific, include character names, concept names, or " +
           "event descriptions rather than generic phrases.",
       },
       top_k: {
@@ -187,7 +187,7 @@ export const GET_BACKLINKS_TOOL: CanonicalToolDefinition = {
   description:
     "Find all notes that link to a given note via wikilinks or markdown links. " +
     "Use this to answer 'which scenes feature this character?' or 'what references this concept?'. " +
-    "More reliable than semantic search for explicit wikilink connections — " +
+    "More reliable than semantic search for explicit wikilink connections, " +
     "a scene may link [[Character Name]] without ever spelling out the name in prose.",
   strategyHint: "find every note that links to a given note (reliable for explicit wikilink connections)",
   errorGuidance: "If the note was not found, call list_directory to find the correct path.",
@@ -211,7 +211,7 @@ export const FIND_NOTES_BY_TAG_TOOL: CanonicalToolDefinition = {
     "(e.g., '#character', '#location', '#antagonist'). " +
     "Call list_directory first if you are not sure which tags exist.",
   strategyHint: "enumerate notes by type or category (e.g. #character, #location)",
-  errorGuidance: "If no notes found, the result will suggest similar tags — try one of those.",
+  errorGuidance: "If no notes found, the result will suggest similar tags, try one of those.",
   parameters: {
     type: "object",
     properties: {
@@ -247,7 +247,7 @@ export const GET_FRONTMATTER_TOOL: CanonicalToolDefinition = {
 };
 
 /**
- * Core vault tools — suitable for all modes and local models.
+ * Core vault tools, suitable for all modes and local models.
  * Covers the fundamental operations: structural discovery, meaning-based and
  * lexical (exact-text) search, and direct note reading. search_content has no
  * embedding dependency, so it stays available as the content fallback even when
@@ -261,7 +261,7 @@ export const CORE_VAULT_TOOLS: CanonicalToolDefinition[] = [
 ];
 
 /**
- * Full vault tool suite — for chat and plan modes with cloud providers.
+ * Full vault tool suite, for chat and plan modes with cloud providers.
  * Adds recursive tree, filename search, and Obsidian-native tools
  * (backlinks, tags, frontmatter) on top of the core set.
  */
@@ -277,7 +277,7 @@ export const ALL_VAULT_TOOLS: CanonicalToolDefinition[] = [
   SEARCH_VAULT_TOOL,
 ];
 
-/** Names of all vault tools — all are read-only (results returned to the model). */
+/** Names of all vault tools, all are read-only (results returned to the model). */
 export const VAULT_TOOL_NAMES = new Set([
   "semantic_search",
   "search_content",
@@ -292,7 +292,7 @@ export const VAULT_TOOL_NAMES = new Set([
 
 /**
  * The ways `semantic_search` can be unavailable. Extends the static
- * {@link RagAvailability} states (minus `ready`) with `unreachable` — a
+ * {@link RagAvailability} states (minus `ready`) with `unreachable`, a
  * configured, indexed backend that fails at *call* time (model stopped/unloaded,
  * endpoint down), which no synchronous check can see.
  */
@@ -301,7 +301,7 @@ export type SemanticSearchUnavailableReason =
   | "unreachable";
 
 /**
- * Model-facing message for each way `semantic_search` is unavailable — the contract
+ * Model-facing message for each way `semantic_search` is unavailable, the contract
  * the model reasons from and relays to the user. Each names, in order: (1) the exact
  * condition that is true, (2) why it blocks semantic search, (3) what the user must do
  * to fix it (with the literal Settings path), and (4) what to do right now instead.
@@ -327,17 +327,17 @@ export const SEMANTIC_SEARCH_UNAVAILABLE_MESSAGE: Record<
     "search_content to find an exact word or phrase.",
   unreachable:
     "Semantic search did not run: the embedding model is configured and an index exists, but the " +
-    "embedding request failed — the model is unreachable (it may be stopped, unloaded, or the " +
-    "endpoint is down). This is a failure to run, NOT an empty result — do not conclude the " +
+    "embedding request failed, the model is unreachable (it may be stopped, unloaded, or the " +
+    "endpoint is down). This is a failure to run, NOT an empty result, do not conclude the " +
     "vault lacks this content. Check that the embedding model is running and reachable to restore " +
     "semantic search. Right now, use search_content for an exact-string lookup.",
 };
 
 /**
  * Drop `semantic_search` from a tool list when the embedding backend cannot serve a
- * query. Shared by both advertising routes — the in-app tool list
+ * query. Shared by both advertising routes, the in-app tool list
  * ({@link ../../chat/finalization/prepareApiMessages}) and the Claude Code MCP bridge
- * ({@link ../../services/ClaudeCodeService}) — so they cannot gate it differently and
+ * ({@link ../../services/ClaudeCodeService}), so they cannot gate it differently and
  * drift apart, which is the defect that produced the silent-failure symptom.
  * See docs/work/issues/semantic-search-silent-embedding-failure.md §3-A/B, §4.
  */

@@ -8,7 +8,7 @@ import type {
 import type { ChatSessionSnapshot } from "../types";
 
 /**
- * Pure in-memory conversation state — no async, no disk I/O, no plugin dependency.
+ * Pure in-memory conversation state, no async, no disk I/O, no plugin dependency.
  *
  * This class is trivially testable: construct it, call methods, assert state.
  * The ChatSessionStore coordinates this with persistence.

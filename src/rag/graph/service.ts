@@ -17,10 +17,10 @@ const GRAPH_FILE = "rag-knowledge-graph.json";
  * Top-level facade for the knowledge graph.
  *
  * Lifecycle:
- * - `configure()` — loads persisted graph from disk. No LLM calls. Safe for plugin load.
- * - `startBuild()` — user-initiated vault scan + LLM extraction.
- * - `stopBuild()` — cancels in-progress extraction.
- * - `isReady()` / `getGraph()` — query-time access.
+ * - `configure()`, loads persisted graph from disk. No LLM calls. Safe for plugin load.
+ * - `startBuild()`, user-initiated vault scan + LLM extraction.
+ * - `stopBuild()`, cancels in-progress extraction.
+ * - `isReady()` / `getGraph()`, query-time access.
  */
 export class GraphService {
   private readonly app: App;
@@ -281,7 +281,7 @@ export class GraphService {
     this.buildState = { status: "idle" };
   }
 
-  /** Clean shutdown — call from plugin `onunload()`. */
+  /** Clean shutdown, call from plugin `onunload()`. */
   destroy(): void {
     this.shutdown();
     this.onStateChangeCallback = null;
@@ -308,11 +308,11 @@ export class GraphService {
       const data = JSON.parse(raw);
 
       if (!this.graph.deserialize(data, this.configuredModelId, this.configuredEmbeddingModelId ?? undefined)) {
-        // Model mismatch — graph was built with a different model.
+        // Model mismatch, graph was built with a different model.
         this.graph.clear();
       }
     } catch {
-      // Corrupt graph file — will rebuild.
+      // Corrupt graph file, will rebuild.
       this.graph.clear();
     }
   }

@@ -6,20 +6,20 @@ import type { CanonicalToolDefinition } from "../types";
  * This is the default value for `settings.editToolSystemPromptPrefix`.
  * Users can customize it in the Advanced settings tab. Tool-specific
  * strategy hints and error handling are appended dynamically by
- * `buildEditToolSystemPrompt()` — just like vault tools.
+ * `buildEditToolSystemPrompt()`, just like vault tools.
  */
 export const TOOL_EDIT_SYSTEM_PROMPT = `You are a writing assistant that can explore the vault and edit documents.
 
 The active document may be provided for reference. If it is, DO NOT reproduce or rewrite it.
-If the document content is not provided, or you need to inspect another file, use your vault tools (read_file, list_directory, semantic_search) to find and read it before proposing edits. Never guess at document content — always verify with a read first.
+If the document content is not provided, or you need to inspect another file, use your vault tools (read_file, list_directory, semantic_search) to find and read it before proposing edits. Never guess at document content, always verify with a read first.
 
-If the user asks a question, wants feedback, or is discussing the document without requesting changes, respond conversationally — do NOT use edit tools. Only use tools when the user asks you to make changes.
+If the user asks a question, wants feedback, or is discussing the document without requesting changes, respond conversationally, do NOT use edit tools. Only use tools when the user asks you to make changes.
 
 ## Rules
-- propose_edit and update_frontmatter require a \`path\` — the vault-relative path of the note to change. Use the path shown for the document under edit, or the path you read with read_file. Never assume the edit lands on the open note.
+- propose_edit and update_frontmatter require a \`path\`, the vault-relative path of the note to change. Use the path shown for the document under edit, or the path you read with read_file. Never assume the edit lands on the open note.
 - A single turn edits one file. To change several files, edit one now and the others in follow-up turns.
 - Before calling propose_edit, ensure you have the exact text from that note. If unsure, use read_file first.
-- If the document is empty or brand-new, propose_edit has nothing to match — use write_file to set its initial content instead.
+- If the document is empty or brand-new, propose_edit has nothing to match, use write_file to set its initial content instead.
 - Preserve the document's existing formatting style and voice.
 - You may include brief commentary in your text response to explain your changes, but keep it concise.
 - Do NOT output the document or any large portion of it in your text response.
@@ -35,7 +35,7 @@ If the user asks a question, wants feedback, or is discussing the document witho
 export function buildEditToolSystemPrompt(tools: CanonicalToolDefinition[]): string {
   const toolLines = tools
     .filter((t) => t.strategyHint)
-    .map((t) => `- ${t.name} — ${t.strategyHint}`)
+    .map((t) => `- ${t.name}, ${t.strategyHint}`)
     .join("\n");
 
   const errorEntries = tools

@@ -59,7 +59,7 @@ export async function sendMessage(options: SendMessageOptions): Promise<void> {
 
   // A new user turn supersedes every prior proposal (both channels): pending work
   // is rejected (interjection = implicit rejection) and applied vault batches go
-  // historical. See supersedePriorProposals — scoped to this user-message boundary.
+  // historical. See supersedePriorProposals, scoped to this user-message boundary.
   const history = store.getSnapshot().messageHistory;
   if (supersedePriorProposals(history)) {
     await store.persistActiveConversation();
@@ -71,7 +71,7 @@ export async function sendMessage(options: SendMessageOptions): Promise<void> {
   // Chat/plan mode: freeze the attached notes (and their embedded images) into a
   // point-in-time snapshot bound to this user turn, so they stay cache-stable in
   // history instead of being re-read into the system prefix every send. Edit mode
-  // keeps its live document — handled downstream in prepareApiMessages.
+  // keeps its live document, handled downstream in prepareApiMessages.
   const supportsVision =
     validated.activeModel.vision
     ?? plugin.services.modelAvailability.getVision(validated.activeModel.modelId)

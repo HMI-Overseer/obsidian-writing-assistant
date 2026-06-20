@@ -20,7 +20,7 @@ export function getTestSuites(): BenchmarkTestSuite[] {
       id: "edit-tools",
       name: "Edit tools",
       description:
-        "Tests whether the model can correctly invoke editing tools — calling the right tool, with valid arguments, in the expected order.",
+        "Tests whether the model can correctly invoke editing tools, calling the right tool, with valid arguments, in the expected order.",
       icon: "wrench",
       testCases: getToolTestCases(),
     },

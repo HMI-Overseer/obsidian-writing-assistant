@@ -6,7 +6,7 @@ import { EditReviewController } from "../../../src/editing/EditReviewController"
 import { resolveEdits, buildHunks } from "../../../src/editing/diffEngine";
 import type { EditBlock, EditProposal } from "../../../src/editing/editTypes";
 
-/** A stand-in for the CM6 EditorView — only `dispatch` is exercised. */
+/** A stand-in for the CM6 EditorView, only `dispatch` is exercised. */
 function fakeCm() {
   return { dispatch: vi.fn() };
 }
@@ -42,7 +42,7 @@ function makeController(doc: string, search: string, replace: string): EditRevie
   });
 }
 
-describe("InlineDiffManager — editor.cm extraction + dispatch", () => {
+describe("InlineDiffManager, editor.cm extraction + dispatch", () => {
   it("dispatches the pending hunks into the active editor's view", () => {
     const cm = fakeCm();
     const ws = makeWorkspace();

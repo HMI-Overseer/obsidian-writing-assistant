@@ -1,10 +1,10 @@
 /**
- * Disposition vocabulary for vault ops — the real outcome of a proposed op, fed
+ * Disposition vocabulary for vault ops, the real outcome of a proposed op, fed
  * back to the model as its tool result (in-loop-tool-approval-blocking-flow).
  *
  * One vocabulary, derived from the proposal's single resolved {@link VaultOpStatus}
  * (the same state the timeline UI renders), so the tool result can never assert an
- * outcome the UI doesn't hold. Pure — no Obsidian, no disk — so it is unit-testable.
+ * outcome the UI doesn't hold. Pure, no Obsidian, no disk, so it is unit-testable.
  */
 
 import { assertNever } from "../utils";
@@ -13,13 +13,13 @@ import type { MatchType } from "../editing/editTypes";
 
 /**
  * The fate of one op as reported back to the model:
- *   - `auto-applied` — applied in-loop with no click (auto gate).
- *   - `applied`      — the user approved and it applied.
- *   - `declined`     — the user declined it.
- *   - `failed`       — apply (or pre-flight) failed; carries a reason.
- *   - `satisfied`    — an already-satisfied no-op (e.g. create_directory on an
+ *   - `auto-applied`, applied in-loop with no click (auto gate).
+ *   - `applied`, the user approved and it applied.
+ *   - `declined`, the user declined it.
+ *   - `failed`, apply (or pre-flight) failed; carries a reason.
+ *   - `satisfied`, an already-satisfied no-op (e.g. create_directory on an
  *                      existing folder); never applied.
- *   - `cancelled`    — the turn was interrupted before the user decided; the op is
+ *   - `cancelled`, the turn was interrupted before the user decided; the op is
  *                      left pending review.
  */
 export type VaultOpDisposition =
@@ -62,7 +62,7 @@ function actionVerb(op: VaultOperation): string {
   }
 }
 
-/** The target rendered in a message — move shows both endpoints. */
+/** The target rendered in a message, move shows both endpoints. */
 function target(op: VaultOperation): string {
   return op.kind === "move" ? `"${op.from}" → "${op.to}"` : `"${op.path}"`;
 }
@@ -82,27 +82,27 @@ export function dispositionMessage(
     case "applied":
       return `${appliedVerb(op)} ${target(op)}.`;
     case "declined":
-      return `Declined by user — ${target(op)} was not changed.`;
+      return `Declined by user, ${target(op)} was not changed.`;
     case "failed":
       // "Error:" prefix so the model reads this as a failure on the text-only loop
       // channel, the same signal the read tools and the system prompt rely on.
-      return `Error: could not ${actionVerb(op)} ${target(op)} — ${reason ?? "the operation failed"}.`;
+      return `Error: could not ${actionVerb(op)} ${target(op)}, ${reason ?? "the operation failed"}.`;
     case "satisfied":
       return op.kind === "createDir"
         ? `Folder ${target(op)} already exists; nothing to do.`
         : `${target(op)} already satisfied; nothing to do.`;
     case "cancelled":
-      return `Generation stopped before you decided — ${target(op)} is still pending review.`;
+      return `Generation stopped before you decided, ${target(op)} is still pending review.`;
     default:
       return assertNever(disposition);
   }
 }
 
-/** Which edit tool produced the disposition — shapes the model-facing wording. */
+/** Which edit tool produced the disposition, shapes the model-facing wording. */
 export type EditOpKind = "edit" | "frontmatter";
 
 /**
- * The match tier, in plain words, for an *applied* edit — the diagnostic the channel
+ * The match tier, in plain words, for an *applied* edit, the diagnostic the channel
  * computes and otherwise discards. Returns null for `exact` (a clean match teaches
  * nothing) and `none` (only reached on failure), so success messages stay quiet
  * unless the search text was loose enough to be worth tightening next time.
@@ -122,12 +122,12 @@ function appliedMatchPhrase(matchType: MatchType): string | null {
 /**
  * Build the tool-result message for a resolved in-document edit. Edits share the
  * vault-op {@link VaultOpDisposition} vocabulary (the model never sees a second
- * dialect) but read in edit terms. `failed` carries the honest reason — for a
+ * dialect) but read in edit terms. `failed` carries the honest reason, for a
  * confidence-0 no-match this is the self-correction prompt the model acts on.
  *
  * When `matchType` is supplied, an *applied* edit names how it matched (e.g.
  * "(fuzzy match)") so the model learns when its search text was sloppy. The phrase
- * can never assert a tier the engine didn't produce — it is derived from the same
+ * can never assert a tier the engine didn't produce, it is derived from the same
  * resolved edit the apply used (one state, two consumers).
  */
 export function editDispositionMessage(
@@ -157,15 +157,15 @@ export function editDispositionMessage(
     case "applied":
       return `Applied ${what} to ${t}${appliedSuffix(false)}.`;
     case "declined":
-      return `Declined by user — ${what} to ${t} was not applied.`;
+      return `Declined by user, ${what} to ${t} was not applied.`;
     case "failed":
       // "Error:" prefix so the model reads this as a failure on the text-only loop
       // channel, the same signal the read tools and the system prompt rely on.
-      return `Error: ${tool} did not apply to ${t} — ${reason ?? "the edit could not be resolved"}.`;
+      return `Error: ${tool} did not apply to ${t}, ${reason ?? "the edit could not be resolved"}.`;
     case "satisfied":
       return `${t} already matches; nothing to change.`;
     case "cancelled":
-      return `Generation stopped before you decided — ${what} to ${t} is still pending review.`;
+      return `Generation stopped before you decided, ${what} to ${t} is still pending review.`;
     default:
       return assertNever(disposition);
   }

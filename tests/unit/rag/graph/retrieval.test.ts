@@ -72,7 +72,7 @@ describe("buildGraphContext", () => {
   });
 
   test("merges file maps across multiple matched entities", () => {
-    // Both Alice and Bob match — their file maps should merge with max relevance.
+    // Both Alice and Bob match, their file maps should merge with max relevance.
     const ctx = buildGraphContext("Alice", graph);
     const aliceRelevance = ctx.relevantFiles.get("file1.md")!;
 

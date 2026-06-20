@@ -103,7 +103,7 @@ describe("LiveVaultReview", () => {
 
   it("fails an out-of-vault write with an explanation and never creates a reviewable op", async () => {
     // Even configured to auto-apply, a path that escapes the vault must not become an
-    // op — so it can never reach the gate where an accidental approval would write out.
+    // op, so it can never reach the gate where an accidental approval would write out.
     const review = new LiveVaultReview({
       app: makeApp(),
       timelineEl: TIMELINE_EL,
@@ -114,7 +114,7 @@ describe("LiveVaultReview", () => {
       const [{ result }] = await review.resolveRound([writeCall(`c-${path}`, path)]);
       expect(result.isError).toBe(true);
       expect(result.content).toContain("outside the vault");
-      // Concise, single self-correcting recovery — no redundant clause and no second
+      // Concise, single self-correcting recovery, no redundant clause and no second
       // generic recovery stacked on top (the message was trimmed, same meaning).
       expect(result.content).toContain("vault-relative path");
       expect(result.content).not.toContain("vault operations can only target");
@@ -135,7 +135,7 @@ describe("LiveVaultReview", () => {
 
     const pending = review.resolveRound([writeCall("c1", "Notes/A.md")]);
     await flush();
-    // Not resolved yet — the op is parked on the user.
+    // Not resolved yet, the op is parked on the user.
     expect(captured.proposalOps[0].status).toBe("pending");
 
     // Simulate the approve click reported by the timeline.
@@ -158,7 +158,7 @@ describe("LiveVaultReview", () => {
     captured.callbacks?.onOpResolved?.(captured.proposalOps[0].id, "declined");
 
     const [{ result }] = await pending;
-    expect(result.content).toBe('Declined by user — "Notes/A.md" was not changed.');
+    expect(result.content).toBe('Declined by user, "Notes/A.md" was not changed.');
     expect(result.isError).toBeFalsy();
   });
 
@@ -184,14 +184,14 @@ describe("LiveVaultReview", () => {
     captured.callbacks?.onOpResolved?.(dirOp.id, "declined");
 
     const results = await pending;
-    expect(results[0].result.content).toBe('Declined by user — "Drafts" was not changed.');
+    expect(results[0].result.content).toBe('Declined by user, "Drafts" was not changed.');
     // Both writes-into-the-folder fail, naming the declined prerequisite.
     expect(results[1].result.isError).toBe(true);
     expect(results[1].result.content).toContain("nowhere to put");
     expect(results[1].result.content).toContain("Drafts/A.md");
     expect(results[2].result.isError).toBe(true);
     expect(results[2].result.content).toContain("Drafts/B.md");
-    // Nothing was applied — the dependents never reached disk.
+    // Nothing was applied, the dependents never reached disk.
     expect(review.getAppliedRecord()).toBeNull();
   });
 
@@ -213,15 +213,15 @@ describe("LiveVaultReview", () => {
     dirOp.status = "rejected";
     captured.callbacks?.onOpResolved?.(dirOp.id, "declined");
 
-    // The independent op is untouched by propagation — still awaiting its own decision.
+    // The independent op is untouched by propagation, still awaiting its own decision.
     const sibling = captured.proposalOps[2];
     expect(sibling.status).toBe("pending");
     sibling.status = "applied";
     captured.callbacks?.onOpResolved?.(sibling.id, "applied");
 
     const results = await pending;
-    expect(results[1].result.isError).toBe(true); // inside Drafts — stranded
-    expect(results[2].result.content).toBe('Created "Notes/Keep.md".'); // outside — applied
+    expect(results[1].result.isError).toBe(true); // inside Drafts, stranded
+    expect(results[2].result.content).toBe('Created "Notes/Keep.md".'); // outside, applied
   });
 
   it("cancelPending resolves a parked op as cancelled (no hung await)", async () => {

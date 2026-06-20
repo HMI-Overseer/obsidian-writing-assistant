@@ -141,11 +141,11 @@ export function closestParagraphDiagnosis(searchText: string, document: string):
   }
 
   if (!best || bestScore < 0.2) {
-    return "search text resembles nothing in the document — the model invented content";
+    return "search text resembles nothing in the document, the model invented content";
   }
 
   const pct = Math.round(bestScore * 100);
-  return `closest is paragraph ${best.index} ("${snippet(best.text)}") at ${pct}% word overlap — the model likely paraphrased instead of quoting exactly`;
+  return `closest is paragraph ${best.index} ("${snippet(best.text)}") at ${pct}% word overlap, the model likely paraphrased instead of quoting exactly`;
 }
 
 // ---------------------------------------------------------------------------
@@ -169,7 +169,7 @@ export function describeAssessment(
   const search = resolved.editBlock.searchText;
 
   if (!applies) {
-    return `${noun} ${index + 1} → NO MATCH for "${snippet(search)}" — ${closestParagraphDiagnosis(search, document)}`;
+    return `${noun} ${index + 1} → NO MATCH for "${snippet(search)}", ${closestParagraphDiagnosis(search, document)}`;
   }
 
   const location =
@@ -196,7 +196,7 @@ export function evaluateEditRegions(
   const spec = testCase.regions;
   if (!spec) {
     return buildResultFromChecks(
-      [check("fixture-valid", "Test case declares ground-truth regions", false, "missing `regions` spec — fixture bug, not a model failure")],
+      [check("fixture-valid", "Test case declares ground-truth regions", false, "missing `regions` spec, fixture bug, not a model failure")],
       [],
       ""
     );
@@ -212,7 +212,7 @@ export function evaluateEditRegions(
   ];
   if (missing.length > 0) {
     return buildResultFromChecks(
-      [check("fixture-valid", "Ground-truth regions exist in the document", false, `region text not found for: ${list(missing)} — fixture bug, not a model failure`)],
+      [check("fixture-valid", "Ground-truth regions exist in the document", false, `region text not found for: ${list(missing)}, fixture bug, not a model failure`)],
       [],
       ""
     );
@@ -225,7 +225,7 @@ export function evaluateEditRegions(
   const { blocks } = parseEditBlocks(response);
   if (blocks.length === 0) {
     checks.push(
-      check("produced-blocks", "Produced SEARCH/REPLACE edit blocks", false, "the response contains no edit blocks — the model answered in prose or used the wrong format")
+      check("produced-blocks", "Produced SEARCH/REPLACE edit blocks", false, "the response contains no edit blocks, the model answered in prose or used the wrong format")
     );
     return buildResultFromChecks(checks, [`Response: "${snippet(response, 200)}"`], "");
   }
@@ -243,7 +243,7 @@ export function evaluateEditRegions(
       dead.length === 0,
       dead.length === 0
         ? `${assessments.length}/${assessments.length} blocks resolve`
-        : `${dead.length} of ${assessments.length} block(s) would fail to apply — see evidence for the closest-paragraph diagnosis`
+        : `${dead.length} of ${assessments.length} block(s) would fail to apply, see evidence for the closest-paragraph diagnosis`
     )
   );
 
@@ -256,7 +256,7 @@ export function evaluateEditRegions(
       fuzzy.length === 0,
       fuzzy.length === 0
         ? undefined
-        : `${fuzzy.length} block(s) only matched via fuzzy/whitespace-normalized matching — works, but the model is not quoting the document precisely`,
+        : `${fuzzy.length} block(s) only matched via fuzzy/whitespace-normalized matching, works, but the model is not quoting the document precisely`,
       false
     )
   );

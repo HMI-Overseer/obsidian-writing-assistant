@@ -10,12 +10,12 @@ import { DiffHunkView } from "./DiffHunkView";
 import type { DiffMode } from "./DiffHunkView";
 
 /**
- * Folds an edit proposal's diff review into the agentic timeline — the edit-channel
+ * Folds an edit proposal's diff review into the agentic timeline, the edit-channel
  * sibling of {@link ../messages/vaultReviewTimeline.VaultReviewTimelineView}. The
  * `propose_edit` / `update_frontmatter` calls are already timeline steps, so each
  * hunk's review lives *on its step*: approve / decline (and undo) sit inline on the
  * step row exactly like a vault op, and the diff renders always-visible directly
- * beneath the step — nested under the timeline so the connecting line stays
+ * beneath the step, nested under the timeline so the connecting line stays
  * continuous. The step's own click-to-expand (the raw tool args) is left intact for
  * inspection/debugging.
  *
@@ -35,7 +35,7 @@ export interface EditReviewTimelineOptions {
   live?: boolean;
 }
 
-/** Per-hunk state class on the step element — drives the status dot tint. */
+/** Per-hunk state class on the step element, drives the status dot tint. */
 function stateClass(view: InitialHunkView, noMatch: boolean): string {
   if (view === "applied") return "is-edit-applied";
   if (view === "skipped") return "is-edit-skipped";
@@ -92,7 +92,7 @@ export class EditReviewTimelineView {
    * Strip decorations a prior view left on this timeline, so re-mounting on an
    * already-decorated DOM (history re-render, or the live per-round re-render)
    * doesn't stack duplicate controls, diffs, or state classes. The step's own raw-args
-   * expand block is left alone — it isn't ours.
+   * expand block is left alone, it isn't ours.
    */
   private cleanPriorDecorations(): void {
     const t = this.opts.timelineEl;
@@ -183,7 +183,7 @@ export class EditReviewTimelineView {
       stepEl.querySelector<HTMLElement>(".lmsa-agentic-timeline-step-body") ?? stepEl;
     bodyEl.querySelector(":scope > .lmsa-edit-step-controls")?.remove();
     bodyEl.querySelector(":scope > .lmsa-edit-timeline-hunk")?.remove();
-    // This step is reviewed, so the overlay owns its state label — drop the base
+    // This step is reviewed, so the overlay owns its state label, drop the base
     // "Failed" word the timeline may have added (it paints first on a history re-render).
     bodyEl.querySelector(":scope > .lmsa-agentic-timeline-step-failed")?.remove();
 
@@ -194,7 +194,7 @@ export class EditReviewTimelineView {
 
     // The diff renders always-visible, nested under the step row (full-width, so it
     // wraps below the row and stays left of the timeline's connecting line). It is a
-    // pure display — its accept/reject are suppressed; the step controls own those.
+    // pure display, its accept/reject are suppressed; the step controls own those.
     const hunkWrap = bodyEl.createDiv({ cls: "lmsa-edit-timeline-hunk" });
     hunkWrap.addEventListener("click", (e) => e.stopPropagation());
     const diffView = new DiffHunkView(
@@ -234,7 +234,7 @@ export class EditReviewTimelineView {
       return;
     }
 
-    // Pending. A no-match can't be applied — offer only a way to dismiss it.
+    // Pending. A no-match can't be applied, offer only a way to dismiss it.
     if (noMatch) {
       controlsEl.createSpan({ cls: "lmsa-edit-step-state is-error", text: "No match" });
       const decline = this.iconButton(controlsEl, "x", "Dismiss", "decline");
@@ -281,7 +281,7 @@ export class EditReviewTimelineView {
   }
 
   // -----------------------------------------------------------------------
-  // Controller broadcasts — keep this view in sync with the in-note overlay
+  // Controller broadcasts, keep this view in sync with the in-note overlay
   // -----------------------------------------------------------------------
 
   private onChange(change: HunkReviewChange): void {

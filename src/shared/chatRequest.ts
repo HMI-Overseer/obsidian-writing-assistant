@@ -26,7 +26,7 @@ export interface DocumentContext {
 
 /**
  * A conversation turn in the chat history.
- * Excludes "system" — system instructions are top-level in ChatRequest.
+ * Excludes "system", system instructions are top-level in ChatRequest.
  */
 export interface ChatTurn {
   role: "user" | "assistant" | "tool";

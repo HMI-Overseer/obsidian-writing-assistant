@@ -12,11 +12,11 @@ import type { VaultOperation } from "../../src/vault-ops/types";
 import type { ToolCall } from "../../src/tools/types";
 
 /**
- * §6.1 — verify the vault-write handler against its **real on-disk resolution**, not
+ * §6.1, verify the vault-write handler against its **real on-disk resolution**, not
  * a string-keyed mock.
  *
  * The unit tests prove our *model* of the boundary: their `vault.create` writes to a
- * `Map`, so an escaping path is just an odd Map key — a real escape would never show.
+ * `Map`, so an escaping path is just an odd Map key, a real escape would never show.
  * This suite instead backs the vault with **real Node `fs` + `path`** in a throwaway
  * temp vault, reproducing Obsidian's `FileSystemAdapter` resolution faithfully:
  * every write resolves via `path.join(vaultRoot, normalizePath(p))` and hits the
@@ -26,13 +26,13 @@ import type { ToolCall } from "../../src/tools/types";
  *
  * (The genuine Electron `FileSystemAdapter` class is unavailable outside the Obsidian
  * runtime, so it cannot be instantiated in CI. Reproducing its documented resolution
- * with the real `path`/`fs` primitives — and asserting against the real disk — is the
+ * with the real `path`/`fs` primitives, and asserting against the real disk, is the
  * faithful stand-in: the part that was previously only an *assumption* (`path.join`
  * vs `path.resolve`, `..` handling, drive-letter / UNC quirks) is now executed for
  * real. The control test below proves the harness genuinely detects an escape, so the
  * guarded assertions are not vacuous.)
  *
- * Layout — the vault sits two levels deep so a `../..` escape lands inside the
+ * Layout, the vault sits two levels deep so a `../..` escape lands inside the
  * sandbox (easy to detect and clean up) rather than polluting the OS temp root:
  *
  *   <sandbox>/a/b/vault   ← vaultRoot (the "vault")
@@ -135,7 +135,7 @@ afterEach(() => {
 const ESCAPING_PATHS = [
   "../../outside-vault.md",
   "../../../a/escape.md",
-  "..\\..\\win-escape.md", // backslash traversal — normalizePath converts to "../.."
+  "..\\..\\win-escape.md", // backslash traversal, normalizePath converts to "../.."
   "foo/../../bar.md", // internal "../" plus one that rises above the root
   "C:/Windows/System32/test.md", // drive-letter absolute
   "d:\\secrets\\note.md",
@@ -144,18 +144,18 @@ const ESCAPING_PATHS = [
 /**
  * Odd shapes the guard intentionally ALLOWS because `path.join` keeps them *inside*
  * the vault (a leading-slash / UNC / percent-encoded / extended-length form is not a
- * `..` escape). They must still never resolve outside vaultRoot — verified on disk.
+ * `..` escape). They must still never resolve outside vaultRoot, verified on disk.
  */
 const ODD_BUT_CONTAINED_PATHS = [
   "/leading-slash.md",
-  "\\\\server\\share\\note.md", // UNC-looking — collapses to server/share/note.md inside vault
+  "\\\\server\\share\\note.md", // UNC-looking, collapses to server/share/note.md inside vault
   "%2e%2e/%2e%2e/encoded.md", // percent-encoded ".." is NOT decoded by the adapter
   "trailing.dot./note.md",
 ];
 
-describe("vault path-boundary — real-filesystem resolution (§6.1)", () => {
+describe("vault path-boundary, real-filesystem resolution (§6.1)", () => {
   it("control: an UNGUARDED adapter write with '../../' really escapes the vault on disk", () => {
-    // Proves the harness genuinely detects a real escape — so the guarded assertions
+    // Proves the harness genuinely detects a real escape, so the guarded assertions
     // below are meaningful, not vacuously passing. We call the raw adapter directly,
     // bypassing every guard; the file must land OUTSIDE vaultRoot.
     const app = makeRealFsApp(vaultRoot);
@@ -186,7 +186,7 @@ describe("vault path-boundary — real-filesystem resolution (§6.1)", () => {
     for (const path of ESCAPING_PATHS) {
       const op: VaultOperation = { kind: "create", path, content: "x" };
 
-      // Layer 2 — pre-flight aborts the batch; nothing is applied.
+      // Layer 2, pre-flight aborts the batch; nothing is applied.
       const batch = await applyVaultOpBatch(app, [{ id: "a", op }]);
       expect(batch.ok, `batch must refuse "${path}"`).toBe(false);
       expect(
@@ -195,7 +195,7 @@ describe("vault path-boundary — real-filesystem resolution (§6.1)", () => {
       ).toBe(true);
       expect(batch.applied).toHaveLength(0);
 
-      // Layer 3 — the disk executor throws as its first act, even if reached directly.
+      // Layer 3, the disk executor throws as its first act, even if reached directly.
       await expect(applyOperation(app, op), `applyOperation must throw for "${path}"`).rejects.toThrow(
         /outside the vault/,
       );
@@ -212,7 +212,7 @@ describe("vault path-boundary — real-filesystem resolution (§6.1)", () => {
     const app = makeRealFsApp(vaultRoot);
     fs.mkdirSync(nodePath.join(vaultRoot, "Notes"), { recursive: true });
     fs.writeFileSync(nodePath.join(vaultRoot, "Notes", "A.md"), "body");
-    // Use the file's REAL fingerprint so the conflict guard passes — the *only* thing
+    // Use the file's REAL fingerprint so the conflict guard passes, the *only* thing
     // that can stop this move is the vault-boundary check, making it the load-bearing
     // assertion (it would escape on disk if the guard were removed).
     const st = fs.statSync(nodePath.join(vaultRoot, "Notes", "A.md"));
@@ -237,12 +237,12 @@ describe("vault path-boundary — real-filesystem resolution (§6.1)", () => {
     for (const path of ODD_BUT_CONTAINED_PATHS) {
       const op: VaultOperation = { kind: "create", path, content: "ok" };
       // These do not escape, so they either apply inside the vault or fail on an
-      // invalid filename — either way they must not write outside vaultRoot. We do
+      // invalid filename, either way they must not write outside vaultRoot. We do
       // not assert ok/throw (OS-dependent for invalid chars), only the boundary.
       try {
         await applyVaultOpBatch(app, [{ id: "o", op }]);
       } catch {
-        /* an invalid on-disk name is fine — it cannot escape. */
+        /* an invalid on-disk name is fine, it cannot escape. */
       }
     }
 

@@ -32,7 +32,7 @@ export interface CreateDirectoryArgs {
 
 /**
  * `create_directory` has a third outcome the others don't: the folder already
- * exists, so there is nothing to create — neither an error nor a reviewable op
+ * exists, so there is nothing to create, neither an error nor a reviewable op
  * (idempotency guard). `satisfied` carries a benign message for the model.
  */
 export type CreateDirectoryResult =
@@ -59,11 +59,11 @@ export function validateWriteFile(
     return err("content must be a string. Got: " + typeof args.content);
   }
   if (resolve(args.path) === "dir") {
-    return err(`"${args.path}" is a folder — choose a file path, or use create_directory.`);
+    return err(`"${args.path}" is a folder, choose a file path, or use create_directory.`);
   }
   // Allowlist the file type: write_file authors Obsidian documents only, so a
   // forgotten extension, a non-document type, or an executable/script (.bat, .exe …)
-  // is refused before any op is created — for create and overwrite alike. Checked
+  // is refused before any op is created, for create and overwrite alike. Checked
   // after the folder branch so a folder path still gets the create_directory hint.
   if (!hasWritableExtension(args.path)) return err(unsupportedTypeMessage(args.path));
   return ok({ path: args.path, content: args.content });
@@ -79,15 +79,15 @@ export function validateCreateDirectory(
   if (escapesVault(args.path)) return err(outsideVaultMessage(args.path));
   const state = resolve(args.path);
   if (state === "file") {
-    return err(`"${args.path}" is a file — choose a folder path.`);
+    return err(`"${args.path}" is a file, choose a folder path.`);
   }
   if (state === "dir") {
-    // Already a folder — not applied; tell the model it's done, calmly.
+    // Already a folder, not applied; tell the model it's done, calmly.
     return {
       ok: true,
       satisfied: true,
       path: args.path,
-      message: `"${args.path}" already exists — nothing to create.`,
+      message: `"${args.path}" already exists, nothing to create.`,
     };
   }
   return ok({ path: args.path });
@@ -106,18 +106,18 @@ export function validateMoveFile(
   if (escapesVault(args.from)) return err(outsideVaultMessage(args.from));
   if (escapesVault(args.to)) return err(outsideVaultMessage(args.to));
   // Hold the write_file allowlist on the destination too, so a move can't launder a
-  // blessed file (note.md) into a forbidden type (note.bat) — the same invariant,
+  // blessed file (note.md) into a forbidden type (note.bat), the same invariant,
   // enforced at every door a model can introduce an extension. Only the destination
   // is constrained; the source already exists in the vault.
   if (!hasWritableExtension(args.to)) return err(unsupportedTypeMessage(args.to));
   if (args.from === args.to) {
-    return err("from and to are the same path — nothing to move.");
+    return err("from and to are the same path, nothing to move.");
   }
   if (resolve(args.from) === "absent") {
     return err(`source "${args.from}" does not exist.`);
   }
   if (resolve(args.to) !== "absent") {
-    return err(`destination "${args.to}" already exists — choose a new name.`);
+    return err(`destination "${args.to}" already exists, choose a new name.`);
   }
   return ok({ from: args.from, to: args.to });
 }
@@ -135,8 +135,8 @@ export function validateTrashFile(
     return err(`"${args.path}" does not exist.`);
   }
   if (state === "dir") {
-    // Files-only in v1 — folder removal is too blunt for an agent.
-    return err(`"${args.path}" is a folder — trash_file targets files only.`);
+    // Files-only in v1, folder removal is too blunt for an agent.
+    return err(`"${args.path}" is a folder, trash_file targets files only.`);
   }
   return ok({ path: args.path });
 }

@@ -433,7 +433,7 @@ describe("search_content", () => {
       ctx,
     );
 
-    // Clamped to 5: lines 11..21 (p10..p20 around match at line 16) — not the whole note.
+    // Clamped to 5: lines 11..21 (p10..p20 around match at line 16), not the whole note.
     expect(result.content).toContain("> 16: the token here");
     expect(result.content).toContain("p10");
     expect(result.content).not.toContain("p9");
@@ -747,15 +747,15 @@ describe("failure contract", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Path-boundary safety — reads name the boundary, and never disclose an
+// Path-boundary safety, reads name the boundary, and never disclose an
 // out-of-vault file.
 //
 // An out-of-vault path (../, drive letter) is refused at the boundary BEFORE the
 // index lookup, with the same wording the write channel uses ("outside the vault.
 // Use a vault-relative path.") instead of a dead-end "not found" the model can't
 // resolve by searching. The index lookup (getFileByPath / getAbstractFileByPath)
-// remains behind it as the security backstop — it can only ever return an
-// in-vault file — so non-disclosure is preserved. These tests lock both in: the
+// remains behind it as the security backstop, it can only ever return an
+// in-vault file, so non-disclosure is preserved. These tests lock both in: the
 // boundary message AND that the lookup is never reached for an escaping path.
 // ---------------------------------------------------------------------------
 
@@ -816,7 +816,7 @@ describe("path-boundary safety (reads stay inside the vault)", () => {
       ctx,
     );
     // The call itself succeeds (per-entry errors), but the out-of-vault path names
-    // the boundary rather than "No note found" — it was never resolved to disk.
+    // the boundary rather than "No note found", it was never resolved to disk.
     expect(result.isError).toBeUndefined();
     expect(result.content).toContain("outside the vault");
     expect(result.content).not.toContain("No note found");

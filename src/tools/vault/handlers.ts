@@ -27,7 +27,7 @@ export interface VaultToolContext {
 
 /**
  * Execute a vault read-only tool and return its result.
- * All vault tools are read-only — results are returned to the model for reasoning.
+ * All vault tools are read-only, results are returned to the model for reasoning.
  */
 export async function executeVaultTool(
   toolCall: ToolCall,
@@ -78,11 +78,10 @@ async function executeSearchVault(
     return toolFailure({ kind: "invalid-args", what: "query is required" });
   }
 
-  // Branch the "can't run" cases on the exact reason, so the model is never told
-  // the vault is empty when search merely couldn't run, and never pointed at a
-  // recovery it can't perform (e.g. "build the index" for a no-backend user). The
-  // curated message already reads as a full recovery contract, so it passes through
-  // verbatim as `content`; `failure.kind` makes the unavailability machine-readable.
+  // Branch "can't run" on the exact reason, so the model is never told the vault is
+  // empty when search merely couldn't run, nor pointed at a recovery it can't perform
+  // (e.g. "build the index" for a no-backend user). The curated message is already a
+  // full recovery contract; `failure.kind` makes the unavailability machine-readable.
   const availability = ctx.ragService.availability();
   if (availability !== "ready") {
     return toolFailure({
@@ -96,7 +95,7 @@ async function executeSearchVault(
   try {
     results = await ctx.ragService.retrieve(query, ctx.activeFilePath);
   } catch (e) {
-    // A live backend that failed at call time — a failure to run, reported as such
+    // A live backend that failed at call time, a failure to run, reported as such
     // (isError) rather than laundered into "found nothing".
     if (e instanceof RagRetrievalError) {
       return toolFailure({
@@ -109,7 +108,7 @@ async function executeSearchVault(
   }
 
   if (!results || results.length === 0) {
-    // Ran fine, found nothing — a valid empty result, not a failure (no `isError`).
+    // Ran fine, found nothing, a valid empty result, not a failure (no `isError`).
     // Still recovery-shaped per the contract's wording rule.
     return {
       content:
@@ -141,7 +140,7 @@ async function executeReadFile(
 
   // Name the vault boundary before the index lookup, so an out-of-vault path is
   // reported as such instead of a dead-end "not found" (the lookup below stays as
-  // the security backstop — it can only ever resolve an in-vault file).
+  // the security backstop, it can only ever resolve an in-vault file).
   const outside = refuseOutsideVault(rawPath);
   if (outside) return outside;
 
@@ -357,7 +356,7 @@ async function executeSearchContent(
 
   // Build the per-line matcher. Regex is opt-in and validated up front so a
   // malformed pattern is a correctable error, not a thrown scan. No `g` flag,
-  // so each exec() searches the line from the start — first match per line.
+  // so each exec() searches the line from the start, first match per line.
   let matcher: (line: string) => number;
   if (useRegex) {
     let rx: RegExp;
@@ -381,7 +380,7 @@ async function executeSearchContent(
   }
 
   // Collect snippets up to the display cap, but keep counting *every* match so
-  // the model gets an honest "showing N of M" when the result set overflows —
+  // the model gets an honest "showing N of M" when the result set overflows,
   // the signal it needs to decide whether to narrow or just read what it got.
   const blocks: string[] = [];
   let totalMatches = 0;
@@ -426,10 +425,10 @@ async function executeSearchContent(
   const truncated = totalMatches > shownMatches;
   const kind = useRegex ? "pattern" : "text";
   const header = truncated
-    ? `Matches for ${kind} "${query}" — showing first ${shownMatches} of ${totalMatches}:`
+    ? `Matches for ${kind} "${query}", showing first ${shownMatches} of ${totalMatches}:`
     : `Matches for ${kind} "${query}" (${totalMatches}):`;
   const footer = truncated
-    ? `\n\n[Showing ${shownMatches} of ${totalMatches} matches — narrow the query or scope with path to see the rest.]`
+    ? `\n\n[Showing ${shownMatches} of ${totalMatches} matches, narrow the query or scope with path to see the rest.]`
     : "";
   const joiner = contextLines > 0 ? "\n\n" : "\n";
   return { content: `${header}\n${blocks.join(joiner)}${footer}`, isReadOnly: true };
@@ -438,7 +437,7 @@ async function executeSearchContent(
 /**
  * Render one file's matches. With no context, each match is a single
  * `path:line: snippet` line (grep default). With contextLines > 0, surrounding
- * lines are shown — and overlapping windows are merged into one hunk per file,
+ * lines are shown, and overlapping windows are merged into one hunk per file,
  * so a model gets the sentence before/after without a follow-up read_file and
  * shared context is never printed twice.
  */
@@ -601,7 +600,7 @@ async function executeFindNotesByTag(
       .slice(0, 5);
     const hint =
       similar.length > 0
-        ? `\nSimilar tags in vault: ${similar.join(", ")} — try one of those.`
+        ? `\nSimilar tags in vault: ${similar.join(", ")}, try one of those.`
         : " No similar tags exist; call list_directory to discover which tags the vault uses.";
     return {
       content: `No notes found with tag "${normalizedTag}".${hint}`,
@@ -647,7 +646,7 @@ async function executeGetFrontmatter(
     }
     const cache = ctx.app.metadataCache.getFileCache(file);
     const fm = { ...(cache?.frontmatter ?? {}) };
-    // Remove Obsidian's internal position metadata — not useful to the model.
+    // Remove Obsidian's internal position metadata, not useful to the model.
     delete fm["position"];
     results[p] = fm;
   }

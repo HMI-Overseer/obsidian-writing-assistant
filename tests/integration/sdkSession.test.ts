@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 // Mock the single SDK boundary. `query` is driven by a fake that consumes the
 // streaming-input iterable and emits one echo turn per pushed user message, so a
-// single fake "process" can serve multiple turns — the persistent-session
+// single fake "process" can serve multiple turns, the persistent-session
 // behavior under test. Declared via `vi.hoisted` for the hoisted `vi.mock` factory.
 const { queryMock, FakeAbortError } = vi.hoisted(() => ({
   queryMock: vi.fn(),
@@ -314,8 +314,8 @@ describe("SdkSessionRegistry", () => {
       "c1",
       turnRequest([{ role: "user", content: "hi" }], "hi", { signal: ac.signal }),
     );
-    // The cold mint sends the full transcript prompt ("user:hi"), so the echo —
-    // banked as the partial reply on interrupt — is "echo:user:hi".
+    // The cold mint sends the full transcript prompt ("user:hi"), so the echo,
+    // banked as the partial reply on interrupt, is "echo:user:hi".
     const first = await gen.next();
     expect(first.value).toBe("echo:user:hi");
     ac.abort();
@@ -324,7 +324,7 @@ describe("SdkSessionRegistry", () => {
     // The interrupted session stays live (its context covers the partial reply).
     expect(registry.size).toBe(1);
 
-    // Next turn extends it — the stored assistant turn must match what was banked,
+    // Next turn extends it, the stored assistant turn must match what was banked,
     // so the prefix hash lines up and the live process is reused (no new query()).
     await drain(
       registry.runTurn(
@@ -370,7 +370,7 @@ describe("SdkSessionRegistry", () => {
         ),
       ),
     );
-    // New process minted — context retention sacrificed for correctness.
+    // New process minted, context retention sacrificed for correctness.
     expect(registry.size).toBe(1);
     expect(queryMock).toHaveBeenCalledTimes(2);
   });

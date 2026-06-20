@@ -1,14 +1,14 @@
 /* -----------------------------------------------------------------------
  * Vault review folded into the agentic timeline (Finding C re-open).
- * The vault ops are tool-call steps; the review lives *on* those steps —
- * inline approve/decline + a status-tinted dot — with one turn-level footer
+ * The vault ops are tool-call steps; the review lives *on* those steps,
+ * inline approve/decline + a status-tinted dot, with one turn-level footer
  * for "Approve all" / "Undo". No separate card or panel.
  * ----------------------------------------------------------------------- */
 
 @layer components {
   /* ── Status on the step dot (state, not class) ──────────────────── */
 
-  /* Awaiting: a softened dot tint — the "pending approval" label is now the
+  /* Awaiting: a softened dot tint, the "pending approval" label is now the
      primary "needs you" signal, so the dot only whispers. */
   .lmsa-agentic-timeline-step.is-vault-awaiting .lmsa-agentic-timeline-dot {
     color: var(--lmsa-mode-accent);
@@ -28,7 +28,7 @@
     background: color-mix(in srgb, var(--text-error) 12%, var(--background-primary));
   }
 
-  /* Declined by the user in review — red, like a failure: the op did not happen. */
+  /* Declined by the user in review, red, like a failure: the op did not happen. */
   .lmsa-agentic-timeline-step.is-vault-rejected .lmsa-agentic-timeline-dot {
     color: var(--text-error);
     border-color: color-mix(in srgb, var(--text-error) 55%, var(--background-modifier-border));
@@ -39,7 +39,7 @@
     opacity: 0.6;
   }
 
-  /* Satisfied no-op (e.g. folder already exists): a neutral, unremarkable dot —
+  /* Satisfied no-op (e.g. folder already exists): a neutral, unremarkable dot,
      it isn't an error and needs nothing from the user. */
   .lmsa-agentic-timeline-step.is-vault-satisfied .lmsa-agentic-timeline-dot {
     color: var(--text-muted);
@@ -54,7 +54,7 @@
     align-self: center;
   }
 
-  /* "pending approval" — detail type scale, edit-mode accent. Inherits the
+  /* "pending approval", detail type scale, edit-mode accent. Inherits the
      timeline font size; only the colour distinguishes it from the path detail. */
   .lmsa-vault-step-pending {
     color: var(--lmsa-mode-accent);
@@ -62,7 +62,7 @@
   }
 
   /* Approve / Decline are quiet icon-only affordances, not buttons: the
-     established subtle recipe (cf. BubbleActionToolbar) — transparent, no chrome,
+     established subtle recipe (cf. BubbleActionToolbar), transparent, no chrome,
      muted, with only a hover wash. Obsidian's base button styling is reset so it
      can't reintroduce the chunky look. */
   .lmsa-vault-step-controls .lmsa-vault-step-btn {
@@ -122,7 +122,7 @@
   }
 
   /* Transparent icon+text affordances, matching the chat bubble action bar (edit /
-     regenerate) — no border or fill at rest, just a hover wash. Obsidian's base
+     regenerate), no border or fill at rest, just a hover wash. Obsidian's base
      button chrome is reset so it can't reintroduce a chunky look. */
   .lmsa-vault-review-footer .lmsa-vault-review-footer-btn {
     @apply lmsa-inline-flex lmsa-cursor-pointer lmsa-items-center lmsa-gap-1 lmsa-rounded-md lmsa-border-none lmsa-bg-transparent;
@@ -162,7 +162,7 @@
   }
 
   /* "Approve all" is text-only: muted at rest like the other footer actions, and
-     on hover the text alone shifts to the accent — no background wash, so nothing
+     on hover the text alone shifts to the accent, no background wash, so nothing
      reads as a button outline. */
   .lmsa-vault-review-footer .lmsa-vault-review-footer-btn--approve:hover:not(:disabled) {
     background: transparent;

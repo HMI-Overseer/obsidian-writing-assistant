@@ -27,7 +27,7 @@ export function buildResultFromChecks(
   }
 
   const reason = firstFailure.detail
-    ? `${firstFailure.label} — ${firstFailure.detail}`
+    ? `${firstFailure.label}, ${firstFailure.detail}`
     : firstFailure.label;
 
   return { passed: false, reason: `Failed: ${reason}`, evidence, checks };

@@ -145,7 +145,7 @@ export function renderModelProfileTab<T extends BaseModel>(
     providerSelect.createEl("option", { text: label, attr: { value } });
   }
 
-  // Provider content area — changes based on selected provider
+  // Provider content area, changes based on selected provider
   const providerContentEl = addSection.bodyEl.createDiv({ cls: "lmsa-provider-content" });
 
   // Add manually button (always visible in footer, hidden for unsupported provider+kind combos)
@@ -220,7 +220,7 @@ export function renderModelProfileTab<T extends BaseModel>(
     text: "Support for this provider is coming soon.",
   });
 
-  // Claude Code: install/auth status (no API key — uses the user's logged-in CLI session)
+  // Claude Code: install/auth status (no API key, uses the user's logged-in CLI session)
   const claudecodeConnectionEl = providerContentEl.createDiv({ cls: "lmsa-provider-connection" });
   const claudecodeStatusEl = claudecodeConnectionEl.createEl("p", {
     cls: "lmsa-settings-section-desc",
@@ -228,7 +228,7 @@ export function renderModelProfileTab<T extends BaseModel>(
   });
   claudecodeConnectionEl.createEl("p", {
     cls: "lmsa-settings-section-desc",
-    text: "Runs through your existing Claude Code session — this plugin never asks for or stores a password or API key.",
+    text: "Runs through your existing Claude Code session, this plugin never asks for or stores a password or API key.",
   });
   claudecodeConnectionEl.createEl("a", {
     text: "Install or set up Claude Code",
@@ -404,10 +404,10 @@ export function renderModelProfileTab<T extends BaseModel>(
     claudecodeConnectionEl.toggleClass("lmsa-hidden", selected !== "claudecode");
     if (selected === "claudecode") void refreshClaudeCodeStatus();
 
-    // Shared discovery block — visible when provider has a fetcher
+    // Shared discovery block, visible when provider has a fetcher
     discoveryEl.toggleClass("lmsa-hidden", !hasFetcher);
 
-    // Add manually button — hidden for unsupported combos
+    // Add manually button, hidden for unsupported combos
     addManuallyBtn.toggleClass("lmsa-hidden", !hasFetcher);
   };
 

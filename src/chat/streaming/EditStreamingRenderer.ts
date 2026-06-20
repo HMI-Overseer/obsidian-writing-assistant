@@ -13,7 +13,7 @@ const STREAMING_RENDER_DEBOUNCE_MS = 100;
  * Complete blocks are shown as lightweight previews during streaming.
  *
  * When `useToolMode` is true, SEARCH/REPLACE block detection is skipped
- * entirely — tool calls are accumulated separately by the client. Only
+ * entirely, tool calls are accumulated separately by the client. Only
  * prose text and a static "Composing edits..." indicator are shown.
  */
 
@@ -79,7 +79,7 @@ export class EditStreamingRenderer {
     let displayText: string;
 
     if (this.useToolMode) {
-      // Tool mode: prose text only — tool calls are accumulated by the client.
+      // Tool mode: prose text only, tool calls are accumulated by the client.
       const allProse = (this.accumulatedProse + text).trim();
       const statusLine = this.toolStatusText || "*Composing edits...*";
       displayText = allProse

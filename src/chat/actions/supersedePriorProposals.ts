@@ -7,19 +7,19 @@ import type { ConversationMessage } from "../../shared/types";
  * message supersedes it under one law applied to both channels:
  *
  *   - **Pending work is rejected.** An un-applied edit hunk or ask-gated vault op
- *     left behind when the user moves on is implicit feedback — a rejection,
+ *     left behind when the user moves on is implicit feedback, a rejection,
  *     identical to the edit channel's long-standing behaviour. Their Apply/Skip
  *     controls go away because the rows are no longer pending.
  *   - **Applied vault batches are marked historical.** They touched disk, so undo
- *     stays *possible* — but the panel renders a locked, compact variant rather
+ *     stays *possible*, but the panel renders a locked, compact variant rather
  *     than a live Undo footer competing with the current turn.
  *
  * Edit-channel applied hunks keep their per-hunk inline undo (no competing footer
- * to demote — re-skinning that is Finding C), so this helper only flips the
+ * to demote, re-skinning that is Finding C), so this helper only flips the
  * `historical` flag on vault proposals.
  *
  * **Invariant:** this MUST run only at user-message boundaries, never per
- * tool-loop round — otherwise an agentic multi-round turn would cancel its own
+ * tool-loop round, otherwise an agentic multi-round turn would cancel its own
  * earlier proposals. Both the API providers and the Claude Code provider
  * route a user turn through `sendMessage`, so calling it there covers both.
  *

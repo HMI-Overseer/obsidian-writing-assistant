@@ -9,7 +9,7 @@ import type {
 import { applyVaultOpBatch, undoVaultOpBatch } from "../../vault-ops/applyBatch";
 import { opPrimaryPath } from "../../vault-ops/summary";
 
-/** Icon per op kind — for synthetic fallback rows (matched steps keep their own). */
+/** Icon per op kind, for synthetic fallback rows (matched steps keep their own). */
 const OP_KIND_ICONS: Record<VaultOperation["kind"], string> = {
   create: "file-plus",
   overwrite: "file-plus",
@@ -18,7 +18,7 @@ const OP_KIND_ICONS: Record<VaultOperation["kind"], string> = {
   trash: "trash-2",
 };
 
-/** Tool name behind each op kind — for the positional fallback (`data-tool-name`). */
+/** Tool name behind each op kind, for the positional fallback (`data-tool-name`). */
 const TOOL_NAME_BY_KIND: Record<VaultOperation["kind"], string> = {
   create: "write_file",
   overwrite: "write_file",
@@ -52,12 +52,12 @@ export type VaultReviewCallbacks = {
   /** Every applied op was undone (clear the applied record). */
   onUndone: () => void;
   /**
-   * An op reached a terminal user decision — `applied` (approved) or `declined`.
+   * An op reached a terminal user decision, `applied` (approved) or `declined`.
    * Only the live in-loop mount sets this: it resolves the pending tool-result
    * promise the model is blocked on (in-loop-tool-approval-blocking-flow). Fired
    * only once an op's {@link VaultOpStatus} actually becomes terminal, so the tool
    * result never asserts an outcome this view doesn't already hold. A failed apply
-   * leaves the op pending (retryable) and does NOT fire — the model stays blocked
+   * leaves the op pending (retryable) and does NOT fire, the model stays blocked
    * until the user retries or declines.
    */
   onOpResolved?: (opId: string, disposition: "applied" | "declined") => void;
@@ -83,7 +83,7 @@ export interface VaultReviewTimelineOptions {
   serial?: boolean;
 }
 
-/** Per-status state class on the step element — drives the dot tint (state, not class). */
+/** Per-status state class on the step element, drives the dot tint (state, not class). */
 function statusClass(status: VaultOpStatus, historical: boolean): string {
   if (historical && (status === "pending" || status === "accepted")) return "is-vault-cancelled";
   switch (status) {
@@ -129,15 +129,13 @@ export class VaultReviewTimelineView {
     }
   }
 
-  // -----------------------------------------------------------------------
-  // Painting — idempotent; re-run after every state change.
-  // -----------------------------------------------------------------------
+  // Painting: idempotent, re-run after every state change.
 
   /**
    * Strip decorations a prior view left on this timeline, so re-mounting on an
    * already-decorated DOM (an incremental history re-render re-runs the proposal
    * pass over kept bubbles) doesn't stack duplicate footers, controls, or state
-   * classes. A freshly rebuilt timeline has none of these — this is a no-op there.
+   * classes. A freshly rebuilt timeline has none of these, this is a no-op there.
    */
   private cleanPriorDecorations(): void {
     const t = this.opts.timelineEl;
@@ -243,7 +241,7 @@ export class VaultReviewTimelineView {
     const bodyEl =
       stepEl.querySelector<HTMLElement>(".lmsa-agentic-timeline-step-body") ?? stepEl;
     bodyEl.querySelector(":scope > .lmsa-vault-step-controls")?.remove();
-    // This step is reviewed, so the overlay owns its state label — drop the base
+    // This step is reviewed, so the overlay owns its state label, drop the base
     // "Failed" word the timeline may have added (it paints first on a history re-render).
     bodyEl.querySelector(":scope > .lmsa-agentic-timeline-step-failed")?.remove();
     const controls = bodyEl.createDiv({ cls: "lmsa-vault-step-controls" });
@@ -263,7 +261,7 @@ export class VaultReviewTimelineView {
     if (historical && awaiting) {
       controls.createSpan({
         cls: "lmsa-vault-step-state",
-        text: "Cancelled — you moved on before applying",
+        text: "Cancelled, you moved on before applying",
       });
       return;
     }
@@ -375,12 +373,10 @@ export class VaultReviewTimelineView {
     }
   }
 
-  // -----------------------------------------------------------------------
-  // Actions — mirror the batch orchestrator (ADR-0006); pre-flight, ordering,
-  // and drift-guarded undo all hold because Apply/Undo route through it.
-  // -----------------------------------------------------------------------
+  // Actions route through the batch orchestrator (ADR-0006), so its pre-flight,
+  // ordering, and drift-guarded undo all hold.
 
-  /** ask-gated ops not yet applied or declined — what Approve / Approve-all commit. */
+  /** ask-gated ops not yet applied or declined, what Approve / Approve-all commit. */
   private appliableOps(): ReviewableVaultOp[] {
     return this.opts.proposal.ops.filter(
       (o) => o.gate === "ask" && (o.status === "pending" || o.status === "accepted"),
@@ -399,7 +395,7 @@ export class VaultReviewTimelineView {
       if (!result.ok) {
         const reason = result.conflicts[0]?.reason ?? result.error ?? "operation failed";
         new Notice(`Couldn't apply vault operations: ${reason}`);
-        return; // statuses unchanged — retry once the conflict clears.
+        return; // statuses unchanged, retry once the conflict clears.
       }
       for (const r of toApply) r.status = "applied";
       this.mergeAppliedRecord(result.applied);
@@ -432,8 +428,8 @@ export class VaultReviewTimelineView {
       const record = this.appliedRecord;
       const result = await undoVaultOpBatch(this.opts.app, record);
       if (result.refused) {
-        // Drift guard refused before touching disk — vault unchanged, applied state intact.
-        new Notice(`Can't undo — ${result.failures[0] ?? "the vault changed since this was applied"}.`);
+        // Drift guard refused before touching disk, vault unchanged, applied state intact.
+        new Notice(`Can't undo, ${result.failures[0] ?? "the vault changed since this was applied"}.`);
         return;
       }
       if (!result.ok) {

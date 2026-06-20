@@ -17,7 +17,7 @@ export interface InlineHunk {
   id: string;
   matchedText: string;
   replaceText: string;
-  /** Snapshot offset where the match started — used to re-anchor against drift. */
+  /** Snapshot offset where the match started, used to re-anchor against drift. */
   matchOffset: number;
   onAccept: () => void;
   onReject: () => void;

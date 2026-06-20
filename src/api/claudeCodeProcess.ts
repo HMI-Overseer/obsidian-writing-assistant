@@ -96,7 +96,7 @@ export interface ClaudeCodeResultUsage {
   outputTokens: number;
   cacheCreationInputTokens?: number;
   cacheReadInputTokens?: number;
-  /** Claude Code's own cost figure (USD), reported directly — not estimated. */
+  /** Claude Code's own cost figure (USD), reported directly, not estimated. */
   costUsd?: number;
   /** Session id for future `--resume` continuation. */
   sessionId?: string;
@@ -108,7 +108,7 @@ export interface ClaudeCodeSpawnOptions {
   args: string[];
   /** Working directory for the subprocess (vault root). */
   cwd?: string;
-  /** Environment for the subprocess. When set, replaces the inherited env entirely — callers merge `process.env` themselves. */
+  /** Environment for the subprocess. When set, replaces the inherited env entirely, callers merge `process.env` themselves. */
   env?: NodeJS.ProcessEnv;
   /** Prompt piped to the subprocess stdin. */
   prompt: string;

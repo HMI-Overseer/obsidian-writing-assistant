@@ -13,7 +13,7 @@ export interface McpToolSchema {
 
 /**
  * Converts a provider-agnostic {@link CanonicalToolDefinition} into the MCP
- * `tools/list` shape. Sibling to `tools/formatters/anthropic.ts` — same source of
+ * `tools/list` shape. Sibling to `tools/formatters/anthropic.ts`, same source of
  * truth, different wire format, so Claude Code sees the exact same tools the API
  * providers do.
  */

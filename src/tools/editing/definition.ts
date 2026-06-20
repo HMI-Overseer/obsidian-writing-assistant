@@ -1,22 +1,22 @@
 import type { CanonicalToolDefinition } from "../types";
 
 // ---------------------------------------------------------------------------
-// Write tools — produce EditBlocks for the diff review pipeline
+// Write tools, produce EditBlocks for the diff review pipeline
 // ---------------------------------------------------------------------------
 
 export const PROPOSE_EDIT_TOOL: CanonicalToolDefinition = {
   name: "propose_edit",
   description:
     "Propose a targeted search-and-replace edit to a note. " +
-    "Always pass `path` — the vault-relative path of the note to change (the one shown as the " +
+    "Always pass `path`, the vault-relative path of the note to change (the one shown as the " +
     "document to edit, or the path you read with read_file). " +
     "The edit is shown to the user for review before being applied. " +
-    "The note must already contain the search text — for an empty or brand-new note, " +
+    "The note must already contain the search text, for an empty or brand-new note, " +
     "use write_file to set its initial content instead. " +
-    "Use one call per distinct change; a single turn edits one file — edit other files in later turns.",
+    "Use one call per distinct change; a single turn edits one file, edit other files in later turns.",
   strategyHint:
     "targeted search/replace for prose changes in a specific note (`path`). Requires exact text " +
-    "from that note — use read_file first if its content is not already in context. " +
+    "from that note, use read_file first if its content is not already in context. " +
     "For an empty document there is nothing to match; use write_file instead.",
   errorGuidance:
     "If `path` is missing or the file is not found, supply the correct vault-relative path. " +
@@ -37,14 +37,14 @@ export const PROPOSE_EDIT_TOOL: CanonicalToolDefinition = {
         description:
           "The exact text to find in the document. Must match character-for-character " +
           "including whitespace and indentation. " +
-          "Keep it SHORT — include only the passage being changed plus 2–3 surrounding lines " +
+          "Keep it SHORT, include only the passage being changed plus 2–3 surrounding lines " +
           "for unambiguous matching. Never include large sections or the full document.",
       },
       replace: {
         type: "string",
         description:
           "The replacement text for the matched search region only. " +
-          "Must contain ONLY the new content for that region — not the rest of the document. " +
+          "Must contain ONLY the new content for that region, not the rest of the document. " +
           "Use an empty string to delete the matched text.",
       },
       explanation: {
@@ -59,7 +59,7 @@ export const PROPOSE_EDIT_TOOL: CanonicalToolDefinition = {
 export const UPDATE_FRONTMATTER_TOOL: CanonicalToolDefinition = {
   name: "update_frontmatter",
   description:
-    "Add, update, or remove YAML frontmatter properties of a note. Always pass `path` — the " +
+    "Add, update, or remove YAML frontmatter properties of a note. Always pass `path`, the " +
     "vault-relative path of the note to change. Put ALL changes into one call. " +
     "Each operation must use action 'set' or 'remove'. Skip properties you want to leave as-is. " +
     "If the document has no frontmatter, a new block will be created.",

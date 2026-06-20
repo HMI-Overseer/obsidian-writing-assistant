@@ -6,8 +6,7 @@ import type { DocumentChunk, EmbeddingMetadata } from "./types";
  * semantically meaningful text. Code blocks are left intact.
  */
 export function preprocessMarkdown(content: string): string {
-  // 1. Protect code blocks from being mangled by later regexes.
-  //    Replace them with placeholders, then restore after cleaning.
+  // 1. Protect code blocks from later regexes via placeholders, restored in step 7.
   const codeBlocks: string[] = [];
   const PLACEHOLDER_PREFIX = "%%CODEBLOCK_";
   const PLACEHOLDER_SUFFIX = "%%";
@@ -279,14 +278,14 @@ export function extractFolder(filePath: string): string {
  * Build the text sent to the embedding model for a chunk.
  * Prepends metadata signals (tags, folder, links) and the note title / heading
  * breadcrumb so the embedding vector captures *where* in the vault this chunk
- * lives and *what entities it references* — not just its prose content.
+ * lives and *what entities it references*, not just its prose content.
  *
  * The stored `content` field is NOT modified; only the embedding input changes.
  */
 export function buildEmbeddingText(chunk: DocumentChunk, meta?: EmbeddingMetadata): string {
   const lines: string[] = [];
 
-  // Metadata prefix lines — only include non-empty signals.
+  // Metadata prefix lines, only include non-empty signals.
   if (meta?.tags?.length) lines.push(`[Tags: ${meta.tags.join(", ")}]`);
   if (meta?.folder) lines.push(`[Folder: ${meta.folder}]`);
   if (meta?.links?.length) lines.push(`[Links: ${meta.links.join(", ")}]`);

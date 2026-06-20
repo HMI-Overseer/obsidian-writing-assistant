@@ -68,7 +68,7 @@ export const TOOL_STATUS_LABELS: Record<string, string> = {
 };
 
 /**
- * Tools that change the vault or active document — the four vault ops plus the two
+ * Tools that change the vault or active document, the four vault ops plus the two
  * edit tools. Mirrors the `destructiveHint` / `idempotentHint` annotations on the
  * vault-op definitions and the edit-tool channel. Drives the orange "mutating" dot in
  * the {@link AgenticTimeline}; every other (read-only) tool keeps the default cyan.

@@ -113,7 +113,7 @@ const VALID_GATES = new Set<Gate>(["auto", "ask", "deny"]);
  * One class's gate, tolerant of both the three-way value and the short-lived
  * binary model. A valid gate string is taken as-is; a saved boolean from the
  * binary era migrates as `false` ⇒ `deny` (tool removed) and `true` ⇒ `ask`
- * (enabled + reviewed — the binary `true` never auto-applied), so no one's
+ * (enabled + reviewed, the binary `true` never auto-applied), so no one's
  * "off" choice silently becomes "review".
  */
 function normalizeGate(raw: unknown, fallback: Gate): Gate {

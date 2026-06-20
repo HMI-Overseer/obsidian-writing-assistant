@@ -43,7 +43,7 @@ Obsidian picks up the rebuilt `main.js` on plugin reload (**Ctrl/Cmd + P > Reloa
 
 | Command | Purpose |
 |---------|---------|
-| `npm run dev` | Watch mode — rebuilds on every file change |
+| `npm run dev` | Watch mode, rebuilds on every file change |
 | `npm run build` | Production build (no source maps, tree-shaken) |
 | `npm run build:css` | Rebuild Tailwind styles only |
 | `npm run lint` | Run ESLint across `src/` |
@@ -68,42 +68,42 @@ Both must pass clean.
 
 ```
 src/
-  main.ts            — Plugin entry point. Registers views, commands, settings.
-  constants.ts       — View type, defaults, thresholds.
-  utils.ts           — Root-level helpers.
+  main.ts, Plugin entry point. Registers views, commands, settings.
+  constants.ts, View type, defaults, thresholds.
+  utils.ts, Root-level helpers.
 
-  api/               — Provider-agnostic ChatClient interface + implementations.
-  providers/         — Provider registry, descriptors, factory.
-  chat/              — Chat UI, conversation logic, streaming, message rendering.
-    actions/         — Send message orchestration, validation, API message prep.
-    composer/        — Message input and command bar.
-    conversation/    — Session store, conversation lifecycle.
-    finalization/    — Post-stream save and auto-insert.
-    messages/        — Message rendering, diff display.
-    models/          — Model selector, profile controls.
-    streaming/       — Streaming renderer.
-    view/            — DOM layout, history drawer.
-  editing/           — Diff engine, edit block parsing, apply logic.
-  tools/             — Agentic tool definitions.
-    vault/           — Read-only vault tools (read file, search, directory tree).
-    editing/         — Write tools (propose edit, update frontmatter).
-    formatters/      — Tool result formatting.
-    think/           — Think/reasoning tool.
-  rag/               — Retrieval-augmented generation.
-    graph/           — Knowledge graph extraction and retrieval.
-  context/           — Active note context extraction.
-  commands/          — Prompt command definitions and registration.
-  services/          — Shared services.
-  settings/          — Settings tab UI, modals.
-    benchmark/       — Provider benchmark tools.
-    modals/          — Model profile and command modals.
-  shared/            — Cross-module types (3+ consumers) and utilities.
-  styles/            — Tailwind entry point + component styles.
+  api/, Provider-agnostic ChatClient interface + implementations.
+  providers/, Provider registry, descriptors, factory.
+  chat/, Chat UI, conversation logic, streaming, message rendering.
+    actions/, Send message orchestration, validation, API message prep.
+    composer/, Message input and command bar.
+    conversation/, Session store, conversation lifecycle.
+    finalization/, Post-stream save and auto-insert.
+    messages/, Message rendering, diff display.
+    models/, Model selector, profile controls.
+    streaming/, Streaming renderer.
+    view/, DOM layout, history drawer.
+  editing/, Diff engine, edit block parsing, apply logic.
+  tools/, Agentic tool definitions.
+    vault/, Read-only vault tools (read file, search, directory tree).
+    editing/, Write tools (propose edit, update frontmatter).
+    formatters/, Tool result formatting.
+    think/, Think/reasoning tool.
+  rag/, Retrieval-augmented generation.
+    graph/, Knowledge graph extraction and retrieval.
+  context/, Active note context extraction.
+  commands/, Prompt command definitions and registration.
+  services/, Shared services.
+  settings/, Settings tab UI, modals.
+    benchmark/, Provider benchmark tools.
+    modals/, Model profile and command modals.
+  shared/, Cross-module types (3+ consumers) and utilities.
+  styles/, Tailwind entry point + component styles.
 
 tests/
-  __mocks__/obsidian.ts   — Mock for the obsidian package.
-  unit/                   — Pure logic tests (no side effects).
-  integration/            — Tests involving multiple modules.
+  __mocks__/obsidian.ts, Mock for the obsidian package.
+  unit/, Pure logic tests (no side effects).
+  integration/, Tests involving multiple modules.
 ```
 
 ---
@@ -112,10 +112,10 @@ tests/
 
 ### Key abstractions
 
-- **ChatClient** (`src/api/chatClient.ts`) — Provider-agnostic interface. Implement this to add a new provider.
-- **ProviderDescriptor** (`src/providers/descriptors.ts`) — Declarative metadata per provider (supported params, auth type, billing model).
-- **ChatView** (`src/chat/ChatView.ts`) — Main `ItemView`. Orchestrates layout, transcript, composer, model selector, history drawer.
-- **ChatSessionStore** (`src/chat/conversation/ChatSessionStore.ts`) — Conversation state management and persistence.
+- **ChatClient** (`src/api/chatClient.ts`), Provider-agnostic interface. Implement this to add a new provider.
+- **ProviderDescriptor** (`src/providers/descriptors.ts`), Declarative metadata per provider (supported params, auth type, billing model).
+- **ChatView** (`src/chat/ChatView.ts`), Main `ItemView`. Orchestrates layout, transcript, composer, model selector, history drawer.
+- **ChatSessionStore** (`src/chat/conversation/ChatSessionStore.ts`), Conversation state management and persistence.
 
 ### Adding a new provider
 
@@ -147,7 +147,7 @@ Follow the official [Obsidian plugin guidelines](https://docs.obsidian.md/Plugin
 
 ### Workspace
 
-- Use `this.app` — never the global `app` reference.
+- Use `this.app`, never the global `app` reference.
 - Get active view via `this.app.workspace.getActiveViewOfType(MarkdownView)`, not `workspace.activeLeaf`.
 - Never store leaf/view references long-term.
 
@@ -171,7 +171,7 @@ Follow the official [Obsidian plugin guidelines](https://docs.obsidian.md/Plugin
 - Framework: **Vitest** with `obsidian` module mocked (`tests/__mocks__/obsidian.ts`).
 - Test files mirror source: `tests/unit/<module>/<name>.test.ts`.
 - Environment: Node (not jsdom). Extract pure logic from UI for testability.
-- No globals — import `describe`, `it`, `expect` from `vitest`.
+- No globals, import `describe`, `it`, `expect` from `vitest`.
 
 ---
 
@@ -197,7 +197,7 @@ After pushing, go to **Releases** on GitHub, review the draft, and publish it.
 ### Versioning
 
 - Follow [semantic versioning](https://semver.org): `patch` for fixes, `minor` for features, `major` for breaking changes.
-- `manifest.json`, `package.json`, and git tags must always match. The `version` script handles this — never bump versions manually.
+- `manifest.json`, `package.json`, and git tags must always match. The `version` script handles this, never bump versions manually.
 
 ---
 

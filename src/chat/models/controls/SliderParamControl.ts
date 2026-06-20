@@ -16,6 +16,13 @@ interface SliderRefs {
 }
 
 /**
+ * Label shown in the value readout when the toggle is off (value is null), so
+ * the provider's own default applies. A visible state label, not prose, so it
+ * reads as "Default" rather than a comma or a dash.
+ */
+const UNSET_VALUE_LABEL = "Default";
+
+/**
  * A nullable slider control with a toggle checkbox.
  * When the toggle is off, the value is null.
  */
@@ -52,7 +59,7 @@ export class SliderParamControl {
 
     const valueDisplay = sliderRow.createEl("span", {
       cls: "lmsa-params-slider-value",
-      text: "—",
+      text: UNSET_VALUE_LABEL,
     });
 
     // Initialize from value
@@ -75,7 +82,7 @@ export class SliderParamControl {
         valueDisplay.textContent = mid.toFixed(this.opts.decimals);
         this.opts.onChange(mid);
       } else {
-        valueDisplay.textContent = "—";
+        valueDisplay.textContent = UNSET_VALUE_LABEL;
         this.opts.onChange(null);
       }
     });

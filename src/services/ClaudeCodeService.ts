@@ -37,9 +37,9 @@ export interface ClaudeCodeDetection {
   /** Whether the bundled Agent SDK linked correctly at runtime. */
   sdkAvailable: boolean;
   /**
-   * Whether the installed CLI's version is compatible with the bundled SDK.
-   * The SDK-backed session path gates on this; when false it falls back to the
-   * legacy one-shot CLI path. False when the CLI is missing or unparseable.
+   * Whether the installed CLI version is compatible with the bundled SDK. Gates the
+   * SDK session path; false (also when the CLI is missing or unparseable) falls back
+   * to the legacy one-shot path.
    */
   sdkCompatible: boolean;
 }
@@ -47,7 +47,7 @@ export interface ClaudeCodeDetection {
 /**
  * Tool-lifecycle event emitted as Claude Code calls the plugin's MCP tools during
  * a run. Claude Code's agent loop is internal to the subprocess, so these events
- * are the only window into its tool activity — the chat UI uses them to drive the
+ * are the only window into its tool activity, the chat UI uses them to drive the
  * same agentic timeline the API providers populate through their own tool loop.
  */
 export type ClaudeCodeToolEvent =
@@ -60,7 +60,7 @@ export type ClaudeCodeToolEvent =
       /**
        * The tool result text returned to Claude Code. Surfaced on the timeline step's
        * error block when `isError`, so a failed call (e.g. an edit's no-match) shows
-       * what the model saw — Claude Code's loop is otherwise opaque to the UI.
+       * what the model saw, Claude Code's loop is otherwise opaque to the UI.
        */
       content: string;
       toolCallId: string;
@@ -68,12 +68,12 @@ export type ClaudeCodeToolEvent =
 
 /** Options for a single Claude Code run, set just before the subprocess is spawned. */
 export interface ClaudeCodeRunOptions {
-  /** Edit mode — exposes the plugin's edit tools and collects proposed edits for the diff panel. */
+  /** Edit mode, exposes the plugin's edit tools and collects proposed edits for the diff panel. */
   editMode?: boolean;
   /** Vault-relative path of the active note (edit target + search relevance). */
   activeFilePath?: string;
   /**
-   * Conversation id — keys the persistent SDK session (Model B). When present and
+   * Conversation id, keys the persistent SDK session (Model B). When present and
    * the SDK path is usable, turns reuse one live `claude` process per conversation
    * for context retention + incremental caching. Absent ⇒ stateless one-shot.
    */
@@ -83,7 +83,7 @@ export interface ClaudeCodeRunOptions {
 /** Official Claude Code install / setup documentation. */
 export const CLAUDE_CODE_SETUP_URL = "https://docs.claude.com/en/docs/claude-code/setup";
 
-/** MCP server key — becomes the `mcp__writing_assistant__*` tool prefix. */
+/** MCP server key, becomes the `mcp__writing_assistant__*` tool prefix. */
 const MCP_SERVER_NAME = "writing_assistant";
 
 /**
@@ -139,7 +139,7 @@ export class ClaudeCodeService {
   /**
    * Runtime context for a chat request. Returns undefined for non-Claude-Code
    * providers so the MCP server only starts when actually needed. Starting the
-   * server before the subprocess is spawned is required — Claude Code connects to
+   * server before the subprocess is spawned is required, Claude Code connects to
    * it (and fetches its tool list) on launch, so edit-mode state must be set here.
    */
   async getRuntime(
@@ -267,7 +267,7 @@ export class ClaudeCodeService {
   /**
    * Whether to drive Claude Code through the Agent SDK: the SDK must have linked
    * at runtime and the installed CLI must be version-compatible with it. Probed
-   * once (the `--version` exec is memoized) and reused for the session — the
+   * once (the `--version` exec is memoized) and reused for the session, the
    * settings UI's {@link detect} runs the same check independently.
    */
   private isSdkUsable(): Promise<boolean> {
@@ -356,7 +356,7 @@ export class ClaudeCodeService {
             ]
           : [...ALL_VAULT_TOOLS];
         // Gate semantic_search the same way the in-app path does, via the shared
-        // predicate — so a setup that can never embed a query (no backend / empty
+        // predicate, so a setup that can never embed a query (no backend / empty
         // index) is not offered the tool over this route either. Previously the
         // bridge shipped it unconditionally, which is where the silent failure came
         // from (semantic-search-silent-embedding-failure.md §3-A).
@@ -379,7 +379,7 @@ export class ClaudeCodeService {
         const toolCallId = call.id || generateId();
         this.toolListener?.({ phase: "start", toolName: call.name, toolCallId });
         let isError = true;
-        // The result text the model received — carried to the timeline so a failed
+        // The result text the model received, carried to the timeline so a failed
         // call shows its error. Defaults cover a thrown executor (no result object).
         let content = "The tool threw an unexpected error.";
         try {
@@ -471,7 +471,7 @@ export class ClaudeCodeService {
   }
 
   destroy(): void {
-    // Kill every live SDK process — the "don't leak processes" rule.
+    // Kill every live SDK process, the "don't leak processes" rule.
     this.sessionRegistry.disposeAll();
     this.mcpServer?.stop();
     this.mcpServer = null;

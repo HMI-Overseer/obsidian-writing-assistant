@@ -74,7 +74,7 @@ const claudecode: ProviderDescriptor = {
   billingModel: "per-token",
   authType: "none",
   defaultContextStrategy: "on-change",
-  // Claude Code takes no sampling parameters — it runs its own agent harness.
+  // Claude Code takes no sampling parameters, it runs its own agent harness.
   supportedParams: {
     temperature: false,
     maxTokens: false,
@@ -86,7 +86,7 @@ const claudecode: ProviderDescriptor = {
   },
   supportsModelDiscovery: true,
   // Claude Code is tool-centric, so it reports as tool-capable. NOTE: it receives
-  // the plugin's tools through the in-process MCP server, NOT via request.tools —
+  // the plugin's tools through the in-process MCP server, NOT via request.tools,
   // `prepareApiMessages` deliberately skips attaching CanonicalToolDefinition tools
   // for this provider so the plugin's own tool loop/timeline stays out of the way.
   supportsToolUse: true,

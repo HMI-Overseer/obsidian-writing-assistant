@@ -111,7 +111,7 @@ describe("validateMoveFile", () => {
 
   test("refuses laundering a blessed file into a forbidden type (note.md -> note.bat)", () => {
     // The whole point of the write_file allowlist would be moot if a move could
-    // rename an allowed file into an executable — so the destination is held to the
+    // rename an allowed file into an executable, so the destination is held to the
     // same allowlist. This is the invariant: no non-blessed extension ever lands.
     const r = validateMoveFile({ from: "note.md", to: "note.bat" }, resolveWith({ "note.md": "file" }));
     expect(r.ok).toBe(false);

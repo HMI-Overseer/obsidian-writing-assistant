@@ -68,7 +68,7 @@ export interface ToolLoopCallbacks {
   /**
    * Called when a round ends with reasoning that should stay in the timeline.
    * committed=true: keep the live reasoning entry (genuine intermediate scratch
-   * before a read-only tool). committed=false: discard it — either because the
+   * before a read-only tool). committed=false: discard it, either because the
    * round produced no reasoning, or because its prose was answer-track (it
    * narrated a mutating action / is the final answer) and will be delivered to
    * the bubble via {@link onDelta} instead.
@@ -85,7 +85,7 @@ export interface ToolLoopResult {
   /** Final usage from the last round that reported usage. */
   usage: UsageResult | null;
   /**
-   * Stop reason of the most recent round that contributed write tool calls — the
+   * Stop reason of the most recent round that contributed write tool calls, the
    * round whose trailing write_file the truncation guard inspects.
    * Null when no round produced write calls.
    */
@@ -103,7 +103,7 @@ export interface ToolLoopResult {
  * model to summarise what it gathered. If the model calls tools again after
  * that warning it is hard-stopped.
  *
- * This function is pure orchestration — it doesn't know about UI components,
+ * This function is pure orchestration, it doesn't know about UI components,
  * conversation persistence, or edit-mode specifics.
  */
 export async function runToolLoop(
@@ -134,8 +134,8 @@ export async function runToolLoop(
   // action (write/edit/vault-op) plus the final round's prose. This is the
   // user-facing answer and is flushed to the bubble at the end (agentic mode);
   // prose that merely precedes a read-only tool stays in the timeline as
-  // reasoning instead. Solves the model saying its piece — e.g. a fenced code
-  // block — alongside a write and having it stranded as plain-text reasoning.
+  // reasoning instead. Solves the model saying its piece, e.g. a fenced code
+  // block, alongside a write and having it stranded as plain-text reasoning.
   let answerProse = "";
 
   // The app, used only to translate absolute paths a model may emit into
@@ -155,7 +155,7 @@ export async function runToolLoop(
         : undefined,
     );
 
-    // In agentic mode, buffer deltas internally — only the timeline receives
+    // In agentic mode, buffer deltas internally, only the timeline receives
     // live updates per round. Answer-track prose is accumulated and flushed to
     // the bubble once, after the loop. In non-agentic mode, deltas flow directly
     // to the bubble as they arrive.
@@ -183,7 +183,7 @@ export async function runToolLoop(
     const usage = await streamResult.usage;
     const rawToolCalls = await streamResult.toolCalls;
     // Translate any absolute paths to vault-relative *once*, here, so every
-    // downstream consumer — overlay, accumulation, finalization, timeline — sees
+    // downstream consumer, overlay, accumulation, finalization, timeline, sees
     // the same resolved path (tools/paths.ts).
     const toolCalls =
       rawToolCalls && app ? rawToolCalls.map((tc) => normalizeVaultToolCall(app, tc)) : rawToolCalls;
@@ -216,7 +216,7 @@ export async function runToolLoop(
 
     if (!hasToolCalls || !toolCalls) {
       // Final round: its prose is the answer (or its tail). Accumulate it and
-      // discard the live reasoning entry — the answer is delivered to the bubble
+      // discard the live reasoning entry, the answer is delivered to the bubble
       // via the single flush after the loop.
       answerProse = appendAnswerProse(answerProse, roundText);
       callbacks.onReasoningRoundFinished?.(false, round);
@@ -242,7 +242,7 @@ export async function runToolLoop(
 
     // Vault-op calls execute in the loop AND accumulate for finalization, just
     // like edits. The pending overlay is seeded from vault ops
-    // accumulated in PRIOR rounds — captured before this round's are appended —
+    // accumulated in PRIOR rounds, captured before this round's are appended,
     // so a later round's move_file sees an earlier round's write_file.
     const priorVaultOpCalls = allWriteToolCalls.filter((tc) => VAULT_OPS_TOOL_NAMES.has(tc.name));
     const vaultOpCalls = loopCalls.filter((tc) => VAULT_OPS_TOOL_NAMES.has(tc.name));
@@ -252,7 +252,7 @@ export async function runToolLoop(
     }
 
     // Prose that narrates a mutating action (write/edit/vault-op) is part of the
-    // user-facing answer — e.g. "Here's the file I created: ```…```" — not
+    // user-facing answer, e.g. "Here's the file I created: ```…```", not
     // reasoning. Accumulate it toward the bubble; prose before a read-only tool
     // stays in the timeline as reasoning (committed below).
     const roundIsMutating =
@@ -263,7 +263,7 @@ export async function runToolLoop(
     // the warning, hard-stop.
     if (capHit || round >= maxRounds) {
       if (capHit) {
-        // Model ignored the cap warning and called tools again — hard stop.
+        // Model ignored the cap warning and called tools again, hard stop.
         answerProse = appendAnswerProse(answerProse, roundText);
         callbacks.onReasoningRoundFinished?.(false, round);
         break;
@@ -346,7 +346,7 @@ export async function runToolLoop(
         ...(result.isError && { isError: true, errorContent: result.content }),
       });
     }
-    // Vault-op and edit steps were already recorded before resolution — push results,
+    // Vault-op and edit steps were already recorded before resolution, push results,
     // and report the outcome so the timeline can flag failures / declines / denials.
     for (const { tc, result } of [...vaultOpResults, ...editResults]) {
       toolLoopTurns.push({ role: "tool", content: result.content, toolCallId: tc.id });
@@ -377,7 +377,7 @@ export async function runToolLoop(
       if (vaultOpToolContext?.liveReview) {
         return vaultOpToolContext.liveReview.resolveRound(vaultOpCalls, stopReason === "max_tokens");
       }
-      // Fallback: no live review — validate only (overlay seeded from prior rounds).
+      // Fallback: no live review, validate only (overlay seeded from prior rounds).
       const overlay = vaultOpToolContext
         ? buildPendingOverlay(vaultOpToolContext.app, priorVaultOpCalls)
         : null;
@@ -418,7 +418,7 @@ export async function runToolLoop(
       if (vaultOpToolContext?.liveReview) {
         return vaultOpToolContext.liveReview.resolveEdits(editCalls);
       }
-      // Fallback: no live review — validate-only acknowledge (legacy non-blocking path).
+      // Fallback: no live review, validate-only acknowledge (legacy non-blocking path).
       return Promise.all(
         editCalls.map(async (tc) => {
           if (!editToolContext) {
@@ -462,20 +462,20 @@ export interface FailedRoundContext {
   usage: UsageResult | null;
   /** The model id, so the message names what to swap out. */
   model: string;
-  /** Which backend ran the turn — the first thing a bug report needs. */
+  /** Which backend ran the turn, the first thing a bug report needs. */
   provider: ProviderOption;
   /** Whether tools were attached / the agent loop was active this turn. */
   agenticMode: boolean;
   /** How many tools were advertised to the model. */
   toolCount: number;
-  /** Edit vs chat — derived from whether a live document rode the request. */
+  /** Edit vs chat, derived from whether a live document rode the request. */
   mode: "edit" | "chat";
 }
 
 /**
  * A round ended with no tool calls and no usable text. Rather than the old
- * one-size-fits-all message, classify *why* — raw tool-call markup, a `tool_use`
- * stop with nothing parseable, a genuinely empty turn, or reasoning-only output —
+ * one-size-fits-all message, classify *why*, raw tool-call markup, a `tool_use`
+ * stop with nothing parseable, a genuinely empty turn, or reasoning-only output,
  * then render a multi-line block (summary, cause, fix, and a copyable diagnostics
  * section) via {@link formatFailedRoundMessage}. Each failure mode is
  * distinguishable in practice and points at a different fix, so collapsing them
@@ -486,7 +486,7 @@ export interface FailedRoundContext {
  * empty final turn with nothing to add. This surfaces especially on regeneration,
  * where the re-issued ops resolve as "already satisfied" and leave nothing to
  * summarize. Treating that as fatal threw the user a scary error on a turn that
- * actually succeeded — so an empty `end_turn` past round 0 ends the loop quietly.
+ * actually succeeded, so an empty `end_turn` past round 0 ends the loop quietly.
  */
 export function checkForFailedToolCall(ctx: FailedRoundContext): void {
   const { hasToolCalls, roundText, stopReason, round, usage } = ctx;
@@ -499,7 +499,7 @@ export function checkForFailedToolCall(ctx: FailedRoundContext): void {
     textContent.startsWith("[TOOL_CALLS]") || textContent.startsWith("[TOOL_REQUEST]");
 
   // The loop only reaches round > 0 by way of a prior tool round, so a clean
-  // end_turn here means the model finished after doing its work — complete, even
+  // end_turn here means the model finished after doing its work, complete, even
   // if it added no closing prose. (Round 0 empty stays a failure: the model
   // answered nothing at all.) Markup / tool_use still fall through as failures.
   if (stopReason === "end_turn" && !isMarkup && round > 0) return;
@@ -512,21 +512,21 @@ export function checkForFailedToolCall(ctx: FailedRoundContext): void {
   if (isMarkup) {
     cause = "It emitted raw tool-call markup as plain text instead of a structured tool call, so no call could be parsed.";
     recovery =
-      "This model's tool-call format isn't being recognized by the provider — switch to a model with native tool-calling, or turn tools off for this request.";
+      "This model's tool-call format isn't being recognized by the provider, switch to a model with native tool-calling, or turn tools off for this request.";
   } else if (stopReason === "tool_use") {
     cause = 'The provider reported a tool call (stop reason "tool_use") but returned no parseable call.';
-    recovery = "The tool-call payload was malformed or empty — regenerate, or switch to a more capable model.";
+    recovery = "The tool-call payload was malformed or empty, regenerate, or switch to a more capable model.";
   } else if (outputTokens && outputTokens > 0) {
     cause = `It generated ${outputTokens} token${outputTokens === 1 ? "" : "s"} but none were text content (likely reasoning-only output with an empty final message).`;
     recovery =
-      "If this is a reasoning model it may have spent the turn thinking without answering — regenerate, or use a model that emits a final message.";
+      "If this is a reasoning model it may have spent the turn thinking without answering, regenerate, or use a model that emits a final message.";
   } else if (stopReason === "max_tokens") {
     cause = "It hit the output token limit before producing any text.";
     recovery = "Raise the max output tokens for this model, or shorten the conversation.";
   } else {
     cause = "It returned an empty response with no text and no tool calls.";
     recovery =
-      "The context may be too long, the request may have been cut off, or the model may be overloaded — regenerate, shorten the conversation, or switch models.";
+      "The context may be too long, the request may have been cut off, or the model may be overloaded, regenerate, shorten the conversation, or switch models.";
   }
 
   throw new Error(formatFailedRoundMessage(ctx, cause, recovery, textContent, outputTokens));
@@ -537,7 +537,7 @@ export function checkForFailedToolCall(ctx: FailedRoundContext): void {
  * cause and suggested fix, then a labelled diagnostics section the user can copy
  * verbatim into a bug report. Errors render in a `white-space: pre-wrap` bubble,
  * so the line breaks survive; the same text is also useful pasted into a console
- * or issue. Keep every field on its own line — this exists to be reported.
+ * or issue. Keep every field on its own line, this exists to be reported.
  */
 function formatFailedRoundMessage(
   ctx: FailedRoundContext,

@@ -128,7 +128,7 @@ describe("rewriteQueryForRetrieval", () => {
     expect(content).not.toContain("Response 5");
   });
 
-  test("filters out tool and assistant turns — only user turns in context", async () => {
+  test("filters out tool and assistant turns, only user turns in context", async () => {
     const client = mockClient("rewritten query");
     const messages: ChatTurn[] = [
       turn("user", "Edit the document"),

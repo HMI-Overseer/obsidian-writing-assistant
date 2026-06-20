@@ -28,7 +28,7 @@ Each day began before dawn. Kael would rake the coals, pump the bellows until th
 
 ## The Commission
 
-The mayor had ordered a new gate for the town square — wrought iron, twelve feet tall, with ivy patterns along the top rail. It was the largest piece Kael had ever attempted, and he had spent three nights sketching designs before touching metal.
+The mayor had ordered a new gate for the town square, wrought iron, twelve feet tall, with ivy patterns along the top rail. It was the largest piece Kael had ever attempted, and he had spent three nights sketching designs before touching metal.
 
 ## Evening
 
@@ -86,7 +86,7 @@ export function getToolTestCases(): BenchmarkTestCase[] {
       id: "tool-search-precision",
       name: "Search text precision",
       description:
-        "Model's propose_edit search text should be short and precise — not the entire document or large sections.",
+        "Model's propose_edit search text should be short and precise, not the entire document or large sections.",
       document: TOOL_TEST_DOC,
       systemPromptSuffix: TOOL_EDIT_SYSTEM_PROMPT,
       tools: ALL_EDIT_TOOLS,
@@ -106,7 +106,7 @@ export function getToolTestCases(): BenchmarkTestCase[] {
       id: "tool-multiple-edits",
       name: "Multiple distinct edits",
       description:
-        "When asked to make several changes, model should produce multiple separate tool calls — one per edit.",
+        "When asked to make several changes, model should produce multiple separate tool calls, one per edit.",
       document: TOOL_TEST_DOC,
       systemPromptSuffix: TOOL_EDIT_SYSTEM_PROMPT,
       tools: ALL_EDIT_TOOLS,
@@ -120,7 +120,7 @@ export function getToolTestCases(): BenchmarkTestCase[] {
         targetKeywords: ["fourteen", "cherry-red", "slate"],
         targetLabel: "Three distinct replacements",
         notes:
-          "The commission section is the only place 'twelve feet tall' appears, but 'twelve' alone also appears elsewhere — search texts must be precise enough to disambiguate.",
+          "The commission section is the only place 'twelve feet tall' appears, but 'twelve' alone also appears elsewhere, search texts must be precise enough to disambiguate.",
       },
     },
   ];

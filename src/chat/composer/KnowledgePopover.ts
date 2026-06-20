@@ -138,7 +138,7 @@ export class KnowledgePopover {
     const toggle = new Toggle(toggleWrap);
     toggle.onChange((value) => void this.callbacks.onRagToggle(value));
 
-    // Model selector — reuses the shared settings model selector component
+    // Model selector, reuses the shared settings model selector component
     const selectorContainer = section.createDiv({ cls: "lmsa-knowledge-popover-model-wrap" });
     const models = this.callbacks.getEmbeddingModels();
     const activeId = this.callbacks.getActiveEmbeddingModelId();
@@ -239,7 +239,7 @@ export class KnowledgePopover {
   private syncRagSection(refs: RagSectionRefs, snap: RagSnapshot): void {
     refs.toggle.setValue(snap.enabled);
 
-    // Conditional visibility — hide selector and action row when disabled
+    // Conditional visibility, hide selector and action row when disabled
     refs.modelSelector.wrapEl.toggleClass("lmsa-hidden", !snap.enabled);
     refs.statusRowEl.toggleClass("lmsa-hidden", !snap.enabled);
 

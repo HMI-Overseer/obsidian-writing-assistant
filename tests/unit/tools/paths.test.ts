@@ -37,7 +37,7 @@ describe("toVaultRelativePath", () => {
   });
 
   it("does not treat a sibling folder sharing a name prefix as inside the vault", () => {
-    // "D:/vault/Harbingers2" is a different folder — must not be mistaken for the root.
+    // "D:/vault/Harbingers2" is a different folder, must not be mistaken for the root.
     expect(toVaultRelativePath("D:\\vault\\Harbingers2\\Lore", ROOT, NAME)).toBe(
       "D:\\vault\\Harbingers2\\Lore",
     );
@@ -114,7 +114,7 @@ describe("normalizeVaultToolCall", () => {
       name: "create_directory",
       arguments: { path: "Harbingers/sandbox 2" },
     };
-    // A genuine top-level "Harbingers" folder stays addressable — no stripping.
+    // A genuine top-level "Harbingers" folder stays addressable, no stripping.
     expect(normalizeVaultToolCall(collidingApp, call)).toBe(call);
   });
 

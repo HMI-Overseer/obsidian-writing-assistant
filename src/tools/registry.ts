@@ -3,7 +3,7 @@ import { PROVIDER_DESCRIPTORS } from "../providers/descriptors";
 
 /**
  * Returns true if the given provider + model combination supports tool/function calling.
- * This is a pure capability check — callers are responsible for gating on `agenticMode`
+ * This is a pure capability check, callers are responsible for gating on `agenticMode`
  * and `preferToolUse` before deciding which tool set to include in a request.
  */
 export function shouldUseToolCall(

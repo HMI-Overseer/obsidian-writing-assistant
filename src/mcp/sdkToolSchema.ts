@@ -3,7 +3,7 @@ import type { ZodTypeAny } from "zod";
 import type { CanonicalToolDefinition, JsonSchemaProperty } from "../tools/types";
 
 /**
- * A Zod "raw shape" — the object of per-field Zod validators the Agent SDK's
+ * A Zod "raw shape", the object of per-field Zod validators the Agent SDK's
  * `tool()` helper expects as its input schema. The SDK converts it back to JSON
  * Schema for the model and validates tool arguments against it.
  */
@@ -12,7 +12,7 @@ export type ZodRawShape = Record<string, ZodTypeAny>;
 /**
  * Converts a provider-agnostic {@link CanonicalToolDefinition} parameter block
  * into a Zod raw shape for the SDK's `tool()`. Sibling to
- * {@link ../mcp/toolSchema.ts toMcpToolSchema} — same source of truth, different
+ * {@link ../mcp/toolSchema.ts toMcpToolSchema}, same source of truth, different
  * wire format, so the SDK-bridged toolstack stays identical to the one the API
  * providers and the legacy HTTP MCP server advertise.
  *

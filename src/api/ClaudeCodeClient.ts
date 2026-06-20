@@ -22,9 +22,9 @@ export { thinkingBudget };
  * reuse/linearity check; the service decides reuse vs cold rebuild and runs it.
  */
 export interface SdkSessionTurnInput {
-  /** Full transcript prompt — sent on a cold mint. */
+  /** Full transcript prompt, sent on a cold mint. */
   fullPrompt: string;
-  /** New user turn only — sent on reuse (the live session holds the rest). */
+  /** New user turn only, sent on reuse (the live session holds the rest). */
   deltaPrompt: string;
   model: string;
   systemPrompt: string;
@@ -40,11 +40,11 @@ export interface SdkSessionTurnInput {
  * settings can't supply. Resolved per-call from the plugin's services.
  */
 export interface ClaudeCodeRuntime {
-  /** Subprocess working directory — the vault root. */
+  /** Subprocess working directory, the vault root. */
   vaultRoot?: string;
   /**
    * Whether to drive Claude Code through the Agent SDK. False when the installed
-   * CLI is missing or version-incompatible with the bundled SDK — the client then
+   * CLI is missing or version-incompatible with the bundled SDK, the client then
    * falls back to the legacy one-shot `claude --print` path (the always-lit floor).
    */
   useSdk: boolean;
@@ -143,7 +143,7 @@ export class ClaudeCodeClient implements ChatClient {
         yield* rawDeltas;
       } finally {
         resolveUsage(toUsageResult(captured));
-        // Claude Code runs its own tools internally via MCP — it never returns
+        // Claude Code runs its own tools internally via MCP, it never returns
         // plugin tool calls through the stream.
         resolveToolCalls(null);
         resolveStopReason("end_turn");
@@ -230,7 +230,6 @@ export class ClaudeCodeClient implements ChatClient {
     };
   }
 
-  /** Builds the legacy one-shot CLI args for a request. */
   private buildLegacyArgs(request: ChatRequest, model: string): string[] {
     const args = [
       "--print",
@@ -260,7 +259,7 @@ export class ClaudeCodeClient implements ChatClient {
         "--allowedTools", this.runtime.mcp.allowedTools,
       );
     } else {
-      // No MCP bridge available — run as a pure analyst with no tools at all.
+      // No MCP bridge available, run as a pure analyst with no tools at all.
       args.push("--tools", "");
     }
 
@@ -289,8 +288,8 @@ function toUsageResult(result: ClaudeCodeResultUsage | null): UsageResult | null
  * stdin. The active document and any attached context become labeled blocks; the
  * conversation history is rendered as a simple speaker transcript.
  *
- * RAG context is intentionally omitted when the MCP bridge is active — Claude Code
- * retrieves from the vault through the plugin's tools — but is included as a block
+ * RAG context is intentionally omitted when the MCP bridge is active, Claude Code
+ * retrieves from the vault through the plugin's tools, but is included as a block
  * when supplied so the client also works as a plain (tool-less) analyst.
  */
 export function buildClaudeCodePrompt(request: ChatRequest): string {
@@ -309,7 +308,7 @@ export function buildClaudeCodePrompt(request: ChatRequest): string {
 
   if (request.ragContext?.length) {
     const chunks = request.ragContext
-      .map((c) => `## ${c.filePath} — ${c.headingPath}\n\n${c.content}`)
+      .map((c) => `## ${c.filePath}, ${c.headingPath}\n\n${c.content}`)
       .join("\n\n");
     blocks.push(`# Retrieved context\n\n${chunks}`);
   }
@@ -345,7 +344,7 @@ function renderTurnBody(turn: ChatTurn): string {
  * turn's text. The session already holds the prior conversation in memory, so
  * re-sending the transcript (or the context blocks, which are re-grounded via MCP)
  * would defeat the point. Falls back to the full prompt if the last turn isn't a
- * user message — reuse won't fire in that case, but the value must still be valid.
+ * user message, reuse won't fire in that case, but the value must still be valid.
  */
 export function buildDeltaPrompt(request: ChatRequest): string {
   const last = request.messages[request.messages.length - 1];

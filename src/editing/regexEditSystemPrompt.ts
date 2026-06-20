@@ -20,7 +20,7 @@ Rules:
 - Preserve the document's existing formatting style and voice.
 - Do NOT wrap blocks in markdown code fences.
 
-Example — given a document containing:
+Example, given a document containing:
 
 The old castle stood on the hill, its walls crumbling
 under the weight of centuries. Birds nested in the

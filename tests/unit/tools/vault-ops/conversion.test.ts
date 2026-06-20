@@ -115,7 +115,7 @@ describe("toVaultOperations", () => {
       expect(errors[0].error).toMatch(/cut off|incomplete/i);
     });
 
-    test("only the final call is suspect — earlier write_files still convert", () => {
+    test("only the final call is suspect, earlier write_files still convert", () => {
       const { ops, errors } = toVaultOperations(
         [
           call("write_file", { path: "a.md", content: "complete" }, "t1"),

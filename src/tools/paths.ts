@@ -7,12 +7,12 @@
  * validators see the real target:
  *
  *  1. An absolute filesystem path (e.g. "D:\vault\Harbingers\sandbox 2\Lore").
- *     Left untranslated it resolves to nothing in the vault — silently bypassing
- *     the folder/existence guards — and surfaces later as a baffling apply-time
+ *     Left untranslated it resolves to nothing in the vault, silently bypassing
+ *     the folder/existence guards, and surfaces later as a baffling apply-time
  *     error ("…\Lore no longer exists").
  *  2. A relative path that redundantly leads with the *vault's own name*
  *     (e.g. "Harbingers/sandbox 2" in a vault named "Harbingers"). Vault ops
- *     apply relative to the root, so this lands at "Harbingers/Harbingers/…" — a
+ *     apply relative to the root, so this lands at "Harbingers/Harbingers/…", a
  *     spurious nested folder. The leading vault-name segment is always redundant.
  */
 
@@ -27,7 +27,7 @@ const PATH_ARRAY_ARG_KEYS = ["paths"] as const;
 
 /**
  * Absolute vault root (`FileSystemAdapter.getBasePath`), or undefined on a
- * non-filesystem vault (e.g. mobile — which this desktop-only plugin never runs on).
+ * non-filesystem vault (e.g. mobile, which this desktop-only plugin never runs on).
  */
 export function vaultBasePath(app: App): string | undefined {
   const adapter = app.vault.adapter;
@@ -38,7 +38,7 @@ export function vaultBasePath(app: App): string | undefined {
  * Drop a leading path segment equal to the vault name. The vault is the root, so
  * a path beginning with its own name is usually a redundant prefix the model
  * added. The caller ({@link normalizeVaultToolCall}) passes `vaultName` only when
- * no real top-level folder by that name exists — so when it *is* passed, stripping
+ * no real top-level folder by that name exists, so when it *is* passed, stripping
  * is unambiguous (a genuine same-named folder is left addressable by withholding
  * the name here). Only the `<name>/rest` *prefix* form is stripped; a bare
  * `<name>` is left alone. Case-insensitive; tolerates leading slashes.
@@ -56,7 +56,7 @@ function stripVaultNamePrefix(path: string, vaultName: string | undefined): stri
 /**
  * Translate a model-supplied path into a vault-relative one (see the module
  * doc-comment for the two shapes handled). An absolute path *outside* the vault
- * is returned unchanged so the normal validators judge it — and the vault-boundary
+ * is returned unchanged so the normal validators judge it, and the vault-boundary
  * guard ({@link ../vault-ops/pathSafety.escapesVault}) then refuses it with a
  * self-correcting error rather than letting it land outside the vault.
  *

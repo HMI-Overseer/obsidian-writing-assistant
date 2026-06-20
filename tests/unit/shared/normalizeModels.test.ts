@@ -6,7 +6,7 @@ import {
 } from "../../../src/shared/normalizeModels";
 
 /**
- * Simulates a JSON round-trip through data.json — the model is serialized
+ * Simulates a JSON round-trip through data.json, the model is serialized
  * then parsed back as a plain object with no type guarantees.
  */
 function jsonRoundTrip<T>(obj: T): Record<string, unknown> {

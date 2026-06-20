@@ -217,7 +217,7 @@ export class LMStudioClient implements ChatClient {
             completedToolCalls.push({
               // A local model that streams a tool call without an id would
               // otherwise leave the echoed tool_call_id empty and break the
-              // review's step↔op id match — mint one so it's always non-empty.
+              // review's step↔op id match, mint one so it's always non-empty.
               id: pending.id || generateId(),
               name: pending.name,
               arguments: JSON.parse(pending.argChunks.join("")),
@@ -292,7 +292,7 @@ export class LMStudioClient implements ChatClient {
     }
 
     // Edit-mode live context (document under edit + extra notes) appended to the
-    // latest user message — kept out of the system messages so it stays in the
+    // latest user message, kept out of the system messages so it stays in the
     // conversation.
     if (messages.length > 0 && messages[messages.length - 1].role === "user") {
       const last = messages[messages.length - 1];

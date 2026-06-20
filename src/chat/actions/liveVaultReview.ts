@@ -59,14 +59,14 @@ interface PendingResolution {
 }
 
 /**
- * Dependencies for the edit channel — present only in edit mode. Edits are vault
+ * Dependencies for the edit channel, present only in edit mode. Edits are vault
  * ops too; their apply path is the {@link EditReviewController} and their review now
  * folds into the agentic timeline via {@link EditReviewTimelineView} (like vault ops),
- * with the in-note overlay as a second view over the same controller — so the
+ * with the in-note overlay as a second view over the same controller, so the
  * coordinator needs only the overlay manager and the resolver tuning.
  */
 export interface LiveEditReviewDeps {
-  /** The shared overlay manager — the second renderer over the same controller. */
+  /** The shared overlay manager, the second renderer over the same controller. */
   inlineDiff: InlineDiffManager;
   /** Resolver tuning from settings (context lines, min confidence). */
   resolveOptions: { contextLines: number; minConfidence: number };
@@ -74,7 +74,7 @@ export interface LiveEditReviewDeps {
 
 export interface LiveVaultReviewOptions {
   app: App;
-  /** The streaming bubble's timeline element — where the review decorates steps. */
+  /** The streaming bubble's timeline element, where the review decorates steps. */
   timelineEl: HTMLElement;
   policy: VaultOpPolicy;
   /** Edit-channel dependencies. Absent outside edit mode. */
@@ -85,8 +85,8 @@ export interface LiveVaultReviewOptions {
  * In-loop vault-op review coordinator (in-loop-tool-approval-blocking-flow).
  *
  * Owns one growing {@link VaultOperationProposal}, mounts {@link VaultReviewTimelineView}
- * live on the streaming bubble, applies `auto` ops immediately, and — for `ask`
- * ops — hands the tool loop a promise that resolves only when the user approves or
+ * live on the streaming bubble, applies `auto` ops immediately, and, for `ask`
+ * ops, hands the tool loop a promise that resolves only when the user approves or
  * declines. The model is thus blocked at the `ask`-gated tool turn and receives the
  * *real* disposition as that call's tool result.
  *
@@ -105,7 +105,7 @@ export class LiveVaultReview {
 
   private readonly proposal: VaultOperationProposal;
   private appliedRecord: AppliedVaultOpRecord | null = null;
-  /** All vault-op calls seen so far — the intent overlay later rounds resolve against. */
+  /** All vault-op calls seen so far, the intent overlay later rounds resolve against. */
   private readonly accumulatedCalls: ToolCall[] = [];
   /** Per-turn count of ops resolved to `auto` (feeds the gateway circuit breaker). */
   private autoSoFar = 0;
@@ -122,12 +122,12 @@ export class LiveVaultReview {
   private readonly editDeps?: LiveEditReviewDeps;
   /** The single edit proposal accumulated across the turn's rounds, or null until the first hunk. */
   private editProposal: EditProposal | null = null;
-  /** One controller for the whole turn — the single apply owner; the view re-renders over it. */
+  /** One controller for the whole turn, the single apply owner; the view re-renders over it. */
   private editController: EditReviewController | null = null;
   /** The live timeline review, re-rendered (destroy + recreate) per round over {@link editController}. */
   private editTimelineView: EditReviewTimelineView | null = null;
   private editAppliedRecord: AppliedEditRecord | null = null;
-  /** The one note this turn edits — fixed by the first resolved edit (one file per turn). */
+  /** The one note this turn edits, fixed by the first resolved edit (one file per turn). */
   private editTargetPath: string | null = null;
 
   constructor(opts: LiveVaultReviewOptions) {
@@ -210,7 +210,7 @@ export class LiveVaultReview {
    * Resolve a round of edit calls (`propose_edit` / `update_frontmatter`). Each
    * call is resolved in-loop with the real three-tier {@link resolveEdits} (not a
    * cheap exact pre-flight), gated by the `edit` policy, and blocks on the user
-   * when `ask` — returning the *real* disposition as that call's tool result. A
+   * when `ask`, returning the *real* disposition as that call's tool result. A
    * no-match is reported honestly as `failed`, never a silent drop.
    */
   async resolveEdits(calls: ToolCall[]): Promise<Array<{ tc: ToolCall; result: ToolResult }>> {
@@ -256,7 +256,7 @@ export class LiveVaultReview {
         // A propose_edit with empty search text would otherwise resolve as a bogus
         // exact match (indexOf("") === 0) and silently insert at the top of the file.
         // Frontmatter blocks legitimately carry empty search (insert-at-top), so guard
-        // only the prose edit channel — mirroring the legacy executeProposeEdit check.
+        // only the prose edit channel, mirroring the legacy executeProposeEdit check.
         if (kind === "edit" && block.searchText === "") {
           results.set(
             call.id,
@@ -266,7 +266,7 @@ export class LiveVaultReview {
         }
 
         // The model names its target via the required `path` arg (no active-doc
-        // fallback) — so an edit lands on the file it read, not whatever pane is open.
+        // fallback), so an edit lands on the file it read, not whatever pane is open.
         if (!block.targetPath) {
           results.set(
             call.id,
@@ -317,12 +317,12 @@ export class LiveVaultReview {
         const resolvedBlock = await this.resolveStructural(block, file.path);
         const [resolved] = resolveEdits([resolvedBlock], docText, deps.resolveOptions);
         if (!resolved || resolved.matchType === "none") {
-          // Honest no-match — the model self-corrects on this result. `nearMiss` steers
+          // Honest no-match, the model self-corrects on this result. `nearMiss` steers
           // the recovery: a close-but-rejected window is a wording difference (spacing
           // is already handled by the whitespace tier upstream), so nudge "re-read and
           // copy exactly"; otherwise the text is simply absent, so nudge "re-read".
           const recovery = resolved?.nearMiss
-            ? "the closest text was close but not identical — re-read that passage and copy the exact wording, then retry"
+            ? "the closest text was close but not identical, re-read that passage and copy the exact wording, then retry"
             : "no location matched the search text; re-read the file and retry";
           results.set(call.id, {
             content: editDispositionMessage(kind, file.path, "failed", recovery, "none"),
@@ -434,7 +434,7 @@ export class LiveVaultReview {
   /**
    * Resolve every outstanding `ask` op as `cancelled` (abort / new user turn), so a
    * parked turn can't leak a hung await. Ops are left `pending` so the user can still
-   * decide later via the finalized review surface — graceful fallback to async review.
+   * decide later via the finalized review surface, graceful fallback to async review.
    */
   cancelPending(): void {
     for (const [, parked] of this.pending) {
@@ -486,8 +486,8 @@ export class LiveVaultReview {
           result: {
             // The validator message is already a self-correcting sentence (e.g. the
             // out-of-vault reason ends with "Use a vault-relative path"), so don't
-            // stack a second generic recovery on top — that only made it heavier.
-            content: `Error: invalid ${call.name} arguments — ${trimDot(error)}.`,
+            // stack a second generic recovery on top, that only made it heavier.
+            content: `Error: invalid ${call.name} arguments, ${trimDot(error)}.`,
             isReadOnly: false,
             isError: true,
             failure: { kind: "invalid-args", recovery: defaultRecovery("invalid-args") },
@@ -543,13 +543,13 @@ export class LiveVaultReview {
     autoEntries: Array<Extract<Entry, { kind: "auto" }>>,
     results: Map<string, ToolResult>,
   ): Promise<void> {
-    // SECURITY INVARIANT (first-class, defense in depth) — auto-apply must NEVER
+    // SECURITY INVARIANT (first-class, defense in depth), auto-apply must NEVER
     // write outside the vault. An escaping path is already refused at conversion
     // (layer 1), pre-flight (layer 2), and the disk executor (layer 3); the
     // auto-apply orchestrator re-checks the boundary here in its own right, so a
     // future refactor of the conversion stage cannot open an auto-apply hole. A
-    // single escaping op fails the *whole* auto batch — nothing reaches
-    // applyVaultOpBatch or disk — the conservative all-or-nothing stance for a
+    // single escaping op fails the *whole* auto batch, nothing reaches
+    // applyVaultOpBatch or disk, the conservative all-or-nothing stance for a
     // safety violation. See docs/work/issues/RESOLVED-vault-path-boundary-out-of-vault-escape.md §6.2.
     if (this.refuseEscapingAuto(autoEntries, results)) return;
 
@@ -572,7 +572,7 @@ export class LiveVaultReview {
 
   /**
    * The auto-apply layer's own vault-boundary defense (see {@link applyAuto}).
-   * If any auto op's path escapes the vault, fail the *entire* batch in place —
+   * If any auto op's path escapes the vault, fail the *entire* batch in place,
    * marking every op `failed` with an accurate, model-facing reason and returning
    * `true` so the caller short-circuits before {@link applyVaultOpBatch} (and thus
    * disk) is ever reached. The escaping op names its own out-of-vault path; the
@@ -607,14 +607,14 @@ export class LiveVaultReview {
     this.pending.set(opId, { resolve, promise });
   }
 
-  /** The timeline reported a terminal user decision — resolve the parked promise. */
+  /** The timeline reported a terminal user decision, resolve the parked promise. */
   private handleResolved(opId: string, disposition: "applied" | "declined"): void {
     const parked = this.pending.get(opId);
     if (!parked) return;
     this.pending.delete(opId);
     parked.resolve({ disposition });
     // A declined folder (or one already stranded) leaves nowhere for the ops that
-    // were going to write inside it — fail those before they can be approved.
+    // were going to write inside it, fail those before they can be approved.
     if (disposition === "declined") this.propagateDeclines();
   }
 
@@ -628,7 +628,7 @@ export class LiveVaultReview {
    * Forward, transitive pass: a failed nested `create_directory` is itself added to
    * the missing set, so a declined `A/` also strands `A/B/` and anything under it.
    * Only fires under serial resolution, where the prerequisite is always decided
-   * before its dependents are offered — so this never overrides a user approval.
+   * before its dependents are offered, so this never overrides a user approval.
    */
   private propagateDeclines(): void {
     const missingDirs = new Set(
@@ -662,7 +662,7 @@ export class LiveVaultReview {
   // --- Edit channel helpers ----------------------------------------------
 
   /**
-   * The turn's single {@link EditReviewController} — the apply owner. Created on the
+   * The turn's single {@link EditReviewController}, the apply owner. Created on the
    * first resolved hunk so a turn with only no-matches mounts nothing. The panel
    * re-renders over it each round; statuses persist on the proposal's hunks.
    */
@@ -713,7 +713,7 @@ export class LiveVaultReview {
     deps.inlineDiff.attach(this.editController);
   }
 
-  /** A hunk reached a terminal status in either renderer — resolve its parked promise. */
+  /** A hunk reached a terminal status in either renderer, resolve its parked promise. */
   private handleEditResolved(hunkId: string, status: EditStatus): void {
     const parked = this.pending.get(hunkId);
     if (!parked) return;
@@ -724,7 +724,7 @@ export class LiveVaultReview {
       this.pending.delete(hunkId);
       parked.resolve({ disposition: "declined" });
     }
-    // "pending" (a mid-loop undo) leaves the op parked — rare and intentionally ignored.
+    // "pending" (a mid-loop undo) leaves the op parked, rare and intentionally ignored.
   }
 
   /** Re-mount the review over the current proposal. Idempotent (cleanPriorDecorations). */
@@ -809,7 +809,7 @@ function cancelledFallback(call: ToolCall): ToolResult {
 }
 
 /**
- * An invalid / denied edit call — surfaced as the call's error tool result. `what`
+ * An invalid / denied edit call, surfaced as the call's error tool result. `what`
  * names the failure; `recovery` is the situated next step, defaulting per kind (via
  * the shared {@link defaultRecovery}) so every edit error carries one even when the
  * caller passes none. "Error:" prefix + uniform punctuation match the read channel.
@@ -835,7 +835,7 @@ function editCancelled(kind: EditOpKind, path: string): ToolResult {
 }
 
 /**
- * The vault path an op writes to — the location that must live under an existing
+ * The vault path an op writes to, the location that must live under an existing
  * folder for the op to make sense. `trash` has no created destination, so it never
  * depends on a freshly-created folder (callers exclude it before asking).
  */

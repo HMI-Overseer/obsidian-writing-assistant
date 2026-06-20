@@ -13,20 +13,19 @@ import { AbortError, query } from "./claudeAgentSdk";
 import type { Options, Query, SDKMessage, SDKUserMessage } from "./claudeAgentSdk";
 
 /**
- * Model B — the persistent in-memory Claude Code session.
+ * Model B, the persistent in-memory Claude Code session.
  *
  * One long-lived SDK `query()` per conversation, driven in streaming-input mode so
  * the `claude` process stays alive between turns, retains context in memory, and
- * caches incrementally (the win one-shot processes can't give —
+ * caches incrementally (the win one-shot processes can't give,
  * `docs/reference/architecture/claude-code-provider.md`). The session lives only in
  * process memory (`persistSession: false`), never on disk, so it's zero-footprint
  * and a process restart simply loses it → the next turn cold-rebuilds.
  *
  * The plugin transcript stays authoritative; a session is a disposable cache reused
- * only when {@link isSessionUsable} proves the live transcript is a clean extension
- * of what the session consumed (the registry below makes that call). On any doubt —
- * abort, SDK error, unexpected end — the session is disposed and the next turn is
- * cold.
+ * only when {@link isSessionUsable} confirms the live transcript cleanly extends what
+ * the session consumed (the registry below makes that call). On any doubt (abort, SDK
+ * error, unexpected end) it is disposed and the next turn is cold.
  */
 
 /** Idle sessions are disposed after this long unused (kills the `claude` process). */
@@ -44,7 +43,7 @@ function userMessage(text: string): SDKUserMessage {
 }
 
 /**
- * Whether a streamed message is the SDK's compaction-boundary signal — the session
+ * Whether a streamed message is the SDK's compaction-boundary signal, the session
  * has summarized its context, so it no longer holds the transcript verbatim and must
  * be invalidated after the turn.
  */
@@ -114,7 +113,7 @@ interface SessionTurnContext {
 
 export class SdkSession {
   readonly meta: HarnessSession;
-  /** Epoch ms of the last turn — drives idle eviction. */
+  /** Epoch ms of the last turn, drives idle eviction. */
   lastUsedAt: number;
 
   private readonly input = new SessionInputStream();
@@ -123,9 +122,9 @@ export class SdkSession {
   private readonly abortController = new AbortController();
   private disposed = false;
   private busy = false;
-  /** Set when the last turn ended on a clean `interrupt()` — the session survives. */
+  /** Set when the last turn ended on a clean `interrupt()`, the session survives. */
   private interruptedCleanly = false;
-  /** Set when the session compacted its context mid-turn — it must be rebuilt next turn. */
+  /** Set when the session compacted its context mid-turn, it must be rebuilt next turn. */
   private compacted = false;
 
   /**
@@ -147,7 +146,7 @@ export class SdkSession {
   /**
    * True when the last turn ended on a clean `interrupt()` (abort that preserved the
    * live process). The registry reads this to keep the session for reuse instead of
-   * disposing it — any *other* error leaves the session tail indeterminate and
+   * disposing it, any *other* error leaves the session tail indeterminate and
    * disposes (`docs/work/plans/claude-code-sdk-refactor-plan.md`).
    */
   get wasInterruptedCleanly(): boolean {
@@ -166,7 +165,7 @@ export class SdkSession {
   /**
    * Sends one turn into the live session and streams its reply as text deltas.
    * `prompt` is the full transcript on a cold mint or just the new user turn on
-   * reuse — the registry decides which. On clean completion the session's
+   * reuse, the registry decides which. On clean completion the session's
    * watermark (`coveredCount` + `prefixHash`) advances to cover the new user turn
    * plus the reply it just generated, so the next turn's reuse check is exact.
    */
@@ -180,7 +179,7 @@ export class SdkSession {
     this.interruptedCleanly = false;
     this.compacted = false;
 
-    // Already cancelled before the turn opened — don't push a message we'd abandon.
+    // Already cancelled before the turn opened, don't push a message we'd abandon.
     if (ctx.signal?.aborted) {
       this.busy = false;
       throw createAbortError();
@@ -230,8 +229,8 @@ export class SdkSession {
         if (message.type === "result") {
           if (interruptRequested) {
             // Clean interrupt: the turn ended on our request with the process intact.
-            // Bank the partial reply as the covered assistant turn — it equals the
-            // streamed deltas the chat layer persists on abort — so the next turn can
+            // Bank the partial reply as the covered assistant turn, it equals the
+            // streamed deltas the chat layer persists on abort, so the next turn can
             // reuse the live session, then surface the abort to the chat layer.
             ctx.onResult?.(resultUsage(message));
             this.advanceWatermark(ctx.turns, assistantText);
@@ -272,7 +271,7 @@ export class SdkSession {
   /**
    * Advances the watermark to cover the new user turn(s) just sent plus the reply
    * just generated. The covered prefix becomes the live transcript plus a synthetic
-   * assistant turn carrying the streamed text — exactly what the next turn hashes.
+   * assistant turn carrying the streamed text, exactly what the next turn hashes.
    */
   private advanceWatermark(turns: readonly SessionTurn[], assistantText: string): void {
     const coveredCount = turns.length + 1;
@@ -286,13 +285,13 @@ export class SdkSession {
 
 /** Everything the registry needs to run (and possibly mint) a session for a turn. */
 export interface SessionTurnRequest {
-  /** Config the turn runs under — gates reuse and is baked into a fresh session. */
+  /** Config the turn runs under, gates reuse and is baked into a fresh session. */
   cfg: SessionConfig;
   /** Full live transcript including the new user turn being sent. */
   turns: readonly SessionTurn[];
-  /** Prompt sent on a cold mint — the full transcript. */
+  /** Prompt sent on a cold mint, the full transcript. */
   fullPrompt: string;
-  /** Prompt sent on reuse — only the new user turn (the session holds the rest). */
+  /** Prompt sent on reuse, only the new user turn (the session holds the rest). */
   deltaPrompt: string;
   /** Builds SDK options for a fresh session (invoked only on a cold mint). */
   buildOptions: (abortController: AbortController) => Options;
@@ -320,7 +319,7 @@ export class SdkSessionRegistry {
   /**
    * Runs one turn for `conversationId`, reusing the held session when valid and
    * cold-rebuilding otherwise. Any failure disposes the session so the next turn
-   * starts clean — the transcript can always rebuild.
+   * starts clean, the transcript can always rebuild.
    */
   async *runTurn(conversationId: string, req: SessionTurnRequest): AsyncGenerator<string> {
     const existing = this.sessions.get(conversationId);
@@ -351,7 +350,7 @@ export class SdkSessionRegistry {
       });
     } catch (error) {
       // A clean interrupt preserves the live process (its context now covers the
-      // partial reply) — keep it for reuse. Any other error (SDK failure, unexpected
+      // partial reply), keep it for reuse. Any other error (SDK failure, unexpected
       // end, hard abort) leaves the session tail indeterminate, so dispose it and let
       // the next turn cold-rebuild from the authoritative transcript.
       if (!session.wasInterruptedCleanly) {

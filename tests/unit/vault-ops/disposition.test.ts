@@ -27,21 +27,21 @@ describe("dispositionMessage", () => {
   });
 
   it("says the op was declined and not changed", () => {
-    expect(dispositionMessage(CREATE, "declined")).toBe('Declined by user — "Notes/Vex.md" was not changed.');
+    expect(dispositionMessage(CREATE, "declined")).toBe('Declined by user, "Notes/Vex.md" was not changed.');
   });
 
   it("prefixes 'Error:' and carries the failure reason in lower-case infinitive", () => {
     expect(dispositionMessage(CREATE, "failed", "path exists")).toBe(
-      'Error: could not create "Notes/Vex.md" — path exists.',
+      'Error: could not create "Notes/Vex.md", path exists.',
     );
     expect(dispositionMessage(MOVE, "failed", "target busy")).toBe(
-      'Error: could not move "a.md" → "b.md" — target busy.',
+      'Error: could not move "a.md" → "b.md", target busy.',
     );
   });
 
   it("falls back to a generic reason when none is given", () => {
     expect(dispositionMessage(CREATE, "failed")).toBe(
-      'Error: could not create "Notes/Vex.md" — the operation failed.',
+      'Error: could not create "Notes/Vex.md", the operation failed.',
     );
   });
 
@@ -51,7 +51,7 @@ describe("dispositionMessage", () => {
 
   it("reports a cancelled op as still pending review", () => {
     expect(dispositionMessage(CREATE, "cancelled")).toBe(
-      'Generation stopped before you decided — "Notes/Vex.md" is still pending review.',
+      'Generation stopped before you decided, "Notes/Vex.md" is still pending review.',
     );
   });
 });
@@ -74,7 +74,7 @@ describe("editDispositionMessage", () => {
 
   it("says the edit was declined and not applied", () => {
     expect(editDispositionMessage("edit", "The War.md", "declined")).toBe(
-      'Declined by user — edit to "The War.md" was not applied.',
+      'Declined by user, edit to "The War.md" was not applied.',
     );
   });
 
@@ -87,16 +87,16 @@ describe("editDispositionMessage", () => {
         "no location matched the search text; re-read the file and retry",
       ),
     ).toBe(
-      'Error: propose_edit did not apply to "The War.md" — no location matched the search text; re-read the file and retry.',
+      'Error: propose_edit did not apply to "The War.md", no location matched the search text; re-read the file and retry.',
     );
     expect(editDispositionMessage("frontmatter", "The War.md", "failed")).toBe(
-      'Error: update_frontmatter did not apply to "The War.md" — the edit could not be resolved.',
+      'Error: update_frontmatter did not apply to "The War.md", the edit could not be resolved.',
     );
   });
 
   it("reports a cancelled edit as still pending review", () => {
     expect(editDispositionMessage("edit", "The War.md", "cancelled")).toBe(
-      'Generation stopped before you decided — edit to "The War.md" is still pending review.',
+      'Generation stopped before you decided, edit to "The War.md" is still pending review.',
     );
   });
 
@@ -115,7 +115,7 @@ describe("editDispositionMessage", () => {
     );
   });
 
-  it("stays quiet about a clean (exact) match — nothing to teach", () => {
+  it("stays quiet about a clean (exact) match, nothing to teach", () => {
     expect(editDispositionMessage("edit", "The War.md", "applied", undefined, "exact")).toBe(
       'Applied edit to "The War.md".',
     );

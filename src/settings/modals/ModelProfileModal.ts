@@ -134,7 +134,7 @@ export abstract class ModelProfileModal<T extends BaseModel> extends Modal {
           fillOptions(await this.getAnthropicCandidates(service));
         }
       } catch {
-        /* Provider may be offline or key invalid — fail silently for autocomplete. */
+        /* Provider may be offline or key invalid, fail silently for autocomplete. */
       }
     })();
   }

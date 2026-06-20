@@ -7,7 +7,7 @@
  * be re-validated whenever the SDK pin is bumped (see
  * `docs/work/plans/claude-code-sdk-refactor-plan.md`).
  *
- * Pure module — no SDK import, no I/O — so it is unit-testable without the CLI.
+ * Pure module, no SDK import, no I/O, so it is unit-testable without the CLI.
  */
 
 /**
@@ -40,7 +40,7 @@ export function parseVersion(raw: string | undefined): ParsedVersion | null {
  *
  * Coupling is enforced at **major.minor**; the patch level may drift (the CLI
  * auto-updates patches independently of the SDK pin). An unparseable or missing
- * version is treated as incompatible — the SDK path is an optimization on a
+ * version is treated as incompatible, the SDK path is an optimization on a
  * floor that always works, so ambiguity degrades to the legacy one-shot path.
  */
 export function isCliVersionCompatible(

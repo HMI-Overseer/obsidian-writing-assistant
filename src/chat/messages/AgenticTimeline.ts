@@ -10,7 +10,7 @@ import { TOOL_ICONS, TOOL_LABELS, isMutatingTool } from "../../tools/metadata";
  * when loading historical messages.
  *
  * Tool-call steps that carry a `toolCallId` tag their element with
- * `data-tool-call-id`, so a later pass can find a step by id and decorate it —
+ * `data-tool-call-id`, so a later pass can find a step by id and decorate it,
  * e.g. the vault-op review attaching inline approve/decline to write steps
  * (see `vaultReviewTimeline.ts`). The timeline itself stays domain-agnostic.
  */
@@ -52,7 +52,7 @@ export class AgenticTimeline {
    *
    * `toolCallId` is set when the caller already knows it (the Claude Code path mints
    * the id before the call runs). Tagging it on the placeholder lets the in-loop vault
-   * review bind approve/decline to this exact step *while it is still pending* — without
+   * review bind approve/decline to this exact step *while it is still pending*, without
    * it the review falls back to positional matching, which a preceding failed call (a
    * step with no op) can misalign into a stray synthetic row (vaultReviewTimeline.ts).
    */
@@ -61,7 +61,7 @@ export class AgenticTimeline {
       cls: toolStepClasses(toolName, "lmsa-agentic-timeline-step--pending"),
     });
     // Tag the tool name so a later pass can bind to it positionally if its
-    // tool-call id is missing (vault review fallback — see vaultReviewTimeline.ts).
+    // tool-call id is missing (vault review fallback, see vaultReviewTimeline.ts).
     stepEl.dataset.toolName = toolName;
     if (toolCallId) stepEl.dataset.toolCallId = toolCallId;
     const dotEl = stepEl.createDiv({ cls: "lmsa-agentic-timeline-dot" });
@@ -120,7 +120,7 @@ export class AgenticTimeline {
   }
 
   /**
-   * Attach a tool result to an already-rendered step after it resolves — the vault-op
+   * Attach a tool result to an already-rendered step after it resolves, the vault-op
    * and edit channels record their step *before* the user decides, so the error state
    * lands here. Updates the stored step (so {@link getSteps} persists it for history)
    * and the live DOM, in both directions: an error result decorates the step, a
@@ -329,9 +329,9 @@ export class AgenticTimeline {
    * The vault/edit review overlay owns the inline state label ("Failed" / "Declined" /
    * "No match") of any step it controls, so we add our own only when no overlay does:
    * read-only tools, and mutating failures that never became a reviewable op/hunk
-   * (conversion errors, policy-deny, a no-match edit) — those carry no overlay controls.
+   * (conversion errors, policy-deny, a no-match edit), those carry no overlay controls.
    * The overlay also strips this label when it later claims a step (its decorateStep),
-   * so a historical re-render — where the base paints before the overlay — never doubles.
+   * so a historical re-render, where the base paints before the overlay, never doubles.
    */
   private decorateError(stepEl: HTMLElement, content: string): void {
     stepEl.classList.add("lmsa-agentic-timeline-step--error");
@@ -369,7 +369,7 @@ export function toolStepClasses(toolName: string | undefined, ...extra: string[]
  * Which queued pending placeholder a completing tool call claims. Prefers the one
  * already tagged with this call's id (the Claude Code path tags placeholders at
  * `start`), so out-of-order completion can't claim the wrong row; otherwise FIFO
- * (index 0 — the plugin path, whose placeholders carry no id at streaming time).
+ * (index 0, the plugin path, whose placeholders carry no id at streaming time).
  */
 export function selectClaimIndex(
   pendingIds: ReadonlyArray<string | undefined>,

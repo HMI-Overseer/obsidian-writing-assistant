@@ -1,5 +1,5 @@
 /**
- * Pure presentation helpers for vault ops — turn a
+ * Pure presentation helpers for vault ops, turn a
  * VaultOperation into the human summary shown in the review panel checklist.
  * No Obsidian, no disk, so they are unit-testable.
  */
@@ -49,7 +49,7 @@ export function opPrimaryPath(op: VaultOperation): string {
 }
 
 /**
- * Longest common ancestor *directory* shared by every path — the redundant root
+ * Longest common ancestor *directory* shared by every path, the redundant root
  * prefix to strip before indenting the hierarchy. Returns "" when the paths share
  * no leading folder. Only whole path segments count (no partial-name matches).
  */
@@ -70,7 +70,7 @@ export function commonAncestorDir(paths: string[]): string {
 export interface OpHierarchyDisplay {
   /** Path with the common root prefix removed. */
   relativePath: string;
-  /** Leaf (final segment) — the folder or file name shown in the row. */
+  /** Leaf (final segment), the folder or file name shown in the row. */
   leaf: string;
   /** Indentation level: number of folders between the root and this op's leaf. */
   depth: number;

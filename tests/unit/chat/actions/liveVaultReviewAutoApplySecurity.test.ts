@@ -10,13 +10,13 @@ import type { VaultOperation } from "../../../../src/vault-ops/types";
  * own right*.
  *
  * The normal flow rejects an out-of-vault path at conversion/validation (layer 1),
- * so it never becomes an `auto` op. This suite drives the auto-apply path *directly*
- * — simulating a future refactor that dropped the conversion-stage rejection — by
+ * so it never becomes an `auto` op. This suite drives the auto-apply path *directly*,
+ * simulating a future refactor that dropped the conversion-stage rejection, by
  * forcing `toVaultOperations` to emit an escaping op. It then proves
  * {@link LiveVaultReview.applyAuto}'s own boundary guard refuses it: the op is
  * reported `failed` with an out-of-vault reason, nothing is recorded as applied, and
  * the disk-touching {@link applyVaultOpBatch} is **never even called**. That last
- * assertion is the point — auto-apply defends the vault boundary before delegating,
+ * assertion is the point, auto-apply defends the vault boundary before delegating,
  * so a hole in conversion (or a hypothetically-broken pre-flight) cannot let an
  * escaping write reach disk. Covers both providers, which share `resolveRound`.
  */
@@ -48,7 +48,7 @@ vi.mock("../../../../src/tools/vault-ops/conversion", () => ({
 }));
 
 // Spy the disk-touching batch executor so the test can assert it is NEVER reached
-// for an escaping op — and make it *succeed* if it ever were, so the only thing
+// for an escaping op, and make it *succeed* if it ever were, so the only thing
 // standing between the escape and a "write" is the auto-apply guard under test.
 const applyBatchSpy = vi.hoisted(() =>
   vi.fn(async (_app: unknown, batch: Array<{ id: string; op: VaultOperation }>) => ({
@@ -146,7 +146,7 @@ describe("LiveVaultReview auto-apply vault-boundary guard (§6.2)", () => {
   });
 
   it("refuses an escaping move endpoint (either side) forced into the auto path", async () => {
-    // The destination escapes even though the source is in-vault — both endpoints
+    // The destination escapes even though the source is in-vault, both endpoints
     // are checked, so the move cannot land a file outside the vault.
     injected.op = {
       kind: "move",
@@ -172,7 +172,7 @@ describe("LiveVaultReview auto-apply vault-boundary guard (§6.2)", () => {
   });
 
   it("still auto-applies an in-vault op (guard does not over-reject internal '..')", async () => {
-    // Control: an internal `..` that stays inside the vault must NOT be refused —
+    // Control: an internal `..` that stays inside the vault must NOT be refused,
     // the guard rejects only escapes, and the normal auto path still reaches disk.
     injected.op = { kind: "create", path: "Notes/sub/../A.md", content: "ok" };
     const review = new LiveVaultReview({

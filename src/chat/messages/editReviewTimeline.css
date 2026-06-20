@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------
- * Edit review folded into the agentic timeline — the edit-channel sibling of
+ * Edit review folded into the agentic timeline, the edit-channel sibling of
  * vaultReviewTimeline.css. A propose_edit / update_frontmatter call is a
  * tool-call step, so its review lives *on* that step: a status-tinted dot,
  * inline approve / decline / undo on the step row (like a vault op), and the
@@ -22,7 +22,7 @@
     background: color-mix(in srgb, var(--text-success) 12%, var(--background-primary));
   }
 
-  /* Declined by the user — red dot (the edit did not happen), with the diff itself
+  /* Declined by the user, red dot (the edit did not happen), with the diff itself
      dimmed below to read as inactive. Parity with the vault op decline. */
   .lmsa-agentic-timeline-step.is-edit-skipped .lmsa-agentic-timeline-dot {
     color: var(--text-error);
@@ -47,7 +47,7 @@
     align-self: center;
   }
 
-  /* "pending review" — the primary "needs you" signal, in the edit-mode accent. */
+  /* "pending review", the primary "needs you" signal, in the edit-mode accent. */
   .lmsa-edit-step-pending {
     color: var(--lmsa-mode-accent);
     margin-right: 2px;

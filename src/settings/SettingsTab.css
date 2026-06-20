@@ -212,7 +212,7 @@
   background: color-mix(in srgb, var(--lmsa-surface-overlay) 80%, transparent) !important;
 }
 
-/* Group label accent — must live outside @layer to beat Obsidian's cascade */
+/* Group label accent, must live outside @layer to beat Obsidian's cascade */
 .lmsa-settings-rail-group.is-active .lmsa-settings-rail-group-label {
   color: var(--lmsa-section-accent) !important;
 }

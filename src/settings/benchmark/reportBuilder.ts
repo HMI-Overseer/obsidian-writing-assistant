@@ -3,6 +3,7 @@ import type {
   BenchmarkHistoryTestResult,
   BenchmarkRunConditions,
 } from "../../shared/types";
+import { NO_DATA } from "./constants";
 import { PACE_ADVICE, SLOW_AVG_ITERATION_MS } from "./pace";
 import type { BenchmarkRunResult } from "./types";
 
@@ -70,12 +71,12 @@ function tallyScore(results: { passCount: number; totalCount: number; isControl:
 }
 
 function formatScore(score: ScoreTally): string {
-  if (score.total === 0) return "—";
+  if (score.total === 0) return NO_DATA;
   const pct = Math.round((score.passed / score.total) * 100);
   return `${score.passed}/${score.total} (${pct}%)`;
 }
 
-/** Iteration-weighted average duration across all results (controls included — speed is speed). */
+/** Iteration-weighted average duration across all results (controls included, speed is speed). */
 function averageIterationMs(results: { avgDurationMs: number; totalCount: number }[]): number | null {
   let totalMs = 0;
   let iterations = 0;
@@ -87,7 +88,7 @@ function averageIterationMs(results: { avgDurationMs: number; totalCount: number
 }
 
 function formatAvgIteration(ms: number | null): string {
-  return ms === null ? "—" : formatSeconds(ms);
+  return ms === null ? NO_DATA : formatSeconds(ms);
 }
 
 // ---------------------------------------------------------------------------
@@ -140,7 +141,7 @@ export function buildBenchmarkReport(
 ): string {
   const lines: string[] = [];
 
-  lines.push(`# Benchmark report — ${conditions.modelName}`);
+  lines.push(`# Benchmark report, ${conditions.modelName}`);
   lines.push("");
 
   // --- Run conditions ---
@@ -186,8 +187,8 @@ export function buildBenchmarkReport(
 
     for (const { result, isControl } of section.results) {
       const name = isControl ? `${result.testName} *(control)*` : result.testName;
-      const passed = result.totalCount > 0 ? `${result.passCount}/${result.totalCount}` : "—";
-      const duration = result.totalCount > 0 ? formatSeconds(result.avgDurationMs) : "—";
+      const passed = result.totalCount > 0 ? `${result.passCount}/${result.totalCount}` : NO_DATA;
+      const duration = result.totalCount > 0 ? formatSeconds(result.avgDurationMs) : NO_DATA;
       const notes: string[] = [];
       if (result.error) notes.push(`Error: ${result.error}`);
       if (result.totalCount > 0 && result.avgDurationMs > SLOW_AVG_ITERATION_MS) notes.push("Slow");
@@ -215,7 +216,7 @@ export function buildBenchmarkReport(
       for (const f of failures) {
         lines.push(`- **${f.testName}** (iteration ${f.iteration}): ${f.reason}`);
         for (const c of f.failedChecks) {
-          lines.push(`    - ✗ ${c.label}${c.detail ? ` — ${c.detail}` : ""}`);
+          lines.push(`    - ✗ ${c.label}${c.detail ? `, ${c.detail}` : ""}`);
         }
         for (const e of f.evidence) {
           lines.push(`    - ${e}`);

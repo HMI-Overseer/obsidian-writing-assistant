@@ -15,11 +15,11 @@ const INDEX_FILE = "rag-index.json";
 
 /**
  * Why semantic search can or cannot run, computed synchronously (no network probe):
- * - `no-backend`  — no embedding model configured; there is no index and none can be built.
- * - `index-empty` — a backend is configured but nothing has been indexed yet.
- * - `ready`       — a backend is configured and an index is present.
+ * - `no-backend`, no embedding model configured; there is no index and none can be built.
+ * - `index-empty`, a backend is configured but nothing has been indexed yet.
+ * - `ready`, a backend is configured and an index is present.
  *
- * The fourth real state — a *live* backend that is currently unreachable — is not
+ * The fourth real state, a *live* backend that is currently unreachable, is not
  * here, because it is only knowable by actually hitting it. It surfaces as a thrown
  * {@link RagRetrievalError} from {@link RagService.retrieve}, not from this enum.
  */
@@ -28,7 +28,7 @@ export type RagAvailability = "ready" | "no-backend" | "index-empty";
 /**
  * Thrown by {@link RagService.retrieve} when a backend is configured and an index
  * exists, but the embedding request itself failed (model stopped/unloaded, endpoint
- * down). This is a *failure to run*, deliberately distinct from an empty result set —
+ * down). This is a *failure to run*, deliberately distinct from an empty result set,
  * callers must not treat it as "the vault has nothing."
  */
 export class RagRetrievalError extends Error {
@@ -64,10 +64,10 @@ export function createEmbeddingClient(
  * Top-level facade for RAG functionality.
  *
  * Lifecycle:
- * - `configure()` — loads persisted index from disk. No API calls. Safe for plugin load.
- * - `startIndexing()` — user-initiated full vault scan. Makes embedding API calls.
- * - `stopIndexing()` — cancels in-progress indexing.
- * - `retrieve()` — query-time retrieval against the loaded index.
+ * - `configure()`, loads persisted index from disk. No API calls. Safe for plugin load.
+ * - `startIndexing()`, user-initiated full vault scan. Makes embedding API calls.
+ * - `stopIndexing()`, cancels in-progress indexing.
+ * - `retrieve()`, query-time retrieval against the loaded index.
  */
 export class RagService {
   private readonly app: App;
@@ -105,7 +105,7 @@ export class RagService {
    * Why semantic search can or cannot run right now, without a network probe.
    * The single readiness signal both advertising routes (in-app tool list and the
    * Claude Code MCP bridge) and the tool handler read from, so they cannot drift.
-   * Does not detect a configured-but-unreachable backend — see {@link RagRetrievalError}.
+   * Does not detect a configured-but-unreachable backend, see {@link RagRetrievalError}.
    */
   availability(): RagAvailability {
     if (!this.isConfigured()) return "no-backend";
@@ -140,7 +140,7 @@ export class RagService {
     const storedChunkSize = this.store.getChunkSize();
     const storedChunkOverlap = this.store.getChunkOverlap();
 
-    // If stored values are 0, the index was built before we tracked these — recommend rebuild.
+    // If stored values are 0, the index was built before we tracked these, recommend rebuild.
     if (storedChunkSize === 0) return true;
 
     // Enrichment setting doesn't match what the index was built with.
@@ -279,13 +279,13 @@ export class RagService {
   /**
    * Retrieve relevant context for a user query.
    * Returns null if RAG is not ready or the query matched nothing. Throws
-   * {@link RagRetrievalError} when the embedding backend is unreachable — a
+   * {@link RagRetrievalError} when the embedding backend is unreachable, a
    * failure to run, which callers must not confuse with an empty result.
    *
-   * Applies two-layer filtering after retrieval:
-   * 1. Score gap detection — cuts off results after a large relevance drop.
-   * 2. Relative threshold — excludes results below 60% of the best score.
-   * 3. Character budget — ensures total context stays within budget.
+   * Applies three filters after retrieval, in order:
+   * 1. Relative threshold, excludes results below 60% of the best score.
+   * 2. Score gap detection, cuts off after a large relevance drop.
+   * 3. Character budget, keeps total context within budget.
    */
   async retrieve(query: string, activeFilePath?: string): Promise<RagContextBlock[] | null> {
     if (!this.retriever || !this.isReady()) {
@@ -350,7 +350,7 @@ export class RagService {
 
       return blocks;
     } catch (e) {
-      // Embedding/transport failure — NOT an empty vault. The Notice is the
+      // Embedding/transport failure, NOT an empty vault. The Notice is the
       // user's channel; the thrown error is the model's, so a tool result can
       // say "could not run" instead of laundering it into "found nothing".
       if (!this.embeddingErrorShown) {
@@ -378,7 +378,7 @@ export class RagService {
     this.graphService = graphService;
   }
 
-  /** Clean shutdown — call from plugin `onunload()`. */
+  /** Clean shutdown, call from plugin `onunload()`. */
   destroy(): void {
     this.shutdown();
     this.onStateChangeCallback = null;
@@ -412,11 +412,11 @@ export class RagService {
       const data = JSON.parse(raw);
 
       if (!this.store.deserialize(data)) {
-        // Model mismatch — index was built with a different model.
+        // Model mismatch, index was built with a different model.
         this.store.clear();
       }
     } catch {
-      // Corrupt index file — will rebuild.
+      // Corrupt index file, will rebuild.
       this.store.clear();
     }
   }
@@ -429,7 +429,7 @@ export class RagService {
       const path = this.getIndexPath();
       await this.app.vault.adapter.write(path, JSON.stringify(data));
     } catch {
-      // Non-fatal — index will be rebuilt on next load.
+      // Non-fatal, index will be rebuilt on next load.
     }
   }
 

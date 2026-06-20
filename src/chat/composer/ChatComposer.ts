@@ -233,7 +233,7 @@ export class ChatComposer {
   /**
    * Clear the attached notes after a send. Chat/plan mode freezes a point-in-time
    * snapshot into the sent message (see snapshotNoteAttachments), so the live
-   * attachment is consumed once per send — re-attach via the context picker to
+   * attachment is consumed once per send, re-attach via the context picker to
    * send an updated snapshot. Does not touch staged images (handled separately).
    */
   clearAttachedNotes(): void {
@@ -335,8 +335,8 @@ export class ChatComposer {
 
     el.toggleClass("is-active", active);
     el.setAttribute("aria-label", active
-      ? "Agentic mode on — vault search and edit tools available"
-      : "Agentic mode off — no tools used");
+      ? "Agentic mode on, vault search and edit tools available"
+      : "Agentic mode off, no tools used");
   }
 
   /**
@@ -379,7 +379,7 @@ export class ChatComposer {
 
     el.toggleClass("is-active", supportsVision);
     el.setAttribute("aria-label", supportsVision
-      ? "Vision supported — model can process images"
+      ? "Vision supported, model can process images"
       : "Vision not available");
   }
 

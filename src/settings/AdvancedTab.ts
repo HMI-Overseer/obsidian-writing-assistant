@@ -30,7 +30,7 @@ export function renderAdvancedTab(container: HTMLElement, plugin: WritingAssista
     );
 
   new SettingItem(agentic.bodyEl)
-    .setName("Max tool rounds — edit mode")
+    .setName("Max tool rounds, edit mode")
     .setDesc(
       `Maximum read-only tool rounds when editing a document (outline inspection before writing). Default: ${DEFAULT_MAX_TOOL_ROUNDS_EDIT}.`
     )
@@ -48,7 +48,7 @@ export function renderAdvancedTab(container: HTMLElement, plugin: WritingAssista
     );
 
   new SettingItem(agentic.bodyEl)
-    .setName("Max tool rounds — chat/plan mode")
+    .setName("Max tool rounds, chat/plan mode")
     .setDesc(
       `Maximum read-only tool rounds when searching the vault in chat or plan mode. Default: ${DEFAULT_MAX_TOOL_ROUNDS_CHAT}.`
     )
@@ -166,7 +166,7 @@ function renderPromptPrefixSetting(
       textareaEl.rows = 6;
       textareaEl.classList.add("lmsa-monospace");
       textarea
-        .setPlaceholder("No prefix — using your custom prompt only")
+        .setPlaceholder("No prefix, using your custom prompt only")
         .setValue(plugin.settings[key])
         .onChange(async (value) => {
           plugin.settings[key] = value;

@@ -10,12 +10,12 @@ interface Registration {
 
 /**
  * Binds {@link EditReviewController}s to the live Markdown editor so a proposal's
- * pending hunks render inline in the note it edits — the second renderer over the
+ * pending hunks render inline in the note it edits, the second renderer over the
  * same controller as the timeline-folded edit review.
  *
  * One registration per target file (latest proposal wins); the overlay shows
  * whichever registered file is currently active. The controller stays the single
- * owner — the manager only translates pending hunks into decorations and pushes
+ * owner, the manager only translates pending hunks into decorations and pushes
  * accept / reject back through the controller.
  */
 export class InlineDiffManager {

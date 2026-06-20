@@ -429,7 +429,7 @@ export class ChatView extends ItemView {
   }
 
   /**
-   * Full conversation sync — re-renders messages from store state and updates
+   * Full conversation sync, re-renders messages from store state and updates
    * all UI chrome. Used for conversation switches, message deletion, branching,
    * and other structural changes to the message list.
    */
@@ -448,7 +448,7 @@ export class ChatView extends ItemView {
 
     // Re-render review panels for historical messages with edit or vault-op
     // proposals. autoApply is omitted (false) so applied auto vault ops do not
-    // re-run on a conversation switch — only the persisted applied record renders.
+    // re-run on a conversation switch, only the persisted applied record renders.
     for (const message of snapshot.messageHistory) {
       if (message.editProposal || message.vaultOpProposal) {
         const bubble = this.transcript.getBubbleForMessage(message.id);
@@ -469,7 +469,7 @@ export class ChatView extends ItemView {
   }
 
   /**
-   * Lightweight post-generation sync — adopts bubbles that were created
+   * Lightweight post-generation sync, adopts bubbles that were created
    * imperatively during the send/generate flow (attaching action toolbars)
    * and updates UI chrome, WITHOUT re-rendering messages from scratch.
    */

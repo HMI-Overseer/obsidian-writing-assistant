@@ -1,4 +1,4 @@
-/* Base — Tailwind layers + shared lmsa-ui-* primitives */
+/* Base, Tailwind layers + shared lmsa-ui-* primitives */
 @import "./base.css";
 
 /* Chat */
@@ -25,7 +25,7 @@
 @import "../chat/messages/editReviewTimeline.css";
 @import "../editing/inlineDiff/inlineDiff.css";
 
-/* Settings — tokens first, then layout + components */
+/* Settings, tokens first, then layout + components */
 @import "../settings/tokens.css";
 @import "../settings/SettingsTab.css";
 @import "../settings/ui.css";

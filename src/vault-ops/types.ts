@@ -1,8 +1,8 @@
 /**
  * Core data model for the vault write surface.
  *
- * See docs/reference/architecture/vault-write-tools.md. These types are portable —
- * no Obsidian imports — so the pure planners (gateway, plan) and validators
+ * See docs/reference/architecture/vault-write-tools.md. These types are portable,
+ * no Obsidian imports, so the pure planners (gateway, plan) and validators
  * can be unit-tested with no vault.
  */
 
@@ -17,7 +17,7 @@ export interface TargetFingerprint {
 
 /**
  * One vault mutation. `write_file` resolves to `create` or `overwrite` at
- * conversion time from whether the path exists — the model never sets a flag.
+ * conversion time from whether the path exists, the model never sets a flag.
  * `trash` carries the trashed file's `snapshot` so its inverse can re-create it.
  */
 export type VaultOperation =
@@ -27,7 +27,7 @@ export type VaultOperation =
   | { kind: "move"; from: string; to: string; expect: TargetFingerprint }
   | { kind: "trash"; path: string; expect: TargetFingerprint; snapshot: string };
 
-/** The class an op is gated by — identical to its `kind` (ADR-0003). */
+/** The class an op is gated by, identical to its `kind` (ADR-0003). */
 export type VaultOpClass = VaultOperation["kind"];
 
 export type VaultOpStatus =
@@ -66,7 +66,7 @@ export interface VaultOperationProposal {
   ops: ReviewableVaultOp[];
   createdAt: number;
   /**
-   * The model's explanatory text for this turn, rendered above the checklist —
+   * The model's explanatory text for this turn, rendered above the checklist,
    * but only when no edit proposal accompanies it (the edit panel owns the prose
    * when both channels fire, so it is never shown twice). Mirrors EditProposal.prose.
    */
@@ -76,7 +76,7 @@ export interface VaultOperationProposal {
    * proposal is *live* only during the turn that created it; the next user message
    * marks it historical, so the panel renders a locked, compact variant instead of
    * a live footer competing with the current turn. Undo stays *possible* on a
-   * historical applied batch — it just stops being a primary affordance.
+   * historical applied batch, it just stops being a primary affordance.
    */
   historical?: boolean;
 }

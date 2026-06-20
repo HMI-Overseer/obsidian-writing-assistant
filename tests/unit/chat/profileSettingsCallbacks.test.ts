@@ -7,7 +7,7 @@ import { PROVIDER_DESCRIPTORS } from "../../../src/providers/descriptors";
 
 /**
  * Tests that the callback wiring between the profile settings popover and
- * plugin settings works correctly — i.e. when a callback fires, the
+ * plugin settings works correctly, i.e. when a callback fires, the
  * corresponding profile/setting is updated and "saved".
  *
  * This mirrors the exact wiring in ChatView.onOpen() where callbacks are
@@ -145,7 +145,7 @@ function wireCallbacks(
 // Tests
 // ---------------------------------------------------------------------------
 
-describe("Profile settings — profile CRUD callbacks", () => {
+describe("Profile settings, profile CRUD callbacks", () => {
   test("onProfileCreate adds a new profile and sets it active", async () => {
     const settings = makeFakeSettings();
     const { callbacks, getSaveCount } = wireCallbacks(settings, makeLMStudioModel());
@@ -222,7 +222,7 @@ describe("Profile settings — profile CRUD callbacks", () => {
   });
 });
 
-describe("Profile settings — Anthropic cache via profile", () => {
+describe("Profile settings, Anthropic cache via profile", () => {
   test("onProfileUpdate updates cache settings on anthropic profile", async () => {
     const settings = makeFakeSettings();
     const { callbacks } = wireCallbacks(settings, makeAnthropicModel());
@@ -238,7 +238,7 @@ describe("Profile settings — Anthropic cache via profile", () => {
   });
 });
 
-describe("Profile settings — getProfilesForProvider", () => {
+describe("Profile settings, getProfilesForProvider", () => {
   test("returns default profile when no user profiles exist", () => {
     const settings = makeFakeSettings();
     const { callbacks } = wireCallbacks(settings, makeLMStudioModel());
@@ -278,7 +278,7 @@ describe("Profile settings — getProfilesForProvider", () => {
   });
 });
 
-describe("Profile settings — getActiveProfile", () => {
+describe("Profile settings, getActiveProfile", () => {
   test("returns default profile when no user profile is active", () => {
     const settings = makeFakeSettings();
     const { callbacks } = wireCallbacks(settings, makeLMStudioModel());

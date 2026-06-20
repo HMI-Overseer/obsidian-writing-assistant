@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------
- * Inline diff overlay — pending edit proposals rendered in the live editor
+ * Inline diff overlay, pending edit proposals rendered in the live editor
  * via a CM6 decoration extension. Colour tokens mirror DiffHunkView.
  *
  * The matched text is struck through in place (inline mark); the proposed
@@ -7,7 +7,7 @@
  * ----------------------------------------------------------------------- */
 
 @layer components {
-  /* Matched text awaiting review — struck through in place. */
+  /* Matched text awaiting review, struck through in place. */
   .lmsa-inline-diff-removed {
     background: color-mix(in srgb, var(--text-error) 10%, var(--background-primary));
     color: var(--text-muted);

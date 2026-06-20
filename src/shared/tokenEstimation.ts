@@ -3,7 +3,7 @@ import type { ChatRequest } from "./chatRequest";
 /**
  * Approximate character-to-token ratio for English text.
  * ~4 characters per token is a well-established heuristic across most tokenizers.
- * This is intentionally rough — used for capacity indicators, not billing.
+ * This is intentionally rough, used for capacity indicators, not billing.
  */
 const CHARS_PER_TOKEN = 4;
 
@@ -39,7 +39,7 @@ export function estimateTokenCount(request: ChatRequest, draft?: string): number
 
   for (const turn of request.messages) {
     totalChars += (turn.content ?? "").length;
-    // Note snapshots live in the conversation now — count their text. Image
+    // Note snapshots live in the conversation now, count their text. Image
     // attachments are excluded (their token cost is tile-based, not char-based).
     for (const attachment of turn.attachments ?? []) {
       if (attachment.type === "note") {

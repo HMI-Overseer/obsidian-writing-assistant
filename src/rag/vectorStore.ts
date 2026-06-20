@@ -8,7 +8,7 @@ import type {
 /**
  * In-memory vector store with JSON serialization.
  *
- * Stores indexed chunks and file metadata. Pure logic — no Obsidian
+ * Stores indexed chunks and file metadata. Pure logic, no Obsidian
  * dependency. Persistence (read/write to disk) is handled by the caller.
  */
 export class VectorStore {

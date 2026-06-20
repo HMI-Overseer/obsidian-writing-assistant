@@ -69,7 +69,7 @@ describe("chunkDocument", () => {
       "# Heading 1",
       "Some text under heading 1.",
       "# Heading 2",
-      "Ok", // Very short — should merge
+      "Ok", // Very short, should merge
     ].join("\n");
 
     const chunks = chunkDocument("merge.md", content, DEFAULT_CHUNK_SIZE, DEFAULT_OVERLAP);
@@ -233,7 +233,7 @@ describe("extractWikilinks", () => {
     const content = "![[screenshot.png]] and [[Real Link]].";
     const links = extractWikilinks(content);
     expect(links).toContain("Real Link");
-    // Image embeds start with ! before [[ — the regex matches inside them,
+    // Image embeds start with ! before [[, the regex matches inside them,
     // but screenshot.png is still a valid link target in Obsidian.
     // We include it; it won't hurt the embedding.
   });

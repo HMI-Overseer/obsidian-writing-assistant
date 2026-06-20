@@ -18,7 +18,7 @@ export interface HunkReviewChange {
   status: EditStatus;
 }
 
-/** How a hunk should first render — derived from persisted state on construction. */
+/** How a hunk should first render, derived from persisted state on construction. */
 export type InitialHunkView = "pending" | "applied" | "skipped";
 
 type ReviewListener = (change: HunkReviewChange) => void;
@@ -73,7 +73,7 @@ export class EditReviewController {
 
   /**
    * How a hunk should first render. With an applied record present (a historical
-   * message), hunks in the record show as applied and the rest as skipped —
+   * message), hunks in the record show as applied and the rest as skipped,
    * mirroring the pre-controller restore behaviour. Otherwise, status drives it.
    */
   initialHunkView(hunkId: string): InitialHunkView {
@@ -87,7 +87,7 @@ export class EditReviewController {
    * How a hunk renders from its live status alone, ignoring any applied record.
    * The in-loop live panel uses this so a still-pending hunk stays interactive
    * even after an earlier hunk in the same turn was applied (the record-first
-   * {@link initialHunkView} would lock it as skipped — correct only on restore).
+   * {@link initialHunkView} would lock it as skipped, correct only on restore).
    */
   liveHunkView(hunkId: string): InitialHunkView {
     const status = this.getStatus(hunkId);
@@ -107,7 +107,7 @@ export class EditReviewController {
   }
 
   // -----------------------------------------------------------------------
-  // Accept — applies the hunk to the document immediately
+  // Accept, applies the hunk to the document immediately
   // -----------------------------------------------------------------------
 
   async accept(hunkId: string): Promise<void> {
@@ -138,7 +138,7 @@ export class EditReviewController {
   }
 
   // -----------------------------------------------------------------------
-  // Reject — marks the hunk skipped, no document change
+  // Reject, marks the hunk skipped, no document change
   // -----------------------------------------------------------------------
 
   reject(hunkId: string): void {
@@ -152,7 +152,7 @@ export class EditReviewController {
   }
 
   // -----------------------------------------------------------------------
-  // Undo — reverses an accepted hunk
+  // Undo, reverses an accepted hunk
   // -----------------------------------------------------------------------
 
   async undo(hunkId: string): Promise<void> {
@@ -175,7 +175,7 @@ export class EditReviewController {
         this.appliedOffsets.get(hunkId)
       );
       if (!result.undone) {
-        new Notice("Cannot undo — the document has been modified since this edit was applied.");
+        new Notice("Cannot undo, the document has been modified since this edit was applied.");
         return;
       }
 

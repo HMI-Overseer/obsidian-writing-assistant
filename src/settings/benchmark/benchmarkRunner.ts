@@ -16,7 +16,7 @@ function errorMessage(err: unknown): string {
  * Runs a single test case for N iterations, returning aggregate results.
  * Invokes `onIteration` after each individual iteration completes.
  *
- * Each iteration is a single completion request — benchmark tests evaluate the
+ * Each iteration is a single completion request, benchmark tests evaluate the
  * model's first response (text or tool calls), mirroring the single-turn
  * scenarios the test cases describe.
  *

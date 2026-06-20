@@ -59,7 +59,7 @@ export class ContextCapacityUpdater {
   }
 
   /**
-   * Immediately recalculate — no debounce.
+   * Immediately recalculate, no debounce.
    * Use after discrete state changes (message send/receive/edit/delete, model change).
    */
   immediateUpdate(inputs: ContextInputs): void {
@@ -77,7 +77,7 @@ export class ContextCapacityUpdater {
     }
   }
 
-  /** Reset correction ratio (e.g., on model change — different tokenizer). */
+  /** Reset correction ratio (e.g., on model change, different tokenizer). */
   resetCalibration(): void {
     this.correctionRatio = 1.0;
   }

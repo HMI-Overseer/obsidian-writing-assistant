@@ -44,7 +44,7 @@ function modelCanUseTools(
 
 const AGENTIC_STATUS_TEXT: Record<string, string> = {
   active: "Vault search and edit tools available",
-  disabled: "Agentic mode off — no tools used",
+  disabled: "Agentic mode off, no tools used",
   "model-unsupported": "Current model does not support tool use",
   "no-model": "No model selected",
 };
@@ -52,7 +52,7 @@ const AGENTIC_STATUS_TEXT: Record<string, string> = {
 const EDIT_TOOLS_STATUS_TEXT: Record<string, string> = {
   active: "Edit mode uses structured tool calls",
   disabled: "Edit mode uses SEARCH/REPLACE text blocks",
-  "model-unsupported": "Model does not support tool use — using text fallback",
+  "model-unsupported": "Model does not support tool use, using text fallback",
   "no-model": "No model selected",
 };
 

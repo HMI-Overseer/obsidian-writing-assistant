@@ -1,15 +1,15 @@
 /**
- * Batch apply & undo orchestration (ADR-0006) — the bridge between the review
+ * Batch apply & undo orchestration (ADR-0006), the bridge between the review
  * panel and the disk-touching executor. It composes the pure planners
  * (`orderOps`, `preflight`, `inverseOf`) with `apply.ts`:
  *
  *   1. order ops into a deterministic dependency order,
- *   2. re-resolve every op against live disk — any conflict aborts the whole
+ *   2. re-resolve every op against live disk, any conflict aborts the whole
  *      batch and nothing is written (the real safety guarantee),
  *   3. apply in order, recording each op's inverse; if an op throws mid-batch
  *      (a race that beat pre-flight) roll back the applied ops in reverse.
  *
- * Undo replays the recorded inverses in reverse — there is no bespoke undo path.
+ * Undo replays the recorded inverses in reverse, there is no bespoke undo path.
  */
 
 import type { App } from "obsidian";
@@ -82,7 +82,7 @@ export interface UndoResult {
  * Runs the op-type-aware drift guard first (Finding B, amendment 3): replaying the
  * inverse of a stale trash or move can resurrect or clobber files in a way a
  * content-diff undo cannot, so any drift refuses the whole undo *before* writing
- * anything — strictly safer than the always-replay it replaces.
+ * anything, strictly safer than the always-replay it replaces.
  */
 export async function undoVaultOpBatch(
   app: App,
@@ -107,7 +107,7 @@ export async function undoVaultOpBatch(
 /**
  * Op-type-aware drift guard for undo (Finding B, amendment 3). Undo applies each
  * recorded *inverse*; if the vault drifted since apply, replaying it can destroy
- * or resurrect newer state. Returns the human reasons undo must be refused —
+ * or resurrect newer state. Returns the human reasons undo must be refused,
  * empty ⇒ safe to proceed. The check is keyed to the inverse's kind because the
  * danger differs: undoing a trash (re-creating a file) or a move is categorically
  * riskier than restoring content.
@@ -118,9 +118,9 @@ export function guardVaultUndo(app: App, record: AppliedVaultOpRecord): string[]
     switch (inverse.kind) {
       case "create": {
         // Undo of a trash: re-create the file. If something occupies the path
-        // again, the original slot was taken — don't resurrect over it.
+        // again, the original slot was taken, don't resurrect over it.
         if (diskState(app, inverse.path) !== "absent") {
-          reasons.push(`"${inverse.path}" exists again — won't recreate it over the current file.`);
+          reasons.push(`"${inverse.path}" exists again, won't recreate it over the current file.`);
         }
         break;
       }
@@ -130,13 +130,13 @@ export function guardVaultUndo(app: App, record: AppliedVaultOpRecord): string[]
         const state = diskState(app, inverse.path);
         if (state === "absent") break;
         if (state === "dir") {
-          // Undo of a createDir trashes the folder — and Obsidian's trash takes the
+          // Undo of a createDir trashes the folder, and Obsidian's trash takes the
           // whole subtree. The folder was created empty, so any contents now are
           // files the user added afterwards; trashing them would be silent data
           // loss (Finding E). Refuse rather than delete what's inside.
           if (!folderIsEmpty(app, inverse.path)) {
             reasons.push(
-              `"${inverse.path}" is no longer empty — won't trash it and delete what's inside.`,
+              `"${inverse.path}" is no longer empty, won't trash it and delete what's inside.`,
             );
           }
           break;
@@ -146,7 +146,7 @@ export function guardVaultUndo(app: App, record: AppliedVaultOpRecord): string[]
         // fingerprint, so it never reaches this content check.)
         if (inverse.snapshot !== "" || state === "file") {
           if (!fingerprintsMatch(diskFingerprint(app, inverse.path), inverse.expect)) {
-            reasons.push(`"${inverse.path}" changed since it was created — won't trash your edits.`);
+            reasons.push(`"${inverse.path}" changed since it was created, won't trash your edits.`);
           }
         }
         break;
@@ -155,7 +155,7 @@ export function guardVaultUndo(app: App, record: AppliedVaultOpRecord): string[]
         // Undo of an overwrite: restore prior content. Refuse if the file changed
         // since we overwrote it, or we'd clobber the newer version.
         if (!fingerprintsMatch(diskFingerprint(app, inverse.path), inverse.expect)) {
-          reasons.push(`"${inverse.path}" changed since it was overwritten — won't clobber it.`);
+          reasons.push(`"${inverse.path}" changed since it was overwritten, won't clobber it.`);
         }
         break;
       }
@@ -166,7 +166,7 @@ export function guardVaultUndo(app: App, record: AppliedVaultOpRecord): string[]
           reasons.push(`"${inverse.from}" is no longer there to move back.`);
         }
         if (diskState(app, inverse.to) !== "absent") {
-          reasons.push(`"${inverse.to}" exists again — won't overwrite it to undo a move.`);
+          reasons.push(`"${inverse.to}" exists again, won't overwrite it to undo a move.`);
         }
         break;
       }
@@ -187,7 +187,7 @@ async function rollback(
     try {
       await applyOperation(app, applied[i].inverse);
     } catch {
-      // Best-effort — a failed rollback step is surfaced by the caller's notice.
+      // Best-effort, a failed rollback step is surfaced by the caller's notice.
     }
   }
 }

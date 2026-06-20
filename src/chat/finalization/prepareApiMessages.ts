@@ -35,7 +35,7 @@ export interface PrepareMessagesOptions {
   maxContextChars: number;
   mode: ChatMode;
   ragService?: RagService;
-  /** Active provider — needed to decide tool use. */
+  /** Active provider, needed to decide tool use. */
   activeProvider?: ProviderOption;
   /** Per-model capabilities (LM Studio). */
   modelCapabilities?: { trainedForToolUse?: boolean };
@@ -47,7 +47,7 @@ export interface PrepareMessagesOptions {
   completionModelId?: string;
   /** System prompt from the active provider profile. */
   profileSystemPrompt?: string;
-  /** When true, all built-in additions are omitted — only profileSystemPrompt is sent. */
+  /** When true, all built-in additions are omitted, only profileSystemPrompt is sent. */
   disableBuiltinSystemPrompts?: boolean;
 }
 
@@ -74,7 +74,7 @@ export async function prepareApiMessages(
 
   const editMode = mode === "edit";
   // Claude Code reports as tool-capable, but it bridges the plugin's tools via its
-  // own MCP server and runs its own agent loop — so the plugin never attaches
+  // own MCP server and runs its own agent loop, so the plugin never attaches
   // CanonicalToolDefinition tools (request.tools) or spins up its tool loop/timeline
   // for it. When agentic is on, Claude Code retrieves through MCP itself.
   const isClaudeCode = activeProvider === "claudecode";
@@ -89,7 +89,7 @@ export async function prepareApiMessages(
     settings.includeLocalAttachmentsAsContext && supportsVision;
 
   // Chat/plan mode attaches notes as frozen snapshots on the user turn (see
-  // snapshotNoteAttachments) — they ride message.attachments below, not the
+  // snapshotNoteAttachments), they ride message.attachments below, not the
   // system prefix. Only edit mode still sends a live document/extra notes here,
   // re-read each turn because the diff engine matches against the current file.
   let documentContext: DocumentContext | null = null;
@@ -154,7 +154,7 @@ export async function prepareApiMessages(
     });
 
   // Retrieve RAG context based on the latest user message.
-  // Skipped when vault tools are active — in agentic mode the model controls
+  // Skipped when vault tools are active, in agentic mode the model controls
   // retrieval itself via semantic_search. Pre-injecting context causes the model
   // to answer from the warm-start content and never call the tool.
   // Also skipped for agentic Claude Code: it retrieves through the plugin's MCP
@@ -178,7 +178,7 @@ export async function prepareApiMessages(
         }
       }
       // Pre-injection is best-effort: if the embedding backend is unreachable,
-      // retrieve() throws. Degrade silently to no context here — the in-loop
+      // retrieve() throws. Degrade silently to no context here, the in-loop
       // semantic_search tool is the surface that reports the failure to the model.
       try {
         ragContext = await ragService.retrieve(retrievalQuery, activeFilePath);
@@ -188,21 +188,21 @@ export async function prepareApiMessages(
     }
   }
 
-  // When RAG context is present, add a grounding instruction so the model
-  // knows retrieved notes exist and should be consulted as reference material.
+  // When RAG context is present, add a grounding instruction so the model knows
+  // retrieved notes exist.
   let groundingNote = "";
   if (ragContext && ragContext.length > 0) {
     const hasGraphAnnotations = ragContext.some((b) => b.graphContext);
     groundingNote = hasGraphAnnotations
-      ? "\n\nWhen retrieved notes are provided, use them as reference material. Documents may include <graph_context> annotations showing entities and relationships from the vault's knowledge graph — use these to understand how topics connect across documents."
+      ? "\n\nWhen retrieved notes are provided, use them as reference material. Documents may include <graph_context> annotations showing entities and relationships from the vault's knowledge graph, use these to understand how topics connect across documents."
       : "\n\nWhen retrieved notes are provided, use them as reference material. If the retrieved notes don't contain relevant information for the question, rely on your general knowledge instead.";
   }
   // Build the tool list based on mode and agentic settings.
   //
   // Vault tool tiers:
-  //   CORE_VAULT_TOOLS  — list_directory, read_file, semantic_search
+  //   CORE_VAULT_TOOLS, list_directory, read_file, semantic_search
   //                       Used in edit mode (focused task) and for local models.
-  //   ALL_VAULT_TOOLS   — core + get_backlinks, find_notes_by_tag, get_frontmatter
+  //   ALL_VAULT_TOOLS, core + get_backlinks, find_notes_by_tag, get_frontmatter
   //                       Used in chat/plan mode with cloud providers (full exploration).
   //
   // Edit tools are added on top in edit mode when preferToolUse is also on.
@@ -215,7 +215,7 @@ export async function prepareApiMessages(
 
   let tools: CanonicalToolDefinition[] | undefined;
   if (useEditTools) {
-    // Edit mode: focused document task — core vault tools for context lookup only,
+    // Edit mode: focused document task, core vault tools for context lookup only,
     // plus the vault-op write channel (create/move/trash whole notes), with any
     // deny-classed op filtered out by policy (ADR-0003).
     // Edits are a gated vault op: "Deny" removes the edit tools entirely so the
@@ -303,7 +303,7 @@ function formatEditMessageContent(message: ConversationMessage): string {
   const { editProposal } = message;
   if (!editProposal) return message.content;
 
-  // Tool-call messages: content is pure prose — annotate with a summary.
+  // Tool-call messages: content is pure prose, annotate with a summary.
   if (message.toolCalls && message.toolCalls.length > 0) {
     return formatToolCallEditHistory(message.content, editProposal);
   }
@@ -326,8 +326,8 @@ function formatEditMessageContent(message: ConversationMessage): string {
   for (const { hunk, index } of hunkPositions) {
     const insertAt = index + hunk.resolvedEdit.editBlock.rawBlock.length;
     const annotation = hunk.status === "accepted"
-      ? "\n[ACCEPTED — applied to document]"
-      : "\n[REJECTED — not applied]";
+      ? "\n[ACCEPTED, applied to document]"
+      : "\n[REJECTED, not applied]";
 
     content = content.slice(0, insertAt) + annotation + content.slice(insertAt);
 
@@ -358,7 +358,7 @@ function formatToolCallEditHistory(prose: string, proposal: EditProposal): strin
     const status = hunk.status === "accepted" ? "ACCEPTED" : "REJECTED";
     const search = hunk.resolvedEdit.editBlock.searchText;
     const preview = search.length > 80 ? search.slice(0, 80) + "..." : search;
-    parts.push(`[Edit: "${preview}" — ${status}]`);
+    parts.push(`[Edit: "${preview}", ${status}]`);
 
     if (hunk.status === "accepted") acceptedCount++;
     else rejectedCount++;

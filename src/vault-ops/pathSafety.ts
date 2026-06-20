@@ -2,8 +2,8 @@
  * Vault-boundary safety for operation paths.
  *
  * The write tools document *vault-relative* paths, and every op must stay inside
- * the vault. A path that escapes — `..` traversal that rises above the root, or a
- * Windows drive-letter absolute (`C:/…`) — would land outside the vault once
+ * the vault. A path that escapes, `..` traversal that rises above the root, or a
+ * Windows drive-letter absolute (`C:/…`), would land outside the vault once
  * `path.join(vaultRoot, p)` resolves it (Obsidian's `normalizePath` does not collapse
  * `..`). So it is refused at three independent layers: the in-loop validator (the
  * model gets a self-correcting error before any review), the apply pre-flight (the
@@ -11,7 +11,7 @@
  *
  * A leading slash is *not* treated as an escape: `normalizePath` strips it, so the
  * path resolves inside the vault. Internal `..` that stays within the vault
- * (e.g. `a/../b.md`) is allowed — only traversal that rises above the root is refused.
+ * (e.g. `a/../b.md`) is allowed, only traversal that rises above the root is refused.
  *
  * Pure (no Obsidian, no disk) so the guard is unit-testable and identical across
  * every layer it defends.
@@ -19,7 +19,7 @@
 
 /**
  * True when a vault-relative path would resolve outside the vault root:
- *  - a Windows drive-letter prefix (`C:`, `d:\`) — never a valid vault path; or
+ *  - a Windows drive-letter prefix (`C:`, `d:\`), never a valid vault path; or
  *  - `..` segments that traverse above the root.
  */
 export function escapesVault(path: string): boolean {

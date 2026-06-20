@@ -6,7 +6,7 @@ import type { RagContextBlock } from "../shared/chatRequest";
  * and end of context, so place the best chunks there.
  *
  * Given relevance-ranked chunks [1, 2, 3, 4, 5], reorders to
- * [1, 4, 5, 3, 2] — best at start, second-best at end.
+ * [1, 4, 5, 3, 2], best at start, second-best at end.
  * Only applied when there are more than 3 chunks.
  */
 function sandwichOrder<T>(items: T[]): T[] {

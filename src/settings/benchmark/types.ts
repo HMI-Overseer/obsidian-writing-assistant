@@ -52,7 +52,7 @@ export interface BenchmarkTestCase {
   regions?: EditRegionSpec;
   /** Declarative evaluation criteria displayed in the UI. */
   criteria?: EvaluationCriteria;
-  /** If true, this test is a control — expected to fail or be unreliable. */
+  /** If true, this test is a control, expected to fail or be unreliable. */
   isControl?: boolean;
 }
 
@@ -69,10 +69,10 @@ export interface EvaluationCheck {
   passed: boolean;
   /**
    * Whether a failure fails the whole test. Informational checks (false) surface
-   * quality signals — e.g. "matched exactly vs. fuzzily" — without affecting the verdict.
+   * quality signals, e.g. "matched exactly vs. fuzzily", without affecting the verdict.
    */
   required: boolean;
-  /** Outcome explanation — especially what actually happened on failure. */
+  /** Outcome explanation, especially what actually happened on failure. */
   detail?: string;
 }
 

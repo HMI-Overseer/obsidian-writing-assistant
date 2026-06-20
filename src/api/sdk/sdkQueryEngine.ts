@@ -11,7 +11,7 @@ import type { McpSdkServerConfigWithInstance, Options, SDKMessage } from "./clau
  * CLI in place of the hand-spawned subprocess, mapping SDK messages onto the same
  * text-delta + `ClaudeCodeResultUsage` shape {@link ../claudeCodeProcess.streamClaudeCode}
  * produces, so {@link ../ClaudeCodeClient.ClaudeCodeClient} can consume either path
- * symmetrically. No session is retained — every turn sends the full transcript and
+ * symmetrically. No session is retained, every turn sends the full transcript and
  * runs with `persistSession: false` (the persistent session lands in a later phase).
  */
 
@@ -19,7 +19,7 @@ import type { McpSdkServerConfigWithInstance, Options, SDKMessage } from "./clau
  * Claude Code's built-in tools, removed from the model's context so it can only
  * call the plugin's MCP tools. `dontAsk` permission mode also denies anything not
  * explicitly allowed, so this list need not be exhaustive against future
- * built-ins — it just keeps the common ones out of context entirely.
+ * built-ins, it just keeps the common ones out of context entirely.
  */
 export const DISALLOWED_NATIVE_TOOLS: readonly string[] = [
   "Bash",
@@ -42,7 +42,7 @@ export const DISALLOWED_NATIVE_TOOLS: readonly string[] = [
 /**
  * Extended-thinking budget (tokens) for each reasoning level. Thinking is emitted
  * before the visible answer, so a non-zero budget delays the first user-facing
- * token — we keep it at 0 unless the profile explicitly asks for reasoning, which
+ * token, we keep it at 0 unless the profile explicitly asks for reasoning, which
  * keeps time-to-first-token low.
  */
 const THINKING_BUDGET_BY_LEVEL: Record<NonNullable<SamplingParams["reasoning"]>, number> = {
@@ -67,7 +67,7 @@ export interface SdkTurnOptions {
   reasoning: SamplingParams["reasoning"];
   /** Resolved `claude` executable path passed to the SDK as `pathToClaudeCodeExecutable`. */
   claudePath: string;
-  /** Subprocess working directory — the vault root. */
+  /** Subprocess working directory, the vault root. */
   vaultRoot?: string;
   /**
    * In-process MCP server bridging the plugin's toolstack. When present, Claude
@@ -123,7 +123,7 @@ export async function* streamSdkTurn(opts: SdkTurnOptions): AsyncGenerator<strin
 /**
  * The slice of a turn's runtime + profile that shapes the SDK `Options`. Shared by
  * the one-shot engine ({@link streamSdkTurn}) and the persistent session
- * ({@link ./sdkSession.SdkSession}) so both bake an identical option set — the
+ * ({@link ./sdkSession.SdkSession}) so both bake an identical option set, the
  * session's {@link ../harnessSession.fingerprint} guards reuse against any of these
  * changing.
  */
@@ -133,7 +133,7 @@ export interface SdkOptionsConfig {
   reasoning: SamplingParams["reasoning"];
   /** Resolved `claude` executable path passed as `pathToClaudeCodeExecutable`. */
   claudePath: string;
-  /** Subprocess working directory — the vault root. */
+  /** Subprocess working directory, the vault root. */
   vaultRoot?: string;
   /** In-process MCP bridge; absent ⇒ the model runs as a pure analyst (no tools). */
   sdkMcp?: { server: McpSdkServerConfigWithInstance; serverName: string };
@@ -159,7 +159,7 @@ export function buildSdkOptions(
     // Model B's win lands later; R1 retains nothing on disk or in memory.
     persistSession: false,
     // Controlled harness: ignore the user's global/project settings, hooks, and
-    // other MCP servers — the plugin owns the entire tool + prompt surface.
+    // other MCP servers, the plugin owns the entire tool + prompt surface.
     settingSources: [],
     includePartialMessages: true,
     systemPrompt: {
@@ -186,7 +186,7 @@ export function buildSdkOptions(
     options.disallowedTools = [...DISALLOWED_NATIVE_TOOLS];
     options.permissionMode = "dontAsk";
   } else {
-    // No MCP bridge — run as a pure analyst with no tools at all.
+    // No MCP bridge, run as a pure analyst with no tools at all.
     options.tools = [];
   }
 

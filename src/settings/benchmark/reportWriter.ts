@@ -5,7 +5,7 @@ import type { App, TFile } from "obsidian";
  * Creates a benchmark report note in the vault and returns the created file.
  *
  * The folder (including missing parents) is created if needed, and an existing
- * note with the same name is never overwritten — the file name gets a numeric
+ * note with the same name is never overwritten, the file name gets a numeric
  * suffix instead.
  */
 export async function writeBenchmarkReport(

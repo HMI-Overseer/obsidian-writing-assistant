@@ -52,7 +52,7 @@ export interface NoteAttachment {
 
 /**
  * A file attachment on a user message.
- * Discriminated union — extend with further attachment kinds later.
+ * Discriminated union, extend with further attachment kinds later.
  */
 export type Attachment = ImageAttachment | NoteAttachment;
 
@@ -149,9 +149,9 @@ export interface RagSourceRef {
   filePath: string;
   headingPath: string;
   score: number;
-  /** Chunk text — populated in memory for hover preview, stripped on persist. */
+  /** Chunk text, populated in memory for hover preview, stripped on persist. */
   content?: string;
-  /** Graph entity/relationship annotations — in-memory only, stripped on persist. */
+  /** Graph entity/relationship annotations, in-memory only, stripped on persist. */
   graphContext?: {
     entities: { name: string; type: string; description: string }[];
     relationships: { source: string; target: string; type: string; description: string }[];
@@ -175,7 +175,7 @@ export interface AgenticStep {
   toolName?: string;
   /**
    * For tool_call: the model's tool-call id. Tags the rendered step element so a
-   * later pass can find it by id — e.g. the vault-op review attaching inline
+   * later pass can find it by id, e.g. the vault-op review attaching inline
    * approve/decline to its write step (a {@link ReviewableVaultOp} carries the
    * same id as `sourceToolCallId`).
    */
@@ -309,7 +309,7 @@ export interface OpenAIProviderSettings {
 export interface ClaudeCodeProviderSettings {
   /**
    * Optional explicit path to the `claude` binary. Empty = resolve from PATH.
-   * Not a secret — authentication uses the user's existing `claude` login session.
+   * Not a secret, authentication uses the user's existing `claude` login session.
    */
   claudePath: string;
 }
@@ -347,9 +347,9 @@ export interface RagSettings {
 /** Knowledge graph settings. */
 export interface KnowledgeGraphSettings {
   enabled: boolean;
-  /** CompletionModel.id — the chat model used for entity extraction. */
+  /** CompletionModel.id, the chat model used for entity extraction. */
   activeCompletionModelId: string | null;
-  /** EmbeddingModel.id — required for generating entity vectors at build time. */
+  /** EmbeddingModel.id, required for generating entity vectors at build time. */
   activeEmbeddingModelId: string | null;
   /** Glob patterns to exclude from graph extraction. */
   excludePatterns: string[];

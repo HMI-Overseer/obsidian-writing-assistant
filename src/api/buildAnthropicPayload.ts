@@ -40,7 +40,7 @@ export function buildAnthropicMessages(
   request: ChatRequest,
   cacheSettings?: AnthropicCacheSettings
 ): { system: AnthropicSystem; messages: AnthropicMessage[] } {
-  // The system block holds only the stable prompt — it carries the cache
+  // The system block holds only the stable prompt, it carries the cache
   // breakpoint. All note/document context lives in the conversation (after the
   // breakpoint) so editing the note never voids the cached prefix.
   const systemText = request.systemPrompt ?? "";
@@ -190,7 +190,7 @@ export function buildAnthropicPayload(
   if (params.temperature !== undefined) body.temperature = params.temperature;
   if (params.topP !== null) body.top_p = params.topP;
   if (params.topK !== null) body.top_k = params.topK;
-  // minP and repeatPenalty are intentionally omitted — Anthropic does not support them.
+  // minP and repeatPenalty are intentionally omitted, Anthropic does not support them.
 
   return JSON.stringify(body);
 }

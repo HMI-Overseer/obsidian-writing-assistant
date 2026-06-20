@@ -14,7 +14,7 @@ const LINE_SIMILARITY_THRESHOLD = 0.85;
 
 /**
  * On a total miss, the closest window must score at least this to count as a
- * "near miss" — similar text that just fell short, worth a "re-read and copy the
+ * "near miss", similar text that just fell short, worth a "re-read and copy the
  * exact wording" nudge rather than a blind re-read. (Pure whitespace differences are
  * already absorbed by the Tier 2 match, so a near miss is a wording/spelling gap.)
  * Below this we treat the text as simply absent.
@@ -119,7 +119,7 @@ function resolveOneBlock(
     );
   }
 
-  // No match found — return an unresolved edit. `nearMiss` distinguishes "close but
+  // No match found, return an unresolved edit. `nearMiss` distinguishes "close but
   // below threshold" (copy the exact wording) from "absent" (re-read), the failure-side
   // signal the channel otherwise collapses to a flat "no match".
   return {
@@ -226,17 +226,11 @@ function mapNormalizedOffset(original: string, normalizedOffset: number): number
       }
       ni++;
     } else if (ch === "\n") {
-      // Consume consecutive newlines in original, advance 1 in normalized
-      const start = oi;
+      // A run of newlines (one or many) collapses to a single normalized newline.
       while (oi < original.length && original[oi] === "\n") {
         oi++;
       }
-      // Only collapse if there were 2+ newlines; single newlines map 1:1
-      if (oi - start === 1) {
-        ni++;
-      } else {
-        ni++;
-      }
+      ni++;
     } else {
       oi++;
       ni++;
@@ -257,7 +251,7 @@ interface FuzzyLineMatch {
 }
 
 /**
- * Result of the fuzzy scan: the accepted `match` (or null), plus `bestScore` — the
+ * Result of the fuzzy scan: the accepted `match` (or null), plus `bestScore`, the
  * highest whole-window average similarity observed, accepted or not. `bestScore`
  * feeds the near-miss signal on a total miss: a window that scored well but had one
  * line below the per-line gate never becomes a match, yet still tells the model "you

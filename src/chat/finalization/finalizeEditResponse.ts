@@ -60,12 +60,12 @@ export interface FinalizeEditOptions {
   toolCalls?: ToolCall[] | null;
   /** Agentic step timeline from the tool loop. Attached to the saved message; never sent to the API. */
   agenticSteps?: AgenticStep[];
-  /** True when generation stopped for max_tokens — arms the write_file truncation guard. */
+  /** True when generation stopped for max_tokens, arms the write_file truncation guard. */
   stoppedForMaxTokens?: boolean;
   /**
    * A vault-op proposal already built and (partly) resolved in-loop by
    * {@link LiveVaultReview} (in-loop-tool-approval-blocking-flow). When present,
-   * finalization persists it as-is instead of re-deriving one — the gate is
+   * finalization persists it as-is instead of re-deriving one, the gate is
    * already resolved and ops are already applied/declined, so no re-apply happens.
    */
   prebuiltVaultOpProposal?: VaultOperationProposal;
@@ -74,7 +74,7 @@ export interface FinalizeEditOptions {
   /**
    * An edit proposal already built and (partly) resolved in-loop by
    * {@link LiveVaultReview} (propose-edit-in-loop-blocking-review). When present,
-   * finalization persists it as-is instead of re-resolving the edit blocks — the
+   * finalization persists it as-is instead of re-resolving the edit blocks, the
    * hunks already carry their accepted/rejected status and applied content.
    */
   prebuiltEditProposal?: EditProposal;
@@ -90,9 +90,9 @@ export interface FinalizeEditOptions {
  *   - the **edit channel** (active-document-bound) → an {@link EditProposal}, reviewed by
  *     {@link EditReviewTimelineView};
  *   - the **vault-op channel** (whole-vault) → a {@link VaultOperationProposal}, reviewed by
- *     {@link VaultReviewTimelineView} — needs no active file.
+ *     {@link VaultReviewTimelineView}, needs no active file.
  *
- * Falls back to a plain message ONLY when both channels are empty — so a pure
+ * Falls back to a plain message ONLY when both channels are empty, so a pure
  * file-ops turn (e.g. "create a new note" with no document open) is no longer
  * silently dropped, the bug the old no-active-file bail caused.
  */
@@ -236,7 +236,7 @@ interface ExtendedMetadataCache extends MetadataCache {
   getBacklinksForFile(file: TFile): { data: Record<string, unknown[]> };
 }
 
-/** Number of notes that link to a file — the `linkImpact` shown for move ops. */
+/** Number of notes that link to a file, the `linkImpact` shown for move ops. */
 function backlinkCount(app: App, path: string): number {
   const file = app.vault.getFileByPath(normalizePath(path));
   if (!file) return 0;
@@ -284,7 +284,7 @@ async function buildVaultOpProposal(
   const reviewable: ReviewableVaultOp[] = [];
   ops.forEach((op, i) => {
     // Already-satisfied no-ops (e.g. create_directory on an existing folder) are
-    // informational only: never gated, never applied — shown on their step as a
+    // informational only: never gated, never applied, shown on their step as a
     // muted "already exists" note.
     const isSatisfied = satisfied[i];
     const gate = isSatisfied ? "auto" : resolveGate(op, policy, autoSoFar);
@@ -314,11 +314,11 @@ async function buildVaultOpProposal(
 /**
  * Render the edit and/or vault-op review for a message into its bubble.
  *
- * Both review channels are folded into the agentic timeline — the write calls *are*
+ * Both review channels are folded into the agentic timeline, the write calls *are*
  * tool-call steps, so each review lives *on its step* rather than in a separate panel:
- *   - the **edit channel** via {@link EditReviewTimelineView} — each hunk decorates its
+ *   - the **edit channel** via {@link EditReviewTimelineView}, each hunk decorates its
  *     `propose_edit` step with an inline status and an expandable diff (accept/reject/undo);
- *   - the **vault-op channel** via {@link VaultReviewTimelineView} — inline approve/decline.
+ *   - the **vault-op channel** via {@link VaultReviewTimelineView}, inline approve/decline.
  * The body card holds only the turn's prose, so the card reads as text and the rail holds
  * the interactive steps. The in-note overlay ({@link InlineDiffManager}) is a second view
  * over the same edit controller.
@@ -373,7 +373,7 @@ export function renderProposalPanels(
 
 /**
  * Render assistant prose through the same markdown-it pipeline as chat bubbles, so
- * code blocks, links, and copy buttons render identically here — rather than via
+ * code blocks, links, and copy buttons render identically here, rather than via
  * Obsidian's MarkdownRenderer, which produced inconsistent fenced-code output.
  */
 function renderProseInto(app: App, el: HTMLElement, prose: string): void {

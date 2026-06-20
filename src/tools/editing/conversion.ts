@@ -25,7 +25,7 @@ export function normalizeEscapes(value: unknown): string {
  * Convert parsed tool calls into EditBlocks for the existing review pipeline.
  *
  * Each tool call's arguments are validated before conversion. Invalid tool
- * calls are skipped with a console.error — the model may have produced
+ * calls are skipped with a console.error, the model may have produced
  * malformed arguments that can't be converted to a meaningful EditBlock.
  *
  * Multiple `update_frontmatter` calls are merged into a single EditBlock
@@ -100,7 +100,7 @@ function mergeUpdateFrontmatterCalls(calls: ToolCall[]): EditBlock | null {
 /**
  * Convert a single edit tool call into an EditBlock. Unlike
  * {@link toolCallsToEditBlocks}, this does NOT merge multiple update_frontmatter
- * calls — it keeps one call → one block so the in-loop review can return one
+ * calls, it keeps one call → one block so the in-loop review can return one
  * disposition per tool call (the loop's one-result-per-call contract).
  */
 export function convertToolCallToEditBlock(tc: ToolCall): EditBlock | null {
@@ -136,7 +136,7 @@ export function convertToolCallToEditBlock(tc: ToolCall): EditBlock | null {
       };
     }
     default:
-      // Unknown write tool — attempt generic search/replace extraction.
+      // Unknown write tool, attempt generic search/replace extraction.
       return {
         id: tc.id,
         searchText: normalizeEscapes(tc.arguments.search),

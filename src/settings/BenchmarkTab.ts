@@ -214,7 +214,7 @@ export function renderBenchmarkTab(
     })();
   });
 
-  // Pace warning banner — shown when iterations of the current run trend slow.
+  // Pace warning banner, shown when iterations of the current run trend slow.
   const paceWarningEl = suitesSection.bodyEl.createDiv({
     cls: "lmsa-benchmark-warning lmsa-hidden",
   });
@@ -369,7 +369,7 @@ export function renderBenchmarkTab(
     });
   }
 
-  // Cross-suite summary — hidden until there is progress or results to show,
+  // Cross-suite summary, hidden until there is progress or results to show,
   // so it doesn't duplicate the per-suite placeholder.
   const globalSummaryEl = suitesSection.bodyEl.createDiv({
     cls: "lmsa-benchmark-summary lmsa-hidden",

@@ -2,13 +2,13 @@
  * One builder for tool *failures*, the read/error-channel analogue of
  * {@link ../vault-ops/disposition.dispositionMessage}: it turns a typed
  * {@link ErrorKind} into a recovery-shaped sentence the model reads, and attaches
- * the structured {@link ToolFailure} consumers branch on. Pure — no Obsidian, no
- * disk — so it is unit-testable.
+ * the structured {@link ToolFailure} consumers branch on. Pure, no Obsidian, no
+ * disk, so it is unit-testable.
  *
  * The invariant it defends, enforced here rather than by per-handler discipline:
  * *every* error result names what failed (`what` / `content`) **and** what to try
  * next (`recovery`, defaulting per kind when a handler gives none). Wording rule:
- * plain, accurate, actionable — common words a small model can follow, and never a
+ * plain, accurate, actionable, common words a small model can follow, and never a
  * claim the caller didn't make (the same one-state-two-consumers honesty
  * `dispositionMessage` already holds).
  */
@@ -19,13 +19,13 @@ import type { ErrorKind, ToolResult } from "./types";
 export interface ToolFailureSpec {
   kind: ErrorKind;
   /**
-   * Names what failed, as a clause with no leading "Error:" and no trailing period —
+   * Names what failed, as a clause with no leading "Error:" and no trailing period,
    * e.g. `no note found at path "Characters/Will.md"`. Used to compose `content` when
    * `content` is not supplied directly.
    */
   what?: string;
   /**
-   * The situated next step, as a clause with no trailing period — e.g.
+   * The situated next step, as a clause with no trailing period, e.g.
    * `call list_directory to locate the correct path`. Falls back to a per-kind
    * default when omitted, so the contract holds even for terse handlers.
    */

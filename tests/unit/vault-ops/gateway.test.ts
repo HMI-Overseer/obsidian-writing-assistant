@@ -108,7 +108,7 @@ describe("resolveEditGate", () => {
     expect(resolveEditGate(policy, "elsewhere/a.md", 0)).toBe("ask");
   });
 
-  test("shares the per-turn auto budget — count past maxAutoOps downgrades auto→ask", () => {
+  test("shares the per-turn auto budget, count past maxAutoOps downgrades auto→ask", () => {
     const policy = { ...basePolicy, edit: "auto" as const, maxAutoOps: 2 };
     expect(resolveEditGate(policy, "Story.md", 1)).toBe("auto");
     expect(resolveEditGate(policy, "Story.md", 2)).toBe("ask");

@@ -7,7 +7,7 @@
  * this gives the *read* and *edit* channels the same wording from the same source.
  * Without it those channels resolve the path through Obsidian's index lookups
  * (`getFileByPath` / `getAbstractFileByPath`), which only ever return in-vault
- * files — so an out-of-vault path falls through to a generic "not found" and the
+ * files, so an out-of-vault path falls through to a generic "not found" and the
  * model is sent to *search* for a path that no in-vault search can ever surface.
  * Naming the boundary instead points it at the real next step (use a vault-relative
  * path). The index lookup stays in place behind this as the security backstop.

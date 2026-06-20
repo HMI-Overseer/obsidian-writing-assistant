@@ -11,7 +11,7 @@ import { THINK_TOOL_NAME } from "../../../../src/tools/think/definition";
  * Answer-track prose accumulation.
  *
  * Prose that narrates a mutating action (a write/edit/vault-op call) is part of
- * the user-facing answer — e.g. "Here's the file I created: ```…```" — and must
+ * the user-facing answer, e.g. "Here's the file I created: ```…```", and must
  * reach the bubble via onDelta, not be stranded as a plain-text reasoning step
  * in the timeline. Prose that merely precedes a read-only tool stays reasoning.
  * These tests pin that routing so the regression can't return in either mode.
@@ -68,7 +68,7 @@ function run(rounds: RoundScript[], callbacks: ToolLoopCallbacks) {
     {} as never,
     new AbortController().signal,
     callbacks,
-    5, // maxRounds — high enough to never cap
+    5, // maxRounds, high enough to never cap
     true, // agenticMode
   );
 }
@@ -100,12 +100,12 @@ describe("runToolLoop answer-track prose", () => {
     await run(
       [
         { deltas: ["Creating the file: ```md\n# Hi\n```"], toolCalls: [call("custom_write")], stopReason: "tool_use" },
-        { deltas: ["Done — the file is ready."], toolCalls: null, stopReason: "end_turn" },
+        { deltas: ["Done, the file is ready."], toolCalls: null, stopReason: "end_turn" },
       ],
       cb,
     );
 
-    expect(flushedAnswer(cb)).toBe("Creating the file: ```md\n# Hi\n```\n\nDone — the file is ready.");
+    expect(flushedAnswer(cb)).toBe("Creating the file: ```md\n# Hi\n```\n\nDone, the file is ready.");
   });
 
   it("keeps prose that precedes a read-only tool as reasoning, not answer", async () => {

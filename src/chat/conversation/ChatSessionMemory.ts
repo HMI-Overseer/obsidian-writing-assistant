@@ -144,6 +144,19 @@ export class ChatSessionMemory {
     return newMessage;
   }
 
+  /**
+   * Put a message that {@link removeLastMessage} popped for a regeneration back
+   * onto the history unchanged. Used when a regeneration is aborted before any
+   * text streams: the original content and its full version history must survive
+   * exactly. Unlike {@link finalizeRegeneration} (which always appends the new
+   * content as a fresh version), this records no spurious duplicate version — a
+   * stopped attempt produced nothing to version.
+   */
+  restoreRegeneration(oldMessage: ConversationMessage): void {
+    this.messageHistory.push(oldMessage);
+    this.recalcLastAssistantResponse();
+  }
+
   switchMessageVersion(messageId: string, newIndex: number): boolean {
     const message = this.messageHistory.find((m) => m.id === messageId);
     if (!message || !message.versions) return false;

@@ -319,3 +319,49 @@ describe("buildAnthropicPayload", () => {
     expect(json).not.toHaveProperty("tools");
   });
 });
+
+describe("buildAnthropicPayload sampling-param gate (by model family)", () => {
+  // temperature/top_p/top_k all set; the gate decides whether they reach the wire.
+  const sampling = makeParams({ temperature: 0.5, topP: 0.9, topK: 40 });
+
+  // Opus 4.7+, Fable 5, and Mythos REMOVED these params and return HTTP 400 if they
+  // are sent. Verified: claude-api reference (Thinking & Effort / error-codes) and
+  // docs/reference/external/anthropic-api.md.
+  test.each([
+    "claude-opus-4-8",
+    "claude-opus-4-7",
+    "claude-fable-5",
+    "claude-mythos-5",
+  ])("omits temperature/top_p/top_k for current-gen model %s (they 400)", (model) => {
+    const json = JSON.parse(buildAnthropicPayload(model, "sys", [], sampling, false));
+    expect(json).not.toHaveProperty("temperature");
+    expect(json).not.toHaveProperty("top_p");
+    expect(json).not.toHaveProperty("top_k");
+  });
+
+  // An unrecognized / future model id is treated as current-gen and fails safe (omit),
+  // so a stale sampling param can never 400 a model the gate hasn't learned about
+  // (e.g. the next Opus generation).
+  test("omits sampling params for an unknown model id (fail safe)", () => {
+    const json = JSON.parse(buildAnthropicPayload("claude-opus-5", "sys", [], sampling, false));
+    expect(json).not.toHaveProperty("temperature");
+    expect(json).not.toHaveProperty("top_p");
+    expect(json).not.toHaveProperty("top_k");
+  });
+
+  // Sampling removal is Opus 4.7+, NOT 4.6: Opus 4.6, Sonnet 4.x, Haiku 4.x, and the
+  // legacy 3.x / 4.0 / 4.1 / 4.5 families still accept these params, so the gate must
+  // not strip them.
+  test.each([
+    "claude-opus-4-6",
+    "claude-sonnet-4-6",
+    "claude-haiku-4-5",
+    "claude-opus-4-1",
+    "claude-3-5-sonnet-20241022",
+  ])("keeps temperature/top_p/top_k for sampling-capable model %s", (model) => {
+    const json = JSON.parse(buildAnthropicPayload(model, "sys", [], sampling, false));
+    expect(json.temperature).toBe(0.5);
+    expect(json.top_p).toBe(0.9);
+    expect(json.top_k).toBe(40);
+  });
+});

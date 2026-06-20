@@ -11,6 +11,34 @@ import {
 
 const DEFAULT_MAX_TOKENS = 4096;
 
+/**
+ * Model-id prefixes whose models still accept the `temperature` / `top_p` / `top_k`
+ * sampling params. Opus 4.7+, Fable 5, and Mythos REMOVED these and return HTTP 400 if
+ * any is sent; Opus 4.6 and earlier, plus the Sonnet 4.x and Haiku 4.x families, still
+ * accept them. Verified against docs/reference/external/anthropic-api.md and the bundled
+ * claude-api reference (the sampling-removal set is Opus 4.7+, not 4.6).
+ *
+ * The gate is an allowlist on purpose: emit sampling only for a model known to accept
+ * it, and omit for anything current-gen OR unrecognized. An unknown / future id (e.g.
+ * the next Opus generation) therefore fails safe — it never 400s on a stale sampling
+ * param. This is the tactical fix; the model-aware capability layer that subsumes it is
+ * tracked in docs/work/issues/anthropic-native-payload-api-drift.md (P0-1).
+ */
+const SAMPLING_CAPABLE_PREFIXES = [
+  "claude-3", // Claude 3.x (opus / sonnet / haiku)
+  "claude-sonnet-4", // Sonnet 4.0 / 4.5 / 4.6
+  "claude-haiku-4", // Haiku 4.5
+  "claude-opus-4-0", // Opus 4.0
+  "claude-opus-4-1", // Opus 4.1
+  "claude-opus-4-5", // Opus 4.5
+  "claude-opus-4-6", // Opus 4.6 — the last Opus tier to accept sampling params
+];
+
+/** Whether `temperature` / `top_p` / `top_k` are safe to send to this Anthropic model. */
+export function anthropicModelSupportsSampling(modelId: string): boolean {
+  return SAMPLING_CAPABLE_PREFIXES.some((prefix) => modelId.startsWith(prefix));
+}
+
 /** Content block types used in Anthropic messages. */
 export type AnthropicContentBlock =
   | { type: "text"; text: string }
@@ -187,9 +215,13 @@ export function buildAnthropicPayload(
     body.tools = tools;
   }
 
-  if (params.temperature !== undefined) body.temperature = params.temperature;
-  if (params.topP !== null) body.top_p = params.topP;
-  if (params.topK !== null) body.top_k = params.topK;
+  // Sampling params are gated by model: current-gen models (Opus 4.7+, Fable, Mythos)
+  // 400 if they are sent, so they're omitted for that tier and any unknown model.
+  if (anthropicModelSupportsSampling(model)) {
+    if (params.temperature !== undefined) body.temperature = params.temperature;
+    if (params.topP !== null) body.top_p = params.topP;
+    if (params.topK !== null) body.top_k = params.topK;
+  }
   // minP and repeatPenalty are intentionally omitted, Anthropic does not support them.
 
   return JSON.stringify(body);

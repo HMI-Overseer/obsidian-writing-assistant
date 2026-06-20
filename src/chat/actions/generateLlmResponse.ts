@@ -412,8 +412,15 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
           });
           transcript.registerBubble(finalization.oldMessage.id, assistantBubble);
         } else {
-          transcript.renderPlainTextContent(assistantBubble, "Generation stopped.");
-          assistantBubble.bodyEl.addClass("is-muted");
+          // Stopped before any text arrived. regenerateMessage popped the
+          // original message up front (removeLastMessage), so unless we put it
+          // back here the original content AND its whole version history are
+          // dropped by the finally-persist below. Restore it exactly (no spurious
+          // version) and show it back in the bubble. This is the abort-side
+          // counterpart to the error branch's restore.
+          store.restoreRegeneration(finalization.oldMessage);
+          transcript.registerBubble(finalization.oldMessage.id, assistantBubble);
+          await transcript.renderBubbleContent(assistantBubble, finalization.oldMessage.content);
         }
       } else {
         await finalizeAbortedResponse(

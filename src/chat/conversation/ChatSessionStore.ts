@@ -96,6 +96,10 @@ export class ChatSessionStore {
     return this.memory.finalizeRegeneration(oldMessage, newContent, metadata);
   }
 
+  restoreRegeneration(oldMessage: ConversationMessage): void {
+    this.memory.restoreRegeneration(oldMessage);
+  }
+
   switchMessageVersion(messageId: string, newIndex: number): boolean {
     return this.memory.switchMessageVersion(messageId, newIndex);
   }

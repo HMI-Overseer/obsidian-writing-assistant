@@ -85,7 +85,7 @@ Save multiple configurations per provider, each with its own system prompt, temp
 
 1. Install the [BRAT plugin](https://github.com/TfTHacker/obsidian42-brat) from community plugins
 2. Open **Settings > BRAT > Add Beta plugin**
-3. Enter `Resolve-public/obsidian-writing-assistant` and click **Add Plugin**
+3. Enter `Resolve-public/writing-assistant-chat` and click **Add Plugin**
 4. Enable **Writing Assistant Chat** in **Settings > Community plugins**
 
 ---

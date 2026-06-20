@@ -1,5 +1,6 @@
 import { TFile } from "obsidian";
 import type { App, TAbstractFile } from "obsidian";
+import { assertEmbeddingVectors } from "./embeddingClient";
 import type { EmbeddingClient } from "./embeddingClient";
 import type { IndexedChunk, FileIndexMeta, IndexingState, EmbeddingMetadata } from "./types";
 import type { VectorStore } from "./vectorStore";
@@ -257,6 +258,10 @@ export class VaultIndexer {
         const batch = chunks.slice(i, i + EMBED_BATCH_SIZE);
         const texts = batch.map((c) => buildEmbeddingText(c, embeddingMeta));
         const result = await this.client.embed(texts, this.modelId, signal);
+        // Reject a truncated/short response before it reaches the store: throwing
+        // here aborts this file before setFileChunks, so it is never persisted
+        // with an undefined vector that would poison retrieval.
+        assertEmbeddingVectors(batch.length, result.vectors);
 
         for (let j = 0; j < batch.length; j++) {
           indexedChunks.push({

@@ -1,3 +1,4 @@
+import { assertEmbeddingVectors } from "./embeddingClient";
 import type { EmbeddingClient, EmbeddingResult } from "./embeddingClient";
 import { request } from "../api/httpTransport";
 
@@ -46,6 +47,10 @@ export class LMStudioEmbeddingClient implements EmbeddingClient {
     // Sort by index to match input order.
     const sorted = [...json.data].sort((a, b) => a.index - b.index);
     const vectors = sorted.map((item) => item.embedding);
+    // Enforce the embed() contract (one valid vector per input) before deriving
+    // the dimension from vectors[0], so a truncated/short response fails honestly
+    // here instead of silently poisoning the index downstream.
+    assertEmbeddingVectors(texts.length, vectors);
     const dimensions = vectors[0].length;
 
     const result: EmbeddingResult = { vectors, dimensions };

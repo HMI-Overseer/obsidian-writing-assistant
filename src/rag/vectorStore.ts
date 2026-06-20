@@ -162,10 +162,33 @@ export class VectorStore {
     };
   }
 
-  /** Deserialize a stored index into this store. Returns false if the model ID doesn't match. */
+  /**
+   * Deserialize a stored index into this store. Returns false (so the caller
+   * discards and rebuilds) if the model ID doesn't match or the index is
+   * dimensionally inconsistent — e.g. one written before vector-count validation
+   * existed, holding empty/short vectors that would silently under-retrieve.
+   * Decoded and validated up front so a rejected load leaves the store untouched.
+   */
   deserialize(data: SerializedVectorIndex): boolean {
     if (data.embeddingModelId !== this.embeddingModelId) {
       return false;
+    }
+
+    const decoded: IndexedChunk[] = [];
+    for (const chunk of data.chunks) {
+      const vector = base64ToVector(chunk.vectorB64);
+      if (data.dimensions > 0 && vector.length !== data.dimensions) {
+        return false;
+      }
+      decoded.push({
+        id: chunk.id,
+        filePath: chunk.filePath,
+        headingPath: chunk.headingPath,
+        content: chunk.content,
+        startOffset: chunk.startOffset,
+        chunkIndex: chunk.chunkIndex,
+        vector,
+      });
     }
 
     this.dimensions = data.dimensions;
@@ -179,16 +202,8 @@ export class VectorStore {
       this.fileMeta.set(file.filePath, file);
     }
 
-    for (const chunk of data.chunks) {
-      this.chunks.set(chunk.id, {
-        id: chunk.id,
-        filePath: chunk.filePath,
-        headingPath: chunk.headingPath,
-        content: chunk.content,
-        startOffset: chunk.startOffset,
-        chunkIndex: chunk.chunkIndex,
-        vector: base64ToVector(chunk.vectorB64),
-      });
+    for (const chunk of decoded) {
+      this.chunks.set(chunk.id, chunk);
     }
 
     return true;

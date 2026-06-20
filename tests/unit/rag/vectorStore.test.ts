@@ -117,6 +117,31 @@ describe("VectorStore", () => {
     expect(store2.getChunkCount()).toBe(0);
   });
 
+  test("deserialize rejects a poisoned index whose vectors don't match the stored dimension", () => {
+    // Simulate an index written before vector-count validation existed: a good
+    // 3-dim chunk plus a chunk whose vector was dropped (serialized empty). On
+    // reload this must be rejected wholesale (→ caller clears + rebuilds clean)
+    // rather than loaded to silently under-retrieve the holed chunk.
+    const healthy = new VectorStore("model-1");
+    healthy.setFileChunks("a.md", [makeChunk("a.md", 0, [1, 2, 3])], makeMeta("a.md", 2));
+    const serialized = healthy.serialize();
+    serialized.chunks.push({
+      id: "a.md::1",
+      filePath: "a.md",
+      headingPath: "Section",
+      content: "Chunk 1 of a.md",
+      startOffset: 100,
+      chunkIndex: 1,
+      vectorB64: vectorToBase64([]), // the poisoned hole
+    });
+
+    const store = new VectorStore("model-1");
+    const ok = store.deserialize(serialized);
+
+    expect(ok).toBe(false);
+    expect(store.getChunkCount()).toBe(0);
+  });
+
   test("auto-detects dimensions from first chunk", () => {
     const store = new VectorStore("model-1");
     expect(store.getDimensions()).toBe(0);

@@ -21,21 +21,15 @@ Connect to one or more LLM providers:
 - **LM Studio**, Local inference via OpenAI-compatible API. No cloud, no API keys, no data leaving your machine.
 - **Anthropic**, Claude models with native API support and prompt caching.
 - **OpenAI**, GPT models via the OpenAI API (or any OpenAI-compatible endpoint).
+- **Claude Code**, Anthropic's agent harness via the local `claude` CLI. Runs its own tool loop over the vault toolstack and uses your existing Claude Code login, so no API key is needed.
 
 Switch between providers and model profiles from the chat panel.
 
 ### Agentic tool use
 
-When enabled, the model can use tools across multiple reasoning rounds:
+When enabled, the model can use tools across multiple reasoning rounds.
 
-- **Read file**, Retrieve full content of notes in your vault.
-- **List directory / Directory tree**, Explore vault structure.
-- **Search files**, Glob-based file searching.
-- **Semantic search**, RAG-powered vault retrieval.
-- **Propose edit**, Search-and-replace proposals for prose edits with diff review. This tool will never edit your documents without your explicit consent.
-- **Update frontmatter**, YAML frontmatter management.
-
-All vault tools are read-only by default. Edit proposals require explicit approval before applying.
+Every operation that changes your vault is routed through an approval gateway. By default each kind (create, overwrite, move, trash, create folder, in-document edit) is set to **Ask**, so nothing is applied without your review. In settings you can set any kind to **Auto-apply** or **Deny** (the tool is removed entirely so the model is never offered it).
 
 ### Vault-wide retrieval (RAG)
 
@@ -70,11 +64,12 @@ Save multiple configurations per provider, each with its own system prompt, temp
 
 ## Requirements
 
-- [Obsidian](https://obsidian.md) v1.12.7 or later (desktop only)
+- [Obsidian](https://obsidian.md) v1.0.0 or later (desktop only; tested on recent 1.12.x releases)
 - At least one LLM provider:
   - **LM Studio**, [lmstudio.ai](https://lmstudio.ai), running locally with at least one model loaded
   - **Anthropic**, An API key from [console.anthropic.com](https://console.anthropic.com)
   - **OpenAI**, An API key from [platform.openai.com](https://platform.openai.com)
+  - **Claude Code**, The [Claude Code](https://claude.com/claude-code) CLI installed and signed in (no API key needed, will use your existing Subscription)
 
 ---
 
@@ -93,16 +88,6 @@ Save multiple configurations per provider, each with its own system prompt, temp
 3. Enter `Resolve-public/obsidian-writing-assistant` and click **Add Plugin**
 4. Enable **Writing Assistant Chat** in **Settings > Community plugins**
 
-### Manual
-
-1. Clone or download this repository
-2. Run `npm install && npm run build`
-3. Copy `main.js`, `manifest.json`, and `styles.css` into:
-   ```
-   <your-vault>/.obsidian/plugins/writing-assistant-chat/
-   ```
-4. In Obsidian: **Settings > Community plugins > Reload plugins**, then enable **Writing Assistant Chat**
-
 ---
 
 ## Getting started
@@ -111,6 +96,7 @@ Save multiple configurations per provider, each with its own system prompt, temp
 2. Choose a provider and configure it:
    - **LM Studio**, Start the local server (default `http://localhost:1234`) and the plugin will discover loaded models
    - **Anthropic / OpenAI**, Enter your API key
+   - **Claude Code**, Make sure the `claude` CLI is installed and signed in (set its path only if it isn't on your `PATH`)
 3. Add a model profile with your preferred system prompt, temperature, and token limit
 4. Click the chat icon in the ribbon, or run the command **Open writing assistant chat**
 5. Start writing
@@ -128,6 +114,7 @@ When using **cloud providers**, the plugin sends your messages (and any note con
 | Anthropic | `api.anthropic.com` | Chat completions |
 | OpenAI | `api.openai.com` (or custom base URL) | Chat completions, embeddings |
 | LM Studio | `localhost` (configurable) | Chat completions, embeddings, model discovery |
+| Claude Code | Local `claude` CLI, which calls Anthropic | Agentic chat (the CLI runs its own tool loop) |
 
 When using **Local providers** exclusively, **no data leaves your machine**.
 
@@ -137,10 +124,6 @@ When using **Local providers** exclusively, **no data leaves your machine**.
 - **Conversations**, **RAG embeddings**, and **knowledge graph data** are stored locally on your device.
 - **No telemetry, analytics, or tracking.** The plugin makes no network requests beyond what is required to communicate with your chosen provider.
 - **No account required.** LM Studio needs no account; Anthropic and OpenAI require their own API accounts.
-
-### Vault access
-
-The plugin reads files in your vault to provide note context, RAG retrieval, and knowledge graph features. It can propose edits to notes in edit mode, but all changes require your explicit approval before being applied.
 
 ---
 

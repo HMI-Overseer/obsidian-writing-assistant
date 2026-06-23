@@ -20,6 +20,22 @@ export type BubbleActionDeps = {
 export class ChatBubbleActionHandler {
   constructor(private readonly deps: BubbleActionDeps) {}
 
+  /**
+   * History-mutating toolbar actions (edit/delete/version-switch) persist the
+   * shared store, which would race the in-flight `finally` persist of an active
+   * generation and leave a surprising final state. Regenerate and branch already
+   * guard against this (block / stop respectively); these three did not. Copy is
+   * read-only and stays available. Returns true (and warns) when the action must
+   * be refused.
+   */
+  private blockedDuringGeneration(): boolean {
+    if (this.deps.getOrchestrator().getIsGenerating()) {
+      new Notice("Wait for the current response to finish.");
+      return true;
+    }
+    return false;
+  }
+
   createCallbacks(): BubbleActionCallbacks {
     return {
       onCopy: (messageId) => this.handleCopy(messageId),
@@ -42,6 +58,8 @@ export class ChatBubbleActionHandler {
   }
 
   handleEdit(messageId: string): void {
+    if (this.blockedDuringGeneration()) return;
+
     const store = this.deps.getStore();
     const transcript = this.deps.getTranscript();
     if (!store || !transcript) return;
@@ -53,6 +71,9 @@ export class ChatBubbleActionHandler {
 
     const editor = new InlineMessageEditor(bubble, message.content, {
       onSave: async (newContent) => {
+        // Re-check at commit time: the editor can outlive the start of a new
+        // generation, and committing then would race the in-flight persist.
+        if (this.blockedDuringGeneration()) return;
         const currentStore = this.deps.getStore();
         if (!currentStore) return;
         currentStore.updateMessageContent(messageId, newContent);
@@ -65,6 +86,8 @@ export class ChatBubbleActionHandler {
   }
 
   async handleDelete(messageId: string): Promise<void> {
+    if (this.blockedDuringGeneration()) return;
+
     const store = this.deps.getStore();
     if (!store) return;
 
@@ -86,6 +109,8 @@ export class ChatBubbleActionHandler {
   }
 
   async handleVersionChange(messageId: string, newIndex: number): Promise<void> {
+    if (this.blockedDuringGeneration()) return;
+
     const store = this.deps.getStore();
     const transcript = this.deps.getTranscript();
     if (!store || !transcript) return;

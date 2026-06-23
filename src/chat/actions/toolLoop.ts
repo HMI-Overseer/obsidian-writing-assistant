@@ -223,29 +223,29 @@ export async function runToolLoop(
       break;
     }
 
-    // Classify tool calls: known loop tools execute inline; unknown tools are
-    // accumulated as write tool calls for the finalization pipeline.
-    const loopCalls = toolCalls.filter((tc) => ALL_LOOP_TOOL_NAMES.has(tc.name));
-    const unknownCalls = toolCalls.filter((tc) => !ALL_LOOP_TOOL_NAMES.has(tc.name));
+    // Classify this round's tool calls into the buckets the loop routes
+    // differently: known loop tools execute inline; unknown tools accumulate as
+    // write calls for finalization; edit/vault-op/vault/think are split among
+    // the loop tools.
+    const { loopCalls, unknownCalls, editCalls, vaultOpCalls, vaultCalls, thinkCalls } =
+      classifyToolCalls(toolCalls);
+
+    // Unknown and edit calls accumulate as write calls for the finalization
+    // pipeline (edits also execute in the loop so the diff panel can render them).
     if (unknownCalls.length > 0) {
       allWriteToolCalls = [...allWriteToolCalls, ...unknownCalls];
       writeStopReason = stopReason;
     }
-
-    // Collect edit tool calls for finalization (they execute in the loop AND
-    // get accumulated so the diff review panel can render them at the end).
-    const editCalls = loopCalls.filter((tc) => EDIT_TOOL_NAMES.has(tc.name));
     if (editCalls.length > 0) {
       allWriteToolCalls = [...allWriteToolCalls, ...editCalls];
       writeStopReason = stopReason;
     }
 
     // Vault-op calls execute in the loop AND accumulate for finalization, just
-    // like edits. The pending overlay is seeded from vault ops
-    // accumulated in PRIOR rounds, captured before this round's are appended,
-    // so a later round's move_file sees an earlier round's write_file.
+    // like edits. The pending overlay is seeded from vault ops accumulated in
+    // PRIOR rounds, captured before this round's are appended, so a later
+    // round's move_file sees an earlier round's write_file.
     const priorVaultOpCalls = allWriteToolCalls.filter((tc) => VAULT_OPS_TOOL_NAMES.has(tc.name));
-    const vaultOpCalls = loopCalls.filter((tc) => VAULT_OPS_TOOL_NAMES.has(tc.name));
     if (vaultOpCalls.length > 0) {
       allWriteToolCalls = [...allWriteToolCalls, ...vaultOpCalls];
       writeStopReason = stopReason;
@@ -297,9 +297,6 @@ export async function runToolLoop(
       callbacks.onReasoningRoundFinished?.(true, round);
     }
 
-    const vaultCalls = loopCalls.filter((tc) => VAULT_TOOL_NAMES.has(tc.name));
-    const thinkCalls = loopCalls.filter((tc) => tc.name === THINK_TOOL_NAME);
-
     toolLoopTurns.push({
       role: "assistant",
       content: roundText || null,
@@ -328,8 +325,21 @@ export async function runToolLoop(
           result: { content: "", isReadOnly: true as const } as ToolResult,
         })),
       ]),
-      resolveVaultOps(),
-      resolveEdits(),
+      resolveVaultOps({
+        vaultOpCalls,
+        priorVaultOpCalls,
+        round,
+        stopReason,
+        context: vaultOpToolContext,
+        callbacks,
+      }),
+      resolveEdits({
+        editCalls,
+        vaultOpContext: vaultOpToolContext,
+        editContext: editToolContext,
+        round,
+        callbacks,
+      }),
     ]);
 
     for (const { tc, result } of otherResults) {
@@ -355,86 +365,6 @@ export async function runToolLoop(
 
     previousRoundsText = fullText;
     callbacks.onNewRound?.();
-
-    /**
-     * Resolve this round's vault-op calls. Records each op's timeline step first,
-     * then routes to the live review (suspends on `ask` ops, returns real
-     * dispositions) or the legacy synchronous validate-only fallback.
-     */
-    async function resolveVaultOps(): Promise<Array<{ tc: ToolCall; result: ToolResult }>> {
-      if (vaultOpCalls.length === 0) return [];
-      for (const tc of vaultOpCalls) {
-        callbacks.onToolStatus?.(tc.name);
-        callbacks.onStepRecorded?.({
-          type: "tool_call",
-          round,
-          toolName: tc.name,
-          toolCallId: tc.id,
-          toolInput: extractToolInput(tc),
-          toolArgs: tc.arguments,
-        });
-      }
-      if (vaultOpToolContext?.liveReview) {
-        return vaultOpToolContext.liveReview.resolveRound(vaultOpCalls, stopReason === "max_tokens");
-      }
-      // Fallback: no live review, validate only (overlay seeded from prior rounds).
-      const overlay = vaultOpToolContext
-        ? buildPendingOverlay(vaultOpToolContext.app, priorVaultOpCalls)
-        : null;
-      return vaultOpCalls.map((tc) => {
-        if (!vaultOpToolContext || !overlay) {
-          return {
-            tc,
-            result: toolFailure({
-              kind: "unavailable",
-              what: "vault operation context unavailable",
-              isReadOnly: false,
-            }),
-          };
-        }
-        return { tc, result: executeVaultOpTool(tc, { app: vaultOpToolContext.app, overlay }) };
-      });
-    }
-
-    /**
-     * Resolve this round's edit calls. Records each edit's timeline step first, then
-     * routes to the live review (resolves in-loop with the real three-tier resolver,
-     * blocks on `ask` edits, returns real dispositions) or the legacy synchronous
-     * validate-only fallback when no live review is available.
-     */
-    async function resolveEdits(): Promise<Array<{ tc: ToolCall; result: ToolResult }>> {
-      if (editCalls.length === 0) return [];
-      for (const tc of editCalls) {
-        callbacks.onToolStatus?.(tc.name);
-        callbacks.onStepRecorded?.({
-          type: "tool_call",
-          round,
-          toolName: tc.name,
-          toolCallId: tc.id,
-          toolInput: extractToolInput(tc),
-          toolArgs: tc.arguments,
-        });
-      }
-      if (vaultOpToolContext?.liveReview) {
-        return vaultOpToolContext.liveReview.resolveEdits(editCalls);
-      }
-      // Fallback: no live review, validate-only acknowledge (legacy non-blocking path).
-      return Promise.all(
-        editCalls.map(async (tc) => {
-          if (!editToolContext) {
-            return {
-              tc,
-              result: toolFailure({
-                kind: "unavailable",
-                what: "edit tool context unavailable",
-                isReadOnly: false,
-              }),
-            };
-          }
-          return { tc, result: await executeEditTool(tc, editToolContext) };
-        }),
-      );
-    }
   }
 
   // Deliver the accumulated answer to the bubble in one shot. In non-agentic
@@ -448,6 +378,143 @@ export async function runToolLoop(
     usage: finalUsage,
     writeStopReason,
   };
+}
+
+/** A round's tool calls partitioned by how the loop routes each kind. */
+export interface ClassifiedCalls {
+  /** Calls the loop executes inline: vault search, edit, vault-op, think. */
+  loopCalls: ToolCall[];
+  /** Calls the loop doesn't recognize; accumulated as write calls for finalization. */
+  unknownCalls: ToolCall[];
+  editCalls: ToolCall[];
+  vaultOpCalls: ToolCall[];
+  vaultCalls: ToolCall[];
+  thinkCalls: ToolCall[];
+}
+
+/**
+ * Partition a round's tool calls into the buckets the loop routes differently.
+ * Pure (no state, no callbacks), so each bucket is independently assertable.
+ */
+export function classifyToolCalls(toolCalls: ToolCall[]): ClassifiedCalls {
+  const loopCalls = toolCalls.filter((tc) => ALL_LOOP_TOOL_NAMES.has(tc.name));
+  return {
+    loopCalls,
+    unknownCalls: toolCalls.filter((tc) => !ALL_LOOP_TOOL_NAMES.has(tc.name)),
+    editCalls: loopCalls.filter((tc) => EDIT_TOOL_NAMES.has(tc.name)),
+    vaultOpCalls: loopCalls.filter((tc) => VAULT_OPS_TOOL_NAMES.has(tc.name)),
+    vaultCalls: loopCalls.filter((tc) => VAULT_TOOL_NAMES.has(tc.name)),
+    thinkCalls: loopCalls.filter((tc) => tc.name === THINK_TOOL_NAME),
+  };
+}
+
+/** Per-round inputs the vault-op resolver needs (was closed-over loop state). */
+export interface ResolveVaultOpsDeps {
+  vaultOpCalls: ToolCall[];
+  /** Vault ops from PRIOR rounds, the overlay seed (a later move sees an earlier write). */
+  priorVaultOpCalls: ToolCall[];
+  round: number;
+  stopReason: StopReason;
+  context: VaultOpToolContext | undefined;
+  callbacks: ToolLoopCallbacks;
+}
+
+/**
+ * Resolve a round's vault-op calls. Records each op's timeline step first, then
+ * routes to the live review (suspends on `ask` ops, returns the real
+ * dispositions) or the legacy synchronous validate-only fallback.
+ *
+ * Lifted to module level from an in-loop closure so the live-review-vs-fallback
+ * branch is reachable from a unit test with a constructed deps record.
+ */
+export async function resolveVaultOps(
+  deps: ResolveVaultOpsDeps,
+): Promise<Array<{ tc: ToolCall; result: ToolResult }>> {
+  const { vaultOpCalls, priorVaultOpCalls, round, stopReason, context, callbacks } = deps;
+  if (vaultOpCalls.length === 0) return [];
+  for (const tc of vaultOpCalls) {
+    callbacks.onToolStatus?.(tc.name);
+    callbacks.onStepRecorded?.({
+      type: "tool_call",
+      round,
+      toolName: tc.name,
+      toolCallId: tc.id,
+      toolInput: extractToolInput(tc),
+      toolArgs: tc.arguments,
+    });
+  }
+  if (context?.liveReview) {
+    return context.liveReview.resolveRound(vaultOpCalls, stopReason === "max_tokens");
+  }
+  // Fallback: no live review, validate only (overlay seeded from prior rounds).
+  const overlay = context ? buildPendingOverlay(context.app, priorVaultOpCalls) : null;
+  return vaultOpCalls.map((tc) => {
+    if (!context || !overlay) {
+      return {
+        tc,
+        result: toolFailure({
+          kind: "unavailable",
+          what: "vault operation context unavailable",
+          isReadOnly: false,
+        }),
+      };
+    }
+    return { tc, result: executeVaultOpTool(tc, { app: context.app, overlay }) };
+  });
+}
+
+/** Per-round inputs the edit resolver needs (was closed-over loop state). */
+export interface ResolveEditsDeps {
+  editCalls: ToolCall[];
+  vaultOpContext: VaultOpToolContext | undefined;
+  editContext: ToolExecutionContext | undefined;
+  round: number;
+  callbacks: ToolLoopCallbacks;
+}
+
+/**
+ * Resolve a round's edit calls. Records each edit's timeline step first, then
+ * routes to the live review (resolves in-loop with the real three-tier resolver,
+ * blocks on `ask` edits, returns the real dispositions) or the legacy
+ * synchronous validate-only fallback when no live review is available.
+ *
+ * Lifted to module level alongside {@link resolveVaultOps}.
+ */
+export async function resolveEdits(
+  deps: ResolveEditsDeps,
+): Promise<Array<{ tc: ToolCall; result: ToolResult }>> {
+  const { editCalls, vaultOpContext, editContext, round, callbacks } = deps;
+  if (editCalls.length === 0) return [];
+  for (const tc of editCalls) {
+    callbacks.onToolStatus?.(tc.name);
+    callbacks.onStepRecorded?.({
+      type: "tool_call",
+      round,
+      toolName: tc.name,
+      toolCallId: tc.id,
+      toolInput: extractToolInput(tc),
+      toolArgs: tc.arguments,
+    });
+  }
+  if (vaultOpContext?.liveReview) {
+    return vaultOpContext.liveReview.resolveEdits(editCalls);
+  }
+  // Fallback: no live review, validate-only acknowledge (legacy non-blocking path).
+  return Promise.all(
+    editCalls.map(async (tc) => {
+      if (!editContext) {
+        return {
+          tc,
+          result: toolFailure({
+            kind: "unavailable",
+            what: "edit tool context unavailable",
+            isReadOnly: false,
+          }),
+        };
+      }
+      return { tc, result: await executeEditTool(tc, editContext) };
+    }),
+  );
 }
 
 export interface FailedRoundContext {

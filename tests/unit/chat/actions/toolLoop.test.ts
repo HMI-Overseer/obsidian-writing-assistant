@@ -1,6 +1,11 @@
 import { describe, it, expect, vi } from "vitest";
 import type { App } from "obsidian";
-import { runToolLoop } from "../../../../src/chat/actions/toolLoop";
+import {
+  runToolLoop,
+  classifyToolCalls,
+  resolveVaultOps,
+  resolveEdits,
+} from "../../../../src/chat/actions/toolLoop";
 import type { ToolLoopCallbacks } from "../../../../src/chat/actions/toolLoop";
 import type { ChatClient } from "../../../../src/api/chatClient";
 import type { StreamResult } from "../../../../src/api/usageTypes";
@@ -8,6 +13,8 @@ import type { ChatRequest } from "../../../../src/shared/chatRequest";
 import type { ToolCall } from "../../../../src/tools/types";
 import { THINK_TOOL_NAME } from "../../../../src/tools/think/definition";
 import { EDIT_TOOL_NAMES } from "../../../../src/tools/editing/definition";
+import { VAULT_TOOL_NAMES } from "../../../../src/tools/vault/definition";
+import { VAULT_OPS_TOOL_NAMES } from "../../../../src/tools/vault-ops/definition";
 import type { LiveVaultReview } from "../../../../src/chat/actions/liveVaultReview";
 
 /**
@@ -271,5 +278,303 @@ describe("runToolLoop step results", () => {
       isError: true,
       content: "Edit could not be applied.",
     });
+  });
+});
+
+/**
+ * Callback-sequence characterization. The P1-15 decomposition (lifting the
+ * in-loop resolvers to module level + extracting call classification) is a
+ * behavior-preserving refactor of streaming, concurrent, callback-heavy code,
+ * exactly where a silent reorder hides. This records the FULL interleaved order
+ * of every callback across a representative multi-round turn that drives all
+ * three concurrent channels in one round (read-only vault tool + vault-op +
+ * edit). It is the lock the refactor must keep green: the order of
+ * onReasoningDelta / onReasoningRoundFinished / onToolStatus / onStepRecorded /
+ * onStepResult / onNewRound / onDelta must not change.
+ */
+describe("runToolLoop callback-sequence characterization", () => {
+  // Minimal app: not a FileSystemAdapter and an empty name, so the path
+  // normalizer returns every tool call untouched (matches the step-result test).
+  const app = {
+    vault: { adapter: {}, getName: () => "", getAbstractFileByPath: () => null },
+  } as unknown as App;
+
+  function recordingCallbacks(seq: string[]): ToolLoopCallbacks {
+    return {
+      onDelta: (text) => seq.push(`delta:${text}`),
+      onReasoningDelta: (text) => seq.push(`rdelta:${text}`),
+      onReasoningRoundFinished: (committed, round) => seq.push(`rrf:${committed}:${round}`),
+      onToolStatus: (name) => seq.push(`status:${name}`),
+      onStepRecorded: (step) => seq.push(`recorded:${step.toolName}:${step.toolCallId}`),
+      onStepResult: (id, result) => seq.push(`result:${id}:${result.isError ? "err" : "ok"}`),
+      onNewRound: () => seq.push("newRound"),
+    };
+  }
+
+  it("preserves the exact interleaved callback order across a three-channel turn", async () => {
+    const seq: string[] = [];
+    const vaultName = [...VAULT_TOOL_NAMES][0];
+    const vaultOpName = [...VAULT_OPS_TOOL_NAMES][0];
+    const editName = [...EDIT_TOOL_NAMES][0];
+
+    const vr0: ToolCall = { id: "vr-0", name: vaultName, arguments: {} };
+    const th0: ToolCall = { id: "th-0", name: THINK_TOOL_NAME, arguments: {} };
+    const vr1: ToolCall = { id: "vr-1", name: vaultName, arguments: {} };
+    const vo1: ToolCall = { id: "vo-1", name: vaultOpName, arguments: {} };
+    const ed1: ToolCall = { id: "ed-1", name: editName, arguments: {} };
+
+    // Live review returns real dispositions for the vault-op and edit channels.
+    const liveReview = {
+      resolveRound: vi.fn(async (calls: ToolCall[]) =>
+        calls.map((tc) => ({ tc, result: { isError: false, content: "op ok" } })),
+      ),
+      resolveEdits: vi.fn(async (calls: ToolCall[]) =>
+        calls.map((tc) => ({ tc, result: { isError: false, content: "edit ok" } })),
+      ),
+    } as unknown as LiveVaultReview;
+
+    const client = countingClient([
+      // Round 0: read-only reasoning round (vault search + think) → committed reasoning.
+      { deltas: ["Let me look around. "], toolCalls: [vr0, th0], stopReason: "tool_use" },
+      // Round 1: all three concurrent channels + mutating narration → answer-track.
+      { deltas: ["Now I'll make changes."], toolCalls: [vr1, vo1, ed1], stopReason: "tool_use" },
+      // Round 2: final answer → single post-loop flush.
+      { deltas: ["All done."], toolCalls: null, stopReason: "end_turn" },
+    ]);
+
+    await runToolLoop(
+      client,
+      baseRequest,
+      "test-model",
+      "lmstudio",
+      {} as never,
+      signal(),
+      recordingCallbacks(seq),
+      5,
+      true,
+      undefined,
+      undefined,
+      { app, liveReview },
+    );
+
+    expect(seq).toEqual([
+      // Round 0 — read-only round: reasoning committed, then the read-only branch.
+      "rdelta:Let me look around. ",
+      "rrf:true:0",
+      `status:${vaultName}`,
+      `recorded:${vaultName}:vr-0`,
+      `recorded:${THINK_TOOL_NAME}:th-0`,
+      "newRound",
+      // Round 1 — mutating round: answer-track reasoning discarded, then the three
+      // concurrent channels fire their synchronous prefixes in array order
+      // (read-only status, then vault-op status+record, then edit status+record),
+      // and the post-await processing records the read-only step and reports the
+      // vault-op / edit dispositions.
+      "rdelta:Now I'll make changes.",
+      "rrf:false:1",
+      `status:${vaultName}`,
+      `status:${vaultOpName}`,
+      `recorded:${vaultOpName}:vo-1`,
+      `status:${editName}`,
+      `recorded:${editName}:ed-1`,
+      `recorded:${vaultName}:vr-1`,
+      "result:vo-1:ok",
+      "result:ed-1:ok",
+      "newRound",
+      // Round 2 — final answer: committed false, loop breaks, single bubble flush.
+      "rdelta:All done.",
+      "rrf:false:2",
+      "delta:Now I'll make changes.\n\nAll done.",
+    ]);
+  });
+});
+
+/**
+ * Direct unit tests for the helpers the P1-15 decomposition lifted out of the
+ * loop body. As in-loop closures these branches were reachable only end-to-end;
+ * extracted, each is asserted in isolation.
+ */
+describe("classifyToolCalls", () => {
+  const ids = (calls: ToolCall[]): string[] => calls.map((c) => c.id);
+  const vaultName = [...VAULT_TOOL_NAMES][0];
+  const vaultOpName = [...VAULT_OPS_TOOL_NAMES][0];
+  const editName = [...EDIT_TOOL_NAMES][0];
+
+  it("partitions a mixed round into loop / unknown / edit / vault-op / vault / think buckets", () => {
+    const c = classifyToolCalls([
+      { id: "u", name: "custom_write", arguments: {} },
+      { id: "e", name: editName, arguments: {} },
+      { id: "o", name: vaultOpName, arguments: {} },
+      { id: "v", name: vaultName, arguments: {} },
+      { id: "t", name: THINK_TOOL_NAME, arguments: {} },
+    ]);
+
+    // unknown is the only non-loop tool; loopCalls is everything else.
+    expect(ids(c.unknownCalls)).toEqual(["u"]);
+    expect(ids(c.loopCalls)).toEqual(["e", "o", "v", "t"]);
+    expect(ids(c.editCalls)).toEqual(["e"]);
+    expect(ids(c.vaultOpCalls)).toEqual(["o"]);
+    expect(ids(c.vaultCalls)).toEqual(["v"]);
+    expect(ids(c.thinkCalls)).toEqual(["t"]);
+  });
+
+  it("returns all-empty buckets for no calls", () => {
+    const c = classifyToolCalls([]);
+    expect(c.loopCalls).toEqual([]);
+    expect(c.unknownCalls).toEqual([]);
+    expect(c.editCalls).toEqual([]);
+    expect(c.vaultOpCalls).toEqual([]);
+    expect(c.vaultCalls).toEqual([]);
+    expect(c.thinkCalls).toEqual([]);
+  });
+});
+
+describe("resolveVaultOps", () => {
+  const vaultOpName = [...VAULT_OPS_TOOL_NAMES][0];
+  const op = (id: string): ToolCall => ({ id, name: vaultOpName, arguments: {} });
+
+  function callbacksSpy() {
+    return { onToolStatus: vi.fn(), onStepRecorded: vi.fn() } as unknown as ToolLoopCallbacks & {
+      onToolStatus: ReturnType<typeof vi.fn>;
+      onStepRecorded: ReturnType<typeof vi.fn>;
+    };
+  }
+
+  it("returns [] and fires no callbacks when there are no vault-op calls", async () => {
+    const cb = callbacksSpy();
+    const result = await resolveVaultOps({
+      vaultOpCalls: [],
+      priorVaultOpCalls: [],
+      round: 0,
+      stopReason: "end_turn",
+      context: undefined,
+      callbacks: cb,
+    });
+    expect(result).toEqual([]);
+    expect(cb.onToolStatus).not.toHaveBeenCalled();
+    expect(cb.onStepRecorded).not.toHaveBeenCalled();
+  });
+
+  it("records steps, routes to the live review, and forwards the max_tokens flag", async () => {
+    const cb = callbacksSpy();
+    const dispositions = [{ tc: op("vo-1"), result: { isError: false, content: "op ok" } }];
+    const liveReview = {
+      resolveRound: vi.fn(async () => dispositions),
+      resolveEdits: vi.fn(async () => []),
+    } as unknown as LiveVaultReview;
+
+    const result = await resolveVaultOps({
+      vaultOpCalls: [op("vo-1")],
+      priorVaultOpCalls: [],
+      round: 2,
+      stopReason: "max_tokens",
+      context: { app: {} as unknown as App, liveReview },
+      callbacks: cb,
+    });
+
+    // Step recorded BEFORE resolution; disposition passed straight through.
+    expect(cb.onToolStatus).toHaveBeenCalledWith(vaultOpName);
+    expect(cb.onStepRecorded).toHaveBeenCalledWith(
+      expect.objectContaining({ type: "tool_call", round: 2, toolCallId: "vo-1" }),
+    );
+    // The load-bearing arg: stopReason === "max_tokens" tells the review the model
+    // was truncated, so it must arrive as `true`.
+    expect(liveReview.resolveRound).toHaveBeenCalledWith([op("vo-1")], true);
+    expect(result).toBe(dispositions);
+  });
+
+  it("passes max_tokens=false to the live review on a normal stop", async () => {
+    const liveReview = {
+      resolveRound: vi.fn(async () => []),
+      resolveEdits: vi.fn(async () => []),
+    } as unknown as LiveVaultReview;
+
+    await resolveVaultOps({
+      vaultOpCalls: [op("vo-1")],
+      priorVaultOpCalls: [],
+      round: 0,
+      stopReason: "tool_use",
+      context: { app: {} as unknown as App, liveReview },
+      callbacks: callbacksSpy(),
+    });
+
+    expect(liveReview.resolveRound).toHaveBeenCalledWith([op("vo-1")], false);
+  });
+
+  it("falls back to an unavailable failure when no context is supplied", async () => {
+    const result = await resolveVaultOps({
+      vaultOpCalls: [op("vo-1")],
+      priorVaultOpCalls: [],
+      round: 0,
+      stopReason: "end_turn",
+      context: undefined,
+      callbacks: callbacksSpy(),
+    });
+    expect(result).toHaveLength(1);
+    expect(result[0].result.isError).toBe(true);
+    expect(result[0].result.content).toContain("vault operation context unavailable");
+  });
+});
+
+describe("resolveEdits", () => {
+  const editName = [...EDIT_TOOL_NAMES][0];
+  const edit = (id: string): ToolCall => ({ id, name: editName, arguments: {} });
+
+  function callbacksSpy() {
+    return { onToolStatus: vi.fn(), onStepRecorded: vi.fn() } as unknown as ToolLoopCallbacks & {
+      onToolStatus: ReturnType<typeof vi.fn>;
+      onStepRecorded: ReturnType<typeof vi.fn>;
+    };
+  }
+
+  it("returns [] and fires no callbacks when there are no edit calls", async () => {
+    const cb = callbacksSpy();
+    const result = await resolveEdits({
+      editCalls: [],
+      vaultOpContext: undefined,
+      editContext: undefined,
+      round: 0,
+      callbacks: cb,
+    });
+    expect(result).toEqual([]);
+    expect(cb.onToolStatus).not.toHaveBeenCalled();
+    expect(cb.onStepRecorded).not.toHaveBeenCalled();
+  });
+
+  it("records steps and routes to the live review when one is present", async () => {
+    const cb = callbacksSpy();
+    const dispositions = [{ tc: edit("ed-1"), result: { isError: false, content: "edit ok" } }];
+    const liveReview = {
+      resolveRound: vi.fn(async () => []),
+      resolveEdits: vi.fn(async () => dispositions),
+    } as unknown as LiveVaultReview;
+
+    const result = await resolveEdits({
+      editCalls: [edit("ed-1")],
+      vaultOpContext: { app: {} as unknown as App, liveReview },
+      editContext: undefined,
+      round: 1,
+      callbacks: cb,
+    });
+
+    expect(cb.onToolStatus).toHaveBeenCalledWith(editName);
+    expect(cb.onStepRecorded).toHaveBeenCalledWith(
+      expect.objectContaining({ type: "tool_call", round: 1, toolCallId: "ed-1" }),
+    );
+    expect(liveReview.resolveEdits).toHaveBeenCalledWith([edit("ed-1")]);
+    expect(result).toBe(dispositions);
+  });
+
+  it("falls back to an unavailable failure when neither a live review nor an edit context exists", async () => {
+    const result = await resolveEdits({
+      editCalls: [edit("ed-1")],
+      vaultOpContext: undefined,
+      editContext: undefined,
+      round: 0,
+      callbacks: callbacksSpy(),
+    });
+    expect(result).toHaveLength(1);
+    expect(result[0].result.isError).toBe(true);
+    expect(result[0].result.content).toContain("edit tool context unavailable");
   });
 });

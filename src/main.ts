@@ -279,8 +279,12 @@ export default class WritingAssistantChat extends Plugin {
           const addCommandItem = (command: CustomCommand) => {
             submenu.addItem((sub) => {
               sub.setTitle(command.name).setIcon(command.icon ?? "wand").onClick(async () => {
+                // Keep the note's tail: {{note}} feeds continuation commands
+                // ("Continue writing from where the note leaves off"), so when a
+                // long chapter exceeds the budget the model must see the ending,
+                // not the opening.
                 const noteText =
-                  (await getActiveNoteText(this.app, this.settings.maxContextChars)) ?? "";
+                  (await getActiveNoteText(this.app, this.settings.maxContextChars, "tail")) ?? "";
                 const expanded = expandCommandTemplate(command.prompt, { selection, noteText });
 
                 await this.activateChatView();

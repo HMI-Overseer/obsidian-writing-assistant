@@ -1,7 +1,11 @@
 import { setIcon } from "obsidian";
 import type WritingAssistantChat from "../main";
+import { DEFAULT_SETTINGS } from "../constants";
 import { ApiKeysModal, ApiKeysDisclaimerModal } from "./modals";
 import { createSettingsSection, SettingItem } from "./ui";
+
+const MIN_CONTEXT_CHARS = 1000;
+const MAX_CONTEXT_CHARS = 200000;
 
 function openApiKeysWithDisclaimer(plugin: WritingAssistantChat): void {
   if (plugin.settings.apiKeysDisclaimerAccepted) {
@@ -64,6 +68,24 @@ export function renderGeneralTab(container: HTMLElement, plugin: WritingAssistan
         plugin.settings.includeLocalAttachmentsAsContext = value;
         await plugin.saveSettings();
       })
+    );
+
+  new SettingItem(context.bodyEl)
+    .setName("Note context limit")
+    .setDesc(
+      `Maximum characters of note text sent as context, ${MIN_CONTEXT_CHARS}–${MAX_CONTEXT_CHARS} (default: ${DEFAULT_SETTINGS.maxContextChars}). Longer notes are trimmed; continuation commands keep the ending.`
+    )
+    .addText((text) =>
+      text
+        .setPlaceholder(String(DEFAULT_SETTINGS.maxContextChars))
+        .setValue(String(plugin.settings.maxContextChars))
+        .onChange(async (value) => {
+          const parsed = parseInt(value, 10);
+          if (!Number.isNaN(parsed) && parsed >= MIN_CONTEXT_CHARS && parsed <= MAX_CONTEXT_CHARS) {
+            plugin.settings.maxContextChars = parsed;
+            await plugin.saveSettings();
+          }
+        })
     );
 
   // ── Support ─────────────────────────────────────────────────────────

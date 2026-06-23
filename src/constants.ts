@@ -109,7 +109,11 @@ export const DEFAULT_SETTINGS: PluginSettings = {
   },
   includeNoteContext: true,
   includeLocalAttachmentsAsContext: false,
-  maxContextChars: 12000,
+  // ~4000 words: holds the bulk of single chapters in one budget so a long note
+  // is not silently truncated. Truncation only triggers on notes that actually
+  // exceed this, so short notes incur no extra cost. User-tunable in the General
+  // tab.
+  maxContextChars: 24000,
   providerProfiles: [],
   activeProfileIds: { ...DEFAULT_ACTIVE_PROFILE_IDS },
   completionModels: [],

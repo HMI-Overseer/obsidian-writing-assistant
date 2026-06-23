@@ -28,7 +28,7 @@ export function renderCommandsTab(
     text: "{{selection}} inserts the current editor selection.",
   });
   hintList.createEl("li", {
-    text: "{{note}} inserts the active note text, trimmed by the advanced context limit.",
+    text: "{{note}} inserts the active note text, trimmed to the note context limit (keeps the ending when trimmed).",
   });
 
   // ── Built-in commands ──────────────────────────────────────────────────

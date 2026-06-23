@@ -222,7 +222,15 @@ function hardSplit(text: string, chunkSize: number, chunkOverlap: number): strin
   return chunks;
 }
 
-/** Merge chunks smaller than MIN_CHUNK_CHARS into the previous chunk. */
+/**
+ * Merge chunks smaller than MIN_CHUNK_CHARS into the previous chunk, but only
+ * when both belong to the same heading section. Merging across sections would
+ * fold the small chunk's prose into the previous chunk and silently relabel it
+ * with the wrong `headingPath` — e.g. a short "Scene 3" indexed as "Scene 2", a
+ * continuity error this tool exists to prevent. A small chunk that can't merge
+ * back into its own section stays standalone; `buildEmbeddingText` still prefixes
+ * it with its own heading breadcrumb, so it keeps correct scene attribution.
+ */
 function mergeSmallChunks(chunks: DocumentChunk[]): DocumentChunk[] {
   if (chunks.length <= 1) return chunks;
 
@@ -232,8 +240,8 @@ function mergeSmallChunks(chunks: DocumentChunk[]): DocumentChunk[] {
     const chunk = chunks[i];
     const prev = result[result.length - 1];
 
-    if (chunk.content.trim().length < MIN_CHUNK_CHARS) {
-      // Merge into previous chunk.
+    if (chunk.content.trim().length < MIN_CHUNK_CHARS && prev.headingPath === chunk.headingPath) {
+      // Merge into the previous chunk of the same section.
       prev.content = prev.content + "\n\n" + chunk.content;
     } else {
       result.push(chunk);

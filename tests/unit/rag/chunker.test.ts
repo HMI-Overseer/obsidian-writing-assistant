@@ -80,6 +80,43 @@ describe("chunkDocument", () => {
     }
   });
 
+  test("does not relabel a short section's text under the previous section's heading", () => {
+    // Regression (P1-10): a sub-50-char section must not glue onto the previous
+    // chunk and inherit its heading — that would index Scene 3 prose as Scene 2,
+    // a continuity error in the exact tool meant to prevent it.
+    const content = [
+      "# Chapter 1",
+      "## Scene 2",
+      "Scene two unfolds across a long stretch of prose that easily clears the fifty character minimum.",
+      "## Scene 3",
+      "She vanished.",
+    ].join("\n");
+
+    const chunks = chunkDocument("story.md", content, DEFAULT_CHUNK_SIZE, DEFAULT_OVERLAP);
+
+    const sceneThreeChunk = chunks.find((c) => c.content.includes("She vanished."));
+    expect(sceneThreeChunk).toBeDefined();
+    expect(sceneThreeChunk?.headingPath).toBe("Chapter 1 > Scene 3");
+
+    // The Scene 3 text must never be folded into a Scene 2 chunk.
+    const sceneTwoChunk = chunks.find((c) => c.headingPath === "Chapter 1 > Scene 2");
+    expect(sceneTwoChunk?.content).not.toContain("She vanished.");
+  });
+
+  test("still merges a short trailing chunk within the same section", () => {
+    // The gate must only suppress CROSS-section merges; a short trailing piece of
+    // the same section should still merge so prose isn't fragmented needlessly.
+    const para = "P".repeat(150);
+    const content = ["# Chapter 1", "## Scene 1", para, "", "End."].join("\n");
+
+    const chunks = chunkDocument("story.md", content, 100, 0);
+
+    const sceneChunks = chunks.filter((c) => c.headingPath === "Chapter 1 > Scene 1");
+    expect(sceneChunks).toHaveLength(1);
+    expect(sceneChunks[0].content).toContain("End.");
+    expect(sceneChunks[0].content).toContain(para);
+  });
+
   test("assigns sequential chunk indices", () => {
     const content = [
       "# A",

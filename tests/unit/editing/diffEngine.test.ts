@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { resolveEdits } from "../../../src/editing/diffEngine";
+import { parseEditBlocks } from "../../../src/editing/parseEditBlocks";
 import type { EditBlock } from "../../../src/editing/editTypes";
 
 function block(searchText: string, replaceText = "REPLACED"): EditBlock {
@@ -93,5 +94,61 @@ describe("resolveEdits, CRLF documents (P1-2)", () => {
     for (const line of [...r.contextBefore, ...r.contextAfter]) {
       expect(line).not.toContain("\r");
     }
+  });
+});
+
+describe("resolveEdits, empty search guard (P1-8)", () => {
+  it("returns no match for an empty search instead of a phantom exact at offset 0", () => {
+    // indexOf("") === 0, so without the guard an empty search resolves as a confident
+    // exact match at the top of the file and prepends replaceText — a silent corruption.
+    const r = resolveOne("Some real document content.", "");
+    expect(r.matchType).toBe("none");
+    expect(r.confidence).toBe(0);
+    expect(r.matchOffset).toBe(-1);
+  });
+
+  it("returns no match for a whitespace-only search (single space)", () => {
+    // A lone space would otherwise hit the first space in the document as a bogus
+    // exact match and replace it; a whitespace-only anchor is the model dropping its
+    // search, not a real location.
+    const r = resolveOne("Some real document.", " ");
+    expect(r.matchType).toBe("none");
+    expect(r.confidence).toBe(0);
+  });
+
+  it("returns no match for an empty search via the regex-parse path", () => {
+    // The SEARCH/REPLACE parser produces toolName-less blocks; an empty SEARCH section
+    // reaches the engine directly with no upstream guard, so resolveOneBlock must fence it.
+    const { blocks } = parseEditBlocks(
+      "<<<<<<< SEARCH\n\n=======\nnew content\n>>>>>>> REPLACE",
+    );
+    expect(blocks).toHaveLength(1);
+    expect(blocks[0].searchText).toBe("");
+    const [r] = resolveEdits(blocks, "Some real document content.", {
+      contextLines: 1,
+      minConfidence: 0.7,
+    });
+    expect(r.matchType).toBe("none");
+    expect(r.confidence).toBe(0);
+  });
+
+  it("still resolves an insert-intent block (frontmatter) with empty search at the top", () => {
+    // A structural insert legitimately carries an empty search to mean "insert at top"
+    // (e.g. frontmatter into a note that has none). The guard is gated on toolName so
+    // this stays a confident insert at offset 0, not a no-match.
+    const insertBlock: EditBlock = {
+      id: "fm0",
+      searchText: "",
+      replaceText: "---\nstatus: draft\n---",
+      rawBlock: "",
+      toolName: "update_frontmatter",
+    };
+    const [r] = resolveEdits([insertBlock], "First line of the note.\n", {
+      contextLines: 1,
+      minConfidence: 0.7,
+    });
+    expect(r.matchType).toBe("exact");
+    expect(r.matchOffset).toBe(0);
+    expect(r.confidence).toBe(1.0);
   });
 });

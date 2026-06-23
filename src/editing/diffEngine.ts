@@ -102,6 +102,20 @@ function resolveOneBlock(
   // tier runs. The original block is preserved on `editBlock` for display.
   const searchText = toLf(block.searchText);
 
+  // Tier 0: fence the empty / whitespace-only search before any tier sees it.
+  // `document.indexOf("")` returns 0, so an unguarded empty search would resolve as a
+  // confident exact match at the top of the file and silently prepend replaceText
+  // (diff-engine-real-document-robustness, symptom B / P1-8). Structural inserts carry
+  // a toolName and legitimately use an empty search to mean "insert at top" (e.g.
+  // frontmatter into a note that has none), so they pass through; a plain prose edit
+  // with no anchor is the model dropping its search, so return a clean no-match it can
+  // self-correct from. This lives in the engine so every entry — the regex-parse path
+  // and the finalize path included — is covered, mirroring the in-loop and tool-preflight
+  // guards rather than relying on them.
+  if (block.toolName === undefined && searchText.trim().length === 0) {
+    return unresolvedEdit(block, false);
+  }
+
   // Tier 1: exact match
   const exactOffset = document.indexOf(searchText);
   if (exactOffset !== -1) {
@@ -135,6 +149,16 @@ function resolveOneBlock(
   // No match found, return an unresolved edit. `nearMiss` distinguishes "close but
   // below threshold" (copy the exact wording) from "absent" (re-read), the failure-side
   // signal the channel otherwise collapses to a flat "no match".
+  return unresolvedEdit(block, fuzzyResult.bestScore >= NEAR_MISS_THRESHOLD);
+}
+
+/**
+ * Build a "no match" ResolvedEdit (matchType `none`, confidence 0, offset -1). Shared by
+ * the empty-search guard (Tier 0) and the total-miss fall-through so both report a miss
+ * identically. `nearMiss` is the total-miss-only "you were close, copy the exact wording"
+ * signal; the empty-search guard passes `false` (nothing was scored).
+ */
+function unresolvedEdit(block: EditBlock, nearMiss: boolean): ResolvedEdit {
   return {
     id: block.id || generateId(),
     editBlock: block,
@@ -147,7 +171,7 @@ function resolveOneBlock(
     contextAfter: [],
     confidence: 0,
     matchType: "none",
-    nearMiss: fuzzyResult.bestScore >= NEAR_MISS_THRESHOLD,
+    nearMiss,
   };
 }
 

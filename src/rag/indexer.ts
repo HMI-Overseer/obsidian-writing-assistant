@@ -15,6 +15,13 @@ const EMBED_BATCH_SIZE = 32;
 /** Delay in ms before persisting the index after the last batch. */
 const SAVE_DEBOUNCE_MS = 2000;
 
+/**
+ * Delay in ms before (re-)indexing a file after its last create/modify event.
+ * Coalesces a burst of rapid edits (and the create+modify pair Obsidian fires
+ * for a new file) into a single index run instead of one run per keystroke.
+ */
+export const MODIFY_DEBOUNCE_MS = 500;
+
 export interface IndexerOptions {
   app: App;
   store: VectorStore;
@@ -51,6 +58,13 @@ export class VaultIndexer {
   private eventRefs: Array<ReturnType<App["vault"]["on"]>> = [];
   private destroyed = false;
 
+  /** Per-file debounce timers for watcher-triggered (re-)indexing. */
+  private readonly indexTimers = new Map<string, ReturnType<typeof setTimeout>>();
+  /** Paths with an index run currently in flight (read → embed → store). */
+  private readonly indexing = new Set<string>();
+  /** Paths that changed again mid-flight and must be re-indexed once that run ends. */
+  private readonly dirty = new Set<string>();
+
   constructor(options: IndexerOptions) {
     this.app = options.app;
     this.store = options.store;
@@ -80,6 +94,12 @@ export class VaultIndexer {
     }
     this.eventRefs = [];
 
+    for (const timer of this.indexTimers.values()) {
+      clearTimeout(timer);
+    }
+    this.indexTimers.clear();
+    this.dirty.clear();
+
     if (this.saveTimer) {
       clearTimeout(this.saveTimer);
       this.saveTimer = null;
@@ -90,7 +110,7 @@ export class VaultIndexer {
     this.eventRefs.push(
       this.app.vault.on("create", (file) => {
         if (file instanceof TFile && this.isMarkdownFile(file)) {
-          this.indexFile(file);
+          this.scheduleIndex(file);
         }
       }),
     );
@@ -98,7 +118,7 @@ export class VaultIndexer {
     this.eventRefs.push(
       this.app.vault.on("modify", (file) => {
         if (file instanceof TFile && this.isMarkdownFile(file)) {
-          this.indexFile(file);
+          this.scheduleIndex(file);
         }
       }),
     );
@@ -106,6 +126,7 @@ export class VaultIndexer {
     this.eventRefs.push(
       this.app.vault.on("delete", (file) => {
         if (this.isMarkdownFile(file)) {
+          this.clearPendingIndex(file.path);
           this.store.removeFile(file.path);
           this.scheduleSave();
         }
@@ -115,6 +136,7 @@ export class VaultIndexer {
     this.eventRefs.push(
       this.app.vault.on("rename", (file, oldPath) => {
         if (this.isMarkdownFile(file)) {
+          this.clearPendingIndex(oldPath);
           this.store.renameFile(oldPath, file.path);
           this.scheduleSave();
         }
@@ -194,7 +216,61 @@ export class VaultIndexer {
     }
   }
 
-  /** Index a single file (used by vault watchers). */
+  /**
+   * Debounce a watcher-triggered (re-)index of a single file. Collapses a burst
+   * of rapid events for the same path into one run after the edits settle.
+   */
+  private scheduleIndex(file: TFile): void {
+    if (this.destroyed) return;
+    const path = file.path;
+    const existing = this.indexTimers.get(path);
+    if (existing) clearTimeout(existing);
+    this.indexTimers.set(
+      path,
+      setTimeout(() => {
+        this.indexTimers.delete(path);
+        void this.indexFileGuarded(file);
+      }, MODIFY_DEBOUNCE_MS),
+    );
+  }
+
+  /** Cancel any pending debounce and clear dirty state for a path (e.g. on delete/rename). */
+  private clearPendingIndex(path: string): void {
+    const timer = this.indexTimers.get(path);
+    if (timer) {
+      clearTimeout(timer);
+      this.indexTimers.delete(path);
+    }
+    this.dirty.delete(path);
+  }
+
+  /**
+   * Index a file under a per-file in-flight guard. If a run is already in
+   * progress for this path, mark it dirty and re-run once with the latest
+   * content when that run finishes, rather than starting an overlapping run
+   * whose stale embed could resolve last, win the store, and stamp the latest
+   * mtime — poisoning the vector until a model change forces a re-index.
+   */
+  private async indexFileGuarded(file: TFile): Promise<void> {
+    if (this.destroyed) return;
+    const path = file.path;
+    if (this.indexing.has(path)) {
+      this.dirty.add(path);
+      return;
+    }
+    this.indexing.add(path);
+    try {
+      await this.indexFile(file);
+    } finally {
+      this.indexing.delete(path);
+      if (this.dirty.has(path) && !this.destroyed) {
+        this.dirty.delete(path);
+        void this.indexFileGuarded(file);
+      }
+    }
+  }
+
+  /** Index a single file (used by the watcher debounce/guard). */
   private async indexFile(file: TFile): Promise<void> {
     try {
       await this.indexBatch([file]);

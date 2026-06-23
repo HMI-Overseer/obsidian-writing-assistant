@@ -1,7 +1,7 @@
 import { describe, test, expect, vi } from "vitest";
 import { TFile } from "obsidian";
 import type { App, TAbstractFile } from "obsidian";
-import { VaultIndexer } from "../../../src/rag/indexer";
+import { VaultIndexer, MODIFY_DEBOUNCE_MS } from "../../../src/rag/indexer";
 import { VectorStore } from "../../../src/rag/vectorStore";
 import type { EmbeddingClient } from "../../../src/rag/embeddingClient";
 import type { IndexingState } from "../../../src/rag/types";
@@ -142,6 +142,35 @@ function makeEventApp(scanFiles: TFile[]) {
 /** Let fire-and-forget watcher work (indexFile) settle. */
 const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
 
+/**
+ * Drain the microtask queue several turns. Used under fake timers where
+ * `flush()`'s real `setTimeout(0)` never fires — releasing a deferred embed
+ * advances an `indexFile` chain (read → embed → store → dirty re-run) purely
+ * through microtasks.
+ */
+const flushMicrotasks = async (turns = 8) => {
+  for (let i = 0; i < turns; i++) await Promise.resolve();
+};
+
+/**
+ * An embed client whose responses resolve only when the test releases them,
+ * so a race between overlapping index runs can be driven deterministically.
+ */
+function deferredClient(): EmbeddingClient & { pending: Array<() => void>; calls: () => number } {
+  const pending: Array<() => void> = [];
+  let calls = 0;
+  return {
+    embed(texts) {
+      calls++;
+      return new Promise((resolve) => {
+        pending.push(() => resolve({ vectors: texts.map(() => [1, 2, 3]), dimensions: 3 }));
+      });
+    },
+    pending,
+    calls: () => calls,
+  };
+}
+
 function eventIndexer(
   client: EmbeddingClient,
   app: App,
@@ -183,20 +212,29 @@ describe("VaultIndexer vault event wiring", () => {
     expect(offref).toHaveBeenCalledTimes(4);
   });
 
-  test("a create event indexes a new markdown file", async () => {
-    const { app, handlers } = makeEventApp([]); // empty at scan time
-    const client = countingClient();
-    const store = new VectorStore("model-1");
-    const indexer = eventIndexer(client, app, store);
-    await indexer.start();
-    expect(store.getChunkCount()).toBe(0);
+  test("a create event indexes a new markdown file once the debounce elapses", async () => {
+    vi.useFakeTimers();
+    try {
+      const { app, handlers } = makeEventApp([]); // empty at scan time
+      const client = countingClient();
+      const store = new VectorStore("model-1");
+      const indexer = eventIndexer(client, app, store);
+      await indexer.start();
+      expect(store.getChunkCount()).toBe(0);
 
-    handlers.create(mdFile("new.md", LONG_CONTENT));
-    await flush();
-    indexer.destroy();
+      handlers.create(mdFile("new.md", LONG_CONTENT));
+      // Nothing is indexed until the per-file debounce window elapses.
+      await vi.advanceTimersByTimeAsync(MODIFY_DEBOUNCE_MS - 1);
+      expect(store.getChunkCount()).toBe(0);
 
-    expect(store.getChunkCount()).toBeGreaterThan(0);
-    expect(client.calls()).toBeGreaterThan(0);
+      await vi.advanceTimersByTimeAsync(2);
+      indexer.destroy();
+
+      expect(store.getChunkCount()).toBeGreaterThan(0);
+      expect(client.calls()).toBeGreaterThan(0);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   test("ignores create events for non-markdown files", async () => {
@@ -265,24 +303,113 @@ describe("VaultIndexer vault event wiring", () => {
   });
 
   test("a modify with unchanged content skips re-embedding but refreshes mtime", async () => {
-    const file = mdFile("note.md", LONG_CONTENT, 1);
-    const { app, handlers } = makeEventApp([file]);
-    const client = countingClient();
-    const store = new VectorStore("model-1");
-    const indexer = eventIndexer(client, app, store);
-    await indexer.start();
-    const embedsAfterScan = client.calls();
-    expect(embedsAfterScan).toBeGreaterThan(0);
+    vi.useFakeTimers();
+    try {
+      const file = mdFile("note.md", LONG_CONTENT, 1);
+      const { app, handlers } = makeEventApp([file]);
+      const client = countingClient();
+      const store = new VectorStore("model-1");
+      const indexer = eventIndexer(client, app, store);
+      await indexer.start();
+      const embedsAfterScan = client.calls();
+      expect(embedsAfterScan).toBeGreaterThan(0);
 
-    // Same content, newer mtime (the classic "touched but not edited" case).
-    (file as unknown as { stat: { mtime: number } }).stat.mtime = 2;
-    handlers.modify(file);
-    await flush();
-    indexer.destroy();
+      // Same content, newer mtime (the classic "touched but not edited" case).
+      (file as unknown as { stat: { mtime: number } }).stat.mtime = 2;
+      handlers.modify(file);
+      await vi.advanceTimersByTimeAsync(MODIFY_DEBOUNCE_MS + 1);
+      indexer.destroy();
 
-    // Dedup: the unchanged content must not trigger another embed round...
-    expect(client.calls()).toBe(embedsAfterScan);
-    // ...but the mtime is refreshed so the next full scan won't re-check it.
-    expect(store.getFileMeta("note.md")?.mtime).toBe(2);
+      // Dedup: the unchanged content must not trigger another embed round...
+      expect(client.calls()).toBe(embedsAfterScan);
+      // ...but the mtime is refreshed so the next full scan won't re-check it.
+      expect(store.getFileMeta("note.md")?.mtime).toBe(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
+// --------------------------------------------------------------------------
+// Live modify-watcher debounce + in-flight guard (P1-11)
+// --------------------------------------------------------------------------
+
+describe("VaultIndexer modify-watcher debounce and in-flight guard", () => {
+  test("coalesces a burst of rapid edits into a single index run", async () => {
+    vi.useFakeTimers();
+    try {
+      const file = mdFile("note.md", LONG_CONTENT, 1);
+      const { app, handlers } = makeEventApp([file]);
+      const client = countingClient();
+      const store = new VectorStore("model-1");
+      const indexer = eventIndexer(client, app, store);
+      await indexer.start();
+      const afterScan = client.calls();
+      expect(afterScan).toBeGreaterThan(0);
+
+      // Three edits in quick succession, each landing before the debounce fires.
+      [2, 3, 4].forEach((mtime, i) => {
+        (file as unknown as { content: string }).content = `${LONG_CONTENT} edit ${i}`;
+        (file as unknown as { stat: { mtime: number } }).stat.mtime = mtime;
+        handlers.modify(file);
+      });
+      // The debounce keeps resetting, so no run has started yet.
+      await vi.advanceTimersByTimeAsync(MODIFY_DEBOUNCE_MS - 1);
+      expect(client.calls()).toBe(afterScan);
+
+      // Once it finally elapses, the burst collapses to exactly one embed round.
+      await vi.advanceTimersByTimeAsync(2);
+      await flushMicrotasks();
+      indexer.destroy();
+
+      expect(client.calls()).toBe(afterScan + 1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  test("the latest content wins even when a stale run's embed resolves last", async () => {
+    vi.useFakeTimers();
+    try {
+      const v1 = `${LONG_CONTENT} marker_stale_one`;
+      const v2 = `${LONG_CONTENT} marker_fresh_two`;
+      const file = mdFile("note.md", v1, 1);
+      const { app, handlers } = makeEventApp([]); // nothing indexed at scan time
+      const embed = deferredClient();
+      const store = new VectorStore("model-1");
+      const indexer = eventIndexer(embed, app, store);
+      await indexer.start();
+
+      // First edit: debounce fires, run A reads v1 and parks on its embed.
+      handlers.modify(file);
+      await vi.advanceTimersByTimeAsync(MODIFY_DEBOUNCE_MS + 1);
+      expect(embed.pending.length).toBe(1); // run A is in flight
+
+      // Second edit arrives mid-flight. It must be deferred, not run in parallel:
+      // a parallel run would queue a second embed (pending.length === 2).
+      (file as unknown as { content: string }).content = v2;
+      (file as unknown as { stat: { mtime: number } }).stat.mtime = 2;
+      handlers.modify(file);
+      await vi.advanceTimersByTimeAsync(MODIFY_DEBOUNCE_MS + 1);
+      expect(embed.pending.length).toBe(1); // still only A — B was marked dirty
+
+      // Release embeds newest-first: the order that lets a stale run win when
+      // unguarded. Guarded, A stores v1, then the dirty re-run reads and stores v2.
+      while (embed.pending.length > 0) {
+        const release = embed.pending.pop();
+        release?.();
+        await flushMicrotasks();
+      }
+      indexer.destroy();
+
+      const text = store
+        .getAllChunks()
+        .map((c) => c.content)
+        .join(" ");
+      expect(text).toContain("marker_fresh_two");
+      expect(text).not.toContain("marker_stale_one");
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

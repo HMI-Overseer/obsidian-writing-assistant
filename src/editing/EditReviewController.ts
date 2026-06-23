@@ -1,6 +1,7 @@
 import { type App, Notice } from "obsidian";
 import type { AppliedEditRecord, DiffHunk, EditProposal, EditStatus } from "./editTypes";
 import { applyHunksLive, undoHunkLive } from "./documentApplicator";
+import { detectOverlaps } from "./diffEngine";
 
 /** Persistence hooks fired as the review's state changes. */
 export interface EditReviewCallbacks {
@@ -110,10 +111,38 @@ export class EditReviewController {
   // Accept, applies the hunk to the document immediately
   // -----------------------------------------------------------------------
 
+  /**
+   * True when accepting `hunk` would conflict with one already applied: their source
+   * regions intersect. Delegates the geometry to the engine's {@link detectOverlaps} over
+   * the accepted set plus this hunk, then checks whether the new hunk landed in a
+   * conflicting pair. Already-accepted hunks are pairwise-disjoint (each passed this same
+   * check), so detectOverlaps' adjacent-pair sweep is exact for the single hunk added, and
+   * the result is order-independent (detectOverlaps sorts by offset).
+   */
+  private overlapsAppliedHunk(hunk: DiffHunk): boolean {
+    const accepted = this.proposal.hunks.filter((h) => h.status === "accepted");
+    if (accepted.length === 0) return false;
+    return detectOverlaps([...accepted, hunk]).some(
+      ([first, second]) => first === hunk.id || second === hunk.id
+    );
+  }
+
   async accept(hunkId: string): Promise<void> {
     if (this.isProcessing) return;
     const hunk = this.proposal.hunks.find((h) => h.id === hunkId);
     if (!hunk || hunk.status !== "pending") return;
+
+    // Refuse an accept whose source region overlaps a hunk that's already applied.
+    // Accepts splice into the live document one-at-a-time and re-anchor by `indexOf` at
+    // apply time, so an overlapping hunk would either silently no-op (its matched text was
+    // already overwritten) or re-anchor to the wrong place, an order-dependent outcome
+    // (diff-engine-real-document-robustness, symptom D / P1-9). The engine reports the
+    // conflict via detectOverlaps; the controller, sole owner of accept, decides: block and
+    // point the user at the fix.
+    if (this.overlapsAppliedHunk(hunk)) {
+      new Notice("This edit overlaps one you already applied. Undo that edit first to apply this one.");
+      return;
+    }
 
     this.isProcessing = true;
     try {

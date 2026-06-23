@@ -1,8 +1,16 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { App } from "obsidian";
+import { Notice } from "obsidian";
 import { EditReviewController, type EditReviewCallbacks } from "../../../src/editing/EditReviewController";
 import { resolveEdits, buildHunks } from "../../../src/editing/diffEngine";
 import type { AppliedEditRecord, EditBlock, EditProposal } from "../../../src/editing/editTypes";
+
+// The overlap guard's only observable signal is the warning Notice, so replace the
+// no-op mock class with a spyable constructor for this file.
+vi.mock("obsidian", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("obsidian")>();
+  return { ...actual, Notice: vi.fn() };
+});
 
 /** Minimal in-memory vault backing the apply/undo paths. */
 function makeApp(initial: string) {
@@ -56,6 +64,10 @@ function makeCallbacks(): EditReviewCallbacks & {
 }
 
 describe("EditReviewController", () => {
+  beforeEach(() => {
+    vi.mocked(Notice).mockClear();
+  });
+
   it("accept applies the hunk to the document and records it", async () => {
     const { app, state } = makeApp("The quick brown fox.");
     const proposal = makeProposal("The quick brown fox.", [{ search: "quick", replace: "slow" }]);
@@ -172,5 +184,71 @@ describe("EditReviewController", () => {
     await controller.accept(id); // second accept is a no-op
 
     expect(state.content).toBe("The slow brown fox.");
+  });
+
+  it("blocks accepting a hunk that overlaps an already-applied one (P1-9)", async () => {
+    // "quick brown" [4,15) and "brown fox" [10,19) share the "brown" span. Accepts apply
+    // one-at-a-time to the live document and re-anchor by indexOf, so applying the second
+    // over the first's rewritten region would silently no-op or re-anchor wrong. The
+    // controller refuses it instead, with a warning notice.
+    const doc = "The quick brown fox jumps.";
+    const { app, state } = makeApp(doc);
+    const proposal = makeProposal(doc, [
+      { search: "quick brown", replace: "slow" },
+      { search: "brown fox", replace: "red dog" },
+    ]);
+    const cb = makeCallbacks();
+    const controller = new EditReviewController(app, proposal, cb);
+    const [a, b] = proposal.hunks;
+
+    await controller.accept(a.id);
+    expect(state.content).toBe("The slow fox jumps.");
+
+    await controller.accept(b.id);
+
+    expect(Notice).toHaveBeenCalledWith(expect.stringContaining("overlaps"));
+    expect(controller.getStatus(b.id)).toBe("pending");
+    expect(state.content).toBe("The slow fox jumps."); // the refused accept changed nothing
+    expect(cb.applied).toHaveBeenCalledTimes(1); // only the first hunk was applied
+  });
+
+  it("does not block accepts whose source regions are disjoint", async () => {
+    const doc = "alpha beta gamma delta";
+    const { app, state } = makeApp(doc);
+    const proposal = makeProposal(doc, [
+      { search: "alpha", replace: "ALPHA" },
+      { search: "gamma", replace: "GAMMA" },
+    ]);
+    const controller = new EditReviewController(app, proposal, makeCallbacks());
+    const [a, b] = proposal.hunks;
+
+    await controller.accept(a.id);
+    await controller.accept(b.id);
+
+    expect(Notice).not.toHaveBeenCalled();
+    expect(controller.getStatus(a.id)).toBe("accepted");
+    expect(controller.getStatus(b.id)).toBe("accepted");
+    expect(state.content).toBe("ALPHA beta GAMMA delta");
+  });
+
+  it("re-allows an overlapping accept once the conflicting hunk is undone", async () => {
+    const doc = "The quick brown fox jumps.";
+    const { app, state } = makeApp(doc);
+    const proposal = makeProposal(doc, [
+      { search: "quick brown", replace: "slow" },
+      { search: "brown fox", replace: "red dog" },
+    ]);
+    const controller = new EditReviewController(app, proposal, makeCallbacks());
+    const [a, b] = proposal.hunks;
+
+    await controller.accept(a.id);
+    await controller.accept(b.id); // blocked while A is applied
+    expect(controller.getStatus(b.id)).toBe("pending");
+
+    await controller.undo(a.id); // frees the overlapping region
+    await controller.accept(b.id);
+
+    expect(controller.getStatus(b.id)).toBe("accepted");
+    expect(state.content).toBe("The quick red dog jumps.");
   });
 });

@@ -61,16 +61,10 @@ export type GraphBuildState =
   | { status: "extracting"; filesProcessed: number; filesTotal: number; targetFolder?: string }
   | { status: "error"; message: string };
 
-/** Knowledge graph settings. */
-export interface KnowledgeGraphSettings {
-  enabled: boolean;
-  /** CompletionModel.id, the chat model used for entity extraction. */
-  activeCompletionModelId: string | null;
-  /** EmbeddingModel.id, required for generating entity vectors at build time. */
-  activeEmbeddingModelId: string | null;
-  /** Glob patterns to exclude from graph extraction. */
-  excludePatterns: string[];
-}
+// KnowledgeGraphSettings is used by 3+ modules, so its canonical definition
+// lives in shared/types. Re-exported here so graph consumers can keep importing
+// it locally.
+export type { KnowledgeGraphSettings } from "../../shared/types";
 
 /**
  * Raw extraction result from a single LLM call.

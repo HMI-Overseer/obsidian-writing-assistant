@@ -41,16 +41,9 @@ export class ServiceContainer {
 
     const s = this.getSettings();
 
-    // PluginSettings uses shared/types variants; services expect rag-specific
-    // variants with extra fields. The runtime data has all fields (populated by
-    // normalize functions), so the casts are safe. The shared types just lag.
-    await this.ragService.configure(
-      s.rag as unknown as RagSettings,
-      s.embeddingModels,
-      s.providerSettings,
-    );
+    await this.ragService.configure(s.rag, s.embeddingModels, s.providerSettings);
     await this.graphService.configure(
-      s.knowledgeGraph as unknown as KnowledgeGraphSettings,
+      s.knowledgeGraph,
       s.completionModels,
       s.embeddingModels,
       s.providerSettings,

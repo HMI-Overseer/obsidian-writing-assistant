@@ -49,28 +49,9 @@ export interface RetrievalResult {
   score: number;
 }
 
-/** RAG-specific settings. */
-export interface RagSettings {
-  enabled: boolean;
-  /** EmbeddingModel.id from the embeddingModels array. */
-  activeEmbeddingModelId: string | null;
-  /** Target chunk size in characters. */
-  chunkSize: number;
-  /** Overlap between chunks in characters. */
-  chunkOverlap: number;
-  /** Number of retrieval results to inject as context. */
-  topK: number;
-  /** Maximum chunks from a single file in retrieval results. */
-  maxChunksPerFile: number;
-  /** Minimum similarity score (0–1) to include a result. */
-  minScore: number;
-  /** File patterns to exclude from indexing (glob strings). */
-  excludePatterns: string[];
-  /** Maximum total characters of RAG context to inject into a prompt. */
-  maxContextChars: number;
-  /** Enrich embedding text with tags, folder path, and wikilink targets for disambiguation. */
-  metadataEnrichment: boolean;
-}
+// RagSettings is used by 3+ modules, so its canonical definition lives in
+// shared/types. Re-exported here so RAG consumers can keep importing it locally.
+export type { RagSettings } from "../shared/types";
 
 /** Serialized index format written to disk. */
 export interface SerializedVectorIndex {

@@ -235,6 +235,8 @@ export class LiveVaultReview {
       kind: EditOpKind;
       path: string;
       matchType: MatchType;
+      /** > 1 when the search was non-unique; surfaced to the model on apply (symptom C). */
+      occurrenceCount?: number;
     };
 
     // Registration + auto-apply run under the shared lock so the per-turn auto
@@ -339,17 +341,38 @@ export class LiveVaultReview {
           continue;
         }
 
+        // A non-unique anchor on the autonomous path is refused, not silently applied to
+        // one of several identical passages. Mirrors Anthropic's text-editor contract (a
+        // str_replace matching more than one location returns an error asking for more
+        // context) and the no-match recovery just above. Gated on `auto`: an ask-gated edit
+        // stays reviewable (the human is the disambiguator, and the diff card shows the
+        // "1 of N" badge), so only the no-human path blocks. The count is the symptom-C
+        // signal resolveEdits already computes (diff-engine-real-document-robustness).
+        if (gate === "auto" && resolved.occurrenceCount !== undefined) {
+          const recovery =
+            `the search text matched ${resolved.occurrenceCount} places; include the surrounding ` +
+            "lines so it identifies exactly one passage, then retry";
+          results.set(call.id, {
+            content: editDispositionMessage(kind, file.path, "failed", recovery),
+            isReadOnly: false,
+            isError: true,
+            failure: { kind: "ambiguous", recovery },
+          });
+          continue;
+        }
+
         const controller = this.ensureEditController(file.path, docText);
         const hunk: DiffHunk = { id: generateId(), resolvedEdit: resolved, status: "pending" };
         controller.proposal.hunks.push(hunk);
 
         const matchType = resolved.matchType;
+        const occurrenceCount = resolved.occurrenceCount;
         if (gate === "auto") {
           this.autoSoFar++;
-          autoApplied.push({ callId: call.id, hunkId: hunk.id, kind, path: file.path, matchType });
+          autoApplied.push({ callId: call.id, hunkId: hunk.id, kind, path: file.path, matchType, occurrenceCount });
         } else {
           this.park(hunk.id);
-          parked.push({ callId: call.id, hunkId: hunk.id, kind, path: file.path, matchType });
+          parked.push({ callId: call.id, hunkId: hunk.id, kind, path: file.path, matchType, occurrenceCount });
         }
       }
 
@@ -366,6 +389,7 @@ export class LiveVaultReview {
             applied ? "auto-applied" : "failed",
             reason,
             a.matchType,
+            a.occurrenceCount,
           ),
           isReadOnly: false,
           isError: !applied,
@@ -386,7 +410,7 @@ export class LiveVaultReview {
         }
         const { disposition, reason } = await pending.promise;
         results.set(p.callId, {
-          content: editDispositionMessage(p.kind, p.path, disposition, reason, p.matchType),
+          content: editDispositionMessage(p.kind, p.path, disposition, reason, p.matchType, p.occurrenceCount),
           isReadOnly: false,
           isError: disposition === "failed",
           failure: disposition === "failed" ? { kind: "failed", recovery: reason } : undefined,

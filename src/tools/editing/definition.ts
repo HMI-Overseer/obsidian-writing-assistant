@@ -21,8 +21,9 @@ export const PROPOSE_EDIT_TOOL: CanonicalToolDefinition = {
   errorGuidance:
     "If `path` is missing or the file is not found, supply the correct vault-relative path. " +
     "If the search text was not found because the document is empty, switch to write_file to set " +
-    "its initial content. Otherwise re-read the document with read_file and match the exact text " +
-    "including whitespace.",
+    "its initial content. If the search text matched more than one place, add the surrounding lines " +
+    "so it identifies exactly one passage. Otherwise re-read the document with read_file and match " +
+    "the exact text including whitespace.",
   parameters: {
     type: "object",
     properties: {

@@ -82,6 +82,22 @@
     height: 12px;
   }
 
+  /* A non-unique exact match: the "1 of N" caution badge sits after the match label
+   * (amber, distinct from the red no-match) so the location reads as worth a review. */
+  .lmsa-chat-window-diff-hunk-confidence.is-ambiguous {
+    @apply lmsa-flex lmsa-items-center lmsa-gap-1;
+  }
+
+  .lmsa-chat-window-diff-hunk-ambiguity {
+    @apply lmsa-inline-flex lmsa-items-center lmsa-gap-1;
+    color: var(--text-warning, #f59e0b);
+  }
+
+  .lmsa-chat-window-diff-hunk-ambiguity svg {
+    width: 12px;
+    height: 12px;
+  }
+
   .lmsa-chat-window-diff-hunk-actions {
     @apply lmsa-flex lmsa-items-center lmsa-gap-2;
   }

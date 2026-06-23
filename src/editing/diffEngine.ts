@@ -119,7 +119,16 @@ function resolveOneBlock(
   // Tier 1: exact match
   const exactOffset = document.indexOf(searchText);
   if (exactOffset !== -1) {
-    return buildResolvedEdit(block, document, docLines, exactOffset, searchText.length, searchText, 1.0, "exact", opts);
+    const resolved = buildResolvedEdit(
+      block, document, docLines, exactOffset, searchText.length, searchText, 1.0, "exact", opts
+    );
+    // A non-unique search anchors the first occurrence (deterministic), but the model
+    // may have meant a later one. Surface the multiplicity so the location gets reviewed
+    // instead of silently guessed (symptom C); the pick itself is unchanged. The empty
+    // search is already fenced by Tier 0, so the count is over a real anchor string.
+    const occurrences = countOccurrences(document, searchText);
+    if (occurrences > 1) resolved.occurrenceCount = occurrences;
+    return resolved;
   }
 
   // Tier 2: whitespace-normalized match
@@ -211,6 +220,23 @@ function buildResolvedEdit(
     confidence,
     matchType,
   };
+}
+
+/**
+ * Count non-overlapping occurrences of `needle` in `haystack`. Drives the symptom-C
+ * ambiguity signal: more than one occurrence means Tier 1's first-`indexOf` anchor is a
+ * guess. Non-overlapping is the right unit, each occurrence is a distinct anchor an edit
+ * could target. Returns 0 for an empty needle (already fenced by Tier 0).
+ */
+function countOccurrences(haystack: string, needle: string): number {
+  if (needle.length === 0) return 0;
+  let count = 0;
+  let idx = haystack.indexOf(needle);
+  while (idx !== -1) {
+    count++;
+    idx = haystack.indexOf(needle, idx + needle.length);
+  }
+  return count;
 }
 
 // ---------------------------------------------------------------------------

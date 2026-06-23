@@ -123,4 +123,28 @@ describe("editDispositionMessage", () => {
       'Applied edit to "The War.md" (auto-applied).',
     );
   });
+
+  it("flags a non-unique search on an applied edit so the model can disambiguate", () => {
+    // The search matched several identical passages and the engine anchored the first.
+    // Telling the model the multiplicity lets it add surrounding context next time
+    // rather than trusting a silent first-match guess (symptom C).
+    expect(editDispositionMessage("edit", "The War.md", "applied", undefined, "exact", 3)).toBe(
+      'Applied edit to "The War.md" (first of 3 matches).',
+    );
+  });
+
+  it("combines the auto-applied flag, match type, and multiplicity in one parenthetical", () => {
+    expect(editDispositionMessage("edit", "The War.md", "auto-applied", undefined, "fuzzy", 2)).toBe(
+      'Applied edit to "The War.md" (auto-applied, fuzzy match, first of 2 matches).',
+    );
+  });
+
+  it("stays quiet about a unique match (count 1 or absent)", () => {
+    expect(editDispositionMessage("edit", "The War.md", "applied", undefined, "exact", 1)).toBe(
+      'Applied edit to "The War.md".',
+    );
+    expect(editDispositionMessage("edit", "The War.md", "applied", undefined, "exact")).toBe(
+      'Applied edit to "The War.md".',
+    );
+  });
 });

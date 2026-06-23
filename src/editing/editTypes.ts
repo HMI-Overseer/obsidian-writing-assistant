@@ -55,6 +55,16 @@ export interface ResolvedEdit {
    * signal vs "that text isn't here, re-read." Absent/false means no near candidate.
    */
   nearMiss?: boolean;
+  /**
+   * For an exact match only: how many times `searchText` occurs in the document, present
+   * *only when that count exceeds one*. A non-unique search is ambiguous, the engine
+   * anchored the FIRST occurrence deterministically but it may not be the one the model
+   * meant, so the chosen location should be reviewed rather than silently trusted
+   * ({@link ./diffEngine} symptom C). Confidence stays 1.0 and matchType stays `exact`,
+   * the string IS there verbatim; this is a *location* signal, orthogonal to match
+   * quality. Absent for a unique match, a whitespace/fuzzy match, or a miss.
+   */
+  occurrenceCount?: number;
 }
 
 export type EditStatus = "pending" | "accepted" | "rejected";

@@ -33,31 +33,58 @@ vi.mock("../../../../src/vault-ops/applyBatch", () => ({
   })),
 }));
 
+// The edit-review timeline touches the DOM; stub it so the auto-apply edit path can run
+// headless (mirrors the vaultReviewTimeline mock above). EditReviewController itself is
+// real, so accepts actually splice the in-memory document.
+vi.mock("../../../../src/chat/messages/editReviewTimeline", () => ({
+  EditReviewTimelineView: class {
+    destroy() {}
+  },
+}));
+
 import {
   LiveVaultReview,
   type LiveEditReviewDeps,
 } from "../../../../src/chat/actions/liveVaultReview";
 
-function makeApp(existing: { files?: string[]; folders?: string[] } = {}): App {
-  const files = new Set((existing.files ?? []).map(normalizePath));
+function makeApp(existing: { files?: string[]; folders?: string[]; content?: string } = {}): App {
   const folders = new Set((existing.folders ?? []).map(normalizePath));
+  // File contents, so the edit path can read a real document and splice it in place via
+  // `process`. Defaults to "" so vault-op tests (which never read) are unaffected.
+  const contents = new Map<string, string>(
+    (existing.files ?? []).map((f) => [normalizePath(f), existing.content ?? ""]),
+  );
+  const fileFor = (n: string) => Object.assign(new TFile(), { path: n, stat: { mtime: 1, size: 1 } });
   return {
     vault: {
       getAbstractFileByPath(p: string) {
         const n = normalizePath(p);
-        if (files.has(n)) return Object.assign(new TFile(), { path: n });
+        if (contents.has(n)) return fileFor(n);
         if (folders.has(n)) return Object.assign(new TFolder(), { path: n });
         return null;
       },
       getFileByPath(p: string) {
         const n = normalizePath(p);
-        return files.has(n) ? Object.assign(new TFile(), { path: n, stat: { mtime: 1, size: 1 } }) : null;
+        return contents.has(n) ? fileFor(n) : null;
       },
-      read: () => Promise.resolve(""),
+      read: (file: TFile) => Promise.resolve(contents.get(normalizePath(file.path)) ?? ""),
+      process: async (file: TFile, fn: (c: string) => string) => {
+        const n = normalizePath(file.path);
+        const next = fn(contents.get(n) ?? "");
+        contents.set(n, next);
+        return next;
+      },
     },
     metadataCache: { getBacklinksForFile: () => ({ data: {} }) },
   } as unknown as App;
 }
+
+/** Functional edit-channel deps: a no-op overlay attach + default resolver tuning. */
+const EDIT_DEPS = (): LiveEditReviewDeps =>
+  ({
+    inlineDiff: { attach: vi.fn() },
+    resolveOptions: { contextLines: 3, minConfidence: 0.7 },
+  }) as unknown as LiveEditReviewDeps;
 
 const POLICY = (overrides: Partial<VaultOpPolicy> = {}): VaultOpPolicy => ({
   create: "ask",
@@ -279,6 +306,46 @@ describe("LiveVaultReview", () => {
     expect(result.failure?.kind).toBe("invalid-args");
     expect(result.content).toMatch(/^Error: /);
     expect(result.content).toContain("search text is empty");
+  });
+
+  it("refuses to auto-apply an edit whose search text matches multiple places (str_replace contract)", async () => {
+    // Industry standard (Anthropic's str_replace text editor): a non-unique anchor is an
+    // error, not a silent guess at one of N identical passages. On the autonomous (auto)
+    // path there is no human to disambiguate, so the edit is refused with the count and a
+    // "add surrounding context" recovery, mirroring the no-match path. (symptom C follow-up)
+    const review = new LiveVaultReview({
+      app: makeApp({ files: ["Notes/A.md"], content: "She nodded.\nHe spoke.\nShe nodded.\n" }),
+      timelineEl: TIMELINE_EL,
+      policy: POLICY({ edit: "auto" }),
+      edit: EDIT_DEPS(),
+    });
+
+    const [{ result }] = await review.resolveEdits([
+      { id: "e1", name: "propose_edit", arguments: { path: "Notes/A.md", search: "She nodded.", replace: "She smiled." } },
+    ]);
+
+    expect(result.isError).toBe(true);
+    expect(result.failure?.kind).toBe("ambiguous");
+    expect(result.content).toMatch(/^Error: /);
+    expect(result.content).toContain("matched 2 places");
+  });
+
+  it("still auto-applies a unique edit (the ambiguity guard does not over-reject)", async () => {
+    // Control + over-broad guard catcher: a unique search must still auto-apply, proving
+    // the guard is gated on multiplicity, not on the auto gate alone.
+    const review = new LiveVaultReview({
+      app: makeApp({ files: ["Notes/A.md"], content: "She nodded.\nHe spoke.\nThey left.\n" }),
+      timelineEl: TIMELINE_EL,
+      policy: POLICY({ edit: "auto" }),
+      edit: EDIT_DEPS(),
+    });
+
+    const [{ result }] = await review.resolveEdits([
+      { id: "e1", name: "propose_edit", arguments: { path: "Notes/A.md", search: "She nodded.", replace: "She smiled." } },
+    ]);
+
+    expect(result.isError).toBeFalsy();
+    expect(result.content).toBe('Applied edit to "Notes/A.md" (auto-applied).');
   });
 
   it("resolveOne binds the op to the supplied tool-call id (Claude Code path)", async () => {

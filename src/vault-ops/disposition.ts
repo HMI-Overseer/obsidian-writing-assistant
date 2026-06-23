@@ -129,6 +129,13 @@ function appliedMatchPhrase(matchType: MatchType): string | null {
  * "(fuzzy match)") so the model learns when its search text was sloppy. The phrase
  * can never assert a tier the engine didn't produce, it is derived from the same
  * resolved edit the apply used (one state, two consumers).
+ *
+ * `occurrenceCount` (> 1) names a *non-unique* search on an applied edit, so the model
+ * learns it anchored the first of several identical passages and can add surrounding
+ * context to target a specific one next time. This is the model-facing half of the
+ * symptom-C signal (the user-facing half is the diff card's "1 of N" badge); it matters
+ * most for an auto-applied edit, where there is no user click and the disposition is the
+ * only channel that isn't silent.
  */
 export function editDispositionMessage(
   kind: EditOpKind,
@@ -136,18 +143,23 @@ export function editDispositionMessage(
   disposition: VaultOpDisposition,
   reason?: string,
   matchType?: MatchType,
+  occurrenceCount?: number,
 ): string {
   const tool = kind === "frontmatter" ? "update_frontmatter" : "propose_edit";
   const what = kind === "frontmatter" ? "frontmatter update" : "edit";
   const t = `"${filePath}"`;
 
   // Compose the trailing "(…)" for an applied edit from the optional auto-applied
-  // flag and the optional match phrase, so the two never collide into "(a) (b)".
+  // flag, the optional match phrase, and the optional multiplicity note, so they never
+  // collide into "(a) (b)".
   const appliedSuffix = (autoFlag: boolean): string => {
     const flags: string[] = [];
     if (autoFlag) flags.push("auto-applied");
     const phrase = matchType ? appliedMatchPhrase(matchType) : null;
     if (phrase) flags.push(phrase);
+    if (occurrenceCount !== undefined && occurrenceCount > 1) {
+      flags.push(`first of ${occurrenceCount} matches`);
+    }
     return flags.length > 0 ? ` (${flags.join(", ")})` : "";
   };
 

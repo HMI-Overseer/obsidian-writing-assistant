@@ -123,7 +123,7 @@ export class DiffHunkView {
 
     this.statusEl.empty();
     this.statusEl.removeClass("lmsa-chat-window-diff-hunk-badge", "lmsa-chat-window-diff-hunk-badge--applied", "lmsa-chat-window-diff-hunk-badge--skipped");
-    this.renderConfidenceLabel(this.statusEl, this.hunk.resolvedEdit.confidence);
+    this.renderConfidenceLabel(this.statusEl);
 
     this.actionsEl.empty();
     this.renderModeToggle(this.actionsEl);
@@ -144,7 +144,7 @@ export class DiffHunkView {
 
     const metaEl = headerEl.createDiv({ cls: "lmsa-chat-window-diff-hunk-meta" });
 
-    const { startLine, endLine, confidence } = this.hunk.resolvedEdit;
+    const { startLine, endLine } = this.hunk.resolvedEdit;
     const locationText =
       startLine === endLine ? `Line ${startLine}` : `Lines ${startLine}–${endLine}`;
     metaEl.createSpan({ cls: "lmsa-chat-window-diff-hunk-location", text: locationText });
@@ -162,7 +162,7 @@ export class DiffHunkView {
     });
 
     const statusEl = metaEl.createSpan({ cls: "lmsa-chat-window-diff-hunk-confidence" });
-    this.renderConfidenceLabel(statusEl, confidence);
+    this.renderConfidenceLabel(statusEl);
 
     const actionsEl = headerEl.createDiv({ cls: "lmsa-chat-window-diff-hunk-actions" });
     this.renderModeToggle(actionsEl);
@@ -222,7 +222,8 @@ export class DiffHunkView {
     return { acceptBtn, rejectBtn };
   }
 
-  private renderConfidenceLabel(el: HTMLElement, confidence: number): void {
+  private renderConfidenceLabel(el: HTMLElement): void {
+    const { confidence, occurrenceCount } = this.hunk.resolvedEdit;
     if (confidence >= 1.0) {
       el.setText("Exact match");
     } else if (confidence >= 0.95) {
@@ -235,6 +236,22 @@ export class DiffHunkView {
       const warnIcon = el.createSpan({ cls: "lmsa-chat-window-diff-hunk-warn-icon" });
       setIcon(warnIcon, "alert-triangle");
       el.createSpan({ text: "No match found" });
+      return;
+    }
+
+    // The search matched several identical passages and the first was anchored. Flag
+    // it (amber, distinct from the red no-match) so the user verifies the location
+    // rather than silently trusting the guess (symptom C). Only exact matches carry a
+    // count, so this never fires on the whitespace/fuzzy/no-match branches.
+    if (occurrenceCount !== undefined && occurrenceCount > 1) {
+      el.addClass("is-ambiguous");
+      const amb = el.createSpan({ cls: "lmsa-chat-window-diff-hunk-ambiguity" });
+      setIcon(amb.createSpan(), "alert-triangle");
+      amb.createSpan({ text: `1 of ${occurrenceCount}` });
+      amb.setAttribute(
+        "aria-label",
+        `This text appears ${occurrenceCount} times; the first was selected. Verify the location.`,
+      );
     }
   }
 

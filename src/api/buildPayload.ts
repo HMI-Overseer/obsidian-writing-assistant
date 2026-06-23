@@ -12,6 +12,7 @@ export function buildCompletionPayload(
   params: SamplingParams,
   stream: boolean,
   tools?: OpenAITool[],
+  includeUsage?: boolean,
 ): string {
   const body: Record<string, unknown> = {
     model,
@@ -26,5 +27,9 @@ export function buildCompletionPayload(
   if (params.repeatPenalty !== null) body.repeat_penalty = params.repeatPenalty;
   if (params.reasoning !== null) body.reasoning = params.reasoning;
   if (tools && tools.length > 0) body.tools = tools;
+  // Opt-in usage accounting: asks OpenAI-compatible endpoints to emit a terminal
+  // chunk (empty `choices`, populated `usage`) before [DONE]. Only valid with
+  // stream:true; opt-in so endpoints that ignore it (LM Studio) stay untouched.
+  if (stream && includeUsage) body.stream_options = { include_usage: true };
   return JSON.stringify(body);
 }

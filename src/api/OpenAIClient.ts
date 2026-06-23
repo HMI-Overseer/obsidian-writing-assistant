@@ -88,44 +88,57 @@ export class OpenAIClient implements ChatClient {
       ? formatOpenAITools(request.tools)
       : undefined;
     const url = `${this.baseUrl}/chat/completions`;
-    const body = buildCompletionPayload(model, messages, params, true, openAITools);
+    const body = buildCompletionPayload(model, messages, params, true, openAITools, true);
 
     // Tool call accumulation state.
     const pendingToolCalls = new Map<number, { id: string; name: string; argChunks: string[] }>();
     const completedToolCalls: ToolCall[] = [];
     let streamStopReason: StopReason = "unknown";
+    let streamUsage: UsageResult | null = null;
+    let resolveUsage: (value: UsageResult | null) => void;
     let resolveToolCalls: (value: ToolCall[] | null) => void;
     let resolveStopReason: (value: StopReason) => void;
+    const usagePromise = new Promise<UsageResult | null>((r) => { resolveUsage = r; });
     const toolCallsPromise = new Promise<ToolCall[] | null>((r) => { resolveToolCalls = r; });
     const stopReasonPromise = new Promise<StopReason>((r) => { resolveStopReason = r; });
 
-    const onEvent = openAITools ? (json: unknown): void => {
+    // Always observe events (not just on tool requests) so streamed usage is
+    // captured for plain chat too — the terminal include_usage chunk carries the
+    // final token counts even when no tools are involved.
+    const onEvent = (json: unknown): void => {
       const record = json as Record<string, unknown>;
       const choices = record.choices as Array<Record<string, unknown>> | undefined;
       const choice = choices?.[0];
-      const delta = choice?.delta as Record<string, unknown> | undefined;
-      const toolCallDeltas = delta?.tool_calls as Array<Record<string, unknown>> | undefined;
+
+      // The terminal accounting chunk has empty `choices` and a populated
+      // `usage`; capture it whenever present (intermediate chunks send null).
+      const usage = extractUsage(record);
+      if (usage) streamUsage = usage;
 
       if (choice?.finish_reason && typeof choice.finish_reason === "string") {
         streamStopReason = mapOpenAIStopReason(choice.finish_reason);
       }
 
-      if (toolCallDeltas) {
-        for (const tc of toolCallDeltas) {
-          const idx = tc.index as number;
-          if (tc.id) {
+      if (openAITools) {
+        const delta = choice?.delta as Record<string, unknown> | undefined;
+        const toolCallDeltas = delta?.tool_calls as Array<Record<string, unknown>> | undefined;
+        if (toolCallDeltas) {
+          for (const tc of toolCallDeltas) {
+            const idx = tc.index as number;
+            if (tc.id) {
+              const fn = tc.function as Record<string, unknown> | undefined;
+              const name = (fn?.name as string) ?? "";
+              pendingToolCalls.set(idx, { id: tc.id as string, name, argChunks: [] });
+              onToolCallStreaming?.(idx, name);
+            }
             const fn = tc.function as Record<string, unknown> | undefined;
-            const name = (fn?.name as string) ?? "";
-            pendingToolCalls.set(idx, { id: tc.id as string, name, argChunks: [] });
-            onToolCallStreaming?.(idx, name);
-          }
-          const fn = tc.function as Record<string, unknown> | undefined;
-          if (fn?.arguments && typeof fn.arguments === "string") {
-            pendingToolCalls.get(idx)?.argChunks.push(fn.arguments);
+            if (fn?.arguments && typeof fn.arguments === "string") {
+              pendingToolCalls.get(idx)?.argChunks.push(fn.arguments);
+            }
           }
         }
       }
-    } : undefined;
+    };
 
     const rawDeltas = streamFetch(url, body, signal, this.headers, undefined, onEvent);
 
@@ -153,12 +166,13 @@ export class OpenAIClient implements ChatClient {
           }
         }
         pendingToolCalls.clear();
+        resolveUsage(streamUsage);
         resolveToolCalls(completedToolCalls.length > 0 ? completedToolCalls : null);
         resolveStopReason(streamStopReason);
       }
     }
 
-    return { deltas: wrappedDeltas(), usage: Promise.resolve(null), toolCalls: toolCallsPromise, stopReason: stopReasonPromise };
+    return { deltas: wrappedDeltas(), usage: usagePromise, toolCalls: toolCallsPromise, stopReason: stopReasonPromise };
   }
 
   private buildMessages(request: ChatRequest): Message[] {

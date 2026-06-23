@@ -142,4 +142,26 @@ describe("buildCompletionPayload", () => {
     );
     expect(json).not.toHaveProperty("tools");
   });
+
+  test("requests usage accounting via stream_options when includeUsage on a stream", () => {
+    const json = JSON.parse(
+      buildCompletionPayload("m", MESSAGES, makeParams(), true, undefined, true)
+    );
+    expect(json.stream_options).toEqual({ include_usage: true });
+  });
+
+  test("omits stream_options when includeUsage is not requested", () => {
+    const json = JSON.parse(
+      buildCompletionPayload("m", MESSAGES, makeParams(), true)
+    );
+    expect(json).not.toHaveProperty("stream_options");
+  });
+
+  test("omits stream_options for a non-streaming request even when includeUsage is set", () => {
+    // stream_options is only valid alongside stream:true; never emit it otherwise.
+    const json = JSON.parse(
+      buildCompletionPayload("m", MESSAGES, makeParams(), false, undefined, true)
+    );
+    expect(json).not.toHaveProperty("stream_options");
+  });
 });

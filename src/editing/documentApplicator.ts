@@ -1,5 +1,6 @@
 import type { App } from "obsidian";
 import type { DiffHunk } from "./editTypes";
+import { detectEol, fromLf, toLf } from "./lineEndings";
 
 /**
  * Maximum character drift allowed between the originally resolved offset
@@ -42,14 +43,19 @@ export async function applyHunksLive(
 
   await app.vault.process(file, (currentContent) => {
     preContent = currentContent;
-    let result = currentContent;
+
+    // Resolve every splice in LF-space (the convention matchedText/replaceText and the
+    // resolved offsets use), then re-expand to the file's prevailing EOL on write, so a
+    // CRLF note stays pure CRLF instead of mixing endings (P1-2).
+    const eol = detectEol(currentContent);
+    let result = toLf(currentContent);
 
     for (const hunk of sortedHunks) {
       // Use matchedText (the actual text found in the document) rather than
       // searchText (what the model provided), these can differ when the match
       // was whitespace-normalized or fuzzy.
       const matchedText = hunk.resolvedEdit.matchedText;
-      const replaceText = hunk.resolvedEdit.editBlock.replaceText;
+      const replaceText = toLf(hunk.resolvedEdit.editBlock.replaceText);
       const idx = result.indexOf(matchedText);
 
       if (idx !== -1) {
@@ -65,7 +71,7 @@ export async function applyHunksLive(
       }
     }
 
-    return result;
+    return fromLf(result, eol);
   });
 
   const postContent = appliedIds.length > 0 ? await app.vault.read(file) : preContent;
@@ -101,27 +107,35 @@ export async function undoHunkLive(
   const file = app.vault.getFileByPath(targetFilePath);
   if (!file) return { undone: false, restoredContent: null };
 
-  const replaceText = hunk.resolvedEdit.editBlock.replaceText;
+  // matchedText/replaceText and the tracked offset are LF-space; reverse the splice
+  // there, then re-expand to the file's prevailing EOL on write (mirrors applyHunksLive).
+  const replaceText = toLf(hunk.resolvedEdit.editBlock.replaceText);
   const originalText = hunk.resolvedEdit.matchedText;
 
   let undone = false;
   let restored: string | null = null;
 
   await app.vault.process(file, (currentContent) => {
+    const eol = detectEol(currentContent);
+    const lfContent = toLf(currentContent);
+
     // Prefer the tracked offset for accuracy; fall back to indexOf.
     let idx = -1;
     if (
       trackedOffset !== undefined &&
-      currentContent.slice(trackedOffset, trackedOffset + replaceText.length) === replaceText
+      lfContent.slice(trackedOffset, trackedOffset + replaceText.length) === replaceText
     ) {
       idx = trackedOffset;
     } else {
-      idx = currentContent.indexOf(replaceText);
+      idx = lfContent.indexOf(replaceText);
     }
 
     if (idx === -1) return currentContent;
 
-    restored = currentContent.slice(0, idx) + originalText + currentContent.slice(idx + replaceText.length);
+    restored = fromLf(
+      lfContent.slice(0, idx) + originalText + lfContent.slice(idx + replaceText.length),
+      eol
+    );
     undone = true;
     return restored;
   });

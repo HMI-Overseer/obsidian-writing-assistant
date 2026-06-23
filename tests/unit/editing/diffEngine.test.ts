@@ -56,3 +56,42 @@ describe("resolveEdits, match type", () => {
     expect(r.nearMiss).toBe(false);
   });
 });
+
+describe("resolveEdits, CRLF documents (P1-2)", () => {
+  it("resolves an LF search against a CRLF document as an exact match", () => {
+    // A Windows-authored note has \r\n; the model emits \n. The \r is an encoding
+    // artifact, not an intentional whitespace difference, so this must resolve at
+    // Tier 1, not fall through to fuzzy (which mislabels a byte-identical edit).
+    const doc = "Line one.\r\nLine two.\r\nLine three.";
+    const r = resolveOne(doc, "Line one.\nLine two.");
+    expect(r.matchType).toBe("exact");
+    expect(r.confidence).toBe(1.0);
+  });
+
+  it("returns LF-only matchedText for a CRLF document (no \\r leaks downstream)", () => {
+    // matchedText feeds applyHunksLive (vs the raw file) AND the in-note CM6 overlay
+    // (vs the editor's LF-only doc); a stray \r breaks the overlay anchor and mixes
+    // endings on apply.
+    const doc = "Line one.\r\nLine two.\r\nLine three.";
+    const r = resolveOne(doc, "Line one.\nLine two.");
+    expect(r.matchedText).toBe("Line one.\nLine two.");
+    expect(r.matchedText).not.toContain("\r");
+  });
+
+  it("resolves an LF search against a CRLF document with collapsed spacing as whitespace", () => {
+    // Double space → not exact, but the whitespace tier should still catch it once the
+    // \r no longer defeats the collapse.
+    const doc = "Line  one.\r\nLine two.\r\nLine three.";
+    const r = resolveOne(doc, "Line one.\nLine two.");
+    expect(r.matchType).toBe("whitespace");
+    expect(r.matchedText).not.toContain("\r");
+  });
+
+  it("strips \\r from context lines of a CRLF document", () => {
+    const doc = "Intro line.\r\nLine one.\r\nLine two.\r\nOutro line.";
+    const r = resolveOne(doc, "Line one.\nLine two.");
+    for (const line of [...r.contextBefore, ...r.contextAfter]) {
+      expect(line).not.toContain("\r");
+    }
+  });
+});

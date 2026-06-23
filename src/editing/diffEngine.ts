@@ -1,4 +1,5 @@
 import { generateId } from "../utils";
+import { toLf } from "./lineEndings";
 import type { EditBlock, ResolvedEdit, DiffHunk, MatchType } from "./editTypes";
 
 /** Options controlling how edits are resolved against a document. */
@@ -40,9 +41,16 @@ export function resolveEdits(
   options: Partial<ResolveOptions> = {}
 ): ResolvedEdit[] {
   const opts = { ...DEFAULT_OPTIONS, ...options };
-  const docLines = document.split("\n");
 
-  return blocks.map((block) => resolveOneBlock(block, document, docLines, opts));
+  // Canonicalize on LF at the boundary so a CRLF-authored note matches an LF search
+  // at the exact/whitespace tiers instead of falling through to fuzzy. Every offset,
+  // line, and matchedText we return is therefore LF-space; the file-write boundary
+  // re-expands to the document's prevailing EOL (diff-engine-real-document-robustness,
+  // P1-2).
+  const lfDoc = toLf(document);
+  const docLines = lfDoc.split("\n");
+
+  return blocks.map((block) => resolveOneBlock(block, lfDoc, docLines, opts));
 }
 
 /**
@@ -89,14 +97,19 @@ function resolveOneBlock(
   docLines: string[],
   opts: ResolveOptions
 ): ResolvedEdit {
+  // `document` is already LF-normalized (see resolveEdits); normalize the model's
+  // search text the same way so the two share a line-ending convention before any
+  // tier runs. The original block is preserved on `editBlock` for display.
+  const searchText = toLf(block.searchText);
+
   // Tier 1: exact match
-  const exactOffset = document.indexOf(block.searchText);
+  const exactOffset = document.indexOf(searchText);
   if (exactOffset !== -1) {
-    return buildResolvedEdit(block, document, docLines, exactOffset, block.searchText.length, block.searchText, 1.0, "exact", opts);
+    return buildResolvedEdit(block, document, docLines, exactOffset, searchText.length, searchText, 1.0, "exact", opts);
   }
 
   // Tier 2: whitespace-normalized match
-  const normalizedResult = findNormalizedMatch(block.searchText, document);
+  const normalizedResult = findNormalizedMatch(searchText, document);
   if (normalizedResult) {
     return buildResolvedEdit(
       block, document, docLines,
@@ -106,7 +119,7 @@ function resolveOneBlock(
   }
 
   // Tier 3: line-level fuzzy match
-  const fuzzyResult = findFuzzyLineMatch(block.searchText, docLines, opts.minConfidence);
+  const fuzzyResult = findFuzzyLineMatch(searchText, docLines, opts.minConfidence);
   if (fuzzyResult.match) {
     const lineOffset = getLineOffset(docLines, fuzzyResult.match.startLine);
     const lineEnd = getLineEndOffset(docLines, fuzzyResult.match.endLine);

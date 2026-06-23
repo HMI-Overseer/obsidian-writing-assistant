@@ -127,3 +127,67 @@ describe("ChatSessionMemory.switchMessageVersion", () => {
     expect(memory.getSnapshot().messageHistory[0].content).toBe("Second version");
   });
 });
+
+describe("ChatSessionMemory.removeLastMessage", () => {
+  /** Build a conversation with an explicit message list. */
+  function withMessages(messages: Conversation["messages"]): Conversation {
+    return { ...makeConversation(), messages };
+  }
+
+  test("returns null and does not mutate when the history is empty", () => {
+    const memory = new ChatSessionMemory();
+
+    expect(memory.removeLastMessage()).toBeNull();
+    expect(memory.getSnapshot().messageHistory).toHaveLength(0);
+  });
+
+  test("pops the last message and recalculates the last-assistant response", () => {
+    const memory = new ChatSessionMemory();
+    memory.hydrateFromConversation(
+      withMessages([
+        { id: "u1", role: "user", content: "q1" },
+        { id: "a1", role: "assistant", content: "First answer" },
+        { id: "u2", role: "user", content: "q2" },
+        { id: "a2", role: "assistant", content: "Second answer" },
+      ]),
+    );
+    expect(memory.getSnapshot().lastAssistantResponse).toBe("Second answer");
+
+    const removed = memory.removeLastMessage();
+
+    expect(removed?.id).toBe("a2");
+    const snapshot = memory.getSnapshot();
+    expect(snapshot.messageHistory).toHaveLength(3);
+    // The newest assistant is gone, so the meter falls back to the prior one.
+    expect(snapshot.lastAssistantResponse).toBe("First answer");
+  });
+
+  test("keeps the last-assistant response when a trailing user message is popped", () => {
+    const memory = new ChatSessionMemory();
+    memory.hydrateFromConversation(
+      withMessages([
+        { id: "a1", role: "assistant", content: "Hello" },
+        { id: "u1", role: "user", content: "pending question" },
+      ]),
+    );
+
+    const removed = memory.removeLastMessage();
+
+    expect(removed?.id).toBe("u1");
+    expect(memory.getSnapshot().lastAssistantResponse).toBe("Hello");
+  });
+
+  test("clears the last-assistant response when no assistant message remains", () => {
+    const memory = new ChatSessionMemory();
+    memory.hydrateFromConversation(
+      withMessages([
+        { id: "u1", role: "user", content: "q1" },
+        { id: "a1", role: "assistant", content: "Only answer" },
+      ]),
+    );
+
+    memory.removeLastMessage();
+
+    expect(memory.getSnapshot().lastAssistantResponse).toBe("");
+  });
+});

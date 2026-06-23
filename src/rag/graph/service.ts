@@ -13,6 +13,9 @@ import type { GraphRetrievalContext } from "./retrieval";
 
 const GRAPH_FILE = "rag-knowledge-graph.json";
 
+/** Delay in ms before persisting the graph after a watcher-driven re-key/removal. */
+const SAVE_DEBOUNCE_MS = 2000;
+
 /**
  * Top-level facade for the knowledge graph.
  *
@@ -33,6 +36,10 @@ export class GraphService {
 
   private configuredModelId: string | null = null;
   private configuredEmbeddingModelId: string | null = null;
+
+  /** Live vault watchers that keep the graph structurally consistent (no LLM). */
+  private eventRefs: Array<ReturnType<App["vault"]["on"]>> = [];
+  private saveTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(
     app: App,
@@ -161,6 +168,63 @@ export class GraphService {
 
     this.graph = new KnowledgeGraph();
     await this.loadGraph();
+
+    // Keep the graph structurally consistent as the vault changes. Rename and
+    // delete are pure bookkeeping (no LLM); content drift from edits is surfaced
+    // via getStaleFileCount, never chased automatically.
+    this.registerVaultEvents();
+  }
+
+  /**
+   * Watch the vault for rename/delete and keep path-keyed entity provenance
+   * consistent without any model call. Gated implicitly on a configured graph
+   * (only called at the end of configure); each handler guards on it anyway.
+   */
+  private registerVaultEvents(): void {
+    this.eventRefs.push(
+      this.app.vault.on("rename", (file, oldPath) => {
+        if (this.graph && isMarkdownPath(file.path)) {
+          this.graph.renameFile(oldPath, file.path);
+          this.scheduleSave();
+        }
+      }),
+    );
+
+    this.eventRefs.push(
+      this.app.vault.on("delete", (file) => {
+        if (this.graph && isMarkdownPath(file.path)) {
+          this.graph.removeFile(file.path);
+          this.scheduleSave();
+        }
+      }),
+    );
+  }
+
+  /** Persist the graph after a debounce, coalescing bursts (e.g. a folder rename). */
+  private scheduleSave(): void {
+    if (this.saveTimer) clearTimeout(this.saveTimer);
+    this.saveTimer = setTimeout(() => {
+      this.saveTimer = null;
+      void this.saveGraph();
+    }, SAVE_DEBOUNCE_MS);
+  }
+
+  /**
+   * Count in-scope markdown files the graph was built from whose content has
+   * changed since (mtime differs). Surfaced in settings so silent description
+   * drift is visible; new/never-built files are reflected by the folder bars,
+   * and deletes are handled live, so neither is counted here.
+   */
+  getStaleFileCount(excludePatterns: string[]): number {
+    if (!this.graph) return 0;
+
+    let count = 0;
+    for (const file of this.app.vault.getMarkdownFiles()) {
+      if (excludePatterns.some((p) => matchGlob(p, file.path))) continue;
+      const meta = this.graph.getFileMeta(file.path);
+      if (meta && meta.mtime !== file.stat.mtime) count++;
+    }
+    return count;
   }
 
   /**
@@ -271,6 +335,16 @@ export class GraphService {
 
   /** Shut down the extractor and release resources. */
   shutdown(): void {
+    for (const ref of this.eventRefs) {
+      this.app.vault.offref(ref);
+    }
+    this.eventRefs = [];
+
+    if (this.saveTimer) {
+      clearTimeout(this.saveTimer);
+      this.saveTimer = null;
+    }
+
     this.extractor?.destroy();
     this.extractor = null;
     this.chatClient = null;
@@ -343,4 +417,15 @@ export class GraphService {
       // Non-fatal.
     }
   }
+}
+
+/**
+ * Whether a renamed/deleted abstract file is a markdown note we may track.
+ * Mirrors the embedding indexer's rename/delete filter: a path-only check (no
+ * `instanceof TFile`), so folder events fall through. Exclude patterns are not
+ * applied, the graph mutators no-op on untracked paths, and skipping a now-excluded
+ * but already-tracked file would orphan it.
+ */
+function isMarkdownPath(path: string): boolean {
+  return path.endsWith(".md");
 }

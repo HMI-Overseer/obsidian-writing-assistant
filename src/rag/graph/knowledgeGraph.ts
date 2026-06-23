@@ -270,6 +270,47 @@ export class KnowledgeGraph {
     }
   }
 
+  /**
+   * Re-key all data from `oldPath` to `newPath` after a vault rename.
+   *
+   * Pure string surgery, no LLM call: a rename is a structural event, not a
+   * semantic one, so the existing entity descriptions are kept under the new
+   * path. Content re-extraction (if the rename also reflects a rewrite) is
+   * deferred to the mtime-driven "changed files" signal, not forced here.
+   */
+  renameFile(oldPath: string, newPath: string): void {
+    if (oldPath === newPath) return;
+
+    // Re-key the file→entity index, and rewrite each affected entity's
+    // sourceFiles entry from the old path to the new one.
+    const entityNames = this.fileEntityIndex.get(oldPath);
+    if (entityNames) {
+      for (const name of entityNames) {
+        const entity = this.entities.get(name);
+        if (!entity) continue;
+        entity.sourceFiles = entity.sourceFiles.map((f) => (f === oldPath ? newPath : f));
+        // Guard against a duplicate if the entity already listed newPath.
+        entity.sourceFiles = [...new Set(entity.sourceFiles)];
+      }
+
+      // Merge into any pre-existing index set for newPath (rename onto a
+      // tracked path is unusual but must not drop entries).
+      const target = this.fileEntityIndex.get(newPath) ?? new Set<string>();
+      for (const name of entityNames) target.add(name);
+      this.fileEntityIndex.set(newPath, target);
+      this.fileEntityIndex.delete(oldPath);
+    }
+
+    // Re-key relations sourced from the old path.
+    for (const relation of this.relations) {
+      if (relation.sourceFile === oldPath) relation.sourceFile = newPath;
+    }
+
+    // Re-key file metadata.
+    const meta = this.fileMeta.find((m) => m.filePath === oldPath);
+    if (meta) meta.filePath = newPath;
+  }
+
   /** Remove all data associated with a file. */
   removeFile(filePath: string): void {
     // Remove entities that only exist in this file.

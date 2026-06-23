@@ -351,6 +351,103 @@ describe("KnowledgeGraph", () => {
     });
   });
 
+  // ── renameFile ───────────────────────────────────────────────────
+
+  describe("renameFile", () => {
+    test("re-keys file→entity index so the entity is reachable under the new path", () => {
+      graph.addExtractions(
+        "Characters/Arden.md",
+        makeExtraction([
+          { name: "Arden", type: "character", description: "A wandering knight" },
+        ]),
+        makeMeta("Characters/Arden.md"),
+      );
+
+      graph.renameFile("Characters/Arden.md", "Characters/Aldous.md");
+
+      // Old path is gone; new path resolves the same entity.
+      expect(graph.getEntitiesInFile("Characters/Arden.md")).toHaveLength(0);
+      const moved = graph.getEntitiesInFile("Characters/Aldous.md");
+      expect(moved).toHaveLength(1);
+      expect(moved[0].name).toBe("Arden");
+    });
+
+    test("rewrites entity sourceFiles to the new path", () => {
+      graph.addExtractions(
+        "Characters/Arden.md",
+        makeExtraction([
+          { name: "Arden", type: "character", description: "A wandering knight" },
+        ]),
+        makeMeta("Characters/Arden.md"),
+      );
+
+      graph.renameFile("Characters/Arden.md", "Characters/Aldous.md");
+
+      const entity = graph.findEntities("Arden")[0];
+      expect(entity.sourceFiles).toEqual(["Characters/Aldous.md"]);
+    });
+
+    test("updates fileMeta path and relation sourceFile", () => {
+      graph.addExtractions(
+        "story.md",
+        makeExtraction(
+          [
+            { name: "Alice", type: "character", description: "A knight" },
+            { name: "Bob", type: "character", description: "A wizard" },
+          ],
+          [{ source: "Alice", target: "Bob", type: "allies with", description: "" }],
+        ),
+        makeMeta("story.md"),
+      );
+
+      graph.renameFile("story.md", "renamed.md");
+
+      expect(graph.getFileMeta("story.md")).toBeUndefined();
+      expect(graph.getFileMeta("renamed.md")?.filePath).toBe("renamed.md");
+
+      // getRelevantFiles must emit the new path, never the dead one.
+      const files = graph.getRelevantFiles("Alice", 1);
+      expect(files.has("story.md")).toBe(false);
+      expect(files.has("renamed.md")).toBe(true);
+    });
+
+    test("preserves an entity shared with another file (only the renamed path changes)", () => {
+      graph.addExtractions(
+        "file1.md",
+        makeExtraction([{ name: "Alice", type: "character", description: "A knight" }]),
+        makeMeta("file1.md"),
+      );
+      graph.addExtractions(
+        "file2.md",
+        makeExtraction([{ name: "Alice", type: "character", description: "A knight" }]),
+        makeMeta("file2.md"),
+      );
+
+      graph.renameFile("file1.md", "renamed.md");
+
+      const entity = graph.findEntities("Alice")[0];
+      expect(entity.sourceFiles).toContain("renamed.md");
+      expect(entity.sourceFiles).toContain("file2.md");
+      expect(entity.sourceFiles).not.toContain("file1.md");
+      // No duplication, still exactly two source files.
+      expect(entity.sourceFiles).toHaveLength(2);
+    });
+
+    test("is a no-op for an untracked path", () => {
+      graph.addExtractions(
+        "file.md",
+        makeExtraction([{ name: "Alice", type: "character", description: "A knight" }]),
+        makeMeta("file.md"),
+      );
+
+      graph.renameFile("never-tracked.md", "elsewhere.md");
+
+      expect(graph.getEntityCount()).toBe(1);
+      expect(graph.getEntitiesInFile("file.md")).toHaveLength(1);
+      expect(graph.getEntitiesInFile("elsewhere.md")).toHaveLength(0);
+    });
+  });
+
   // ── Serialization ────────────────────────────────────────────────
 
   describe("serialize / deserialize", () => {

@@ -180,6 +180,7 @@ export function renderKnowledgeGraphTab(
     const headerRow = statusBlock.createDiv({ cls: "lmsa-index-status-header" });
     const infoEl = headerRow.createDiv({ cls: "lmsa-index-status-info" });
     const statusTextEl = infoEl.createEl("p", { cls: "lmsa-index-status-text" });
+    const staleNoticeEl = infoEl.createEl("p", { cls: "lmsa-index-drift-notice" });
 
     const actionsEl = headerRow.createDiv({ cls: "lmsa-index-actions" });
     const buildBtn = new Button(actionsEl).setButtonText("Build graph").setCta().onClick(async () => {
@@ -242,6 +243,17 @@ export function renderKnowledgeGraphTab(
         statusTextEl.textContent = "Graph not built. Click build graph to start.";
         statusTextEl.removeClass("mod-error");
       }
+
+      // Staleness notice: tracked files edited since the last build. A rename or
+      // delete is re-keyed live, but an edit only refreshes on a (re)build, so
+      // surface the drift instead of silently serving stale entity descriptions.
+      const staleCount = hasGraph && !isExtracting
+        ? plugin.services.graphService.getStaleFileCount(kg.excludePatterns)
+        : 0;
+      staleNoticeEl.textContent = staleCount > 0
+        ? `${staleCount} file${staleCount === 1 ? "" : "s"} changed since the graph was built. Rebuild to refresh.`
+        : "";
+      staleNoticeEl.toggleClass("is-visible", staleCount > 0);
 
       // Overall extraction progress bar (shown during any active build)
       if (isExtracting) {

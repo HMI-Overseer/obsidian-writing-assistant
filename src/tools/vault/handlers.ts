@@ -1,18 +1,10 @@
-import type { App, MetadataCache } from "obsidian";
+import type { App } from "obsidian";
 import { TFile, TFolder, normalizePath } from "obsidian";
-
-/**
- * Obsidian exposes these methods at runtime but they are not part of the
- * official published TypeScript definitions.
- */
-interface ExtendedMetadataCache extends MetadataCache {
-  getBacklinksForFile(file: TFile): { data: Record<string, unknown[]> };
-  getTags(): Record<string, number>;
-}
 import type { ToolCall, ToolResult } from "../types";
 import { toolFailure } from "../toolFailure";
 import { refuseOutsideVault } from "../pathBoundary";
 import { escapesVault, outsideVaultMessage } from "../../vault-ops/pathSafety";
+import type { ExtendedMetadataCache } from "../../vault-ops/metadata";
 import type { RagContextBlock } from "../../shared/chatRequest";
 import { RagRetrievalError } from "../../rag/ragService";
 import type { RagService } from "../../rag/ragService";
@@ -542,7 +534,7 @@ async function executeGetBacklinks(
   }
 
   const backlinks = (ctx.app.metadataCache as ExtendedMetadataCache).getBacklinksForFile(file);
-  const paths = Object.keys(backlinks.data).sort();
+  const paths = Object.keys(backlinks?.data ?? {}).sort();
 
   if (paths.length === 0) {
     return {

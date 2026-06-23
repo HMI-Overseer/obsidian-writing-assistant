@@ -1,4 +1,4 @@
-import { type App, type MetadataCache, type TFile, normalizePath } from "obsidian";
+import { type App, normalizePath } from "obsidian";
 import type { ErrorKind, ToolCall, ToolResult } from "../../tools/types";
 import type {
   AppliedVaultOpRecord,
@@ -6,11 +6,15 @@ import type {
   VaultOperation,
   VaultOperationProposal,
 } from "../../vault-ops/types";
-import { diskState, diskFingerprint, readContentOrNull } from "../../vault-ops/apply";
+import { diskState, diskFingerprint } from "../../vault-ops/apply";
 import { applyVaultOpBatch } from "../../vault-ops/applyBatch";
-import { resolveGate, resolveEditGate, targetPaths, type VaultOpPolicy } from "../../vault-ops/gateway";
+import { resolveEditGate, targetPaths, type VaultOpPolicy } from "../../vault-ops/gateway";
 import { escapesVault, outsideVaultMessage } from "../../vault-ops/pathSafety";
-import { summarizeOp } from "../../vault-ops/summary";
+import {
+  preReadTrashSnapshots,
+  gateConvertedOp,
+  buildReviewableOp,
+} from "../../vault-ops/proposalSupport";
 import {
   dispositionMessage,
   editDispositionMessage,
@@ -40,10 +44,6 @@ import { convertToolCallToEditBlock } from "../../tools/editing/conversion";
 import { resolveStructuralEditBlocks } from "../../tools/editing/handlers";
 import { defaultRecovery, trimDot } from "../../tools/toolFailure";
 import { generateId } from "../../utils";
-
-interface ExtendedMetadataCache extends MetadataCache {
-  getBacklinksForFile(file: TFile): { data: Record<string, unknown[]> };
-}
 
 /** A converted op classified by how it must resolve. */
 type Entry =
@@ -474,15 +474,9 @@ export class LiveVaultReview {
     const overlay = buildPendingOverlay(this.app, this.accumulatedCalls);
     const resolve = makeResolver(overlay, (p) => diskState(this.app, p));
 
-    // Pre-read trash snapshots (async) so conversion stays synchronous, mirroring
-    // buildVaultOpProposal: a trashed file's snapshot is what its inverse recreates.
-    const snapshots = new Map<string, string>();
-    for (const tc of calls) {
-      if (tc.name === "trash_file" && typeof tc.arguments.path === "string") {
-        const content = await readContentOrNull(this.app, tc.arguments.path);
-        if (content !== null) snapshots.set(normalizePath(tc.arguments.path), content);
-      }
-    }
+    // A trashed file's snapshot is what its inverse recreates on undo; pre-read so
+    // conversion stays synchronous (shared with the finalize path).
+    const snapshots = await preReadTrashSnapshots(this.app, calls);
 
     const probes: ConversionProbes = {
       resolve,
@@ -521,7 +515,7 @@ export class LiveVaultReview {
       }
 
       const { op, satisfied: isSatisfied } = found;
-      const gate = isSatisfied ? "auto" : resolveGate(op, this.policy, this.autoSoFar);
+      const { gate, autoConsumed } = gateConvertedOp(op, isSatisfied, this.policy, this.autoSoFar);
       if (gate === "deny") {
         // Denied tools are filtered upstream (Phase 4); guard anyway.
         const recovery = defaultRecovery("denied");
@@ -537,17 +531,9 @@ export class LiveVaultReview {
         });
         continue;
       }
-      if (gate === "auto" && !isSatisfied) this.autoSoFar++;
+      if (autoConsumed) this.autoSoFar++;
 
-      const reviewable: ReviewableVaultOp = {
-        id: generateId(),
-        op,
-        gate,
-        status: isSatisfied ? "satisfied" : "pending",
-        summary: summarizeOp(op),
-        sourceToolCallId: call.id,
-      };
-      if (op.kind === "move") reviewable.linkImpact = this.backlinkCount(op.from);
+      const reviewable = buildReviewableOp(this.app, op, gate, isSatisfied, call.id);
       this.proposal.ops.push(reviewable);
 
       if (isSatisfied) {
@@ -790,13 +776,6 @@ export class LiveVaultReview {
       this.appliedRecord.applied = [...this.appliedRecord.applied, ...applied];
       this.appliedRecord.appliedAt = Date.now();
     }
-  }
-
-  private backlinkCount(path: string): number {
-    const file = this.app.vault.getFileByPath(normalizePath(path));
-    if (!file) return 0;
-    const backlinks = (this.app.metadataCache as ExtendedMetadataCache).getBacklinksForFile(file);
-    return Object.keys(backlinks?.data ?? {}).length;
   }
 
   private async runExclusive<T>(fn: () => Promise<T>): Promise<T> {

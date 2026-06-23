@@ -1,11 +1,4 @@
-import {
-  type App,
-  type Component,
-  type MetadataCache,
-  type TFile,
-  Notice,
-  normalizePath,
-} from "obsidian";
+import { type App, type Component, Notice, normalizePath } from "obsidian";
 import { parseEditBlocks } from "../../editing/parseEditBlocks";
 import { toolCallsToEditBlocks } from "../../tools/editing/conversion";
 import { resolveStructuralEditBlocks } from "../../tools/editing/handlers";
@@ -14,9 +7,13 @@ import type { AppliedEditRecord, EditBlock, EditProposal } from "../../editing/e
 import { EDIT_TOOL_NAMES } from "../../tools/editing/definition";
 import { VAULT_OPS_TOOL_NAMES } from "../../tools/vault-ops/definition";
 import { toVaultOperations, type ConversionProbes } from "../../tools/vault-ops/conversion";
-import { diskState, diskFingerprint, readContentOrNull } from "../../vault-ops/apply";
-import { resolveGate, type VaultOpPolicy } from "../../vault-ops/gateway";
-import { summarizeOp } from "../../vault-ops/summary";
+import { diskState, diskFingerprint } from "../../vault-ops/apply";
+import type { VaultOpPolicy } from "../../vault-ops/gateway";
+import {
+  preReadTrashSnapshots,
+  gateConvertedOp,
+  buildReviewableOp,
+} from "../../vault-ops/proposalSupport";
 import type {
   AppliedVaultOpRecord,
   ReviewableVaultOp,
@@ -232,18 +229,6 @@ async function buildEditProposal(
   };
 }
 
-interface ExtendedMetadataCache extends MetadataCache {
-  getBacklinksForFile(file: TFile): { data: Record<string, unknown[]> };
-}
-
-/** Number of notes that link to a file, the `linkImpact` shown for move ops. */
-function backlinkCount(app: App, path: string): number {
-  const file = app.vault.getFileByPath(normalizePath(path));
-  if (!file) return 0;
-  const backlinks = (app.metadataCache as ExtendedMetadataCache).getBacklinksForFile(file);
-  return Object.keys(backlinks?.data ?? {}).length;
-}
-
 /**
  * Convert vault-op tool calls into a reviewable proposal:
  * convert → capture fingerprints/snapshots → resolveGate (threading the per-turn
@@ -256,15 +241,9 @@ async function buildVaultOpProposal(
   stoppedForMaxTokens: boolean,
   policy: VaultOpPolicy,
 ): Promise<VaultOperationProposal | null> {
-  // Pre-read trash snapshots (async) so the pure conversion can stay synchronous;
-  // a trashed file's snapshot is what its inverse re-creates on undo.
-  const snapshots = new Map<string, string>();
-  for (const tc of vaultOpCalls) {
-    if (tc.name === "trash_file" && typeof tc.arguments.path === "string") {
-      const content = await readContentOrNull(app, tc.arguments.path);
-      if (content !== null) snapshots.set(normalizePath(tc.arguments.path), content);
-    }
-  }
+  // A trashed file's snapshot is what its inverse re-creates on undo; pre-read so
+  // the pure conversion below can stay synchronous.
+  const snapshots = await preReadTrashSnapshots(app, vaultOpCalls);
 
   const probes: ConversionProbes = {
     resolve: (p) => diskState(app, p),
@@ -287,19 +266,10 @@ async function buildVaultOpProposal(
     // informational only: never gated, never applied, shown on their step as a
     // muted "already exists" note.
     const isSatisfied = satisfied[i];
-    const gate = isSatisfied ? "auto" : resolveGate(op, policy, autoSoFar);
+    const { gate, autoConsumed } = gateConvertedOp(op, isSatisfied, policy, autoSoFar);
     if (gate === "deny") return; // denied tools are filtered upstream (Phase 4); guard anyway.
-    if (gate === "auto" && !isSatisfied) autoSoFar++;
-    const reviewableOp: ReviewableVaultOp = {
-      id: generateId(),
-      op,
-      gate,
-      status: isSatisfied ? "satisfied" : "pending",
-      summary: summarizeOp(op),
-      sourceToolCallId: sources[i],
-    };
-    if (op.kind === "move") reviewableOp.linkImpact = backlinkCount(app, op.from);
-    reviewable.push(reviewableOp);
+    if (autoConsumed) autoSoFar++;
+    reviewable.push(buildReviewableOp(app, op, gate, isSatisfied, sources[i]));
   });
   if (reviewable.length === 0) return null;
 

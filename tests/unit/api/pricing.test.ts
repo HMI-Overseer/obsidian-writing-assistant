@@ -88,4 +88,56 @@ describe("estimateCost", () => {
     const expected = (2489 / 1_000_000) * 0.25 + (12 / 1_000_000) * 1.25;
     expect(cost).toBeCloseTo(expected, 8);
   });
+
+  // --- Current-generation pricing (P1-4) ---
+
+  test("prices the current Opus family (4.6/4.7/4.8) at $5/$25, not the legacy $15/$75", () => {
+    const usage = makeUsage({ inputTokens: 1_000_000, outputTokens: 1_000_000 });
+    // $5/M input + $25/M output = $30 — NOT the $90 the stale "claude-opus-4" prefix charged.
+    expect(estimateCost("claude-opus-4-8", usage)).toBeCloseTo(30, 4);
+    expect(estimateCost("claude-opus-4-7", usage)).toBeCloseTo(30, 4);
+    expect(estimateCost("claude-opus-4-6", usage)).toBeCloseTo(30, 4);
+    expect(estimateCost("claude-opus-4-5", usage)).toBeCloseTo(30, 4);
+  });
+
+  test("prices current Opus cache tokens at the dropped rate", () => {
+    // $6.25/M cache write (1.25x input), $0.50/M cache read (0.1x input).
+    expect(
+      estimateCost("claude-opus-4-8", makeUsage({ cacheCreationInputTokens: 1_000_000 }))
+    ).toBeCloseTo(6.25, 4);
+    expect(
+      estimateCost("claude-opus-4-8", makeUsage({ cacheReadInputTokens: 1_000_000 }))
+    ).toBeCloseTo(0.5, 4);
+  });
+
+  test("keeps legacy Opus 4.0/4.1 distinct at $15/$75", () => {
+    const usage = makeUsage({ inputTokens: 1_000_000, outputTokens: 1_000_000 });
+    // $15/M input + $75/M output = $90.
+    expect(estimateCost("claude-opus-4-0", usage)).toBeCloseTo(90, 4);
+    expect(estimateCost("claude-opus-4-1", usage)).toBeCloseTo(90, 4);
+    expect(estimateCost("claude-opus-4-1-20250805", usage)).toBeCloseTo(90, 4);
+  });
+
+  test("prices Haiku 4.5 at $1/$5", () => {
+    const usage = makeUsage({ inputTokens: 1_000_000, outputTokens: 1_000_000 });
+    expect(estimateCost("claude-haiku-4-5", usage)).toBeCloseTo(6, 4);
+    expect(estimateCost("claude-haiku-4-5-20251001", usage)).toBeCloseTo(6, 4);
+  });
+
+  test("prices Fable 5 and Mythos 5 at $10/$50", () => {
+    const usage = makeUsage({ inputTokens: 1_000_000, outputTokens: 1_000_000 });
+    expect(estimateCost("claude-fable-5", usage)).toBeCloseTo(60, 4);
+    expect(estimateCost("claude-mythos-5", usage)).toBeCloseTo(60, 4);
+  });
+
+  test("prices Sonnet 4.6 at $3/$15", () => {
+    const usage = makeUsage({ inputTokens: 1_000_000, outputTokens: 1_000_000 });
+    expect(estimateCost("claude-sonnet-4-6", usage)).toBeCloseTo(18, 4);
+  });
+
+  test("returns null for an unknown future Anthropic model instead of mis-pricing it", () => {
+    // No broad "claude-opus-4" catch-all: a model not in the table is honestly
+    // unknown (null), not silently charged a neighbouring tier's price.
+    expect(estimateCost("claude-opus-4-9", makeUsage({ inputTokens: 1_000_000 }))).toBeNull();
+  });
 });

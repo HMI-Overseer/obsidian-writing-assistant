@@ -22,6 +22,11 @@
     color: var(--lmsa-mode-accent);
   }
 
+  .lmsa-chat-window-usage-cost-unavailable {
+    @apply lmsa-inline-flex lmsa-items-center lmsa-italic;
+    opacity: 0.6;
+  }
+
   .lmsa-chat-window-usage-cache {
     @apply lmsa-inline-flex lmsa-items-center;
     color: var(--text-success);

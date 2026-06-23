@@ -1,4 +1,16 @@
 import type { MessageUsage, ProviderOption } from "../../shared/types";
+import { PROVIDER_DESCRIPTORS } from "../../providers/descriptors";
+import { PRICING_AS_OF } from "../../api/pricing";
+
+/**
+ * Whether the provider bills per token (Anthropic, OpenAI, Claude Code) versus a
+ * free/local model (LM Studio). Used to tell "metered model with no price table
+ * entry" apart from "free local model" — the former surfaces "price unavailable",
+ * the latter shows nothing.
+ */
+function isMeteredProvider(provider: ProviderOption | undefined): boolean {
+  return provider !== undefined && PROVIDER_DESCRIPTORS[provider].billingModel === "per-token";
+}
 
 function formatTokenCount(tokens: number): string {
   if (tokens >= 1_000_000) return `${(tokens / 1_000_000).toFixed(1)}M`;
@@ -55,9 +67,21 @@ export function renderUsageBadge(
       usage.estimatedCostUsd !== undefined &&
       usage.estimatedCostUsd > 0
     ) {
+      // A token-table estimate, not a billed figure. The "~" and the dated tooltip
+      // keep it honestly an estimate "as of" a price snapshot, not authoritative.
       badgeEl.createSpan({
         cls: "lmsa-chat-window-usage-cost",
-        text: formatCost(usage.estimatedCostUsd),
+        text: `~${formatCost(usage.estimatedCostUsd)}`,
+        title: `Estimated from pricing as of ${PRICING_AS_OF}`,
+      });
+    } else if (usage.estimatedCostUsd === undefined && isMeteredProvider(provider)) {
+      // A per-token provider whose model isn't in the price table. Surfacing this
+      // as "price unavailable" distinguishes it from a free/local model, which
+      // intentionally shows no cost at all.
+      badgeEl.createSpan({
+        cls: "lmsa-chat-window-usage-cost-unavailable",
+        text: "price unavailable",
+        title: "No local pricing data for this model",
       });
     }
   }

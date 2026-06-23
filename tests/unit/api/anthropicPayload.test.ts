@@ -3,9 +3,14 @@ import {
   buildAnthropicMessages,
   buildAnthropicHeaders,
   buildAnthropicPayload,
+  anthropicModelSupportsAdaptiveThinking,
 } from "../../../src/api/buildAnthropicPayload";
 import type { ChatRequest } from "../../../src/shared/chatRequest";
-import type { SamplingParams, AnthropicCacheSettings } from "../../../src/shared/types";
+import type {
+  SamplingParams,
+  AnthropicCacheSettings,
+  ReasoningLevel,
+} from "../../../src/shared/types";
 
 function makeRequest(overrides: Partial<ChatRequest> = {}): ChatRequest {
   return {
@@ -61,6 +66,28 @@ describe("buildAnthropicMessages", () => {
     const { system } = buildAnthropicMessages(makeRequest(), cache);
     expect(typeof system).toBe("string");
     expect(system).toBe("You are helpful.");
+  });
+
+  // The 1-hour extended cache TTL is applied via `ttl: "1h"` on the cache_control block
+  // (verified against the claude-api skill + docs/reference/external/anthropic-api.md).
+  // Previously the block hardcoded `{ type: "ephemeral" }` with no ttl, so a user who
+  // selected the 1h cache paid the 2x write premium intent but never got the longer TTL.
+  test("with cache enabled + 1h TTL emits ttl on the cache_control block", () => {
+    const cache: AnthropicCacheSettings = { enabled: true, ttl: "1h" };
+    const { system } = buildAnthropicMessages(makeRequest(), cache);
+    expect(system).toEqual([
+      { type: "text", text: "You are helpful.", cache_control: { type: "ephemeral", ttl: "1h" } },
+    ]);
+  });
+
+  // Default (5-min) TTL is the wire default — omit `ttl` entirely; `ttl: "default"` is an
+  // internal label, not a valid wire value.
+  test("with cache enabled + default TTL omits ttl from the cache_control block", () => {
+    const cache: AnthropicCacheSettings = { enabled: true, ttl: "default" };
+    const { system } = buildAnthropicMessages(makeRequest(), cache);
+    expect(system).toEqual([
+      { type: "text", text: "You are helpful.", cache_control: { type: "ephemeral" } },
+    ]);
   });
 
   test("keeps document context out of the system block (cache prefix stays stable)", () => {
@@ -189,29 +216,21 @@ describe("buildAnthropicMessages", () => {
 });
 
 describe("buildAnthropicHeaders", () => {
-  test("without cache has no beta header", () => {
+  test("builds base auth + version + content-type headers", () => {
     const headers = buildAnthropicHeaders("sk-test", "2023-06-01");
-    expect(headers).not.toHaveProperty("anthropic-beta");
     expect(headers["x-api-key"]).toBe("sk-test");
     expect(headers["anthropic-version"]).toBe("2023-06-01");
     expect(headers["Content-Type"]).toBe("application/json");
-  });
-
-  test("with cache enabled + default TTL has no beta header", () => {
-    const cache: AnthropicCacheSettings = { enabled: true, ttl: "default" };
-    const headers = buildAnthropicHeaders("sk-test", "2023-06-01", cache);
     expect(headers).not.toHaveProperty("anthropic-beta");
   });
 
-  test("with cache enabled + 1h TTL includes beta header", () => {
-    const cache: AnthropicCacheSettings = { enabled: true, ttl: "1h" };
-    const headers = buildAnthropicHeaders("sk-test", "2023-06-01", cache);
-    expect(headers["anthropic-beta"]).toBe("prompt-caching-2024-07-31");
-  });
-
-  test("with cache disabled + 1h TTL does not include beta header", () => {
-    const cache: AnthropicCacheSettings = { enabled: false, ttl: "1h" };
-    const headers = buildAnthropicHeaders("sk-test", "2023-06-01", cache);
+  // The 1-hour extended cache TTL is GA and needs NO beta header (verified against the
+  // claude-api skill + docs/reference/external/anthropic-api.md). The legacy
+  // prompt-caching-2024-07-31 header must never be sent — the TTL rides on the
+  // cache_control block instead (see the buildAnthropicMessages tests above), so the
+  // headers no longer depend on cache settings at all.
+  test("never sends a prompt-caching beta header (1h TTL is GA, carried on the block)", () => {
+    const headers = buildAnthropicHeaders("sk-test", "2023-06-01");
     expect(headers).not.toHaveProperty("anthropic-beta");
   });
 });
@@ -363,5 +382,141 @@ describe("buildAnthropicPayload sampling-param gate (by model family)", () => {
     expect(json.temperature).toBe(0.5);
     expect(json.top_p).toBe(0.9);
     expect(json.top_k).toBe(40);
+  });
+});
+
+describe("buildAnthropicPayload reasoning → adaptive thinking + effort (by model)", () => {
+  // The profile reasoning level maps to adaptive thinking + the effort control on
+  // current-gen models. Adaptive (`thinking: {type:"adaptive"}`) is the only on-mode;
+  // budget_tokens 400s. Verified against the bundled claude-api reference.
+  test.each([
+    ["low", "low"],
+    ["medium", "medium"],
+    ["high", "high"],
+  ])("maps reasoning '%s' to adaptive thinking + effort '%s' on a capable model", (level, effort) => {
+    const json = JSON.parse(
+      buildAnthropicPayload(
+        "claude-opus-4-8", "sys", [],
+        makeParams({ reasoning: level as ReasoningLevel }),
+        false
+      )
+    );
+    expect(json.thinking).toEqual({ type: "adaptive" });
+    expect(json.output_config).toEqual({ effort });
+  });
+
+  test("maps reasoning 'on' to adaptive thinking with no explicit effort (model default)", () => {
+    const json = JSON.parse(
+      buildAnthropicPayload("claude-opus-4-8", "sys", [], makeParams({ reasoning: "on" }), false)
+    );
+    expect(json.thinking).toEqual({ type: "adaptive" });
+    expect(json).not.toHaveProperty("output_config");
+  });
+
+  test("emits no thinking for reasoning 'off'", () => {
+    const json = JSON.parse(
+      buildAnthropicPayload("claude-opus-4-8", "sys", [], makeParams({ reasoning: "off" }), false)
+    );
+    expect(json).not.toHaveProperty("thinking");
+    expect(json).not.toHaveProperty("output_config");
+  });
+
+  test("emits no thinking when reasoning is null", () => {
+    const json = JSON.parse(
+      buildAnthropicPayload("claude-opus-4-8", "sys", [], makeParams({ reasoning: null }), false)
+    );
+    expect(json).not.toHaveProperty("thinking");
+  });
+
+  // Fail safe: a model that doesn't support adaptive thinking (Haiku 4.5, older Sonnets,
+  // legacy ids, unknown/future ids) gets no thinking field, so a stale reasoning setting
+  // can never 400 it. budget_tokens-era thinking on those models is out of scope here.
+  test.each([
+    "claude-haiku-4-5",
+    "claude-opus-4-5",
+    "claude-3-5-sonnet-20241022",
+    "claude-opus-9",
+  ])("omits thinking for non-adaptive model %s (fail safe)", (model) => {
+    const json = JSON.parse(
+      buildAnthropicPayload(model, "sys", [], makeParams({ reasoning: "high" }), false)
+    );
+    expect(json).not.toHaveProperty("thinking");
+    expect(json).not.toHaveProperty("output_config");
+  });
+
+  // The native tool loop does not round-trip thinking blocks, and a tool-use turn missing
+  // its thinking block 400s on the follow-up. So thinking is gated to tool-free requests.
+  test("omits thinking when the request carries tools", () => {
+    const tools = [{
+      name: "propose_edit",
+      description: "Edit.",
+      input_schema: { type: "object" as const, properties: {}, required: [] },
+    }];
+    const json = JSON.parse(
+      buildAnthropicPayload(
+        "claude-opus-4-8", "sys", [],
+        makeParams({ reasoning: "high" }),
+        false, tools
+      )
+    );
+    expect(json).not.toHaveProperty("thinking");
+    expect(json).not.toHaveProperty("output_config");
+    expect(json.tools).toEqual(tools);
+  });
+
+  // Opus 4.6 / Sonnet 4.6 accept sampling AND adaptive thinking. When reasoning is on,
+  // steer via thinking/effort and drop the sampling params (don't mix the two).
+  test("suppresses sampling params when thinking is emitted on a sampling-capable model", () => {
+    const json = JSON.parse(
+      buildAnthropicPayload(
+        "claude-opus-4-6", "sys", [],
+        makeParams({ temperature: 0.5, topP: 0.9, topK: 40, reasoning: "high" }),
+        false
+      )
+    );
+    expect(json.thinking).toEqual({ type: "adaptive" });
+    expect(json.output_config).toEqual({ effort: "high" });
+    expect(json).not.toHaveProperty("temperature");
+    expect(json).not.toHaveProperty("top_p");
+    expect(json).not.toHaveProperty("top_k");
+  });
+
+  test("keeps sampling params on a sampling-capable model when reasoning is off", () => {
+    const json = JSON.parse(
+      buildAnthropicPayload(
+        "claude-opus-4-6", "sys", [],
+        makeParams({ temperature: 0.5, topP: 0.9, topK: 40, reasoning: "off" }),
+        false
+      )
+    );
+    expect(json).not.toHaveProperty("thinking");
+    expect(json.temperature).toBe(0.5);
+    expect(json.top_p).toBe(0.9);
+    expect(json.top_k).toBe(40);
+  });
+});
+
+describe("anthropicModelSupportsAdaptiveThinking", () => {
+  test.each([
+    "claude-opus-4-6",
+    "claude-opus-4-7",
+    "claude-opus-4-8",
+    "claude-sonnet-4-6",
+    "claude-fable-5",
+    "claude-mythos-5",
+  ])("returns true for adaptive-thinking-capable model %s", (model) => {
+    expect(anthropicModelSupportsAdaptiveThinking(model)).toBe(true);
+  });
+
+  // Haiku 4.5 and the older Sonnet/Opus families use the legacy budget_tokens thinking
+  // path (out of scope), and an unknown / future id fails safe.
+  test.each([
+    "claude-haiku-4-5",
+    "claude-opus-4-5",
+    "claude-sonnet-4-5",
+    "claude-3-5-sonnet-20241022",
+    "claude-opus-9",
+  ])("returns false for non-adaptive (older / unknown) model %s", (model) => {
+    expect(anthropicModelSupportsAdaptiveThinking(model)).toBe(false);
   });
 });

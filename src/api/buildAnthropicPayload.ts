@@ -39,6 +39,35 @@ export function anthropicModelSupportsSampling(modelId: string): boolean {
   return SAMPLING_CAPABLE_PREFIXES.some((prefix) => modelId.startsWith(prefix));
 }
 
+/**
+ * Model-id prefixes whose models support **adaptive thinking** (`thinking: {type:"adaptive"}`)
+ * plus the `output_config.effort` control. Adaptive is the only on-mode on the current
+ * generation; the legacy `thinking: {type:"enabled", budget_tokens:N}` 400s on Opus 4.7+/
+ * Fable and is deprecated elsewhere. The effort levels this maps to (low/medium/high) are
+ * valid on every model in this set. Verified against docs/reference/external/anthropic-api.md
+ * and the bundled claude-api reference.
+ *
+ * Like the sampling gate, this is an allowlist: emit a thinking field only for a model known
+ * to accept adaptive thinking, and omit for older families (Haiku 4.5, Sonnet 4.5, legacy
+ * 3.x / 4.0 / 4.1 / 4.5 — these use the legacy budget_tokens path, intentionally out of scope
+ * here) OR any unrecognized id. An unknown / future id therefore fails safe: no thinking
+ * field, never a 400 on a stale reasoning setting. The model-aware capability layer that
+ * subsumes this is tracked in docs/work/issues/anthropic-native-payload-api-drift.md (P1-6).
+ */
+const ADAPTIVE_THINKING_CAPABLE_PREFIXES = [
+  "claude-opus-4-6", // Opus 4.6
+  "claude-opus-4-7", // Opus 4.7
+  "claude-opus-4-8", // Opus 4.8
+  "claude-sonnet-4-6", // Sonnet 4.6
+  "claude-fable-5", // Fable 5
+  "claude-mythos-5", // Mythos 5 (Glasswing)
+];
+
+/** Whether this Anthropic model accepts adaptive thinking + the `effort` control. */
+export function anthropicModelSupportsAdaptiveThinking(modelId: string): boolean {
+  return ADAPTIVE_THINKING_CAPABLE_PREFIXES.some((prefix) => modelId.startsWith(prefix));
+}
+
 /** Content block types used in Anthropic messages. */
 export type AnthropicContentBlock =
   | { type: "text"; text: string }
@@ -54,7 +83,9 @@ export interface AnthropicMessage {
 export interface AnthropicSystemBlock {
   type: "text";
   text: string;
-  cache_control?: { type: string };
+  // `ttl: "1h"` selects the 1-hour extended cache TTL; omitting it is the wire default
+  // (5-min). The extended TTL is GA and needs no beta header (see buildAnthropicHeaders).
+  cache_control?: { type: string; ttl?: "1h" };
 }
 
 export type AnthropicSystem = string | AnthropicSystemBlock[];
@@ -161,10 +192,16 @@ export function buildAnthropicMessages(
     }
   }
 
-  // When caching is enabled, send system as a content block with cache_control.
+  // When caching is enabled, send system as a content block with cache_control. The
+  // selected TTL rides on the block: `ttl: "1h"` for the extended cache, omitted for the
+  // wire default (5-min). `CacheTtl` "default" is an internal label, not a wire value.
   if (cacheSettings?.enabled && systemText) {
+    const cacheControl: AnthropicSystemBlock["cache_control"] =
+      cacheSettings.ttl === "1h"
+        ? { type: "ephemeral", ttl: "1h" }
+        : { type: "ephemeral" };
     const system: AnthropicSystemBlock[] = [
-      { type: "text", text: systemText, cache_control: { type: "ephemeral" } },
+      { type: "text", text: systemText, cache_control: cacheControl },
     ];
     return { system, messages };
   }
@@ -172,22 +209,22 @@ export function buildAnthropicMessages(
   return { system: systemText, messages };
 }
 
-/** Builds Anthropic API request headers, adding the beta header when extended TTL is used. */
+/**
+ * Builds Anthropic API request headers.
+ *
+ * Prompt caching needs no beta header: both base caching and the 1-hour extended cache
+ * TTL are GA (the TTL is carried on the cache_control block, not a header). The retired
+ * `prompt-caching-2024-07-31` header was the legacy base-caching beta and is not sent.
+ */
 export function buildAnthropicHeaders(
   apiKey: string,
-  anthropicVersion: string,
-  cacheSettings?: AnthropicCacheSettings
+  anthropicVersion: string
 ): Record<string, string> {
-  const headers: Record<string, string> = {
+  return {
     "x-api-key": apiKey,
     "anthropic-version": anthropicVersion,
     "Content-Type": "application/json",
   };
-  // Extended TTL requires a beta header.
-  if (cacheSettings?.enabled && cacheSettings.ttl === "1h") {
-    headers["anthropic-beta"] = "prompt-caching-2024-07-31";
-  }
-  return headers;
 }
 
 /** Serializes an Anthropic Messages API payload to JSON. */
@@ -211,13 +248,34 @@ export function buildAnthropicPayload(
     body.system = system;
   }
 
-  if (tools && tools.length > 0) {
+  const hasTools = tools !== undefined && tools.length > 0;
+  if (hasTools) {
     body.tools = tools;
   }
 
+  // Reasoning: map the profile reasoning level to adaptive thinking + the effort control
+  // for models that support it. Adaptive is the only on-mode on current-gen models; effort
+  // (low/medium/high) sets depth, and "on" leaves the model default. "off"/null emit no
+  // thinking. Gated to tool-free requests: the native tool loop does not round-trip the
+  // thinking blocks Anthropic requires on a tool-use turn, so emitting thinking there would
+  // 400 the follow-up. Older / unknown models fail safe (no thinking field). See P1-6.
+  const emitThinking =
+    params.reasoning !== null &&
+    params.reasoning !== "off" &&
+    !hasTools &&
+    anthropicModelSupportsAdaptiveThinking(model);
+  if (emitThinking) {
+    body.thinking = { type: "adaptive" };
+    if (params.reasoning !== "on") {
+      body.output_config = { effort: params.reasoning };
+    }
+  }
+
   // Sampling params are gated by model: current-gen models (Opus 4.7+, Fable, Mythos)
-  // 400 if they are sent, so they're omitted for that tier and any unknown model.
-  if (anthropicModelSupportsSampling(model)) {
+  // 400 if they are sent, so they're omitted for that tier and any unknown model. They are
+  // also suppressed whenever a thinking field is emitted: current-gen models steer via
+  // thinking/effort, not sampling, so the two are not mixed on one request.
+  if (!emitThinking && anthropicModelSupportsSampling(model)) {
     if (params.temperature !== undefined) body.temperature = params.temperature;
     if (params.topP !== null) body.top_p = params.topP;
     if (params.topK !== null) body.top_k = params.topK;

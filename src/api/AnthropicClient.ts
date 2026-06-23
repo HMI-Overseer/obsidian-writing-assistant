@@ -73,7 +73,7 @@ export class AnthropicClient implements ChatClient {
       "/v1/messages",
       payload,
       signal,
-      buildAnthropicHeaders(this.apiKey, ANTHROPIC_VERSION, cacheSettings)
+      buildAnthropicHeaders(this.apiKey, ANTHROPIC_VERSION)
     );
 
     const json = JSON.parse(body) as Record<string, unknown>;
@@ -220,7 +220,7 @@ export class AnthropicClient implements ChatClient {
 
     // Wrap the raw generator so we can resolve usage + tool calls when it ends.
     const rawGenerator = streamNode(
-      url, payload, signal, buildAnthropicHeaders(this.apiKey, ANTHROPIC_VERSION, cacheSettings), anthropicDeltaExtractor, onEvent
+      url, payload, signal, buildAnthropicHeaders(this.apiKey, ANTHROPIC_VERSION), anthropicDeltaExtractor, onEvent
     );
 
     /**

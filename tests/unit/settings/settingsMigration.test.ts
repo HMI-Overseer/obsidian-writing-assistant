@@ -1,0 +1,161 @@
+import { describe, it, expect } from "vitest";
+import {
+  normalizeGate,
+  normalizePluginSettings,
+  normalizeProviderProfiles,
+  normalizeVaultOpPolicy,
+  normalizeActiveProfileIds,
+  normalizeRagSettings,
+} from "../../../src/settings/settingsMigration";
+import { DEFAULT_SETTINGS, DEFAULT_ACTIVE_PROFILE_IDS, DEFAULT_RAG_SETTINGS } from "../../../src/constants";
+import { DEFAULT_VAULT_OP_POLICY } from "../../../src/vault-ops/gateway";
+import { PROVIDER_DESCRIPTORS } from "../../../src/providers/descriptors";
+
+describe("normalizePluginSettings", () => {
+  it("returns a full defaults object for null (first run)", () => {
+    expect(normalizePluginSettings(null)).toEqual(DEFAULT_SETTINGS);
+  });
+
+  it("returns a full defaults object for an empty blob", () => {
+    expect(normalizePluginSettings({})).toEqual(DEFAULT_SETTINGS);
+  });
+
+  it("applies valid scalar overrides and defaults the rest", () => {
+    const result = normalizePluginSettings({
+      maxContextChars: 9000,
+      agenticMode: true,
+      planSystemPromptPrefix: "custom plan",
+    });
+    expect(result.maxContextChars).toBe(9000);
+    expect(result.agenticMode).toBe(true);
+    expect(result.planSystemPromptPrefix).toBe("custom plan");
+    // untouched fields fall back to defaults
+    expect(result.maxToolRoundsChat).toBe(DEFAULT_SETTINGS.maxToolRoundsChat);
+    expect(result.chatSystemPromptPrefix).toBe(DEFAULT_SETTINGS.chatSystemPromptPrefix);
+  });
+
+  it("rejects wrong-typed scalars and falls back to defaults", () => {
+    const result = normalizePluginSettings({
+      maxContextChars: "lots" as unknown as number,
+      agenticMode: "yes" as unknown as boolean,
+    });
+    expect(result.maxContextChars).toBe(DEFAULT_SETTINGS.maxContextChars);
+    expect(result.agenticMode).toBe(DEFAULT_SETTINGS.agenticMode);
+  });
+
+  it("normalizes each command by index, defaulting missing fields", () => {
+    const result = normalizePluginSettings({
+      commands: [{ prompt: "do it" }, { name: "Named", id: "x", icon: "  " }] as never,
+    });
+    expect(result.commands).toEqual([
+      { id: "command-1", name: "Command 1", prompt: "do it", icon: "wand" },
+      { id: "x", name: "Named", prompt: "", icon: "wand" },
+    ]);
+  });
+
+  it("drops a non-array commands blob to an empty list", () => {
+    const result = normalizePluginSettings({ commands: "nope" as unknown as never });
+    expect(result.commands).toEqual([]);
+  });
+});
+
+describe("normalizeGate", () => {
+  it("passes through a valid three-way gate string", () => {
+    expect(normalizeGate("auto", "ask")).toBe("auto");
+    expect(normalizeGate("ask", "deny")).toBe("ask");
+    expect(normalizeGate("deny", "auto")).toBe("deny");
+  });
+
+  it("migrates the legacy binary boolean (false -> deny, true -> ask)", () => {
+    expect(normalizeGate(false, "auto")).toBe("deny");
+    expect(normalizeGate(true, "deny")).toBe("ask");
+  });
+
+  it("falls back for an unknown string or junk", () => {
+    expect(normalizeGate("maybe", "ask")).toBe("ask");
+    expect(normalizeGate(42, "deny")).toBe("deny");
+    expect(normalizeGate(undefined, "auto")).toBe("auto");
+  });
+});
+
+describe("normalizeVaultOpPolicy", () => {
+  it("defaults a missing policy entirely", () => {
+    expect(normalizeVaultOpPolicy(undefined)).toEqual(DEFAULT_VAULT_OP_POLICY);
+  });
+
+  it("migrates per-class booleans and clamps maxAutoOps", () => {
+    const policy = normalizeVaultOpPolicy({
+      create: true,
+      trash: false,
+      maxAutoOps: 7.9,
+      scopes: ["Notes", 3],
+    });
+    expect(policy.create).toBe("ask");
+    expect(policy.trash).toBe("deny");
+    expect(policy.maxAutoOps).toBe(7);
+    expect(policy.scopes).toEqual(["Notes"]);
+    // unspecified classes keep their defaults
+    expect(policy.move).toBe(DEFAULT_VAULT_OP_POLICY.move);
+  });
+
+  it("rejects a negative maxAutoOps", () => {
+    expect(normalizeVaultOpPolicy({ maxAutoOps: -1 }).maxAutoOps).toBe(
+      DEFAULT_VAULT_OP_POLICY.maxAutoOps,
+    );
+  });
+});
+
+describe("normalizeProviderProfiles", () => {
+  it("keeps well-formed non-default profiles and drops the rest", () => {
+    const profiles = normalizeProviderProfiles([
+      { id: "a", name: "A", provider: "anthropic", isDefault: false },
+      { id: "b", name: "B", provider: "anthropic", isDefault: true }, // default dropped
+      { id: "c", name: "C", provider: "made-up" }, // unknown provider dropped
+      { name: "D", provider: "openai" }, // missing id dropped
+    ]);
+    expect(profiles).toHaveLength(1);
+    expect(profiles[0].id).toBe("a");
+  });
+
+  it("returns an empty list for a non-array", () => {
+    expect(normalizeProviderProfiles(null)).toEqual([]);
+  });
+
+  it("accepts a profile for every registered provider (VALID_PROVIDERS derives from descriptors)", () => {
+    const keys = Object.keys(PROVIDER_DESCRIPTORS);
+    const profiles = keys.map((provider, i) => ({
+      id: `p${i}`,
+      name: provider,
+      provider,
+      isDefault: false,
+    }));
+    // If VALID_PROVIDERS were a stale hardcoded list missing a descriptor key,
+    // that provider's profile would be dropped and the lengths would diverge.
+    expect(normalizeProviderProfiles(profiles)).toHaveLength(keys.length);
+  });
+});
+
+describe("normalizeActiveProfileIds", () => {
+  it("overrides only string-valued provider keys", () => {
+    const ids = normalizeActiveProfileIds({ anthropic: "my-claude", openai: 7 });
+    expect(ids.anthropic).toBe("my-claude");
+    expect(ids.openai).toBe(DEFAULT_ACTIVE_PROFILE_IDS.openai);
+  });
+
+  it("returns defaults for a non-object", () => {
+    expect(normalizeActiveProfileIds("x")).toEqual(DEFAULT_ACTIVE_PROFILE_IDS);
+  });
+});
+
+describe("normalizeRagSettings", () => {
+  it("filters non-string exclude patterns and defaults bad numerics", () => {
+    const rag = normalizeRagSettings({
+      excludePatterns: ["a/**", 5, "b/**"],
+      chunkSize: "big",
+      topK: 9,
+    });
+    expect(rag.excludePatterns).toEqual(["a/**", "b/**"]);
+    expect(rag.chunkSize).toBe(DEFAULT_RAG_SETTINGS.chunkSize);
+    expect(rag.topK).toBe(9);
+  });
+});

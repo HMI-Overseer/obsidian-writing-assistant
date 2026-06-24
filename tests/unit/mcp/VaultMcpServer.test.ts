@@ -45,6 +45,16 @@ describe("VaultMcpServer", () => {
     expect(res.status).toBe(401);
   });
 
+  it("rejects a same-length but wrong token (constant-time content check is load-bearing)", async () => {
+    // Same length as the real token, so the length short-circuit can't be what
+    // rejects it — only the timingSafeEqual content comparison can.
+    const last = handle.token.slice(-1);
+    const sameLengthWrong = handle.token.slice(0, -1) + (last === "0" ? "1" : "0");
+    expect(sameLengthWrong.length).toBe(handle.token.length);
+    const res = await rpc({ jsonrpc: "2.0", id: 1, method: "tools/list" }, sameLengthWrong);
+    expect(res.status).toBe(401);
+  });
+
   it("answers initialize, echoing the requested protocol version", async () => {
     const res = await rpc({
       jsonrpc: "2.0",

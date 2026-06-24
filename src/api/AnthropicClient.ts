@@ -5,6 +5,7 @@ import type { UsageResult, StreamResult, CompletionResult, StopReason } from "./
 import type { ToolCall } from "../tools/types";
 import { formatAnthropicTools } from "../tools/formatters/anthropic";
 import { nodeRequestWithHeaders } from "./httpTransport";
+import { withRetry } from "./retry";
 import { streamNode } from "./streamingTransport";
 import type { DeltaExtractor } from "./streamingTransport";
 import { ANTHROPIC_BASE_URL, ANTHROPIC_VERSION } from "./anthropicConstants";
@@ -67,13 +68,21 @@ export class AnthropicClient implements ChatClient {
       : undefined;
     const payload = buildAnthropicPayload(model, system, messages, params, false, anthropicTools);
 
-    const { body } = await nodeRequestWithHeaders(
-      "POST",
-      ANTHROPIC_BASE_URL,
-      "/v1/messages",
-      payload,
-      signal,
-      buildAnthropicHeaders(this.apiKey, ANTHROPIC_VERSION)
+    // Wrap the request in withRetry so a transient 429 / 5xx (incl. 529
+    // overloaded) is retried with backoff, matching the LM Studio / OpenAI
+    // model-list path and the Anthropic SDK's own default. isRetryable rejects
+    // 4xx and aborts, so a bad payload still fails fast.
+    const { body } = await withRetry(
+      () =>
+        nodeRequestWithHeaders(
+          "POST",
+          ANTHROPIC_BASE_URL,
+          "/v1/messages",
+          payload,
+          signal,
+          buildAnthropicHeaders(this.apiKey, ANTHROPIC_VERSION)
+        ),
+      { signal }
     );
 
     const json = JSON.parse(body) as Record<string, unknown>;
@@ -186,16 +195,21 @@ export class AnthropicClient implements ChatClient {
       } else if (record.type === "content_block_stop") {
         const pending = pendingToolCalls.get(record.index as number);
         if (pending) {
+          const raw = pending.jsonChunks.join("");
+          let args: Record<string, unknown> = {};
           try {
-            const raw = pending.jsonChunks.join("");
-            completedToolCalls.push({
-              id: pending.id,
-              name: pending.name,
-              arguments: raw ? JSON.parse(raw) : {},
-            });
+            if (raw) args = JSON.parse(raw) as Record<string, unknown>;
           } catch (e) {
-            console.error(`[tool] Failed to parse tool call "${pending.name}" (${pending.id}):`, e);
+            // Surface the call with empty args rather than dropping it, so the
+            // tool loop returns a self-correcting validation error and the model
+            // can retry — a dropped call would silently vanish from the turn.
+            console.error(
+              `[tool] Failed to parse args for tool call "${pending.name}" (${pending.id}); ` +
+                "surfacing with empty args:",
+              e
+            );
           }
+          completedToolCalls.push({ id: pending.id, name: pending.name, arguments: args });
           pendingToolCalls.delete(record.index as number);
         }
       }

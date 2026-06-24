@@ -123,3 +123,19 @@ export interface ToolResult {
    */
   failure?: ToolFailure;
 }
+
+/**
+ * In-loop reviewer for a single vault-op / edit tool call: blocks on the user's
+ * approve/decline and returns the real disposition as a {@link ToolResult}.
+ *
+ * The narrow contract the Claude Code MCP path depends on, so the service layer
+ * stays decoupled from the concrete chat-UI coordinator (`LiveVaultReview`) that
+ * implements it. Expressed entirely in tool-domain types, with no Obsidian or
+ * chat dependency, so it lives here next to {@link ToolCall} / {@link ToolResult}.
+ */
+export interface VaultOpReviewer {
+  /** Resolve a single vault-op call, bound to the given tool-call/timeline id. */
+  resolveOne(call: ToolCall, toolCallId: string): Promise<ToolResult>;
+  /** Resolve a single edit call (the edit-channel sibling of {@link resolveOne}). */
+  resolveEditOne(call: ToolCall, toolCallId: string): Promise<ToolResult>;
+}

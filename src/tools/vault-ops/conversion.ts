@@ -23,6 +23,8 @@ export interface ConversionProbes {
   fingerprint: (path: string) => TargetFingerprint | null;
   /** Current content, captured as the trash snapshot for undo; null if absent. */
   readContent: (path: string) => string | null;
+  /** Live `app.vault.configDir`, used to refuse writes into the config subtree. */
+  configDir: string;
 }
 
 export interface ConversionError {
@@ -80,7 +82,7 @@ export function toVaultOperations(
           );
           return;
         }
-        const v = validateWriteFile(tc.arguments, probes.resolve);
+        const v = validateWriteFile(tc.arguments, probes.resolve, probes.configDir);
         if (!v.ok) return fail(v.error);
         if (probes.resolve(v.args.path) === "file") {
           emit({
@@ -95,7 +97,7 @@ export function toVaultOperations(
         return;
       }
       case "create_directory": {
-        const v = validateCreateDirectory(tc.arguments, probes.resolve);
+        const v = validateCreateDirectory(tc.arguments, probes.resolve, probes.configDir);
         if (!v.ok) return fail(v.error);
         // Folder already exists (idempotency guard): emit a flagged no-op so the
         // timeline can show "directory already exists", but it is never applied.
@@ -107,7 +109,7 @@ export function toVaultOperations(
         return;
       }
       case "move_file": {
-        const v = validateMoveFile(tc.arguments, probes.resolve);
+        const v = validateMoveFile(tc.arguments, probes.resolve, probes.configDir);
         if (!v.ok) return fail(v.error);
         emit({
           kind: "move",

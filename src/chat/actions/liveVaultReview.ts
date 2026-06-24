@@ -1,5 +1,5 @@
 import { type App, normalizePath } from "obsidian";
-import type { ErrorKind, ToolCall, ToolResult } from "../../tools/types";
+import type { ErrorKind, ToolCall, ToolResult, VaultOpReviewer } from "../../tools/types";
 import type {
   AppliedVaultOpRecord,
   ReviewableVaultOp,
@@ -98,7 +98,7 @@ export interface LiveVaultReviewOptions {
  * Shared by both executors: the plugin tool loop calls {@link resolveRound} once per
  * round; the Claude Code MCP path calls {@link resolveOne} per tool call.
  */
-export class LiveVaultReview {
+export class LiveVaultReview implements VaultOpReviewer {
   private readonly app: App;
   private readonly timelineEl: HTMLElement;
   private readonly policy: VaultOpPolicy;
@@ -482,6 +482,7 @@ export class LiveVaultReview {
       resolve,
       fingerprint: (p) => diskFingerprint(this.app, p),
       readContent: (p) => snapshots.get(normalizePath(p)) ?? null,
+      configDir: this.app.vault.configDir,
     };
 
     const { ops, sources, satisfied, errors } = toVaultOperations(calls, probes, {

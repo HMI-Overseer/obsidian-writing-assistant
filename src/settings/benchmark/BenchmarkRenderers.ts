@@ -269,5 +269,5 @@ export function renderProgressSummary(
 
   const progressBar = summaryEl.createDiv({ cls: "lmsa-benchmark-summary-progress-bar" });
   const fill = progressBar.createDiv({ cls: "lmsa-benchmark-summary-progress-fill" });
-  fill.style.width = `${(completedIterations / totalIterations) * 100}%`;
+  fill.setCssStyles({ width: `${(completedIterations / totalIterations) * 100}%` });
 }

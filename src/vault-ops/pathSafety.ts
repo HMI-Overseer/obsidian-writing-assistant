@@ -44,3 +44,34 @@ export function escapesVault(path: string): boolean {
 export function outsideVaultMessage(path: string): string {
   return `"${path}" is outside the vault. Use a vault-relative path.`;
 }
+
+/**
+ * True when a path's *first* segment is the vault's configuration directory
+ * (`app.vault.configDir`, conventionally `.obsidian`). Model write / overwrite /
+ * move-into / create-directory ops are refused here as defense in depth: the
+ * file-type allowlist already blocks `.json`/`.css` config files, but a `.md` or
+ * `.canvas` written into the config subtree would otherwise pass it, and a stray
+ * write there can corrupt the vault's configuration. This guard stands in front of
+ * the (default "ask") gate so the model never even proposes a config-subtree write.
+ *
+ * `configDir` is the *live* value (sourced from `app.vault.configDir` at the
+ * call site), so a user who renamed their config directory is still protected,
+ * and a vault that legitimately holds a folder named `.obsidian` is not.
+ */
+export function isReservedConfigPath(path: string, configDir: string): boolean {
+  const target = configDir.replace(/\\/g, "/").replace(/^\/+|\/+$/g, "");
+  const normalized = path.replace(/\\/g, "/");
+  for (const segment of normalized.split("/")) {
+    if (segment === "" || segment === ".") continue;
+    return segment === target;
+  }
+  return false;
+}
+
+/** Model-facing reason a config-subtree path was refused. */
+export function reservedConfigMessage(path: string, configDir: string): string {
+  return (
+    `"${path}" is inside the ${configDir} configuration folder, which is off limits. ` +
+    `Write to the vault's note area instead.`
+  );
+}

@@ -1,5 +1,5 @@
 import * as http from "http";
-import { randomBytes } from "crypto";
+import { randomBytes, timingSafeEqual } from "crypto";
 import type { CanonicalToolDefinition, ToolCall, ToolResult } from "../tools/types";
 import { toMcpToolSchema } from "./toolSchema";
 
@@ -89,9 +89,22 @@ export class VaultMcpServer {
     this.server = null;
   }
 
+  /**
+   * Constant-time bearer-token check. The loopback bind + per-session ephemeral
+   * token already make a timing attack impractical; comparing in constant time is
+   * defense in depth so the check itself leaks nothing about the token. The length
+   * guard short-circuits (lengths differ ⇒ reject) — the token length is fixed and
+   * not secret, and `timingSafeEqual` requires equal-length buffers.
+   */
+  private authorized(header: string | undefined): boolean {
+    const provided = Buffer.from(header ?? "");
+    const expected = Buffer.from(`Bearer ${this.token}`);
+    return provided.length === expected.length && timingSafeEqual(provided, expected);
+  }
+
   private async handle(req: http.IncomingMessage, res: http.ServerResponse): Promise<void> {
     // Loopback bind + bearer token: nothing else on the machine can call us.
-    if (req.headers.authorization !== `Bearer ${this.token}`) {
+    if (!this.authorized(req.headers.authorization)) {
       res.writeHead(401).end();
       return;
     }

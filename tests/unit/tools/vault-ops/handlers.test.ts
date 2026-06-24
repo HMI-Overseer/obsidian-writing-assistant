@@ -11,6 +11,7 @@ import {
 function makeApp(states: Record<string, "file" | "dir">): App {
   return {
     vault: {
+      configDir: ".obsidian",
       getAbstractFileByPath(path: string) {
         const norm = path.replace(/\\/g, "/").replace(/(^\/|\/$)/g, "");
         const state = states[norm];

@@ -282,7 +282,14 @@ export function createModelSelector(
 
   // ── Open / close ──
 
+  // A document-level click closes an open dropdown. Scoped to the open state
+  // (added in open, removed in close) so the listener never outlives the
+  // dropdown: this settings helper has no Component to hang registerDomEvent on,
+  // and a never-removed document listener accumulates across settings re-renders.
+  const onDocClick = (): void => { if (isOpen) close(); };
+
   function close(): void {
+    document.removeEventListener("click", onDocClick);
     dropdownEl.addClass("lmsa-hidden");
     isOpen = false;
     btn.removeClass("is-active");
@@ -291,6 +298,7 @@ export function createModelSelector(
   }
 
   function open(): void {
+    document.addEventListener("click", onDocClick);
     dropdownEl.empty();
     dropdownEl.removeClass("lmsa-hidden");
     isOpen = true;
@@ -329,9 +337,6 @@ export function createModelSelector(
     e.stopPropagation();
     if (isOpen) close(); else open();
   });
-
-  const onDocClick = (): void => { if (isOpen) close(); };
-  document.addEventListener("click", onDocClick);
 
   // ── Attention effect ──
 

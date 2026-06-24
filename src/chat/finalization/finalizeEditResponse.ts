@@ -249,6 +249,7 @@ async function buildVaultOpProposal(
     resolve: (p) => diskState(app, p),
     fingerprint: (p) => diskFingerprint(app, p),
     readContent: (p) => snapshots.get(normalizePath(p)) ?? null,
+    configDir: app.vault.configDir,
   };
 
   const { ops, sources, satisfied, errors } = toVaultOperations(vaultOpCalls, probes, {

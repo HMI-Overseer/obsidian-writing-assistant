@@ -26,7 +26,7 @@ import { allowedVaultOpsTools, VAULT_OPS_TOOL_NAMES } from "../tools/vault-ops/d
 import { executeVaultOpTool, buildPendingOverlay } from "../tools/vault-ops/handlers";
 import { normalizeVaultToolCall } from "../tools/paths";
 import { VaultMcpServer, type McpServerHandle, type McpToolProvider } from "../mcp/VaultMcpServer";
-import type { LiveVaultReview } from "../chat/actions/liveVaultReview";
+import type { VaultOpReviewer } from "../tools/types";
 import { generateId } from "../utils";
 
 /** Result of probing the local `claude` binary for the settings panel. */
@@ -117,7 +117,7 @@ export class ClaudeCodeService {
   /** Per-run in-loop review coordinator. When set, vault-op calls suspend on the
    *  user's approve/decline and return the real disposition rather than collecting
    *  for a post-run panel (in-loop-tool-approval-blocking-flow). */
-  private liveReview: LiveVaultReview | null = null;
+  private liveReview: VaultOpReviewer | null = null;
 
   constructor(
     private readonly app: App,
@@ -291,7 +291,7 @@ export class ClaudeCodeService {
    * run. Set just before generation starts and cleared in its `finally` so a
    * coordinator never leaks across runs.
    */
-  setLiveReview(review: LiveVaultReview | null): void {
+  setLiveReview(review: VaultOpReviewer | null): void {
     this.liveReview = review;
   }
 

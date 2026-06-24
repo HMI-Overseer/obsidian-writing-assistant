@@ -26,7 +26,7 @@ export class InlineMessageEditor {
       attr: { rows: "1" },
     });
     this.textareaEl.value = this.originalContent;
-    this.textareaEl.style.minHeight = `${contentHeight}px`;
+    this.textareaEl.setCssStyles({ minHeight: `${contentHeight}px` });
 
     const actionsEl = this.editorEl.createDiv({
       cls: "lmsa-chat-window-inline-editor-actions",

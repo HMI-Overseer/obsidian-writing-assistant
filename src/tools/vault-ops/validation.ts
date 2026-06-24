@@ -9,7 +9,12 @@
  */
 
 import type { PathState } from "../../vault-ops/types";
-import { escapesVault, outsideVaultMessage } from "../../vault-ops/pathSafety";
+import {
+  escapesVault,
+  isReservedConfigPath,
+  outsideVaultMessage,
+  reservedConfigMessage,
+} from "../../vault-ops/pathSafety";
 import { hasWritableExtension, unsupportedTypeMessage } from "./writableFileTypes";
 
 type ValidationOk<T> = { ok: true; args: T };
@@ -50,11 +55,13 @@ export interface TrashFileArgs {
 export function validateWriteFile(
   args: Record<string, unknown>,
   resolve: ResolvePath,
+  configDir: string,
 ): ValidationResult<WriteFileArgs> {
   if (typeof args.path !== "string" || args.path.trim() === "") {
     return err("path must be a non-empty string.");
   }
   if (escapesVault(args.path)) return err(outsideVaultMessage(args.path));
+  if (isReservedConfigPath(args.path, configDir)) return err(reservedConfigMessage(args.path, configDir));
   if (typeof args.content !== "string") {
     return err("content must be a string. Got: " + typeof args.content);
   }
@@ -72,11 +79,13 @@ export function validateWriteFile(
 export function validateCreateDirectory(
   args: Record<string, unknown>,
   resolve: ResolvePath,
+  configDir: string,
 ): CreateDirectoryResult {
   if (typeof args.path !== "string" || args.path.trim() === "") {
     return err("path must be a non-empty string.");
   }
   if (escapesVault(args.path)) return err(outsideVaultMessage(args.path));
+  if (isReservedConfigPath(args.path, configDir)) return err(reservedConfigMessage(args.path, configDir));
   const state = resolve(args.path);
   if (state === "file") {
     return err(`"${args.path}" is a file, choose a folder path.`);
@@ -96,6 +105,7 @@ export function validateCreateDirectory(
 export function validateMoveFile(
   args: Record<string, unknown>,
   resolve: ResolvePath,
+  configDir: string,
 ): ValidationResult<MoveFileArgs> {
   if (typeof args.from !== "string" || args.from.trim() === "") {
     return err("from must be a non-empty string.");
@@ -105,6 +115,11 @@ export function validateMoveFile(
   }
   if (escapesVault(args.from)) return err(outsideVaultMessage(args.from));
   if (escapesVault(args.to)) return err(outsideVaultMessage(args.to));
+  // Refuse a move *into* the config subtree (the destination is the write target),
+  // the same defense-in-depth guard as write_file. The source is intentionally not
+  // guarded: it must already exist as a vault file, and relocating one out of the
+  // config dir is not a write into it.
+  if (isReservedConfigPath(args.to, configDir)) return err(reservedConfigMessage(args.to, configDir));
   // Hold the write_file allowlist on the destination too, so a move can't launder a
   // blessed file (note.md) into a forbidden type (note.bat), the same invariant,
   // enforced at every door a model can introduce an extension. Only the destination

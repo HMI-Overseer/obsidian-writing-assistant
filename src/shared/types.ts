@@ -242,9 +242,10 @@ export interface ConversationMessage {
 /**
  * A full conversation record stored in history.
  *
- * `parentConversationId` and `branchFromMessageId` are reserved for future
- * branch-off support (create a new conversation forked from a specific bubble).
- * They are undefined on normal conversations.
+ * `parentConversationId` and `branchFromMessageId` record a branch-off: when the
+ * user forks a new conversation from a specific bubble (see
+ * {@link createBranchConversation}), they point back to the source conversation
+ * and the message it was forked at. Both are undefined on a normal conversation.
  */
 export interface Conversation {
   id: string;
@@ -257,9 +258,9 @@ export interface Conversation {
   modelName: string;
   messages: ConversationMessage[];
   draft: string;
-  /** Reserved for future branching support. */
+  /** Source conversation this was branched from; undefined unless branched. */
   parentConversationId?: string;
-  /** Reserved for future branching support. */
+  /** Message id in the source conversation the branch was forked at. */
   branchFromMessageId?: string;
 }
 

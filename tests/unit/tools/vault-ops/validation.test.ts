@@ -1,11 +1,24 @@
 import { describe, test, expect } from "vitest";
 import {
-  validateCreateDirectory,
-  validateMoveFile,
+  validateCreateDirectory as _validateCreateDirectory,
+  validateMoveFile as _validateMoveFile,
   validateTrashFile,
-  validateWriteFile,
+  validateWriteFile as _validateWriteFile,
 } from "../../../../src/tools/vault-ops/validation";
 import type { PathState } from "../../../../src/vault-ops/types";
+
+type Resolve = (path: string) => PathState;
+
+// Default config dir for the existing cases; the live value is threaded from
+// `app.vault.configDir` in production. The config-subtree tests below pass an
+// explicit dir to prove the guard tracks the live value, not a hardcoded name.
+const CONFIG_DIR = ".obsidian";
+const validateWriteFile = (args: Record<string, unknown>, resolve: Resolve, cfg = CONFIG_DIR) =>
+  _validateWriteFile(args, resolve, cfg);
+const validateCreateDirectory = (args: Record<string, unknown>, resolve: Resolve, cfg = CONFIG_DIR) =>
+  _validateCreateDirectory(args, resolve, cfg);
+const validateMoveFile = (args: Record<string, unknown>, resolve: Resolve, cfg = CONFIG_DIR) =>
+  _validateMoveFile(args, resolve, cfg);
 
 const absent = (): PathState => "absent";
 const resolveWith = (states: Record<string, PathState>) => (p: string) => states[p] ?? "absent";
@@ -186,5 +199,44 @@ describe("vault-boundary rejection (out-of-vault paths fail before the review ga
 
   test("still allows an internal .. that stays inside the vault (no over-rejection)", () => {
     expect(validateWriteFile({ path: "a/../b.md", content: "x" }, absent).ok).toBe(true);
+  });
+});
+
+describe("config-subtree rejection (.obsidian writes refused before the gate)", () => {
+  test("validateWriteFile refuses a blessed-type write into .obsidian (slips the extension allowlist)", () => {
+    // A .md / .canvas under .obsidian passes hasWritableExtension, so the
+    // file-type guard alone would let it through; the reserved-prefix guard is
+    // what stops it.
+    for (const path of [".obsidian/note.md", ".obsidian/board.canvas"]) {
+      const r = validateWriteFile({ path, content: "x" }, absent);
+      expect(r.ok, path).toBe(false);
+      if (!r.ok) expect(r.error).toContain("configuration folder");
+    }
+  });
+
+  test("validateCreateDirectory refuses a folder inside .obsidian", () => {
+    const r = validateCreateDirectory({ path: ".obsidian/plugins/evil" }, absent);
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error).toContain("off limits");
+  });
+
+  test("validateMoveFile refuses a move whose destination is inside .obsidian", () => {
+    const r = validateMoveFile({ from: "note.md", to: ".obsidian/note.md" }, resolveWith({ "note.md": "file" }));
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error).toContain("configuration folder");
+  });
+
+  test("still allows a note whose name merely starts with .obsidian (no over-rejection)", () => {
+    expect(validateWriteFile({ path: "Sandbox/.obsidian-notes.md", content: "x" }, absent).ok).toBe(true);
+  });
+
+  test("tracks the live configDir, not a hardcoded name (renamed config dir is protected)", () => {
+    // A user who renamed their config directory: writes into it are refused, and a
+    // folder literally named .obsidian is now ordinary content the model may write.
+    const refused = validateWriteFile({ path: ".config/app.md", content: "x" }, absent, ".config");
+    expect(refused.ok).toBe(false);
+    if (!refused.ok) expect(refused.error).toContain(".config");
+
+    expect(validateWriteFile({ path: ".obsidian/note.md", content: "x" }, absent, ".config").ok).toBe(true);
   });
 });

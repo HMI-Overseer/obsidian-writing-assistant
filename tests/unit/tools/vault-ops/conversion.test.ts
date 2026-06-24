@@ -14,6 +14,7 @@ function probes(
     resolve: (p) => states[p] ?? "absent",
     fingerprint: (p) => (states[p] && states[p] !== "absent" ? FP : null),
     readContent: (p) => content[p] ?? null,
+    configDir: ".obsidian",
   };
 }
 

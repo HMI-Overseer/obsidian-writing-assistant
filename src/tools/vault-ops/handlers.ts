@@ -38,16 +38,17 @@ export function executeVaultOpTool(call: ToolCall, ctx: VaultOpContext): ToolRes
   }
 
   const resolve = makeResolver(ctx.overlay, (path) => diskState(ctx.app, path));
+  const configDir = ctx.app.vault.configDir;
 
   switch (call.name) {
     case "write_file": {
-      const v = validateWriteFile(call.arguments, resolve);
+      const v = validateWriteFile(call.arguments, resolve, configDir);
       if (!v.ok) return fail("write_file", v.error);
       const verb = resolve(v.args.path) === "file" ? "Overwrite of" : "New file";
       return queued(`${verb} "${v.args.path}"`);
     }
     case "create_directory": {
-      const v = validateCreateDirectory(call.arguments, resolve);
+      const v = validateCreateDirectory(call.arguments, resolve, configDir);
       if (!v.ok) return fail("create_directory", v.error);
       // Already a folder: a benign, non-error acknowledgement, no review row
       // is emitted for it at finalization (conversion drops the satisfied op).
@@ -55,7 +56,7 @@ export function executeVaultOpTool(call: ToolCall, ctx: VaultOpContext): ToolRes
       return queued(`New folder "${v.args.path}"`);
     }
     case "move_file": {
-      const v = validateMoveFile(call.arguments, resolve);
+      const v = validateMoveFile(call.arguments, resolve, configDir);
       if (!v.ok) return fail("move_file", v.error);
       return queued(`Move "${v.args.from}" → "${v.args.to}"`);
     }
@@ -102,6 +103,7 @@ function makeConversionProbes(app: App, overlay: PendingOverlay): ConversionProb
     // we care only about path *state*, so these can stay cheap and empty.
     fingerprint: () => null,
     readContent: () => null,
+    configDir: app.vault.configDir,
   };
 }
 

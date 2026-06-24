@@ -57,6 +57,7 @@ function makeApp(existing: { files?: string[]; folders?: string[]; content?: str
   const fileFor = (n: string) => Object.assign(new TFile(), { path: n, stat: { mtime: 1, size: 1 } });
   return {
     vault: {
+      configDir: ".obsidian",
       getAbstractFileByPath(p: string) {
         const n = normalizePath(p);
         if (contents.has(n)) return fileFor(n);

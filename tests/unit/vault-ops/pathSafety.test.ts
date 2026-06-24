@@ -1,5 +1,10 @@
 import { describe, test, expect } from "vitest";
-import { escapesVault, outsideVaultMessage } from "../../../src/vault-ops/pathSafety";
+import {
+  escapesVault,
+  isReservedConfigPath,
+  outsideVaultMessage,
+  reservedConfigMessage,
+} from "../../../src/vault-ops/pathSafety";
 
 describe("escapesVault", () => {
   test("allows ordinary vault-relative paths", () => {
@@ -56,5 +61,51 @@ describe("outsideVaultMessage", () => {
     const msg = outsideVaultMessage("../../x.md");
     expect(msg).toContain("../../x.md");
     expect(msg).toContain("outside the vault");
+  });
+});
+
+describe("isReservedConfigPath", () => {
+  const CFG = ".obsidian";
+
+  test("refuses a path whose first segment is the config dir", () => {
+    for (const p of [
+      ".obsidian",
+      ".obsidian/note.md",
+      ".obsidian/plugins/x/main.js",
+      ".obsidian/snippets/a.css",
+      "/.obsidian/note.md", // leading slash, still first real segment
+      ".obsidian\\note.md", // Windows separator
+      "./.obsidian/note.md", // explicit current-dir prefix
+    ]) {
+      expect(isReservedConfigPath(p, CFG), p).toBe(true);
+    }
+  });
+
+  test("allows ordinary paths and only matches the first segment exactly", () => {
+    for (const p of [
+      "note.md",
+      "Sandbox/.obsidian/note.md", // .obsidian not the first segment
+      ".obsidianx/note.md", // not exactly .obsidian (no over-broad prefix match)
+      "my.obsidian/note.md",
+      ".obsidian-archive/note.md",
+      "obsidian/note.md", // no leading dot
+    ]) {
+      expect(isReservedConfigPath(p, CFG), p).toBe(false);
+    }
+  });
+
+  test("uses the live config dir name, tolerating slashes around it", () => {
+    expect(isReservedConfigPath(".config/app.md", ".config")).toBe(true);
+    expect(isReservedConfigPath(".config/app.md", "/.config/")).toBe(true); // padded configDir
+    expect(isReservedConfigPath(".obsidian/note.md", ".config")).toBe(false); // not the live config dir
+  });
+});
+
+describe("reservedConfigMessage", () => {
+  test("names the offending path and the config folder", () => {
+    const msg = reservedConfigMessage(".obsidian/note.md", ".obsidian");
+    expect(msg).toContain(".obsidian/note.md");
+    expect(msg).toContain(".obsidian");
+    expect(msg).toContain("off limits");
   });
 });

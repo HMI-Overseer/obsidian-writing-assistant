@@ -170,6 +170,17 @@ export function guardVaultUndo(app: App, record: AppliedVaultOpRecord): string[]
         }
         break;
       }
+      case "replaceInVault": {
+        // Undo of a replace: restore each file's prior content. Refuse if any target
+        // changed since the replace applied, or we'd clobber the newer version (the
+        // per-file analogue of the overwrite guard above).
+        for (const t of inverse.targets) {
+          if (!fingerprintsMatch(diskFingerprint(app, t.path), t.expect)) {
+            reasons.push(`"${t.path}" changed since the replace was applied, won't clobber it.`);
+          }
+        }
+        break;
+      }
       case "createDir":
         // Never produced as an inverse (inverseOf returns trash or null); ignore.
         break;

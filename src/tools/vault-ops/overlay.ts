@@ -33,6 +33,12 @@ export function buildOverlay(ops: VaultOperation[]): PendingOverlay {
       case "trash":
         overlay.set(op.path, "absent");
         break;
+      case "replaceInVault":
+        // Content-only change; the targets stay files. (In practice a replace never
+        // reaches the overlay, its conversion probe yields no targets there, but the
+        // path state it implies is "still a file".)
+        for (const t of op.targets) overlay.set(t.path, "file");
+        break;
     }
   }
   return overlay;

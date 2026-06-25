@@ -11,6 +11,7 @@ import { diskState, diskFingerprint } from "../../vault-ops/apply";
 import type { VaultOpPolicy } from "../../vault-ops/gateway";
 import {
   preReadTrashSnapshots,
+  preScanReplacements,
   gateConvertedOp,
   buildReviewableOp,
 } from "../../vault-ops/proposalSupport";
@@ -242,14 +243,17 @@ async function buildVaultOpProposal(
   policy: VaultOpPolicy,
 ): Promise<VaultOperationProposal | null> {
   // A trashed file's snapshot is what its inverse re-creates on undo; pre-read so
-  // the pure conversion below can stay synchronous.
+  // the pure conversion below can stay synchronous. A replace's per-file targets are
+  // scanned the same way (async reads → synchronous conversion).
   const snapshots = await preReadTrashSnapshots(app, vaultOpCalls);
+  const replaceScans = await preScanReplacements(app, vaultOpCalls);
 
   const probes: ConversionProbes = {
     resolve: (p) => diskState(app, p),
     fingerprint: (p) => diskFingerprint(app, p),
     readContent: (p) => snapshots.get(normalizePath(p)) ?? null,
     configDir: app.vault.configDir,
+    replaceTargets: (callId) => replaceScans.get(callId) ?? null,
   };
 
   const { ops, sources, satisfied, errors } = toVaultOperations(vaultOpCalls, probes, {

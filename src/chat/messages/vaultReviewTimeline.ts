@@ -16,6 +16,7 @@ const OP_KIND_ICONS: Record<VaultOperation["kind"], string> = {
   createDir: "folder-plus",
   move: "file-symlink",
   trash: "trash-2",
+  replaceInVault: "replace",
 };
 
 /** Tool name behind each op kind, for the positional fallback (`data-tool-name`). */
@@ -25,6 +26,7 @@ const TOOL_NAME_BY_KIND: Record<VaultOperation["kind"], string> = {
   createDir: "create_directory",
   move: "move_file",
   trash: "trash_file",
+  replaceInVault: "replace_in_vault",
 };
 
 /**

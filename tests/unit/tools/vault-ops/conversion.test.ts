@@ -9,12 +9,14 @@ const FP: TargetFingerprint = { mtime: 100, size: 50 };
 function probes(
   states: Record<string, PathState> = {},
   content: Record<string, string> = {},
+  replaceTargets: ConversionProbes["replaceTargets"] = () => null,
 ): ConversionProbes {
   return {
     resolve: (p) => states[p] ?? "absent",
     fingerprint: (p) => (states[p] && states[p] !== "absent" ? FP : null),
     readContent: (p) => content[p] ?? null,
     configDir: ".obsidian",
+    replaceTargets,
   };
 }
 
@@ -88,6 +90,68 @@ describe("toVaultOperations", () => {
   test("unknown tool name is an error", () => {
     const { errors } = toVaultOperations([call("delete_everything", {})], probes());
     expect(errors).toHaveLength(1);
+  });
+
+  describe("replace_in_vault", () => {
+    const scan = {
+      targets: [
+        { path: "Lore/A.md", content: "new A", expect: { mtime: 1, size: 5 } },
+        { path: "Lore/B.md", content: "new B", expect: { mtime: 2, size: 5 } },
+      ],
+      occurrences: 3,
+    };
+
+    test("one call → one composite replaceInVault op from the scan probe", () => {
+      const { ops, errors } = toVaultOperations(
+        [call("replace_in_vault", { search: "old", replace: "new" }, "r1")],
+        probes({}, {}, (id) => (id === "r1" ? scan : null)),
+      );
+      expect(errors).toHaveLength(0);
+      expect(ops).toEqual([
+        {
+          kind: "replaceInVault",
+          search: "old",
+          replace: "new",
+          caseSensitive: false,
+          wholeWord: false,
+          targets: scan.targets,
+          occurrences: 3,
+        },
+      ]);
+    });
+
+    test("threads the flags through to the op", () => {
+      const { ops } = toVaultOperations(
+        [
+          call(
+            "replace_in_vault",
+            { search: "old", replace: "new", caseSensitive: true, wholeWord: true },
+            "r1",
+          ),
+        ],
+        probes({}, {}, () => scan),
+      );
+      expect(ops[0]).toMatchObject({ caseSensitive: true, wholeWord: true });
+    });
+
+    test("no matches (probe returns null) → no op, no error", () => {
+      const { ops, errors } = toVaultOperations(
+        [call("replace_in_vault", { search: "absent", replace: "x" })],
+        probes({}, {}, () => null),
+      );
+      expect(ops).toHaveLength(0);
+      expect(errors).toHaveLength(0);
+    });
+
+    test("empty search is a self-correcting error, not an op", () => {
+      const { ops, errors } = toVaultOperations(
+        [call("replace_in_vault", { search: "", replace: "x" })],
+        probes({}, {}, () => scan),
+      );
+      expect(ops).toHaveLength(0);
+      expect(errors).toHaveLength(1);
+      expect(errors[0].error).toMatch(/search/i);
+    });
   });
 
   test("sources are index-aligned with ops, skipping dropped calls", () => {

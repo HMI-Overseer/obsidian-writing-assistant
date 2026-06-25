@@ -2,6 +2,7 @@ import { describe, test, expect } from "vitest";
 import {
   validateCreateDirectory as _validateCreateDirectory,
   validateMoveFile as _validateMoveFile,
+  validateReplaceInVault,
   validateTrashFile,
   validateWriteFile as _validateWriteFile,
 } from "../../../../src/tools/vault-ops/validation";
@@ -155,6 +156,59 @@ describe("validateTrashFile", () => {
 
   test("rejects a folder (files only in v1)", () => {
     expect(validateTrashFile({ path: "Dir" }, resolveWith({ Dir: "dir" })).ok).toBe(false);
+  });
+});
+
+describe("validateReplaceInVault", () => {
+  test("accepts a search/replace pair and defaults the flags to false", () => {
+    const r = validateReplaceInVault({ search: "old", replace: "new" });
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.args).toEqual({
+        search: "old",
+        replace: "new",
+        path: undefined,
+        caseSensitive: false,
+        wholeWord: false,
+      });
+    }
+  });
+
+  test("threads an explicit scope path and the boolean flags", () => {
+    const r = validateReplaceInVault({
+      search: "old",
+      replace: "new",
+      path: "Lore",
+      caseSensitive: true,
+      wholeWord: true,
+    });
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.args).toMatchObject({ path: "Lore", caseSensitive: true, wholeWord: true });
+  });
+
+  test("rejects an empty search (would match nothing meaningful)", () => {
+    const r = validateReplaceInVault({ search: "", replace: "new" });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error).toContain("search");
+  });
+
+  test("accepts an empty replace (deletes the term)", () => {
+    expect(validateReplaceInVault({ search: "draft ", replace: "" }).ok).toBe(true);
+  });
+
+  test("rejects a non-string replace", () => {
+    expect(validateReplaceInVault({ search: "old", replace: 5 }).ok).toBe(false);
+  });
+
+  test("rejects a scope path that escapes the vault", () => {
+    const r = validateReplaceInVault({ search: "old", replace: "new", path: "../outside" });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error).toContain("outside the vault");
+  });
+
+  test("rejects non-boolean flags", () => {
+    expect(validateReplaceInVault({ search: "a", replace: "b", caseSensitive: "yes" }).ok).toBe(false);
+    expect(validateReplaceInVault({ search: "a", replace: "b", wholeWord: 1 }).ok).toBe(false);
   });
 });
 

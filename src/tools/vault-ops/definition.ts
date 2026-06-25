@@ -1,6 +1,5 @@
 import type { CanonicalToolDefinition } from "../types";
-import type { VaultOpPolicy } from "../../vault-ops/gateway";
-import type { VaultOpClass } from "../../vault-ops/types";
+import type { VaultOpPolicy, GatedVaultOpClass } from "../../vault-ops/gateway";
 
 // ---------------------------------------------------------------------------
 // Vault-operation tools, produce a VaultOperationProposal for review.
@@ -117,12 +116,62 @@ export const TRASH_FILE_TOOL: CanonicalToolDefinition = {
   },
 };
 
+export const REPLACE_IN_VAULT_TOOL: CanonicalToolDefinition = {
+  name: "replace_in_vault",
+  description:
+    "Find and replace an exact piece of text across many notes in one operation, e.g. to rename a " +
+    "term, character, or place everywhere it appears. Every matching note is rewritten and the whole " +
+    "set of changes is shown to the user for review before anything is applied. " +
+    "Use this for a vault-wide rename instead of editing notes one at a time; for a single passage in " +
+    "one note use propose_edit, and never rewrite whole files with write_file just to change a term.",
+  strategyHint:
+    "rename or relabel an exact term across the whole vault (or one folder) in a single reviewable step, " +
+    "prefer it over editing notes one by one. Use propose_edit for a single passage in one note.",
+  errorGuidance:
+    "If no occurrences are found, check spelling and case, or widen the scope, the search is literal, not " +
+    "a pattern. If it would change too many unrelated matches, narrow it with a longer search string, set " +
+    "wholeWord true, or limit path to a folder.",
+  annotations: { destructiveHint: true },
+  parameters: {
+    type: "object",
+    properties: {
+      search: {
+        type: "string",
+        description:
+          "The exact literal text to find (not a regular expression). Matched across note bodies, " +
+          "every occurrence in every matching note is replaced.",
+      },
+      replace: {
+        type: "string",
+        description:
+          "The replacement text, inserted verbatim. Use an empty string to delete the search text.",
+      },
+      path: {
+        type: "string",
+        description:
+          "Optional vault-relative folder to limit the replace to (e.g. 'Lore'). Omit to search the whole vault.",
+      },
+      caseSensitive: {
+        type: "boolean",
+        description: "Match case exactly. Defaults to false (case-insensitive).",
+      },
+      wholeWord: {
+        type: "boolean",
+        description:
+          "Only match whole words, so 'cat' will not match inside 'category'. Defaults to false.",
+      },
+    },
+    required: ["search", "replace"],
+  },
+};
+
 /** All vault-operation tools, in the order they should appear in the API request. */
 export const ALL_VAULT_OPS_TOOLS: CanonicalToolDefinition[] = [
   WRITE_FILE_TOOL,
   CREATE_DIRECTORY_TOOL,
   MOVE_FILE_TOOL,
   TRASH_FILE_TOOL,
+  REPLACE_IN_VAULT_TOOL,
 ];
 
 /** Set of vault-op tool names for fast membership checks in the tool loop. */
@@ -133,11 +182,14 @@ export const VAULT_OPS_TOOL_NAMES = new Set(ALL_VAULT_OPS_TOOLS.map((t) => t.nam
  * it picks `create` or `overwrite` at apply time from whether the path exists
  * (ADR-0004), so it stays usable as long as either is allowed.
  */
-const TOOL_POLICY_CLASSES: Record<string, VaultOpClass[]> = {
+const TOOL_POLICY_CLASSES: Record<string, GatedVaultOpClass[]> = {
   write_file: ["create", "overwrite"],
   create_directory: ["createDir"],
   move_file: ["move"],
   trash_file: ["trash"],
+  // A vault-wide replace is gated as an overwrite (it rewrites file content), so it
+  // stays available whenever overwrites are allowed, no separate policy knob.
+  replace_in_vault: ["overwrite"],
 };
 
 /**

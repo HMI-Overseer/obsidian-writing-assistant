@@ -24,6 +24,7 @@ export const TOOL_ICONS: Record<string, string> = {
   create_directory: "folder-plus",
   move_file: "file-symlink",
   trash_file: "trash-2",
+  replace_in_vault: "replace",
   think: "brain",
 };
 
@@ -44,6 +45,7 @@ export const TOOL_LABELS: Record<string, string> = {
   create_directory: "Created folder",
   move_file: "Moved file",
   trash_file: "Trashed file",
+  replace_in_vault: "Replaced across notes",
   think: "Thought",
 };
 
@@ -64,6 +66,7 @@ export const TOOL_STATUS_LABELS: Record<string, string> = {
   create_directory: "Creating folder...",
   move_file: "Moving file...",
   trash_file: "Trashing file...",
+  replace_in_vault: "Replacing text...",
   think: "Thinking...",
 };
 
@@ -78,6 +81,7 @@ export const MUTATING_TOOL_NAMES: ReadonlySet<string> = new Set([
   "create_directory",
   "move_file",
   "trash_file",
+  "replace_in_vault",
   "propose_edit",
   "update_frontmatter",
 ]);
@@ -111,6 +115,10 @@ export function extractToolInput(
         ? `${args.from} → ${args.to}`
         : undefined;
     case "trash_file": return typeof args.path === "string" ? args.path : undefined;
+    case "replace_in_vault":
+      return typeof args.search === "string" && typeof args.replace === "string"
+        ? `"${args.search}" → "${args.replace}"`
+        : undefined;
     case "think": return typeof args.thought === "string" ? args.thought : undefined;
     default: return undefined;
   }

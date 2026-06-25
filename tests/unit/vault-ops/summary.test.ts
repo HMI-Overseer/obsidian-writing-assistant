@@ -54,6 +54,37 @@ describe("summarizeOp", () => {
     const op: VaultOperation = { kind: "trash", path: "Old.md", expect: FP, snapshot: "x" };
     expect(summarizeOp(op)).toBe("Trash Old.md");
   });
+
+  it("summarizes a replaceInVault with its terms, note count, and match count", () => {
+    const op: VaultOperation = {
+      kind: "replaceInVault",
+      search: "Age of Laurels",
+      replace: "Age of Ambition",
+      caseSensitive: false,
+      wholeWord: false,
+      targets: [
+        { path: "Lore/A.md", content: "x", expect: FP },
+        { path: "Lore/B.md", content: "y", expect: FP },
+      ],
+      occurrences: 3,
+    };
+    expect(summarizeOp(op)).toBe(
+      'Replace "Age of Laurels" → "Age of Ambition" in 2 notes (3 matches)',
+    );
+  });
+
+  it("uses the singular for a single-note replace", () => {
+    const op: VaultOperation = {
+      kind: "replaceInVault",
+      search: "a",
+      replace: "b",
+      caseSensitive: false,
+      wholeWord: false,
+      targets: [{ path: "One.md", content: "x", expect: FP }],
+      occurrences: 1,
+    };
+    expect(summarizeOp(op)).toBe('Replace "a" → "b" in 1 note (1 matches)');
+  });
 });
 
 describe("gateBadgeLabel", () => {

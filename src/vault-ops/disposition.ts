@@ -43,6 +43,8 @@ function appliedVerb(op: VaultOperation): string {
       return "Moved";
     case "trash":
       return "Trashed";
+    case "replaceInVault":
+      return "Replaced";
   }
 }
 
@@ -59,12 +61,23 @@ function actionVerb(op: VaultOperation): string {
       return "move";
     case "trash":
       return "trash";
+    case "replaceInVault":
+      return "replace";
   }
 }
 
-/** The target rendered in a message, move shows both endpoints. */
+/** Plural-aware "N note(s)" for a replace's target count. */
+function noteCountLabel(count: number): string {
+  return `${count} note${count === 1 ? "" : "s"}`;
+}
+
+/** The target rendered in a message: move shows both endpoints, a replace its terms + reach. */
 function target(op: VaultOperation): string {
-  return op.kind === "move" ? `"${op.from}" → "${op.to}"` : `"${op.path}"`;
+  if (op.kind === "move") return `"${op.from}" → "${op.to}"`;
+  if (op.kind === "replaceInVault") {
+    return `"${op.search}" → "${op.replace}" in ${noteCountLabel(op.targets.length)} (${op.occurrences} matches)`;
+  }
+  return `"${op.path}"`;
 }
 
 /**

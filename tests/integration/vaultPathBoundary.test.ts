@@ -44,16 +44,32 @@ let vaultRoot: string;
 /** A vault App backed by the real filesystem, resolving exactly as the adapter does. */
 function makeRealFsApp(root: string): App {
   const full = (p: string) => nodePath.join(root, normalizePath(p));
+  // Real child listing for a folder, so the confusable-path resolver
+  // (snapToExistingFile) can scan siblings exactly as it would in the live vault.
+  const childrenOf = (relDir: string): (TFile | TFolder)[] => {
+    const abs = full(relDir);
+    if (!fs.existsSync(abs)) return [];
+    const norm = normalizePath(relDir);
+    return fs.readdirSync(abs, { withFileTypes: true }).map((entry) => {
+      const childRel = normalizePath(norm ? `${norm}/${entry.name}` : entry.name);
+      return entry.isDirectory()
+        ? Object.assign(new TFolder(), { path: childRel, children: [] })
+        : Object.assign(new TFile(), { path: childRel });
+    });
+  };
   return {
     vault: {
       adapter: { getBasePath: () => root },
       getName: () => nodePath.basename(root),
+      getRoot() {
+        return Object.assign(new TFolder(), { path: "", children: childrenOf("") });
+      },
       getAbstractFileByPath(p: string) {
         const abs = full(p);
         if (!fs.existsSync(abs)) return null;
         const st = fs.statSync(abs);
         if (st.isDirectory()) {
-          return Object.assign(new TFolder(), { path: normalizePath(p), children: [] });
+          return Object.assign(new TFolder(), { path: normalizePath(p), children: childrenOf(p) });
         }
         return Object.assign(new TFile(), {
           path: normalizePath(p),
@@ -258,5 +274,96 @@ describe("vault path-boundary, real-filesystem resolution (§6.1)", () => {
     expect(batch.ok).toBe(true);
     expect(fs.readFileSync(nodePath.join(vaultRoot, "Notes", "Welcome.md"), "utf8")).toBe("hello");
     expect(filesOutsideVault()).toEqual([]);
+  });
+
+  it("applies a replaceInVault over in-vault targets, but refuses one whose target escapes", async () => {
+    const app = makeRealFsApp(vaultRoot);
+    fs.mkdirSync(nodePath.join(vaultRoot, "Lore"), { recursive: true });
+    fs.writeFileSync(nodePath.join(vaultRoot, "Lore", "A.md"), "old A old");
+    const st = fs.statSync(nodePath.join(vaultRoot, "Lore", "A.md"));
+
+    // All targets in-vault: applies on real disk.
+    const ok: VaultOperation = {
+      kind: "replaceInVault",
+      search: "old",
+      replace: "new",
+      caseSensitive: false,
+      wholeWord: false,
+      targets: [
+        { path: "Lore/A.md", content: "new A new", expect: { mtime: st.mtimeMs, size: st.size } },
+      ],
+      occurrences: 2,
+    };
+    const okBatch = await applyVaultOpBatch(app, [{ id: "ok", op: ok }]);
+    expect(okBatch.ok).toBe(true);
+    expect(fs.readFileSync(nodePath.join(vaultRoot, "Lore", "A.md"), "utf8")).toBe("new A new");
+
+    // A target that escapes the vault: pre-flight aborts, and the executor throws as
+    // its first act, so the SECURITY invariant holds for the composite op too.
+    const escaping: VaultOperation = {
+      kind: "replaceInVault",
+      search: "x",
+      replace: "y",
+      caseSensitive: false,
+      wholeWord: false,
+      targets: [{ path: "../../escaped.md", content: "pwned", expect: { mtime: 0, size: 0 } }],
+      occurrences: 1,
+    };
+    const badBatch = await applyVaultOpBatch(app, [{ id: "bad", op: escaping }]);
+    expect(badBatch.ok).toBe(false);
+    expect(badBatch.conflicts.some((c) => c.reason.includes("outside the vault"))).toBe(true);
+    await expect(applyOperation(app, escaping)).rejects.toThrow(/outside the vault/);
+    expect(filesOutsideVault()).toEqual([]);
+  });
+});
+
+describe("smart-quote path resolution, real filesystem", () => {
+  // ’ = U+2019, the curly apostrophe Obsidian saves; the model "straightens" it to '.
+  const CURLY = "’";
+
+  it("snaps a read_file straight apostrophe to the real curly-quoted file on disk", () => {
+    const app = makeRealFsApp(vaultRoot);
+    fs.mkdirSync(nodePath.join(vaultRoot, "Lore"), { recursive: true });
+    const realName = `Anno${CURLY}s Crucible.md`;
+    fs.writeFileSync(nodePath.join(vaultRoot, "Lore", realName), "body");
+
+    const call: ToolCall = {
+      id: "r",
+      name: "read_file",
+      arguments: { path: "Lore/Anno's Crucible.md" },
+    };
+    const normalized = normalizeVaultToolCall(app, call);
+
+    expect(normalized.arguments.path).toBe(`Lore/${realName}`);
+    // The snapped path resolves on real disk, the original straight one would not.
+    expect(app.vault.getFileByPath(normalized.arguments.path as string)).not.toBeNull();
+  });
+
+  it("snaps a move_file source and moves the real curly-quoted file on disk", async () => {
+    const app = makeRealFsApp(vaultRoot);
+    fs.mkdirSync(nodePath.join(vaultRoot, "Lore"), { recursive: true });
+    const realName = `The Sovereign${CURLY}s Halo.md`;
+    fs.writeFileSync(nodePath.join(vaultRoot, "Lore", realName), "body");
+    const st = fs.statSync(nodePath.join(vaultRoot, "Lore", realName));
+
+    const call: ToolCall = {
+      id: "m",
+      name: "move_file",
+      arguments: { from: "Lore/The Sovereign's Halo.md", to: "Lore/Renamed.md" },
+    };
+    const normalized = normalizeVaultToolCall(app, call);
+    expect(normalized.arguments.from).toBe(`Lore/${realName}`);
+
+    const op: VaultOperation = {
+      kind: "move",
+      from: normalized.arguments.from as string,
+      to: normalized.arguments.to as string,
+      expect: { mtime: st.mtimeMs, size: st.size },
+    };
+    const batch = await applyVaultOpBatch(app, [{ id: "m", op }]);
+
+    expect(batch.ok).toBe(true);
+    expect(fs.existsSync(nodePath.join(vaultRoot, "Lore", "Renamed.md"))).toBe(true);
+    expect(fs.existsSync(nodePath.join(vaultRoot, "Lore", realName))).toBe(false);
   });
 });

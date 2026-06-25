@@ -181,6 +181,56 @@ describe("applyVaultOpBatch", () => {
     ).rejects.toThrow(/outside the vault/);
     expect(files.size).toBe(0);
   });
+
+  it("applies a replaceInVault across every target and records a restoring inverse", async () => {
+    const vault = makeVault();
+    const eA = vault.seedFile("Lore/A.md", "old A old");
+    const eB = vault.seedFile("Lore/B.md", "old B");
+    const op: VaultOperation = {
+      kind: "replaceInVault",
+      search: "old",
+      replace: "new",
+      caseSensitive: false,
+      wholeWord: false,
+      targets: [
+        { path: "Lore/A.md", content: "new A new", expect: eA },
+        { path: "Lore/B.md", content: "new B", expect: eB },
+      ],
+      occurrences: 3,
+    };
+
+    const result = await applyVaultOpBatch(vault.app, [{ id: "r", op }]);
+
+    expect(result.ok).toBe(true);
+    expect(vault.files.get("Lore/A.md")?.content).toBe("new A new");
+    expect(vault.files.get("Lore/B.md")?.content).toBe("new B");
+    expect(result.applied[0].inverse).toMatchObject({ kind: "replaceInVault" });
+  });
+
+  it("aborts a replaceInVault when any target's fingerprint drifted, writing nothing", async () => {
+    const vault = makeVault();
+    const eA = vault.seedFile("Lore/A.md", "old A");
+    vault.seedFile("Lore/B.md", "old B");
+    const stale: TargetFingerprint = { mtime: 1, size: 1 };
+    const op: VaultOperation = {
+      kind: "replaceInVault",
+      search: "old",
+      replace: "new",
+      caseSensitive: false,
+      wholeWord: false,
+      targets: [
+        { path: "Lore/A.md", content: "new A", expect: eA },
+        { path: "Lore/B.md", content: "new B", expect: stale },
+      ],
+      occurrences: 2,
+    };
+
+    const result = await applyVaultOpBatch(vault.app, [{ id: "r", op }]);
+
+    expect(result.ok).toBe(false);
+    expect(vault.files.get("Lore/A.md")?.content).toBe("old A"); // all-or-nothing
+    expect(vault.files.get("Lore/B.md")?.content).toBe("old B");
+  });
 });
 
 describe("undoVaultOpBatch", () => {
@@ -259,6 +309,43 @@ describe("undoVaultOpBatch", () => {
     });
 
     expect(vault.files.get("Old.md")?.content).toBe("keepme");
+  });
+
+  it("round-trips a replaceInVault: undo restores every original file", async () => {
+    const vault = makeVault();
+    const eA = vault.seedFile("A.md", "old A");
+    const eB = vault.seedFile("B.md", "old B old");
+
+    const apply = await applyVaultOpBatch(vault.app, [
+      {
+        id: "r",
+        op: {
+          kind: "replaceInVault",
+          search: "old",
+          replace: "new",
+          caseSensitive: false,
+          wholeWord: false,
+          targets: [
+            { path: "A.md", content: "new A", expect: eA },
+            { path: "B.md", content: "new B new", expect: eB },
+          ],
+          occurrences: 3,
+        },
+      },
+    ]);
+    expect(apply.ok).toBe(true);
+    expect(vault.files.get("A.md")?.content).toBe("new A");
+    expect(vault.files.get("B.md")?.content).toBe("new B new");
+
+    const undo = await undoVaultOpBatch(vault.app, {
+      proposalId: "p",
+      applied: apply.applied,
+      appliedAt: 0,
+    });
+
+    expect(undo.ok).toBe(true);
+    expect(vault.files.get("A.md")?.content).toBe("old A");
+    expect(vault.files.get("B.md")?.content).toBe("old B old");
   });
 });
 
@@ -378,5 +465,36 @@ describe("undoVaultOpBatch drift guard (§3-B amendment 3)", () => {
     expect(undo.ok).toBe(true);
     expect(undo.refused).toBeUndefined();
     expect(vault.files.has("Clean.md")).toBe(false);
+  });
+
+  it("refuses to undo a replaceInVault when a rewritten file changed since apply", async () => {
+    const vault = makeVault();
+    const eA = vault.seedFile("A.md", "old A");
+    const apply = await applyVaultOpBatch(vault.app, [
+      {
+        id: "r",
+        op: {
+          kind: "replaceInVault",
+          search: "old",
+          replace: "new",
+          caseSensitive: false,
+          wholeWord: false,
+          targets: [{ path: "A.md", content: "new A", expect: eA }],
+          occurrences: 1,
+        },
+      },
+    ]);
+    expect(apply.ok).toBe(true);
+    // The user hand-edits the rewritten file after the replace applied.
+    await vault.app.vault.process(vault.app.vault.getFileByPath("A.md")!, () => "hand edited");
+
+    const undo = await undoVaultOpBatch(vault.app, {
+      proposalId: "p",
+      applied: apply.applied,
+      appliedAt: 0,
+    });
+
+    expect(undo.refused).toBe(true);
+    expect(vault.files.get("A.md")?.content).toBe("hand edited"); // not clobbered.
   });
 });

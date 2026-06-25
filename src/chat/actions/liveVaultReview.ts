@@ -12,6 +12,7 @@ import { resolveEditGate, targetPaths, type VaultOpPolicy } from "../../vault-op
 import { escapesVault, outsideVaultMessage } from "../../vault-ops/pathSafety";
 import {
   preReadTrashSnapshots,
+  preScanReplacements,
   gateConvertedOp,
   buildReviewableOp,
 } from "../../vault-ops/proposalSupport";
@@ -475,14 +476,17 @@ export class LiveVaultReview implements VaultOpReviewer {
     const resolve = makeResolver(overlay, (p) => diskState(this.app, p));
 
     // A trashed file's snapshot is what its inverse recreates on undo; pre-read so
-    // conversion stays synchronous (shared with the finalize path).
+    // conversion stays synchronous (shared with the finalize path). A replace's
+    // per-file targets are scanned the same way.
     const snapshots = await preReadTrashSnapshots(this.app, calls);
+    const replaceScans = await preScanReplacements(this.app, calls);
 
     const probes: ConversionProbes = {
       resolve,
       fingerprint: (p) => diskFingerprint(this.app, p),
       readContent: (p) => snapshots.get(normalizePath(p)) ?? null,
       configDir: this.app.vault.configDir,
+      replaceTargets: (callId) => replaceScans.get(callId) ?? null,
     };
 
     const { ops, sources, satisfied, errors } = toVaultOperations(calls, probes, {
@@ -853,6 +857,10 @@ function destinationPath(op: VaultOperation): string {
       return op.to;
     case "trash":
       return op.path;
+    case "replaceInVault":
+      // A replace's targets already exist on disk, so it never depends on a folder
+      // created this turn; "" is under no directory, so decline-propagation skips it.
+      return "";
   }
 }
 

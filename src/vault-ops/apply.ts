@@ -10,7 +10,7 @@
 import type { App } from "obsidian";
 import { TFile, TFolder, normalizePath } from "obsidian";
 import type { PathState, TargetFingerprint, VaultOperation } from "./types";
-import type { DiskSnapshot } from "./plan";
+import type { DiskSnapshot, InverseContext } from "./plan";
 import { inverseOf } from "./plan";
 import { targetPaths } from "./gateway";
 import { escapesVault } from "./pathSafety";
@@ -124,6 +124,25 @@ export async function applyOperation(
       // fileManager.trashFile honors the user's deleted-files preference, never vault.delete.
       await app.fileManager.trashFile(file);
       return inverseOf(op, {});
+    }
+    case "replaceInVault": {
+      // Rewrite each target to its precomputed content (the same vault.process
+      // primitive as overwrite), capturing pre-content + post fingerprint per file so
+      // the single composite inverse can restore them all on undo.
+      const replaceTargets: InverseContext["replaceTargets"] = [];
+      for (const target of op.targets) {
+        const path = normalizePath(target.path);
+        const file = app.vault.getFileByPath(path);
+        if (!file) throw new Error(`replace target "${target.path}" no longer exists.`);
+        const preContent = await app.vault.read(file);
+        await app.vault.process(file, () => target.content);
+        replaceTargets.push({
+          path: target.path,
+          preContent,
+          fingerprint: diskFingerprint(app, path) ?? { mtime: 0, size: 0 },
+        });
+      }
+      return inverseOf(op, { replaceTargets });
     }
   }
 }

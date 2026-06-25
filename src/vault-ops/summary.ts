@@ -15,6 +15,11 @@ export function formatBytes(content: string): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+/** Plural-aware "N note(s)" for a replace's target count. */
+function noteCountLabel(count: number): string {
+  return `${count} note${count === 1 ? "" : "s"}`;
+}
+
 /** One-line checklist summary for an op, e.g. "New file Characters/Vex.md (1.2 KB)". */
 export function summarizeOp(op: VaultOperation): string {
   switch (op.kind) {
@@ -28,6 +33,8 @@ export function summarizeOp(op: VaultOperation): string {
       return `Move ${op.from} → ${op.to}`;
     case "trash":
       return `Trash ${op.path}`;
+    case "replaceInVault":
+      return `Replace "${op.search}" → "${op.replace}" in ${noteCountLabel(op.targets.length)} (${op.occurrences} matches)`;
   }
 }
 
@@ -43,9 +50,12 @@ export function gateBadgeLabel(gate: Gate): string {
   }
 }
 
-/** The single path an op acts on, for hierarchy display (move shows its destination). */
+/** The single path an op acts on, for hierarchy display (move shows its destination,
+ *  a replace its first target as a representative path). */
 export function opPrimaryPath(op: VaultOperation): string {
-  return op.kind === "move" ? op.to : op.path;
+  if (op.kind === "move") return op.to;
+  if (op.kind === "replaceInVault") return op.targets[0]?.path ?? "";
+  return op.path;
 }
 
 /**
@@ -101,5 +111,7 @@ export function opDetailText(op: VaultOperation): string {
       return `moved from ${op.from}`;
     case "trash":
       return "trash";
+    case "replaceInVault":
+      return `replace · ${op.occurrences} match${op.occurrences === 1 ? "" : "es"}`;
   }
 }

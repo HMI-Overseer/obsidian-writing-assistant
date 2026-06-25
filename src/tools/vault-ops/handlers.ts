@@ -9,6 +9,7 @@ import { toVaultOperations, type ConversionProbes } from "./conversion";
 import {
   validateCreateDirectory,
   validateMoveFile,
+  validateReplaceInVault,
   validateTrashFile,
   validateWriteFile,
 } from "./validation";
@@ -65,6 +66,15 @@ export function executeVaultOpTool(call: ToolCall, ctx: VaultOpContext): ToolRes
       if (!v.ok) return fail("trash_file", v.error);
       return queued(`Trash "${v.args.path}"`);
     }
+    case "replace_in_vault": {
+      // Validate + acknowledge only; the scan (which files, how many matches) runs at
+      // proposal-build time, and the counted result reaches the model via the op's
+      // disposition after review ("Replaced … in N notes (M matches).").
+      const v = validateReplaceInVault(call.arguments);
+      if (!v.ok) return fail("replace_in_vault", v.error);
+      const scope = v.args.path ? ` in "${v.args.path}"` : "";
+      return queued(`Replace "${v.args.search}" → "${v.args.replace}"${scope}`);
+    }
     default:
       return unknownVaultOpTool(call.name);
   }
@@ -104,6 +114,9 @@ function makeConversionProbes(app: App, overlay: PendingOverlay): ConversionProb
     fingerprint: () => null,
     readContent: () => null,
     configDir: app.vault.configDir,
+    // A replace changes only content, never path state, so it contributes nothing to
+    // the overlay; returning null makes conversion emit no op for it here.
+    replaceTargets: () => null,
   };
 }
 

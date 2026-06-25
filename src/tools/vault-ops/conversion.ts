@@ -12,9 +12,16 @@ import type { PathState, TargetFingerprint, VaultOperation } from "../../vault-o
 import {
   validateCreateDirectory,
   validateMoveFile,
+  validateReplaceInVault,
   validateTrashFile,
   validateWriteFile,
 } from "./validation";
+
+/** Precomputed per-file change set for a `replace_in_vault` call (see preScanReplacements). */
+export interface ReplaceScanResult {
+  targets: Array<{ path: string; content: string; expect: TargetFingerprint }>;
+  occurrences: number;
+}
 
 export interface ConversionProbes {
   /** Existence resolved against overlay ?? disk. */
@@ -25,6 +32,13 @@ export interface ConversionProbes {
   readContent: (path: string) => string | null;
   /** Live `app.vault.configDir`, used to refuse writes into the config subtree. */
   configDir: string;
+  /**
+   * Precomputed targets for a `replace_in_vault` call, keyed by tool-call id. Null
+   * when there is no scan in this context (e.g. overlay building, where a replace is
+   * a no-op for path state) or when nothing matched. The scan is async, so it runs
+   * before conversion ({@link ../../vault-ops/proposalSupport.preScanReplacements}).
+   */
+  replaceTargets: (callId: string) => ReplaceScanResult | null;
 }
 
 export interface ConversionError {
@@ -127,6 +141,25 @@ export function toVaultOperations(
           path: v.args.path,
           expect: probes.fingerprint(v.args.path) ?? MISSING_FINGERPRINT,
           snapshot: probes.readContent(v.args.path) ?? "",
+        });
+        return;
+      }
+      case "replace_in_vault": {
+        const v = validateReplaceInVault(tc.arguments);
+        if (!v.ok) return fail(v.error);
+        const found = probes.replaceTargets(tc.id);
+        // No matches, or no scan in this context (overlay building) → emit nothing.
+        // A zero-match replace is not an error; the model learns it via the op's
+        // disposition / the handler's acknowledgement, so the proposal just omits it.
+        if (!found || found.targets.length === 0) return;
+        emit({
+          kind: "replaceInVault",
+          search: v.args.search,
+          replace: v.args.replace,
+          caseSensitive: v.args.caseSensitive,
+          wholeWord: v.args.wholeWord,
+          targets: found.targets,
+          occurrences: found.occurrences,
         });
         return;
       }

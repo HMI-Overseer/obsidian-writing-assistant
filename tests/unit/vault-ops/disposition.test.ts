@@ -9,6 +9,18 @@ const OVERWRITE: VaultOperation = { kind: "overwrite", path: "Notes/Vex.md", con
 const DIR: VaultOperation = { kind: "createDir", path: "Notes/Folder" };
 const MOVE: VaultOperation = { kind: "move", from: "a.md", to: "b.md", expect: FP };
 const TRASH: VaultOperation = { kind: "trash", path: "a.md", expect: FP, snapshot: "x" };
+const REPLACE: VaultOperation = {
+  kind: "replaceInVault",
+  search: "Age of Laurels",
+  replace: "Age of Ambition",
+  caseSensitive: false,
+  wholeWord: false,
+  targets: [
+    { path: "Lore/A.md", content: "x", expect: FP },
+    { path: "Lore/B.md", content: "y", expect: FP },
+  ],
+  occurrences: 3,
+};
 
 describe("dispositionMessage", () => {
   it("reports an applied op in the past tense, with the path", () => {
@@ -20,6 +32,15 @@ describe("dispositionMessage", () => {
 
   it("shows both endpoints for a move", () => {
     expect(dispositionMessage(MOVE, "applied")).toBe('Moved "a.md" → "b.md".');
+  });
+
+  it("reports a replace with its terms, note count, and match count", () => {
+    expect(dispositionMessage(REPLACE, "applied")).toBe(
+      'Replaced "Age of Laurels" → "Age of Ambition" in 2 notes (3 matches).',
+    );
+    expect(dispositionMessage(REPLACE, "failed", "a file changed on disk")).toBe(
+      'Error: could not replace "Age of Laurels" → "Age of Ambition" in 2 notes (3 matches), a file changed on disk.',
+    );
   });
 
   it("flags an auto-applied op so the model knows there was no click", () => {

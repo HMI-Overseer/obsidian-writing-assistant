@@ -16,7 +16,7 @@
  *     spurious nested folder. The leading vault-name segment is always redundant.
  */
 
-import { type App, FileSystemAdapter, normalizePath } from "obsidian";
+import { type App, FileSystemAdapter, TFolder, normalizePath } from "obsidian";
 import type { ToolCall } from "./types";
 
 /** Tool-argument keys carrying a single vault path (write/edit + most reads). */
@@ -24,6 +24,71 @@ const PATH_ARG_KEYS = ["path", "from", "to"] as const;
 
 /** Tool-argument keys carrying an *array* of vault paths (e.g. get_frontmatter `paths`). */
 const PATH_ARRAY_ARG_KEYS = ["paths"] as const;
+
+/**
+ * Per-tool path-arg keys whose value must reference an *existing* file, so a
+ * confusable-punctuation mismatch may be snapped to the real on-disk path
+ * ({@link snapToExistingFile}). Deliberately excludes write destinations
+ * (`write_file.path`, `move_file.to`, `create_directory.path`, `replace_in_vault.path`):
+ * those are meant to be absent, and snapping one could silently retarget a new file
+ * onto an existing note. Read/source/edit-target keys only.
+ */
+const SNAP_TOOL_KEYS: Record<string, readonly string[]> = {
+  read_file: ["path"],
+  get_backlinks: ["path"],
+  trash_file: ["path"],
+  propose_edit: ["path"],
+  update_frontmatter: ["path"],
+  get_frontmatter: ["paths"],
+  move_file: ["from"],
+};
+
+/**
+ * Fold the punctuation a model routinely "straightens" when it emits a path, so two
+ * spellings of the same filename compare equal: curly ↔ straight quotes, en/em dashes
+ * ↔ hyphen, ellipsis ↔ three dots, plus Unicode NFC. These are genuinely distinct
+ * codepoints that `normalizePath` does not reconcile (e.g. ’ U+2019 vs ' U+0027), so
+ * an exact `getFileByPath` lookup misses even though the file is right there.
+ */
+function foldConfusables(value: string): string {
+  return value
+    .normalize("NFC")
+    .replace(/[‘’‛]/g, "'")
+    .replace(/[“”‟]/g, '"')
+    .replace(/[–—]/g, "-")
+    .replace(/…/g, "...");
+}
+
+/**
+ * When an exact lookup of `path` fails, try to resolve it to a real file in the same
+ * parent folder whose name matches once confusable punctuation is folded
+ * ({@link foldConfusables}). Returns the file's *real* on-disk path on a unique match,
+ * or the input unchanged when the path already resolves, nothing matches, or more than
+ * one candidate folds the same (ambiguous, never guess). Only ever snaps to a real
+ * in-vault file, so the vault-boundary guard is never weakened. Leaf-only: a confusable
+ * in a parent *folder* segment is left for the normal not-found path (rare; the common
+ * case is an apostrophe in the filename).
+ */
+export function snapToExistingFile(app: App, path: string): string {
+  const normalized = normalizePath(path);
+  if (app.vault.getAbstractFileByPath(normalized)) return path; // exact hit, nothing to fix
+
+  const slash = normalized.lastIndexOf("/");
+  const parentPath = slash > 0 ? normalized.slice(0, slash) : "";
+  const parent = parentPath
+    ? app.vault.getAbstractFileByPath(parentPath)
+    : app.vault.getRoot();
+  if (!(parent instanceof TFolder)) return path;
+
+  const target = foldConfusables(normalized);
+  let match: string | null = null;
+  for (const child of parent.children) {
+    if (foldConfusables(child.path) !== target) continue;
+    if (match !== null) return path; // ambiguous (>1 fold to the same), don't guess
+    match = child.path;
+  }
+  return match ?? path;
+}
 
 /**
  * Absolute vault root (`FileSystemAdapter.getBasePath`), or undefined on a
@@ -106,16 +171,24 @@ export function normalizeVaultToolCall(app: App, call: ToolCall): ToolCall {
   const vaultName = app.vault.getName();
   const name =
     vaultName && !app.vault.getAbstractFileByPath(normalizePath(vaultName)) ? vaultName : undefined;
-  if (!base && !name) return call;
+  const snapKeys = SNAP_TOOL_KEYS[call.name] ?? [];
+
+  // Rewrite a single path: first to its vault-relative shape, then (for keys that
+  // must reference an existing file) snap a confusable-punctuation mismatch to the
+  // real on-disk path. Snapping runs last so it sees the already-relative path.
+  const rewrite = (value: string, key: string): string => {
+    const relative = toVaultRelativePath(value, base, name);
+    return snapKeys.includes(key) ? snapToExistingFile(app, relative) : relative;
+  };
 
   let changed = false;
   const args: Record<string, unknown> = { ...call.arguments };
   for (const key of PATH_ARG_KEYS) {
     const value = args[key];
     if (typeof value !== "string") continue;
-    const relative = toVaultRelativePath(value, base, name);
-    if (relative !== value) {
-      args[key] = relative;
+    const rewritten = rewrite(value, key);
+    if (rewritten !== value) {
+      args[key] = rewritten;
       changed = true;
     }
   }
@@ -125,9 +198,9 @@ export function normalizeVaultToolCall(app: App, call: ToolCall): ToolCall {
     let arrayChanged = false;
     const rewritten = value.map((entry) => {
       if (typeof entry !== "string") return entry;
-      const relative = toVaultRelativePath(entry, base, name);
-      if (relative !== entry) arrayChanged = true;
-      return relative;
+      const next = rewrite(entry, key);
+      if (next !== entry) arrayChanged = true;
+      return next;
     });
     if (arrayChanged) {
       args[key] = rewritten;

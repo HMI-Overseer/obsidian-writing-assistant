@@ -1,6 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { FileSystemAdapter } from "obsidian";
-import { toVaultRelativePath, normalizeVaultToolCall } from "../../../src/tools/paths";
+import { FileSystemAdapter, TFile, TFolder, normalizePath } from "obsidian";
+import {
+  toVaultRelativePath,
+  normalizeVaultToolCall,
+  snapToExistingFile,
+} from "../../../src/tools/paths";
 import type { ToolCall } from "../../../src/tools/types";
 import type { App } from "obsidian";
 
@@ -91,6 +95,59 @@ function appWithBase(base: string, name = NAME, vaultNameFolderExists = false): 
       adapter,
       getName: () => name,
       getAbstractFileByPath: (p: string) => (vaultNameFolderExists && p === name ? {} : null),
+      // Snap-eligible tools look up the parent folder / root; an empty root means no
+      // confusable candidates, so snapping is a no-op for these vault-name tests.
+      getRoot: () => new TFolder(),
+    },
+  } as unknown as App;
+}
+
+/**
+ * App whose vault resolves a fixed set of file paths into a TFolder/TFile tree, so
+ * {@link snapToExistingFile} can find (or fail to find) confusable-folded matches.
+ */
+function appWithFiles(filePaths: string[]): App {
+  const folders = new Map<string, TFolder>();
+  const files = new Map<string, TFile>();
+  const folderAt = (path: string): TFolder => {
+    let f = folders.get(path);
+    if (!f) {
+      f = new TFolder();
+      f.path = path;
+      folders.set(path, f);
+    }
+    return f;
+  };
+  const root = folderAt("");
+
+  for (const raw of filePaths) {
+    const p = normalizePath(raw);
+    const segs = p.split("/");
+    let parent = root;
+    let cur = "";
+    for (let i = 0; i < segs.length - 1; i++) {
+      cur = cur ? `${cur}/${segs[i]}` : segs[i];
+      const folder = folderAt(cur);
+      if (!parent.children.includes(folder)) parent.children.push(folder);
+      parent = folder;
+    }
+    const file = new TFile();
+    file.path = p;
+    files.set(p, file);
+    parent.children.push(file);
+  }
+
+  const adapter = new FileSystemAdapter();
+  adapter.getBasePath = () => ROOT;
+  return {
+    vault: {
+      adapter,
+      getName: () => NAME,
+      getRoot: () => root,
+      getAbstractFileByPath: (path: string) => {
+        const p = normalizePath(path);
+        return files.get(p) ?? folders.get(p) ?? null;
+      },
     },
   } as unknown as App;
 }
@@ -184,5 +241,90 @@ describe("normalizeVaultToolCall", () => {
     // No base path means the absolute prefix can't be stripped; the vault-name
     // segment is mid-path (not leading), so nothing changes.
     expect(normalizeVaultToolCall(app, call)).toBe(call);
+  });
+});
+
+// ’ = U+2019 (right single quotation mark), the curly apostrophe Obsidian saves and
+// the model "straightens" to ' (U+0027) when it composes a path, the smart-quote
+// move/read failure this resolver fixes.
+const CURLY = "’";
+
+describe("snapToExistingFile (confusable-punctuation path snapping)", () => {
+  const app = appWithFiles([
+    `Lore/The Sovereign${CURLY}s Halo.md`,
+    `Lore/Anno${CURLY}s Crucible.md`,
+    "Lore/Plain.md",
+  ]);
+
+  it("returns an exact path unchanged", () => {
+    const exact = `Lore/The Sovereign${CURLY}s Halo.md`;
+    expect(snapToExistingFile(app, exact)).toBe(exact);
+  });
+
+  it("snaps a straight apostrophe to the curly-quoted file actually on disk", () => {
+    expect(snapToExistingFile(app, "Lore/The Sovereign's Halo.md")).toBe(
+      `Lore/The Sovereign${CURLY}s Halo.md`,
+    );
+  });
+
+  it("returns the input unchanged when nothing in the folder matches", () => {
+    expect(snapToExistingFile(app, "Lore/Missing.md")).toBe("Lore/Missing.md");
+  });
+
+  it("never snaps across folders (only the same parent is searched)", () => {
+    // The curly file lives in Lore/, so a root-level lookup must not reach it.
+    expect(snapToExistingFile(app, "The Sovereign's Halo.md")).toBe("The Sovereign's Halo.md");
+  });
+
+  it("refuses to guess when more than one file folds to the same name", () => {
+    const ambiguous = appWithFiles([`Lore/A${CURLY}s.md`, "Lore/A‘s.md"]);
+    // Both the right- and left-quote files fold to "Lore/A's.md"; the straight input
+    // matches neither exactly, so the snap is ambiguous and must be left alone.
+    expect(snapToExistingFile(ambiguous, "Lore/A's.md")).toBe("Lore/A's.md");
+  });
+});
+
+describe("normalizeVaultToolCall confusable snapping (existing-file keys only)", () => {
+  const app = appWithFiles([
+    `Lore/The Sovereign${CURLY}s Halo.md`,
+    `Lore/Anno${CURLY}s Crucible.md`,
+  ]);
+
+  it("snaps move_file `from` to the on-disk curly name but leaves `to` (a destination) alone", () => {
+    const call: ToolCall = {
+      id: "m",
+      name: "move_file",
+      arguments: { from: "Lore/The Sovereign's Halo.md", to: "Archive/The Sovereign's Halo.md" },
+    };
+    const out = normalizeVaultToolCall(app, call);
+    expect(out.arguments.from).toBe(`Lore/The Sovereign${CURLY}s Halo.md`);
+    expect(out.arguments.to).toBe("Archive/The Sovereign's Halo.md");
+  });
+
+  it("snaps read_file `path`", () => {
+    const out = normalizeVaultToolCall(app, {
+      id: "r",
+      name: "read_file",
+      arguments: { path: "Lore/Anno's Crucible.md" },
+    });
+    expect(out.arguments.path).toBe(`Lore/Anno${CURLY}s Crucible.md`);
+  });
+
+  it("does NOT snap write_file `path` (a destination), even when a confusable file exists", () => {
+    const out = normalizeVaultToolCall(app, {
+      id: "w",
+      name: "write_file",
+      arguments: { path: "Lore/The Sovereign's Halo.md", content: "x" },
+    });
+    expect(out.arguments.path).toBe("Lore/The Sovereign's Halo.md");
+  });
+
+  it("snaps each existing-file entry of get_frontmatter `paths`, leaving misses alone", () => {
+    const out = normalizeVaultToolCall(app, {
+      id: "gf",
+      name: "get_frontmatter",
+      arguments: { paths: ["Lore/Anno's Crucible.md", "Lore/Missing.md"] },
+    });
+    expect(out.arguments.paths).toEqual([`Lore/Anno${CURLY}s Crucible.md`, "Lore/Missing.md"]);
   });
 });

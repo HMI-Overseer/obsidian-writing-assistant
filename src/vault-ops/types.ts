@@ -19,13 +19,35 @@ export interface TargetFingerprint {
  * One vault mutation. `write_file` resolves to `create` or `overwrite` at
  * conversion time from whether the path exists, the model never sets a flag.
  * `trash` carries the trashed file's `snapshot` so its inverse can re-create it.
+ *
+ * `replaceInVault` is a single composite op for a vault-wide find-and-replace: one
+ * tool call, reviewed/applied/undone as one unit, that rewrites every matched
+ * file's content. It carries precomputed per-file content (the model never authors
+ * file bodies) and is gated as an `overwrite` (see `classOf`), since it is a
+ * multi-file content rewrite. Reviewing it as a single unit keeps the in-loop
+ * review coordinator and timeline at their 1-call/1-op design.
  */
 export type VaultOperation =
   | { kind: "create"; path: string; content: string }
   | { kind: "overwrite"; path: string; content: string; expect: TargetFingerprint }
   | { kind: "createDir"; path: string }
   | { kind: "move"; from: string; to: string; expect: TargetFingerprint }
-  | { kind: "trash"; path: string; expect: TargetFingerprint; snapshot: string };
+  | { kind: "trash"; path: string; expect: TargetFingerprint; snapshot: string }
+  | {
+      kind: "replaceInVault";
+      search: string;
+      replace: string;
+      caseSensitive: boolean;
+      wholeWord: boolean;
+      /**
+       * Precomputed per-file change. Each target carries the file's full new
+       * content and the conflict guard captured at proposal time (re-checked at
+       * apply, like `overwrite`).
+       */
+      targets: Array<{ path: string; content: string; expect: TargetFingerprint }>;
+      /** Total occurrences replaced across all targets, for the summary/disposition. */
+      occurrences: number;
+    };
 
 /** The class an op is gated by, identical to its `kind` (ADR-0003). */
 export type VaultOpClass = VaultOperation["kind"];

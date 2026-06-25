@@ -51,6 +51,14 @@ export interface MoveFileArgs {
 export interface TrashFileArgs {
   path: string;
 }
+export interface ReplaceInVaultArgs {
+  search: string;
+  replace: string;
+  /** Optional folder scope; undefined ⇒ whole vault. */
+  path?: string;
+  caseSensitive: boolean;
+  wholeWord: boolean;
+}
 
 export function validateWriteFile(
   args: Record<string, unknown>,
@@ -135,6 +143,38 @@ export function validateMoveFile(
     return err(`destination "${args.to}" already exists, choose a new name.`);
   }
   return ok({ from: args.from, to: args.to });
+}
+
+export function validateReplaceInVault(
+  args: Record<string, unknown>,
+): ValidationResult<ReplaceInVaultArgs> {
+  if (typeof args.search !== "string" || args.search === "") {
+    return err("search must be a non-empty string.");
+  }
+  if (typeof args.replace !== "string") {
+    return err("replace must be a string. Got: " + typeof args.replace);
+  }
+  let path: string | undefined;
+  if (args.path !== undefined && args.path !== null && args.path !== "") {
+    if (typeof args.path !== "string") return err("path must be a string when provided.");
+    // A scope path that escapes the vault is refused up front (same boundary guard as
+    // the other write tools), not silently treated as "no matches".
+    if (escapesVault(args.path)) return err(outsideVaultMessage(args.path));
+    path = args.path;
+  }
+  if (args.caseSensitive !== undefined && typeof args.caseSensitive !== "boolean") {
+    return err("caseSensitive must be a boolean when provided.");
+  }
+  if (args.wholeWord !== undefined && typeof args.wholeWord !== "boolean") {
+    return err("wholeWord must be a boolean when provided.");
+  }
+  return ok({
+    search: args.search,
+    replace: args.replace,
+    path,
+    caseSensitive: args.caseSensitive === true,
+    wholeWord: args.wholeWord === true,
+  });
 }
 
 export function validateTrashFile(

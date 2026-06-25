@@ -68,6 +68,15 @@ export function preflight(ops: VaultOperation[], disk: DiskSnapshot): PreflightR
         else if (!fingerprintsMatch(disk.fingerprint(op.path), op.expect))
           add(`"${op.path}" changed on disk since it was proposed.`);
         break;
+      case "replaceInVault":
+        // Each target must still be a file and match the fingerprint captured at scan
+        // time; any drift means the precomputed replacement is stale, abort the batch.
+        for (const t of op.targets) {
+          if (disk.state(t.path) !== "file") add(`"${t.path}" no longer exists.`);
+          else if (!fingerprintsMatch(disk.fingerprint(t.path), t.expect))
+            add(`"${t.path}" changed on disk since the replacement was prepared.`);
+        }
+        break;
     }
   });
   return { ok: conflicts.length === 0, conflicts };
@@ -77,6 +86,8 @@ const KIND_PRIORITY: Record<VaultOperation["kind"], number> = {
   createDir: 0,
   create: 1,
   overwrite: 1,
+  // A replace rewrites existing files' content, same tier as overwrite/create.
+  replaceInVault: 1,
   move: 2,
   trash: 3,
 };
@@ -160,6 +171,11 @@ export interface InverseContext {
   dirPreExisted?: boolean;
   /** Conflict guard embedded in the inverse, captured from post-apply state. */
   fingerprint?: TargetFingerprint;
+  /**
+   * replaceInVault: per-target prior content + post-apply fingerprint, gathered by
+   * the executor so the inverse can restore every rewritten file and drift-guard it.
+   */
+  replaceTargets?: Array<{ path: string; preContent: string; fingerprint: TargetFingerprint }>;
 }
 
 const ZERO_FINGERPRINT: TargetFingerprint = { mtime: 0, size: 0 };
@@ -182,5 +198,26 @@ export function inverseOf(op: VaultOperation, ctx: InverseContext = {}): VaultOp
       return { kind: "move", from: op.to, to: op.from, expect };
     case "trash":
       return { kind: "create", path: op.path, content: op.snapshot };
+    case "replaceInVault": {
+      // Restore each rewritten file to its prior content. The inverse is itself a
+      // replaceInVault whose targets carry the pre-content as their `content`, so
+      // applying it overwrites every file back. The search/replace fields are
+      // vestigial for the inverse (apply writes `content` directly), kept reversed
+      // only so a summary, if ever shown, reads sensibly.
+      const targets = (ctx.replaceTargets ?? []).map((t) => ({
+        path: t.path,
+        content: t.preContent,
+        expect: t.fingerprint,
+      }));
+      return {
+        kind: "replaceInVault",
+        search: op.replace,
+        replace: op.search,
+        caseSensitive: op.caseSensitive,
+        wholeWord: op.wholeWord,
+        targets,
+        occurrences: op.occurrences,
+      };
+    }
   }
 }

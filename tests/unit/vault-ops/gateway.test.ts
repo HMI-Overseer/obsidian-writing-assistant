@@ -24,6 +24,15 @@ const basePolicy: VaultOpPolicy = {
 
 const create = (path: string): VaultOperation => ({ kind: "create", path, content: "x" });
 const move = (from: string, to: string): VaultOperation => ({ kind: "move", from, to, expect: FP });
+const replace = (paths: string[]): VaultOperation => ({
+  kind: "replaceInVault",
+  search: "old",
+  replace: "new",
+  caseSensitive: false,
+  wholeWord: false,
+  targets: paths.map((p) => ({ path: p, content: "x", expect: FP })),
+  occurrences: paths.length,
+});
 
 describe("classOf / targetPaths", () => {
   test("class is the op kind", () => {
@@ -31,9 +40,19 @@ describe("classOf / targetPaths", () => {
     expect(classOf(move("a.md", "b.md"))).toBe("move");
   });
 
-  test("move touches both endpoints; others one", () => {
+  test("a replace is gated as an overwrite (the one class ≠ kind exception)", () => {
+    expect(classOf(replace(["a.md"]))).toBe("overwrite");
+  });
+
+  test("move touches both endpoints; a replace touches every target; others one", () => {
     expect(targetPaths(move("a.md", "b/c.md"))).toEqual(["a.md", "b/c.md"]);
     expect(targetPaths(create("a.md"))).toEqual(["a.md"]);
+    expect(targetPaths(replace(["Lore/a.md", "Lore/b.md"]))).toEqual(["Lore/a.md", "Lore/b.md"]);
+  });
+
+  test("a replace resolves through the overwrite gate", () => {
+    expect(resolveGate(replace(["a.md"]), basePolicy, 0)).toBe("ask"); // overwrite is "ask"
+    expect(resolveGate(replace(["a.md"]), { ...basePolicy, overwrite: "deny" }, 0)).toBe("deny");
   });
 });
 

@@ -33,6 +33,7 @@ ${strategyLines}
 
 ## Guidance
 - To change part of an existing note, prefer propose_edit. Reach for write_file only to create a new note or replace one wholesale.
+- To rename or relabel a term everywhere it appears (across many notes), use replace_in_vault in a single call. Never rewrite whole notes with write_file, or edit them one at a time, just to swap a recurring term.
 - Always provide the complete file content for write_file, it replaces the file entirely, so partial content discards the rest.
 - The review panel already shows every queued operation as a folder/file tree the user can inspect, so don't redraw it: skip ASCII diagrams or bullet lists that re-list the paths. Explain intent and trade-offs in prose instead.${errorSection}`;
 }

@@ -59,14 +59,29 @@ export const DEFAULT_VAULT_OP_POLICY: VaultOpPolicy = {
   maxAutoOps: 20,
 };
 
-/** Annotation-derived class of an op, identical to its kind. */
-export function classOf(op: VaultOperation): VaultOpClass {
+/**
+ * The op classes that carry a gate in {@link VaultOpPolicy}. Excludes
+ * `replaceInVault`, which gates as `overwrite` ({@link classOf}) rather than
+ * carrying its own knob, so it never indexes the policy directly.
+ */
+export type GatedVaultOpClass = Exclude<VaultOpClass, "replaceInVault">;
+
+/**
+ * Annotation-derived gate class of an op. Identical to its kind for every op except
+ * `replaceInVault`: a vault-wide replace is a multi-file content rewrite, so it gates
+ * exactly like an `overwrite` (no separate settings knob). This is the one deliberate
+ * exception to "class === kind" (ADR-0003).
+ */
+export function classOf(op: VaultOperation): GatedVaultOpClass {
+  if (op.kind === "replaceInVault") return "overwrite";
   return op.kind;
 }
 
-/** Every path an op touches (move touches two). */
+/** Every path an op touches (move touches two; a replace touches all its targets). */
 export function targetPaths(op: VaultOperation): string[] {
-  return op.kind === "move" ? [op.from, op.to] : [op.path];
+  if (op.kind === "move") return [op.from, op.to];
+  if (op.kind === "replaceInVault") return op.targets.map((t) => t.path);
+  return [op.path];
 }
 
 /** True when every path sits inside one of the scope prefixes (empty ⇒ whole vault). */

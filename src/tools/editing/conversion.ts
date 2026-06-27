@@ -1,6 +1,10 @@
 import type { ToolCall } from "../types";
 import type { EditBlock } from "../../editing/editTypes";
-import { validateProposeEdit, validateUpdateFrontmatter } from "./validation";
+import {
+  validateInsertIntoNote,
+  validateProposeEdit,
+  validateUpdateFrontmatter,
+} from "./validation";
 import type { FrontmatterOperation } from "./validation";
 
 // ---------------------------------------------------------------------------
@@ -133,6 +137,29 @@ export function convertToolCallToEditBlock(tc: ToolCall): EditBlock | null {
         ...(v.args.path ? { targetPath: v.args.path } : {}),
         toolName: "update_frontmatter" as const,
         toolArgs: { operations: v.args.operations },
+      };
+    }
+    case "insert_into_note": {
+      const v = validateInsertIntoNote(tc.arguments);
+      if (!v.ok) {
+        console.error(`[tool] Skipping insert_into_note (${tc.id}): ${v.error}`);
+        return null;
+      }
+      // Structural: searchText/replaceText are computed at resolution time from the
+      // anchor and the document content (resolveStructuralEditBlocks). Escapes are
+      // normalized here so the stored anchor/text match what the document holds.
+      return {
+        id: tc.id,
+        searchText: "",
+        replaceText: "",
+        rawBlock: `[tool_call:${tc.id}]`,
+        ...(v.args.path ? { targetPath: v.args.path } : {}),
+        toolName: "insert_into_note" as const,
+        toolArgs: {
+          anchor: normalizeEscapes(v.args.anchor ?? ""),
+          text: normalizeEscapes(v.args.text),
+          where: v.args.where,
+        },
       };
     }
     default:

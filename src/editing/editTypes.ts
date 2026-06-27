@@ -10,7 +10,7 @@ export interface EditBlock {
    */
   targetPath?: string;
   /** For structure-aware tools, the originating tool name. */
-  toolName?: "update_frontmatter";
+  toolName?: "update_frontmatter" | "insert_into_note";
   /** Tool-specific arguments needed for resolution (e.g., heading text, line number). */
   toolArgs?: Record<string, unknown>;
 }

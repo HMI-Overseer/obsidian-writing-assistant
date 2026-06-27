@@ -47,6 +47,22 @@ export interface UpdateFrontmatterArgs {
   explanation?: string;
 }
 
+/** Where insert_into_note places its text relative to the anchor / the document. */
+export type InsertWhere = "before" | "after" | "append" | "prepend";
+
+/** Valid `where` values, also the schema enum (single source of truth). */
+export const INSERT_WHERES: InsertWhere[] = ["before", "after", "append", "prepend"];
+
+export interface InsertIntoNoteArgs {
+  /** Vault-relative path of the note to edit. Required by the tool; enforced at execution. */
+  path?: string;
+  /** Existing text to anchor on; required for "before"/"after", ignored for append/prepend. */
+  anchor?: string;
+  text: string;
+  where: InsertWhere;
+  explanation?: string;
+}
+
 // ---------------------------------------------------------------------------
 // Validators
 // ---------------------------------------------------------------------------
@@ -109,6 +125,30 @@ export function validateUpdateFrontmatter(
   return ok({
     path: typeof args.path === "string" ? args.path : undefined,
     operations: validated,
+    explanation: typeof args.explanation === "string" ? args.explanation : undefined,
+  });
+}
+
+export function validateInsertIntoNote(
+  args: Record<string, unknown>,
+): ValidationResult<InsertIntoNoteArgs> {
+  if (typeof args.text !== "string" || args.text === "") {
+    return err("text must be a non-empty string.");
+  }
+  if (typeof args.where !== "string" || !INSERT_WHERES.includes(args.where as InsertWhere)) {
+    return err(`where must be one of ${INSERT_WHERES.join(", ")}. Got: ${JSON.stringify(args.where)}`);
+  }
+  const where = args.where as InsertWhere;
+  // "before"/"after" need a passage to anchor on; append/prepend do not.
+  const needsAnchor = where === "before" || where === "after";
+  if (needsAnchor && (typeof args.anchor !== "string" || args.anchor === "")) {
+    return err(`anchor must be a non-empty string when where is "${where}".`);
+  }
+  return ok({
+    path: typeof args.path === "string" ? args.path : undefined,
+    anchor: typeof args.anchor === "string" ? args.anchor : undefined,
+    text: args.text,
+    where,
     explanation: typeof args.explanation === "string" ? args.explanation : undefined,
   });
 }

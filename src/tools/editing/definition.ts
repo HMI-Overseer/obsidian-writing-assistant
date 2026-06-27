@@ -1,4 +1,5 @@
 import type { CanonicalToolDefinition } from "../types";
+import { INSERT_WHERES } from "./validation";
 
 // ---------------------------------------------------------------------------
 // Write tools, produce EditBlocks for the diff review pipeline
@@ -111,9 +112,69 @@ export const UPDATE_FRONTMATTER_TOOL: CanonicalToolDefinition = {
   },
 };
 
+export const INSERT_INTO_NOTE_TOOL: CanonicalToolDefinition = {
+  name: "insert_into_note",
+  description:
+    "Add new text to an existing note without rewriting it. Always pass `path`, the " +
+    "vault-relative path of the note to change, plus `text` (the content to add) and `where`. " +
+    "Use `where`: \"after\" or \"before\" to place the text just after/before an existing passage " +
+    "(pass that passage as `anchor`); \"append\" to add it at the end of the note, or \"prepend\" " +
+    "at the start (no anchor needed). The text is added as its own paragraph, separated by a blank " +
+    "line, so put structure (headings, list markers) inside `text` itself. " +
+    "The change is shown to the user for review before it is applied. " +
+    "Prefer this over write_file (which replaces the whole file) when adding to a note, and over " +
+    "propose_edit when you only need to add content rather than rewrite an existing passage.",
+  strategyHint:
+    "add content to an existing note without rewriting it: append/prepend, or insert before/after " +
+    "an `anchor` passage. Prefer it over propose_edit when adding (not changing) text, and over " +
+    "write_file for any note that already has content.",
+  errorGuidance:
+    "If `path` is missing or the file is not found, supply the correct vault-relative path. " +
+    "For where \"before\"/\"after\", if the anchor was not found, re-read the note with read_file and " +
+    "copy the anchor exactly (dropping read_file's line-number prefix), or use \"append\"/\"prepend\" " +
+    "which need no anchor.",
+  parameters: {
+    type: "object",
+    properties: {
+      path: {
+        type: "string",
+        description:
+          "Vault-relative path of the note to add to (e.g. \"Journal/2026-06-27.md\"). " +
+          "Use the path of the document under edit or the file you read with read_file.",
+      },
+      text: {
+        type: "string",
+        description:
+          "The content to add. It is inserted as its own paragraph (separated by a blank line); " +
+          "include any headings or list markers in this text yourself.",
+      },
+      where: {
+        type: "string",
+        enum: INSERT_WHERES,
+        description:
+          "Where to place the text: \"after\" or \"before\" an `anchor` passage, " +
+          "\"append\" at the end of the note, or \"prepend\" at the start.",
+      },
+      anchor: {
+        type: "string",
+        description:
+          "For where \"before\"/\"after\": the exact existing passage to place the text next to. " +
+          "Match it character-for-character (drop read_file's line-number prefix). " +
+          "Keep it short, a sentence or a heading line. Not used for \"append\"/\"prepend\".",
+      },
+      explanation: {
+        type: "string",
+        description: "Brief explanation of what this insertion adds and why.",
+      },
+    },
+    required: ["path", "text", "where"],
+  },
+};
+
 /** All edit-mode tools, in the order they should appear in the API request. */
 export const ALL_EDIT_TOOLS: CanonicalToolDefinition[] = [
   PROPOSE_EDIT_TOOL,
+  INSERT_INTO_NOTE_TOOL,
   UPDATE_FRONTMATTER_TOOL,
 ];
 

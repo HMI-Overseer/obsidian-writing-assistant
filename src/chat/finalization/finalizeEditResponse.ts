@@ -202,8 +202,8 @@ async function buildEditProposal(
   blocks: EditBlock[],
   prose: string,
 ): Promise<EditProposal | null> {
-  // Resolve structural edit blocks (replace_section, insert_at_position,
-  // update_frontmatter) that need MetadataCache or document content.
+  // Resolve structural edit blocks (insert_into_note, update_frontmatter) that
+  // need document content or MetadataCache to populate searchText/replaceText.
   let resolved = blocks;
   if (blocks.some((b) => b.toolName)) {
     resolved = await resolveStructuralEditBlocks(blocks, { app, filePath });

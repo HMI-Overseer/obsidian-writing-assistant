@@ -249,7 +249,7 @@ export class LiveVaultReview implements VaultOpReviewer {
       const parked: Parked[] = [];
 
       for (const call of calls) {
-        const kind: EditOpKind = call.name === "update_frontmatter" ? "frontmatter" : "edit";
+        const kind = editKind(call.name);
         const block = convertToolCallToEditBlock(call);
         if (!block) {
           results.set(call.id, editError(call, "could not parse edit arguments"));
@@ -421,12 +421,7 @@ export class LiveVaultReview implements VaultOpReviewer {
 
     return calls.map((tc) => ({
       tc,
-      result:
-        results.get(tc.id) ??
-        editCancelled(
-          tc.name === "update_frontmatter" ? "frontmatter" : "edit",
-          this.editTargetPath ?? "",
-        ),
+      result: results.get(tc.id) ?? editCancelled(editKind(tc.name), this.editTargetPath ?? ""),
     }));
   }
 
@@ -840,6 +835,13 @@ function editError(
 /** A parked edit cancelled before the user decided (abort / new turn). */
 function editCancelled(kind: EditOpKind, path: string): ToolResult {
   return { content: editDispositionMessage(kind, path, "cancelled"), isReadOnly: false };
+}
+
+/** Map an edit tool name to the disposition kind that shapes its model-facing wording. */
+function editKind(toolName: string): EditOpKind {
+  if (toolName === "update_frontmatter") return "frontmatter";
+  if (toolName === "insert_into_note") return "insert";
+  return "edit";
 }
 
 /**

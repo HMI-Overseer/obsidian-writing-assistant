@@ -120,7 +120,7 @@ export function dispositionMessage(
 }
 
 /** Which edit tool produced the disposition, shapes the model-facing wording. */
-export type EditOpKind = "edit" | "frontmatter";
+export type EditOpKind = "edit" | "frontmatter" | "insert";
 
 /**
  * The match tier, in plain words, for an *applied* edit, the diagnostic the channel
@@ -166,8 +166,9 @@ export function editDispositionMessage(
   matchType?: MatchType,
   occurrenceCount?: number,
 ): string {
-  const tool = kind === "frontmatter" ? "update_frontmatter" : "propose_edit";
-  const what = kind === "frontmatter" ? "frontmatter update" : "edit";
+  const tool =
+    kind === "frontmatter" ? "update_frontmatter" : kind === "insert" ? "insert_into_note" : "propose_edit";
+  const what = kind === "frontmatter" ? "frontmatter update" : kind === "insert" ? "insertion" : "edit";
   const t = `"${filePath}"`;
 
   // Compose the trailing "(…)" for an applied edit from the optional auto-applied

@@ -38,6 +38,7 @@ const SNAP_TOOL_KEYS: Record<string, readonly string[]> = {
   get_backlinks: ["path"],
   trash_file: ["path"],
   propose_edit: ["path"],
+  insert_into_note: ["path"],
   update_frontmatter: ["path"],
   get_frontmatter: ["paths"],
   move_file: ["from"],

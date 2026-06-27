@@ -22,6 +22,7 @@ export const TOOL_ICONS: Record<string, string> = {
   find_notes_by_tag: "tag",
   get_frontmatter: "file-code",
   propose_edit: "pencil",
+  insert_into_note: "list-plus",
   update_frontmatter: "file-code-2",
   write_file: "file-plus",
   create_directory: "folder-plus",
@@ -43,6 +44,7 @@ export const TOOL_LABELS: Record<string, string> = {
   find_notes_by_tag: "Found notes by tag",
   get_frontmatter: "Read frontmatter",
   propose_edit: "Proposed edit",
+  insert_into_note: "Inserted into note",
   update_frontmatter: "Updated frontmatter",
   write_file: "Wrote file",
   create_directory: "Created folder",
@@ -64,6 +66,7 @@ export const TOOL_STATUS_LABELS: Record<string, string> = {
   find_notes_by_tag: "Finding notes by tag...",
   get_frontmatter: "Reading frontmatter...",
   propose_edit: "Composing edit...",
+  insert_into_note: "Inserting into note...",
   update_frontmatter: "Updating frontmatter...",
   write_file: "Writing file...",
   create_directory: "Creating folder...",
@@ -107,6 +110,7 @@ export function extractToolInput(
     case "find_notes_by_tag": return typeof args.tag === "string" ? args.tag : undefined;
     case "get_frontmatter": return Array.isArray(args.paths) ? `${args.paths.length} note(s)` : undefined;
     case "propose_edit": return typeof args.explanation === "string" ? args.explanation : undefined;
+    case "insert_into_note": return typeof args.explanation === "string" ? args.explanation : undefined;
     case "update_frontmatter": return typeof args.explanation === "string" ? args.explanation : undefined;
     case "write_file": return typeof args.path === "string" ? args.path : undefined;
     case "create_directory": return typeof args.path === "string" ? args.path : undefined;

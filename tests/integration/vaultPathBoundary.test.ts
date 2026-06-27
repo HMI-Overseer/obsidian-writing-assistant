@@ -7,6 +7,10 @@ import { TFile, TFolder, normalizePath } from "obsidian";
 import { applyVaultOpBatch } from "../../src/vault-ops/applyBatch";
 import { applyOperation } from "../../src/vault-ops/apply";
 import { executeVaultOpTool, buildPendingOverlay } from "../../src/tools/vault-ops/handlers";
+import { executeEditTool, resolveStructuralEditBlocks } from "../../src/tools/editing/handlers";
+import { convertToolCallToEditBlock } from "../../src/tools/editing/conversion";
+import { resolveEdits } from "../../src/editing/diffEngine";
+import { applyHunksLive } from "../../src/editing/documentApplicator";
 import { normalizeVaultToolCall } from "../../src/tools/paths";
 import type { VaultOperation } from "../../src/vault-ops/types";
 import type { ToolCall } from "../../src/tools/types";
@@ -394,6 +398,66 @@ describe("folder ops, real-filesystem resolution (§6.1)", () => {
     expect(result.ok).toBe(true);
     expect(fs.existsSync(nodePath.join(vaultRoot, "Manuscript", "Scene.md"))).toBe(true);
     expect(fs.existsSync(nodePath.join(vaultRoot, "Drafts", "Act II"))).toBe(false);
+    expect(filesOutsideVault()).toEqual([]);
+  });
+});
+
+describe("insert_into_note path boundary (edit channel), real filesystem (§6.1)", () => {
+  it("executeEditTool refuses every escaping insert before touching the vault", async () => {
+    const app = makeRealFsApp(vaultRoot);
+
+    for (const path of ESCAPING_PATHS) {
+      const result = await executeEditTool(
+        { id: `c-${path}`, name: "insert_into_note", arguments: { path, text: "pwned", where: "append" } },
+        { app, filePath: "" },
+      );
+      expect(result.isError, `should refuse "${path}"`).toBe(true);
+      expect(result.content).toContain("outside the vault");
+    }
+    expect(filesOutsideVault()).toEqual([]); // validation never writes anything.
+  });
+
+  it("resolving + applying an escaping insert never writes outside the vault", async () => {
+    // The edit channel only edits an EXISTING in-vault file (getFileByPath); an
+    // escaping path resolves to no file, so the apply throws before any write.
+    const app = makeRealFsApp(vaultRoot);
+
+    for (const path of ESCAPING_PATHS) {
+      const block = convertToolCallToEditBlock({
+        id: "i",
+        name: "insert_into_note",
+        arguments: { path, text: "pwned", where: "append" },
+      });
+      expect(block).not.toBeNull();
+      const [resolved] = await resolveStructuralEditBlocks([block!], { app, filePath: path });
+      const [edit] = resolveEdits([resolved], "");
+      await expect(
+        applyHunksLive(app, path, [{ id: "h", resolvedEdit: edit, status: "pending" }]),
+        `apply must refuse "${path}"`,
+      ).rejects.toThrow();
+      expect(fs.existsSync(nodePath.join(vaultRoot, path))).toBe(false);
+    }
+    expect(filesOutsideVault()).toEqual([]);
+  });
+
+  it("applies a legitimate in-vault append on the real filesystem (positive control)", async () => {
+    const app = makeRealFsApp(vaultRoot);
+    fs.mkdirSync(nodePath.join(vaultRoot, "Notes"), { recursive: true });
+    fs.writeFileSync(nodePath.join(vaultRoot, "Notes", "Journal.md"), "Day 1.\n");
+
+    const block = convertToolCallToEditBlock({
+      id: "i",
+      name: "insert_into_note",
+      arguments: { path: "Notes/Journal.md", text: "Day 2.", where: "append" },
+    });
+    const [resolved] = await resolveStructuralEditBlocks([block!], { app, filePath: "Notes/Journal.md" });
+    const doc = fs.readFileSync(nodePath.join(vaultRoot, "Notes", "Journal.md"), "utf8");
+    const [edit] = resolveEdits([resolved], doc);
+    await applyHunksLive(app, "Notes/Journal.md", [{ id: "h", resolvedEdit: edit, status: "pending" }]);
+
+    expect(fs.readFileSync(nodePath.join(vaultRoot, "Notes", "Journal.md"), "utf8")).toBe(
+      "Day 1.\n\nDay 2.\n",
+    );
     expect(filesOutsideVault()).toEqual([]);
   });
 });

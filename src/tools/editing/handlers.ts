@@ -1,4 +1,5 @@
 import { type App, type TFile, normalizePath } from "obsidian";
+import { assertNever } from "../../utils";
 import type { EditBlock } from "../../editing/editTypes";
 import { findEditMatch } from "../../editing/diffEngine";
 import { toLf } from "../../editing/lineEndings";
@@ -6,8 +7,12 @@ import type { ToolCall, ToolResult } from "../types";
 import { toolFailure } from "../toolFailure";
 import { refuseOutsideVault } from "../pathBoundary";
 import { EDIT_TOOL_NAMES } from "./definition";
-import { validateProposeEdit, validateUpdateFrontmatter } from "./validation";
-import type { FrontmatterOperation } from "./validation";
+import {
+  validateInsertIntoNote,
+  validateProposeEdit,
+  validateUpdateFrontmatter,
+} from "./validation";
+import type { FrontmatterOperation, InsertWhere } from "./validation";
 import { normalizeEscapes } from "./conversion";
 
 // ---------------------------------------------------------------------------
@@ -39,6 +44,8 @@ export async function executeEditTool(
   switch (toolCall.name) {
     case "propose_edit":
       return executeProposeEdit(toolCall.arguments, ctx);
+    case "insert_into_note":
+      return executeInsertIntoNote(toolCall.arguments, ctx);
     case "update_frontmatter":
       return executeUpdateFrontmatter(toolCall.arguments);
     default:
@@ -82,6 +89,32 @@ function resolveTargetFile(ctx: ToolExecutionContext, path?: string): TargetReso
   return { file: null, explicit: false };
 }
 
+/**
+ * The shared failure for an unresolved edit target. An explicit `path` that didn't
+ * resolve is a missing file (report not-found so the model creates it or fixes the
+ * path); no target at all asks for a `path`. Used by every path-targeted edit tool.
+ */
+function noTargetFailure(
+  target: Extract<TargetResolution, { file: null }>,
+  path?: string,
+): ToolResult {
+  if (target.explicit) {
+    return toolFailure({
+      kind: "not-found",
+      what: `file not found at "${path}"`,
+      recovery: "check the path, or use write_file to create the note first",
+      isReadOnly: false,
+    });
+  }
+  return toolFailure({
+    kind: "invalid-args",
+    what: "no target note",
+    recovery:
+      "pass `path` (the vault-relative path of the note to edit), or open the file you want to edit",
+    isReadOnly: false,
+  });
+}
+
 async function executeProposeEdit(
   args: Record<string, unknown>,
   ctx: ToolExecutionContext,
@@ -114,25 +147,7 @@ async function executeProposeEdit(
   }
 
   const target = resolveTargetFile(ctx, v.args.path);
-  if (!target.file) {
-    // An explicit `path` that didn't resolve is a missing file (not a missing
-    // argument), report it honestly so the model creates it or fixes the path.
-    if (target.explicit) {
-      return toolFailure({
-        kind: "not-found",
-        what: `file not found at "${v.args.path}"`,
-        recovery: "check the path, or use write_file to create the note first",
-        isReadOnly: false,
-      });
-    }
-    return toolFailure({
-      kind: "invalid-args",
-      what: "no target note",
-      recovery:
-        "pass `path` (the vault-relative path of the note to edit), or open the file you want to edit",
-      isReadOnly: false,
-    });
-  }
+  if (!target.file) return noTargetFailure(target, v.args.path);
 
   const content = await ctx.app.vault.read(target.file);
   // Match the way the apply step will: exact first, then whitespace-normalized,
@@ -155,6 +170,53 @@ async function executeProposeEdit(
   const explanation = v.args.explanation ? ` (${v.args.explanation})` : "";
   return {
     content: `Edit proposed for "${target.path}": matched at line ${lineNumber}${explanation}. Queued for user review.`,
+    isReadOnly: false,
+  };
+}
+
+async function executeInsertIntoNote(
+  args: Record<string, unknown>,
+  ctx: ToolExecutionContext,
+): Promise<ToolResult> {
+  const v = validateInsertIntoNote(args);
+  if (!v.ok) {
+    return toolFailure({
+      kind: "invalid-args",
+      what: `invalid insert_into_note arguments: ${v.error}`,
+      isReadOnly: false,
+    });
+  }
+
+  // Name an out-of-vault `path` at the boundary before any lookup (mirrors
+  // executeProposeEdit), so the model gets the boundary reason, not a generic
+  // "not found" that points it to search for an unreachable path.
+  if (v.args.path) {
+    const outside = refuseOutsideVault(v.args.path, false);
+    if (outside) return outside;
+  }
+
+  const target = resolveTargetFile(ctx, v.args.path);
+  if (!target.file) return noTargetFailure(target, v.args.path);
+
+  // For before/after, verify the anchor resolves now so the model self-corrects
+  // within the turn. append/prepend need no anchor, so they always acknowledge.
+  if (v.args.where === "before" || v.args.where === "after") {
+    const anchor = normalizeEscapes(v.args.anchor ?? "");
+    const content = await ctx.app.vault.read(target.file);
+    if (!findEditMatch(anchor, content)) {
+      return toolFailure({
+        kind: "no-match",
+        what: `anchor text not found in "${target.path}"`,
+        recovery:
+          "match the anchor exactly (including whitespace), or use where \"append\"/\"prepend\" which need no anchor",
+        isReadOnly: false,
+      });
+    }
+  }
+
+  const explanation = v.args.explanation ? ` (${v.args.explanation})` : "";
+  return {
+    content: `Insertion proposed for "${target.path}" (${v.args.where})${explanation}. Queued for user review.`,
     isReadOnly: false,
   };
 }
@@ -200,11 +262,81 @@ export async function resolveStructuralEditBlocks(
   for (const block of blocks) {
     if (block.toolName === "update_frontmatter") {
       resolved.push(await resolveUpdateFrontmatter(ctx.app, file, block));
+    } else if (block.toolName === "insert_into_note") {
+      resolved.push(await resolveInsertIntoNote(ctx.app, file, block));
     } else {
       resolved.push(block);
     }
   }
   return resolved;
+}
+
+/**
+ * Resolve an insert_into_note block into concrete searchText/replaceText against the
+ * document, so the diff engine and apply step treat it exactly like a search/replace:
+ *
+ *   - before/after, searchText is the anchor (matched with the engine's three tiers,
+ *     so whitespace drift is tolerated), replaceText wraps it with the new paragraph.
+ *   - prepend, an empty search resolves to offset 0 (a robust top-of-file insert).
+ *   - append, the shortest *unique* trailing block anchors the end, grown upward from
+ *     the last non-empty line until it occurs once, so a duplicated final line never
+ *     anchors the insert in the middle of the note.
+ *
+ * The inserted text is separated from the surrounding content by one blank line (a
+ * paragraph break); its own leading/trailing blank lines are trimmed so seams never
+ * double up. An empty note takes the body alone.
+ */
+async function resolveInsertIntoNote(
+  app: App,
+  file: TFile,
+  block: EditBlock,
+): Promise<EditBlock> {
+  const where = block.toolArgs?.where as InsertWhere | undefined;
+  const rawText = typeof block.toolArgs?.text === "string" ? block.toolArgs.text : "";
+  const anchor = typeof block.toolArgs?.anchor === "string" ? block.toolArgs.anchor : "";
+  // Malformed args never reach here (conversion validated the call); guard anyway.
+  if (!where || rawText === "") return block;
+
+  const content = toLf(await app.vault.read(file));
+  const body = rawText.replace(/^\n+|\n+$/g, "");
+  const isEmpty = content.trim().length === 0;
+
+  switch (where) {
+    case "before":
+      return { ...block, searchText: anchor, replaceText: `${body}\n\n${anchor}` };
+    case "after":
+      return { ...block, searchText: anchor, replaceText: `${anchor}\n\n${body}` };
+    case "prepend":
+      return { ...block, searchText: "", replaceText: isEmpty ? body : `${body}\n\n` };
+    case "append": {
+      if (isEmpty) return { ...block, searchText: "", replaceText: body };
+      const tail = uniqueTrailingAnchor(content);
+      return { ...block, searchText: tail, replaceText: `${tail}\n\n${body}` };
+    }
+    default:
+      return assertNever(where);
+  }
+}
+
+/**
+ * The shortest block of trailing lines that occurs exactly once in `content`, used to
+ * anchor an append. Starts at the last non-empty line and grows upward until the block
+ * is unique (or reaches the whole document, which is always unique), so a repeated
+ * final line can never make the diff engine anchor the append earlier in the note.
+ */
+function uniqueTrailingAnchor(content: string): string {
+  const lines = content.split("\n");
+  let end = lines.length;
+  while (end > 0 && lines[end - 1].trim() === "") end--; // skip trailing blank lines
+  if (end === 0) return "";
+
+  let start = end - 1;
+  let anchor = lines.slice(start, end).join("\n");
+  while (start > 0 && content.indexOf(anchor) !== content.lastIndexOf(anchor)) {
+    start--;
+    anchor = lines.slice(start, end).join("\n");
+  }
+  return anchor;
 }
 
 // ---------------------------------------------------------------------------

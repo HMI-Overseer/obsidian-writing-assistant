@@ -310,6 +310,15 @@ describe("normalizeVaultToolCall confusable snapping (existing-file keys only)",
     expect(out.arguments.path).toBe(`Lore/Anno${CURLY}s Crucible.md`);
   });
 
+  it("snaps insert_into_note `path` (an existing-note edit target)", () => {
+    const out = normalizeVaultToolCall(app, {
+      id: "i",
+      name: "insert_into_note",
+      arguments: { path: "Lore/Anno's Crucible.md", text: "x", where: "append" },
+    });
+    expect(out.arguments.path).toBe(`Lore/Anno${CURLY}s Crucible.md`);
+  });
+
   it("does NOT snap write_file `path` (a destination), even when a confusable file exists", () => {
     const out = normalizeVaultToolCall(app, {
       id: "w",

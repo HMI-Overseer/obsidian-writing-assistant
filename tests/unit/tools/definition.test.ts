@@ -37,11 +37,12 @@ describe("UPDATE_FRONTMATTER_TOOL", () => {
 });
 
 describe("ALL_EDIT_TOOLS", () => {
-  test("contains exactly 2 tools", () => {
-    expect(ALL_EDIT_TOOLS).toHaveLength(2);
+  test("contains exactly 3 tools", () => {
+    expect(ALL_EDIT_TOOLS).toHaveLength(3);
     const names = ALL_EDIT_TOOLS.map((t) => t.name);
     expect(names).toContain("propose_edit");
     expect(names).toContain("update_frontmatter");
+    expect(names).toContain("insert_into_note");
   });
 });
 

@@ -68,6 +68,24 @@ export function anthropicModelSupportsAdaptiveThinking(modelId: string): boolean
   return ADAPTIVE_THINKING_CAPABLE_PREFIXES.some((prefix) => modelId.startsWith(prefix));
 }
 
+/**
+ * Model-id prefixes whose models accept a mid-conversation `{role:"system"}`
+ * message in the `messages` array (no beta header). Verified against the bundled
+ * claude-api reference: this is Claude Opus 4.8 ONLY today — Fable 5, Sonnet 4.6,
+ * and Opus 4.7 are not on the platform-availability list and return HTTP 400
+ * (`role 'system' is not supported on this model`). So the gate is an allowlist:
+ * any other / unrecognized id falls back to the `<system-reminder>` user-turn
+ * block. Re-confirm at platform.claude.com as more models add support. The id the
+ * plugin sends is the wire model id (e.g. "claude-opus-4-8"), so a prefix match
+ * also covers harness-suffixed variants.
+ */
+const SYSTEM_ROLE_CAPABLE_PREFIXES = ["claude-opus-4-8"];
+
+/** Whether this Anthropic model accepts a mid-conversation `{role:"system"}` message. */
+export function anthropicModelSupportsSystemRole(modelId: string): boolean {
+  return SYSTEM_ROLE_CAPABLE_PREFIXES.some((prefix) => modelId.startsWith(prefix));
+}
+
 /** Content block types used in Anthropic messages. */
 export type AnthropicContentBlock =
   | { type: "text"; text: string }
@@ -76,7 +94,11 @@ export type AnthropicContentBlock =
   | { type: "tool_result"; tool_use_id: string; content: string };
 
 export interface AnthropicMessage {
-  role: "user" | "assistant";
+  // `system` is the mid-conversation operator channel: a {role:"system"} message
+  // placed after the cached history (Opus 4.8+ only — see
+  // anthropicModelSupportsSystemRole). It carries the per-mode tail without
+  // touching the cached prefix.
+  role: "user" | "assistant" | "system";
   content: string | AnthropicContentBlock[];
 }
 
@@ -97,7 +119,8 @@ export type AnthropicSystem = string | AnthropicSystemBlock[];
  */
 export function buildAnthropicMessages(
   request: ChatRequest,
-  cacheSettings?: AnthropicCacheSettings
+  cacheSettings?: AnthropicCacheSettings,
+  model?: string
 ): { system: AnthropicSystem; messages: AnthropicMessage[] } {
   // The system block holds only the stable prompt, it carries the cache
   // breakpoint. All note/document context lives in the conversation (after the
@@ -189,6 +212,27 @@ export function buildAnthropicMessages(
     const lastIdx = messages.length - 1;
     if (messages[lastIdx].role === "user") {
       appendTextToUserMessage(messages[lastIdx], formatRagContext(request.ragContext));
+    }
+  }
+
+  // Per-mode wording rides the message tail so the cached `system` block stays
+  // mode-invariant (Layer 1, prompt-cache design §6.1.3). On Opus 4.8+ it's a
+  // non-spoofable {role:"system"} message appended after the cached history (it
+  // must follow a user turn and be the last entry — both hold here); older
+  // models 400 on a system message, so it falls back to a <system-reminder>
+  // block in the last user turn. Either way it sits after the breakpoint, so it
+  // never invalidates the cached prefix.
+  if (request.modeTail && messages.length > 0) {
+    const lastIdx = messages.length - 1;
+    if (messages[lastIdx].role === "user") {
+      if (model && anthropicModelSupportsSystemRole(model)) {
+        messages.push({ role: "system", content: request.modeTail });
+      } else {
+        appendTextToUserMessage(
+          messages[lastIdx],
+          `<system-reminder>\n${request.modeTail}\n</system-reminder>`
+        );
+      }
     }
   }
 

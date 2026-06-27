@@ -84,7 +84,8 @@ export async function prepareApiMessages(
   const useEditTools = editMode && settings.agenticMode && usePluginTools && settings.preferToolUse;
   const claudeCodeRetrievesViaMcp = isClaudeCode && settings.agenticMode;
 
-  const systemPrompt = composeSystemPrompt(mode, useEditTools, settings, profileSystemPrompt);
+  const modePrefix = selectModePrefix(mode, useEditTools, settings);
+  const systemPrompt = [modePrefix, profileSystemPrompt].filter(Boolean).join("\n\n");
   const shouldIncludeNoteImages =
     settings.includeLocalAttachmentsAsContext && supportsVision;
 
@@ -189,14 +190,16 @@ export async function prepareApiMessages(
   }
 
   // When RAG context is present, add a grounding instruction so the model knows
-  // retrieved notes exist.
-  let groundingNote = "";
+  // retrieved notes exist. The body is kept separator-free so it can join the
+  // mode tail cleanly; the local path re-adds the leading "\n\n".
+  let groundingNoteBody = "";
   if (ragContext && ragContext.length > 0) {
     const hasGraphAnnotations = ragContext.some((b) => b.graphContext);
-    groundingNote = hasGraphAnnotations
-      ? "\n\nWhen retrieved notes are provided, use them as reference material. Documents may include <graph_context> annotations showing entities and relationships from the vault's knowledge graph, use these to understand how topics connect across documents."
-      : "\n\nWhen retrieved notes are provided, use them as reference material. If the retrieved notes don't contain relevant information for the question, rely on your general knowledge instead.";
+    groundingNoteBody = hasGraphAnnotations
+      ? "When retrieved notes are provided, use them as reference material. Documents may include <graph_context> annotations showing entities and relationships from the vault's knowledge graph, use these to understand how topics connect across documents."
+      : "When retrieved notes are provided, use them as reference material. If the retrieved notes don't contain relevant information for the question, rely on your general knowledge instead.";
   }
+  const groundingNote = groundingNoteBody ? "\n\n" + groundingNoteBody : "";
   // Build the tool list based on mode and agentic settings.
   //
   // Vault tool tiers:
@@ -238,21 +241,42 @@ export async function prepareApiMessages(
 
   // Build tool guidance from the filtered tool lists so the system prompt
   // accurately reflects what is actually available (e.g. no semantic_search
-  // when the RAG index is not ready).
+  // when the RAG index is not ready). Each body is kept separator-free for the
+  // mode tail; the local path re-adds the leading "\n\n" to preserve its bytes.
   const activeVaultTools = (tools ?? []).filter((t) => VAULT_TOOL_NAMES.has(t.name));
-  const vaultGuidance = useVaultTools ? "\n\n" + buildVaultToolSystemPrompt(activeVaultTools) : "";
+  const vaultGuidanceBody = useVaultTools ? buildVaultToolSystemPrompt(activeVaultTools) : "";
+  const vaultGuidance = useVaultTools ? "\n\n" + vaultGuidanceBody : "";
   const activeEditTools = (tools ?? []).filter((t) => EDIT_TOOL_NAMES.has(t.name));
-  const editGuidance = useEditTools ? "\n\n" + buildEditToolSystemPrompt(activeEditTools) : "";
+  const editGuidanceBody = useEditTools ? buildEditToolSystemPrompt(activeEditTools) : "";
+  const editGuidance = useEditTools ? "\n\n" + editGuidanceBody : "";
   const activeVaultOpTools = (tools ?? []).filter((t) => VAULT_OPS_TOOL_NAMES.has(t.name));
-  const vaultOpGuidance = activeVaultOpTools.length > 0
-    ? "\n\n" + buildVaultOpToolSystemPrompt(activeVaultOpTools)
+  const vaultOpGuidanceBody = activeVaultOpTools.length > 0
+    ? buildVaultOpToolSystemPrompt(activeVaultOpTools)
     : "";
+  const vaultOpGuidance = activeVaultOpTools.length > 0 ? "\n\n" + vaultOpGuidanceBody : "";
   const finalSystemPrompt = disableBuiltinSystemPrompts
     ? profileSystemPrompt
     : systemPrompt + groundingNote + vaultGuidance + editGuidance + vaultOpGuidance;
 
+  // Layer 1 (prompt-cache design §6.1.2): on the billed paths that have a tail
+  // mechanism, hold the cached `system` block mode-invariant (profile prompt
+  // only) and carry the per-mode wording + tool guidance in the message tail.
+  // Local providers (and disableBuiltinSystemPrompts) keep today's full system
+  // prompt, byte-for-byte, with no tail. The clients place modeTail in their own
+  // tail mechanism (see ChatRequest.modeTail).
+  const useModeTail =
+    !disableBuiltinSystemPrompts &&
+    (activeProvider === "anthropic" || isClaudeCode);
+  const { systemPrompt: outSystemPrompt, modeTail } = splitSystemForTail({
+    useModeTail,
+    fullSystemPrompt: finalSystemPrompt,
+    cachedSystemPrompt: profileSystemPrompt,
+    tailParts: [modePrefix, groundingNoteBody, vaultGuidanceBody, editGuidanceBody, vaultOpGuidanceBody],
+  });
+
   return {
-    systemPrompt: finalSystemPrompt,
+    systemPrompt: outSystemPrompt,
+    ...(modeTail ? { modeTail } : {}),
     documentContext,
     ragContext,
     rewrittenQuery,
@@ -261,6 +285,29 @@ export async function prepareApiMessages(
     additionalContextItems,
     ...(noteImageContext?.length ? { noteImageContext } : {}),
   };
+}
+
+/**
+ * Selects the mode-specific prompt prefix. `useEditTools` selects between the
+ * tool vs fallback edit prefix. This is the per-mode wording that Layer 1 moves
+ * out of the cached `system` block and into the message tail (see
+ * {@link splitSystemForTail}).
+ */
+export function selectModePrefix(
+  mode: ChatMode,
+  useEditTools: boolean,
+  settings: PluginSettings,
+): string {
+  switch (mode) {
+    case "plan":
+      return settings.planSystemPromptPrefix;
+    case "conversation":
+      return settings.chatSystemPromptPrefix;
+    case "edit":
+      return useEditTools
+        ? settings.editToolSystemPromptPrefix
+        : settings.editFallbackSystemPromptPrefix;
+  }
 }
 
 /**
@@ -273,22 +320,35 @@ export function composeSystemPrompt(
   settings: PluginSettings,
   profileSystemPrompt: string,
 ): string {
-  let prefix: string;
-  switch (mode) {
-    case "plan":
-      prefix = settings.planSystemPromptPrefix;
-      break;
-    case "conversation":
-      prefix = settings.chatSystemPromptPrefix;
-      break;
-    case "edit":
-      prefix = useEditTools
-        ? settings.editToolSystemPromptPrefix
-        : settings.editFallbackSystemPromptPrefix;
-      break;
-  }
+  return [selectModePrefix(mode, useEditTools, settings), profileSystemPrompt]
+    .filter(Boolean)
+    .join("\n\n");
+}
 
-  return [prefix, profileSystemPrompt].filter(Boolean).join("\n\n");
+/**
+ * Layer 1 decomposition of the system prompt into a mode-invariant cached block
+ * and a per-mode tail (prompt-cache design §6.1.2).
+ *
+ * When `useModeTail` is false (local providers, or built-in prompts disabled),
+ * returns today's full system prompt unchanged with no tail. When true, the
+ * cached `system` becomes the profile prompt only and the per-mode pieces
+ * (`tailParts`, in render order) are joined into `modeTail`. An all-empty tail
+ * yields `modeTail: undefined` so callers never emit an empty block.
+ */
+export function splitSystemForTail(opts: {
+  useModeTail: boolean;
+  fullSystemPrompt: string;
+  cachedSystemPrompt: string;
+  tailParts: string[];
+}): { systemPrompt: string; modeTail?: string } {
+  if (!opts.useModeTail) {
+    return { systemPrompt: opts.fullSystemPrompt };
+  }
+  const modeTail = opts.tailParts.filter(Boolean).join("\n\n");
+  return {
+    systemPrompt: opts.cachedSystemPrompt,
+    ...(modeTail ? { modeTail } : {}),
+  };
 }
 
 /**

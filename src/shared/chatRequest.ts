@@ -71,6 +71,16 @@ export interface NoteImageContextItem {
 export interface ChatRequest {
   /** Behavioral instructions (system prompt). Empty string = no system prompt. */
   systemPrompt: string;
+  /**
+   * Per-mode wording (mode-specific framing + tool guidance) carried in the
+   * message tail rather than the cached `system` block, so the cached prefix
+   * stays mode-invariant (Layer 1, prompt-cache design §6.1.2). Set only for the
+   * billed paths that have a tail mechanism (`anthropic`, `claudecode`); absent
+   * for local providers, which keep the wording in `systemPrompt`. Each client
+   * places it in its own tail (a `{role:"system"}` / `<system-reminder>` block on
+   * the direct API, the user-turn delta on Claude Code).
+   */
+  modeTail?: string;
   /** Optional document context (active note). null = no document attached. */
   documentContext: DocumentContext | null;
   /** RAG retrieval results. null = RAG disabled or no results. */

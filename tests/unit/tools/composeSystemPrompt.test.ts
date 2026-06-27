@@ -1,5 +1,9 @@
 import { describe, test, expect } from "vitest";
-import { composeSystemPrompt } from "../../../src/chat/finalization/prepareApiMessages";
+import {
+  composeSystemPrompt,
+  selectModePrefix,
+  splitSystemForTail,
+} from "../../../src/chat/finalization/prepareApiMessages";
 import type { PluginSettings } from "../../../src/shared/types";
 import { DEFAULT_ACTIVE_PROFILE_IDS } from "../../../src/constants";
 
@@ -94,5 +98,77 @@ describe("composeSystemPrompt", () => {
   test("uses chat prefix for conversation mode", () => {
     const settings = makeSettings({ chatSystemPromptPrefix: "Chat prefix." });
     expect(composeSystemPrompt("conversation", false, settings, "")).toBe("Chat prefix.");
+  });
+});
+
+describe("selectModePrefix", () => {
+  test("returns the plan prefix for plan mode", () => {
+    const settings = makeSettings({ planSystemPromptPrefix: "PLAN" });
+    expect(selectModePrefix("plan", false, settings)).toBe("PLAN");
+  });
+
+  test("returns the chat prefix for conversation mode", () => {
+    const settings = makeSettings({ chatSystemPromptPrefix: "CHAT" });
+    expect(selectModePrefix("conversation", false, settings)).toBe("CHAT");
+  });
+
+  test("switches the edit prefix on useEditTools", () => {
+    const settings = makeSettings({
+      editToolSystemPromptPrefix: "TOOL",
+      editFallbackSystemPromptPrefix: "FALLBACK",
+    });
+    expect(selectModePrefix("edit", true, settings)).toBe("TOOL");
+    expect(selectModePrefix("edit", false, settings)).toBe("FALLBACK");
+  });
+
+  test("does not fold in the profile prompt (that's composeSystemPrompt's job)", () => {
+    const settings = makeSettings({ planSystemPromptPrefix: "PLAN" });
+    expect(selectModePrefix("plan", false, settings)).toBe("PLAN");
+  });
+});
+
+describe("splitSystemForTail", () => {
+  test("passes the full system prompt through unchanged when the tail is off", () => {
+    expect(
+      splitSystemForTail({
+        useModeTail: false,
+        fullSystemPrompt: "FULL",
+        cachedSystemPrompt: "PROFILE",
+        tailParts: ["MODE", "GUIDE"],
+      }),
+    ).toEqual({ systemPrompt: "FULL" });
+  });
+
+  test("moves the per-mode pieces into the tail and keeps only the profile cached", () => {
+    expect(
+      splitSystemForTail({
+        useModeTail: true,
+        fullSystemPrompt: "MODE\n\nPROFILE\n\nGUIDE",
+        cachedSystemPrompt: "PROFILE",
+        tailParts: ["MODE", "GUIDE"],
+      }),
+    ).toEqual({ systemPrompt: "PROFILE", modeTail: "MODE\n\nGUIDE" });
+  });
+
+  test("joins only the non-empty tail parts, in order", () => {
+    expect(
+      splitSystemForTail({
+        useModeTail: true,
+        fullSystemPrompt: "x",
+        cachedSystemPrompt: "PROFILE",
+        tailParts: ["MODE", "", "GUIDE", ""],
+      }).modeTail,
+    ).toBe("MODE\n\nGUIDE");
+  });
+
+  test("omits modeTail entirely when every tail part is empty", () => {
+    expect(
+      splitSystemForTail({
+        useModeTail: true,
+        fullSystemPrompt: "PROFILE",
+        cachedSystemPrompt: "PROFILE",
+        tailParts: ["", ""],
+      }),
+    ).toEqual({ systemPrompt: "PROFILE" });
   });
 });

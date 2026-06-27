@@ -346,17 +346,28 @@ export function buildClaudeCodePrompt(request: ChatRequest): string {
     blocks.push(`# Retrieved context\n\n${chunks}`);
   }
 
-  const transcript = request.messages.map(renderTurn).filter(Boolean).join("\n\n");
+  // Per-mode wording rides the latest user turn so request.systemPrompt stays
+  // mode-invariant and the live session's configFingerprint stops rebuilding on
+  // mode switch (prompt-cache design §6.1.3). On a cold mint the whole transcript
+  // is replayed, so the framing is prepended to the last user turn within it.
+  const lastIdx = request.messages.length - 1;
+  const transcript = request.messages
+    .map((turn, i) =>
+      i === lastIdx && turn.role === "user" ? renderTurn(turn, request.modeTail) : renderTurn(turn),
+    )
+    .filter(Boolean)
+    .join("\n\n");
   if (transcript) blocks.push(transcript);
 
   return blocks.join("\n\n---\n\n");
 }
 
-function renderTurn(turn: ChatTurn): string {
+function renderTurn(turn: ChatTurn, framing?: string): string {
   const body = renderTurnBody(turn);
   if (!body) return "";
   const speaker = turn.role === "assistant" ? "Assistant" : "User";
-  return `${speaker}: ${body}`;
+  const framed = framing ? `${framing}\n\n${body}` : body;
+  return `${speaker}: ${framed}`;
 }
 
 /**
@@ -383,7 +394,11 @@ export function buildDeltaPrompt(request: ChatRequest): string {
   const last = request.messages[request.messages.length - 1];
   if (last && last.role === "user") {
     const body = renderTurnBody(last);
-    if (body) return body;
+    if (body) {
+      // The per-mode framing is prepended to the new user turn so the baked
+      // systemPrompt stays mode-invariant (prompt-cache design §6.1.3).
+      return request.modeTail ? `${request.modeTail}\n\n${body}` : body;
+    }
   }
   return buildClaudeCodePrompt(request);
 }

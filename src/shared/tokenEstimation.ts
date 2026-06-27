@@ -25,6 +25,12 @@ export function estimateTokenCount(request: ChatRequest, draft?: string): number
     totalChars += request.systemPrompt.length;
   }
 
+  // The per-mode tail (mode framing + tool guidance) is sent each turn, just in a
+  // different place than systemPrompt, so count it for an accurate estimate.
+  if (request.modeTail) {
+    totalChars += request.modeTail.length;
+  }
+
   if (request.documentContext) {
     // Account for the label prefix that clients prepend (e.g. "---\nCurrent note (path):\n")
     totalChars += request.documentContext.filePath.length + 30;

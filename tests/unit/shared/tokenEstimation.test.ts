@@ -91,6 +91,14 @@ describe("estimateTokenCount", () => {
     expect(result).toBe(Math.ceil(expectedChars / 4));
   });
 
+  test("includes the mode tail in the estimate", () => {
+    // The per-mode tail is sent each turn, just in the message tail rather than
+    // systemPrompt, so it must be counted or the indicator under-reports.
+    const modeTail = "F".repeat(40);
+    const result = estimateTokenCount(makeRequest({ systemPrompt: "G".repeat(8), modeTail }));
+    expect(result).toBe(Math.ceil((8 + 40) / 4));
+  });
+
   test("rounds up to nearest integer", () => {
     // 5 chars / 4 = 1.25 → should be 2
     const request = makeRequest({ systemPrompt: "Hello" });

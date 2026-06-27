@@ -62,7 +62,7 @@ export class AnthropicClient implements ChatClient {
     signal?: AbortSignal
   ): Promise<CompletionResult> {
     const cacheSettings = request.anthropicCacheSettings;
-    const { system, messages } = buildAnthropicMessages(request, cacheSettings);
+    const { system, messages } = buildAnthropicMessages(request, cacheSettings, model);
     const anthropicTools = request.tools?.length
       ? formatAnthropicTools(request.tools)
       : undefined;
@@ -129,7 +129,7 @@ export class AnthropicClient implements ChatClient {
     onToolCallStreaming?: (index: number, name: string) => void,
   ): StreamResult {
     const cacheSettings = request.anthropicCacheSettings;
-    const { system, messages } = buildAnthropicMessages(request, cacheSettings);
+    const { system, messages } = buildAnthropicMessages(request, cacheSettings, model);
     const anthropicTools = request.tools?.length
       ? formatAnthropicTools(request.tools)
       : undefined;

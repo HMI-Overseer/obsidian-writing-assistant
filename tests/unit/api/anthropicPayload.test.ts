@@ -4,6 +4,7 @@ import {
   buildAnthropicHeaders,
   buildAnthropicPayload,
   anthropicModelSupportsAdaptiveThinking,
+  anthropicModelSupportsSystemRole,
 } from "../../../src/api/buildAnthropicPayload";
 import type { ChatRequest } from "../../../src/shared/chatRequest";
 import type {
@@ -188,6 +189,80 @@ describe("buildAnthropicMessages", () => {
       { role: "user", content: "Hi" },
       { role: "assistant", content: "Hello" },
     ]);
+  });
+
+  test("places the mode tail as a {role:system} message on Opus 4.8 (after the user turn)", () => {
+    const { system, messages } = buildAnthropicMessages(
+      makeRequest({
+        systemPrompt: "Profile prompt.",
+        modeTail: "Planning mode framing.",
+        messages: [{ role: "user", content: "Help" }],
+      }),
+      undefined,
+      "claude-opus-4-8",
+    );
+    // Cached system stays mode-invariant (no mode wording).
+    expect(system).toBe("Profile prompt.");
+    // The tail rides a trailing system-role message, after the user turn.
+    expect(messages).toEqual([
+      { role: "user", content: "Help" },
+      { role: "system", content: "Planning mode framing." },
+    ]);
+  });
+
+  test("falls back to a <system-reminder> in the last user turn for non-4.8 models", () => {
+    const { system, messages } = buildAnthropicMessages(
+      makeRequest({
+        systemPrompt: "Profile prompt.",
+        modeTail: "Planning mode framing.",
+        messages: [{ role: "user", content: "Help" }],
+      }),
+      undefined,
+      "claude-opus-4-7",
+    );
+    expect(system).toBe("Profile prompt.");
+    // No system-role message; the framing rides the user turn as a reminder block.
+    expect(messages).toHaveLength(1);
+    expect(messages[0].role).toBe("user");
+    expect(messages[0].content).toContain("Help");
+    expect(messages[0].content).toContain(
+      "<system-reminder>\nPlanning mode framing.\n</system-reminder>",
+    );
+  });
+
+  test("uses the <system-reminder> fallback when no model id is supplied", () => {
+    const { messages } = buildAnthropicMessages(
+      makeRequest({
+        modeTail: "Mode framing.",
+        messages: [{ role: "user", content: "Hi" }],
+      }),
+    );
+    expect(messages).toHaveLength(1);
+    expect(messages[0].content).toContain("<system-reminder>\nMode framing.\n</system-reminder>");
+  });
+
+  test("places the mode tail after live document context in the last user turn", () => {
+    const { messages } = buildAnthropicMessages(
+      makeRequest({
+        modeTail: "Edit mode framing.",
+        documentContext: { filePath: "doc.md", content: "Body", isFull: true },
+        messages: [{ role: "user", content: "Edit this" }],
+      }),
+      undefined,
+      "claude-opus-4-7",
+    );
+    const content = messages[messages.length - 1].content as string;
+    // Reminder comes after the re-read document, so it sits last in the turn.
+    expect(content.indexOf("Body")).toBeLessThan(content.indexOf("<system-reminder>"));
+  });
+
+  test("emits no tail when modeTail is absent", () => {
+    const { messages } = buildAnthropicMessages(
+      makeRequest({ messages: [{ role: "user", content: "Hi" }] }),
+      undefined,
+      "claude-opus-4-8",
+    );
+    expect(messages).toEqual([{ role: "user", content: "Hi" }]);
   });
 
   test("appends note image context to the user message", () => {
@@ -518,5 +593,31 @@ describe("anthropicModelSupportsAdaptiveThinking", () => {
     "claude-opus-9",
   ])("returns false for non-adaptive (older / unknown) model %s", (model) => {
     expect(anthropicModelSupportsAdaptiveThinking(model)).toBe(false);
+  });
+});
+
+describe("anthropicModelSupportsSystemRole", () => {
+  // Mid-conversation {role:"system"} is Opus 4.8 ONLY today (claude-api reference /
+  // platform-availability). The prefix match also covers harness-suffixed ids.
+  test.each(["claude-opus-4-8"])(
+    "returns true for system-role-capable model %s",
+    (model) => {
+      expect(anthropicModelSupportsSystemRole(model)).toBe(true);
+    },
+  );
+
+  // Everything else 400s on a system message and must take the <system-reminder>
+  // fallback — including current-gen models that are otherwise capable, and any
+  // unknown / future id (fail safe to the fallback, never a 400).
+  test.each([
+    "claude-opus-4-7",
+    "claude-opus-4-6",
+    "claude-sonnet-4-6",
+    "claude-fable-5",
+    "claude-haiku-4-5",
+    "claude-3-5-sonnet-20241022",
+    "claude-opus-9",
+  ])("returns false for non-system-role model %s", (model) => {
+    expect(anthropicModelSupportsSystemRole(model)).toBe(false);
   });
 });

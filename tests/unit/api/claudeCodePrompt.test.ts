@@ -1,5 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { buildClaudeCodePrompt, thinkingBudget } from "../../../src/api/ClaudeCodeClient";
+import {
+  buildClaudeCodePrompt,
+  buildDeltaPrompt,
+  thinkingBudget,
+} from "../../../src/api/ClaudeCodeClient";
 import type { ChatRequest } from "../../../src/shared/chatRequest";
 
 function makeRequest(overrides: Partial<ChatRequest> = {}): ChatRequest {
@@ -88,6 +92,65 @@ describe("buildClaudeCodePrompt", () => {
       }),
     );
     expect(prompt).toBe("User: Only this");
+  });
+
+  it("prepends the mode tail to the latest user turn only", () => {
+    const prompt = buildClaudeCodePrompt(
+      makeRequest({
+        modeTail: "Planning mode framing.",
+        messages: [
+          { role: "user", content: "First" },
+          { role: "assistant", content: "Ack" },
+          { role: "user", content: "Second" },
+        ],
+      }),
+    );
+    // Framing rides the current (last) user turn, not earlier ones.
+    expect(prompt).toContain("User: Planning mode framing.\n\nSecond");
+    expect(prompt).toContain("User: First");
+    expect(prompt).not.toContain("Planning mode framing.\n\nFirst");
+  });
+
+  it("does not prepend the mode tail when the last turn is the assistant", () => {
+    const prompt = buildClaudeCodePrompt(
+      makeRequest({
+        modeTail: "Mode framing.",
+        messages: [
+          { role: "user", content: "Hi" },
+          { role: "assistant", content: "There" },
+        ],
+      }),
+    );
+    expect(prompt).not.toContain("Mode framing.");
+  });
+});
+
+describe("buildDeltaPrompt", () => {
+  it("returns just the latest user turn body when no mode tail is set", () => {
+    const prompt = buildDeltaPrompt(
+      makeRequest({
+        messages: [
+          { role: "user", content: "First" },
+          { role: "assistant", content: "Ack" },
+          { role: "user", content: "Second" },
+        ],
+      }),
+    );
+    expect(prompt).toBe("Second");
+  });
+
+  it("prepends the mode tail to the latest user turn body", () => {
+    const prompt = buildDeltaPrompt(
+      makeRequest({
+        modeTail: "Planning mode framing.",
+        messages: [
+          { role: "user", content: "First" },
+          { role: "assistant", content: "Ack" },
+          { role: "user", content: "Second" },
+        ],
+      }),
+    );
+    expect(prompt).toBe("Planning mode framing.\n\nSecond");
   });
 });
 

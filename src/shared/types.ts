@@ -136,12 +136,42 @@ export interface CustomCommand {
   icon?: string;
 }
 
+/**
+ * Why the Claude Code live session cold-rebuilt instead of reusing the held
+ * process for a turn (Phase 0 cache instrumentation, 2026-06-27 prompt-cache
+ * design). Attributed to a single change so a baseline plan→chat→edit session
+ * shows which lever drove each rebuild. `reused` is the absence of a reason; the
+ * first turn of a conversation is `no-session`, an expected cold mint, not a
+ * regression.
+ */
+export type SessionRebuildReason =
+  | "no-session"
+  | "session-disposed"
+  | "provider-mismatch"
+  | "model-changed"
+  | "system-prompt-changed"
+  | "reasoning-changed"
+  | "edit-mode-changed"
+  | "agentic-mode-changed"
+  | "tools-changed"
+  | "config-changed"
+  | "history-edited"
+  | "turn-count";
+
 export interface MessageUsage {
   inputTokens: number;
   outputTokens: number;
   cacheCreationInputTokens?: number;
   cacheReadInputTokens?: number;
   estimatedCostUsd?: number;
+  /**
+   * Claude Code only: whether this turn reused the live session (true) or
+   * cold-rebuilt it (false). Undefined for every other provider and for Claude
+   * Code turns that ran without a persistent session.
+   */
+  sessionReused?: boolean;
+  /** Claude Code only: when the session cold-rebuilt, the change that drove it. */
+  sessionRebuildReason?: SessionRebuildReason;
 }
 
 /** A RAG source reference attached to an assistant message. */

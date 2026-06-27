@@ -12,7 +12,7 @@ import {
 } from "./claudeCodeProcess";
 import { streamSdkTurn, thinkingBudget, DISALLOWED_NATIVE_TOOLS } from "./sdk/sdkQueryEngine";
 import type { McpSdkServerConfigWithInstance } from "./sdk/claudeAgentSdk";
-import type { SessionTurn } from "./harnessSession";
+import type { SessionReuseDiagnosis, SessionTurn } from "./harnessSession";
 
 export { thinkingBudget };
 
@@ -33,6 +33,8 @@ export interface SdkSessionTurnInput {
   turns: SessionTurn[];
   signal?: AbortSignal;
   onResult?: (result: ClaudeCodeResultUsage) => void;
+  /** Reports whether this turn reused the live session or cold-rebuilt it. */
+  onReuseDecision?: (decision: SessionReuseDiagnosis) => void;
 }
 
 /**
@@ -100,17 +102,23 @@ export class ClaudeCodeClient implements ChatClient {
     signal?: AbortSignal,
   ): Promise<CompletionResult> {
     let captured: ClaudeCodeResultUsage | null = null;
+    let decision: SessionReuseDiagnosis | undefined;
     const parts: string[] = [];
 
-    const deltas = this.runTurn(request, model, params, signal, (result) => {
-      captured = result;
-    });
+    const deltas = this.runTurn(
+      request,
+      model,
+      params,
+      signal,
+      (result) => { captured = result; },
+      (d) => { decision = d; },
+    );
 
     for await (const delta of deltas) parts.push(delta);
 
     return {
       text: parts.join(""),
-      usage: toUsageResult(captured),
+      usage: applyReuseDecision(toUsageResult(captured), decision),
       toolCalls: null,
       stopReason: "end_turn",
     };
@@ -124,6 +132,7 @@ export class ClaudeCodeClient implements ChatClient {
     _onToolCallStreaming?: (index: number, name: string) => void,
   ): StreamResult {
     let captured: ClaudeCodeResultUsage | null = null;
+    let decision: SessionReuseDiagnosis | undefined;
     let resolveUsage!: (value: UsageResult | null) => void;
     let resolveToolCalls!: (value: ToolCall[] | null) => void;
     let resolveStopReason!: (value: StopReason) => void;
@@ -132,9 +141,14 @@ export class ClaudeCodeClient implements ChatClient {
     const toolCalls = new Promise<ToolCall[] | null>((r) => { resolveToolCalls = r; });
     const stopReason = new Promise<StopReason>((r) => { resolveStopReason = r; });
 
-    const rawDeltas = this.runTurn(request, model, params, signal, (result) => {
-      captured = result;
-    });
+    const rawDeltas = this.runTurn(
+      request,
+      model,
+      params,
+      signal,
+      (result) => { captured = result; },
+      (d) => { decision = d; },
+    );
 
     // Mirror the AnthropicClient contract: deferred promises resolve only after
     // the delta generator is fully consumed (completed, thrown, or returned).
@@ -142,7 +156,7 @@ export class ClaudeCodeClient implements ChatClient {
       try {
         yield* rawDeltas;
       } finally {
-        resolveUsage(toUsageResult(captured));
+        resolveUsage(applyReuseDecision(toUsageResult(captured), decision));
         // Claude Code runs its own tools internally via MCP, it never returns
         // plugin tool calls through the stream.
         resolveToolCalls(null);
@@ -164,6 +178,7 @@ export class ClaudeCodeClient implements ChatClient {
     params: SamplingParams,
     signal: AbortSignal | undefined,
     onResult: (result: ClaudeCodeResultUsage) => void,
+    onReuseDecision?: (decision: SessionReuseDiagnosis) => void,
   ): AsyncGenerator<string> {
     const prompt = buildClaudeCodePrompt(request);
 
@@ -177,6 +192,7 @@ export class ClaudeCodeClient implements ChatClient {
         turns: request.messages.map((turn) => ({ role: turn.role, content: turn.content })),
         signal,
         onResult,
+        onReuseDecision,
       });
     }
 
@@ -280,6 +296,23 @@ function toUsageResult(result: ClaudeCodeResultUsage | null): UsageResult | null
     usage.cacheReadInputTokens = result.cacheReadInputTokens;
   }
   if (result.costUsd !== undefined) usage.costUsd = result.costUsd;
+  return usage;
+}
+
+/**
+ * Folds the session reuse-vs-rebuild decision onto the turn's usage so it rides
+ * the same path to the usage badge (Phase 0 cache instrumentation). A turn with
+ * no usage (error / abort) carries no decision; those aren't the baseline-
+ * measurement target, and a token-less usage object would render a misleading
+ * "0 in / 0 out" badge.
+ */
+function applyReuseDecision(
+  usage: UsageResult | null,
+  decision: SessionReuseDiagnosis | undefined,
+): UsageResult | null {
+  if (!usage || !decision) return usage;
+  usage.sessionReused = decision.reuse;
+  if (!decision.reuse) usage.sessionRebuildReason = decision.reason;
   return usage;
 }
 

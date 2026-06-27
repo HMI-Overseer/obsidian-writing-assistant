@@ -272,6 +272,77 @@ describe("SdkSessionRegistry", () => {
     expect(queryMock).toHaveBeenCalledTimes(1);
   });
 
+  it("reports the reuse decision per turn (no-session, then reuse)", async () => {
+    installEchoQuery();
+    const decisions: unknown[] = [];
+    const onReuseDecision = (d: unknown) => decisions.push(d);
+
+    const reply = await drain(
+      registry.runTurn("c1", turnRequest([{ role: "user", content: "hi" }], "hi", { onReuseDecision })),
+    );
+    await drain(
+      registry.runTurn(
+        "c1",
+        turnRequest(
+          [
+            { role: "user", content: "hi" },
+            { role: "assistant", content: reply },
+            { role: "user", content: "again" },
+          ],
+          "again",
+          { onReuseDecision },
+        ),
+      ),
+    );
+
+    expect(decisions).toEqual([{ reuse: false, reason: "no-session" }, { reuse: true }]);
+  });
+
+  it("reports the field that drove a cold rebuild", async () => {
+    installEchoQuery();
+    const decisions: unknown[] = [];
+    const onReuseDecision = (d: unknown) => decisions.push(d);
+
+    await drain(registry.runTurn("c1", turnRequest([{ role: "user", content: "hi" }], "hi", { onReuseDecision })));
+    await drain(
+      registry.runTurn(
+        "c1",
+        turnRequest(
+          [
+            { role: "user", content: "hi" },
+            { role: "assistant", content: "echo:hi" },
+            { role: "user", content: "again" },
+          ],
+          "again",
+          { cfg: cfg({ model: "claude-opus-4-8" }), onReuseDecision },
+        ),
+      ),
+    );
+
+    expect(decisions).toEqual([{ reuse: false, reason: "no-session" }, { reuse: false, reason: "model-changed" }]);
+  });
+
+  it("reports the decision before a turn that then errors", async () => {
+    installEchoQuery(() => [
+      { type: "result", subtype: "error_during_execution", is_error: true, errors: ["boom"], usage: {} },
+    ]);
+    const decisions: unknown[] = [];
+
+    await expect(
+      drain(
+        registry.runTurn(
+          "c1",
+          turnRequest([{ role: "user", content: "hi" }], "hi", { onReuseDecision: (d) => decisions.push(d) }),
+        ),
+      ),
+    ).rejects.toThrow(/boom/);
+
+    // The decision is emitted up front (before streaming), so an errored turn
+    // still reports it exactly once; the failure then disposes the session.
+    expect(decisions).toEqual([{ reuse: false, reason: "no-session" }]);
+    expect(registry.size).toBe(0);
+  });
+
   it("cold-rebuilds (new process) when config drifts", async () => {
     installEchoQuery();
 

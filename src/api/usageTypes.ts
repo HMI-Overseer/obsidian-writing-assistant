@@ -1,4 +1,5 @@
 import type { ToolCall } from "../tools/types";
+import type { SessionRebuildReason } from "../shared/types";
 
 /** Token usage returned by a provider after a completion request. */
 export interface UsageResult {
@@ -15,6 +16,14 @@ export interface UsageResult {
    * for a subscription-billed harness.
    */
   costUsd?: number;
+  /**
+   * Claude Code only: whether this turn reused the live session (true) or
+   * cold-rebuilt it (false). Undefined for every other provider and for Claude
+   * Code turns without a persistent session (Phase 0 cache instrumentation).
+   */
+  sessionReused?: boolean;
+  /** Claude Code only: when the session cold-rebuilt, the change that drove it. */
+  sessionRebuildReason?: SessionRebuildReason;
 }
 
 /** Why the model stopped generating. */

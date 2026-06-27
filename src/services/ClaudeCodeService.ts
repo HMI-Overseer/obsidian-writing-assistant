@@ -261,6 +261,7 @@ export class ClaudeCodeService {
       buildOptions,
       signal: input.signal,
       onResult: input.onResult,
+      onReuseDecision: input.onReuseDecision,
     });
   }
 

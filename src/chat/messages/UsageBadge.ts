@@ -1,6 +1,28 @@
-import type { MessageUsage, ProviderOption } from "../../shared/types";
+import type { MessageUsage, ProviderOption, SessionRebuildReason } from "../../shared/types";
 import { PROVIDER_DESCRIPTORS } from "../../providers/descriptors";
 import { PRICING_AS_OF } from "../../api/pricing";
+
+/**
+ * Short, human labels for each cold-rebuild cause, shown next to "session
+ * rebuilt" in the Claude Code usage badge. The interesting measurement signal is
+ * a config-driven rebuild (a mode switch changing the prompt / tools), which the
+ * prompt-cache work targets; a first-turn mint ("no-session") and a disposed
+ * prior session read as expected, not regressions, and are handled separately.
+ */
+const SESSION_REBUILD_LABELS: Record<SessionRebuildReason, string> = {
+  "no-session": "new",
+  "session-disposed": "expired",
+  "provider-mismatch": "provider changed",
+  "model-changed": "model changed",
+  "system-prompt-changed": "prompt changed",
+  "reasoning-changed": "reasoning changed",
+  "edit-mode-changed": "edit mode changed",
+  "agentic-mode-changed": "agentic mode changed",
+  "tools-changed": "tools changed",
+  "config-changed": "config changed",
+  "history-edited": "history edited",
+  "turn-count": "history changed",
+};
 
 /**
  * Whether the provider bills per token (Anthropic, OpenAI, Claude Code) versus a
@@ -55,6 +77,19 @@ export function renderUsageBadge(
       });
     }
 
+    // Claude Code session reuse signal: whether this turn kept the live process
+    // alive (cheap, incremental cache) or cold-rebuilt it (full transcript
+    // replay), and what drove a rebuild. The plugin-level analog of the cache
+    // read/write figures above (Phase 0 cache instrumentation).
+    const session = describeSession(usage);
+    if (session) {
+      const sessionEl = badgeEl.createSpan({
+        cls: "lmsa-chat-window-usage-session",
+        text: session.text,
+      });
+      sessionEl.addClass(`is-${session.state}`);
+    }
+
     // Claude Code runs on a subscription, so per-message cost is meaningless,
     // show the plan instead of a calculated price.
     if (provider === "claudecode") {
@@ -95,4 +130,24 @@ export function renderUsageBadge(
   }
 
   return badgeEl;
+}
+
+/**
+ * Maps a turn's session reuse fields to a badge label + visual state, or null
+ * when the provider doesn't report session reuse (everything but Claude Code).
+ * `reused` is a win (warm process), a first-turn `no-session` is a neutral cold
+ * mint, and any other rebuild is the regression the prompt-cache work targets.
+ * Exported for unit testing (pure logic lifted out of the DOM render).
+ */
+export function describeSession(
+  usage: MessageUsage,
+): { text: string; state: "reused" | "started" | "rebuilt" } | null {
+  if (usage.sessionReused === undefined) return null;
+  if (usage.sessionReused) return { text: "session reused", state: "reused" };
+  const reason = usage.sessionRebuildReason;
+  if (reason === "no-session") return { text: "session started", state: "started" };
+  if (reason === undefined || reason === "session-disposed") {
+    return { text: "session rebuilt", state: "rebuilt" };
+  }
+  return { text: `session rebuilt · ${SESSION_REBUILD_LABELS[reason]}`, state: "rebuilt" };
 }

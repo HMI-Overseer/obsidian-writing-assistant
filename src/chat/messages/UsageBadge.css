@@ -32,6 +32,18 @@
     color: var(--text-success);
   }
 
+  .lmsa-chat-window-usage-session {
+    @apply lmsa-inline-flex lmsa-items-center;
+  }
+
+  .lmsa-chat-window-usage-session.is-reused {
+    color: var(--text-success);
+  }
+
+  .lmsa-chat-window-usage-session.is-rebuilt {
+    color: var(--text-warning);
+  }
+
   .lmsa-chat-window-usage-model {
     @apply lmsa-inline-flex lmsa-items-center;
     font-size: var(--font-smallest);

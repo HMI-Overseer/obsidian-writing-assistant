@@ -1,11 +1,12 @@
 import { createAbortError } from "../httpTransport";
 import type { ClaudeCodeResultUsage } from "../claudeCodeProcess";
 import {
+  decideReuse,
   fingerprint,
   hashPrefix,
-  isSessionUsable,
   type HarnessSession,
   type SessionConfig,
+  type SessionReuseDiagnosis,
   type SessionTurn,
 } from "../harnessSession";
 import { resultErrorMessage, resultUsage, textDelta } from "./sdkQueryEngine";
@@ -297,6 +298,11 @@ export interface SessionTurnRequest {
   buildOptions: (abortController: AbortController) => Options;
   signal?: AbortSignal;
   onResult?: (usage: ClaudeCodeResultUsage) => void;
+  /**
+   * Reports the reuse-vs-rebuild decision for this turn before it runs (Phase 0
+   * cache instrumentation). Fires exactly once per turn.
+   */
+  onReuseDecision?: (decision: SessionReuseDiagnosis) => void;
 }
 
 /**
@@ -323,10 +329,9 @@ export class SdkSessionRegistry {
    */
   async *runTurn(conversationId: string, req: SessionTurnRequest): AsyncGenerator<string> {
     const existing = this.sessions.get(conversationId);
-    const reuse =
-      existing !== undefined &&
-      !existing.isDisposed &&
-      isSessionUsable(existing.meta, req.turns, req.cfg);
+    const decision = decideReuse(existing, req.turns, req.cfg);
+    req.onReuseDecision?.(decision);
+    const reuse = decision.reuse;
 
     let session: SdkSession;
     let prompt: string;
@@ -415,5 +420,6 @@ function mintMeta(cfg: SessionConfig): HarnessSession {
     coveredCount: 0,
     prefixHash: "",
     configFingerprint: fingerprint(cfg),
+    config: cfg,
   };
 }

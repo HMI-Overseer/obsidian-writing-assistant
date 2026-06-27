@@ -63,7 +63,11 @@ export const DEFAULT_CHAT_SYSTEM_PROMPT_PREFIX =
 
 export const DEFAULT_PLAN_SYSTEM_PROMPT_PREFIX = DEFAULT_CHAT_SYSTEM_PROMPT_PREFIX;
 
-export const DEFAULT_MAX_TOOL_ROUNDS_EDIT = 5;
+// A high backstop, not the primary spin control (D5): the per-turn identical-call
+// guard in the tool loop catches a model repeating the same call; the round cap
+// only stops genuinely unbounded multi-hop work. A budget of 5 was too small and
+// cut off legitimate read → read → edit chains, so it is raised well clear of them.
+export const DEFAULT_MAX_TOOL_ROUNDS_EDIT = 15;
 export const DEFAULT_MAX_TOOL_ROUNDS_CHAT = 20;
 
 /** Maximum persisted benchmark runs. Oldest entries are dropped beyond this. */

@@ -128,6 +128,9 @@ export async function runToolLoop(
   let calibrated = false;
   // Set to true once a cap-hit synthesis pass has been injected.
   let capHit = false;
+  // Per-turn identical-call counts (D5), keyed on tool name + canonical args. Drives
+  // the spin guard: the same call past IDENTICAL_CALL_THRESHOLD is refused, not run.
+  const callCounts = new Map<string, number>();
   // Stop reason of the latest round that accumulated write calls (truncation guard).
   let writeStopReason: StopReason | null = null;
   // Answer-track prose accumulated across rounds: prose that narrates a mutating
@@ -230,14 +233,26 @@ export async function runToolLoop(
     const { loopCalls, unknownCalls, editCalls, vaultOpCalls, vaultCalls, thinkCalls } =
       classifyToolCalls(toolCalls);
 
+    // D5 spin guard: refuse loop-executed calls that exactly repeat past the
+    // per-turn threshold, BEFORE they execute or accumulate as write calls (so a
+    // refused mutating call is never applied). Blocked calls stay in `loopCalls`
+    // for the assistant turn (history validity) but are excluded from the live
+    // buckets below; their refusal results are pushed alongside the executed ones.
+    const { blockedResults, blockedIds } = applyIdenticalCallGuard(loopCalls, callCounts);
+    const isLive = (tc: ToolCall): boolean => !blockedIds.has(tc.id);
+    const liveEditCalls = editCalls.filter(isLive);
+    const liveVaultOpCalls = vaultOpCalls.filter(isLive);
+    const liveVaultCalls = vaultCalls.filter(isLive);
+    const liveThinkCalls = thinkCalls.filter(isLive);
+
     // Unknown and edit calls accumulate as write calls for the finalization
     // pipeline (edits also execute in the loop so the diff panel can render them).
     if (unknownCalls.length > 0) {
       allWriteToolCalls = [...allWriteToolCalls, ...unknownCalls];
       writeStopReason = stopReason;
     }
-    if (editCalls.length > 0) {
-      allWriteToolCalls = [...allWriteToolCalls, ...editCalls];
+    if (liveEditCalls.length > 0) {
+      allWriteToolCalls = [...allWriteToolCalls, ...liveEditCalls];
       writeStopReason = stopReason;
     }
 
@@ -246,8 +261,8 @@ export async function runToolLoop(
     // PRIOR rounds, captured before this round's are appended, so a later
     // round's move_file sees an earlier round's write_file.
     const priorVaultOpCalls = allWriteToolCalls.filter((tc) => VAULT_OPS_TOOL_NAMES.has(tc.name));
-    if (vaultOpCalls.length > 0) {
-      allWriteToolCalls = [...allWriteToolCalls, ...vaultOpCalls];
+    if (liveVaultOpCalls.length > 0) {
+      allWriteToolCalls = [...allWriteToolCalls, ...liveVaultOpCalls];
       writeStopReason = stopReason;
     }
 
@@ -256,7 +271,7 @@ export async function runToolLoop(
     // reasoning. Accumulate it toward the bubble; prose before a read-only tool
     // stays in the timeline as reasoning (committed below).
     const roundIsMutating =
-      unknownCalls.length > 0 || editCalls.length > 0 || vaultOpCalls.length > 0;
+      unknownCalls.length > 0 || liveEditCalls.length > 0 || liveVaultOpCalls.length > 0;
 
     // Cap reached: push terminal error results to keep history valid, then let
     // the model produce one synthesis response. If it calls tools again after
@@ -309,7 +324,7 @@ export async function runToolLoop(
     // both channels return the *real* disposition as the tool result.
     const [otherResults, vaultOpResults, editResults] = await Promise.all([
       Promise.all([
-        ...vaultCalls.map(async (tc) => {
+        ...liveVaultCalls.map(async (tc) => {
           callbacks.onToolStatus?.(tc.name);
           if (!vaultToolContext) {
             return {
@@ -320,13 +335,13 @@ export async function runToolLoop(
           return { tc, result: await executeVaultTool(tc, vaultToolContext) };
         }),
         // think is a no-op: returns empty content so the model continues reasoning.
-        ...thinkCalls.map((tc) => ({
+        ...liveThinkCalls.map((tc) => ({
           tc,
           result: { content: "", isReadOnly: true as const } as ToolResult,
         })),
       ]),
       resolveVaultOps({
-        vaultOpCalls,
+        vaultOpCalls: liveVaultOpCalls,
         priorVaultOpCalls,
         round,
         stopReason,
@@ -334,7 +349,7 @@ export async function runToolLoop(
         callbacks,
       }),
       resolveEdits({
-        editCalls,
+        editCalls: liveEditCalls,
         vaultOpContext: vaultOpToolContext,
         editContext: editToolContext,
         round,
@@ -342,7 +357,9 @@ export async function runToolLoop(
       }),
     ]);
 
-    for (const { tc, result } of otherResults) {
+    // Read-only / think results plus any spin-guard refusals record their step with
+    // the result in hand (a refusal flags its step like a failed read-only call).
+    for (const { tc, result } of [...otherResults, ...blockedResults]) {
       toolLoopTurns.push({ role: "tool", content: result.content, toolCallId: tc.id });
       callbacks.onStepRecorded?.({
         type: "tool_call",
@@ -406,6 +423,80 @@ export function classifyToolCalls(toolCalls: ToolCall[]): ClassifiedCalls {
     vaultCalls: loopCalls.filter((tc) => VAULT_TOOL_NAMES.has(tc.name)),
     thinkCalls: loopCalls.filter((tc) => tc.name === THINK_TOOL_NAME),
   };
+}
+
+/**
+ * D5 spin guard: how many identical (tool name + canonical args) calls run before
+ * the next exact repeat is refused. The first {@link IDENTICAL_CALL_THRESHOLD}
+ * execute; the 4th and beyond are short-circuited. The round cap is a high
+ * backstop; this is the primary control against a model re-issuing the same call.
+ */
+export const IDENTICAL_CALL_THRESHOLD = 3;
+
+/**
+ * Order-independent serialization of a value: object keys are sorted recursively
+ * so two argument maps that differ only in key order produce the same string.
+ * Pure; used to canonicalize a tool call's arguments for the identical-call key.
+ */
+function stableStringify(value: unknown): string {
+  if (value === null || typeof value !== "object") return JSON.stringify(value) ?? "null";
+  if (Array.isArray(value)) return `[${value.map(stableStringify).join(",")}]`;
+  const obj = value as Record<string, unknown>;
+  const keys = Object.keys(obj).sort();
+  return `{${keys.map((k) => `${JSON.stringify(k)}:${stableStringify(obj[k])}`).join(",")}}`;
+}
+
+/** Canonical per-turn key for a tool call: name + order-independent arguments. */
+function canonicalToolKey(tc: ToolCall): string {
+  return `${tc.name} ${stableStringify(tc.arguments)}`;
+}
+
+/** The recovery-shaped refusal returned when a call repeats past the threshold. */
+function identicalCallRefusal(tc: ToolCall): ToolResult {
+  const isReadOnly = VAULT_TOOL_NAMES.has(tc.name) || tc.name === THINK_TOOL_NAME;
+  return toolFailure({
+    kind: "precondition",
+    what: `${tc.name} was already called with these exact arguments ${IDENTICAL_CALL_THRESHOLD} times this turn and its result has not changed`,
+    recovery:
+      "use the result you already have, or change the arguments or your approach instead of repeating the call",
+    isReadOnly,
+  });
+}
+
+/** Result of applying the per-turn identical-call guard to a round's loop calls. */
+export interface IdenticalCallGuardResult {
+  /** Refusal results to push for calls blocked as over-threshold repeats. */
+  blockedResults: Array<{ tc: ToolCall; result: ToolResult }>;
+  /** Ids of the blocked calls, so execution/accumulation buckets can exclude them. */
+  blockedIds: Set<string>;
+}
+
+/**
+ * Per-turn spin guard (D5). Counts identical (tool name + canonical args) calls
+ * across the turn in `counts`; the first {@link IDENTICAL_CALL_THRESHOLD} run
+ * normally, the next exact repeat is refused with a recovery-shaped `precondition`
+ * failure telling the model it already has this result. Mutates `counts`, and is
+ * applied to a round's loop calls before they execute *or* accumulate as write
+ * calls, so a refused mutating call is never applied. Pure aside from the counter,
+ * so its threshold behavior is unit-testable in isolation.
+ */
+export function applyIdenticalCallGuard(
+  loopCalls: ToolCall[],
+  counts: Map<string, number>,
+): IdenticalCallGuardResult {
+  const blockedResults: Array<{ tc: ToolCall; result: ToolResult }> = [];
+  const blockedIds = new Set<string>();
+  for (const tc of loopCalls) {
+    const key = canonicalToolKey(tc);
+    const prior = counts.get(key) ?? 0;
+    if (prior >= IDENTICAL_CALL_THRESHOLD) {
+      blockedIds.add(tc.id);
+      blockedResults.push({ tc, result: identicalCallRefusal(tc) });
+    } else {
+      counts.set(key, prior + 1);
+    }
+  }
+  return { blockedResults, blockedIds };
 }
 
 /** Per-round inputs the vault-op resolver needs (was closed-over loop state). */

@@ -5,6 +5,8 @@ import {
   classifyToolCalls,
   resolveVaultOps,
   resolveEdits,
+  applyIdenticalCallGuard,
+  IDENTICAL_CALL_THRESHOLD,
 } from "../../../../src/chat/actions/toolLoop";
 import type { ToolLoopCallbacks } from "../../../../src/chat/actions/toolLoop";
 import type { ChatClient } from "../../../../src/api/chatClient";
@@ -576,5 +578,111 @@ describe("resolveEdits", () => {
     expect(result).toHaveLength(1);
     expect(result[0].result.isError).toBe(true);
     expect(result[0].result.content).toContain("edit tool context unavailable");
+  });
+});
+
+/**
+ * D5, per-turn identical-call spin guard. The threshold is
+ * {@link IDENTICAL_CALL_THRESHOLD} (3): the first three identical
+ * (tool name + canonicalized arguments) calls run, the fourth is refused with a
+ * recovery-shaped `precondition` failure rather than executing. Keyed on the
+ * canonical args so key order doesn't matter and distinct args never collide.
+ */
+describe("applyIdenticalCallGuard", () => {
+  const readName = [...VAULT_TOOL_NAMES][0];
+  const mk = (id: string, args: Record<string, unknown> = {}): ToolCall => ({
+    id,
+    name: readName,
+    arguments: args,
+  });
+
+  it("allows the first three identical calls and refuses the fourth", () => {
+    const counts = new Map<string, number>();
+    const r1 = applyIdenticalCallGuard([mk("a1")], counts);
+    const r2 = applyIdenticalCallGuard([mk("a2")], counts);
+    const r3 = applyIdenticalCallGuard([mk("a3")], counts);
+    const r4 = applyIdenticalCallGuard([mk("a4")], counts);
+
+    expect(r1.blockedIds.size).toBe(0);
+    expect(r2.blockedIds.size).toBe(0);
+    expect(r3.blockedIds.size).toBe(0);
+    expect(r4.blockedIds.has("a4")).toBe(true);
+
+    const refusal = r4.blockedResults[0].result;
+    expect(refusal.isError).toBe(true);
+    expect(refusal.failure?.kind).toBe("precondition");
+    expect(refusal.content).toContain("already called");
+    expect(refusal.content).toContain(String(IDENTICAL_CALL_THRESHOLD));
+  });
+
+  it("blocks the fourth identical call within a single round", () => {
+    const counts = new Map<string, number>();
+    const { blockedIds } = applyIdenticalCallGuard(
+      [mk("a"), mk("b"), mk("c"), mk("d")],
+      counts,
+    );
+    expect([...blockedIds]).toEqual(["d"]);
+  });
+
+  it("keys on canonical args, so key order does not matter", () => {
+    const counts = new Map<string, number>();
+    applyIdenticalCallGuard([mk("a", { a: 1, b: 2 })], counts);
+    applyIdenticalCallGuard([mk("b", { b: 2, a: 1 })], counts);
+    applyIdenticalCallGuard([mk("c", { a: 1, b: 2 })], counts);
+    const r4 = applyIdenticalCallGuard([mk("d", { b: 2, a: 1 })], counts);
+    expect(r4.blockedIds.has("d")).toBe(true);
+  });
+
+  it("counts each distinct argument set independently", () => {
+    const counts = new Map<string, number>();
+    // Five calls, all distinct paths: none ever repeats, so none is blocked.
+    for (let i = 0; i < 5; i++) {
+      const { blockedIds } = applyIdenticalCallGuard([mk(`x${i}`, { path: `note-${i}.md` })], counts);
+      expect(blockedIds.size).toBe(0);
+    }
+    // A second call to an already-seen path is only the 2nd for that key, still allowed.
+    const r = applyIdenticalCallGuard([mk("y", { path: "note-0.md" })], counts);
+    expect(r.blockedIds.size).toBe(0);
+  });
+});
+
+describe("runToolLoop identical-call guard", () => {
+  it("refuses the fourth identical tool call and never executes it", async () => {
+    const cb = makeCallbacks();
+    const vaultName = [...VAULT_TOOL_NAMES][0];
+    // Fresh id per round (providers assign new ids), same name + args each time.
+    const mkCall = (id: string): ToolCall => ({
+      id,
+      name: vaultName,
+      arguments: { path: "Note.md" },
+    });
+
+    const client = countingClient([
+      { deltas: ["r0"], toolCalls: [mkCall("c0")], stopReason: "tool_use" },
+      { deltas: ["r1"], toolCalls: [mkCall("c1")], stopReason: "tool_use" },
+      { deltas: ["r2"], toolCalls: [mkCall("c2")], stopReason: "tool_use" },
+      { deltas: ["r3"], toolCalls: [mkCall("c3")], stopReason: "tool_use" },
+      { deltas: ["done"], toolCalls: null, stopReason: "end_turn" },
+    ]);
+
+    // No vaultToolContext: an *executed* read returns an "unavailable" failure, so
+    // the three executions are distinguishable from the blocked 4th, which returns
+    // the precondition refusal and proves it never ran.
+    await runToolLoop(
+      client,
+      baseRequest,
+      "test-model",
+      "lmstudio",
+      {} as never,
+      signal(),
+      cb,
+      20, // maxRounds high, so the round cap can't interfere
+      true,
+    );
+
+    const recorded = (cb.onStepRecorded as ReturnType<typeof vi.fn>).mock.calls.map((c) => c[0]);
+    const errors = recorded.filter((s) => s.isError).map((s) => s.errorContent as string);
+    expect(errors.filter((e) => e.includes("vault tool context unavailable"))).toHaveLength(3);
+    expect(errors.filter((e) => e.includes("already called"))).toHaveLength(1);
   });
 });

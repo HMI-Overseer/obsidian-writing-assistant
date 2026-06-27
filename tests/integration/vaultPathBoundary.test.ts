@@ -317,6 +317,87 @@ describe("vault path-boundary, real-filesystem resolution (§6.1)", () => {
   });
 });
 
+describe("folder ops, real-filesystem resolution (§6.1)", () => {
+  it("refuses an escaping move_folder destination without moving the folder out of the vault", async () => {
+    const app = makeRealFsApp(vaultRoot);
+    fs.mkdirSync(nodePath.join(vaultRoot, "Drafts", "Act II"), { recursive: true });
+    fs.writeFileSync(nodePath.join(vaultRoot, "Drafts", "Act II", "Scene.md"), "body");
+
+    const op: VaultOperation = {
+      kind: "moveFolder",
+      from: "Drafts/Act II",
+      to: "../../../escaped-folder",
+    };
+    const batch = await applyVaultOpBatch(app, [{ id: "mf", op }]);
+
+    expect(batch.ok).toBe(false);
+    expect(batch.conflicts.some((c) => c.reason.includes("outside the vault"))).toBe(true);
+    expect(fs.existsSync(nodePath.join(vaultRoot, "Drafts", "Act II", "Scene.md"))).toBe(true);
+    // The executor also throws as its first act, even if reached directly.
+    await expect(applyOperation(app, op)).rejects.toThrow(/outside the vault/);
+    expect(filesOutsideVault()).toEqual([]); // nothing escaped onto disk.
+  });
+
+  it("moves a real folder and its contents inside the vault (positive control)", async () => {
+    const app = makeRealFsApp(vaultRoot);
+    fs.mkdirSync(nodePath.join(vaultRoot, "Drafts", "Act II"), { recursive: true });
+    fs.writeFileSync(nodePath.join(vaultRoot, "Drafts", "Act II", "Scene.md"), "body");
+
+    const op: VaultOperation = { kind: "moveFolder", from: "Drafts/Act II", to: "Manuscript/Act II" };
+    const batch = await applyVaultOpBatch(app, [{ id: "mf", op }]);
+
+    expect(batch.ok).toBe(true);
+    expect(fs.readFileSync(nodePath.join(vaultRoot, "Manuscript", "Act II", "Scene.md"), "utf8")).toBe(
+      "body",
+    );
+    expect(fs.existsSync(nodePath.join(vaultRoot, "Drafts", "Act II"))).toBe(false);
+  });
+
+  it("trash_folder removes an empty folder but refuses a populated one (empty-only, real disk)", async () => {
+    const app = makeRealFsApp(vaultRoot);
+    fs.mkdirSync(nodePath.join(vaultRoot, "Empty"), { recursive: true });
+    fs.mkdirSync(nodePath.join(vaultRoot, "Full"), { recursive: true });
+    fs.writeFileSync(nodePath.join(vaultRoot, "Full", "Note.md"), "precious");
+
+    const emptyBatch = await applyVaultOpBatch(app, [{ id: "e", op: { kind: "trashFolder", path: "Empty" } }]);
+    expect(emptyBatch.ok).toBe(true);
+    expect(fs.existsSync(nodePath.join(vaultRoot, "Empty"))).toBe(false);
+
+    const fullBatch = await applyVaultOpBatch(app, [{ id: "f", op: { kind: "trashFolder", path: "Full" } }]);
+    expect(fullBatch.ok).toBe(false);
+    expect(fullBatch.error).toMatch(/not empty/i);
+    expect(fs.readFileSync(nodePath.join(vaultRoot, "Full", "Note.md"), "utf8")).toBe("precious");
+  });
+
+  it("reorg end-to-end on real disk: move the note out, then trash the empty husk", async () => {
+    const app = makeRealFsApp(vaultRoot);
+    fs.mkdirSync(nodePath.join(vaultRoot, "Drafts", "Act II"), { recursive: true });
+    fs.writeFileSync(nodePath.join(vaultRoot, "Drafts", "Act II", "Scene.md"), "body");
+    const st = fs.statSync(nodePath.join(vaultRoot, "Drafts", "Act II", "Scene.md"));
+
+    // Folder trash is listed first; orderOps must run the move first so the husk is
+    // empty by apply time, and the apply-time folderIsEmpty check then passes on disk.
+    const batch = [
+      { id: "tf", op: { kind: "trashFolder", path: "Drafts/Act II" } as VaultOperation },
+      {
+        id: "mv",
+        op: {
+          kind: "move",
+          from: "Drafts/Act II/Scene.md",
+          to: "Manuscript/Scene.md",
+          expect: { mtime: st.mtimeMs, size: st.size },
+        } as VaultOperation,
+      },
+    ];
+    const result = await applyVaultOpBatch(app, batch);
+
+    expect(result.ok).toBe(true);
+    expect(fs.existsSync(nodePath.join(vaultRoot, "Manuscript", "Scene.md"))).toBe(true);
+    expect(fs.existsSync(nodePath.join(vaultRoot, "Drafts", "Act II"))).toBe(false);
+    expect(filesOutsideVault()).toEqual([]);
+  });
+});
+
 describe("smart-quote path resolution, real filesystem", () => {
   // ’ = U+2019, the curly apostrophe Obsidian saves; the model "straightens" it to '.
   const CURLY = "’";

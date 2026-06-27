@@ -51,6 +51,13 @@ export interface MoveFileArgs {
 export interface TrashFileArgs {
   path: string;
 }
+export interface MoveFolderArgs {
+  from: string;
+  to: string;
+}
+export interface TrashFolderArgs {
+  path: string;
+}
 export interface ReplaceInVaultArgs {
   search: string;
   replace: string;
@@ -143,6 +150,58 @@ export function validateMoveFile(
     return err(`destination "${args.to}" already exists, choose a new name.`);
   }
   return ok({ from: args.from, to: args.to });
+}
+
+export function validateMoveFolder(
+  args: Record<string, unknown>,
+  resolve: ResolvePath,
+  configDir: string,
+): ValidationResult<MoveFolderArgs> {
+  if (typeof args.from !== "string" || args.from.trim() === "") {
+    return err("from must be a non-empty string.");
+  }
+  if (typeof args.to !== "string" || args.to.trim() === "") {
+    return err("to must be a non-empty string.");
+  }
+  if (escapesVault(args.from)) return err(outsideVaultMessage(args.from));
+  if (escapesVault(args.to)) return err(outsideVaultMessage(args.to));
+  // Refuse a move *into* the config subtree (the destination is the write target), the
+  // same defense-in-depth guard as move_file. The source is not guarded: relocating a
+  // folder out of the config dir is not a write into it.
+  if (isReservedConfigPath(args.to, configDir)) return err(reservedConfigMessage(args.to, configDir));
+  // No document-extension allowlist here: a folder has no extension. The vault-boundary
+  // and reserved-config guards above are what keep a folder move in bounds.
+  if (args.from === args.to) {
+    return err("from and to are the same path, nothing to move.");
+  }
+  const fromState = resolve(args.from);
+  if (fromState === "absent") return err(`source folder "${args.from}" does not exist.`);
+  if (fromState === "file") {
+    return err(`"${args.from}" is a file, use move_file to move a note.`);
+  }
+  if (resolve(args.to) !== "absent") {
+    return err(`destination "${args.to}" already exists, choose a new name.`);
+  }
+  return ok({ from: args.from, to: args.to });
+}
+
+export function validateTrashFolder(
+  args: Record<string, unknown>,
+  resolve: ResolvePath,
+): ValidationResult<TrashFolderArgs> {
+  if (typeof args.path !== "string" || args.path.trim() === "") {
+    return err("path must be a non-empty string.");
+  }
+  if (escapesVault(args.path)) return err(outsideVaultMessage(args.path));
+  const state = resolve(args.path);
+  if (state === "absent") return err(`"${args.path}" does not exist.`);
+  if (state === "file") {
+    return err(`"${args.path}" is a file, use trash_file to trash a note.`);
+  }
+  // Emptiness is *not* checked here (this validator sees only path state, not the
+  // folder's children): the empty-only guarantee is enforced authoritatively at apply
+  // via folderIsEmpty, after any same-batch moves have emptied the husk.
+  return ok({ path: args.path });
 }
 
 export function validateReplaceInVault(

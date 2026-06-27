@@ -65,6 +65,34 @@ describe("toVaultOperations", () => {
     expect(ops).toEqual([{ kind: "createDir", path: "Dir" }]);
   });
 
+  test("move_folder → moveFolder, no fingerprint (existence guard)", () => {
+    const { ops, errors } = toVaultOperations(
+      [call("move_folder", { from: "Drafts/Act II", to: "Manuscript/Act II" })],
+      probes({ "Drafts/Act II": "dir" }),
+    );
+    expect(errors).toHaveLength(0);
+    expect(ops).toEqual([{ kind: "moveFolder", from: "Drafts/Act II", to: "Manuscript/Act II" }]);
+  });
+
+  test("trash_folder → trashFolder, no snapshot (empty-only, inverse is createDir)", () => {
+    const { ops, errors } = toVaultOperations(
+      [call("trash_folder", { path: "Drafts/Act II" })],
+      probes({ "Drafts/Act II": "dir" }),
+    );
+    expect(errors).toHaveLength(0);
+    expect(ops).toEqual([{ kind: "trashFolder", path: "Drafts/Act II" }]);
+  });
+
+  test("a move_folder whose source is a file is an error, not an op (steers to move_file)", () => {
+    const { ops, errors } = toVaultOperations(
+      [call("move_folder", { from: "note.md", to: "Archive" })],
+      probes({ "note.md": "file" }),
+    );
+    expect(ops).toHaveLength(0);
+    expect(errors).toHaveLength(1);
+    expect(errors[0].error).toContain("move_file");
+  });
+
   test("create_directory on an existing folder → flagged no-op, no error (idempotent)", () => {
     const { ops, satisfied, errors } = toVaultOperations(
       [call("create_directory", { path: "Dir" })],

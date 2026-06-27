@@ -60,26 +60,34 @@ export const DEFAULT_VAULT_OP_POLICY: VaultOpPolicy = {
 };
 
 /**
- * The op classes that carry a gate in {@link VaultOpPolicy}. Excludes
- * `replaceInVault`, which gates as `overwrite` ({@link classOf}) rather than
- * carrying its own knob, so it never indexes the policy directly.
+ * The op classes that carry a gate in {@link VaultOpPolicy}. Excludes the op kinds
+ * that gate as a *different* class than their kind ({@link classOf}) rather than
+ * carrying their own knob, so they never index the policy directly: `replaceInVault`
+ * (gates as `overwrite`), and the folder ops `moveFolder`/`trashFolder` (gate as
+ * `move`/`trash`).
  */
-export type GatedVaultOpClass = Exclude<VaultOpClass, "replaceInVault">;
+export type GatedVaultOpClass = Exclude<
+  VaultOpClass,
+  "replaceInVault" | "moveFolder" | "trashFolder"
+>;
 
 /**
- * Annotation-derived gate class of an op. Identical to its kind for every op except
- * `replaceInVault`: a vault-wide replace is a multi-file content rewrite, so it gates
- * exactly like an `overwrite` (no separate settings knob). This is the one deliberate
- * exception to "class === kind" (ADR-0003).
+ * Annotation-derived gate class of an op. Identical to its kind except for the ops
+ * that deliberately reuse another class's policy knob (ADR-0003):
+ *   - `replaceInVault` gates as `overwrite` (a multi-file content rewrite);
+ *   - `moveFolder` gates as `move` (a relocation, just folder-level);
+ *   - `trashFolder` gates as `trash` (a removal, empty-folder-only).
  */
 export function classOf(op: VaultOperation): GatedVaultOpClass {
   if (op.kind === "replaceInVault") return "overwrite";
+  if (op.kind === "moveFolder") return "move";
+  if (op.kind === "trashFolder") return "trash";
   return op.kind;
 }
 
-/** Every path an op touches (move touches two; a replace touches all its targets). */
+/** Every path an op touches (a move/moveFolder touches two; a replace touches all its targets). */
 export function targetPaths(op: VaultOperation): string[] {
-  if (op.kind === "move") return [op.from, op.to];
+  if (op.kind === "move" || op.kind === "moveFolder") return [op.from, op.to];
   if (op.kind === "replaceInVault") return op.targets.map((t) => t.path);
   return [op.path];
 }

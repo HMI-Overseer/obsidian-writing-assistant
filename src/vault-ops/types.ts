@@ -26,6 +26,13 @@ export interface TargetFingerprint {
  * file bodies) and is gated as an `overwrite` (see `classOf`), since it is a
  * multi-file content rewrite. Reviewing it as a single unit keeps the in-loop
  * review coordinator and timeline at their 1-call/1-op design.
+ *
+ * `moveFolder` and `trashFolder` are the folder-level siblings of `move`/`trash`.
+ * Unlike a file, a folder has no meaningful `{mtime,size}`, so they carry no
+ * {@link TargetFingerprint}: their conflict guard is purely existence-based
+ * (re-checked at pre-flight), and `trashFolder` is scoped to *empty* folders only
+ * (enforced at apply via `folderIsEmpty`), so its inverse is a trivial `createDir`
+ * with no recursive content snapshot. They gate as `move`/`trash` (see `classOf`).
  */
 export type VaultOperation =
   | { kind: "create"; path: string; content: string }
@@ -33,6 +40,8 @@ export type VaultOperation =
   | { kind: "createDir"; path: string }
   | { kind: "move"; from: string; to: string; expect: TargetFingerprint }
   | { kind: "trash"; path: string; expect: TargetFingerprint; snapshot: string }
+  | { kind: "moveFolder"; from: string; to: string }
+  | { kind: "trashFolder"; path: string }
   | {
       kind: "replaceInVault";
       search: string;

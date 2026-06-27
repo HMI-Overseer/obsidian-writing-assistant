@@ -55,6 +55,16 @@ describe("summarizeOp", () => {
     expect(summarizeOp(op)).toBe("Trash Old.md");
   });
 
+  it("summarizes a folder move with an arrow", () => {
+    const op: VaultOperation = { kind: "moveFolder", from: "Drafts/Act II", to: "Manuscript/Act II" };
+    expect(summarizeOp(op)).toBe("Move folder Drafts/Act II → Manuscript/Act II");
+  });
+
+  it("summarizes a folder trash, naming the empty-only scope", () => {
+    const op: VaultOperation = { kind: "trashFolder", path: "Drafts/Act II" };
+    expect(summarizeOp(op)).toBe("Trash empty folder Drafts/Act II");
+  });
+
   it("summarizes a replaceInVault with its terms, note count, and match count", () => {
     const op: VaultOperation = {
       kind: "replaceInVault",
@@ -105,6 +115,11 @@ describe("opPrimaryPath", () => {
     expect(opPrimaryPath({ kind: "move", from: "Inbox/D.md", to: "C/D.md", expect: FP })).toBe(
       "C/D.md",
     );
+  });
+
+  it("returns the destination for a folder move and the path for a folder trash", () => {
+    expect(opPrimaryPath({ kind: "moveFolder", from: "A", to: "B/C" })).toBe("B/C");
+    expect(opPrimaryPath({ kind: "trashFolder", path: "A/B" })).toBe("A/B");
   });
 });
 
@@ -171,5 +186,9 @@ describe("opDetailText", () => {
       "moved from Inbox/D.md",
     );
     expect(opDetailText({ kind: "trash", path: "Old.md", expect: FP, snapshot: "x" })).toBe("trash");
+    expect(opDetailText({ kind: "moveFolder", from: "Drafts/X", to: "Manuscript/X" })).toBe(
+      "folder moved from Drafts/X",
+    );
+    expect(opDetailText({ kind: "trashFolder", path: "Drafts/X" })).toBe("trash empty folder");
   });
 });

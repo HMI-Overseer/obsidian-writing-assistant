@@ -45,7 +45,7 @@ function escapeRegExp(value: string): string {
  */
 export function buildReplaceRegex(opts: ReplaceOptions): RegExp {
   const body = escapeRegExp(opts.search);
-  const pattern = body; // MUTATION: ignore wholeWord boundaries
+  const pattern = opts.wholeWord ? `\\b${body}\\b` : body;
   return new RegExp(pattern, opts.caseSensitive ? "g" : "gi");
 }
 
@@ -62,7 +62,9 @@ export function applyReplacement(
   const rx = buildReplaceRegex(opts);
   const matches = content.match(rx);
   const count = matches ? matches.length : 0;
-  const next = content.replace(rx, opts.replace); // MUTATION: string replacement, $ interpreted
+  // A function replacer returns the replacement verbatim, so any `$`-sequence in
+  // `replace` ($&, $1, …) stays literal instead of being read as a capture reference.
+  const next = content.replace(rx, () => opts.replace);
   return { content: next, count };
 }
 

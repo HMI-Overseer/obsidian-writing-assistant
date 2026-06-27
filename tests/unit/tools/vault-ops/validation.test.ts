@@ -2,8 +2,10 @@ import { describe, test, expect } from "vitest";
 import {
   validateCreateDirectory as _validateCreateDirectory,
   validateMoveFile as _validateMoveFile,
+  validateMoveFolder as _validateMoveFolder,
   validateReplaceInVault,
   validateTrashFile,
+  validateTrashFolder,
   validateWriteFile as _validateWriteFile,
 } from "../../../../src/tools/vault-ops/validation";
 import type { PathState } from "../../../../src/vault-ops/types";
@@ -20,6 +22,8 @@ const validateCreateDirectory = (args: Record<string, unknown>, resolve: Resolve
   _validateCreateDirectory(args, resolve, cfg);
 const validateMoveFile = (args: Record<string, unknown>, resolve: Resolve, cfg = CONFIG_DIR) =>
   _validateMoveFile(args, resolve, cfg);
+const validateMoveFolder = (args: Record<string, unknown>, resolve: Resolve, cfg = CONFIG_DIR) =>
+  _validateMoveFolder(args, resolve, cfg);
 
 const absent = (): PathState => "absent";
 const resolveWith = (states: Record<string, PathState>) => (p: string) => states[p] ?? "absent";
@@ -156,6 +160,89 @@ describe("validateTrashFile", () => {
 
   test("rejects a folder (files only in v1)", () => {
     expect(validateTrashFile({ path: "Dir" }, resolveWith({ Dir: "dir" })).ok).toBe(false);
+  });
+});
+
+describe("validateMoveFolder", () => {
+  test("accepts an existing folder to an absent destination", () => {
+    const r = validateMoveFolder(
+      { from: "Drafts/Act II", to: "Manuscript/Act II" },
+      resolveWith({ "Drafts/Act II": "dir" }),
+    );
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.args).toEqual({ from: "Drafts/Act II", to: "Manuscript/Act II" });
+  });
+
+  test("needs no document extension (a folder has none, unlike move_file's destination)", () => {
+    // The whole point of the folder op: an extensionless destination that move_file
+    // would refuse as an unsupported type is exactly what a folder move requires.
+    const r = validateMoveFolder({ from: "A", to: "B" }, resolveWith({ A: "dir" }));
+    expect(r.ok).toBe(true);
+  });
+
+  test("rejects a missing source folder", () => {
+    const r = validateMoveFolder({ from: "Gone", to: "B" }, absent);
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error).toContain("does not exist");
+  });
+
+  test("rejects a file source, steering to move_file", () => {
+    const r = validateMoveFolder({ from: "note.md", to: "B" }, resolveWith({ "note.md": "file" }));
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error).toContain("move_file");
+  });
+
+  test("rejects an occupied destination", () => {
+    const r = validateMoveFolder(
+      { from: "A", to: "B" },
+      resolveWith({ A: "dir", B: "dir" }),
+    );
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error).toContain("already exists");
+  });
+
+  test("rejects identical from/to", () => {
+    expect(validateMoveFolder({ from: "A", to: "A" }, resolveWith({ A: "dir" })).ok).toBe(false);
+  });
+
+  test("rejects an escaping source or destination", () => {
+    const fromBad = validateMoveFolder({ from: "../X", to: "B" }, absent);
+    expect(fromBad.ok).toBe(false);
+    if (!fromBad.ok) expect(fromBad.error).toContain("outside the vault");
+
+    const toBad = validateMoveFolder({ from: "A", to: "../../X" }, resolveWith({ A: "dir" }));
+    expect(toBad.ok).toBe(false);
+    if (!toBad.ok) expect(toBad.error).toContain("outside the vault");
+  });
+
+  test("refuses a move whose destination is inside the config subtree", () => {
+    const r = validateMoveFolder({ from: "A", to: ".obsidian/A" }, resolveWith({ A: "dir" }));
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error).toContain("configuration folder");
+  });
+});
+
+describe("validateTrashFolder", () => {
+  test("accepts an existing folder (emptiness is enforced later, at apply)", () => {
+    const r = validateTrashFolder({ path: "Drafts/Act II" }, resolveWith({ "Drafts/Act II": "dir" }));
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.args).toEqual({ path: "Drafts/Act II" });
+  });
+
+  test("rejects an absent path", () => {
+    expect(validateTrashFolder({ path: "Gone" }, absent).ok).toBe(false);
+  });
+
+  test("rejects a file, steering to trash_file", () => {
+    const r = validateTrashFolder({ path: "note.md" }, resolveWith({ "note.md": "file" }));
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error).toContain("trash_file");
+  });
+
+  test("rejects an escaping path", () => {
+    const r = validateTrashFolder({ path: "../../secret" }, resolveWith({}));
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error).toContain("outside the vault");
   });
 });
 

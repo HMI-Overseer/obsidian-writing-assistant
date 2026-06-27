@@ -33,6 +33,10 @@ export function summarizeOp(op: VaultOperation): string {
       return `Move ${op.from} → ${op.to}`;
     case "trash":
       return `Trash ${op.path}`;
+    case "moveFolder":
+      return `Move folder ${op.from} → ${op.to}`;
+    case "trashFolder":
+      return `Trash empty folder ${op.path}`;
     case "replaceInVault":
       return `Replace "${op.search}" → "${op.replace}" in ${noteCountLabel(op.targets.length)} (${op.occurrences} matches)`;
   }
@@ -53,7 +57,7 @@ export function gateBadgeLabel(gate: Gate): string {
 /** The single path an op acts on, for hierarchy display (move shows its destination,
  *  a replace its first target as a representative path). */
 export function opPrimaryPath(op: VaultOperation): string {
-  if (op.kind === "move") return op.to;
+  if (op.kind === "move" || op.kind === "moveFolder") return op.to;
   if (op.kind === "replaceInVault") return op.targets[0]?.path ?? "";
   return op.path;
 }
@@ -111,6 +115,10 @@ export function opDetailText(op: VaultOperation): string {
       return `moved from ${op.from}`;
     case "trash":
       return "trash";
+    case "moveFolder":
+      return `folder moved from ${op.from}`;
+    case "trashFolder":
+      return "trash empty folder";
     case "replaceInVault":
       return `replace · ${op.occurrences} match${op.occurrences === 1 ? "" : "es"}`;
   }

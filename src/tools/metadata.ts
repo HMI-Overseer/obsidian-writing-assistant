@@ -7,6 +7,9 @@
  * added to the definitions is also represented in the UI.
  */
 
+import { VAULT_OPS_TOOL_NAMES } from "./vault-ops/definition";
+import { EDIT_TOOL_NAMES } from "./editing/definition";
+
 /** Obsidian icon name for each tool (used in AgenticTimeline). */
 export const TOOL_ICONS: Record<string, string> = {
   semantic_search: "search",
@@ -71,19 +74,16 @@ export const TOOL_STATUS_LABELS: Record<string, string> = {
 };
 
 /**
- * Tools that change the vault or active document, the four vault ops plus the two
- * edit tools. Mirrors the `destructiveHint` / `idempotentHint` annotations on the
- * vault-op definitions and the edit-tool channel. Drives the orange "mutating" dot in
- * the {@link AgenticTimeline}; every other (read-only) tool keeps the default cyan.
+ * Tools that change the vault or active document: every vault-op plus every edit
+ * tool. Derived from the two source-of-truth name sets rather than re-listed, so a
+ * newly added vault-op / edit tool is classified as mutating automatically (no drift,
+ * the one place this used to break on a new tool). Mirrors the `destructiveHint` /
+ * `idempotentHint` annotations; drives the orange "mutating" dot in the
+ * {@link AgenticTimeline}, every other (read-only) tool keeps the default cyan.
  */
-export const MUTATING_TOOL_NAMES: ReadonlySet<string> = new Set([
-  "write_file",
-  "create_directory",
-  "move_file",
-  "trash_file",
-  "replace_in_vault",
-  "propose_edit",
-  "update_frontmatter",
+export const MUTATING_TOOL_NAMES: ReadonlySet<string> = new Set<string>([
+  ...VAULT_OPS_TOOL_NAMES,
+  ...EDIT_TOOL_NAMES,
 ]);
 
 /** True when a tool mutates the vault/document (vault op or edit), false for read-only tools. */

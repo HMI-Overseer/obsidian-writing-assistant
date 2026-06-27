@@ -16,6 +16,8 @@ const OP_KIND_ICONS: Record<VaultOperation["kind"], string> = {
   createDir: "folder-plus",
   move: "file-symlink",
   trash: "trash-2",
+  moveFolder: "folder-symlink",
+  trashFolder: "folder-x",
   replaceInVault: "replace",
 };
 
@@ -26,6 +28,8 @@ const TOOL_NAME_BY_KIND: Record<VaultOperation["kind"], string> = {
   createDir: "create_directory",
   move: "move_file",
   trash: "trash_file",
+  moveFolder: "move_folder",
+  trashFolder: "trash_folder",
   replaceInVault: "replace_in_vault",
 };
 

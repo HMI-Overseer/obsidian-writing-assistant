@@ -43,6 +43,10 @@ function appliedVerb(op: VaultOperation): string {
       return "Moved";
     case "trash":
       return "Trashed";
+    case "moveFolder":
+      return "Moved folder";
+    case "trashFolder":
+      return "Trashed empty folder";
     case "replaceInVault":
       return "Replaced";
   }
@@ -61,6 +65,10 @@ function actionVerb(op: VaultOperation): string {
       return "move";
     case "trash":
       return "trash";
+    case "moveFolder":
+      return "move folder";
+    case "trashFolder":
+      return "trash folder";
     case "replaceInVault":
       return "replace";
   }
@@ -73,7 +81,7 @@ function noteCountLabel(count: number): string {
 
 /** The target rendered in a message: move shows both endpoints, a replace its terms + reach. */
 function target(op: VaultOperation): string {
-  if (op.kind === "move") return `"${op.from}" → "${op.to}"`;
+  if (op.kind === "move" || op.kind === "moveFolder") return `"${op.from}" → "${op.to}"`;
   if (op.kind === "replaceInVault") {
     return `"${op.search}" → "${op.replace}" in ${noteCountLabel(op.targets.length)} (${op.occurrences} matches)`;
   }

@@ -29,6 +29,16 @@ describe("buildOverlay", () => {
       .toBe("absent");
   });
 
+  test("moveFolder clears the source and marks the destination a dir", () => {
+    const overlay = buildOverlay([{ kind: "moveFolder", from: "A", to: "B" }]);
+    expect(overlay.get("A")).toBe("absent");
+    expect(overlay.get("B")).toBe("dir");
+  });
+
+  test("trashFolder marks the path absent", () => {
+    expect(buildOverlay([{ kind: "trashFolder", path: "A" }]).get("A")).toBe("absent");
+  });
+
   test("later ops win (write then move)", () => {
     const ops: VaultOperation[] = [
       { kind: "create", path: "a.md", content: "" },

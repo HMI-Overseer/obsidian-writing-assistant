@@ -34,6 +34,16 @@ describe("dispositionMessage", () => {
     expect(dispositionMessage(MOVE, "applied")).toBe('Moved "a.md" → "b.md".');
   });
 
+  it("reports folder ops with folder-aware verbs", () => {
+    const moveFolder: VaultOperation = { kind: "moveFolder", from: "Drafts/X", to: "Manuscript/X" };
+    const trashFolder: VaultOperation = { kind: "trashFolder", path: "Drafts/X" };
+    expect(dispositionMessage(moveFolder, "applied")).toBe('Moved folder "Drafts/X" → "Manuscript/X".');
+    expect(dispositionMessage(trashFolder, "applied")).toBe('Trashed empty folder "Drafts/X".');
+    expect(dispositionMessage(trashFolder, "failed", "the folder is not empty")).toBe(
+      'Error: could not trash folder "Drafts/X", the folder is not empty.',
+    );
+  });
+
   it("reports a replace with its terms, note count, and match count", () => {
     expect(dispositionMessage(REPLACE, "applied")).toBe(
       'Replaced "Age of Laurels" → "Age of Ambition" in 2 notes (3 matches).',

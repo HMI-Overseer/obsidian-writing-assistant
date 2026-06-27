@@ -77,6 +77,19 @@ export function preflight(ops: VaultOperation[], disk: DiskSnapshot): PreflightR
             add(`"${t.path}" changed on disk since the replacement was prepared.`);
         }
         break;
+      case "moveFolder":
+        // Existence-based guard (a folder has no mtime/size fingerprint): the source
+        // must still be a folder and the destination free.
+        if (disk.state(op.from) !== "dir") add(`source folder "${op.from}" no longer exists.`);
+        if (disk.state(op.to) !== "absent") add(`destination "${op.to}" already exists.`);
+        break;
+      case "trashFolder":
+        // Existence only here. Emptiness is enforced authoritatively at apply
+        // (folderIsEmpty), not at pre-flight, so a same-batch move that empties this
+        // folder first (moves are ordered before folder trashes) is not false-flagged
+        // as a conflict against the pre-move disk snapshot.
+        if (disk.state(op.path) !== "dir") add(`"${op.path}" is not a folder, or no longer exists.`);
+        break;
     }
   });
   return { ok: conflicts.length === 0, conflicts };
@@ -89,7 +102,11 @@ const KIND_PRIORITY: Record<VaultOperation["kind"], number> = {
   // A replace rewrites existing files' content, same tier as overwrite/create.
   replaceInVault: 1,
   move: 2,
+  // A folder move sits in the move tier; a folder trash in the trash tier, so a
+  // husk-emptying move/moveFolder always applies before the trashFolder that removes it.
+  moveFolder: 2,
   trash: 3,
+  trashFolder: 3,
 };
 
 /**
@@ -198,6 +215,13 @@ export function inverseOf(op: VaultOperation, ctx: InverseContext = {}): VaultOp
       return { kind: "move", from: op.to, to: op.from, expect };
     case "trash":
       return { kind: "create", path: op.path, content: op.snapshot };
+    case "moveFolder":
+      // Symmetric: move the folder back. No fingerprint, existence guard suffices.
+      return { kind: "moveFolder", from: op.to, to: op.from };
+    case "trashFolder":
+      // The folder was empty when trashed (apply enforces folderIsEmpty), so undo is a
+      // plain re-create of an empty folder, no recursive content snapshot to restore.
+      return { kind: "createDir", path: op.path };
     case "replaceInVault": {
       // Restore each rewritten file to its prior content. The inverse is itself a
       // replaceInVault whose targets carry the pre-content as their `content`, so

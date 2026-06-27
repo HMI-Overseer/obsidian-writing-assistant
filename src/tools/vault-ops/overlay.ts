@@ -33,6 +33,13 @@ export function buildOverlay(ops: VaultOperation[]): PendingOverlay {
       case "trash":
         overlay.set(op.path, "absent");
         break;
+      case "moveFolder":
+        overlay.set(op.from, "absent");
+        overlay.set(op.to, "dir");
+        break;
+      case "trashFolder":
+        overlay.set(op.path, "absent");
+        break;
       case "replaceInVault":
         // Content-only change; the targets stay files. (In practice a replace never
         // reaches the overlay, its conversion probe yields no targets there, but the

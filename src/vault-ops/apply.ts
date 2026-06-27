@@ -125,6 +125,35 @@ export async function applyOperation(
       await app.fileManager.trashFile(file);
       return inverseOf(op, {});
     }
+    case "moveFolder": {
+      const from = normalizePath(op.from);
+      const to = normalizePath(op.to);
+      const folder = app.vault.getAbstractFileByPath(from);
+      if (!(folder instanceof TFolder)) {
+        throw new Error(`move source "${op.from}" is not a folder or no longer exists.`);
+      }
+      await ensureParentFolder(app, to);
+      // fileManager.renameFile rewrites every descendant wikilink/backlink for a folder
+      // move too, the same primitive the file case relies on, never vault.rename.
+      await app.fileManager.renameFile(folder, to);
+      return inverseOf(op, {});
+    }
+    case "trashFolder": {
+      const path = normalizePath(op.path);
+      const folder = app.vault.getAbstractFileByPath(path);
+      if (!(folder instanceof TFolder)) {
+        throw new Error(`trash target "${op.path}" is not a folder or no longer exists.`);
+      }
+      // Empty-only guarantee (the safe carve-out of the v1 folder-removal ban): refuse a
+      // populated folder so a folder trash can never recursively delete notes. Any
+      // same-batch move out of this folder has already applied (ordered first), so a
+      // husk emptied this turn passes here.
+      if (!folderIsEmpty(app, path)) {
+        throw new Error(`folder "${op.path}" is not empty; only empty folders can be trashed.`);
+      }
+      await app.fileManager.trashFile(folder);
+      return inverseOf(op, {});
+    }
     case "replaceInVault": {
       // Rewrite each target to its precomputed content (the same vault.process
       // primitive as overwrite), capturing pre-content + post fingerprint per file so

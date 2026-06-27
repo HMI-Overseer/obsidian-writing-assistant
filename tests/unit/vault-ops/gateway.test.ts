@@ -54,6 +54,26 @@ describe("classOf / targetPaths", () => {
     expect(resolveGate(replace(["a.md"]), basePolicy, 0)).toBe("ask"); // overwrite is "ask"
     expect(resolveGate(replace(["a.md"]), { ...basePolicy, overwrite: "deny" }, 0)).toBe("deny");
   });
+
+  test("folder ops reuse their file siblings' gate class (moveFolder→move, trashFolder→trash)", () => {
+    const moveFolder: VaultOperation = { kind: "moveFolder", from: "A", to: "B" };
+    const trashFolder: VaultOperation = { kind: "trashFolder", path: "A" };
+    expect(classOf(moveFolder)).toBe("move");
+    expect(classOf(trashFolder)).toBe("trash");
+    // A moveFolder touches both endpoints, like a file move.
+    expect(targetPaths(moveFolder)).toEqual(["A", "B"]);
+    expect(targetPaths(trashFolder)).toEqual(["A"]);
+  });
+
+  test("a folder op resolves through its borrowed policy knob", () => {
+    const moveFolder: VaultOperation = { kind: "moveFolder", from: "A", to: "B" };
+    const trashFolder: VaultOperation = { kind: "trashFolder", path: "A" };
+    // basePolicy: move = "ask", trash = "deny".
+    expect(resolveGate(moveFolder, basePolicy, 0)).toBe("ask");
+    expect(resolveGate(trashFolder, basePolicy, 0)).toBe("deny");
+    // Flip the borrowed knobs and the folder op follows.
+    expect(resolveGate(moveFolder, { ...basePolicy, move: "deny" }, 0)).toBe("deny");
+  });
 });
 
 describe("inScope", () => {

@@ -181,8 +181,28 @@ export function guardVaultUndo(app: App, record: AppliedVaultOpRecord): string[]
         }
         break;
       }
-      case "createDir":
-        // Never produced as an inverse (inverseOf returns trash or null); ignore.
+      case "createDir": {
+        // Produced as the inverse of a trashFolder (re-create the empty folder we
+        // trashed). Refuse only if a *file* now occupies the path, recreating a folder
+        // over it would fail; an existing folder is a harmless idempotent no-op.
+        if (diskState(app, inverse.path) === "file") {
+          reasons.push(`"${inverse.path}" is a file now, won't recreate the folder over it.`);
+        }
+        break;
+      }
+      case "moveFolder": {
+        // Undo of a folder move: move it back. The folder must still be at the moved-to
+        // location, and its original spot must be free.
+        if (diskState(app, inverse.from) !== "dir") {
+          reasons.push(`"${inverse.from}" is no longer there to move back.`);
+        }
+        if (diskState(app, inverse.to) !== "absent") {
+          reasons.push(`"${inverse.to}" exists again, won't overwrite it to undo a folder move.`);
+        }
+        break;
+      }
+      case "trashFolder":
+        // Never produced as an inverse (inverseOf returns createDir for a trashFolder); ignore.
         break;
     }
   }

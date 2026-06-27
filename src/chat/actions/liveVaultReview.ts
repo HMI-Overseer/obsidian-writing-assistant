@@ -854,8 +854,10 @@ function destinationPath(op: VaultOperation): string {
     case "createDir":
       return op.path;
     case "move":
+    case "moveFolder":
       return op.to;
     case "trash":
+    case "trashFolder":
       return op.path;
     case "replaceInVault":
       // A replace's targets already exist on disk, so it never depends on a folder

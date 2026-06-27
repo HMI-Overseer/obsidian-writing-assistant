@@ -176,6 +176,61 @@ describe("executeVaultOpTool", () => {
       expect(result.content).toContain("files only");
     });
   });
+
+  describe("move_folder", () => {
+    it("acknowledges a valid folder move", () => {
+      const app = makeApp({ "Drafts/Act II": "dir" });
+      const result = executeVaultOpTool(
+        call("move_folder", { from: "Drafts/Act II", to: "Manuscript/Act II" }),
+        { app, overlay: NO_OVERLAY },
+      );
+      expect(result.isError).toBeUndefined();
+      expect(result.content).toContain("Move folder");
+      expect(result.content).toContain("queued for review");
+    });
+
+    it("steers a file source to move_file", () => {
+      const app = makeApp({ "note.md": "file" });
+      const result = executeVaultOpTool(
+        call("move_folder", { from: "note.md", to: "Archive" }),
+        { app, overlay: NO_OVERLAY },
+      );
+      expect(result.isError).toBe(true);
+      expect(result.content).toContain("move_file");
+    });
+
+    it("refuses an escaping destination", () => {
+      const app = makeApp({ A: "dir" });
+      const result = executeVaultOpTool(
+        call("move_folder", { from: "A", to: "../../escaped" }),
+        { app, overlay: NO_OVERLAY },
+      );
+      expect(result.isError).toBe(true);
+      expect(result.content).toContain("outside the vault");
+    });
+  });
+
+  describe("trash_folder", () => {
+    it("acknowledges trashing an empty folder", () => {
+      const app = makeApp({ "Drafts/Act II": "dir" });
+      const result = executeVaultOpTool(call("trash_folder", { path: "Drafts/Act II" }), {
+        app,
+        overlay: NO_OVERLAY,
+      });
+      expect(result.isError).toBeUndefined();
+      expect(result.content).toContain("Trash empty folder");
+    });
+
+    it("steers a file path to trash_file", () => {
+      const app = makeApp({ "note.md": "file" });
+      const result = executeVaultOpTool(call("trash_folder", { path: "note.md" }), {
+        app,
+        overlay: NO_OVERLAY,
+      });
+      expect(result.isError).toBe(true);
+      expect(result.content).toContain("trash_file");
+    });
+  });
 });
 
 describe("buildPendingOverlay (intra-turn dependencies, spec §4)", () => {

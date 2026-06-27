@@ -24,6 +24,19 @@ describe("allowedVaultOpsTools", () => {
     expect(allowed).toContain("create_directory");
   });
 
+  test("folder ops detach with their borrowed class (move_folder→move, trash_folder→trash)", () => {
+    // The folder ops carry no policy knob of their own; they gate as move/trash, so
+    // denying those classes must remove the folder tool too, never leaving the model a
+    // folder capability whose underlying class is denied.
+    const noMove: VaultOpPolicy = { ...DEFAULT_VAULT_OP_POLICY, move: "deny" };
+    expect(names(allowedVaultOpsTools(noMove))).not.toContain("move_folder");
+    expect(names(allowedVaultOpsTools(noMove))).toContain("trash_folder");
+
+    const noTrash: VaultOpPolicy = { ...DEFAULT_VAULT_OP_POLICY, trash: "deny" };
+    expect(names(allowedVaultOpsTools(noTrash))).not.toContain("trash_folder");
+    expect(names(allowedVaultOpsTools(noTrash))).toContain("move_folder");
+  });
+
   test("write_file survives while either create or overwrite is allowed", () => {
     const createOnly: VaultOpPolicy = { ...DEFAULT_VAULT_OP_POLICY, overwrite: "deny" };
     expect(names(allowedVaultOpsTools(createOnly))).toContain("write_file");

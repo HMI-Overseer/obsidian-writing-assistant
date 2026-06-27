@@ -12,8 +12,10 @@ import type { PathState, TargetFingerprint, VaultOperation } from "../../vault-o
 import {
   validateCreateDirectory,
   validateMoveFile,
+  validateMoveFolder,
   validateReplaceInVault,
   validateTrashFile,
+  validateTrashFolder,
   validateWriteFile,
 } from "./validation";
 
@@ -142,6 +144,19 @@ export function toVaultOperations(
           expect: probes.fingerprint(v.args.path) ?? MISSING_FINGERPRINT,
           snapshot: probes.readContent(v.args.path) ?? "",
         });
+        return;
+      }
+      case "move_folder": {
+        const v = validateMoveFolder(tc.arguments, probes.resolve, probes.configDir);
+        if (!v.ok) return fail(v.error);
+        // A folder move needs no fingerprint (existence guard) and no content snapshot.
+        emit({ kind: "moveFolder", from: v.args.from, to: v.args.to });
+        return;
+      }
+      case "trash_folder": {
+        const v = validateTrashFolder(tc.arguments, probes.resolve);
+        if (!v.ok) return fail(v.error);
+        emit({ kind: "trashFolder", path: v.args.path });
         return;
       }
       case "replace_in_vault": {

@@ -70,12 +70,34 @@ function makeVault() {
       },
     },
     fileManager: {
-      renameFile(file: TFile, to: string) {
+      renameFile(file: TFile | TFolder, to: string) {
         const from = normalizePath(file.path);
+        const dest = normalizePath(to);
+        if (folders.has(from)) {
+          // Folder move: relocate the folder marker and every descendant, mirroring how
+          // fileManager.renameFile rehomes a TFolder's whole subtree.
+          folders.delete(from);
+          folders.add(dest);
+          const prefix = `${from}/`;
+          for (const f of [...files.keys()]) {
+            if (f.startsWith(prefix)) {
+              const rec = files.get(f)!;
+              files.delete(f);
+              files.set(dest + f.slice(from.length), { ...rec, mtime: ++clock });
+            }
+          }
+          for (const d of [...folders]) {
+            if (d.startsWith(prefix)) {
+              folders.delete(d);
+              folders.add(dest + d.slice(from.length));
+            }
+          }
+          return Promise.resolve();
+        }
         const rec = files.get(from);
         if (rec) {
           files.delete(from);
-          files.set(normalizePath(to), { ...rec, mtime: ++clock });
+          files.set(dest, { ...rec, mtime: ++clock });
         }
         return Promise.resolve();
       },
@@ -233,6 +255,79 @@ describe("applyVaultOpBatch", () => {
   });
 });
 
+describe("applyVaultOpBatch — folder ops", () => {
+  it("moves a folder and its contents, recording a symmetric inverse", async () => {
+    const vault = makeVault();
+    vault.folders.add("Drafts/Act II");
+    vault.seedFile("Drafts/Act II/Scene.md", "body");
+
+    const op: VaultOperation = { kind: "moveFolder", from: "Drafts/Act II", to: "Manuscript/Act II" };
+    const result = await applyVaultOpBatch(vault.app, [{ id: "mf", op }]);
+
+    expect(result.ok).toBe(true);
+    expect(vault.folders.has("Manuscript/Act II")).toBe(true);
+    expect(vault.folders.has("Drafts/Act II")).toBe(false);
+    expect(vault.files.has("Manuscript/Act II/Scene.md")).toBe(true);
+    expect(vault.files.has("Drafts/Act II/Scene.md")).toBe(false);
+    expect(result.applied[0].inverse).toEqual({
+      kind: "moveFolder",
+      from: "Manuscript/Act II",
+      to: "Drafts/Act II",
+    });
+  });
+
+  it("trashes an empty folder and records a createDir inverse", async () => {
+    const vault = makeVault();
+    await vault.app.vault.createFolder("Drafts/Husk");
+    expect(vault.folders.has("Drafts/Husk")).toBe(true);
+
+    const op: VaultOperation = { kind: "trashFolder", path: "Drafts/Husk" };
+    const result = await applyVaultOpBatch(vault.app, [{ id: "tf", op }]);
+
+    expect(result.ok).toBe(true);
+    expect(vault.folders.has("Drafts/Husk")).toBe(false);
+    expect(result.applied[0].inverse).toEqual({ kind: "createDir", path: "Drafts/Husk" });
+  });
+
+  it("refuses to trash a NON-empty folder, preserving its contents (empty-only guarantee)", async () => {
+    // The load-bearing data-loss guard: a populated folder must never be trashed, even
+    // though the disk primitive (trashFile) would happily take the whole subtree.
+    const vault = makeVault();
+    vault.folders.add("Drafts/Act II");
+    vault.seedFile("Drafts/Act II/Scene.md", "precious words");
+
+    const op: VaultOperation = { kind: "trashFolder", path: "Drafts/Act II" };
+    const result = await applyVaultOpBatch(vault.app, [{ id: "tf", op }]);
+
+    expect(result.ok).toBe(false);
+    expect(result.error).toMatch(/not empty/i);
+    expect(vault.folders.has("Drafts/Act II")).toBe(true); // folder kept...
+    expect(vault.files.get("Drafts/Act II/Scene.md")?.content).toBe("precious words"); // ...contents safe.
+  });
+
+  it("reorg end-to-end: a same-batch move empties the husk, then trash_folder removes it", async () => {
+    const vault = makeVault();
+    vault.folders.add("Drafts/Act II");
+    const fp = vault.seedFile("Drafts/Act II/Scene.md", "body");
+
+    // Issued in the "wrong" order on purpose: orderOps must run the move first so the
+    // husk is empty by the time the folder trash's apply-time emptiness check runs.
+    const batch = [
+      { id: "tf", op: { kind: "trashFolder", path: "Drafts/Act II" } as VaultOperation },
+      {
+        id: "mv",
+        op: { kind: "move", from: "Drafts/Act II/Scene.md", to: "Manuscript/Scene.md", expect: fp } as VaultOperation,
+      },
+    ];
+    const result = await applyVaultOpBatch(vault.app, batch);
+
+    expect(result.ok).toBe(true);
+    expect(vault.files.has("Manuscript/Scene.md")).toBe(true);
+    expect(vault.files.has("Drafts/Act II/Scene.md")).toBe(false);
+    expect(vault.folders.has("Drafts/Act II")).toBe(false); // husk cleaned up.
+  });
+});
+
 describe("undoVaultOpBatch", () => {
   it("undoes a create by trashing the file", async () => {
     const { app, files } = makeVault();
@@ -309,6 +404,49 @@ describe("undoVaultOpBatch", () => {
     });
 
     expect(vault.files.get("Old.md")?.content).toBe("keepme");
+  });
+
+  it("round-trips a moveFolder: undo moves the folder and its contents back", async () => {
+    const vault = makeVault();
+    vault.folders.add("Drafts/Act II");
+    vault.seedFile("Drafts/Act II/Scene.md", "body");
+
+    const apply = await applyVaultOpBatch(vault.app, [
+      { id: "mf", op: { kind: "moveFolder", from: "Drafts/Act II", to: "Manuscript/Act II" } },
+    ]);
+    expect(apply.ok).toBe(true);
+    expect(vault.files.has("Manuscript/Act II/Scene.md")).toBe(true);
+
+    const undo = await undoVaultOpBatch(vault.app, {
+      proposalId: "p",
+      applied: apply.applied,
+      appliedAt: 0,
+    });
+
+    expect(undo.ok).toBe(true);
+    expect(vault.folders.has("Drafts/Act II")).toBe(true);
+    expect(vault.files.has("Drafts/Act II/Scene.md")).toBe(true);
+    expect(vault.folders.has("Manuscript/Act II")).toBe(false);
+  });
+
+  it("round-trips a trashFolder: undo re-creates the empty folder", async () => {
+    const vault = makeVault();
+    await vault.app.vault.createFolder("Drafts/Husk");
+
+    const apply = await applyVaultOpBatch(vault.app, [
+      { id: "tf", op: { kind: "trashFolder", path: "Drafts/Husk" } },
+    ]);
+    expect(apply.ok).toBe(true);
+    expect(vault.folders.has("Drafts/Husk")).toBe(false);
+
+    const undo = await undoVaultOpBatch(vault.app, {
+      proposalId: "p",
+      applied: apply.applied,
+      appliedAt: 0,
+    });
+
+    expect(undo.ok).toBe(true);
+    expect(vault.folders.has("Drafts/Husk")).toBe(true);
   });
 
   it("round-trips a replaceInVault: undo restores every original file", async () => {
@@ -448,6 +586,48 @@ describe("undoVaultOpBatch drift guard (§3-B amendment 3)", () => {
     expect(undo.ok).toBe(true);
     expect(undo.refused).toBeUndefined();
     expect(vault.folders.has("Empty Folder")).toBe(false); // empty folder removed cleanly.
+  });
+
+  it("refuses to undo a moveFolder when the original spot is occupied again", async () => {
+    const vault = makeVault();
+    vault.folders.add("Drafts/Act II");
+    vault.seedFile("Drafts/Act II/Scene.md", "body");
+    const apply = await applyVaultOpBatch(vault.app, [
+      { id: "mf", op: { kind: "moveFolder", from: "Drafts/Act II", to: "Manuscript/Act II" } },
+    ]);
+    expect(apply.ok).toBe(true);
+    // A new folder takes the vacated source path before undo.
+    vault.folders.add("Drafts/Act II");
+
+    const undo = await undoVaultOpBatch(vault.app, {
+      proposalId: "p",
+      applied: apply.applied,
+      appliedAt: 0,
+    });
+
+    expect(undo.refused).toBe(true);
+    expect(vault.folders.has("Manuscript/Act II")).toBe(true); // moved folder untouched.
+  });
+
+  it("refuses to undo a trashFolder when a file now occupies the folder's path", async () => {
+    const vault = makeVault();
+    await vault.app.vault.createFolder("Drafts/Husk");
+    const apply = await applyVaultOpBatch(vault.app, [
+      { id: "tf", op: { kind: "trashFolder", path: "Drafts/Husk" } },
+    ]);
+    expect(apply.ok).toBe(true);
+    // The undo would re-create the folder (createDir inverse), but a file is there now.
+    vault.seedFile("Drafts/Husk", "a note now lives at the old folder path");
+
+    const undo = await undoVaultOpBatch(vault.app, {
+      proposalId: "p",
+      applied: apply.applied,
+      appliedAt: 0,
+    });
+
+    expect(undo.ok).toBe(false);
+    expect(undo.refused).toBe(true);
+    expect(vault.files.get("Drafts/Husk")?.content).toBe("a note now lives at the old folder path");
   });
 
   it("still undoes cleanly when nothing drifted", async () => {

@@ -93,6 +93,39 @@ export const MOVE_FILE_TOOL: CanonicalToolDefinition = {
   },
 };
 
+export const MOVE_FOLDER_TOOL: CanonicalToolDefinition = {
+  name: "move_folder",
+  description:
+    "Move or rename an entire folder, with everything inside it, to a new vault-relative path. " +
+    "All wikilinks and backlinks to the notes it contains are rewritten automatically. " +
+    "Use this to reorganize the vault a whole folder at a time, instead of moving notes one by one. " +
+    "The change is shown to the user for review before it is applied.",
+  strategyHint:
+    "move or rename a whole folder and its contents in one step; backlinks are rewritten automatically. " +
+    "Prefer it over moving notes one by one to reorganize the vault.",
+  errorGuidance:
+    "If the destination already exists, choose a new name. " +
+    "If the source is a single note rather than a folder, use move_file instead. " +
+    "If the source does not exist, verify the path with list_directory.",
+  annotations: { destructiveHint: true },
+  parameters: {
+    type: "object",
+    properties: {
+      from: {
+        type: "string",
+        description: "Current vault-relative path of the folder (e.g., 'Drafts/Act II').",
+      },
+      to: {
+        type: "string",
+        description:
+          "Destination vault-relative folder path (e.g., 'Manuscript/Act II'). " +
+          "Missing parent folders are created automatically.",
+      },
+    },
+    required: ["from", "to"],
+  },
+};
+
 export const TRASH_FILE_TOOL: CanonicalToolDefinition = {
   name: "trash_file",
   description:
@@ -110,6 +143,31 @@ export const TRASH_FILE_TOOL: CanonicalToolDefinition = {
       path: {
         type: "string",
         description: "Vault-relative file path of the note to trash (e.g., 'Inbox/Obsolete.md').",
+      },
+    },
+    required: ["path"],
+  },
+};
+
+export const TRASH_FOLDER_TOOL: CanonicalToolDefinition = {
+  name: "trash_folder",
+  description:
+    "Send an empty folder to trash. Empty folders only, a folder that still contains notes is refused. " +
+    "Use it to clean up the husk left behind after moving a folder's contents elsewhere. " +
+    "Honors the user's deleted-files preference (system trash or .trash). " +
+    "The change is shown to the user for review before it is applied, and can be undone.",
+  strategyHint:
+    "remove an empty folder, e.g. the husk left after moving its notes out. Empty folders only.",
+  errorGuidance:
+    "If the folder still contains notes, move or trash its contents first, then trash the empty folder. " +
+    "If the path is a single note, use trash_file instead. If it does not exist, verify the path first.",
+  annotations: { destructiveHint: true },
+  parameters: {
+    type: "object",
+    properties: {
+      path: {
+        type: "string",
+        description: "Vault-relative path of the empty folder to trash (e.g., 'Drafts/Act II').",
       },
     },
     required: ["path"],
@@ -149,7 +207,9 @@ export const REPLACE_IN_VAULT_TOOL: CanonicalToolDefinition = {
       path: {
         type: "string",
         description:
-          "Optional vault-relative folder to limit the replace to (e.g. 'Lore'). Omit to search the whole vault.",
+          "Optional vault-relative scope. Either a folder to limit the replace to (e.g. 'Lore'), " +
+          "or a single note to replace within just that one file (e.g. 'Manuscript/Chapter 4.md'). " +
+          "Omit to search the whole vault.",
       },
       caseSensitive: {
         type: "boolean",
@@ -170,7 +230,9 @@ export const ALL_VAULT_OPS_TOOLS: CanonicalToolDefinition[] = [
   WRITE_FILE_TOOL,
   CREATE_DIRECTORY_TOOL,
   MOVE_FILE_TOOL,
+  MOVE_FOLDER_TOOL,
   TRASH_FILE_TOOL,
+  TRASH_FOLDER_TOOL,
   REPLACE_IN_VAULT_TOOL,
 ];
 
@@ -187,6 +249,10 @@ const TOOL_POLICY_CLASSES: Record<string, GatedVaultOpClass[]> = {
   create_directory: ["createDir"],
   move_file: ["move"],
   trash_file: ["trash"],
+  // Folder ops reuse the file siblings' gate class (moveFolder→move, trashFolder→trash,
+  // see classOf), so denying "move"/"trash" detaches the folder tool too.
+  move_folder: ["move"],
+  trash_folder: ["trash"],
   // A vault-wide replace is gated as an overwrite (it rewrites file content), so it
   // stays available whenever overwrites are allowed, no separate policy knob.
   replace_in_vault: ["overwrite"],

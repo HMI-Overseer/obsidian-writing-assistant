@@ -1,5 +1,7 @@
 import { type App, type TFile, normalizePath } from "obsidian";
 import type { EditBlock } from "../../editing/editTypes";
+import { findEditMatch } from "../../editing/diffEngine";
+import { toLf } from "../../editing/lineEndings";
 import type { ToolCall, ToolResult } from "../types";
 import { toolFailure } from "../toolFailure";
 import { refuseOutsideVault } from "../pathBoundary";
@@ -133,9 +135,13 @@ async function executeProposeEdit(
   }
 
   const content = await ctx.app.vault.read(target.file);
-  const idx = content.indexOf(searchText);
+  // Match the way the apply step will: exact first, then whitespace-normalized,
+  // so a search that differs only in indentation/spacing is not falsely rejected
+  // here only to succeed at apply time (tool-set-review H1). The line number is
+  // read off the same LF space the match offset lives in.
+  const match = findEditMatch(searchText, content);
 
-  if (idx === -1) {
+  if (!match) {
     return toolFailure({
       kind: "no-match",
       what: `search text not found in "${target.path}"`,
@@ -145,7 +151,7 @@ async function executeProposeEdit(
     });
   }
 
-  const lineNumber = content.slice(0, idx).split("\n").length;
+  const lineNumber = toLf(content).slice(0, match.offset).split("\n").length;
   const explanation = v.args.explanation ? ` (${v.args.explanation})` : "";
   return {
     content: `Edit proposed for "${target.path}": matched at line ${lineNumber}${explanation}. Queued for user review.`,

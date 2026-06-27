@@ -161,6 +161,68 @@ describe("resolveStructuralEditBlocks", () => {
 });
 
 // ---------------------------------------------------------------------------
+// propose_edit, whitespace-tolerant matching (tool-set-review H1)
+// ---------------------------------------------------------------------------
+
+describe("executeEditTool, propose_edit whitespace-tolerant matching", () => {
+  test("matches search text that differs only in indentation, instead of a false no-match", async () => {
+    // The note indents with a tab; the model reconstructs it with two spaces. A
+    // bare indexOf misses (burning a round); the whitespace-normalized fallback
+    // resolves it, the same way the apply step would.
+    const app = mockApp({ fileContent: "# Chapter\n\n\tHe drew the blade slowly.\n" });
+
+    const result = await executeEditTool(
+      {
+        id: "t",
+        name: "propose_edit",
+        arguments: {
+          path: CTX_PATH,
+          search: "  He drew the blade slowly.",
+          replace: "  He drew the blade in one motion.",
+        },
+      },
+      { app, filePath: CTX_PATH },
+    );
+
+    expect(result.isError).toBeUndefined();
+    expect(result.content).toContain("Edit proposed");
+    expect(result.content).toContain("Queued for user review");
+  });
+
+  test("tolerates collapsed internal whitespace", async () => {
+    const app = mockApp({ fileContent: "He drew  the  blade slowly." });
+
+    const result = await executeEditTool(
+      {
+        id: "t",
+        name: "propose_edit",
+        arguments: { path: CTX_PATH, search: "He drew the blade slowly.", replace: "x" },
+      },
+      { app, filePath: CTX_PATH },
+    );
+
+    expect(result.isError).toBeUndefined();
+    expect(result.content).toContain("Edit proposed");
+  });
+
+  test("still reports no-match when the text is genuinely absent", async () => {
+    const app = mockApp({ fileContent: "# Chapter\n\nHe drew the blade slowly.\n" });
+
+    const result = await executeEditTool(
+      {
+        id: "t",
+        name: "propose_edit",
+        arguments: { path: CTX_PATH, search: "She sheathed the sword.", replace: "x" },
+      },
+      { app, filePath: CTX_PATH },
+    );
+
+    expect(result.isError).toBe(true);
+    expect(result.failure?.kind).toBe("no-match");
+  });
+});
+
+// ---------------------------------------------------------------------------
 // propose_edit, path boundary
 // ---------------------------------------------------------------------------
 

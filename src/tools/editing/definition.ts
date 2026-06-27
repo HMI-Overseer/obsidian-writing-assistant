@@ -23,7 +23,7 @@ export const PROPOSE_EDIT_TOOL: CanonicalToolDefinition = {
     "If the search text was not found because the document is empty, switch to write_file to set " +
     "its initial content. If the search text matched more than one place, add the surrounding lines " +
     "so it identifies exactly one passage. Otherwise re-read the document with read_file and match " +
-    "the exact text including whitespace.",
+    "the exact text, including whitespace and dropping read_file's line-number prefix.",
   parameters: {
     type: "object",
     properties: {
@@ -36,8 +36,10 @@ export const PROPOSE_EDIT_TOOL: CanonicalToolDefinition = {
       search: {
         type: "string",
         description:
-          "The exact text to find in the document. Must match character-for-character " +
+          "The exact text to find in the document. Match it character-for-character, " +
           "including whitespace and indentation. " +
+          "If you copied the passage from read_file, drop the leading line-number prefix " +
+          "(the right-aligned number and the tab after it); match only the line text itself. " +
           "Keep it SHORT, include only the passage being changed plus 2–3 surrounding lines " +
           "for unambiguous matching. Never include large sections or the full document.",
       },

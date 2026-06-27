@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { resolveEdits } from "../../../src/editing/diffEngine";
+import { resolveEdits, findEditMatch } from "../../../src/editing/diffEngine";
 import { parseEditBlocks } from "../../../src/editing/parseEditBlocks";
 import type { EditBlock } from "../../../src/editing/editTypes";
 
@@ -55,6 +55,38 @@ describe("resolveEdits, match type", () => {
     const r = resolveOne("Totally different sentence.", "zzz qqq vvv");
     expect(r.matchType).toBe("none");
     expect(r.nearMiss).toBe(false);
+  });
+});
+
+describe("findEditMatch (propose_edit preflight)", () => {
+  it("returns an exact match offset for a verbatim search", () => {
+    const doc = "# Title\n\nThe quick brown fox.";
+    const m = findEditMatch("quick brown", doc);
+    expect(m).not.toBeNull();
+    expect(m?.matchType).toBe("exact");
+    expect(doc.slice(m!.offset, m!.offset + "quick brown".length)).toBe("quick brown");
+  });
+
+  it("matches a search that differs only in whitespace (tabs vs spaces)", () => {
+    const doc = "# Title\n\n\tHe drew the blade.";
+    const m = findEditMatch("  He drew the blade.", doc);
+    expect(m).not.toBeNull();
+    expect(m?.matchType).toBe("whitespace");
+  });
+
+  it("matches across a CRLF document with an LF search", () => {
+    const m = findEditMatch("beta\ngamma", "alpha\r\nbeta\r\ngamma");
+    expect(m).not.toBeNull();
+  });
+
+  it("does not preflight fuzzy matches (a wording miss stays a miss)", () => {
+    // resolveEdits would rescue this via tier-3 fuzzy, but the preflight stops at
+    // whitespace so the model is nudged to quote the document exactly.
+    expect(findEditMatch("The quick brown fox jumps over.", "The quack brown fix jumps over.")).toBeNull();
+  });
+
+  it("returns null for an empty search", () => {
+    expect(findEditMatch("", "anything")).toBeNull();
   });
 });
 

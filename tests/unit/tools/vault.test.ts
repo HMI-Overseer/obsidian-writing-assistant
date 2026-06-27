@@ -441,6 +441,40 @@ describe("search_content", () => {
 });
 
 // ---------------------------------------------------------------------------
+// read_file
+// ---------------------------------------------------------------------------
+
+describe("read_file", () => {
+  test("returns content with cat -n style line numbers under the path header", async () => {
+    const note = makeFile("Notes/chapter.md");
+    const ctx = makeCtx({
+      files: [note],
+      fileContents: { "Notes/chapter.md": "First line.\nSecond line.\nThird line." },
+    });
+
+    const result = await executeVaultTool(tc("read_file", { path: "Notes/chapter.md" }), ctx);
+
+    expect(result.isReadOnly).toBe(true);
+    expect(result.isError).toBeUndefined();
+    expect(result.content).toContain("[Notes/chapter.md]");
+    expect(result.content).toContain("1\tFirst line.");
+    expect(result.content).toContain("2\tSecond line.");
+    expect(result.content).toContain("3\tThird line.");
+  });
+
+  test("right-aligns line numbers so anchors line up on a longer note", async () => {
+    const note = makeFile("big.md");
+    const body = Array.from({ length: 12 }, (_, i) => `line ${i + 1}`).join("\n");
+    const ctx = makeCtx({ files: [note], fileContents: { "big.md": body } });
+
+    const result = await executeVaultTool(tc("read_file", { path: "big.md" }), ctx);
+
+    expect(result.content).toContain(" 1\tline 1");
+    expect(result.content).toContain("12\tline 12");
+  });
+});
+
+// ---------------------------------------------------------------------------
 // get_backlinks
 // ---------------------------------------------------------------------------
 

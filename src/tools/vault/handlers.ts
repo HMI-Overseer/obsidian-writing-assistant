@@ -9,6 +9,7 @@ import type { RagContextBlock } from "../../shared/chatRequest";
 import { RagRetrievalError } from "../../rag/ragService";
 import type { RagService } from "../../rag/ragService";
 import { VAULT_TOOL_NAMES, SEMANTIC_SEARCH_UNAVAILABLE_MESSAGE } from "./definition";
+import { formatWithLineNumbers } from "./readFormat";
 
 export interface VaultToolContext {
   app: App;
@@ -148,7 +149,7 @@ async function executeReadFile(
 
   const content = await ctx.app.vault.read(file);
 
-  return { content: `[${path}]\n\n${content}`, isReadOnly: true };
+  return { content: `[${path}]\n\n${formatWithLineNumbers(content)}`, isReadOnly: true };
 }
 
 async function executeListDirectory(

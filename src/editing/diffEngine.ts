@@ -53,6 +53,39 @@ export function resolveEdits(
   return blocks.map((block) => resolveOneBlock(block, lfDoc, docLines, opts));
 }
 
+/** A preflight match: where `searchText` resolves, and which tier matched it. */
+export interface EditMatch {
+  /** Offset into the LF-normalized document. */
+  offset: number;
+  matchType: "exact" | "whitespace";
+}
+
+/**
+ * Locate `searchText` in `document` the way {@link resolveEdits} will at apply
+ * time for its first two tiers: exact, then whitespace-normalized. Returns the
+ * LF-space offset and matched tier, or null when neither tier matches.
+ *
+ * Shared with the propose_edit in-loop preflight ({@link ../tools/editing/handlers}),
+ * whose old bare `indexOf` rejected edits the apply step would have accepted on a
+ * whitespace difference alone (tabs vs spaces, collapsed runs), the classic
+ * search/replace friction (tool-set-review H1). Tier 3 (fuzzy) is deliberately
+ * omitted: the preflight stays strict enough that a genuine wording miss is still
+ * surfaced for the model to fix, while pure indentation/spacing drift passes.
+ */
+export function findEditMatch(searchText: string, document: string): EditMatch | null {
+  const lfSearch = toLf(searchText);
+  if (lfSearch.length === 0) return null;
+  const lfDoc = toLf(document);
+
+  const exact = lfDoc.indexOf(lfSearch);
+  if (exact !== -1) return { offset: exact, matchType: "exact" };
+
+  const normalized = findNormalizedMatch(lfSearch, lfDoc);
+  if (normalized) return { offset: normalized.offset, matchType: "whitespace" };
+
+  return null;
+}
+
 /**
  * Build DiffHunks from resolved edits (all start as "pending").
  */

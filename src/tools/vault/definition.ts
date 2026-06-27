@@ -6,8 +6,11 @@ export const READ_FILE_TOOL: CanonicalToolDefinition = {
   description:
     "Read the full content of a specific vault note by its file path. " +
     "Use this when you already know which note you need (e.g., from a wikilink or search result) " +
-    "and want the complete text rather than matched chunks.",
-  strategyHint: "read the full content of a specific note once you know its path",
+    "and want the complete text rather than matched chunks. " +
+    "Lines are returned with cat -n style line numbers (a right-aligned number, a tab, then the " +
+    "line) for reference only; the text after the tab is verbatim. When quoting a line back to an " +
+    "edit tool, use only that text and drop the line-number prefix.",
+  strategyHint: "read the full content of a specific note once you know its path (output is line-numbered)",
   errorGuidance: "If the note was not found, call list_directory first to locate the correct path.",
   parameters: {
     type: "object",

@@ -9,6 +9,7 @@ import {
   CORE_VAULT_TOOLS,
   GET_OUTLINE_TOOL,
   READ_SECTION_TOOL,
+  GET_OUTGOING_LINKS_TOOL,
   VAULT_TOOL_NAMES,
   filterSemanticSearchByAvailability,
   SEMANTIC_SEARCH_UNAVAILABLE_MESSAGE,
@@ -78,6 +79,29 @@ describe("GET_OUTLINE_TOOL / READ_SECTION_TOOL", () => {
     const core = CORE_VAULT_TOOLS.map((t) => t.name);
     expect(core).not.toContain("get_outline");
     expect(core).not.toContain("read_section");
+  });
+});
+
+describe("GET_OUTGOING_LINKS_TOOL (M3)", () => {
+  test("has correct name and requires only a path", () => {
+    expect(GET_OUTGOING_LINKS_TOOL.name).toBe("get_outgoing_links");
+    expect(GET_OUTGOING_LINKS_TOOL.parameters.required).toEqual(["path"]);
+    expect(GET_OUTGOING_LINKS_TOOL.parameters.properties.path).toBeDefined();
+  });
+
+  test("has a strategyHint so the prompt auto-derives", () => {
+    expect(GET_OUTGOING_LINKS_TOOL.strategyHint).toBeTruthy();
+  });
+
+  test("is advertised in ALL_VAULT_TOOLS and registered in VAULT_TOOL_NAMES", () => {
+    const names = ALL_VAULT_TOOLS.map((t) => t.name);
+    expect(names).toContain("get_outgoing_links");
+    expect(VAULT_TOOL_NAMES.has("get_outgoing_links")).toBe(true);
+  });
+
+  test("mirrors get_backlinks' tiering: cloud-only, not in the local CORE tier", () => {
+    const core = CORE_VAULT_TOOLS.map((t) => t.name);
+    expect(core).not.toContain("get_outgoing_links");
   });
 });
 

@@ -32,6 +32,7 @@ function makeCtx(overrides: {
   fileContents?: Record<string, string>;
   fileCaches?: Record<string, Record<string, unknown>>;
   backlinks?: Record<string, Record<string, unknown[]>>;
+  resolvedLinks?: Record<string, Record<string, number>>;
   tags?: Record<string, number>;
   root?: TFolder;
   abstractFiles?: Record<string, TFile | TFolder>;
@@ -43,6 +44,7 @@ function makeCtx(overrides: {
     fileContents = {},
     fileCaches = {},
     backlinks = {},
+    resolvedLinks = {},
     tags = {},
     root = makeFolder(""),
     abstractFiles = {},
@@ -65,6 +67,7 @@ function makeCtx(overrides: {
       metadataCache: {
         getFileCache: vi.fn((file: TFile) => fileCaches[file.path] ?? null),
         getBacklinksForFile: vi.fn((file: TFile) => ({ data: backlinks[file.path] ?? {} })),
+        resolvedLinks,
         getTags: vi.fn(() => tags),
       },
     } as unknown as import("obsidian").App,
@@ -691,6 +694,62 @@ describe("get_backlinks", () => {
 });
 
 // ---------------------------------------------------------------------------
+// get_outgoing_links (M3 — the forward-link mirror of get_backlinks)
+// ---------------------------------------------------------------------------
+
+describe("get_outgoing_links", () => {
+  test("returns the notes the target links out to (resolved links)", async () => {
+    const source = makeFile("Scenes/Act1.md");
+    const ctx = makeCtx({
+      files: [source],
+      resolvedLinks: {
+        "Scenes/Act1.md": {
+          "Characters/Will.md": 1,
+          "Lore/The Fold.md": 2,
+        },
+      },
+    });
+
+    const result = await executeVaultTool(
+      tc("get_outgoing_links", { path: "Scenes/Act1.md" }),
+      ctx,
+    );
+
+    expect(result.isReadOnly).toBe(true);
+    expect(result.isError).toBeUndefined();
+    expect(result.content).toContain("Characters/Will.md");
+    expect(result.content).toContain("Lore/The Fold.md");
+    expect(result.content).toContain("(2)");
+  });
+
+  test("reports no outgoing links when the note references nothing", async () => {
+    const source = makeFile("Scenes/Lonely.md");
+    const ctx = makeCtx({ files: [source] });
+
+    const result = await executeVaultTool(
+      tc("get_outgoing_links", { path: "Scenes/Lonely.md" }),
+      ctx,
+    );
+    expect(result.content).toContain("no outgoing");
+    expect(result.isError).toBeUndefined();
+  });
+
+  test("returns error when note not found", async () => {
+    const ctx = makeCtx({});
+    const result = await executeVaultTool(tc("get_outgoing_links", { path: "Missing.md" }), ctx);
+
+    expect(result.isError).toBe(true);
+    expect(result.content).toContain("Error:");
+  });
+
+  test("returns error when path is empty", async () => {
+    const ctx = makeCtx({});
+    const result = await executeVaultTool(tc("get_outgoing_links", { path: "" }), ctx);
+    expect(result.isError).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // find_notes_by_tag
 // ---------------------------------------------------------------------------
 
@@ -986,6 +1045,14 @@ describe("path-boundary safety (reads stay inside the vault)", () => {
     const ctx = makeCtx({ files: [makeFile("In/Vault.md")] });
     const result = await executeVaultTool(tc("get_backlinks", { path: "../../etc/passwd" }), ctx);
     expectBoundaryRefusal(result);
+  });
+
+  test("get_outgoing_links names the boundary, never reaching the lookup", async () => {
+    const ctx = makeCtx({ files: [makeFile("In/Vault.md")] });
+    for (const path of ESCAPING) {
+      expectBoundaryRefusal(await executeVaultTool(tc("get_outgoing_links", { path }), ctx));
+    }
+    expect(ctx.app.vault.getFileByPath).not.toHaveBeenCalled();
   });
 
   test("get_outline / read_section name the boundary, never reaching the lookup", async () => {

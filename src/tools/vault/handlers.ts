@@ -50,6 +50,8 @@ export async function executeVaultTool(
       return executeSearchContent(toolCall.arguments, ctx);
     case "get_backlinks":
       return executeGetBacklinks(toolCall.arguments, ctx);
+    case "get_outgoing_links":
+      return executeGetOutgoingLinks(toolCall.arguments, ctx);
     case "find_notes_by_tag":
       return executeFindNotesByTag(toolCall.arguments, ctx);
     case "get_frontmatter":
@@ -671,6 +673,47 @@ async function executeGetBacklinks(
 
   return {
     content: `Notes linking to "${path}" (${paths.length}):\n${paths.join("\n")}`,
+    isReadOnly: true,
+  };
+}
+
+async function executeGetOutgoingLinks(
+  args: Record<string, unknown>,
+  ctx: VaultToolContext,
+): Promise<ToolResult> {
+  const rawPath = typeof args.path === "string" ? args.path.trim() : "";
+  if (!rawPath) {
+    return toolFailure({ kind: "invalid-args", what: "path is required" });
+  }
+
+  const outside = refuseOutsideVault(rawPath);
+  if (outside) return outside;
+
+  const path = normalizePath(rawPath);
+  const file = ctx.app.vault.getFileByPath(path);
+  if (!file) {
+    return toolFailure({
+      kind: "not-found",
+      what: `no note found at path "${path}"`,
+      recovery: "call list_directory or search_files to find the correct path",
+    });
+  }
+
+  // resolvedLinks maps each source path to its resolved targets (a Record<target,
+  // count>), the forward-link mirror of getBacklinksForFile. Resolved-only, so it
+  // matches get_backlinks' shape and never lists a link whose target is missing.
+  const outgoing = ctx.app.metadataCache.resolvedLinks[file.path] ?? {};
+  const paths = Object.keys(outgoing).sort();
+
+  if (paths.length === 0) {
+    return {
+      content: `"${path}" has no outgoing links. This note links to no other notes; nothing to follow up.`,
+      isReadOnly: true,
+    };
+  }
+
+  return {
+    content: `Notes "${path}" links to (${paths.length}):\n${paths.join("\n")}`,
     isReadOnly: true,
   };
 }

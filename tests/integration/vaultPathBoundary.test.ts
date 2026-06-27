@@ -122,7 +122,7 @@ function makeRealFsApp(root: string): App {
         return Promise.resolve();
       },
     },
-    metadataCache: { getBacklinksForFile: () => ({ data: {} }) },
+    metadataCache: { getBacklinksForFile: () => ({ data: {} }), resolvedLinks: {} },
   } as unknown as App;
 }
 
@@ -490,6 +490,29 @@ describe("get_outline / read_section path boundary (read channel), real filesyst
       );
       expect(section.isError, `read_section should refuse "${path}"`).toBe(true);
       expect(section.content).toContain("outside the vault");
+    }
+    expect(filesOutsideVault()).toEqual([]); // reads never write, and nothing escaped.
+  });
+});
+
+describe("get_outgoing_links path boundary (read channel), real filesystem (§6.1)", () => {
+  // The forward-link read mirror of get_backlinks: it only ever resolves an in-vault
+  // file (getFileByPath), but still names the boundary honestly via refuseOutsideVault
+  // rather than dead-ending the model on "not found". Verify on real disk that every
+  // escaping outgoing-links read is refused at the boundary, and nothing escapes.
+  const readCtx = (app: App) =>
+    ({ app, ragService: {} as unknown as RagService } as VaultToolContext);
+
+  it("refuses every escaping outgoing-links read, naming the boundary", async () => {
+    const app = makeRealFsApp(vaultRoot);
+
+    for (const path of ESCAPING_PATHS) {
+      const result = await executeVaultTool(
+        { id: `g-${path}`, name: "get_outgoing_links", arguments: { path } },
+        readCtx(app),
+      );
+      expect(result.isError, `get_outgoing_links should refuse "${path}"`).toBe(true);
+      expect(result.content).toContain("outside the vault");
     }
     expect(filesOutsideVault()).toEqual([]); // reads never write, and nothing escaped.
   });

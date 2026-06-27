@@ -21,6 +21,7 @@ export const TOOL_ICONS: Record<string, string> = {
   search_files: "file-search",
   search_content: "text-search",
   get_backlinks: "link",
+  get_outgoing_links: "external-link",
   find_notes_by_tag: "tag",
   get_frontmatter: "file-code",
   propose_edit: "pencil",
@@ -45,6 +46,7 @@ export const TOOL_LABELS: Record<string, string> = {
   search_files: "Searched files",
   search_content: "Searched content",
   get_backlinks: "Found backlinks",
+  get_outgoing_links: "Found outgoing links",
   find_notes_by_tag: "Found notes by tag",
   get_frontmatter: "Read frontmatter",
   propose_edit: "Proposed edit",
@@ -69,6 +71,7 @@ export const TOOL_STATUS_LABELS: Record<string, string> = {
   search_files: "Searching files...",
   search_content: "Searching content...",
   get_backlinks: "Finding backlinks...",
+  get_outgoing_links: "Finding outgoing links...",
   find_notes_by_tag: "Finding notes by tag...",
   get_frontmatter: "Reading frontmatter...",
   propose_edit: "Composing edit...",
@@ -120,6 +123,7 @@ export function extractToolInput(
     case "search_files": return typeof args.pattern === "string" ? args.pattern : undefined;
     case "search_content": return typeof args.query === "string" ? args.query : undefined;
     case "get_backlinks": return typeof args.path === "string" ? args.path : undefined;
+    case "get_outgoing_links": return typeof args.path === "string" ? args.path : undefined;
     case "find_notes_by_tag": return typeof args.tag === "string" ? args.tag : undefined;
     case "get_frontmatter": return Array.isArray(args.paths) ? `${args.paths.length} note(s)` : undefined;
     case "propose_edit": return typeof args.explanation === "string" ? args.explanation : undefined;

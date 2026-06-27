@@ -271,6 +271,30 @@ export const GET_BACKLINKS_TOOL: CanonicalToolDefinition = {
   },
 };
 
+export const GET_OUTGOING_LINKS_TOOL: CanonicalToolDefinition = {
+  name: "get_outgoing_links",
+  description:
+    "Find all notes a given note links out to via wikilinks or markdown links. " +
+    "The forward-link mirror of get_backlinks: get_backlinks answers 'what links to this note?', " +
+    "get_outgoing_links answers 'what does this note reference?'. " +
+    "Use this to follow what a scene draws on (the characters, locations, and lore it mentions) " +
+    "without reading the whole note and parsing its [[wikilinks]] by hand. " +
+    "Returns resolved links only (links whose target note exists).",
+  strategyHint:
+    "find every note a given note links out to (the forward-link mirror of get_backlinks)",
+  errorGuidance: "If the note was not found, call list_directory or search_files to find the correct path.",
+  parameters: {
+    type: "object",
+    properties: {
+      path: {
+        type: "string",
+        description: "Vault-relative path of the source note (e.g., 'Scenes/Act 1.md').",
+      },
+    },
+    required: ["path"],
+  },
+};
+
 export const FIND_NOTES_BY_TAG_TOOL: CanonicalToolDefinition = {
   name: "find_notes_by_tag",
   description:
@@ -330,10 +354,10 @@ export const CORE_VAULT_TOOLS: CanonicalToolDefinition[] = [
 
 /**
  * Full vault tool suite, for chat and plan modes with cloud providers.
- * Adds recursive tree, filename search, Obsidian-native tools (backlinks, tags,
- * frontmatter), and the get_outline / read_section structure pair on top of the
- * core set. The pair is cloud-only for now; CORE (local) inclusion is deferred to
- * the tool benchmark rather than assumed (tool-set-review D6).
+ * Adds recursive tree, filename search, Obsidian-native tools (backlinks,
+ * outgoing links, tags, frontmatter), and the get_outline / read_section structure
+ * pair on top of the core set. The pair is cloud-only for now; CORE (local)
+ * inclusion is deferred to the tool benchmark rather than assumed (tool-set-review D6).
  */
 export const ALL_VAULT_TOOLS: CanonicalToolDefinition[] = [
   LIST_DIRECTORY_TOOL,
@@ -342,6 +366,7 @@ export const ALL_VAULT_TOOLS: CanonicalToolDefinition[] = [
   SEARCH_CONTENT_TOOL,
   FIND_NOTES_BY_TAG_TOOL,
   GET_BACKLINKS_TOOL,
+  GET_OUTGOING_LINKS_TOOL,
   GET_FRONTMATTER_TOOL,
   READ_FILE_TOOL,
   GET_OUTLINE_TOOL,
@@ -360,6 +385,7 @@ export const VAULT_TOOL_NAMES = new Set([
   "directory_tree",
   "search_files",
   "get_backlinks",
+  "get_outgoing_links",
   "find_notes_by_tag",
   "get_frontmatter",
 ]);

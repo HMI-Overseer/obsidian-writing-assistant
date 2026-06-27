@@ -6,6 +6,7 @@ import {
   resolveVaultOps,
   resolveEdits,
   applyIdenticalCallGuard,
+  applyModeAllowGuard,
   IDENTICAL_CALL_THRESHOLD,
 } from "../../../../src/chat/actions/toolLoop";
 import type { ToolLoopCallbacks } from "../../../../src/chat/actions/toolLoop";
@@ -643,6 +644,96 @@ describe("applyIdenticalCallGuard", () => {
     // A second call to an already-seen path is only the 2nd for that key, still allowed.
     const r = applyIdenticalCallGuard([mk("y", { path: "note-0.md" })], counts);
     expect(r.blockedIds.size).toBe(0);
+  });
+});
+
+/**
+ * Mode allow-list guard (§6.1.4). The stable cloud surface advertises more than a
+ * mode permits, so a call whose tool the mode disallows is refused before it runs.
+ * Reads are unrestricted on cloud, so only out-of-mode writes are blocked in practice.
+ * Local providers pass no allow-list, making the guard a no-op.
+ */
+describe("applyModeAllowGuard", () => {
+  const readName = [...VAULT_TOOL_NAMES][0];
+  const writeName = [...VAULT_OPS_TOOL_NAMES][0];
+  const mk = (id: string, name: string): ToolCall => ({ id, name, arguments: {} });
+
+  it("is a no-op when no allow-list is supplied (local providers)", () => {
+    const r = applyModeAllowGuard([mk("a", writeName)], undefined);
+    expect(r.blockedIds.size).toBe(0);
+    expect(r.blockedResults).toEqual([]);
+  });
+
+  it("allows a call whose tool is in the allow-list", () => {
+    const r = applyModeAllowGuard([mk("a", readName)], [readName]);
+    expect(r.blockedIds.size).toBe(0);
+  });
+
+  it("refuses a call whose tool the mode does not permit", () => {
+    const r = applyModeAllowGuard([mk("a", readName), mk("b", writeName)], [readName]);
+    expect([...r.blockedIds]).toEqual(["b"]);
+    const refusal = r.blockedResults[0].result;
+    expect(refusal.isError).toBe(true);
+    expect(refusal.failure?.kind).toBe("precondition");
+    expect(refusal.content).toContain(writeName);
+  });
+});
+
+describe("runToolLoop mode allow-list", () => {
+  it("refuses an out-of-mode write and never accumulates it as a write call", async () => {
+    const cb = makeCallbacks();
+    const readName = [...VAULT_TOOL_NAMES][0];
+    const writeName = [...VAULT_OPS_TOOL_NAMES][0];
+    const client = countingClient([
+      {
+        deltas: ["r0"],
+        toolCalls: [{ id: "w0", name: writeName, arguments: { path: "x.md" } }],
+        stopReason: "tool_use",
+      },
+      { deltas: ["done"], toolCalls: null, stopReason: "end_turn" },
+    ]);
+
+    // The mode permits only the read tool; the advertised write is gated off.
+    const request = { ...baseRequest, allowedToolNames: [readName] } as ChatRequest;
+    const result = await runToolLoop(
+      client,
+      request,
+      "test-model",
+      "anthropic",
+      {} as never,
+      signal(),
+      cb,
+      20,
+      true,
+    );
+
+    // Refused at the allow-list, so it never reached the write-finalization pipeline.
+    expect(result.writeToolCalls).toBeNull();
+    const recorded = (cb.onStepRecorded as ReturnType<typeof vi.fn>).mock.calls.map((c) => c[0]);
+    const errors = recorded.filter((s) => s.isError).map((s) => s.errorContent as string);
+    expect(errors.filter((e) => e.includes("not available in the current mode"))).toHaveLength(1);
+  });
+
+  it("lets an in-mode call through the gate to execute", async () => {
+    const cb = makeCallbacks();
+    const readName = [...VAULT_TOOL_NAMES][0];
+    const client = countingClient([
+      {
+        deltas: ["r0"],
+        toolCalls: [{ id: "r-call", name: readName, arguments: { path: "x.md" } }],
+        stopReason: "tool_use",
+      },
+      { deltas: ["done"], toolCalls: null, stopReason: "end_turn" },
+    ]);
+    const request = { ...baseRequest, allowedToolNames: [readName] } as ChatRequest;
+    await runToolLoop(client, request, "test-model", "anthropic", {} as never, signal(), cb, 20, true);
+
+    // No vault context, so the permitted read executes and returns "unavailable", it
+    // was NOT blocked by the mode gate (proving the gate let it through).
+    const recorded = (cb.onStepRecorded as ReturnType<typeof vi.fn>).mock.calls.map((c) => c[0]);
+    const errors = recorded.filter((s) => s.isError).map((s) => s.errorContent as string);
+    expect(errors.some((e) => e.includes("not available in the current mode"))).toBe(false);
+    expect(errors.some((e) => e.includes("vault tool context unavailable"))).toBe(true);
   });
 });
 

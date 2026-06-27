@@ -15,7 +15,6 @@ function cfg(overrides: Partial<SessionConfig> = {}): SessionConfig {
     model: "claude-sonnet-4-6",
     systemPrompt: "Be concise.",
     reasoning: "off",
-    editMode: false,
     agenticMode: true,
     toolNames: ["read_note", "search_vault"],
     ...overrides,
@@ -50,7 +49,6 @@ describe("fingerprint", () => {
     expect(fingerprint(cfg({ model: "claude-opus-4-8" }))).not.toBe(base);
     expect(fingerprint(cfg({ systemPrompt: "different" }))).not.toBe(base);
     expect(fingerprint(cfg({ reasoning: "high" }))).not.toBe(base);
-    expect(fingerprint(cfg({ editMode: true }))).not.toBe(base);
     expect(fingerprint(cfg({ agenticMode: false }))).not.toBe(base);
     expect(fingerprint(cfg({ toolNames: ["a"] }))).not.toBe(base);
   });
@@ -91,11 +89,11 @@ describe("isSessionUsable", () => {
     expect(isSessionUsable(meta, live, cfg({ model: "claude-opus-4-8" }))).toBe(false);
   });
 
-  it("rejects config drift (e.g. edit-mode toggle)", () => {
+  it("rejects config drift (e.g. a reasoning change)", () => {
     const covered = turns(["user", "hi"], ["assistant", "yo"]);
     const meta = metaFor(covered, cfg());
     const live = [...covered, { role: "user", content: "next" }];
-    expect(isSessionUsable(meta, live, cfg({ editMode: true }))).toBe(false);
+    expect(isSessionUsable(meta, live, cfg({ reasoning: "high" }))).toBe(false);
   });
 
   it("rejects an edit to a covered message (prefix hash)", () => {
@@ -139,7 +137,6 @@ describe("diagnoseSessionReuse", () => {
       [{ model: "claude-opus-4-8" }, "model-changed"],
       [{ systemPrompt: "different" }, "system-prompt-changed"],
       [{ reasoning: "high" }, "reasoning-changed"],
-      [{ editMode: true }, "edit-mode-changed"],
       [{ agenticMode: false }, "agentic-mode-changed"],
       [{ toolNames: ["only_one"] }, "tools-changed"],
     ];
@@ -153,37 +150,26 @@ describe("diagnoseSessionReuse", () => {
     expect(diagnoseSessionReuse(meta, live, cfg({ toolNames: ["b", "a"] }))).toEqual({ reuse: true });
   });
 
-  // The real edit-mode transition (chat → edit-with-preferToolUse) flips THREE
-  // fingerprint fields in one turn: systemPrompt (mode prefix), editMode
-  // (collectingEdits), and toolNames (edit tools added). Attribution is
-  // single-field by priority, so it names only the first — systemPrompt. The
-  // masked fields are a known measurement limitation (see the design doc).
-  it("names the highest-priority field when several change at once", () => {
+  // Phase 2 made the mode switch cache-neutral on Claude Code: mode wording left the
+  // system prompt (Phase 1), the advertised tool set is the stable superset (constant
+  // across modes + RAG availability), and editMode is no longer a baked field. So a
+  // plan↔chat↔edit switch builds a byte-identical config and reuses the live session.
+  // The end-to-end guarantee lives where the config is built (the service emits one
+  // mode-invariant config); the pure invariant here is that an unchanged config reuses.
+  it("reuses across a mode switch (config is mode-invariant after Phase 2)", () => {
     const meta = metaFor(covered, cfg());
-    const editTransition = cfg({
-      systemPrompt: "edit prefix",
-      editMode: true,
-      toolNames: ["read_note", "search_vault", "propose_edit"],
-    });
-    expect(diagnoseSessionReuse(meta, live, editTransition)).toEqual({
-      reuse: false,
-      reason: "system-prompt-changed",
-    });
+    expect(diagnoseSessionReuse(meta, live, cfg())).toEqual({ reuse: true });
   });
 
-  // Once Phase 1 moves mode wording out of systemPrompt, the same edit transition
-  // no longer touches systemPrompt, so the next-priority changed field surfaces.
-  // The instrumentation tracks the levers as the phases land, rather than staying
-  // pinned on the prompt.
-  it("surfaces edit-mode once the system prompt is held stable", () => {
+  // Single-field attribution still names the highest-priority changed field when
+  // several baked fields move at once (the masking the design doc notes); priority
+  // order is systemPrompt → reasoning → agentic → tools.
+  it("names the highest-priority field when several change at once", () => {
     const meta = metaFor(covered, cfg());
-    const editTransition = cfg({
-      editMode: true,
-      toolNames: ["read_note", "search_vault", "propose_edit"],
-    });
-    expect(diagnoseSessionReuse(meta, live, editTransition)).toEqual({
+    const drift = cfg({ systemPrompt: "different", toolNames: ["only_one"] });
+    expect(diagnoseSessionReuse(meta, live, drift)).toEqual({
       reuse: false,
-      reason: "edit-mode-changed",
+      reason: "system-prompt-changed",
     });
   });
 

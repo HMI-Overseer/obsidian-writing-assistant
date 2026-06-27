@@ -84,7 +84,6 @@ function cfg(overrides: Partial<SessionConfig> = {}): SessionConfig {
     model: "claude-sonnet-4-6",
     systemPrompt: "Be concise.",
     reasoning: "off",
-    editMode: false,
     agenticMode: true,
     toolNames: ["read_note"],
     ...overrides,

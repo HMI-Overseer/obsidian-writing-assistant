@@ -151,7 +151,6 @@ export type SessionRebuildReason =
   | "model-changed"
   | "system-prompt-changed"
   | "reasoning-changed"
-  | "edit-mode-changed"
   | "agentic-mode-changed"
   | "tools-changed"
   | "config-changed"

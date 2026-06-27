@@ -16,7 +16,6 @@ const SESSION_REBUILD_LABELS: Record<SessionRebuildReason, string> = {
   "model-changed": "model changed",
   "system-prompt-changed": "prompt changed",
   "reasoning-changed": "reasoning changed",
-  "edit-mode-changed": "edit mode changed",
   "agentic-mode-changed": "agentic mode changed",
   "tools-changed": "tools changed",
   "config-changed": "config changed",

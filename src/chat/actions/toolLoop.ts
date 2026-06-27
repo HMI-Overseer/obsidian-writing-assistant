@@ -8,6 +8,7 @@ import { VAULT_TOOL_NAMES } from "../../tools/vault/definition";
 import { executeVaultTool } from "../../tools/vault/handlers";
 import type { VaultToolContext } from "../../tools/vault/handlers";
 import { toolFailure } from "../../tools/toolFailure";
+import { modeNotAllowedFailure } from "../../tools/toolSurface";
 import { EDIT_TOOL_NAMES } from "../../tools/editing/definition";
 import { executeEditTool } from "../../tools/editing/handlers";
 import type { ToolExecutionContext } from "../../tools/editing/handlers";
@@ -233,12 +234,25 @@ export async function runToolLoop(
     const { loopCalls, unknownCalls, editCalls, vaultOpCalls, vaultCalls, thinkCalls } =
       classifyToolCalls(toolCalls);
 
-    // D5 spin guard: refuse loop-executed calls that exactly repeat past the
-    // per-turn threshold, BEFORE they execute or accumulate as write calls (so a
-    // refused mutating call is never applied). Blocked calls stay in `loopCalls`
-    // for the assistant turn (history validity) but are excluded from the live
-    // buckets below; their refusal results are pushed alongside the executed ones.
-    const { blockedResults, blockedIds } = applyIdenticalCallGuard(loopCalls, callCounts);
+    // Two pre-execution guards, both BEFORE a call executes or accumulates as a
+    // write (so a refused mutating call is never applied). Blocked calls stay in
+    // `loopCalls` for the assistant turn (history validity) but are excluded from the
+    // live buckets below; their refusal results are pushed alongside the executed
+    // ones.
+    //   (1) Mode allow-list: the stable cloud surface advertises more than the mode
+    //       permits, so a call the current mode disallows is refused here. Local
+    //       providers emit exactly what they allow (no allowedToolNames), so this is
+    //       a no-op for them.
+    //   (2) D5 spin guard: refuse a call that exactly repeats past the per-turn
+    //       threshold. Mode-blocked calls are excluded first so they never advance
+    //       the spin counter (they never ran).
+    const modeGuard = applyModeAllowGuard(loopCalls, baseRequest.allowedToolNames);
+    const spinGuard = applyIdenticalCallGuard(
+      loopCalls.filter((tc) => !modeGuard.blockedIds.has(tc.id)),
+      callCounts,
+    );
+    const blockedResults = [...modeGuard.blockedResults, ...spinGuard.blockedResults];
+    const blockedIds = new Set([...modeGuard.blockedIds, ...spinGuard.blockedIds]);
     const isLive = (tc: ToolCall): boolean => !blockedIds.has(tc.id);
     const liveEditCalls = editCalls.filter(isLive);
     const liveVaultOpCalls = vaultOpCalls.filter(isLive);
@@ -495,6 +509,33 @@ export function applyIdenticalCallGuard(
     } else {
       counts.set(key, prior + 1);
     }
+  }
+  return { blockedResults, blockedIds };
+}
+
+/**
+ * Mode allow-list guard (prompt-cache design §6.1.4). The stable cloud surface
+ * advertises the full tool superset for cache stability, so the model can *see* a
+ * tool the current mode does not permit; this refuses any such call with a
+ * recovery-shaped {@link ../../tools/toolSurface.modeNotAllowedFailure} before it
+ * executes or accumulates as a write. Reads are unrestricted on cloud, so in practice
+ * only out-of-mode writes are blocked. `allowedToolNames` is absent for local
+ * providers (their emitted set already equals the allowed set), making this a no-op;
+ * shares {@link IdenticalCallGuardResult} with the spin guard so the loop merges them
+ * uniformly.
+ */
+export function applyModeAllowGuard(
+  loopCalls: ToolCall[],
+  allowedToolNames: string[] | undefined,
+): IdenticalCallGuardResult {
+  if (!allowedToolNames) return { blockedResults: [], blockedIds: new Set() };
+  const allowed = new Set(allowedToolNames);
+  const blockedResults: Array<{ tc: ToolCall; result: ToolResult }> = [];
+  const blockedIds = new Set<string>();
+  for (const tc of loopCalls) {
+    if (allowed.has(tc.name)) continue;
+    blockedIds.add(tc.id);
+    blockedResults.push({ tc, result: modeNotAllowedFailure(tc.name) });
   }
   return { blockedResults, blockedIds };
 }

@@ -3,18 +3,21 @@ import type { AdditionalContextItem, ChatRequest, ChatTurn, DocumentContext, Ext
 import { getFullNoteContent, truncateNoteText } from "../../context/noteContext";
 import { resolveNoteImageContext } from "../../context/noteImageContext";
 import { shouldUseToolCall } from "../../tools/registry";
-import { ALL_EDIT_TOOLS, EDIT_TOOL_NAMES } from "../../tools/editing/definition";
+import { EDIT_TOOL_NAMES } from "../../tools/editing/definition";
 import { buildEditToolSystemPrompt } from "../../tools/editing/systemPrompt";
 import {
-  ALL_VAULT_TOOLS,
-  CORE_VAULT_TOOLS,
   VAULT_TOOL_NAMES,
   filterSemanticSearchByAvailability,
 } from "../../tools/vault/definition";
-import { allowedVaultOpsTools, VAULT_OPS_TOOL_NAMES } from "../../tools/vault-ops/definition";
+import { VAULT_OPS_TOOL_NAMES } from "../../tools/vault-ops/definition";
 import { buildVaultOpToolSystemPrompt } from "../../tools/vault-ops/systemPrompt";
-import { THINK_TOOL } from "../../tools/think/definition";
 import { buildVaultToolSystemPrompt } from "../../tools/vault/systemPrompt";
+import {
+  CLOUD_STABLE_TOOL_SET,
+  cloudAllowedToolNames,
+  cloudAllowedToolSet,
+  resolveLocalToolSet,
+} from "../../tools/toolSurface";
 import type { CanonicalToolDefinition } from "../../tools/types";
 import type { ChatMode } from "../types";
 import type { App, TFile } from "obsidian";
@@ -200,56 +203,61 @@ export async function prepareApiMessages(
       : "When retrieved notes are provided, use them as reference material. If the retrieved notes don't contain relevant information for the question, rely on your general knowledge instead.";
   }
   const groundingNote = groundingNoteBody ? "\n\n" + groundingNoteBody : "";
-  // Build the tool list based on mode and agentic settings.
+  // Build the tool surface. The only mode/policy-varying decision is the write gate
+  // (which mutating tools a mode permits); reads are unrestricted on the cloud paths.
+  // The canonical resolver lives in src/tools/toolSurface.ts so every path reads one
+  // source (prompt-cache design §6.1.1/§6.1.4/§6.1.5).
   //
-  // Vault tool tiers:
-  //   CORE_VAULT_TOOLS, list_directory, read_file, semantic_search
-  //                       Used in edit mode (focused task) and for local models.
-  //   ALL_VAULT_TOOLS, core + get_backlinks, find_notes_by_tag, get_frontmatter
-  //                       Used in chat/plan mode with cloud providers (full exploration).
-  //
-  // Edit tools are added on top in edit mode when preferToolUse is also on.
-  // Cloud providers get the full edit tool set; local models get a reduced set.
-  // think is a meta-reasoning tool that benefits large cloud models.
-  // LM Studio (local models) already struggle with multi-tool schemas, and
-  // Magistral-family reasoning models conflict with a tool named "think" via
-  // lmstudio-ai/lmstudio-bug-tracker#1592.
+  // think is a meta-reasoning tool that benefits large cloud models. LM Studio (local
+  // models) already struggle with multi-tool schemas, and Magistral-family reasoning
+  // models conflict with a tool named "think" (lmstudio-ai/lmstudio-bug-tracker#1592),
+  // so it is excluded there.
   const useThinkTool = activeProvider !== "lmstudio";
+  const surfaceOpts = {
+    editMode,
+    preferToolUse: settings.preferToolUse,
+    policy: settings.vaultOpPolicy,
+    useThinkTool,
+  };
+  const availability = ragService?.availability() ?? "no-backend";
 
+  // Emission diverges by path. The direct Anthropic path emits the full stable
+  // superset and holds it byte-identical across modes (Layer 1, keeps the prompt
+  // cache warm); a runtime allow-list (allowedToolNames, enforced in the tool loop)
+  // restricts what may actually be called, so mode/policy never shrink the emitted
+  // block. semantic_search stays in the superset and reports unavailability at call
+  // time. Local providers keep their lean per-mode materialization (no caching
+  // incentive, smaller menu = better selection); for them the emitted set already is
+  // the allowed set, and the shared filter drops semantic_search when the backend is
+  // cold (so the two routes can't drift, the original defect).
   let tools: CanonicalToolDefinition[] | undefined;
-  if (useEditTools) {
-    // Edit mode: focused document task, core vault tools for context lookup only,
-    // plus the vault-op write channel (create/move/trash whole notes), with any
-    // deny-classed op filtered out by policy (ADR-0003).
-    // Edits are a gated vault op: "Deny" removes the edit tools entirely so the
-    // model is never offered them (a real read-only policy).
-    const editTools = settings.vaultOpPolicy.edit === "deny" ? [] : ALL_EDIT_TOOLS;
-    const vaultOpTools = allowedVaultOpsTools(settings.vaultOpPolicy);
-    tools = [...CORE_VAULT_TOOLS, ...editTools, ...vaultOpTools, ...(useThinkTool ? [THINK_TOOL] : [])];
-  } else if (useVaultTools) {
-    tools = [...ALL_VAULT_TOOLS, ...(useThinkTool ? [THINK_TOOL] : [])];
+  let allowedToolNames: string[] | undefined;
+  // The tools whose guidance the mode tail describes: what the model may actually use
+  // this mode (the allowed subset on cloud, the emitted lean set on local).
+  let guidanceTools: CanonicalToolDefinition[] = [];
+  if (useVaultTools) {
+    if (activeProvider === "anthropic") {
+      tools = CLOUD_STABLE_TOOL_SET;
+      allowedToolNames = cloudAllowedToolNames(surfaceOpts);
+      guidanceTools = filterSemanticSearchByAvailability(cloudAllowedToolSet(surfaceOpts), availability);
+    } else {
+      const lean = filterSemanticSearchByAvailability(resolveLocalToolSet(surfaceOpts), availability);
+      tools = lean;
+      guidanceTools = lean;
+    }
   }
 
-  // semantic_search can only run with a live embedding backend and a built index.
-  // Drop it otherwise so the model uses structural tools instead of burning rounds
-  // on guaranteed failures. Same predicate + helper the Claude Code MCP bridge uses,
-  // so the two advertising routes can't drift apart (the original defect).
-  if (tools) {
-    const availability = ragService?.availability() ?? "no-backend";
-    tools = filterSemanticSearchByAvailability(tools, availability);
-  }
-
-  // Build tool guidance from the filtered tool lists so the system prompt
-  // accurately reflects what is actually available (e.g. no semantic_search
-  // when the RAG index is not ready). Each body is kept separator-free for the
-  // mode tail; the local path re-adds the leading "\n\n" to preserve its bytes.
-  const activeVaultTools = (tools ?? []).filter((t) => VAULT_TOOL_NAMES.has(t.name));
+  // Build tool guidance from guidanceTools so the mode tail accurately reflects what
+  // the model may use (e.g. no semantic_search when the RAG index is not ready, and
+  // only the mode's permitted writes). Each body is kept separator-free for the mode
+  // tail; the local path re-adds the leading "\n\n" to preserve its bytes.
+  const activeVaultTools = guidanceTools.filter((t) => VAULT_TOOL_NAMES.has(t.name));
   const vaultGuidanceBody = useVaultTools ? buildVaultToolSystemPrompt(activeVaultTools) : "";
   const vaultGuidance = useVaultTools ? "\n\n" + vaultGuidanceBody : "";
-  const activeEditTools = (tools ?? []).filter((t) => EDIT_TOOL_NAMES.has(t.name));
+  const activeEditTools = guidanceTools.filter((t) => EDIT_TOOL_NAMES.has(t.name));
   const editGuidanceBody = useEditTools ? buildEditToolSystemPrompt(activeEditTools) : "";
   const editGuidance = useEditTools ? "\n\n" + editGuidanceBody : "";
-  const activeVaultOpTools = (tools ?? []).filter((t) => VAULT_OPS_TOOL_NAMES.has(t.name));
+  const activeVaultOpTools = guidanceTools.filter((t) => VAULT_OPS_TOOL_NAMES.has(t.name));
   const vaultOpGuidanceBody = activeVaultOpTools.length > 0
     ? buildVaultOpToolSystemPrompt(activeVaultOpTools)
     : "";
@@ -282,6 +290,7 @@ export async function prepareApiMessages(
     rewrittenQuery,
     messages,
     tools,
+    ...(allowedToolNames ? { allowedToolNames } : {}),
     additionalContextItems,
     ...(noteImageContext?.length ? { noteImageContext } : {}),
   };

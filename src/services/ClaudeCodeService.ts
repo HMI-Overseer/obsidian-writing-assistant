@@ -13,17 +13,18 @@ import type { SessionConfig } from "../api/harnessSession";
 import { isCliVersionCompatible } from "../api/sdkVersionGuard";
 import type { RagService } from "../rag/ragService";
 import type { CanonicalToolDefinition, ToolCall, ToolResult } from "../tools/types";
-import {
-  ALL_VAULT_TOOLS,
-  VAULT_TOOL_NAMES,
-  filterSemanticSearchByAvailability,
-} from "../tools/vault/definition";
+import { VAULT_TOOL_NAMES } from "../tools/vault/definition";
 import { executeVaultTool } from "../tools/vault/handlers";
 import { toolFailure } from "../tools/toolFailure";
-import { ALL_EDIT_TOOLS, EDIT_TOOL_NAMES } from "../tools/editing/definition";
+import { EDIT_TOOL_NAMES } from "../tools/editing/definition";
 import { executeEditTool } from "../tools/editing/handlers";
-import { allowedVaultOpsTools, VAULT_OPS_TOOL_NAMES } from "../tools/vault-ops/definition";
+import { VAULT_OPS_TOOL_NAMES } from "../tools/vault-ops/definition";
 import { executeVaultOpTool, buildPendingOverlay } from "../tools/vault-ops/handlers";
+import {
+  CLAUDE_CODE_STABLE_TOOL_SET,
+  cloudAllowedToolSet,
+  modeNotAllowedFailure,
+} from "../tools/toolSurface";
 import { normalizeVaultToolCall } from "../tools/paths";
 import { VaultMcpServer, type McpServerHandle, type McpToolProvider } from "../mcp/VaultMcpServer";
 import type { VaultOpReviewer } from "../tools/types";
@@ -106,7 +107,15 @@ export class ClaudeCodeService {
   private readonly sessionRegistry = new SdkSessionRegistry();
   /** Memoized SDK usability (SDK linked + CLI version-compatible). Probed once. */
   private sdkUsable: Promise<boolean> | null = null;
-  private collectingEdits = false;
+  /**
+   * Per-run tool allow-list (prompt-cache design §6.1.4). The MCP server advertises
+   * the full stable superset always (so `toolNames` never drifts and the live session
+   * survives mode switches); this names what the *current* run actually permits, and
+   * {@link executeTool} refuses anything outside it. Reads are always present; writes
+   * follow the run's mode + policy. Set per turn in {@link getRuntime}; the chat UI
+   * serializes generation, so one slot is sufficient.
+   */
+  private runAllowedTools: Set<string> = new Set();
   private collectedEdits: ToolCall[] = [];
   /** Vault-op calls Claude Code made this run, surfaced to the same review panel. */
   private collectedVaultOps: ToolCall[] = [];
@@ -154,15 +163,29 @@ export class ClaudeCodeService {
     const useSdk = await this.isSdkUsable();
     const agentic = settings.agenticMode;
 
-    // Structured edit tools follow the same gate as the API providers: edit mode +
-    // preferToolUse, and only meaningful in agentic mode (analyst runs tool-less).
-    this.collectingEdits = agentic && (options.editMode ?? false) && settings.preferToolUse;
+    // Per-run allow-list, the same canonical resolver the API providers use: reads
+    // unrestricted, writes follow edit mode + preferToolUse + policy. Held OFF the
+    // session fingerprint (it is not baked into SessionConfig), so a mode switch reuses
+    // the live session instead of cold-rebuilding (prompt-cache design §6.1.4); the
+    // gate in executeTool enforces it per turn. Empty when not agentic (no tools run).
+    this.runAllowedTools = agentic
+      ? new Set(
+          cloudAllowedToolSet({
+            editMode: options.editMode ?? false,
+            preferToolUse: settings.preferToolUse,
+            policy: settings.vaultOpPolicy,
+            useThinkTool: false,
+          }).map((tool) => tool.name),
+        )
+      : new Set();
     this.editTargetPath = options.activeFilePath ?? "";
 
     // SDK path with a conversation id → persistent per-conversation session
     // (Model B): one live `claude` process reused across turns for context
-    // retention + incremental caching. The session bakes the current agentic/edit
-    // config; config drift cold-rebuilds it (see harnessSession.isSessionUsable).
+    // retention + incremental caching. The session bakes model / systemPrompt /
+    // reasoning / agentic / toolNames; config drift cold-rebuilds it (see
+    // harnessSession.isSessionUsable). Mode is no longer baked, so plan↔chat↔edit
+    // switches reuse the session, the per-run allow-list gates writes instead.
     if (useSdk && options.conversationId) {
       const conversationId = options.conversationId;
       return {
@@ -176,8 +199,8 @@ export class ClaudeCodeService {
     }
 
     // SDK path without a conversation id (e.g. complete()) → stateless one-shot
-    // with an in-process MCP server, rebuilt per turn so the advertised tool set
-    // reflects the current edit-mode gate.
+    // with an in-process MCP server. The advertised tool set is the constant stable
+    // superset; the per-run allow-list gates what may actually run.
     if (useSdk) {
       return {
         vaultRoot: this.vaultRoot,
@@ -226,7 +249,6 @@ export class ClaudeCodeService {
       model: input.model,
       systemPrompt: input.systemPrompt,
       reasoning: input.reasoning ?? "off",
-      editMode: this.collectingEdits,
       agenticMode: agentic,
       toolNames,
     };
@@ -339,30 +361,21 @@ export class ClaudeCodeService {
 
   /**
    * Bridges the plugin's tools to MCP. The same executors back the API providers'
-   * tool loop, so Claude Code runs the identical, plugin-owned implementations.
-   * Edit tools are advertised only in edit mode; their calls are collected for the
-   * diff-review panel rather than applied directly.
+   * tool loop, so Claude Code runs the identical, plugin-owned implementations. The
+   * full superset (reads + edit + vault-ops) is advertised in every mode for session
+   * stability; the per-run allow-list ({@link runAllowedTools}, enforced in
+   * {@link executeTool}) decides what may actually run, and permitted edit/vault-op
+   * calls are collected for the diff-review panel rather than applied directly.
    */
   private createToolProvider(): McpToolProvider {
     return {
-      // When collecting writes, advertise the full write surface alongside reads:
-      // the edit channel plus the vault-op tools the policy leaves usable (deny
-      // detaches a class, ADR-0003). Same catalogue the API providers receive.
-      listTools: (): CanonicalToolDefinition[] => {
-        const tools = this.collectingEdits
-          ? [
-              ...ALL_VAULT_TOOLS,
-              ...ALL_EDIT_TOOLS,
-              ...allowedVaultOpsTools(this.getSettings().vaultOpPolicy),
-            ]
-          : [...ALL_VAULT_TOOLS];
-        // Gate semantic_search the same way the in-app path does, via the shared
-        // predicate, so a setup that can never embed a query (no backend / empty
-        // index) is not offered the tool over this route either. Previously the
-        // bridge shipped it unconditionally, which is where the silent failure came
-        // from (semantic-search-silent-embedding-failure.md §3-A).
-        return filterSemanticSearchByAvailability(tools, this.getRagService().availability());
-      },
+      // Advertise the full stable superset (reads + edit + vault-ops) unchanged across
+      // modes and RAG availability, so `toolNames` never drifts and the live session
+      // survives a mode switch instead of cold-rebuilding (prompt-cache design §6.1.1).
+      // semantic_search stays advertised and reports unavailability at call time (the
+      // handler's curated message); the runtime allow-list (runAllowedTools, enforced
+      // in executeTool) restricts writes per mode, not this catalogue.
+      listTools: (): CanonicalToolDefinition[] => CLAUDE_CODE_STABLE_TOOL_SET,
       callTool: async (rawCall: ToolCall): Promise<ToolResult> => {
         // Surface tool activity to the chat UI's timeline (Claude Code runs its
         // loop internally, so this MCP hook is the only place we see its calls).
@@ -406,6 +419,14 @@ export class ClaudeCodeService {
    *  `toolCallId` is the id minted in `callTool`; reused for the collected vault
    *  op so it shares the id of its timeline step (review binding). */
   private async executeTool(call: ToolCall, toolCallId: string): Promise<ToolResult> {
+    // Runtime allow-list (prompt-cache design §6.1.4): the MCP server advertises the
+    // full superset, so refuse a call the current run does not permit before it runs
+    // or collects. Reads are always permitted; out-of-mode writes and policy-denied
+    // ops (absent from the allow-list) are refused here, the primary deny gate, with
+    // the live-review deny check as defense in depth.
+    if (!this.runAllowedTools.has(call.name)) {
+      return modeNotAllowedFailure(call.name);
+    }
     if (VAULT_TOOL_NAMES.has(call.name)) {
       return executeVaultTool(call, {
         app: this.app,
@@ -414,13 +435,6 @@ export class ClaudeCodeService {
       });
     }
     if (EDIT_TOOL_NAMES.has(call.name)) {
-      if (!this.collectingEdits) {
-        return toolFailure({
-          kind: "unavailable",
-          what: `editing is not available in this mode (${call.name})`,
-          isReadOnly: false,
-        });
-      }
       // Live in-loop review: suspend on the edit until the user accepts/declines and
       // return the real disposition, mirroring vault ops (resolveEditOne). The diff
       // proposal is built in-loop, so finalization persists it via getEditProposal();
@@ -441,13 +455,6 @@ export class ClaudeCodeService {
       return result;
     }
     if (VAULT_OPS_TOOL_NAMES.has(call.name)) {
-      if (!this.collectingEdits) {
-        return toolFailure({
-          kind: "unavailable",
-          what: `vault operations are not available in this mode (${call.name})`,
-          isReadOnly: false,
-        });
-      }
       // Live in-loop review: suspend on an `ask` op until the user approves or
       // declines, returning the real disposition as this call's result. The SDK
       // runs `permissionMode="dontAsk"`, so the plugin owns permission here.

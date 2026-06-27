@@ -93,6 +93,15 @@ export interface ChatRequest {
   anthropicCacheSettings?: AnthropicCacheSettings;
   /** Tool definitions to include in the request. null/undefined = no tools. */
   tools?: CanonicalToolDefinition[] | null;
+  /**
+   * Runtime allow-list: the tool names the current mode actually permits the model
+   * to call (prompt-cache design §6.1.4). Set only when `tools` is the stable cloud
+   * superset (the direct Anthropic path), which advertises more than the mode allows
+   * so the cached prefix stays warm; the tool loop refuses any call whose name is not
+   * here. Absent when the emitted set already equals the allowed set (local providers)
+   * or when there are no tools.
+   */
+  allowedToolNames?: string[];
   /** Additional context notes manually attached by the user. */
   additionalContextItems?: AdditionalContextItem[];
   /** Local image embeds resolved from attached notes for vision-capable models only. */

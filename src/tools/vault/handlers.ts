@@ -10,6 +10,7 @@ import { RagRetrievalError } from "../../rag/ragService";
 import type { RagService } from "../../rag/ragService";
 import { VAULT_TOOL_NAMES, SEMANTIC_SEARCH_UNAVAILABLE_MESSAGE } from "./definition";
 import { formatWithLineNumbers } from "./readFormat";
+import { buildOutline, sectionLines, matchSection, countWords } from "./outline";
 
 export interface VaultToolContext {
   app: App;
@@ -35,6 +36,10 @@ export async function executeVaultTool(
       return executeSearchVault(toolCall.arguments, ctx);
     case "read_file":
       return executeReadFile(toolCall.arguments, ctx);
+    case "get_outline":
+      return executeGetOutline(toolCall.arguments, ctx);
+    case "read_section":
+      return executeReadSection(toolCall.arguments, ctx);
     case "list_directory":
       return executeListDirectory(toolCall.arguments, ctx);
     case "directory_tree":
@@ -150,6 +155,126 @@ async function executeReadFile(
   const content = await ctx.app.vault.read(file);
 
   return { content: `[${path}]\n\n${formatWithLineNumbers(content)}`, isReadOnly: true };
+}
+
+async function executeGetOutline(
+  args: Record<string, unknown>,
+  ctx: VaultToolContext,
+): Promise<ToolResult> {
+  const rawPath = typeof args.path === "string" ? args.path.trim() : "";
+  if (!rawPath) {
+    return toolFailure({ kind: "invalid-args", what: "path is required" });
+  }
+
+  // Name the vault boundary before the index lookup (the lookup below stays the
+  // security backstop, it can only ever resolve an in-vault file).
+  const outside = refuseOutsideVault(rawPath);
+  if (outside) return outside;
+
+  const path = normalizePath(rawPath);
+  const file = ctx.app.vault.getFileByPath(path);
+  if (!file) {
+    return toolFailure({
+      kind: "not-found",
+      what: `no note found at path "${path}"`,
+      recovery: "call list_directory or search_files to find the correct path",
+    });
+  }
+
+  const headings = ctx.app.metadataCache.getFileCache(file)?.headings ?? [];
+  if (headings.length === 0) {
+    return {
+      content: `Note "${path}" has no headings; read it whole with read_file.`,
+      isReadOnly: true,
+    };
+  }
+
+  const lines = (await ctx.app.vault.read(file)).split("\n");
+  const outline = buildOutline(headings, lines.length);
+
+  const payload = {
+    path,
+    headingCount: outline.length,
+    headings: outline.map((o) => {
+      const section = sectionLines(lines, o);
+      return {
+        depth: o.depth,
+        headingPath: o.headingPath,
+        words: countWords(section.join("\n")),
+        lines: section.length,
+      };
+    }),
+  };
+
+  return { content: JSON.stringify(payload, null, 2), isReadOnly: true };
+}
+
+async function executeReadSection(
+  args: Record<string, unknown>,
+  ctx: VaultToolContext,
+): Promise<ToolResult> {
+  const rawPath = typeof args.path === "string" ? args.path.trim() : "";
+  if (!rawPath) {
+    return toolFailure({ kind: "invalid-args", what: "path is required" });
+  }
+  const headingPath = typeof args.headingPath === "string" ? args.headingPath.trim() : "";
+  if (!headingPath) {
+    return toolFailure({
+      kind: "invalid-args",
+      what: "headingPath is required",
+      recovery: "call get_outline to see the note's heading paths, then pass one",
+    });
+  }
+
+  const outside = refuseOutsideVault(rawPath);
+  if (outside) return outside;
+
+  const path = normalizePath(rawPath);
+  const file = ctx.app.vault.getFileByPath(path);
+  if (!file) {
+    return toolFailure({
+      kind: "not-found",
+      what: `no note found at path "${path}"`,
+      recovery: "call list_directory or search_files to find the correct path",
+    });
+  }
+
+  const headings = ctx.app.metadataCache.getFileCache(file)?.headings ?? [];
+  if (headings.length === 0) {
+    // No sections to address; point straight at the whole-note reader, not get_outline.
+    return toolFailure({
+      kind: "not-found",
+      what: `note "${path}" has no headings to read a section from`,
+      recovery: "read it whole with read_file",
+    });
+  }
+
+  const lines = (await ctx.app.vault.read(file)).split("\n");
+  const outline = buildOutline(headings, lines.length);
+  const match = matchSection(outline, headingPath);
+
+  if (match.kind === "ambiguous") {
+    return toolFailure({
+      kind: "ambiguous",
+      what: `heading "${headingPath}" matches ${match.candidates.length} sections in "${path}"`,
+      recovery: `pass one of these full headingPaths: ${match.candidates.join(" | ")}`,
+    });
+  }
+  if (match.kind === "not-found") {
+    return toolFailure({
+      kind: "not-found",
+      what: `no heading matching "${headingPath}" in "${path}"`,
+      recovery: "call get_outline to see the note's exact heading paths",
+    });
+  }
+
+  const section = sectionLines(lines, match.heading);
+  // startLine is 1-indexed so the numbers match read_file's whole-file numbering.
+  const numbered = formatWithLineNumbers(section.join("\n"), match.heading.startLine + 1);
+  return {
+    content: `[${path} > ${match.heading.headingPath}]\n\n${numbered}`,
+    isReadOnly: true,
+  };
 }
 
 async function executeListDirectory(

@@ -14,6 +14,8 @@ import { EDIT_TOOL_NAMES } from "./editing/definition";
 export const TOOL_ICONS: Record<string, string> = {
   semantic_search: "search",
   read_file: "file-text",
+  get_outline: "list-tree",
+  read_section: "text-select",
   list_directory: "folder",
   directory_tree: "folder-tree",
   search_files: "file-search",
@@ -36,6 +38,8 @@ export const TOOL_ICONS: Record<string, string> = {
 export const TOOL_LABELS: Record<string, string> = {
   semantic_search: "Searched vault",
   read_file: "Read note",
+  get_outline: "Read outline",
+  read_section: "Read section",
   list_directory: "Listed folder",
   directory_tree: "Explored tree",
   search_files: "Searched files",
@@ -58,6 +62,8 @@ export const TOOL_LABELS: Record<string, string> = {
 export const TOOL_STATUS_LABELS: Record<string, string> = {
   semantic_search: "Searching vault...",
   read_file: "Reading note...",
+  get_outline: "Reading outline...",
+  read_section: "Reading section...",
   list_directory: "Listing folder...",
   directory_tree: "Exploring tree...",
   search_files: "Searching files...",
@@ -102,6 +108,13 @@ export function extractToolInput(
   switch (tc.name) {
     case "semantic_search": return typeof args.query === "string" ? args.query : undefined;
     case "read_file": return typeof args.path === "string" ? args.path : undefined;
+    case "get_outline": return typeof args.path === "string" ? args.path : undefined;
+    case "read_section":
+      return typeof args.path === "string" && typeof args.headingPath === "string"
+        ? `${args.path} > ${args.headingPath}`
+        : typeof args.path === "string"
+          ? args.path
+          : undefined;
     case "list_directory": return typeof args.path === "string" ? args.path : undefined;
     case "directory_tree": return typeof args.path === "string" ? args.path : undefined;
     case "search_files": return typeof args.pattern === "string" ? args.pattern : undefined;

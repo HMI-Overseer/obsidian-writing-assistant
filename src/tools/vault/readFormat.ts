@@ -10,15 +10,23 @@
  * the file's last real line is the last numbered line (matching cat -n). An
  * empty note renders as "" (there is nothing to number).
  *
- * Shared by read_file and, later, read_section so both speak one line
- * vocabulary (tool-set-review D6).
+ * `startLine` (1-indexed, default 1) is the file line number of the first line
+ * of `content`. read_section passes the heading's line number so its numbers are
+ * the *same* numbers read_file would show for those lines (tool-set-review D6's
+ * line-number-consistency condition); read_file leaves it at the default. The
+ * number column widens to the largest absolute line number so an offset slice
+ * still right-aligns.
+ *
+ * Shared by read_file and read_section so both speak one line vocabulary.
  */
-export function formatWithLineNumbers(content: string): string {
+export function formatWithLineNumbers(content: string, startLine = 1): string {
   if (content === "") return "";
   const lines = content.split("\n");
   // A trailing newline produces a phantom empty final element; cat -n does not
   // number it, so neither do we.
   if (lines.length > 1 && lines[lines.length - 1] === "") lines.pop();
-  const width = String(lines.length).length;
-  return lines.map((line, i) => `${String(i + 1).padStart(width)}\t${line}`).join("\n");
+  const width = String(startLine + lines.length - 1).length;
+  return lines
+    .map((line, i) => `${String(startLine + i).padStart(width)}\t${line}`)
+    .join("\n");
 }

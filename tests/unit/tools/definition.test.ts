@@ -7,6 +7,9 @@ import {
 import {
   ALL_VAULT_TOOLS,
   CORE_VAULT_TOOLS,
+  GET_OUTLINE_TOOL,
+  READ_SECTION_TOOL,
+  VAULT_TOOL_NAMES,
   filterSemanticSearchByAvailability,
   SEMANTIC_SEARCH_UNAVAILABLE_MESSAGE,
 } from "../../../src/tools/vault/definition";
@@ -43,6 +46,38 @@ describe("ALL_EDIT_TOOLS", () => {
     expect(names).toContain("propose_edit");
     expect(names).toContain("update_frontmatter");
     expect(names).toContain("insert_into_note");
+  });
+});
+
+describe("GET_OUTLINE_TOOL / READ_SECTION_TOOL", () => {
+  test("get_outline requires only a path", () => {
+    expect(GET_OUTLINE_TOOL.name).toBe("get_outline");
+    expect(GET_OUTLINE_TOOL.parameters.required).toEqual(["path"]);
+  });
+
+  test("read_section requires path and headingPath", () => {
+    expect(READ_SECTION_TOOL.name).toBe("read_section");
+    expect(READ_SECTION_TOOL.parameters.required).toEqual(["path", "headingPath"]);
+    expect(READ_SECTION_TOOL.parameters.properties.headingPath).toBeDefined();
+  });
+
+  test("both pair tools have a strategyHint so the prompt auto-derives", () => {
+    expect(GET_OUTLINE_TOOL.strategyHint).toBeTruthy();
+    expect(READ_SECTION_TOOL.strategyHint).toBeTruthy();
+  });
+
+  test("both are advertised in ALL_VAULT_TOOLS and registered in VAULT_TOOL_NAMES", () => {
+    const names = ALL_VAULT_TOOLS.map((t) => t.name);
+    expect(names).toContain("get_outline");
+    expect(names).toContain("read_section");
+    expect(VAULT_TOOL_NAMES.has("get_outline")).toBe(true);
+    expect(VAULT_TOOL_NAMES.has("read_section")).toBe(true);
+  });
+
+  test("the pair stays out of the local CORE tier until the benchmark decides", () => {
+    const core = CORE_VAULT_TOOLS.map((t) => t.name);
+    expect(core).not.toContain("get_outline");
+    expect(core).not.toContain("read_section");
   });
 });
 

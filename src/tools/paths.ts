@@ -35,6 +35,8 @@ const PATH_ARRAY_ARG_KEYS = ["paths"] as const;
  */
 const SNAP_TOOL_KEYS: Record<string, readonly string[]> = {
   read_file: ["path"],
+  get_outline: ["path"],
+  read_section: ["path"],
   get_backlinks: ["path"],
   trash_file: ["path"],
   propose_edit: ["path"],

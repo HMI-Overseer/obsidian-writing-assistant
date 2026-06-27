@@ -7,6 +7,7 @@ import { TFile, TFolder, normalizePath } from "obsidian";
 import { applyVaultOpBatch } from "../../src/vault-ops/applyBatch";
 import { applyOperation } from "../../src/vault-ops/apply";
 import { executeVaultOpTool, buildPendingOverlay } from "../../src/tools/vault-ops/handlers";
+import { executeVaultTool } from "../../src/tools/vault/handlers";
 import { executeEditTool, resolveStructuralEditBlocks } from "../../src/tools/editing/handlers";
 import { convertToolCallToEditBlock } from "../../src/tools/editing/conversion";
 import { resolveEdits } from "../../src/editing/diffEngine";
@@ -14,6 +15,8 @@ import { applyHunksLive } from "../../src/editing/documentApplicator";
 import { normalizeVaultToolCall } from "../../src/tools/paths";
 import type { VaultOperation } from "../../src/vault-ops/types";
 import type { ToolCall } from "../../src/tools/types";
+import type { VaultToolContext } from "../../src/tools/vault/handlers";
+import type { RagService } from "../../src/rag/ragService";
 
 /**
  * §6.1, verify the vault-write handler against its **real on-disk resolution**, not
@@ -459,6 +462,36 @@ describe("insert_into_note path boundary (edit channel), real filesystem (§6.1)
       "Day 1.\n\nDay 2.\n",
     );
     expect(filesOutsideVault()).toEqual([]);
+  });
+});
+
+describe("get_outline / read_section path boundary (read channel), real filesystem (§6.1)", () => {
+  // The read channel only resolves an in-vault file (getFileByPath), but it still
+  // names the boundary honestly via refuseOutsideVault rather than dead-ending the
+  // model on "not found". Verify on real disk that every escaping outline/section
+  // read is refused at the boundary, before any file is opened, and nothing escapes.
+  const readCtx = (app: App) =>
+    ({ app, ragService: {} as unknown as RagService } as VaultToolContext);
+
+  it("refuses every escaping outline/section read, naming the boundary", async () => {
+    const app = makeRealFsApp(vaultRoot);
+
+    for (const path of ESCAPING_PATHS) {
+      const outline = await executeVaultTool(
+        { id: `o-${path}`, name: "get_outline", arguments: { path } },
+        readCtx(app),
+      );
+      expect(outline.isError, `get_outline should refuse "${path}"`).toBe(true);
+      expect(outline.content).toContain("outside the vault");
+
+      const section = await executeVaultTool(
+        { id: `s-${path}`, name: "read_section", arguments: { path, headingPath: "Any" } },
+        readCtx(app),
+      );
+      expect(section.isError, `read_section should refuse "${path}"`).toBe(true);
+      expect(section.content).toContain("outside the vault");
+    }
+    expect(filesOutsideVault()).toEqual([]); // reads never write, and nothing escaped.
   });
 });
 

@@ -7,10 +7,14 @@ export const READ_FILE_TOOL: CanonicalToolDefinition = {
     "Read the full content of a specific vault note by its file path. " +
     "Use this when you already know which note you need (e.g., from a wikilink or search result) " +
     "and want the complete text rather than matched chunks. " +
+    "For a long or heavily structured note, call get_outline first to see its heading tree, then " +
+    "read_section to read just the part you need, instead of reading the whole note. " +
     "Lines are returned with cat -n style line numbers (a right-aligned number, a tab, then the " +
     "line) for reference only; the text after the tab is verbatim. When quoting a line back to an " +
     "edit tool, use only that text and drop the line-number prefix.",
-  strategyHint: "read the full content of a specific note once you know its path (output is line-numbered)",
+  strategyHint:
+    "read a whole note once you know its path (output is line-numbered); for a long structured " +
+    "note, prefer get_outline then read_section",
   errorGuidance: "If the note was not found, call list_directory first to locate the correct path.",
   parameters: {
     type: "object",
@@ -23,6 +27,67 @@ export const READ_FILE_TOOL: CanonicalToolDefinition = {
       },
     },
     required: ["path"],
+  },
+};
+
+export const GET_OUTLINE_TOOL: CanonicalToolDefinition = {
+  name: "get_outline",
+  description:
+    "Get the heading structure of a single note without reading its prose. For each heading it " +
+    "returns the depth, the full headingPath (e.g. \"Act I > Chapter 3 > The Duel\"), and an " +
+    "approximate word and line count for that heading's section. Use this to survey a long or " +
+    "structured note and decide which part to read, then pass a headingPath to read_section. " +
+    "A note with no headings is reported as such (read it whole with read_file instead).",
+  strategyHint:
+    "survey the heading tree of a long note, then read_section the part you need (cheaper than " +
+    "read_file on a whole manuscript)",
+  errorGuidance: "If the note was not found, call list_directory or search_files to locate the correct path.",
+  parameters: {
+    type: "object",
+    properties: {
+      path: {
+        type: "string",
+        description:
+          "Vault-relative file path (e.g., 'Manuscript/Act I.md'). " +
+          "Paths are case-sensitive on most systems.",
+      },
+    },
+    required: ["path"],
+  },
+};
+
+export const READ_SECTION_TOOL: CanonicalToolDefinition = {
+  name: "read_section",
+  description:
+    "Read a single section of a note by its headingPath, exactly as emitted by get_outline " +
+    "(e.g. \"Act I > Chapter 3 > The Duel\"). A section is the heading plus everything beneath it " +
+    "down to the next heading of the same or higher level, so a parent heading includes its " +
+    "subsections; pass a deeper headingPath to read just that part. Output is line-numbered " +
+    "consistently with read_file. Use this instead of read_file to read one part of a long " +
+    "structured note. If a bare heading is duplicated in the note, pass the full headingPath to " +
+    "disambiguate.",
+  strategyHint:
+    "read one section of a structured note by its headingPath from get_outline, instead of the whole note",
+  errorGuidance:
+    "If the heading was not found, call get_outline to see the note's exact heading paths. " +
+    "If the heading is ambiguous, pass one of the full headingPaths listed in the error. " +
+    "If the note has no headings, read it whole with read_file.",
+  parameters: {
+    type: "object",
+    properties: {
+      path: {
+        type: "string",
+        description: "Vault-relative file path (e.g., 'Manuscript/Act I.md').",
+      },
+      headingPath: {
+        type: "string",
+        description:
+          "The section's full breadcrumb as shown by get_outline, e.g. " +
+          "\"Act I > Chapter 3 > The Duel\". A shorter trailing path narrows to that heading; " +
+          "pass the full path when a bare heading is duplicated.",
+      },
+    },
+    required: ["path", "headingPath"],
   },
 };
 
@@ -265,8 +330,10 @@ export const CORE_VAULT_TOOLS: CanonicalToolDefinition[] = [
 
 /**
  * Full vault tool suite, for chat and plan modes with cloud providers.
- * Adds recursive tree, filename search, and Obsidian-native tools
- * (backlinks, tags, frontmatter) on top of the core set.
+ * Adds recursive tree, filename search, Obsidian-native tools (backlinks, tags,
+ * frontmatter), and the get_outline / read_section structure pair on top of the
+ * core set. The pair is cloud-only for now; CORE (local) inclusion is deferred to
+ * the tool benchmark rather than assumed (tool-set-review D6).
  */
 export const ALL_VAULT_TOOLS: CanonicalToolDefinition[] = [
   LIST_DIRECTORY_TOOL,
@@ -277,6 +344,8 @@ export const ALL_VAULT_TOOLS: CanonicalToolDefinition[] = [
   GET_BACKLINKS_TOOL,
   GET_FRONTMATTER_TOOL,
   READ_FILE_TOOL,
+  GET_OUTLINE_TOOL,
+  READ_SECTION_TOOL,
   SEARCH_VAULT_TOOL,
 ];
 
@@ -285,6 +354,8 @@ export const VAULT_TOOL_NAMES = new Set([
   "semantic_search",
   "search_content",
   "read_file",
+  "get_outline",
+  "read_section",
   "list_directory",
   "directory_tree",
   "search_files",

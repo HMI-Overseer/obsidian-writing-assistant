@@ -25,4 +25,15 @@ describe("formatWithLineNumbers", () => {
   test("numbers a single line with no trailing newline", () => {
     expect(formatWithLineNumbers("only line")).toBe("1\tonly line");
   });
+
+  test("starts numbering at startLine so a section read matches read_file's numbers", () => {
+    expect(formatWithLineNumbers("five\nsix", 5)).toBe("5\tfive\n6\tsix");
+  });
+
+  test("widths align to the largest absolute line number when offset", () => {
+    // startLine 8, two lines -> max line 9, width 1.
+    expect(formatWithLineNumbers("a\nb", 8)).toBe("8\ta\n9\tb");
+    // startLine 9, two lines -> max line 10, width 2 (the offset line aligns).
+    expect(formatWithLineNumbers("a\nb", 9)).toBe(" 9\ta\n10\tb");
+  });
 });

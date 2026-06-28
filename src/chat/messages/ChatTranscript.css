@@ -410,32 +410,86 @@
     transform: scale(1.02);
   }
 
-  .lmsa-chat-image-modal-shell .modal {
-    width: min(92vw, 1100px);
-    max-width: 1100px;
+  /* ── Image lightbox ──────────────────────────────────────────────────────────
+     The image itself IS the popover. Strip Obsidian's modal chrome (frame, title,
+     default close button) so only the picture and a built-in X remain. The modal
+     renders outside .lmsa-root, so chrome resets use !important and a two-class
+     selector to clear Obsidian's core .modal / button styling. */
+
+  .modal.lmsa-chat-image-modal-shell {
+    width: auto !important;
+    min-width: 0 !important;
+    max-width: 94vw !important;
+    max-height: none !important;
+    overflow: visible !important;
+    padding: 0 !important;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
   }
 
+  .lmsa-chat-image-modal-shell .modal-close-button,
   .lmsa-chat-image-modal-shell .modal-title {
+    display: none !important;
+  }
+
+  .lmsa-chat-image-modal-shell .lmsa-chat-image-lightbox {
+    padding: 0 !important;
+    max-height: none !important;
+    overflow: visible !important;
+  }
+
+  .lmsa-chat-image-lightbox-frame {
+    position: relative;
+    display: inline-flex;
+    line-height: 0;
+    border-radius: 14px;
     overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .lmsa-chat-image-modal {
-    @apply lmsa-flex lmsa-flex-col;
-    padding: 0;
-  }
-
-  .lmsa-chat-image-modal-img {
-    display: block;
-    width: 100%;
-    max-width: 100%;
-    max-height: 80vh;
-    object-fit: contain;
-    border-radius: 16px;
+    box-shadow: 0 24px 70px rgba(0, 0, 0, 0.45);
     background:
       linear-gradient(135deg, color-mix(in srgb, var(--lmsa-mode-accent) 8%, transparent), transparent),
       color-mix(in srgb, var(--background-primary) 86%, var(--background-secondary));
+  }
+
+  .lmsa-chat-image-lightbox-img {
+    display: block;
+    max-width: 90vw;
+    max-height: 85vh;
+    object-fit: contain;
+  }
+
+  /* Built-in close: a subtle Obsidian-themed disc on the image's top-right corner.
+     Two-class selector + explicit resets to beat Obsidian's core button chrome. */
+  .lmsa-chat-image-modal-shell .lmsa-chat-image-lightbox-close {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    min-height: 0;
+    padding: 0;
+    border-radius: 50%;
+    border: 1px solid var(--background-modifier-border);
+    background: var(--background-secondary);
+    color: var(--text-muted);
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
+    cursor: pointer;
+    appearance: none;
+    transition: color 120ms ease, background 120ms ease, transform 120ms ease;
+  }
+
+  .lmsa-chat-image-modal-shell .lmsa-chat-image-lightbox-close:hover {
+    color: var(--text-normal);
+    background: var(--background-modifier-hover);
+    transform: scale(1.05);
+  }
+
+  .lmsa-chat-image-lightbox-close svg {
+    width: 16px;
+    height: 16px;
   }
 }
 

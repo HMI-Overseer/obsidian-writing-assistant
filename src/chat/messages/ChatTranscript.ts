@@ -382,7 +382,7 @@ export class ChatTranscript {
         });
 
         thumbEl.addEventListener("click", () => {
-          new ImagePreviewModal(this.app, imageSrc, imageAlt, attachment.fileName).open();
+          new ImagePreviewModal(this.app, imageSrc, imageAlt).open();
         });
       } else if (attachment.type === "note") {
         const chipEl = galleryEl.createDiv({ cls: "lmsa-chat-window-attachment-note" });

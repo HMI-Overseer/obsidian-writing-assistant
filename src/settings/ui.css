@@ -321,10 +321,19 @@
      (which has no arrow), so the chevron overlaps short labels like "Ask" /
      "Auto" and they read as clipped. Reserve room for the arrow and keep a floor
      width so short-label boxes don't collapse under it. Inputs/textareas keep
-     the tighter padding. Fixes every settings dropdown at once. */
+     the tighter padding.
+
+     Obsidian also pins selects to a fixed --input-height; combined with the 8px
+     vertical padding from the shared rule above, that leaves too little room for
+     the text line and the label clips top-and-bottom. height:auto + a min-height
+     lets the box grow to fit its content instead. Fixes every settings dropdown
+     at once. */
   .lmsa-settings-root select {
     padding-right: 28px;
     min-width: 6ch;
+    height: auto;
+    min-height: 36px;
+    overflow: visible;
   }
 
   .lmsa-settings-root input[type="text"]:focus,

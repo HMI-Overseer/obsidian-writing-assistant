@@ -142,4 +142,29 @@ describe("OpenAIClient.stream usage accounting", () => {
     expect(await result.usage).toEqual({ inputTokens: 20, outputTokens: 8 });
     expect(await result.stopReason).toBe("tool_use");
   });
+
+  test("surfaces a malformed tool call with empty args instead of dropping it", async () => {
+    // A model that streams broken JSON for its arguments must still produce a
+    // tool call: surfaced with {} so the loop returns a self-correcting validation
+    // error on the timeline step. Dropping it would silently vanish from the turn.
+    mockStreamFetch.mockImplementation(streamImpl([
+      { event: { choices: [{ index: 0, delta: { tool_calls: [{ index: 0, id: "call_1", function: { name: "propose_edit", arguments: "{\"a\":" } }] } }] } },
+      { event: { choices: [{ index: 0, delta: {}, finish_reason: "tool_calls" }] } },
+    ]));
+    const client = new OpenAIClient("key", "https://api.openai.com/v1");
+    const request = makeRequest({
+      tools: [{
+        name: "propose_edit",
+        description: "Edit the document.",
+        parameters: { type: "object", properties: {}, required: [] },
+      }],
+    });
+
+    const result = client.stream(request, "gpt-4o", makeParams());
+    await drain(result.deltas);
+
+    expect(await result.toolCalls).toEqual([
+      { id: "call_1", name: "propose_edit", arguments: {} },
+    ]);
+  });
 });

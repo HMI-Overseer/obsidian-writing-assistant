@@ -10,6 +10,7 @@ import { withRetry } from "./retry";
 import { streamNode } from "./streamingTransport";
 import type { DeltaExtractor } from "./streamingTransport";
 import { ANTHROPIC_BASE_URL, ANTHROPIC_VERSION } from "./anthropicConstants";
+import { parseToolArguments } from "./parsing";
 import {
   buildAnthropicMessages,
   buildAnthropicHeaders,
@@ -205,21 +206,15 @@ export class AnthropicClient implements ChatClient {
       } else if (record.type === "content_block_stop") {
         const pending = pendingToolCalls.get(record.index as number);
         if (pending) {
-          const raw = pending.jsonChunks.join("");
-          let args: Record<string, unknown> = {};
-          try {
-            if (raw) args = JSON.parse(raw) as Record<string, unknown>;
-          } catch (e) {
-            // Surface the call with empty args rather than dropping it, so the
-            // tool loop returns a self-correcting validation error and the model
-            // can retry — a dropped call would silently vanish from the turn.
-            console.error(
-              `[tool] Failed to parse args for tool call "${pending.name}" (${pending.id}); ` +
-                "surfacing with empty args:",
-              e
-            );
-          }
-          completedToolCalls.push({ id: pending.id, name: pending.name, arguments: args });
+          // Malformed (or empty) args surface as {} rather than dropping the call,
+          // so the tool loop returns a self-correcting validation error on the
+          // timeline step and the model can retry — a dropped call would silently
+          // vanish from the turn.
+          completedToolCalls.push({
+            id: pending.id,
+            name: pending.name,
+            arguments: parseToolArguments(pending.jsonChunks.join("")),
+          });
           pendingToolCalls.delete(record.index as number);
         }
       }

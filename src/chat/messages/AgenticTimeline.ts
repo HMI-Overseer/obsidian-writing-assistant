@@ -371,7 +371,7 @@ export class AgenticTimeline {
     const errorEl = expandEl.createDiv({ cls: "lmsa-agentic-timeline-error" });
     errorEl.createSpan({
       cls: "lmsa-agentic-timeline-error-label",
-      text: "Error returned to the model",
+      text: "error",
     });
     errorEl.createEl("pre", { cls: "lmsa-agentic-timeline-arg-value", text: content });
     expandEl.prepend(errorEl); // keep the error above any raw-args entries

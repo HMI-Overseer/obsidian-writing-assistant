@@ -29,8 +29,11 @@ export function normalizeEscapes(value: unknown): string {
  * Convert parsed tool calls into EditBlocks for the existing review pipeline.
  *
  * Each tool call's arguments are validated before conversion. Invalid tool
- * calls are skipped with a console.error, the model may have produced
- * malformed arguments that can't be converted to a meaningful EditBlock.
+ * calls are skipped (the converter returns null); the in-loop edit resolver turns
+ * that null into a self-correcting error result on the call's timeline step
+ * ({@link ../../chat/actions/liveVaultReview}), so the model sees what went wrong
+ * and can retry. No console output: the developer console is not a channel the
+ * user or model can act on.
  *
  * Multiple `update_frontmatter` calls are merged into a single EditBlock
  * to prevent overlapping diffs when the model makes separate calls per
@@ -72,10 +75,7 @@ function mergeUpdateFrontmatterCalls(calls: ToolCall[]): EditBlock | null {
 
   for (const tc of calls) {
     const v = validateUpdateFrontmatter(tc.arguments);
-    if (!v.ok) {
-      console.error(`[tool] Skipping update_frontmatter (${tc.id}): ${v.error}`);
-      continue;
-    }
+    if (!v.ok) continue; // surfaced to the model via the loop's editError result
     if (!targetPath && v.args.path) targetPath = v.args.path;
     allOperations.push(...v.args.operations);
   }
@@ -111,10 +111,7 @@ export function convertToolCallToEditBlock(tc: ToolCall): EditBlock | null {
   switch (tc.name) {
     case "propose_edit": {
       const v = validateProposeEdit(tc.arguments);
-      if (!v.ok) {
-        console.error(`[tool] Skipping propose_edit (${tc.id}): ${v.error}`);
-        return null;
-      }
+      if (!v.ok) return null; // surfaced to the model via the loop's editError result
       return {
         id: tc.id,
         searchText: normalizeEscapes(v.args.search),
@@ -125,10 +122,7 @@ export function convertToolCallToEditBlock(tc: ToolCall): EditBlock | null {
     }
     case "update_frontmatter": {
       const v = validateUpdateFrontmatter(tc.arguments);
-      if (!v.ok) {
-        console.error(`[tool] Skipping update_frontmatter (${tc.id}): ${v.error}`);
-        return null;
-      }
+      if (!v.ok) return null; // surfaced to the model via the loop's editError result
       return {
         id: tc.id,
         searchText: "", // Resolved later via current frontmatter extraction
@@ -141,10 +135,7 @@ export function convertToolCallToEditBlock(tc: ToolCall): EditBlock | null {
     }
     case "insert_into_note": {
       const v = validateInsertIntoNote(tc.arguments);
-      if (!v.ok) {
-        console.error(`[tool] Skipping insert_into_note (${tc.id}): ${v.error}`);
-        return null;
-      }
+      if (!v.ok) return null; // surfaced to the model via the loop's editError result
       // Structural: searchText/replaceText are computed at resolution time from the
       // anchor and the document content (resolveStructuralEditBlocks). Escapes are
       // normalized here so the stored anchor/text match what the document holds.

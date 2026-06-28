@@ -263,12 +263,11 @@ async function buildVaultOpProposal(
     replaceTargets: (callId) => replaceScans.get(callId) ?? null,
   };
 
-  const { ops, sources, satisfied, errors } = toVaultOperations(vaultOpCalls, probes, {
+  const { ops, sources, satisfied } = toVaultOperations(vaultOpCalls, probes, {
     stoppedForMaxTokens,
   });
-  for (const e of errors) {
-    console.error(`[vault-op] Skipping ${e.toolName} (${e.toolCallId}): ${e.error}`);
-  }
+  // Conversion errors are not logged here: the in-loop resolveRound already
+  // surfaced each as a self-correcting tool result on its timeline step.
   if (ops.length === 0) return null;
 
   let autoSoFar = 0;

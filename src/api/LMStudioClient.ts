@@ -15,7 +15,7 @@ import { formatOpenAITools } from "../tools/formatters/openai";
 import { resolveLMStudioBaseUrls } from "./urlResolution";
 import { normalizeModelList } from "./modelNormalization";
 import { requestJson, createModelListError } from "./httpTransport";
-import { isRecord } from "./parsing";
+import { isRecord, parseToolArguments } from "./parsing";
 import { streamNode, streamFetch } from "./streamingTransport";
 import { buildCompletionPayload } from "./buildPayload";
 import { formatRagContext } from "../rag/formatContext";
@@ -120,15 +120,13 @@ export class LMStudioClient implements ChatClient {
       for (const tc of rawToolCalls) {
         const fn = tc.function as Record<string, unknown> | undefined;
         if (fn) {
-          try {
-            toolCalls.push({
-              id: (tc.id as string) ?? "",
-              name: (fn.name as string) ?? "",
-              arguments: JSON.parse(fn.arguments as string),
-            });
-          } catch (e) {
-            console.error(`[tool] Failed to parse tool call "${fn.name}" (${tc.id}):`, e);
-          }
+          toolCalls.push({
+            id: (tc.id as string) ?? "",
+            name: (fn.name as string) ?? "",
+            // Malformed args surface as {} so the loop returns a self-correcting
+            // validation error on the timeline step, rather than dropping the call.
+            arguments: parseToolArguments(fn.arguments as string),
+          });
         }
       }
       if (toolCalls.length === 0) toolCalls = null;
@@ -213,18 +211,16 @@ export class LMStudioClient implements ChatClient {
       } finally {
         // Finalize any pending tool calls.
         for (const [, pending] of pendingToolCalls) {
-          try {
-            completedToolCalls.push({
-              // A local model that streams a tool call without an id would
-              // otherwise leave the echoed tool_call_id empty and break the
-              // review's step↔op id match, mint one so it's always non-empty.
-              id: pending.id || generateId(),
-              name: pending.name,
-              arguments: JSON.parse(pending.argChunks.join("")),
-            });
-          } catch (e) {
-            console.error(`[tool] Failed to parse tool call "${pending.name}" (${pending.id}):`, e);
-          }
+          completedToolCalls.push({
+            // A local model that streams a tool call without an id would
+            // otherwise leave the echoed tool_call_id empty and break the
+            // review's step↔op id match, mint one so it's always non-empty.
+            id: pending.id || generateId(),
+            name: pending.name,
+            // Malformed args surface as {} so the loop returns a self-correcting
+            // validation error on the timeline step, rather than dropping the call.
+            arguments: parseToolArguments(pending.argChunks.join("")),
+          });
         }
         pendingToolCalls.clear();
         resolveToolCalls(completedToolCalls.length > 0 ? completedToolCalls : null);

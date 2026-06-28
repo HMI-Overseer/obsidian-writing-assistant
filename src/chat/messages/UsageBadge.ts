@@ -4,9 +4,9 @@ import { PRICING_AS_OF } from "../../api/pricing";
 
 /**
  * Short, human labels for each cold-rebuild cause, shown next to "session
- * rebuilt" in the Claude Code usage badge. The interesting measurement signal is
- * a config-driven rebuild (a mode switch changing the prompt / tools), which the
- * prompt-cache work targets; a first-turn mint ("no-session") and a disposed
+ * rebuilt" in the Claude Code usage tooltip. The interesting measurement signal
+ * is a config-driven rebuild (a mode switch changing the prompt / tools), which
+ * the prompt-cache work targets; a first-turn mint ("no-session") and a disposed
  * prior session read as expected, not regressions, and are handled separately.
  */
 const SESSION_REBUILD_LABELS: Record<SessionRebuildReason, string> = {
@@ -33,16 +33,113 @@ function isMeteredProvider(provider: ProviderOption | undefined): boolean {
   return provider !== undefined && PROVIDER_DESCRIPTORS[provider].billingModel === "per-token";
 }
 
+/** Abbreviated count for the compact face (e.g. 12756 → "12.8k"). */
 function formatTokenCount(tokens: number): string {
   if (tokens >= 1_000_000) return `${(tokens / 1_000_000).toFixed(1)}M`;
   if (tokens >= 1_000) return `${(tokens / 1_000).toFixed(1)}k`;
   return String(tokens);
 }
 
+/** Exact count with thousands separators for the tooltip (locale-independent). */
+function withThousands(n: number): string {
+  return n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+}
+
 function formatCost(usd: number): string {
   if (usd < 0.01) return `$${usd.toFixed(4)}`;
   if (usd < 1) return `$${usd.toFixed(3)}`;
   return `$${usd.toFixed(2)}`;
+}
+
+/**
+ * The single headline shown on the badge face. Cost is the headline for a metered
+ * provider with a known price (what those users watch); everything else (Claude
+ * Code's subscription, a metered model with no price table entry, a free local
+ * model) falls back to a compact total-token figure. The in/out split, cache, and
+ * price basis all move to the tooltip. Pure, unit-tested.
+ */
+export function buildHeadline(
+  usage: MessageUsage,
+  provider: ProviderOption | undefined,
+): { text: string; isCost: boolean } {
+  const hasCost =
+    provider !== "claudecode" &&
+    usage.estimatedCostUsd !== null &&
+    usage.estimatedCostUsd !== undefined &&
+    usage.estimatedCostUsd > 0;
+  if (hasCost) {
+    return { text: `~${formatCost(usage.estimatedCostUsd as number)}`, isCost: true };
+  }
+  return { text: `${formatTokenCount(usage.inputTokens + usage.outputTokens)} tok`, isCost: false };
+}
+
+/**
+ * The cache figures shown on the badge face for cache-capable providers
+ * (Anthropic, Claude Code): the read total, plus the write total when one was
+ * created. Tinted by whether the turn HIT the cache (read > 0, green) or MISSED
+ * it (read === 0, amber) — a miss means the prefix was reprocessed from scratch.
+ * Null when the provider reports no cache fields (OpenAI, LM Studio). Pure,
+ * unit-tested.
+ */
+export function describeCache(
+  usage: MessageUsage,
+): { text: string; state: "hit" | "miss" } | null {
+  if (usage.cacheReadInputTokens === undefined) return null;
+  const write =
+    usage.cacheCreationInputTokens && usage.cacheCreationInputTokens > 0
+      ? ` · ${formatTokenCount(usage.cacheCreationInputTokens)} cache write`
+      : "";
+  return {
+    text: `${formatTokenCount(usage.cacheReadInputTokens)} cache read${write}`,
+    state: usage.cacheReadInputTokens > 0 ? "hit" : "miss",
+  };
+}
+
+/**
+ * The full usage breakdown, shown as the badge's hover tooltip (a native
+ * multi-line title). Everything the minimal face omits lives here: the in/out
+ * split, cache read/write figures, the session reuse reason, the cost basis, and
+ * the model id. Pure, unit-tested.
+ */
+export function composeUsageTooltip(
+  usage: MessageUsage,
+  modelId: string | undefined,
+  provider: ProviderOption | undefined,
+): string {
+  const lines: string[] = [
+    `${withThousands(usage.inputTokens)} in · ${withThousands(usage.outputTokens)} out`,
+  ];
+
+  // Prompt-cache figures, reported by cache-capable providers (Anthropic, Claude
+  // Code). A "0 cache read" is the tell that the turn reprocessed its prefix.
+  if (usage.cacheReadInputTokens !== undefined) {
+    const write =
+      usage.cacheCreationInputTokens && usage.cacheCreationInputTokens > 0
+        ? ` · ${withThousands(usage.cacheCreationInputTokens)} cache write`
+        : "";
+    lines.push(`${withThousands(usage.cacheReadInputTokens)} cache read${write}`);
+  }
+
+  const session = describeSession(usage);
+  if (session) lines.push(session.text);
+
+  if (provider === "claudecode") {
+    lines.push("Subscription (no per-message cost)");
+  } else if (
+    usage.estimatedCostUsd !== null &&
+    usage.estimatedCostUsd !== undefined &&
+    usage.estimatedCostUsd > 0
+  ) {
+    lines.push(`~${formatCost(usage.estimatedCostUsd)} — estimated, pricing as of ${PRICING_AS_OF}`);
+  } else if (usage.estimatedCostUsd === undefined && isMeteredProvider(provider)) {
+    lines.push("Price unavailable — no local pricing for this model");
+  }
+
+  if (modelId && provider && provider !== "lmstudio") {
+    lines.push(`model: ${modelId}`);
+  }
+
+  return lines.join("\n");
 }
 
 export function renderUsageBadge(
@@ -56,75 +153,41 @@ export function renderUsageBadge(
 
   const badgeEl = parentEl.createDiv({ cls: "lmsa-chat-window-usage-badge" });
 
-  if (usage) {
-    badgeEl.createSpan({
-      cls: "lmsa-chat-window-usage-tokens",
-      text: `${formatTokenCount(usage.inputTokens)} in \u00b7 ${formatTokenCount(usage.outputTokens)} out`,
-    });
-
-    // Prompt-cache figures, shown only for cache-capable providers (Anthropic,
-    // Claude Code report these fields). A "0 cache read" is itself the signal
-    // that a turn missed the cache and reprocessed its prefix from scratch.
-    if (usage.cacheReadInputTokens !== undefined) {
-      const writeSuffix =
-        usage.cacheCreationInputTokens && usage.cacheCreationInputTokens > 0
-          ? ` · ${formatTokenCount(usage.cacheCreationInputTokens)} cache write`
-          : "";
-      badgeEl.createSpan({
-        cls: "lmsa-chat-window-usage-cache",
-        text: `${formatTokenCount(usage.cacheReadInputTokens)} cache read${writeSuffix}`,
-      });
+  // No usage figures (e.g. an aborted or older message): keep just the model id.
+  if (!usage) {
+    if (modelId && provider && provider !== "lmstudio") {
+      badgeEl.createSpan({ cls: "lmsa-chat-window-usage-model", text: modelId });
     }
-
-    // Claude Code session reuse signal: whether this turn kept the live process
-    // alive (cheap, incremental cache) or cold-rebuilt it (full transcript
-    // replay), and what drove a rebuild. The plugin-level analog of the cache
-    // read/write figures above (Phase 0 cache instrumentation).
-    const session = describeSession(usage);
-    if (session) {
-      const sessionEl = badgeEl.createSpan({
-        cls: "lmsa-chat-window-usage-session",
-        text: session.text,
-      });
-      sessionEl.addClass(`is-${session.state}`);
-    }
-
-    // Claude Code runs on a subscription, so per-message cost is meaningless,
-    // show the plan instead of a calculated price.
-    if (provider === "claudecode") {
-      badgeEl.createSpan({
-        cls: "lmsa-chat-window-usage-cost",
-        text: "Subscription",
-      });
-    } else if (
-      usage.estimatedCostUsd !== null &&
-      usage.estimatedCostUsd !== undefined &&
-      usage.estimatedCostUsd > 0
-    ) {
-      // A token-table estimate, not a billed figure. The "~" and the dated tooltip
-      // keep it honestly an estimate "as of" a price snapshot, not authoritative.
-      badgeEl.createSpan({
-        cls: "lmsa-chat-window-usage-cost",
-        text: `~${formatCost(usage.estimatedCostUsd)}`,
-        title: `Estimated from pricing as of ${PRICING_AS_OF}`,
-      });
-    } else if (usage.estimatedCostUsd === undefined && isMeteredProvider(provider)) {
-      // A per-token provider whose model isn't in the price table. Surfacing this
-      // as "price unavailable" distinguishes it from a free/local model, which
-      // intentionally shows no cost at all.
-      badgeEl.createSpan({
-        cls: "lmsa-chat-window-usage-cost-unavailable",
-        text: "price unavailable",
-        title: "No local pricing data for this model",
-      });
-    }
+    return badgeEl;
   }
 
-  // Show model tag in mixed-provider conversations for clarity.
-  if (modelId && provider && provider !== "lmstudio") {
+  // The face stays minimal; the full breakdown rides the hover tooltip.
+  badgeEl.setAttribute("title", composeUsageTooltip(usage, modelId, provider));
+
+  const headline = buildHeadline(usage, provider);
+  const headlineEl = badgeEl.createSpan({
+    cls: "lmsa-chat-window-usage-headline",
+    text: headline.text,
+  });
+  if (headline.isCost) headlineEl.addClass("is-cost");
+
+  // Cache read/write, surfaced on the face and tinted by hit (green) / miss (amber).
+  const cache = describeCache(usage);
+  if (cache) {
+    const cacheEl = badgeEl.createSpan({
+      cls: "lmsa-chat-window-usage-cache",
+      text: cache.text,
+    });
+    cacheEl.addClass(cache.state === "hit" ? "is-hit" : "is-miss");
+  }
+
+  // Claude Code only: flag a cold session *rebuild* (the prompt-cache regression).
+  // The cause lives in the tooltip; a reused/started session needs no extra word.
+  const session = describeSession(usage);
+  if (session?.state === "rebuilt") {
     badgeEl.createSpan({
-      cls: "lmsa-chat-window-usage-model",
-      text: modelId,
+      cls: "lmsa-chat-window-usage-session is-rebuilt",
+      text: "rebuilt",
     });
   }
 
@@ -132,11 +195,11 @@ export function renderUsageBadge(
 }
 
 /**
- * Maps a turn's session reuse fields to a badge label + visual state, or null
- * when the provider doesn't report session reuse (everything but Claude Code).
- * `reused` is a win (warm process), a first-turn `no-session` is a neutral cold
- * mint, and any other rebuild is the regression the prompt-cache work targets.
- * Exported for unit testing (pure logic lifted out of the DOM render).
+ * Maps a turn's session reuse fields to a label + visual state, or null when the
+ * provider doesn't report session reuse (everything but Claude Code). `reused` is
+ * a win (warm process), a first-turn `no-session` is a neutral cold mint, and any
+ * other rebuild is the regression the prompt-cache work targets. Exported for unit
+ * testing and reused by both the face warmth dot and the tooltip session line.
  */
 export function describeSession(
   usage: MessageUsage,

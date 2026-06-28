@@ -13,37 +13,35 @@
     opacity: 1;
   }
 
-  .lmsa-chat-window-usage-tokens {
+  /* Headline: the single glanceable figure (cost or total tokens). */
+  .lmsa-chat-window-usage-headline {
     @apply lmsa-inline-flex lmsa-items-center;
   }
 
-  .lmsa-chat-window-usage-cost {
-    @apply lmsa-inline-flex lmsa-items-center;
+  .lmsa-chat-window-usage-headline.is-cost {
     color: var(--lmsa-mode-accent);
   }
 
-  .lmsa-chat-window-usage-cost-unavailable {
-    @apply lmsa-inline-flex lmsa-items-center lmsa-italic;
-    opacity: 0.6;
-  }
-
+  /* Cache read/write figures, tinted by cache hit (green) vs miss (amber). */
   .lmsa-chat-window-usage-cache {
     @apply lmsa-inline-flex lmsa-items-center;
+  }
+
+  .lmsa-chat-window-usage-cache.is-hit {
     color: var(--text-success);
   }
 
-  .lmsa-chat-window-usage-session {
-    @apply lmsa-inline-flex lmsa-items-center;
-  }
-
-  .lmsa-chat-window-usage-session.is-reused {
-    color: var(--text-success);
-  }
-
-  .lmsa-chat-window-usage-session.is-rebuilt {
+  .lmsa-chat-window-usage-cache.is-miss {
     color: var(--text-warning);
   }
 
+  /* Claude Code: a cold session rebuild, the prompt-cache regression to notice. */
+  .lmsa-chat-window-usage-session.is-rebuilt {
+    @apply lmsa-inline-flex lmsa-items-center;
+    color: var(--text-warning);
+  }
+
+  /* Model id, shown alone for a usage-less message (e.g. aborted/older turns). */
   .lmsa-chat-window-usage-model {
     @apply lmsa-inline-flex lmsa-items-center;
     font-size: var(--font-smallest);

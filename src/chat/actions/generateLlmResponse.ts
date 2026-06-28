@@ -228,7 +228,7 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
     // One unified agentic round budget now that the modes are gone (the old edit-only
     // cap keyed off the live document, which no longer exists). The per-turn
     // identical-call guard is the primary spin control; this is the high backstop.
-    const maxRounds = plugin.settings.maxToolRoundsChat;
+    const maxRounds = plugin.settings.maxToolRounds;
 
     // Only the plugin-owned tool loop buffers deltas; Claude Code streams live.
     const agenticMode = pluginAgentic;

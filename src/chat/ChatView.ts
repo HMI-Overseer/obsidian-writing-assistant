@@ -308,7 +308,6 @@ export class ChatView extends ItemView {
 
     this.toolUsePopover = new ToolUsePopover(this.layout, {
       getAgenticMode: () => this.plugin.settings.agenticMode,
-      getPreferEditTools: () => this.plugin.settings.preferToolUse,
       getActiveModel: () => this.sessionStore?.getResolvedConversationModel() ?? null,
       getTrainedForToolUse: (modelId) =>
         this.plugin.services.modelAvailability.getTrainedForToolUse(modelId),
@@ -318,10 +317,6 @@ export class ChatView extends ItemView {
         this.composer?.refreshToolUseIndicator(
           this.sessionStore?.getResolvedConversationModel() ?? null,
         );
-      },
-      onEditToolsToggle: async (enabled) => {
-        this.plugin.settings.preferToolUse = enabled;
-        await this.plugin.saveSettings();
       },
       onBeforeOpen: () => {
         if (this.knowledgePopover?.isOpen()) this.knowledgePopover.close();

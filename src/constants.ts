@@ -65,8 +65,9 @@ export const DEFAULT_SYSTEM_PROMPT_PREFIX =
 // guard in the tool loop catches a model repeating the same call; the round cap
 // only stops genuinely unbounded multi-hop work. A budget of 5 was too small and
 // cut off legitimate read → read → edit chains, so it is raised well clear of them.
-export const DEFAULT_MAX_TOOL_ROUNDS_EDIT = 15;
-export const DEFAULT_MAX_TOOL_ROUNDS_CHAT = 20;
+// One unified budget now that the plan/chat/edit modes are gone (the old edit-only
+// cap keyed off the live document, which no longer exists).
+export const DEFAULT_MAX_TOOL_ROUNDS = 20;
 
 /** Maximum persisted benchmark runs. Oldest entries are dropped beyond this. */
 export const MAX_BENCHMARK_HISTORY = 50;
@@ -129,9 +130,7 @@ export const DEFAULT_SETTINGS: PluginSettings = {
   systemPromptPrefix: DEFAULT_SYSTEM_PROMPT_PREFIX,
   apiKeysDisclaimerAccepted: false,
   agenticMode: false,
-  preferToolUse: false,
-  maxToolRoundsEdit: DEFAULT_MAX_TOOL_ROUNDS_EDIT,
-  maxToolRoundsChat: DEFAULT_MAX_TOOL_ROUNDS_CHAT,
+  maxToolRounds: DEFAULT_MAX_TOOL_ROUNDS,
   benchmark: { ...DEFAULT_BENCHMARK_SETTINGS },
   vaultOpPolicy: { ...DEFAULT_VAULT_OP_POLICY, scopes: [...DEFAULT_VAULT_OP_POLICY.scopes] },
 };

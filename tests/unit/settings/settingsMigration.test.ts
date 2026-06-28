@@ -30,7 +30,30 @@ describe("normalizePluginSettings", () => {
     expect(result.agenticMode).toBe(true);
     expect(result.systemPromptPrefix).toBe("custom prefix");
     // untouched fields fall back to defaults
-    expect(result.maxToolRoundsChat).toBe(DEFAULT_SETTINGS.maxToolRoundsChat);
+    expect(result.maxToolRounds).toBe(DEFAULT_SETTINGS.maxToolRounds);
+  });
+
+  // The per-mode round budgets (maxToolRoundsEdit / maxToolRoundsChat) collapsed into
+  // one maxToolRounds (prompt-cache cleanup 2). A customized legacy value is carried
+  // forward, the live chat budget preferred over the dead edit budget; a present new
+  // field wins; old data carrying both legacy fields must not crash.
+  it("migrates the legacy per-mode tool-round budgets into maxToolRounds", () => {
+    const bothLegacy = normalizePluginSettings({
+      maxToolRoundsChat: 12,
+      maxToolRoundsEdit: 7,
+    } as unknown as Partial<PluginSettings>);
+    expect(bothLegacy.maxToolRounds).toBe(12);
+
+    const editOnly = normalizePluginSettings({
+      maxToolRoundsEdit: 9,
+    } as unknown as Partial<PluginSettings>);
+    expect(editOnly.maxToolRounds).toBe(9);
+
+    const newWins = normalizePluginSettings({
+      maxToolRounds: 30,
+      maxToolRoundsChat: 12,
+    } as unknown as Partial<PluginSettings>);
+    expect(newWins.maxToolRounds).toBe(30);
   });
 
   // The plan/chat/edit mode prompts collapsed into one unified systemPromptPrefix

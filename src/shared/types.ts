@@ -472,12 +472,8 @@ export interface PluginSettings {
   apiKeysDisclaimerAccepted: boolean;
   /** Master gate for all tool use. When false, no mode uses tools. */
   agenticMode: boolean;
-  /** Use structured edit tools in edit mode when agentic mode is on and model supports them. */
-  preferToolUse: boolean;
-  /** Maximum tool rounds in edit mode (outline inspect → write); a high backstop, with the per-turn identical-call guard as the primary spin control. */
-  maxToolRoundsEdit: number;
-  /** Maximum read-only tool rounds in chat/plan mode (multi-hop vault retrieval). */
-  maxToolRoundsChat: number;
+  /** Maximum read-only tool rounds per turn (multi-hop vault retrieval / outline inspection before responding or editing); a high backstop, with the per-turn identical-call guard as the primary spin control. */
+  maxToolRounds: number;
   /** Benchmark report folder and persisted run history. */
   benchmark: BenchmarkSettings;
   /** Approval policy for vault write operations (create/overwrite/move/trash/createDir). */

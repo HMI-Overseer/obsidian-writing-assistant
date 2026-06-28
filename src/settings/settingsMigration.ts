@@ -230,6 +230,17 @@ function migrateSystemPromptPrefix(data: Partial<PluginSettings> | null): string
   return DEFAULT_SETTINGS.systemPromptPrefix;
 }
 
+// The old per-mode round budgets (`maxToolRoundsEdit` / `maxToolRoundsChat`) collapsed
+// into one `maxToolRounds` once the modes were gone; carry a customized legacy value
+// forward, the live chat budget preferred over the dead edit one.
+function migrateMaxToolRounds(data: Partial<PluginSettings> | null): number {
+  if (typeof data?.maxToolRounds === "number") return data.maxToolRounds;
+  const legacy = data as Record<string, unknown> | null;
+  if (typeof legacy?.maxToolRoundsChat === "number") return legacy.maxToolRoundsChat;
+  if (typeof legacy?.maxToolRoundsEdit === "number") return legacy.maxToolRoundsEdit;
+  return DEFAULT_SETTINGS.maxToolRounds;
+}
+
 export function normalizePluginSettings(data: Partial<PluginSettings> | null): PluginSettings {
   const completionModels: CompletionModel[] = Array.isArray(data?.completionModels)
     ? data.completionModels.map((model, index) => normalizeCompletionModel(model, index))
@@ -297,18 +308,7 @@ export function normalizePluginSettings(data: Partial<PluginSettings> | null): P
       typeof data?.agenticMode === "boolean"
         ? data.agenticMode
         : DEFAULT_SETTINGS.agenticMode,
-    preferToolUse:
-      typeof data?.preferToolUse === "boolean"
-        ? data.preferToolUse
-        : DEFAULT_SETTINGS.preferToolUse,
-    maxToolRoundsEdit:
-      typeof data?.maxToolRoundsEdit === "number"
-        ? data.maxToolRoundsEdit
-        : DEFAULT_SETTINGS.maxToolRoundsEdit,
-    maxToolRoundsChat:
-      typeof data?.maxToolRoundsChat === "number"
-        ? data.maxToolRoundsChat
-        : DEFAULT_SETTINGS.maxToolRoundsChat,
+    maxToolRounds: migrateMaxToolRounds(data),
     benchmark: normalizeBenchmarkSettings(data?.benchmark),
     vaultOpPolicy: normalizeVaultOpPolicy(data?.vaultOpPolicy),
   };

@@ -1,7 +1,6 @@
 import type WritingAssistantChat from "../main";
 import {
-  DEFAULT_MAX_TOOL_ROUNDS_CHAT,
-  DEFAULT_MAX_TOOL_ROUNDS_EDIT,
+  DEFAULT_MAX_TOOL_ROUNDS,
   DEFAULT_SYSTEM_PROMPT_PREFIX,
 } from "../constants";
 import { createSettingsSection, SettingItem } from "./ui";
@@ -27,36 +26,18 @@ export function renderAdvancedTab(container: HTMLElement, plugin: WritingAssista
     );
 
   new SettingItem(agentic.bodyEl)
-    .setName("Max tool rounds, edit mode")
+    .setName("Max tool rounds")
     .setDesc(
-      `Maximum read-only tool rounds when editing a document (outline inspection before writing). Default: ${DEFAULT_MAX_TOOL_ROUNDS_EDIT}.`
+      `Maximum read-only tool rounds per turn (vault search and outline inspection before the model responds or edits). Default: ${DEFAULT_MAX_TOOL_ROUNDS}.`
     )
     .addText((text) =>
       text
-        .setPlaceholder(String(DEFAULT_MAX_TOOL_ROUNDS_EDIT))
-        .setValue(String(plugin.settings.maxToolRoundsEdit))
+        .setPlaceholder(String(DEFAULT_MAX_TOOL_ROUNDS))
+        .setValue(String(plugin.settings.maxToolRounds))
         .onChange(async (value) => {
           const parsed = parseInt(value, 10);
           if (!Number.isNaN(parsed) && parsed >= 1 && parsed <= 50) {
-            plugin.settings.maxToolRoundsEdit = parsed;
-            await plugin.saveSettings();
-          }
-        })
-    );
-
-  new SettingItem(agentic.bodyEl)
-    .setName("Max tool rounds, chat/plan mode")
-    .setDesc(
-      `Maximum read-only tool rounds when searching the vault in chat or plan mode. Default: ${DEFAULT_MAX_TOOL_ROUNDS_CHAT}.`
-    )
-    .addText((text) =>
-      text
-        .setPlaceholder(String(DEFAULT_MAX_TOOL_ROUNDS_CHAT))
-        .setValue(String(plugin.settings.maxToolRoundsChat))
-        .onChange(async (value) => {
-          const parsed = parseInt(value, 10);
-          if (!Number.isNaN(parsed) && parsed >= 1 && parsed <= 50) {
-            plugin.settings.maxToolRoundsChat = parsed;
+            plugin.settings.maxToolRounds = parsed;
             await plugin.saveSettings();
           }
         })

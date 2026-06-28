@@ -166,3 +166,18 @@ describe("toolNotAllowedFailure", () => {
     expect(result.isReadOnly).toBe(false);
   });
 });
+
+describe("Layer 2 progressive-disclosure trigger (ADR-0009)", () => {
+  // Phase 4 (Layer 2 / tool-search) was evaluated and DEFERRED at 23 tools across one
+  // logical server (the vault). Field guidance (design doc Q4 / §6.2.5) says revisit
+  // progressive disclosure once the catalogue crosses ~40-50 tools, a second tool domain
+  // is added, or selection quality regresses. This tripwire fails when the catalogue
+  // crosses the low end of that band, forcing the Phase-4 revisit conversation rather
+  // than letting the always-on tool tax grow silently ("no silent caps").
+  // See docs/reference/adr/0009-layer-2-progressive-disclosure-deferred.md.
+  const LAYER2_REVISIT_THRESHOLD = 40;
+
+  it("the full tool catalogue stays below the Layer-2 revisit threshold", () => {
+    expect(CLOUD_STABLE_TOOL_SET.length).toBeLessThan(LAYER2_REVISIT_THRESHOLD);
+  });
+});

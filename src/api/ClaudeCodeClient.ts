@@ -318,8 +318,11 @@ function applyReuseDecision(
 
 /**
  * Flattens a {@link ChatRequest} into a single prompt string for Claude Code's
- * stdin. The active document and any attached context become labeled blocks; the
- * conversation history is rendered as a simple speaker transcript.
+ * stdin. Attached context items become labeled blocks and the conversation history
+ * is rendered as a simple speaker transcript. A `documentContext` block is emitted
+ * only when one is supplied, i.e. the benchmark/analyst path; the production chat
+ * path sends `documentContext: null` (the active note rides as a frozen attachment
+ * on the user turn instead), so that block is inert there.
  *
  * RAG context is intentionally omitted when the MCP bridge is active, Claude Code
  * retrieves from the vault through the plugin's tools, but is included as a block

@@ -1,8 +1,7 @@
 import type { WorkspaceLeaf } from "obsidian";
 import { ItemView } from "obsidian";
-import type { ProviderProfile } from "../shared/types";
+import type { ApprovalPosture, ProviderProfile } from "../shared/types";
 import type { DocumentContext } from "../shared/chatRequest";
-import type { ChatMode } from "./types";
 import type WritingAssistantChat from "../main";
 import { VIEW_TYPE_CHAT, makeDefaultProfile } from "../constants";
 import { getActiveProfile, getProfilesForProvider, generateProfileId } from "../shared/profileUtils";
@@ -123,9 +122,9 @@ export class ChatView extends ItemView {
       onStopRequest: () => {
         this.orchestrator.stopGeneration();
       },
-      onModeChange: (mode) => {
+      onPostureChange: (posture) => {
         if (this.layout) {
-          this.layout.rootEl.dataset.mode = mode;
+          this.layout.rootEl.dataset.posture = posture;
         }
         this.composer?.refreshToolUseIndicator(
           this.sessionStore?.getResolvedConversationModel() ?? null
@@ -148,7 +147,7 @@ export class ChatView extends ItemView {
     });
 
     if (this.layout) {
-      this.layout.rootEl.dataset.mode = "conversation";
+      this.layout.rootEl.dataset.posture = "ask";
     }
 
     this.modelSelector = new ChatModelSelector(this.plugin, this.layout, {
@@ -424,8 +423,8 @@ export class ChatView extends ItemView {
     await this.orchestrator.send(expandedPrompt);
   }
 
-  setMode(mode: ChatMode): void {
-    this.composer?.setMode(mode);
+  setPosture(posture: ApprovalPosture): void {
+    this.composer?.setPosture(posture);
   }
 
   /**

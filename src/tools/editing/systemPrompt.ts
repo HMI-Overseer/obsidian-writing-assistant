@@ -1,12 +1,10 @@
 import type { CanonicalToolDefinition } from "../types";
 
 /**
- * Static system prompt prefix for edit-tool mode.
- *
- * This is the default value for `settings.editToolSystemPromptPrefix`.
- * Users can customize it in the Advanced settings tab. Tool-specific
- * strategy hints and error handling are appended dynamically by
- * `buildEditToolSystemPrompt()`, just like vault tools.
+ * Static edit-tool framing prompt. With the plan/chat/edit modes gone (§6.3) this is
+ * no longer a settings default; it is retained as a benchmark fixture
+ * ({@link ../../settings/benchmark/toolTestCases}). The live edit guidance the model
+ * sees is built dynamically by `buildEditToolSystemPrompt()` from the active edit tools.
  */
 export const TOOL_EDIT_SYSTEM_PROMPT = `You are a writing assistant that can explore the vault and edit documents.
 

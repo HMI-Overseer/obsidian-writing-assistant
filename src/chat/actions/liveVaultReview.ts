@@ -9,6 +9,7 @@ import type {
 import { diskState, diskFingerprint } from "../../vault-ops/apply";
 import { applyVaultOpBatch } from "../../vault-ops/applyBatch";
 import { resolveEditGate, targetPaths, type VaultOpPolicy } from "../../vault-ops/gateway";
+import type { ApprovalPosture } from "../../shared/types";
 import { escapesVault, outsideVaultMessage } from "../../vault-ops/pathSafety";
 import {
   preReadTrashSnapshots,
@@ -78,7 +79,9 @@ export interface LiveVaultReviewOptions {
   /** The streaming bubble's timeline element, where the review decorates steps. */
   timelineEl: HTMLElement;
   policy: VaultOpPolicy;
-  /** Edit-channel dependencies. Absent outside edit mode. */
+  /** Session approval posture; `auto` overrules the per-class policy to auto-apply (§6.3). */
+  posture: ApprovalPosture;
+  /** Edit-channel dependencies. Absent when no writes are permitted (read-only). */
   edit?: LiveEditReviewDeps;
 }
 
@@ -103,6 +106,7 @@ export class LiveVaultReview implements VaultOpReviewer {
   private readonly app: App;
   private readonly timelineEl: HTMLElement;
   private readonly policy: VaultOpPolicy;
+  private readonly posture: ApprovalPosture;
 
   private readonly proposal: VaultOperationProposal;
   private appliedRecord: AppliedVaultOpRecord | null = null;
@@ -135,6 +139,7 @@ export class LiveVaultReview implements VaultOpReviewer {
     this.app = opts.app;
     this.timelineEl = opts.timelineEl;
     this.policy = opts.policy;
+    this.posture = opts.posture;
     this.editDeps = opts.edit;
     this.proposal = { id: generateId(), ops: [], createdAt: Date.now() };
   }
@@ -336,7 +341,7 @@ export class LiveVaultReview implements VaultOpReviewer {
           continue;
         }
 
-        const gate = resolveEditGate(this.policy, file.path, this.autoSoFar);
+        const gate = resolveEditGate(this.policy, file.path, this.autoSoFar, this.posture);
         if (gate === "deny") {
           results.set(call.id, editError(call, "edits are denied by the current policy", "denied"));
           continue;
@@ -515,7 +520,7 @@ export class LiveVaultReview implements VaultOpReviewer {
       }
 
       const { op, satisfied: isSatisfied } = found;
-      const { gate, autoConsumed } = gateConvertedOp(op, isSatisfied, this.policy, this.autoSoFar);
+      const { gate, autoConsumed } = gateConvertedOp(op, isSatisfied, this.policy, this.autoSoFar, this.posture);
       if (gate === "deny") {
         // Denied tools are filtered upstream (Phase 4); guard anyway.
         const recovery = defaultRecovery("denied");

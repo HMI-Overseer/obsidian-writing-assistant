@@ -1,31 +1,34 @@
 import { Notice, setIcon } from "obsidian";
 import type { App } from "obsidian";
-import type { Attachment, CompletionModel, ImageMimeType } from "../../shared/types";
+import type {
+  ApprovalPosture,
+  Attachment,
+  CompletionModel,
+  ImageMimeType,
+} from "../../shared/types";
 import type WritingAssistantChat from "../../main";
 import { shouldUseToolCall } from "../../tools/registry";
 import { getActiveFileName } from "../../context/noteContext";
 import type { ExtraContextItem } from "../../shared/chatRequest";
-import type { ChatLayoutRefs, ChatMode } from "../types";
+import type { ChatLayoutRefs } from "../types";
 import { generateId } from "../../utils";
 import { MAX_IMAGE_SIZE_BYTES, SUPPORTED_IMAGE_TYPES } from "../../constants";
 
-const MODE_OPTIONS: { mode: ChatMode; label: string; icon: string }[] = [
-  { mode: "plan", icon: "zap", label: "Plan" },
-  { mode: "conversation", icon: "message-square", label: "Chat" },
-  { mode: "edit", icon: "pen-line", label: "Edit" },
+const POSTURE_OPTIONS: { posture: ApprovalPosture; label: string; icon: string }[] = [
+  { posture: "ask", icon: "circle-check", label: "Ask before edits" },
+  { posture: "auto", icon: "zap", label: "Edit automatically" },
 ];
 
-const MODE_PLACEHOLDERS: Record<ChatMode, string> = {
-  plan: "Describe what you want to plan...",
-  conversation: "Send a message to the model...",
-  edit: "Describe the changes you want to make...",
+const POSTURE_PLACEHOLDERS: Record<ApprovalPosture, string> = {
+  ask: "Send a message to the model...",
+  auto: "Send a message (edits apply automatically)...",
 };
 
 type ChatComposerCallbacks = {
   onDraftChange: (draft: string) => void;
   onSendRequest: () => void;
   onStopRequest: () => void;
-  onModeChange: (mode: ChatMode) => void;
+  onPostureChange: (posture: ApprovalPosture) => void;
   onContextToggle: () => void;
 };
 
@@ -40,8 +43,8 @@ export class ChatComposer {
   private stagedAttachments: Attachment[] = [];
   private supportsVision = false;
   private isSending = false;
-  private currentMode: ChatMode = "conversation";
-  private modeButtons = new Map<ChatMode, HTMLButtonElement>();
+  private currentPosture: ApprovalPosture = "ask";
+  private postureButtons = new Map<ApprovalPosture, HTMLButtonElement>();
   private readonly handleKeydown: (event: KeyboardEvent) => void;
   private readonly handleInput: () => void;
   private readonly handleActionClick: () => void;
@@ -138,7 +141,7 @@ export class ChatComposer {
       composerPanel.addEventListener("drop", this.handleDrop);
     }
 
-    this.renderModeToggle();
+    this.renderPostureToggle();
   }
 
   /**
@@ -162,16 +165,16 @@ export class ChatComposer {
     input.click();
   }
 
-  getMode(): ChatMode {
-    return this.currentMode;
+  getPosture(): ApprovalPosture {
+    return this.currentPosture;
   }
 
-  setMode(mode: ChatMode): void {
-    this.currentMode = mode;
-    this.syncModeToggle();
-    this.refs.textareaEl.placeholder = MODE_PLACEHOLDERS[mode];
+  setPosture(posture: ApprovalPosture): void {
+    this.currentPosture = posture;
+    this.syncPostureToggle();
+    this.refs.textareaEl.placeholder = POSTURE_PLACEHOLDERS[posture];
     this.updateContextChips();
-    this.callbacks.onModeChange(mode);
+    this.callbacks.onPostureChange(posture);
   }
 
   seedPrompt(text: string): void {
@@ -294,7 +297,7 @@ export class ChatComposer {
     const fileName = getActiveFileName(this.app);
     if (fileName && this.activeNoteAttached) {
       this.renderChip(
-        this.currentMode === "edit" ? "file-pen-line" : "file-text",
+        this.currentPosture === "auto" ? "file-pen-line" : "file-text",
         fileName,
         () => {
           this.activeNoteAttached = false;
@@ -483,31 +486,31 @@ export class ChatComposer {
     }
   }
 
-  private renderModeToggle(): void {
+  private renderPostureToggle(): void {
     this.refs.modeToggleEl.empty();
-    this.modeButtons.clear();
+    this.postureButtons.clear();
 
-    for (const { mode, label, icon } of MODE_OPTIONS) {
+    for (const { posture, label, icon } of POSTURE_OPTIONS) {
       const btn = this.refs.modeToggleEl.createEl("button", {
         cls: "lmsa-chat-composer-mode-toggle-btn",
-        attr: { "aria-label": `${label} mode`, "data-mode": mode },
+        attr: { "aria-label": label, "data-posture": posture },
       });
       const iconEl = btn.createEl("span", { cls: "lmsa-chat-composer-mode-toggle-icon" });
       setIcon(iconEl, icon);
       btn.createEl("span", { cls: "lmsa-chat-composer-mode-toggle-label", text: label });
-      btn.addEventListener("click", () => this.setMode(mode));
-      this.modeButtons.set(mode, btn);
+      btn.addEventListener("click", () => this.setPosture(posture));
+      this.postureButtons.set(posture, btn);
     }
 
     this.refs.modeToggleEl.createDiv({ cls: "lmsa-chat-composer-mode-slider" });
-    this.syncModeToggle();
+    this.syncPostureToggle();
   }
 
-  private syncModeToggle(): void {
-    const activeIndex = MODE_OPTIONS.findIndex((o) => o.mode === this.currentMode);
+  private syncPostureToggle(): void {
+    const activeIndex = POSTURE_OPTIONS.findIndex((o) => o.posture === this.currentPosture);
     this.refs.modeToggleEl.dataset.activeIndex = String(activeIndex);
-    for (const [mode, btn] of this.modeButtons) {
-      btn.toggleClass("is-active", mode === this.currentMode);
+    for (const [posture, btn] of this.postureButtons) {
+      btn.toggleClass("is-active", posture === this.currentPosture);
     }
   }
 

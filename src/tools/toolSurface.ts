@@ -1,101 +1,92 @@
 import type { CanonicalToolDefinition, ToolResult } from "./types";
 import type { VaultOpPolicy } from "../vault-ops/gateway";
-import { ALL_VAULT_TOOLS, CORE_VAULT_TOOLS, VAULT_TOOL_NAMES } from "./vault/definition";
+import type { ApprovalPosture } from "../shared/types";
+import { ALL_VAULT_TOOLS, VAULT_TOOL_NAMES } from "./vault/definition";
 import { ALL_EDIT_TOOLS } from "./editing/definition";
 import { ALL_VAULT_OPS_TOOLS, allowedVaultOpsTools } from "./vault-ops/definition";
 import { THINK_TOOL, THINK_TOOL_NAME } from "./think/definition";
 import { toolFailure } from "./toolFailure";
 
 /**
- * The canonical tool-surface resolver (prompt-cache design §6.1.1/§6.1.4/§6.1.5).
+ * The canonical tool-surface resolver (prompt-cache design §6.1.1/§6.1.4/§6.1.5, §6.3).
  *
  * One module, read by every path, so the surfaces cannot drift (the defect that
- * produced the `semantic_search` silent-failure). The mode-varying decision that
- * actually matters for safety is the **write gate**: which mutating tools (edit +
- * vault-ops) a mode permits. That lives in {@link resolveModeWriteTools} and is the
- * single source consumed by both local materialization and the cloud allow-list.
+ * produced the `semantic_search` silent-failure). The session-varying decision that
+ * matters for safety is the **write gate**: which mutating tools (edit + vault-ops)
+ * are offered. That lives in {@link resolveWriteTools} and is the single source
+ * consumed by both local materialization and the cloud allow-list, so the two can
+ * never diverge on what may write.
  *
- * **Reads are not mode-gated on the cloud paths.** The whole point of the design is
- * to give cloud providers the full tool surface (bloat is addressed by Layer 2
- * progressive disclosure, not by per-mode read-subsetting), so a cloud provider may
- * call any read tool in any mode (see {@link cloudAllowedToolSet}). Local providers
- * keep their lean per-mode read tier ({@link resolveModeReadTools}) because they pay
- * no caching cost and benefit from a small menu; that tier is local-only.
- *
- * While the three modes coexist (Phases 1-2) the write gate keys on mode; once the
- * selector collapses into the approval posture (§6.3) the residual gate is the
- * per-class deny policy plus the posture's apply-vs-ask routing. Portable: no
- * Obsidian, no disk, so it unit-tests in isolation.
+ * Writes are no longer gated by an edit "mode" (the plan/chat/edit selector is gone,
+ * §6.3); they are offered whenever the {@link ApprovalPosture} + per-class
+ * {@link VaultOpPolicy} permit. Under the default `ask` posture a `deny`-classed
+ * write is excluded (the hard read-only guarantee, ADR-0003); under the `auto`
+ * posture ("Edit automatically") the policy is overruled and every write is offered
+ * so it can auto-apply at the gate. Reads are never gated on the cloud paths, and the
+ * local read tier is now the full read suite too (the per-mode read-narrowing went
+ * away with the modes). Portable: no Obsidian, no disk, so it unit-tests in isolation.
  */
 
-/** Inputs that decide a request's tool surface. `editSurface` = edit mode with tool-based editing on. */
+/** Inputs that decide a request's tool surface. */
 export interface ToolSurfaceOptions {
-  /** True in edit mode (vs plan/conversation). */
-  editMode: boolean;
-  /** The `preferToolUse` setting: edit via tools rather than the prose fallback. */
-  preferToolUse: boolean;
-  /** Vault-op approval policy; a `deny`-classed write is excluded from every surface. */
+  /** Session approval posture. `auto` ("Edit automatically") re-offers deny-classed writes. */
+  posture: ApprovalPosture;
+  /** Vault-op approval policy; under the `ask` posture a `deny`-classed write is excluded. */
   policy: VaultOpPolicy;
   /** Whether the `think` meta tool is offered (false for LM Studio and Claude Code). */
   useThinkTool: boolean;
 }
 
-/** The edit tool surface is active only in edit mode with tool-based editing preferred. */
-function isEditSurface(opts: ToolSurfaceOptions): boolean {
-  return opts.editMode && opts.preferToolUse;
-}
-
 /**
- * The mutating tools a mode permits, policy-filtered. **The single source for the
- * write gate**, consumed by local materialization ({@link resolveLocalToolSet}) and
- * the cloud allow-list ({@link cloudAllowedToolSet}) alike, so the two can never
- * diverge on what is allowed to write. Edit tools come first, then the vault-op
- * superset minus any `deny`-classed op (ADR-0003). Outside the edit surface there
- * are no writes at all (plan/conversation, and edit without tool-based editing).
+ * The mutating tools the session permits, policy-filtered. **The single source for
+ * the write gate**, consumed by local materialization ({@link resolveLocalToolSet})
+ * and the cloud allow-list ({@link cloudAllowedToolSet}) alike. Under the default
+ * `ask` posture, `deny`-classed writes are excluded (edit via `policy.edit`, vault-ops
+ * via {@link allowedVaultOpsTools}). Under the `auto` posture the per-class policy is
+ * overruled, so the full edit + vault-op superset is offered (and auto-applies at the
+ * gate, see {@link resolveGate}).
  */
-export function resolveModeWriteTools(opts: ToolSurfaceOptions): CanonicalToolDefinition[] {
-  if (!isEditSurface(opts)) return [];
+export function resolveWriteTools(opts: ToolSurfaceOptions): CanonicalToolDefinition[] {
+  if (opts.posture === "auto") {
+    return [...ALL_EDIT_TOOLS, ...ALL_VAULT_OPS_TOOLS];
+  }
   const editTools = opts.policy.edit === "deny" ? [] : ALL_EDIT_TOOLS;
   return [...editTools, ...allowedVaultOpsTools(opts.policy)];
 }
 
 /**
- * The lean per-mode **read** tier, materialized only by local providers. The edit
- * surface narrows to the core primitives (a focused document task); every other
- * mode gets the full read suite. Cloud providers ignore this and allow all reads
- * ({@link cloudAllowedToolSet}).
+ * The tools the session permits the model to actually call: every read tool
+ * (unrestricted) + the posture/policy's permitted writes + `think`. Local providers
+ * emit exactly this set; cloud emits the full stable superset
+ * ({@link CLOUD_STABLE_TOOL_SET}) for cache stability but enforces this narrower
+ * allow-list at the execution gate.
  */
-export function resolveModeReadTools(opts: ToolSurfaceOptions): CanonicalToolDefinition[] {
-  return isEditSurface(opts) ? CORE_VAULT_TOOLS : ALL_VAULT_TOOLS;
-}
-
-/**
- * The lean tool set a local provider emits for a mode: its read tier + its write
- * tier + `think`, in the order the request expects. Reproduces the historical
- * per-mode materialization byte-for-byte, so local behavior is unchanged.
- */
-export function resolveLocalToolSet(opts: ToolSurfaceOptions): CanonicalToolDefinition[] {
-  return [
-    ...resolveModeReadTools(opts),
-    ...resolveModeWriteTools(opts),
-    ...(opts.useThinkTool ? [THINK_TOOL] : []),
-  ];
-}
-
-/**
- * The tools a **cloud** path allows the model to actually call this turn: every
- * read tool (unrestricted, in every mode) + the mode's permitted writes + `think`.
- * The cloud emits the full stable superset ({@link CLOUD_STABLE_TOOL_SET}) for cache
- * stability, but enforces this narrower allow-list at the execution gate; a tool not
- * in it is refused with {@link modeNotAllowedFailure}, never executed. Reuses
- * {@link resolveModeWriteTools} so the write gate matches local exactly.
- */
-export function cloudAllowedToolSet(opts: ToolSurfaceOptions): CanonicalToolDefinition[] {
+function permittedTools(opts: ToolSurfaceOptions): CanonicalToolDefinition[] {
   return [
     ...ALL_VAULT_TOOLS,
-    ...resolveModeWriteTools(opts),
+    ...resolveWriteTools(opts),
     ...(opts.useThinkTool ? [THINK_TOOL] : []),
   ];
+}
+
+/**
+ * The lean tool set a local provider emits: the full read suite + the permitted
+ * writes + `think`. Local has no caching incentive, so the emitted set already is the
+ * allowed set (no separate runtime allow-list).
+ */
+export function resolveLocalToolSet(opts: ToolSurfaceOptions): CanonicalToolDefinition[] {
+  return permittedTools(opts);
+}
+
+/**
+ * The tools a **cloud** path allows the model to actually call this turn (every read
+ * + permitted writes + `think`). The cloud emits the full stable superset for cache
+ * stability but enforces this allow-list at the execution gate; a tool not in it is
+ * refused with {@link toolNotAllowedFailure}, never executed. Identical to the local
+ * set ({@link resolveLocalToolSet}) now that reads are unrestricted on both.
+ */
+export function cloudAllowedToolSet(opts: ToolSurfaceOptions): CanonicalToolDefinition[] {
+  return permittedTools(opts);
 }
 
 /** Names of the cloud allow-list, for the runtime gate (tool loop / MCP `callTool`). */
@@ -104,11 +95,11 @@ export function cloudAllowedToolNames(opts: ToolSurfaceOptions): string[] {
 }
 
 /**
- * The full, deterministic, mode/policy-invariant tool surface emitted on the direct
- * Anthropic path (Layer 1). Holding it byte-identical across modes is what keeps the
- * `cache_control` prefix warm through plan/chat/edit switches. It is the union of
- * every read, edit, and vault-op tool plus `think`; mode and policy are enforced at
- * the runtime allow-list, not by shrinking this block.
+ * The full, deterministic, posture/policy-invariant tool surface emitted on the direct
+ * Anthropic path (Layer 1). Holding it byte-identical across postures and policy is
+ * what keeps the `cache_control` prefix warm; the posture/policy are enforced at the
+ * runtime allow-list, not by shrinking this block. It is the union of every read,
+ * edit, and vault-op tool plus `think`.
  */
 export const CLOUD_STABLE_TOOL_SET: CanonicalToolDefinition[] = [
   ...ALL_VAULT_TOOLS,
@@ -119,9 +110,9 @@ export const CLOUD_STABLE_TOOL_SET: CanonicalToolDefinition[] = [
 
 /**
  * The Claude Code analogue of {@link CLOUD_STABLE_TOOL_SET}: the same superset minus
- * `think` (which is never bridged over MCP, §6.2.5). Advertising it unchanged across
- * mode + RAG-availability flips is what keeps the live session alive instead of
- * cold-rebuilding (the `toolNames` fingerprint field stops drifting).
+ * `think` (which is never bridged over MCP, §6.2.5). Advertising it unchanged keeps
+ * the live session alive instead of cold-rebuilding (the `toolNames` fingerprint field
+ * stops drifting).
  */
 export const CLAUDE_CODE_STABLE_TOOL_SET: CanonicalToolDefinition[] = [
   ...ALL_VAULT_TOOLS,
@@ -131,17 +122,18 @@ export const CLAUDE_CODE_STABLE_TOOL_SET: CanonicalToolDefinition[] = [
 
 /**
  * The recovery-shaped refusal returned when the runtime allow-list blocks a call the
- * stable surface advertised but the current mode does not permit (the spin-guard
- * precedent, {@link ../chat/actions/toolLoop.applyIdenticalCallGuard}). Only mutating
- * tools ever reach this gate (reads are always allowed), so the wording tells the
- * model to drop the call rather than re-issue it.
+ * stable surface advertised but the session does not permit (a `deny`-classed write
+ * under the `ask` posture). Built on the spin-guard precedent
+ * ({@link ../chat/actions/toolLoop.applyIdenticalCallGuard}). Only mutating tools ever
+ * reach this gate (reads are always allowed), so the wording tells the model to drop
+ * the call rather than re-issue it.
  */
-export function modeNotAllowedFailure(name: string): ToolResult {
+export function toolNotAllowedFailure(name: string): ToolResult {
   const isReadOnly = VAULT_TOOL_NAMES.has(name) || name === THINK_TOOL_NAME;
   return toolFailure({
     kind: "precondition",
-    what: `${name} is not available in the current mode`,
-    recovery: `do not retry it; the current session does not permit ${name}, so continue without it`,
+    what: `${name} is not permitted in this session`,
+    recovery: `do not retry it; the current approval settings do not allow ${name}, so continue without it`,
     isReadOnly,
   });
 }

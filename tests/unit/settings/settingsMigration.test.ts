@@ -24,14 +24,34 @@ describe("normalizePluginSettings", () => {
     const result = normalizePluginSettings({
       maxContextChars: 9000,
       agenticMode: true,
-      planSystemPromptPrefix: "custom plan",
+      systemPromptPrefix: "custom prefix",
     });
     expect(result.maxContextChars).toBe(9000);
     expect(result.agenticMode).toBe(true);
-    expect(result.planSystemPromptPrefix).toBe("custom plan");
+    expect(result.systemPromptPrefix).toBe("custom prefix");
     // untouched fields fall back to defaults
     expect(result.maxToolRoundsChat).toBe(DEFAULT_SETTINGS.maxToolRoundsChat);
-    expect(result.chatSystemPromptPrefix).toBe(DEFAULT_SETTINGS.chatSystemPromptPrefix);
+  });
+
+  // The plan/chat/edit mode prompts collapsed into one unified systemPromptPrefix
+  // (prompt-cache design §6.3). A user's customized legacy chat (then plan) prefix is
+  // carried forward; a new systemPromptPrefix wins over any legacy field.
+  it("migrates a legacy chat/plan prompt prefix into systemPromptPrefix", () => {
+    const fromChat = normalizePluginSettings({
+      chatSystemPromptPrefix: "my chat prefix",
+    } as unknown as Partial<PluginSettings>);
+    expect(fromChat.systemPromptPrefix).toBe("my chat prefix");
+
+    const fromPlan = normalizePluginSettings({
+      planSystemPromptPrefix: "my plan prefix",
+    } as unknown as Partial<PluginSettings>);
+    expect(fromPlan.systemPromptPrefix).toBe("my plan prefix");
+
+    const newWins = normalizePluginSettings({
+      systemPromptPrefix: "new",
+      chatSystemPromptPrefix: "old chat",
+    } as unknown as Partial<PluginSettings>);
+    expect(newWins.systemPromptPrefix).toBe("new");
   });
 
   it("rejects wrong-typed scalars and falls back to defaults", () => {

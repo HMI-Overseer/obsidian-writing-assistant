@@ -12,6 +12,18 @@ import {
 const DEFAULT_MAX_TOKENS = 4096;
 
 /**
+ * Conversation cache breakpoints share the 4-per-request budget with the
+ * tools + system breakpoint, so at most 3 land on the conversation. Each
+ * breakpoint's cache lookup walks back at most 20 content blocks, so intermediate
+ * breakpoints are spaced ~15 blocks apart to keep a long agentic turn (many
+ * tool_use / tool_result blocks emitted in one turn) inside that window
+ * (prompt-cache design §5 / §10, verified against the bundled claude-api
+ * reference's 20-block-lookback and 4-breakpoint rules).
+ */
+const MAX_CONVERSATION_BREAKPOINTS = 3;
+const CONVERSATION_BREAKPOINT_BLOCK_STRIDE = 15;
+
+/**
  * Model-id prefixes whose models still accept the `temperature` / `top_p` / `top_k`
  * sampling params. Opus 4.7+, Fable 5, and Mythos REMOVED these and return HTTP 400 if
  * any is sent; Opus 4.6 and earlier, plus the Sonnet 4.x and Haiku 4.x families, still
@@ -86,12 +98,36 @@ export function anthropicModelSupportsSystemRole(modelId: string): boolean {
   return SYSTEM_ROLE_CAPABLE_PREFIXES.some((prefix) => modelId.startsWith(prefix));
 }
 
-/** Content block types used in Anthropic messages. */
+/**
+ * A cache breakpoint marker. `ttl: "1h"` selects the 1-hour extended cache TTL;
+ * omitting it is the wire default (5-min). The extended TTL is GA and needs no
+ * beta header (see buildAnthropicHeaders).
+ */
+export interface AnthropicCacheControl {
+  type: string;
+  ttl?: "1h";
+}
+
+/**
+ * Content block types used in Anthropic messages. Any block may carry a
+ * `cache_control` breakpoint; the conversation breakpoint (placeConversationBreakpoints)
+ * lands on the last block of a stable history turn.
+ */
 export type AnthropicContentBlock =
-  | { type: "text"; text: string }
-  | { type: "image"; source: { type: "base64"; media_type: string; data: string } }
-  | { type: "tool_use"; id: string; name: string; input: Record<string, unknown> }
-  | { type: "tool_result"; tool_use_id: string; content: string };
+  | { type: "text"; text: string; cache_control?: AnthropicCacheControl }
+  | {
+      type: "image";
+      source: { type: "base64"; media_type: string; data: string };
+      cache_control?: AnthropicCacheControl;
+    }
+  | {
+      type: "tool_use";
+      id: string;
+      name: string;
+      input: Record<string, unknown>;
+      cache_control?: AnthropicCacheControl;
+    }
+  | { type: "tool_result"; tool_use_id: string; content: string; cache_control?: AnthropicCacheControl };
 
 export interface AnthropicMessage {
   // `system` is the mid-conversation operator channel: a {role:"system"} message
@@ -105,9 +141,7 @@ export interface AnthropicMessage {
 export interface AnthropicSystemBlock {
   type: "text";
   text: string;
-  // `ttl: "1h"` selects the 1-hour extended cache TTL; omitting it is the wire default
-  // (5-min). The extended TTL is GA and needs no beta header (see buildAnthropicHeaders).
-  cache_control?: { type: string; ttl?: "1h" };
+  cache_control?: AnthropicCacheControl;
 }
 
 export type AnthropicSystem = string | AnthropicSystemBlock[];
@@ -236,14 +270,26 @@ export function buildAnthropicMessages(
     }
   }
 
-  // When caching is enabled, send system as a content block with cache_control. The
-  // selected TTL rides on the block: `ttl: "1h"` for the extended cache, omitted for the
-  // wire default (5-min). `CacheTtl` "default" is an internal label, not a wire value.
-  if (cacheSettings?.enabled && systemText) {
-    const cacheControl: AnthropicSystemBlock["cache_control"] =
-      cacheSettings.ttl === "1h"
-        ? { type: "ephemeral", ttl: "1h" }
-        : { type: "ephemeral" };
+  if (!cacheSettings?.enabled) {
+    return { system: systemText, messages };
+  }
+
+  // The selected TTL rides on every breakpoint: `ttl: "1h"` for the extended
+  // cache, omitted for the wire default (5-min). `CacheTtl` "default" is an
+  // internal label, not a wire value.
+  const cacheControl: AnthropicCacheControl =
+    cacheSettings.ttl === "1h" ? { type: "ephemeral", ttl: "1h" } : { type: "ephemeral" };
+
+  // Conversation breakpoint(s): cache the growing history incrementally, not just
+  // tools + system (prompt-cache design §6.1.6, goal G3). Anchored on the last
+  // stable turn so the per-turn volatile tail (note/doc/RAG context + the modeTail
+  // system/<system-reminder>) stays after the breakpoint and never voids the
+  // cached prefix (§3.4 / §10).
+  placeConversationBreakpoints(messages, cacheControl);
+
+  // System breakpoint: a content block carrying cache_control caches tools +
+  // system together (only when there is a system prompt to cache).
+  if (systemText) {
     const system: AnthropicSystemBlock[] = [
       { type: "text", text: systemText, cache_control: cacheControl },
     ];
@@ -368,4 +414,69 @@ function ensureAnthropicUserBlocks(message: AnthropicMessage): AnthropicContentB
   }
   message.content = blocks;
   return blocks;
+}
+
+/**
+ * Places up to {@link MAX_CONVERSATION_BREAKPOINTS} cache breakpoints on the
+ * stable conversation history so it caches incrementally turn over turn (goal G3),
+ * not just tools + system.
+ *
+ * The newest breakpoint lands on the last *stable* turn (everything before the
+ * latest user turn and any trailing modeTail system message), so the per-turn
+ * volatile tail — note/doc/RAG context and the modeTail — stays after it and
+ * never voids the cached prefix. Stable string turns are first normalized to
+ * single-block arrays so an anchored turn renders identically whether or not it
+ * carries the breakpoint in a given request (the prefix-stability invariant);
+ * this keeps pure-text conversations cacheable too, not only tool-heavy ones,
+ * with no reliance on string vs single-block cache equivalence.
+ *
+ * Intermediate breakpoints are spaced ~{@link CONVERSATION_BREAKPOINT_BLOCK_STRIDE}
+ * blocks back so a single long agentic turn stays inside the 20-block lookback
+ * window. One residual gap the design accepts: a single turn whose own content
+ * exceeds 20 blocks (e.g. >20 parallel tool calls) cannot be bridged at message
+ * granularity; cache_read staying ~0 across such turns is the signal.
+ */
+function placeConversationBreakpoints(
+  messages: AnthropicMessage[],
+  cacheControl: AnthropicCacheControl
+): void {
+  const stableEnd = lastStableMessageIndex(messages);
+  if (stableEnd < 0) return; // No settled history yet (the opening turn).
+
+  for (let i = 0; i <= stableEnd; i++) {
+    normalizeMessageToBlocks(messages[i]);
+  }
+
+  let placed = 0;
+  let blocksSinceMark = 0;
+  for (let i = stableEnd; i >= 0 && placed < MAX_CONVERSATION_BREAKPOINTS; i--) {
+    const blocks = messages[i].content;
+    if (!Array.isArray(blocks) || blocks.length === 0) continue;
+    if (placed === 0 || blocksSinceMark >= CONVERSATION_BREAKPOINT_BLOCK_STRIDE) {
+      blocks[blocks.length - 1].cache_control = cacheControl;
+      placed++;
+      blocksSinceMark = 0;
+    }
+    blocksSinceMark += blocks.length;
+  }
+}
+
+/**
+ * Index of the last conversation turn that is stable across requests: skips a
+ * trailing modeTail `{role:"system"}` turn and the latest user turn (which carries
+ * the per-turn volatile context). Returns -1 when there is no settled history yet
+ * (the opening turn), so no conversation breakpoint is placed.
+ */
+function lastStableMessageIndex(messages: AnthropicMessage[]): number {
+  let i = messages.length - 1;
+  if (i >= 0 && messages[i].role === "system") i--;
+  if (i >= 0 && messages[i].role === "user") i--;
+  return i;
+}
+
+/** Normalizes a non-empty string turn to a single text block so it can carry a breakpoint. */
+function normalizeMessageToBlocks(message: AnthropicMessage): void {
+  if (typeof message.content === "string" && message.content.length > 0) {
+    message.content = [{ type: "text", text: message.content }];
+  }
 }

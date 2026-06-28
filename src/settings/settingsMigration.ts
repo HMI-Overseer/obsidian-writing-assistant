@@ -216,6 +216,20 @@ export function normalizeActiveProfileIds(raw: unknown): Record<ProviderOption, 
  * Every field defaults from {@link DEFAULT_SETTINGS}; collections are validated
  * element-by-element so a single bad entry can't poison the rest.
  */
+/**
+ * Migrates the prompt prefix. The plan/chat/edit mode prompts collapsed into one
+ * unified prefix (prompt-cache design §6.3): a new `systemPromptPrefix` wins; otherwise
+ * a customized legacy chat (then plan) prefix is carried forward, so a user's prior
+ * wording survives. The edit-format prompts are dropped (their guidance is now dynamic).
+ */
+function migrateSystemPromptPrefix(data: Partial<PluginSettings> | null): string {
+  if (typeof data?.systemPromptPrefix === "string") return data.systemPromptPrefix;
+  const legacy = data as Record<string, unknown> | null;
+  if (typeof legacy?.chatSystemPromptPrefix === "string") return legacy.chatSystemPromptPrefix;
+  if (typeof legacy?.planSystemPromptPrefix === "string") return legacy.planSystemPromptPrefix;
+  return DEFAULT_SETTINGS.systemPromptPrefix;
+}
+
 export function normalizePluginSettings(data: Partial<PluginSettings> | null): PluginSettings {
   const completionModels: CompletionModel[] = Array.isArray(data?.completionModels)
     ? data.completionModels.map((model, index) => normalizeCompletionModel(model, index))
@@ -274,22 +288,7 @@ export function normalizePluginSettings(data: Partial<PluginSettings> | null): P
         : DEFAULT_SETTINGS.diffMinMatchConfidence,
     rag: normalizeRagSettings(data?.rag),
     knowledgeGraph: normalizeKnowledgeGraphSettings(data?.knowledgeGraph),
-    planSystemPromptPrefix:
-      typeof data?.planSystemPromptPrefix === "string"
-        ? data.planSystemPromptPrefix
-        : DEFAULT_SETTINGS.planSystemPromptPrefix,
-    chatSystemPromptPrefix:
-      typeof data?.chatSystemPromptPrefix === "string"
-        ? data.chatSystemPromptPrefix
-        : DEFAULT_SETTINGS.chatSystemPromptPrefix,
-    editToolSystemPromptPrefix:
-      typeof data?.editToolSystemPromptPrefix === "string"
-        ? data.editToolSystemPromptPrefix
-        : DEFAULT_SETTINGS.editToolSystemPromptPrefix,
-    editFallbackSystemPromptPrefix:
-      typeof data?.editFallbackSystemPromptPrefix === "string"
-        ? data.editFallbackSystemPromptPrefix
-        : DEFAULT_SETTINGS.editFallbackSystemPromptPrefix,
+    systemPromptPrefix: migrateSystemPromptPrefix(data),
     apiKeysDisclaimerAccepted:
       typeof data?.apiKeysDisclaimerAccepted === "boolean"
         ? data.apiKeysDisclaimerAccepted

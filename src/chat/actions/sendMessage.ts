@@ -1,5 +1,6 @@
 import type { Component } from "obsidian";
 import { createChatClient } from "../../providers/registry";
+import type { ApprovalPosture } from "../../shared/types";
 import type WritingAssistantChat from "../../main";
 import type { ChatComposer } from "../composer/ChatComposer";
 import type { ChatSessionStore } from "../conversation/ChatSessionStore";
@@ -25,7 +26,7 @@ export type SendMessageOptions = {
   onCalibrate?: (estimatedTokens: number, actualTokens: number) => void;
   promptOverride?: string;
   autoInsertAfterResponse?: boolean;
-  editMode?: boolean;
+  posture: ApprovalPosture;
 };
 
 export async function sendMessage(options: SendMessageOptions): Promise<void> {
@@ -43,7 +44,7 @@ export async function sendMessage(options: SendMessageOptions): Promise<void> {
     onCalibrate,
     promptOverride,
     autoInsertAfterResponse = false,
-    editMode = false,
+    posture,
   } = options;
 
   const validated = await validateSendRequest(
@@ -68,26 +69,25 @@ export async function sendMessage(options: SendMessageOptions): Promise<void> {
 
   const pendingAttachments = composer.getAttachments();
 
-  // Chat/plan mode: freeze the attached notes (and their embedded images) into a
-  // point-in-time snapshot bound to this user turn, so they stay cache-stable in
-  // history instead of being re-read into the system prefix every send. Edit mode
-  // keeps its live document, handled downstream in prepareApiMessages.
+  // Freeze the attached notes (and their embedded images) into a point-in-time
+  // snapshot bound to this user turn, so they stay cache-stable in history instead
+  // of being re-read into the prefix every send. There is no live document re-read
+  // anymore (ambient editing, §6.3/§10/§13); the model reads current content via
+  // tools when it edits.
   const supportsVision =
     validated.activeModel.vision
     ?? plugin.services.modelAvailability.getVision(validated.activeModel.modelId)
     ?? false;
-  const noteAttachments = editMode
-    ? []
-    : await snapshotNoteAttachments(plugin.app, {
-        activeNoteAttached: composer.isActiveNoteAttached(),
-        extraContextItems: composer.getExtraContextItems(),
-        maxContextChars: plugin.settings.maxContextChars,
-        includeImages: plugin.settings.includeLocalAttachmentsAsContext && supportsVision,
-      });
+  const noteAttachments = await snapshotNoteAttachments(plugin.app, {
+    activeNoteAttached: composer.isActiveNoteAttached(),
+    extraContextItems: composer.getExtraContextItems(),
+    maxContextChars: plugin.settings.maxContextChars,
+    includeImages: plugin.settings.includeLocalAttachmentsAsContext && supportsVision,
+  });
 
   composer.clearDraft();
   composer.clearAttachments();
-  if (!editMode) composer.clearAttachedNotes();
+  composer.clearAttachedNotes();
   store.setDraft("");
   setIsGenerating(true);
 
@@ -109,7 +109,7 @@ export async function sendMessage(options: SendMessageOptions): Promise<void> {
     activeModel.provider,
     plugin.settings.providerSettings,
     await plugin.services.claudeCode.getRuntime(activeModel.provider, {
-      editMode: composer.getMode() === "edit",
+      posture,
       activeFilePath: plugin.app.workspace.getActiveFile()?.path,
       conversationId: store.getActiveConversationId() ?? undefined,
     }),
@@ -120,10 +120,9 @@ export async function sendMessage(options: SendMessageOptions): Promise<void> {
     owner,
     store,
     transcript,
-    composer,
     activeModel,
     client,
-    editMode,
+    posture,
     finalization: { kind: "append", autoInsert: autoInsertAfterResponse },
     setIsGenerating,
     setActiveAbortController,

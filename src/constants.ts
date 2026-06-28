@@ -1,6 +1,4 @@
 import type { BenchmarkSettings, ChatHistory, KnowledgeGraphSettings, PluginSettings, ProviderOption, ProviderProfile, RagSettings } from "./shared/types";
-import { EDIT_SYSTEM_PROMPT } from "./editing/regexEditSystemPrompt";
-import { TOOL_EDIT_SYSTEM_PROMPT } from "./tools/editing/systemPrompt";
 import { DEFAULT_VAULT_OP_POLICY } from "./vault-ops/gateway";
 import type { ImageMimeType } from "./shared/types";
 
@@ -57,11 +55,11 @@ export const DEFAULT_KNOWLEDGE_GRAPH_SETTINGS: KnowledgeGraphSettings = {
   excludePatterns: ["templates/**"],
 };
 
-export const DEFAULT_CHAT_SYSTEM_PROMPT_PREFIX =
+// The unified system prompt prefix (the plan/chat/edit modes are gone, §6.3). Edit
+// capability rides the dynamic tool/regex guidance, so the prefix stays general.
+export const DEFAULT_SYSTEM_PROMPT_PREFIX =
   "When asked to research, explore, or find information, search exhaustively before answering. " +
   "Use multiple rounds of tool calls if needed, and synthesize only after you have gathered enough context.";
-
-export const DEFAULT_PLAN_SYSTEM_PROMPT_PREFIX = DEFAULT_CHAT_SYSTEM_PROMPT_PREFIX;
 
 // A high backstop, not the primary spin control (D5): the per-turn identical-call
 // guard in the tool loop catches a model repeating the same call; the round cap
@@ -128,10 +126,7 @@ export const DEFAULT_SETTINGS: PluginSettings = {
   diffMinMatchConfidence: 0.7,
   rag: { ...DEFAULT_RAG_SETTINGS },
   knowledgeGraph: { ...DEFAULT_KNOWLEDGE_GRAPH_SETTINGS },
-  planSystemPromptPrefix: DEFAULT_PLAN_SYSTEM_PROMPT_PREFIX,
-  chatSystemPromptPrefix: DEFAULT_CHAT_SYSTEM_PROMPT_PREFIX,
-  editToolSystemPromptPrefix: TOOL_EDIT_SYSTEM_PROMPT,
-  editFallbackSystemPromptPrefix: EDIT_SYSTEM_PROMPT,
+  systemPromptPrefix: DEFAULT_SYSTEM_PROMPT_PREFIX,
   apiKeysDisclaimerAccepted: false,
   agenticMode: false,
   preferToolUse: false,

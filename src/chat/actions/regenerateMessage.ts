@@ -60,7 +60,7 @@ export async function regenerateMessage(options: RegenerateOptions): Promise<voi
     return;
   }
 
-  const editMode = composer.getMode() === "edit";
+  const posture = composer.getPosture();
 
   const oldMessage = store.removeLastMessage();
   if (!oldMessage) return;
@@ -74,7 +74,7 @@ export async function regenerateMessage(options: RegenerateOptions): Promise<voi
     activeModel.provider,
     plugin.settings.providerSettings,
     await plugin.services.claudeCode.getRuntime(activeModel.provider, {
-      editMode,
+      posture,
       activeFilePath: plugin.app.workspace.getActiveFile()?.path,
       conversationId: store.getActiveConversationId() ?? undefined,
     }),
@@ -85,10 +85,9 @@ export async function regenerateMessage(options: RegenerateOptions): Promise<voi
     owner,
     store,
     transcript,
-    composer,
     activeModel,
     client,
-    editMode,
+    posture,
     finalization: { kind: "replace", oldMessage },
     setIsGenerating,
     setActiveAbortController,

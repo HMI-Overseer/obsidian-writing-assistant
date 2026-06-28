@@ -1,10 +1,9 @@
-import type { ConversationMessage, PluginSettings, ProviderOption } from "../../shared/types";
-import type { AdditionalContextItem, ChatRequest, ChatTurn, DocumentContext, ExtraContextItem, RagContextBlock } from "../../shared/chatRequest";
-import { getFullNoteContent, truncateNoteText } from "../../context/noteContext";
-import { resolveNoteImageContext } from "../../context/noteImageContext";
+import type { ConversationMessage, PluginSettings, ProviderOption, ApprovalPosture } from "../../shared/types";
+import type { ChatRequest, ChatTurn, RagContextBlock } from "../../shared/chatRequest";
 import { shouldUseToolCall } from "../../tools/registry";
 import { EDIT_TOOL_NAMES } from "../../tools/editing/definition";
 import { buildEditToolSystemPrompt } from "../../tools/editing/systemPrompt";
+import { EDIT_SYSTEM_PROMPT } from "../../editing/regexEditSystemPrompt";
 import {
   VAULT_TOOL_NAMES,
   filterSemanticSearchByAvailability,
@@ -18,9 +17,9 @@ import {
   cloudAllowedToolSet,
   resolveLocalToolSet,
 } from "../../tools/toolSurface";
+import { writesPermitted } from "../../vault-ops/gateway";
 import type { CanonicalToolDefinition } from "../../tools/types";
-import type { ChatMode } from "../types";
-import type { App, TFile } from "obsidian";
+import type { App } from "obsidian";
 import type { ChatSessionStore } from "../conversation/ChatSessionStore";
 import type { RagService } from "../../rag";
 import type { ChatClient } from "../../api/chatClient";
@@ -31,12 +30,8 @@ export interface PrepareMessagesOptions {
   app: App;
   store: ChatSessionStore;
   settings: PluginSettings;
-  /** Whether the active note is currently attached (replaces includeNoteContext + sessionContextEnabled). */
-  activeNoteAttached: boolean;
-  /** Extra vault notes manually attached by the user via the context picker. */
-  extraContextItems: ExtraContextItem[];
-  maxContextChars: number;
-  mode: ChatMode;
+  /** Session approval posture, the cloud surface's replacement for the plan/chat/edit mode (§6.3). */
+  posture: ApprovalPosture;
   ragService?: RagService;
   /** Active provider, needed to decide tool use. */
   activeProvider?: ProviderOption;
@@ -61,10 +56,7 @@ export async function prepareApiMessages(
     app,
     store,
     settings,
-    activeNoteAttached,
-    extraContextItems,
-    maxContextChars,
-    mode,
+    posture,
     ragService,
     activeProvider,
     modelCapabilities,
@@ -75,7 +67,6 @@ export async function prepareApiMessages(
     supportsVision = false,
   } = options;
 
-  const editMode = mode === "edit";
   // Claude Code reports as tool-capable, but it bridges the plugin's tools via its
   // own MCP server and runs its own agent loop, so the plugin never attaches
   // CanonicalToolDefinition tools (request.tools) or spins up its tool loop/timeline
@@ -84,60 +75,24 @@ export async function prepareApiMessages(
   const modelCanUseTools = !!activeProvider && shouldUseToolCall(activeProvider, modelCapabilities);
   const usePluginTools = modelCanUseTools && !isClaudeCode;
   const useVaultTools = settings.agenticMode && usePluginTools;
-  const useEditTools = editMode && settings.agenticMode && usePluginTools && settings.preferToolUse;
   const claudeCodeRetrievesViaMcp = isClaudeCode && settings.agenticMode;
 
-  const modePrefix = selectModePrefix(mode, useEditTools, settings);
-  const systemPrompt = [modePrefix, profileSystemPrompt].filter(Boolean).join("\n\n");
-  const shouldIncludeNoteImages =
-    settings.includeLocalAttachmentsAsContext && supportsVision;
+  // Ambient editing (prompt-cache design §6.3): with the plan/chat/edit modes gone, one
+  // unified system prefix frames every turn. A non-agentic turn (no tools) still edits,
+  // via SEARCH/REPLACE blocks the diff engine parses, so it carries the regex-edit format
+  // guidance whenever editing is permitted but no tools carry it.
+  const editsPermitted = writesPermitted(settings.vaultOpPolicy, posture);
+  const useRegexEditGuidance = !useVaultTools && !claudeCodeRetrievesViaMcp && editsPermitted;
 
-  // Chat/plan mode attaches notes as frozen snapshots on the user turn (see
-  // snapshotNoteAttachments), they ride message.attachments below, not the
-  // system prefix. Only edit mode still sends a live document/extra notes here,
-  // re-read each turn because the diff engine matches against the current file.
-  let documentContext: DocumentContext | null = null;
-  let additionalContextItems: AdditionalContextItem[] | undefined;
-  const noteImageSources: Array<{ file: TFile; rawContent: string }> = [];
+  const basePrefix = settings.systemPromptPrefix;
+  const systemPrompt = [basePrefix, profileSystemPrompt].filter(Boolean).join("\n\n");
 
-  if (editMode && activeNoteAttached) {
-    const noteData = await getFullNoteContent(app);
-    if (noteData) {
-      documentContext = {
-        filePath: noteData.filePath,
-        content: noteData.content,
-        isFull: true,
-      };
-      const file = app.workspace.getActiveFile();
-      if (shouldIncludeNoteImages && file) {
-        noteImageSources.push({ file, rawContent: noteData.content });
-      }
-    }
-  }
-
-  if (editMode && extraContextItems.length > 0) {
-    const resolved: AdditionalContextItem[] = [];
-    for (const item of extraContextItems) {
-      const file = app.vault.getFileByPath(item.filePath);
-      if (!file) continue;
-      const raw = await app.vault.read(file);
-      const content = truncateNoteText(raw, maxContextChars);
-      resolved.push({ filePath: item.filePath, fileName: item.fileName, content });
-      if (shouldIncludeNoteImages) {
-        noteImageSources.push({ file, rawContent: raw });
-      }
-    }
-    if (resolved.length > 0) additionalContextItems = resolved;
-  }
-
-  const noteImageContext = shouldIncludeNoteImages && noteImageSources.length > 0
-    ? await resolveNoteImageContext(app, noteImageSources)
-    : undefined;
-
-  // The active file is excluded from RAG retrieval. In edit mode it's the
-  // documentContext; in chat mode the note now lives in an attachment, so read
-  // the current active file directly.
-  const activeFilePath = documentContext?.filePath ?? app.workspace.getActiveFile()?.path;
+  // The active note + extra notes (and their embedded images) are frozen into a
+  // point-in-time snapshot bound to the user turn at send time (snapshotNoteAttachments),
+  // so they ride message.attachments and stay cache-stable. There is no live re-read of
+  // the active document here, the model reads current content via tools when it edits
+  // (the §10/§13 cache-coupling anti-pattern is gone).
+  const activeFilePath = app.workspace.getActiveFile()?.path;
 
   const messages: ChatTurn[] = store
     .getSnapshot()
@@ -150,23 +105,21 @@ export async function prepareApiMessages(
       );
       return {
         role: message.role as "user" | "assistant",
-        content: editMode && message.editProposal
+        content: message.editProposal
           ? formatEditMessageContent(message)
           : message.content,
         ...(attachments?.length ? { attachments } : {}),
       };
     });
 
-  // Retrieve RAG context based on the latest user message.
-  // Skipped when vault tools are active, in agentic mode the model controls
-  // retrieval itself via semantic_search. Pre-injecting context causes the model
-  // to answer from the warm-start content and never call the tool.
-  // Also skipped for agentic Claude Code: it retrieves through the plugin's MCP
-  // tools, so pre-injecting would duplicate context and discourage it from
-  // searching. A non-agentic Claude Code run has no tools, so RAG still helps.
+  // Retrieve RAG context based on the latest user message. Skipped when vault tools are
+  // active: in agentic mode the model controls retrieval itself via semantic_search, and
+  // pre-injecting context causes it to answer from the warm-start content and never call
+  // the tool. Also skipped for agentic Claude Code (it retrieves through the plugin's MCP
+  // tools). A non-agentic run has no tools, so RAG still helps.
   let ragContext: RagContextBlock[] | null = null;
   let rewrittenQuery: string | undefined;
-  if (!editMode && !useVaultTools && !claudeCodeRetrievesViaMcp && ragService?.isReady()) {
+  if (!useVaultTools && !claudeCodeRetrievesViaMcp && ragService?.isReady()) {
     const lastUserMessage = [...messages].reverse().find((m: ChatTurn) => m.role === "user");
     if (lastUserMessage?.content) {
       let retrievalQuery = lastUserMessage.content;
@@ -194,7 +147,7 @@ export async function prepareApiMessages(
 
   // When RAG context is present, add a grounding instruction so the model knows
   // retrieved notes exist. The body is kept separator-free so it can join the
-  // mode tail cleanly; the local path re-adds the leading "\n\n".
+  // tail cleanly; the local path re-adds the leading "\n\n".
   let groundingNoteBody = "";
   if (ragContext && ragContext.length > 0) {
     const hasGraphAnnotations = ragContext.some((b) => b.graphContext);
@@ -203,10 +156,11 @@ export async function prepareApiMessages(
       : "When retrieved notes are provided, use them as reference material. If the retrieved notes don't contain relevant information for the question, rely on your general knowledge instead.";
   }
   const groundingNote = groundingNoteBody ? "\n\n" + groundingNoteBody : "";
-  // Build the tool surface. The only mode/policy-varying decision is the write gate
-  // (which mutating tools a mode permits); reads are unrestricted on the cloud paths.
-  // The canonical resolver lives in src/tools/toolSurface.ts so every path reads one
-  // source (prompt-cache design §6.1.1/§6.1.4/§6.1.5).
+
+  // Build the tool surface. The only posture/policy-varying decision is the write gate
+  // (which mutating tools the session permits); reads are unrestricted on the cloud
+  // paths. The canonical resolver lives in src/tools/toolSurface.ts so every path reads
+  // one source (prompt-cache design §6.1.1/§6.1.4/§6.1.5).
   //
   // think is a meta-reasoning tool that benefits large cloud models. LM Studio (local
   // models) already struggle with multi-tool schemas, and Magistral-family reasoning
@@ -214,26 +168,23 @@ export async function prepareApiMessages(
   // so it is excluded there.
   const useThinkTool = activeProvider !== "lmstudio";
   const surfaceOpts = {
-    editMode,
-    preferToolUse: settings.preferToolUse,
+    posture,
     policy: settings.vaultOpPolicy,
     useThinkTool,
   };
   const availability = ragService?.availability() ?? "no-backend";
 
   // Emission diverges by path. The direct Anthropic path emits the full stable
-  // superset and holds it byte-identical across modes (Layer 1, keeps the prompt
+  // superset and holds it byte-identical across postures (Layer 1, keeps the prompt
   // cache warm); a runtime allow-list (allowedToolNames, enforced in the tool loop)
-  // restricts what may actually be called, so mode/policy never shrink the emitted
+  // restricts what may actually be called, so posture/policy never shrink the emitted
   // block. semantic_search stays in the superset and reports unavailability at call
-  // time. Local providers keep their lean per-mode materialization (no caching
-  // incentive, smaller menu = better selection); for them the emitted set already is
-  // the allowed set, and the shared filter drops semantic_search when the backend is
-  // cold (so the two routes can't drift, the original defect).
+  // time. Local providers materialize exactly their allowed set; the shared filter
+  // drops semantic_search when the backend is cold (so the two routes can't drift).
   let tools: CanonicalToolDefinition[] | undefined;
   let allowedToolNames: string[] | undefined;
-  // The tools whose guidance the mode tail describes: what the model may actually use
-  // this mode (the allowed subset on cloud, the emitted lean set on local).
+  // The tools whose guidance the tail describes: what the model may actually use this
+  // turn (the allowed subset on cloud, the emitted lean set on local).
   let guidanceTools: CanonicalToolDefinition[] = [];
   if (useVaultTools) {
     if (activeProvider === "anthropic") {
@@ -247,31 +198,36 @@ export async function prepareApiMessages(
     }
   }
 
-  // Build tool guidance from guidanceTools so the mode tail accurately reflects what
-  // the model may use (e.g. no semantic_search when the RAG index is not ready, and
-  // only the mode's permitted writes). Each body is kept separator-free for the mode
-  // tail; the local path re-adds the leading "\n\n" to preserve its bytes.
+  // Build tool guidance from guidanceTools so the tail accurately reflects what the
+  // model may use (e.g. no semantic_search when the RAG index is not ready, and only
+  // the permitted writes). Each body is kept separator-free for the tail; the local
+  // path re-adds the leading "\n\n" to preserve its bytes.
   const activeVaultTools = guidanceTools.filter((t) => VAULT_TOOL_NAMES.has(t.name));
   const vaultGuidanceBody = useVaultTools ? buildVaultToolSystemPrompt(activeVaultTools) : "";
   const vaultGuidance = useVaultTools ? "\n\n" + vaultGuidanceBody : "";
   const activeEditTools = guidanceTools.filter((t) => EDIT_TOOL_NAMES.has(t.name));
-  const editGuidanceBody = useEditTools ? buildEditToolSystemPrompt(activeEditTools) : "";
-  const editGuidance = useEditTools ? "\n\n" + editGuidanceBody : "";
+  const editGuidanceBody = activeEditTools.length > 0 ? buildEditToolSystemPrompt(activeEditTools) : "";
+  const editGuidance = activeEditTools.length > 0 ? "\n\n" + editGuidanceBody : "";
   const activeVaultOpTools = guidanceTools.filter((t) => VAULT_OPS_TOOL_NAMES.has(t.name));
   const vaultOpGuidanceBody = activeVaultOpTools.length > 0
     ? buildVaultOpToolSystemPrompt(activeVaultOpTools)
     : "";
   const vaultOpGuidance = activeVaultOpTools.length > 0 ? "\n\n" + vaultOpGuidanceBody : "";
+  // Non-agentic regex-edit format guidance (ambient editing without tools). The
+  // SEARCH/REPLACE format the diff engine parses, taught only when no edit tools carry
+  // it (agentic edits are described by editGuidance instead).
+  const regexEditGuidanceBody = useRegexEditGuidance ? EDIT_SYSTEM_PROMPT : "";
+  const regexEditGuidance = useRegexEditGuidance ? "\n\n" + regexEditGuidanceBody : "";
+
   const finalSystemPrompt = disableBuiltinSystemPrompts
     ? profileSystemPrompt
-    : systemPrompt + groundingNote + vaultGuidance + editGuidance + vaultOpGuidance;
+    : systemPrompt + groundingNote + vaultGuidance + editGuidance + vaultOpGuidance + regexEditGuidance;
 
   // Layer 1 (prompt-cache design §6.1.2): on the billed paths that have a tail
-  // mechanism, hold the cached `system` block mode-invariant (profile prompt
-  // only) and carry the per-mode wording + tool guidance in the message tail.
-  // Local providers (and disableBuiltinSystemPrompts) keep today's full system
-  // prompt, byte-for-byte, with no tail. The clients place modeTail in their own
-  // tail mechanism (see ChatRequest.modeTail).
+  // mechanism, hold the cached `system` block invariant (profile prompt only) and
+  // carry the per-turn wording + tool guidance in the message tail. Local providers
+  // (and disableBuiltinSystemPrompts) keep the full system prompt, byte-for-byte, with
+  // no tail. The clients place modeTail in their own tail mechanism (ChatRequest.modeTail).
   const useModeTail =
     !disableBuiltinSystemPrompts &&
     (activeProvider === "anthropic" || isClaudeCode);
@@ -279,70 +235,37 @@ export async function prepareApiMessages(
     useModeTail,
     fullSystemPrompt: finalSystemPrompt,
     cachedSystemPrompt: profileSystemPrompt,
-    tailParts: [modePrefix, groundingNoteBody, vaultGuidanceBody, editGuidanceBody, vaultOpGuidanceBody],
+    tailParts: [
+      basePrefix,
+      groundingNoteBody,
+      vaultGuidanceBody,
+      editGuidanceBody,
+      vaultOpGuidanceBody,
+      regexEditGuidanceBody,
+    ],
   });
 
   return {
     systemPrompt: outSystemPrompt,
     ...(modeTail ? { modeTail } : {}),
-    documentContext,
+    documentContext: null,
     ragContext,
     rewrittenQuery,
     messages,
     tools,
     ...(allowedToolNames ? { allowedToolNames } : {}),
-    additionalContextItems,
-    ...(noteImageContext?.length ? { noteImageContext } : {}),
   };
 }
 
 /**
- * Selects the mode-specific prompt prefix. `useEditTools` selects between the
- * tool vs fallback edit prefix. This is the per-mode wording that Layer 1 moves
- * out of the cached `system` block and into the message tail (see
- * {@link splitSystemForTail}).
- */
-export function selectModePrefix(
-  mode: ChatMode,
-  useEditTools: boolean,
-  settings: PluginSettings,
-): string {
-  switch (mode) {
-    case "plan":
-      return settings.planSystemPromptPrefix;
-    case "conversation":
-      return settings.chatSystemPromptPrefix;
-    case "edit":
-      return useEditTools
-        ? settings.editToolSystemPromptPrefix
-        : settings.editFallbackSystemPromptPrefix;
-  }
-}
-
-/**
- * Combines a mode-specific prefix with the user's custom prompt from the active profile.
- * `useEditTools` selects between the tool vs fallback edit prefix.
- */
-export function composeSystemPrompt(
-  mode: ChatMode,
-  useEditTools: boolean,
-  settings: PluginSettings,
-  profileSystemPrompt: string,
-): string {
-  return [selectModePrefix(mode, useEditTools, settings), profileSystemPrompt]
-    .filter(Boolean)
-    .join("\n\n");
-}
-
-/**
- * Layer 1 decomposition of the system prompt into a mode-invariant cached block
- * and a per-mode tail (prompt-cache design §6.1.2).
+ * Layer 1 decomposition of the system prompt into an invariant cached block and a
+ * per-turn tail (prompt-cache design §6.1.2).
  *
  * When `useModeTail` is false (local providers, or built-in prompts disabled),
- * returns today's full system prompt unchanged with no tail. When true, the
- * cached `system` becomes the profile prompt only and the per-mode pieces
- * (`tailParts`, in render order) are joined into `modeTail`. An all-empty tail
- * yields `modeTail: undefined` so callers never emit an empty block.
+ * returns the full system prompt unchanged with no tail. When true, the cached
+ * `system` becomes the profile prompt only and the per-turn pieces (`tailParts`, in
+ * render order) are joined into `modeTail`. An all-empty tail yields
+ * `modeTail: undefined` so callers never emit an empty block.
  */
 export function splitSystemForTail(opts: {
   useModeTail: boolean;

@@ -1,11 +1,8 @@
 import type WritingAssistantChat from "../main";
-import { EDIT_SYSTEM_PROMPT } from "../editing/regexEditSystemPrompt";
-import { TOOL_EDIT_SYSTEM_PROMPT } from "../tools/editing/systemPrompt";
 import {
-  DEFAULT_CHAT_SYSTEM_PROMPT_PREFIX,
   DEFAULT_MAX_TOOL_ROUNDS_CHAT,
   DEFAULT_MAX_TOOL_ROUNDS_EDIT,
-  DEFAULT_PLAN_SYSTEM_PROMPT_PREFIX,
+  DEFAULT_SYSTEM_PROMPT_PREFIX,
 } from "../constants";
 import { createSettingsSection, SettingItem } from "./ui";
 
@@ -108,45 +105,23 @@ export function renderAdvancedTab(container: HTMLElement, plugin: WritingAssista
         })
     );
 
-  // ── System prompt prefixes ──────────────────────────────────────────────
+  // ── System prompt prefix ────────────────────────────────────────────────
 
   const prompts = createSettingsSection(
     container,
-    "System prompt prefixes",
-    "These prompts are prepended before your custom prompt (set in the chat popover). Leave empty to use only your custom prompt.",
+    "System prompt prefix",
+    "Prepended before your custom prompt (set in the chat popover) on every turn. Leave empty to use only your custom prompt. Edit-format guidance is added automatically when editing.",
     { icon: "message-square" }
   );
 
   renderPromptPrefixSetting(
-    prompts.bodyEl, plugin, "Plan mode prefix",
-    "Prepended before your custom prompt in plan mode.",
-    "planSystemPromptPrefix", DEFAULT_PLAN_SYSTEM_PROMPT_PREFIX
-  );
-
-  renderPromptPrefixSetting(
-    prompts.bodyEl, plugin, "Chat mode prefix",
-    "Prepended before your custom prompt in chat mode.",
-    "chatSystemPromptPrefix", DEFAULT_CHAT_SYSTEM_PROMPT_PREFIX
-  );
-
-  renderPromptPrefixSetting(
-    prompts.bodyEl, plugin, "Edit mode prefix (tool use)",
-    "Used when the model supports native tool/function calling.",
-    "editToolSystemPromptPrefix", TOOL_EDIT_SYSTEM_PROMPT
-  );
-
-  renderPromptPrefixSetting(
-    prompts.bodyEl, plugin, "Edit mode prefix (text fallback)",
-    "Used when the model does not support tool use (SEARCH/REPLACE blocks).",
-    "editFallbackSystemPromptPrefix", EDIT_SYSTEM_PROMPT
+    prompts.bodyEl, plugin, "Prefix",
+    "Prepended before your custom prompt on every turn.",
+    "systemPromptPrefix", DEFAULT_SYSTEM_PROMPT_PREFIX
   );
 }
 
-type PromptPrefixKey =
-  | "planSystemPromptPrefix"
-  | "chatSystemPromptPrefix"
-  | "editToolSystemPromptPrefix"
-  | "editFallbackSystemPromptPrefix";
+type PromptPrefixKey = "systemPromptPrefix";
 
 function renderPromptPrefixSetting(
   container: HTMLElement,

@@ -66,13 +66,11 @@ export default class WritingAssistantChat extends Plugin {
     this.addCommand({
       id: "edit-active-note",
       name: "Edit active note with AI",
+      // Editing is now ambient (prompt-cache design §6.3): the chat can always
+      // propose edits to the active note (reviewed at the default "ask" posture),
+      // so the command just opens the chat with the note in context.
       editorCallback: async () => {
         await this.activateChatView();
-        const leaves = this.app.workspace.getLeavesOfType(VIEW_TYPE_CHAT);
-        if (leaves.length > 0) {
-          const view = leaves[0].view as ChatView;
-          view.setMode("edit");
-        }
       },
     });
 

@@ -5,6 +5,7 @@
  * no Obsidian and no disk. This is the single most important seam to get right.
  */
 
+import type { ApprovalPosture } from "../shared/types";
 import type { VaultOperation, VaultOpClass } from "./types";
 
 /**
@@ -111,19 +112,48 @@ function trimSlashes(value: string): string {
 
 /**
  * Decide one operation's fate. `autoSoFar` is the count of ops already
- * resolved to "auto" this turn. Both downgrades only ever *tighten*:
- * out-of-scope auto→ask, count auto→ask. "deny" short-circuits.
+ * resolved to "auto" this turn. `posture` is the session-level override
+ * (prompt-cache design §6.3): under `"auto"` ("Edit automatically") every op
+ * auto-applies, overriding the per-class gate (ask AND deny) and the scope
+ * restriction, bounded only by the `maxAutoOps` runaway backstop. Under `"ask"`
+ * (the default) the per-class policy fires as configured, with the usual
+ * tightening-only downgrades: out-of-scope auto→ask, over-budget auto→ask,
+ * "deny" short-circuits.
  */
 export function resolveGate(
   op: VaultOperation,
   policy: VaultOpPolicy,
   autoSoFar: number,
+  posture: ApprovalPosture = "ask",
 ): Gate {
+  if (posture === "auto") {
+    return autoSoFar >= policy.maxAutoOps ? "ask" : "auto";
+  }
   const base = policy[classOf(op)];
   if (base === "deny") return "deny";
   if (!inScope(targetPaths(op), policy.scopes)) return "ask";
   if (base === "auto" && autoSoFar >= policy.maxAutoOps) return "ask";
   return base;
+}
+
+/**
+ * Whether the session permits any vault write at all. A deny-all policy under the
+ * default `ask` posture is a read-only session; the `auto` posture overrules the
+ * policy, so it always permits writes. Drives the **ambient edit pipeline**
+ * (prompt-cache design §6.3): with the plan/chat/edit modes gone, the edit renderer +
+ * diff review run whenever writes are possible (every assistant turn may propose
+ * edits), and a read-only session is exactly a deny-all policy.
+ */
+export function writesPermitted(policy: VaultOpPolicy, posture: ApprovalPosture): boolean {
+  if (posture === "auto") return true;
+  return (
+    policy.edit !== "deny" ||
+    policy.create !== "deny" ||
+    policy.overwrite !== "deny" ||
+    policy.move !== "deny" ||
+    policy.trash !== "deny" ||
+    policy.createDir !== "deny"
+  );
 }
 
 /**
@@ -137,7 +167,11 @@ export function resolveEditGate(
   policy: VaultOpPolicy,
   filePath: string,
   autoSoFar: number,
+  posture: ApprovalPosture = "ask",
 ): Gate {
+  if (posture === "auto") {
+    return autoSoFar >= policy.maxAutoOps ? "ask" : "auto";
+  }
   const base = policy.edit;
   if (base === "deny") return "deny";
   if (!inScope([filePath], policy.scopes)) return "ask";

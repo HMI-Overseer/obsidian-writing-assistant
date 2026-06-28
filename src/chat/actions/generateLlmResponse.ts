@@ -3,10 +3,10 @@ import { Notice } from "obsidian";
 import { buildSamplingParams } from "../finalization/buildSamplingParams";
 import type WritingAssistantChat from "../../main";
 import type { ChatClient } from "../../api/chatClient";
-import type { ChatComposer } from "../composer/ChatComposer";
 import type { ChatSessionStore } from "../conversation/ChatSessionStore";
 import type { ChatTranscript } from "../messages/ChatTranscript";
-import type { CompletionModel, ConversationMessage } from "../../shared/types";
+import type { ApprovalPosture, CompletionModel, ConversationMessage } from "../../shared/types";
+import { writesPermitted } from "../../vault-ops/gateway";
 import { getActiveProfile } from "../../shared/profileUtils";
 import { makeMessage } from "../conversation/conversationUtils";
 import { prepareApiMessages } from "../finalization/prepareApiMessages";
@@ -39,10 +39,10 @@ export interface LlmGenerationOptions {
   owner: Component;
   store: ChatSessionStore;
   transcript: ChatTranscript;
-  composer: ChatComposer;
   activeModel: CompletionModel;
   client: ChatClient;
-  editMode: boolean;
+  /** Session approval posture, the replacement for the plan/chat/edit mode (§6.3). */
+  posture: ApprovalPosture;
   finalization: FinalizationMode;
   setIsGenerating: (v: boolean) => void;
   setActiveAbortController: (c: AbortController | null) => void;
@@ -82,10 +82,9 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
     owner,
     store,
     transcript,
-    composer,
     activeModel,
     client,
-    editMode,
+    posture,
     finalization,
     setIsGenerating,
     setActiveAbortController,
@@ -94,14 +93,17 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
 
   const activeProfile = getActiveProfile(plugin.settings, activeModel.provider);
 
+  // Ambient editing (prompt-cache design §6.3): the edit pipeline (edit renderer, edit
+  // review channel, finalizeEditResponse) is active whenever the session permits any
+  // write. A read-only session is exactly a deny-all policy under the `ask` posture.
+  const editsActive = writesPermitted(plugin.settings.vaultOpPolicy, posture);
+  const activeFilePath = plugin.app.workspace.getActiveFile()?.path;
+
   const apiMessages = await prepareApiMessages({
     app: plugin.app,
     store,
     settings: plugin.settings,
-    activeNoteAttached: composer.isActiveNoteAttached(),
-    extraContextItems: composer.getExtraContextItems(),
-    maxContextChars: plugin.settings.maxContextChars,
-    mode: editMode ? "edit" : "conversation",
+    posture,
     ragService: plugin.services.ragService,
     activeProvider: activeModel.provider,
     modelCapabilities: {
@@ -150,8 +152,8 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
   assistantBubble.bodyEl.addClass("is-streaming");
 
   // useToolMode: the edit renderer shows a tool-call UI overlay (not for vault-only tool use)
-  const useToolMode = editMode && !!apiMessages.tools?.length;
-  const renderer = editMode
+  const useToolMode = editsActive && !!apiMessages.tools?.length;
+  const renderer = editsActive
     ? new EditStreamingRenderer(assistantBubble, transcript, { useToolMode })
     : new StreamingRenderer(assistantBubble, transcript);
 
@@ -177,26 +179,27 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
   const vaultToolContext: VaultToolContext = {
     app: plugin.app,
     ragService: plugin.services.ragService,
-    // Edit mode carries the active note in documentContext; in chat mode the note
-    // moved into a message attachment, so fall back to the current active file.
-    activeFilePath: apiMessages.documentContext?.filePath ?? plugin.app.workspace.getActiveFile()?.path,
+    // The active note rides as a frozen attachment; the model reads current content
+    // via tools, so the active file is just the current pane's file (RAG exclusion).
+    activeFilePath,
   };
 
   const editToolContext: ToolExecutionContext | undefined =
-    editMode
-      ? { app: plugin.app, filePath: apiMessages.documentContext?.filePath ?? "" }
+    editsActive
+      ? { app: plugin.app, filePath: activeFilePath ?? "" }
       : undefined;
 
   // The in-loop review coordinator: owns the live vault-op proposal, mounts the
   // review on the streaming timeline, applies auto ops, and suspends the loop on
   // ask-gated ops until the user decides (in-loop-tool-approval-blocking-flow). In
-  // edit mode it also owns the edit channel, folding the live diff onto the timeline
-  // step like vault ops (propose-edit-in-loop-blocking-review).
+  // when editing is active it also owns the edit channel, folding the live diff onto
+  // the timeline step like vault ops (propose-edit-in-loop-blocking-review).
   const liveReview = new LiveVaultReview({
     app: plugin.app,
     timelineEl: assistantBubble.timelineEl,
     policy: plugin.settings.vaultOpPolicy,
-    ...(editMode && {
+    posture,
+    ...(editsActive && {
       edit: {
         inlineDiff: plugin.inlineDiff,
         resolveOptions: {
@@ -222,9 +225,10 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
 
   try {
 
-    const maxRounds = apiMessages.documentContext?.filePath
-      ? plugin.settings.maxToolRoundsEdit
-      : plugin.settings.maxToolRoundsChat;
+    // One unified agentic round budget now that the modes are gone (the old edit-only
+    // cap keyed off the live document, which no longer exists). The per-turn
+    // identical-call guard is the primary spin control; this is the high backstop.
+    const maxRounds = plugin.settings.maxToolRoundsChat;
 
     // Only the plugin-owned tool loop buffers deltas; Claude Code streams live.
     const agenticMode = pluginAgentic;
@@ -324,7 +328,7 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
       : [];
     const effectiveWriteToolCalls = ccWriteToolCalls.length > 0 ? ccWriteToolCalls : writeToolCalls;
 
-    if (editMode && renderer instanceof EditStreamingRenderer) {
+    if (editsActive && renderer instanceof EditStreamingRenderer) {
       // Drop the transient in-loop edit panel so it can't double up with the
       // durable one finalize renders into the message body.
       liveReview.detachEditPanel();
@@ -342,6 +346,7 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
         toolCalls: effectiveWriteToolCalls,
         agenticSteps,
         stoppedForMaxTokens: writeStopReason === "max_tokens",
+        posture,
         prebuiltVaultOpProposal: liveReview.getProposal() ?? undefined,
         prebuiltVaultOpRecord: liveReview.getAppliedRecord() ?? undefined,
         prebuiltEditProposal: liveReview.getEditProposal() ?? undefined,
@@ -384,7 +389,7 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
 
     if (isAbortError(error)) {
       const partialSteps = timeline?.getSteps();
-      if (editMode && renderer instanceof EditStreamingRenderer) {
+      if (editsActive && renderer instanceof EditStreamingRenderer) {
         liveReview.detachEditPanel();
         await finalizeEditResponse({
           app: plugin.app,
@@ -397,6 +402,7 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
           modelId: activeModel.modelId,
           provider: activeModel.provider,
           agenticSteps: partialSteps,
+          posture,
           prebuiltVaultOpProposal: liveReview.getProposal() ?? undefined,
           prebuiltVaultOpRecord: liveReview.getAppliedRecord() ?? undefined,
           prebuiltEditProposal: liveReview.getEditProposal() ?? undefined,

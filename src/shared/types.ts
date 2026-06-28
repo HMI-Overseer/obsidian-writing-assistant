@@ -425,6 +425,22 @@ export interface BenchmarkSettings {
   history: BenchmarkHistoryEntry[];
 }
 
+/**
+ * Session-scoped approval posture, the cloud chat surface's replacement for the
+ * plan/chat/edit mode selector (prompt-cache design §6.3). It routes the
+ * apply-vs-ask decision at the vault-op gate and is cache-neutral: it changes
+ * only the runtime allow-list / per-run gate, never the cached prefix or the
+ * Claude Code fingerprint, so it can flip mid-session for free.
+ *
+ *   - `ask`, honor the per-class {@link VaultOpPolicy} as configured (auto where
+ *            set, ask where set, deny = read-only). Default.
+ *   - `auto`, "Edit automatically": a blanket session override, every op
+ *            auto-applies (ask AND deny are overridden to auto), bounded only by
+ *            the per-turn `maxAutoOps` runaway backstop; deny-classed write tools
+ *            are re-offered so they can run.
+ */
+export type ApprovalPosture = "ask" | "auto";
+
 export interface PluginSettings {
   providerSettings: ProviderSettingsMap;
   includeNoteContext: boolean;
@@ -446,14 +462,12 @@ export interface PluginSettings {
   rag: RagSettings;
   /** Knowledge graph settings. */
   knowledgeGraph: KnowledgeGraphSettings;
-  /** System prompt prefix for Plan mode. Prepended before user's custom prompt. */
-  planSystemPromptPrefix: string;
-  /** System prompt prefix for Chat mode. Prepended before user's custom prompt. */
-  chatSystemPromptPrefix: string;
-  /** System prompt prefix for Edit mode (tool use variant). Prepended before user's custom prompt. */
-  editToolSystemPromptPrefix: string;
-  /** System prompt prefix for Edit mode (fallback SEARCH/REPLACE variant). Prepended before user's custom prompt. */
-  editFallbackSystemPromptPrefix: string;
+  /**
+   * The unified system prompt prefix, prepended before the profile's custom prompt on
+   * every turn (the plan/chat/edit modes are gone, §6.3). Edit-format guidance
+   * (tool-edit or non-agentic SEARCH/REPLACE) is appended dynamically, not stored here.
+   */
+  systemPromptPrefix: string;
   /** Whether the user has accepted the API keys privacy disclaimer. */
   apiKeysDisclaimerAccepted: boolean;
   /** Master gate for all tool use. When false, no mode uses tools. */

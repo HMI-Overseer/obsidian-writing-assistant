@@ -153,3 +153,44 @@ describe("resolveEditGate", () => {
     expect(resolveEditGate(policy, "Story.md", 2)).toBe("ask");
   });
 });
+
+// The "Edit automatically" posture (prompt-cache design §6.3) is a session-level
+// blanket override: every op auto-applies, overriding the per-class gate (ask AND
+// deny) and the scope restriction, bounded only by the maxAutoOps runaway backstop.
+// The default "ask" posture leaves resolveGate / resolveEditGate exactly as before.
+describe("approval posture override", () => {
+  test("default posture is 'ask': the per-class policy fires unchanged", () => {
+    // deny stays deny, auto stays auto, ask stays ask, scope/budget downgrades hold.
+    expect(resolveGate(create("a.md"), basePolicy, 0, "ask")).toBe("auto");
+    expect(resolveGate({ kind: "trash", path: "a.md", expect: FP, snapshot: "" }, basePolicy, 0, "ask"))
+      .toBe("deny");
+    expect(resolveEditGate({ ...basePolicy, edit: "deny" }, "Story.md", 0, "ask")).toBe("deny");
+  });
+
+  test("'auto' posture overrides an ask-classed op to auto", () => {
+    expect(resolveGate({ kind: "overwrite", path: "a.md", content: "x", expect: FP }, basePolicy, 0, "auto"))
+      .toBe("auto");
+    expect(resolveEditGate({ ...basePolicy, edit: "ask" }, "Story.md", 0, "auto")).toBe("auto");
+  });
+
+  test("'auto' posture overrides even a deny-classed op to auto", () => {
+    const trash: VaultOperation = { kind: "trash", path: "a.md", expect: FP, snapshot: "" };
+    expect(resolveGate(trash, basePolicy, 0, "auto")).toBe("auto"); // trash is "deny" in basePolicy
+    expect(resolveEditGate({ ...basePolicy, edit: "deny" }, "Story.md", 0, "auto")).toBe("auto");
+  });
+
+  test("'auto' posture ignores the scope restriction", () => {
+    const policy = { ...basePolicy, scopes: ["AI drafts"] };
+    // Out of scope would downgrade to ask under "ask"; "auto" applies anyway.
+    expect(resolveGate(create("elsewhere/a.md"), policy, 0, "auto")).toBe("auto");
+  });
+
+  test("'auto' posture still respects the maxAutoOps runaway backstop", () => {
+    const policy = { ...basePolicy, maxAutoOps: 2 };
+    expect(resolveGate({ kind: "trash", path: "a.md", expect: FP, snapshot: "" }, policy, 1, "auto"))
+      .toBe("auto");
+    expect(resolveGate({ kind: "trash", path: "a.md", expect: FP, snapshot: "" }, policy, 2, "auto"))
+      .toBe("ask");
+    expect(resolveEditGate(policy, "Story.md", 2, "auto")).toBe("ask");
+  });
+});

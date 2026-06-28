@@ -6,7 +6,7 @@ import {
   resolveVaultOps,
   resolveEdits,
   applyIdenticalCallGuard,
-  applyModeAllowGuard,
+  applyToolAllowGuard,
   IDENTICAL_CALL_THRESHOLD,
 } from "../../../../src/chat/actions/toolLoop";
 import type { ToolLoopCallbacks } from "../../../../src/chat/actions/toolLoop";
@@ -648,29 +648,29 @@ describe("applyIdenticalCallGuard", () => {
 });
 
 /**
- * Mode allow-list guard (§6.1.4). The stable cloud surface advertises more than a
- * mode permits, so a call whose tool the mode disallows is refused before it runs.
- * Reads are unrestricted on cloud, so only out-of-mode writes are blocked in practice.
- * Local providers pass no allow-list, making the guard a no-op.
+ * Tool allow-list guard (§6.1.4/§6.3). The stable cloud surface advertises more than
+ * the session permits, so a call whose tool the session disallows (a deny-classed write
+ * under the ask posture) is refused before it runs. Reads are unrestricted on cloud, so
+ * only not-permitted writes are blocked. Local providers pass no allow-list (no-op).
  */
-describe("applyModeAllowGuard", () => {
+describe("applyToolAllowGuard", () => {
   const readName = [...VAULT_TOOL_NAMES][0];
   const writeName = [...VAULT_OPS_TOOL_NAMES][0];
   const mk = (id: string, name: string): ToolCall => ({ id, name, arguments: {} });
 
   it("is a no-op when no allow-list is supplied (local providers)", () => {
-    const r = applyModeAllowGuard([mk("a", writeName)], undefined);
+    const r = applyToolAllowGuard([mk("a", writeName)], undefined);
     expect(r.blockedIds.size).toBe(0);
     expect(r.blockedResults).toEqual([]);
   });
 
   it("allows a call whose tool is in the allow-list", () => {
-    const r = applyModeAllowGuard([mk("a", readName)], [readName]);
+    const r = applyToolAllowGuard([mk("a", readName)], [readName]);
     expect(r.blockedIds.size).toBe(0);
   });
 
   it("refuses a call whose tool the mode does not permit", () => {
-    const r = applyModeAllowGuard([mk("a", readName), mk("b", writeName)], [readName]);
+    const r = applyToolAllowGuard([mk("a", readName), mk("b", writeName)], [readName]);
     expect([...r.blockedIds]).toEqual(["b"]);
     const refusal = r.blockedResults[0].result;
     expect(refusal.isError).toBe(true);
@@ -679,8 +679,8 @@ describe("applyModeAllowGuard", () => {
   });
 });
 
-describe("runToolLoop mode allow-list", () => {
-  it("refuses an out-of-mode write and never accumulates it as a write call", async () => {
+describe("runToolLoop tool allow-list", () => {
+  it("refuses a not-permitted write and never accumulates it as a write call", async () => {
     const cb = makeCallbacks();
     const readName = [...VAULT_TOOL_NAMES][0];
     const writeName = [...VAULT_OPS_TOOL_NAMES][0];
@@ -693,7 +693,7 @@ describe("runToolLoop mode allow-list", () => {
       { deltas: ["done"], toolCalls: null, stopReason: "end_turn" },
     ]);
 
-    // The mode permits only the read tool; the advertised write is gated off.
+    // The session permits only the read tool; the advertised write is gated off.
     const request = { ...baseRequest, allowedToolNames: [readName] } as ChatRequest;
     const result = await runToolLoop(
       client,
@@ -711,7 +711,7 @@ describe("runToolLoop mode allow-list", () => {
     expect(result.writeToolCalls).toBeNull();
     const recorded = (cb.onStepRecorded as ReturnType<typeof vi.fn>).mock.calls.map((c) => c[0]);
     const errors = recorded.filter((s) => s.isError).map((s) => s.errorContent as string);
-    expect(errors.filter((e) => e.includes("not available in the current mode"))).toHaveLength(1);
+    expect(errors.filter((e) => e.includes("not permitted in this session"))).toHaveLength(1);
   });
 
   it("lets an in-mode call through the gate to execute", async () => {

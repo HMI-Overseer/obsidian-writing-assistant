@@ -6,6 +6,7 @@ import { findReplaceTargets } from "../tools/vault-ops/replaceScan";
 import { validateReplaceInVault } from "../tools/vault-ops/validation";
 import type { ReplaceScanResult } from "../tools/vault-ops/conversion";
 import { readContentOrNull } from "./apply";
+import type { ApprovalPosture } from "../shared/types";
 import { resolveGate, type Gate, type VaultOpPolicy } from "./gateway";
 import { backlinkCount } from "./metadata";
 import { isReservedConfigPath } from "./pathSafety";
@@ -106,8 +107,9 @@ export function gateConvertedOp(
   isSatisfied: boolean,
   policy: VaultOpPolicy,
   autoSoFar: number,
+  posture: ApprovalPosture = "ask",
 ): { gate: Gate; autoConsumed: boolean } {
-  const gate = isSatisfied ? "auto" : resolveGate(op, policy, autoSoFar);
+  const gate = isSatisfied ? "auto" : resolveGate(op, policy, autoSoFar, posture);
   return { gate, autoConsumed: gate === "auto" && !isSatisfied };
 }
 

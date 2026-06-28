@@ -38,7 +38,7 @@ import {
 import type { BubbleRefs } from "../types";
 import type { EditStreamingRenderer } from "../streaming/EditStreamingRenderer";
 import type WritingAssistantChat from "../../main";
-import type { AgenticStep, ConversationMessage, ProviderOption } from "../../shared/types";
+import type { AgenticStep, ApprovalPosture, ConversationMessage, ProviderOption } from "../../shared/types";
 import type { ToolCall } from "../../tools/types";
 import type { UsageResult } from "../../api/usageTypes";
 import { attachUsageToMessage } from "./finalizeResponse";
@@ -60,6 +60,8 @@ export interface FinalizeEditOptions {
   agenticSteps?: AgenticStep[];
   /** True when generation stopped for max_tokens, arms the write_file truncation guard. */
   stoppedForMaxTokens?: boolean;
+  /** Session approval posture; `auto` overrules the per-class policy to auto-apply (§6.3). */
+  posture?: ApprovalPosture;
   /**
    * A vault-op proposal already built and (partly) resolved in-loop by
    * {@link LiveVaultReview} (in-loop-tool-approval-blocking-flow). When present,
@@ -158,6 +160,7 @@ export async function finalizeEditResponse(options: FinalizeEditOptions): Promis
       editProposal ? undefined : prose,
       stoppedForMaxTokens ?? false,
       plugin.settings.vaultOpPolicy,
+      options.posture ?? "ask",
     );
   }
 
@@ -241,6 +244,7 @@ async function buildVaultOpProposal(
   prose: string | undefined,
   stoppedForMaxTokens: boolean,
   policy: VaultOpPolicy,
+  posture: ApprovalPosture,
 ): Promise<VaultOperationProposal | null> {
   // A trashed file's snapshot is what its inverse re-creates on undo; pre-read so
   // the pure conversion below can stay synchronous. A replace's per-file targets are
@@ -271,7 +275,7 @@ async function buildVaultOpProposal(
     // informational only: never gated, never applied, shown on their step as a
     // muted "already exists" note.
     const isSatisfied = satisfied[i];
-    const { gate, autoConsumed } = gateConvertedOp(op, isSatisfied, policy, autoSoFar);
+    const { gate, autoConsumed } = gateConvertedOp(op, isSatisfied, policy, autoSoFar, posture);
     if (gate === "deny") return; // denied tools are filtered upstream (Phase 4); guard anyway.
     if (autoConsumed) autoSoFar++;
     reviewable.push(buildReviewableOp(app, op, gate, isSatisfied, sources[i]));

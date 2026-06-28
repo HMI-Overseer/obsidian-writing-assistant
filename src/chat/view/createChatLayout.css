@@ -10,7 +10,7 @@
     padding-right: 0 !important;
     padding-top: 0 !important;
 
-    /* Mode accent, overridden per data-mode */
+    /* Mode accent, overridden per data-posture */
     --lmsa-mode-accent: var(--interactive-accent);
 
     /* Chat hover tokens, derived from mode accent */
@@ -24,11 +24,8 @@
     transition: background 400ms ease;
   }
 
-  .lmsa-root[data-mode="plan"] {
-    --lmsa-mode-accent: var(--color-blue, #4a90d9);
-  }
-
-  .lmsa-root[data-mode="edit"] {
+  /* "ask" posture keeps the base --interactive-accent (no override needed). */
+  .lmsa-root[data-posture="auto"] {
     --lmsa-mode-accent: var(--color-orange, #e8a84b);
   }
 

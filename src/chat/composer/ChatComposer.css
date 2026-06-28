@@ -359,7 +359,7 @@
     top: 0;
     bottom: 0;
     left: 0;
-    width: calc(100% / 3);
+    width: calc(100% / 2);
     border-radius: 999px;
     background: color-mix(in srgb, var(--lmsa-mode-accent) 15%, var(--background-primary));
     transition: transform 200ms ease-out, background 400ms ease;
@@ -372,10 +372,6 @@
 
   .lmsa-chat-composer-mode-toggle[data-active-index="1"] .lmsa-chat-composer-mode-slider {
     transform: translateX(100%);
-  }
-
-  .lmsa-chat-composer-mode-toggle[data-active-index="2"] .lmsa-chat-composer-mode-slider {
-    transform: translateX(200%);
   }
 
   /* ── Tool indicator ──────────────────────────────────────────────────────── */

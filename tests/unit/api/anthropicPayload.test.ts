@@ -6,7 +6,8 @@ import {
   anthropicModelSupportsAdaptiveThinking,
   anthropicModelSupportsSystemRole,
 } from "../../../src/api/buildAnthropicPayload";
-import type { ChatRequest } from "../../../src/shared/chatRequest";
+import type { AnthropicMessage } from "../../../src/api/buildAnthropicPayload";
+import type { ChatRequest, ChatTurn } from "../../../src/shared/chatRequest";
 import type {
   SamplingParams,
   AnthropicCacheSettings,
@@ -619,5 +620,128 @@ describe("anthropicModelSupportsSystemRole", () => {
     "claude-opus-9",
   ])("returns false for non-system-role model %s", (model) => {
     expect(anthropicModelSupportsSystemRole(model)).toBe(false);
+  });
+});
+
+describe("buildAnthropicMessages conversation cache breakpoint", () => {
+  const cache: AnthropicCacheSettings = { enabled: true, ttl: "default" };
+
+  // Every message block that carries a cache_control breakpoint, in message order.
+  function cacheMarks(messages: AnthropicMessage[]): { index: number; blockType: string }[] {
+    const out: { index: number; blockType: string }[] = [];
+    messages.forEach((m, index) => {
+      if (Array.isArray(m.content)) {
+        for (const block of m.content) {
+          if (block.cache_control) out.push({ index, blockType: block.type });
+        }
+      }
+    });
+    return out;
+  }
+
+  // Places the breakpoint on the last STABLE turn, never on the volatile tail
+  // (the live doc/RAG context glued to the latest user turn, or the modeTail).
+  test("anchors on the last stable turn, not on the volatile per-turn tail", () => {
+    const { system, messages } = buildAnthropicMessages(
+      makeRequest({
+        systemPrompt: "Profile.",
+        modeTail: "Mode framing.",
+        documentContext: { filePath: "n.md", content: "DOC-BODY", isFull: false },
+        messages: [
+          { role: "user", content: "q1" },
+          { role: "assistant", content: "a1" },
+          { role: "user", content: "q2" },
+        ],
+      }),
+      cache,
+      "claude-opus-4-8",
+    );
+
+    // messages: [user q1, assistant a1, user q2(+doc), system(modeTail)].
+    const marks = cacheMarks(messages);
+    expect(marks).toEqual([{ index: 1, blockType: "text" }]);
+
+    // The volatile latest user turn carries the live doc and no breakpoint.
+    expect(typeof messages[2].content).toBe("string");
+    expect(messages[2].content).toContain("DOC-BODY");
+
+    // The modeTail rides a trailing system turn, also after the breakpoint.
+    expect(messages[3].role).toBe("system");
+    expect(typeof messages[3].content).toBe("string");
+
+    // System breakpoint still present: tools + system cache, conversation caches
+    // separately — 2 breakpoints total, within the 4-per-request budget.
+    expect(Array.isArray(system)).toBe(true);
+    expect((system as { cache_control?: unknown }[])[0].cache_control).toBeDefined();
+  });
+
+  // Pure-text chat (no tools, no attachments, no doc/RAG) still caches: the
+  // stable string turns are normalized to single-block arrays so they can carry
+  // a breakpoint, with no reliance on string vs single-block cache equivalence.
+  test("caches a pure-text conversation by normalizing stable string turns", () => {
+    const { messages } = buildAnthropicMessages(
+      makeRequest({
+        messages: [
+          { role: "user", content: "u1" },
+          { role: "assistant", content: "a1" },
+          { role: "user", content: "u2" },
+        ],
+      }),
+      cache,
+    );
+
+    // u1 and a1 (stable) are normalized to block arrays; u2 (latest user) stays a string.
+    expect(Array.isArray(messages[0].content)).toBe(true);
+    expect(Array.isArray(messages[1].content)).toBe(true);
+    expect(typeof messages[2].content).toBe("string");
+    expect(cacheMarks(messages)).toEqual([{ index: 1, blockType: "text" }]);
+  });
+
+  test("places no conversation breakpoint on the opening turn (no settled history)", () => {
+    const { system, messages } = buildAnthropicMessages(
+      makeRequest({ messages: [{ role: "user", content: "hi" }] }),
+      cache,
+    );
+    expect(cacheMarks(messages)).toEqual([]);
+    // System block still carries its own breakpoint.
+    expect((system as { cache_control?: unknown }[])[0].cache_control).toBeDefined();
+  });
+
+  test("adds no breakpoints and no normalization when caching is disabled", () => {
+    const { messages } = buildAnthropicMessages(
+      makeRequest({
+        messages: [
+          { role: "user", content: "u1" },
+          { role: "assistant", content: "a1" },
+          { role: "user", content: "u2" },
+        ],
+      }),
+      { enabled: false, ttl: "default" },
+    );
+    expect(cacheMarks(messages)).toEqual([]);
+    expect(typeof messages[1].content).toBe("string"); // not normalized
+  });
+
+  // A long turn must stay inside the 20-block lookback: intermediate breakpoints
+  // spaced ~15 blocks back, capped at 3 so the system block keeps the 4th slot.
+  test("spaces intermediate breakpoints ~15 blocks back, capped within budget", () => {
+    // 37 single-block turns; the last (index 36, user) is the volatile target,
+    // so the stable region is indices 0..35.
+    const turns: ChatTurn[] = [];
+    for (let k = 0; k <= 36; k++) {
+      turns.push({ role: k % 2 === 0 ? "user" : "assistant", content: `m${k}` });
+    }
+
+    const { system, messages } = buildAnthropicMessages(
+      makeRequest({ systemPrompt: "Profile.", messages: turns }),
+      cache,
+      "claude-opus-4-7", // no modeTail tail to keep indices clean
+    );
+
+    const marks = cacheMarks(messages);
+    // Capped at 3 conversation breakpoints, spaced 15 blocks apart from stableEnd (35).
+    expect(marks.map((m) => m.index)).toEqual([5, 20, 35]);
+    // Plus the system breakpoint = 4 total, exactly the per-request maximum.
+    expect((system as { cache_control?: unknown }[])[0].cache_control).toBeDefined();
   });
 });

@@ -62,7 +62,7 @@ export class ChatGenerationOrchestrator {
     const modelSelector = this.deps.getModelSelector();
     if (!store || !transcript || !composer || !modelSelector) return;
 
-    const useEditMode = composer.getMode() === "edit";
+    const posture = composer.getPosture();
 
     await sendMessage({
       plugin: this.deps.plugin,
@@ -80,7 +80,7 @@ export class ChatGenerationOrchestrator {
       onCalibrate: (est, actual) => this.deps.getContextUpdater()?.calibrate(est, actual),
       promptOverride,
       autoInsertAfterResponse,
-      editMode: useEditMode,
+      posture,
     });
     await this.deps.postGenerationSync();
   }
@@ -156,12 +156,12 @@ export class ChatGenerationOrchestrator {
 
     if (store.getSnapshot().messageHistory.length === 0) return;
 
-    const editMode = composer.getMode() === "edit";
+    const posture = composer.getPosture();
     const client = createChatClient(
       activeModel.provider,
       this.deps.plugin.settings.providerSettings,
       await this.deps.plugin.services.claudeCode.getRuntime(activeModel.provider, {
-        editMode,
+        posture,
         activeFilePath: this.deps.plugin.app.workspace.getActiveFile()?.path,
         conversationId: store.getActiveConversationId() ?? undefined,
       }),
@@ -174,10 +174,9 @@ export class ChatGenerationOrchestrator {
       owner: this.deps.owner,
       store,
       transcript,
-      composer,
       activeModel,
       client,
-      editMode,
+      posture,
       finalization: { kind: "append" },
       setIsGenerating: (v) => this.setIsGeneratingAndSync(v),
       setActiveAbortController: (c) => {

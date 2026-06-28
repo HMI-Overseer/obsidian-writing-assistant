@@ -1,7 +1,5 @@
 import type { Attachment, ConversationMessage } from "../shared/types";
 
-export type ChatMode = "plan" | "conversation" | "edit";
-
 export type BubbleRole = "user" | "assistant";
 
 

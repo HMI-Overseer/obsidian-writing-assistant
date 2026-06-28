@@ -1,7 +1,7 @@
 import type { App } from "obsidian";
 import { FileSystemAdapter } from "obsidian";
 import { execFile } from "child_process";
-import type { PluginSettings, ProviderOption } from "../shared/types";
+import type { ApprovalPosture, PluginSettings, ProviderOption } from "../shared/types";
 import type { ClaudeCodeRuntime, SdkSessionTurnInput } from "../api/ClaudeCodeClient";
 import { resolveClaudeBinary } from "../api/claudeCodeProcess";
 import { isSdkAvailable } from "../api/sdk/claudeAgentSdk";
@@ -23,7 +23,7 @@ import { executeVaultOpTool, buildPendingOverlay } from "../tools/vault-ops/hand
 import {
   CLAUDE_CODE_STABLE_TOOL_SET,
   cloudAllowedToolSet,
-  modeNotAllowedFailure,
+  toolNotAllowedFailure,
 } from "../tools/toolSurface";
 import { normalizeVaultToolCall } from "../tools/paths";
 import { VaultMcpServer, type McpServerHandle, type McpToolProvider } from "../mcp/VaultMcpServer";
@@ -69,8 +69,8 @@ export type ClaudeCodeToolEvent =
 
 /** Options for a single Claude Code run, set just before the subprocess is spawned. */
 export interface ClaudeCodeRunOptions {
-  /** Edit mode, exposes the plugin's edit tools and collects proposed edits for the diff panel. */
-  editMode?: boolean;
+  /** Session approval posture; gates which writes the per-run allow-list permits (§6.3). */
+  posture?: ApprovalPosture;
   /** Vault-relative path of the active note (edit target + search relevance). */
   activeFilePath?: string;
   /**
@@ -164,15 +164,14 @@ export class ClaudeCodeService {
     const agentic = settings.agenticMode;
 
     // Per-run allow-list, the same canonical resolver the API providers use: reads
-    // unrestricted, writes follow edit mode + preferToolUse + policy. Held OFF the
-    // session fingerprint (it is not baked into SessionConfig), so a mode switch reuses
-    // the live session instead of cold-rebuilding (prompt-cache design §6.1.4); the
+    // unrestricted, writes follow the posture + policy. Held OFF the session
+    // fingerprint (it is not baked into SessionConfig), so a posture flip reuses the
+    // live session instead of cold-rebuilding (prompt-cache design §6.1.4/§6.3); the
     // gate in executeTool enforces it per turn. Empty when not agentic (no tools run).
     this.runAllowedTools = agentic
       ? new Set(
           cloudAllowedToolSet({
-            editMode: options.editMode ?? false,
-            preferToolUse: settings.preferToolUse,
+            posture: options.posture ?? "ask",
             policy: settings.vaultOpPolicy,
             useThinkTool: false,
           }).map((tool) => tool.name),
@@ -425,7 +424,7 @@ export class ClaudeCodeService {
     // ops (absent from the allow-list) are refused here, the primary deny gate, with
     // the live-review deny check as defense in depth.
     if (!this.runAllowedTools.has(call.name)) {
-      return modeNotAllowedFailure(call.name);
+      return toolNotAllowedFailure(call.name);
     }
     if (VAULT_TOOL_NAMES.has(call.name)) {
       return executeVaultTool(call, {

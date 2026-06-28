@@ -23,12 +23,20 @@ import type {
   McpSdkServerConfigWithInstance,
   Options,
   Query,
+  SdkMcpToolDefinition,
   SDKMessage,
   SDKUserMessage,
 } from "@anthropic-ai/claude-agent-sdk";
 
 export { AbortError, createSdkMcpServer, query, tool };
-export type { McpSdkServerConfigWithInstance, Options, Query, SDKMessage, SDKUserMessage };
+export type {
+  McpSdkServerConfigWithInstance,
+  Options,
+  Query,
+  SdkMcpToolDefinition,
+  SDKMessage,
+  SDKUserMessage,
+};
 
 /**
  * Confirms the bundled SDK linked correctly at runtime. The `import.meta.url`

@@ -272,17 +272,25 @@ export class AnthropicClient implements ChatClient {
  * turn ends with `tool_use`: the server resolves the search inline, appends the matched
  * schema, and the model emits a (client-side) tool_use the loop then executes, so no new
  * stop reason is needed. The edge case is `pause_turn`: the server-tool loop can hit its
- * ~10-iteration cap (e.g. many back-to-back searches) and pause for resumption. The
- * plugin tool loop does not resume paused turns, so `pause_turn` falls through to
- * `"unknown"` here and, if the paused turn carried no client tool_use and no text, the
- * loop surfaces it as a failed round (recoverable by regenerating). Resumption is a
- * follow-up if the Claude Code / direct-API live gates ever observe it in practice.
+ * ~10-iteration cap (e.g. many back-to-back searches) and pause for resumption.
+ *
+ * `pause_turn` maps to its own {@link StopReason} (not `"unknown"`), so the tool loop can
+ * render an accurate recoverable message (the server-tool loop paused, regenerate to
+ * continue) instead of misclassifying the in-flight server_tool_use tokens as
+ * reasoning-only output (see {@link ../chat/actions/toolLoop.checkForFailedToolCall}).
+ * The plugin does NOT auto-resume a paused turn: that would mean echoing the
+ * server_tool_use / tool_search_tool_result blocks back verbatim, which the
+ * provider-agnostic conversation model does not carry. Resumption is the deferred option,
+ * to be built only if a live gate ever observes a real `pause_turn` (ADR-0009
+ * B-hardening; the realistic tool-search flow resolves to a client tool_use long before
+ * the cap, so this is near-unreachable in practice).
  */
 function mapAnthropicStopReason(raw: string | undefined): StopReason {
   switch (raw) {
     case "end_turn": return "end_turn";
     case "tool_use": return "tool_use";
     case "max_tokens": return "max_tokens";
+    case "pause_turn": return "pause_turn";
     default: return "unknown";
   }
 }

@@ -26,8 +26,16 @@ export interface UsageResult {
   sessionRebuildReason?: SessionRebuildReason;
 }
 
-/** Why the model stopped generating. */
-export type StopReason = "end_turn" | "tool_use" | "max_tokens" | "unknown";
+/**
+ * Why the model stopped generating. `pause_turn` is Anthropic's server-tool pause:
+ * the server-side tool loop (e.g. tool search) hit its iteration cap before the model
+ * emitted a client tool call or a final answer. It maps to its own value (not
+ * `"unknown"`) so the tool loop can surface a distinct, accurate recoverable message
+ * (regenerate to continue) rather than auto-resuming the paused turn (ADR-0009
+ * B-hardening; resumption is the deferred option, see
+ * {@link ../chat/actions/toolLoop.checkForFailedToolCall} and mapAnthropicStopReason).
+ */
+export type StopReason = "end_turn" | "tool_use" | "max_tokens" | "pause_turn" | "unknown";
 
 /** Wrapper returned by ChatClient.stream(). */
 export interface StreamResult {

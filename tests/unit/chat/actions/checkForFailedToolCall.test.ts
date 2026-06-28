@@ -75,6 +75,23 @@ describe("checkForFailedToolCall", () => {
     ).toMatch(/reasoning-only/);
   });
 
+  it("reports a server-tool pause distinctly, not as reasoning-only output", () => {
+    // A pause_turn carries the in-flight server-tool tokens, so the generic
+    // outputTokens branch would misread it as reasoning-only. The pause_turn branch
+    // must win and name the real cause (the server tool-search loop hit its iteration
+    // cap) so the recovery ("regenerate") is accurate. ADR-0009 B-hardening.
+    const msg = thrownMessage(
+      ctx({
+        round: 2,
+        roundText: "",
+        stopReason: "pause_turn",
+        usage: { inputTokens: 10, outputTokens: 42 },
+      }),
+    );
+    expect(msg).toMatch(/server-side tool-search|paused/);
+    expect(msg).not.toMatch(/reasoning-only/);
+  });
+
   it("does not throw when the model produced normal text without tool calls", () => {
     expect(() =>
       checkForFailedToolCall(ctx({ round: 0, roundText: "Here is your answer.", stopReason: "end_turn" })),

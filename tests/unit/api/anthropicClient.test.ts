@@ -181,4 +181,28 @@ describe("AnthropicClient.complete Layer-2 block tolerance", () => {
     ]);
     expect(result.stopReason).toBe("tool_use");
   });
+
+  // A pause_turn (the server-side tool-search loop hit its ~10-iteration cap) carries a
+  // trailing server_tool_use block but no client tool_use and no text. It maps to its own
+  // StopReason (B-hardening), NOT "unknown", so the tool loop can render an accurate
+  // recoverable message instead of misclassifying it as reasoning-only output.
+  test("maps a pause_turn server-tool pause to its own stop reason", async () => {
+    mockRequest.mockResolvedValueOnce({
+      body: JSON.stringify({
+        content: [
+          { type: "server_tool_use", id: "srv_1", name: "tool_search_tool_regex", input: { query: "read" } },
+        ],
+        usage: { input_tokens: 5, output_tokens: 7 },
+        stop_reason: "pause_turn",
+      }),
+      headers: {},
+    });
+
+    const client = new AnthropicClient("test-key");
+    const result = await client.complete(makeRequest(), "claude-opus-4-8", makeParams());
+
+    expect(result.text).toBe("");
+    expect(result.toolCalls).toBeNull();
+    expect(result.stopReason).toBe("pause_turn");
+  });
 });

@@ -674,7 +674,8 @@ export interface FailedRoundContext {
 /**
  * A round ended with no tool calls and no usable text. Rather than the old
  * one-size-fits-all message, classify *why*, raw tool-call markup, a `tool_use`
- * stop with nothing parseable, a genuinely empty turn, or reasoning-only output,
+ * stop with nothing parseable, a server-tool `pause_turn`, a genuinely empty turn,
+ * or reasoning-only output,
  * then render a multi-line block (summary, cause, fix, and a copyable diagnostics
  * section) via {@link formatFailedRoundMessage}. Each failure mode is
  * distinguishable in practice and points at a different fix, so collapsing them
@@ -712,6 +713,13 @@ export function checkForFailedToolCall(ctx: FailedRoundContext): void {
     cause = "It emitted raw tool-call markup as plain text instead of a structured tool call, so no call could be parsed.";
     recovery =
       "This model's tool-call format isn't being recognized by the provider, switch to a model with native tool-calling, or turn tools off for this request.";
+  } else if (stopReason === "pause_turn") {
+    // Must precede the outputTokens branch: a pause_turn carries the in-flight
+    // server_tool_use tokens, which would otherwise be misread as reasoning-only output.
+    cause =
+      "It paused after a long run of server-side tool-search calls (the server's tool loop hit its iteration cap before the model emitted a client tool call or a final answer).";
+    recovery =
+      "Regenerate to continue. The plugin does not auto-resume a paused server-tool turn; if this recurs, the model is searching the tool catalogue repeatedly without acting, so narrow the request.";
   } else if (stopReason === "tool_use") {
     cause = 'The provider reported a tool call (stop reason "tool_use") but returned no parseable call.';
     recovery = "The tool-call payload was malformed or empty, regenerate, or switch to a more capable model.";

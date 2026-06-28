@@ -6,6 +6,10 @@ import {
   cloudAllowedToolNames,
   CLOUD_STABLE_TOOL_SET,
   CLAUDE_CODE_STABLE_TOOL_SET,
+  CORE_READ_TOOLS,
+  CORE_READ_TOOL_NAMES,
+  isCoreReadTool,
+  anthropicNonDeferredToolNames,
   toolNotAllowedFailure,
   type ToolSurfaceOptions,
 } from "../../../src/tools/toolSurface";
@@ -167,17 +171,51 @@ describe("toolNotAllowedFailure", () => {
   });
 });
 
-describe("Layer 2 progressive-disclosure trigger (ADR-0009)", () => {
-  // Phase 4 (Layer 2 / tool-search) was evaluated and DEFERRED at 23 tools across one
-  // logical server (the vault). Field guidance (design doc Q4 / §6.2.5) says revisit
-  // progressive disclosure once the catalogue crosses ~40-50 tools, a second tool domain
-  // is added, or selection quality regresses. This tripwire fails when the catalogue
-  // crosses the low end of that band, forcing the Phase-4 revisit conversation rather
-  // than letting the always-on tool tax grow silently ("no silent caps").
+describe("Layer 2 progressive-disclosure core (ADR-0009 / §6.2.5)", () => {
+  // Layer 2 shipped. The long tail (the extra reads + every write) now defers behind the
+  // native tool-search entry (anthropic) and the SDK `alwaysLoad` split (Claude Code), so
+  // the OLD tripwire (whole catalogue must stay < 40) is obsolete: catalogue growth is now
+  // cheap because deferred tools sit outside the cached prefix. What must stay bounded
+  // instead is the NON-DEFERRED CORE. It is the only part of the tool block that lives in
+  // the cached prefix turn over turn, so each tool kept there is a permanent always-on tax
+  // and a permanent draw on tool-selection quality; growing it re-bloats exactly the prefix
+  // Layer 2 exists to shrink. Crossing this guard should force the §6.2.5 "does this
+  // primitive earn a non-deferred slot" conversation (the get_outline / read_section
+  // watch-item), not a silent bump.
   // See docs/reference/adr/0009-layer-2-progressive-disclosure-deferred.md.
-  const LAYER2_REVISIT_THRESHOLD = 40;
+  const NON_DEFERRED_CORE_MAX = 8;
 
-  it("the full tool catalogue stays below the Layer-2 revisit threshold", () => {
-    expect(CLOUD_STABLE_TOOL_SET.length).toBeLessThan(LAYER2_REVISIT_THRESHOLD);
+  it("keeps the core read set to the six §6.2.5 primitives", () => {
+    expect(names(CORE_READ_TOOLS)).toEqual([
+      "list_directory",
+      "semantic_search",
+      "search_content",
+      "read_file",
+      "get_outline",
+      "read_section",
+    ]);
+    expect(CORE_READ_TOOL_NAMES.size).toBe(6);
+  });
+
+  it("holds the anthropic non-deferred core (core reads + think) small", () => {
+    // 6 core reads + think. The native tool-search entry is non-deferred at the wire
+    // layer but is not a canonical tool, so it is not counted here.
+    const nonDeferred = anthropicNonDeferredToolNames();
+    expect(nonDeferred.size).toBeLessThanOrEqual(NON_DEFERRED_CORE_MAX);
+    expect(nonDeferred.size).toBe(7);
+    expect(nonDeferred.has("think")).toBe(true);
+  });
+
+  it("classifies only the six core reads as non-deferred, never writes or tail reads", () => {
+    expect(isCoreReadTool("read_file")).toBe(true);
+    expect(isCoreReadTool("semantic_search")).toBe(true);
+    // Tail reads defer.
+    expect(isCoreReadTool("directory_tree")).toBe(false);
+    expect(isCoreReadTool("get_frontmatter")).toBe(false);
+    // Writes always defer.
+    expect(isCoreReadTool("propose_edit")).toBe(false);
+    expect(isCoreReadTool("write_file")).toBe(false);
+    // think is core only on the native path, added separately, not a "read".
+    expect(isCoreReadTool("think")).toBe(false);
   });
 });

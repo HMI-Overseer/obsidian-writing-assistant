@@ -1,7 +1,13 @@
 import type { CanonicalToolDefinition, ToolResult } from "./types";
 import type { VaultOpPolicy } from "../vault-ops/gateway";
 import type { ApprovalPosture } from "../shared/types";
-import { ALL_VAULT_TOOLS, VAULT_TOOL_NAMES } from "./vault/definition";
+import {
+  ALL_VAULT_TOOLS,
+  VAULT_TOOL_NAMES,
+  CORE_VAULT_TOOLS,
+  GET_OUTLINE_TOOL,
+  READ_SECTION_TOOL,
+} from "./vault/definition";
 import { ALL_EDIT_TOOLS } from "./editing/definition";
 import { ALL_VAULT_OPS_TOOLS, allowedVaultOpsTools } from "./vault-ops/definition";
 import { THINK_TOOL, THINK_TOOL_NAME } from "./think/definition";
@@ -119,6 +125,62 @@ export const CLAUDE_CODE_STABLE_TOOL_SET: CanonicalToolDefinition[] = [
   ...ALL_EDIT_TOOLS,
   ...ALL_VAULT_OPS_TOOLS,
 ];
+
+/*
+ * Layer 2, progressive disclosure (the bloat fix). Settled in ADR-0009 and the
+ * prompt-cache design §6.2.5: under tool-search deferral the always-loaded surface
+ * shrinks to a small core of retrieval / navigation primitives, and the long tail
+ * (the rest of the reads + every write) loads on demand. On the direct `anthropic`
+ * path the core is non-deferred and the tail carries `defer_loading`; on Claude Code
+ * the core is marked `alwaysLoad` and the tail is left deferrable.
+ *
+ * The core is held SMALL on purpose. Deferred tools are excluded from the cached
+ * prefix and appended inline (as `tool_reference` blocks) only when discovered, so
+ * they never void the cache and cost nothing turn over turn. The core, by contrast,
+ * stays in the prefix every turn, so each tool kept here is a permanent always-on
+ * tax (Problem 2) and a permanent draw on tool-selection budget (Problem 3). The unit
+ * tripwire that used to fire when the whole catalogue crossed 40 tools now guards this
+ * core size instead.
+ */
+
+/**
+ * The non-deferred Layer-2 core reads: the retrieval / navigation primitives kept
+ * always-loaded on both billed paths (§6.2.5). It is {@link CORE_VAULT_TOOLS}
+ * (list_directory, semantic_search, search_content, read_file) plus the section-level
+ * {@link GET_OUTLINE_TOOL} / {@link READ_SECTION_TOOL} pair. Everything else, the read
+ * tail and every write, defers.
+ */
+export const CORE_READ_TOOLS: CanonicalToolDefinition[] = [
+  ...CORE_VAULT_TOOLS,
+  GET_OUTLINE_TOOL,
+  READ_SECTION_TOOL,
+];
+
+/** Names of {@link CORE_READ_TOOLS}, for the wire-layer defer / `alwaysLoad` split. */
+export const CORE_READ_TOOL_NAMES: ReadonlySet<string> = new Set(
+  CORE_READ_TOOLS.map((tool) => tool.name),
+);
+
+/**
+ * Whether `name` is a non-deferred Layer-2 core read, always loaded on both billed
+ * paths. Consumed by the Claude Code MCP bridge to mark the core `alwaysLoad`
+ * ({@link ../api/sdk/sdkMcpServer}) and by the direct-API tool formatter to decide
+ * which emitted tools carry `defer_loading` ({@link ./formatters/anthropic}).
+ */
+export function isCoreReadTool(name: string): boolean {
+  return CORE_READ_TOOL_NAMES.has(name);
+}
+
+/**
+ * The non-deferred tool NAMES on the direct `anthropic` path: the Layer-2 core reads
+ * plus `think` (always-loaded on the native agentic path, §6.2.5; never bridged to
+ * Claude Code). The native tool-search entry is non-deferred by construction at the
+ * wire layer and is not a {@link CanonicalToolDefinition}, so it is not listed here.
+ * Every emitted tool whose name is absent from this set carries `defer_loading: true`.
+ */
+export function anthropicNonDeferredToolNames(): Set<string> {
+  return new Set([...CORE_READ_TOOL_NAMES, THINK_TOOL_NAME]);
+}
 
 /**
  * The recovery-shaped refusal returned when the runtime allow-list blocks a call the

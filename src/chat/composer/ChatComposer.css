@@ -514,34 +514,36 @@
   /* ── Responsive (container query, reacts to panel width, not viewport) ──
      Degradation order as the footer narrows: the context % label (lowest-priority
      extra) goes first, then vision → knowledge → tool indicators, then mode-toggle
-     labels (icon-only), then the capacity ring itself. Dropping the % first keeps the
-     footer from being squeezed (which shoved the actions and jittered the composer). */
+     labels (icon-only), then the capacity ring itself. Thresholds are derived from the
+     measured footprints: full content glues at ~516px; each drop is the prior threshold
+     minus that item's footprint (its width + the gap it frees) — % 37, each icon 40 —
+     so an item leaves exactly when the row would otherwise run out of room. */
 
-  @container lmsa-composer-footer (max-width: 470px) {
+  @container lmsa-composer-footer (max-width: 516px) {
     .lmsa-context-ring-label {
       display: none;
     }
   }
 
-  @container lmsa-composer-footer (max-width: 435px) {
+  @container lmsa-composer-footer (max-width: 479px) {
     .lmsa-chat-composer-vision-indicator {
       display: none;
     }
   }
 
-  @container lmsa-composer-footer (max-width: 400px) {
+  @container lmsa-composer-footer (max-width: 439px) {
     .lmsa-chat-composer-knowledge-wrap {
       display: none;
     }
   }
 
-  @container lmsa-composer-footer (max-width: 365px) {
+  @container lmsa-composer-footer (max-width: 399px) {
     .lmsa-chat-composer-tool-wrap {
       display: none;
     }
   }
 
-  @container lmsa-composer-footer (max-width: 330px) {
+  @container lmsa-composer-footer (max-width: 359px) {
     .lmsa-chat-composer-mode-toggle-label {
       display: none;
     }

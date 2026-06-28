@@ -2,9 +2,18 @@
   /* ── Root ────────────────────────────────────────────────────────────────── */
 
   .lmsa-root {
-    @apply lmsa-relative lmsa-overflow-hidden;
+    @apply lmsa-relative;
     height: 100%;
     font-size: var(--font-ui-small);
+
+    /* The plugin root is also Obsidian's .view-content, whose core rule sets
+       `overflow: auto` and wins the cascade over a plain/layered `overflow: hidden`.
+       Left unbeaten, the root itself scrolls: a few px of horizontal overflow at narrow
+       widths pops a scrollbar that steals height and shoves the composer up (a jitter).
+       !important is required here, matching the padding overrides just below that beat
+       the same .view-content rule. The chat scrolls internally (the messages list), so
+       the root must never scroll. */
+    overflow: hidden !important;
 
     padding-left: 0 !important;
     padding-right: 0 !important;

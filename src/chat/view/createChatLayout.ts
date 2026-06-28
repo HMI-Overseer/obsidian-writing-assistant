@@ -123,7 +123,12 @@ export function createChatLayout(contentEl: HTMLElement): ChatLayoutRefs {
 
   const composerFooter = composerPanel.createDiv({ cls: "lmsa-chat-composer-footer" });
 
-  const contextCapacityEl = composerFooter.createDiv({ cls: "lmsa-chat-composer-context-capacity lmsa-hidden" });
+  // The in-flow footer content (capacity + actions) lives in a clipping row so it can
+  // never produce a horizontal scrollbar between responsive breakpoints. The popovers
+  // below stay direct children of the (positioned) footer, so the clip does not hide them.
+  const composerFooterRow = composerFooter.createDiv({ cls: "lmsa-chat-composer-footer-row" });
+
+  const contextCapacityEl = composerFooterRow.createDiv({ cls: "lmsa-chat-composer-context-capacity lmsa-hidden" });
 
   const ringSvg = document.createElementNS(SVG_NS, "svg");
   ringSvg.classList.add("lmsa-context-ring-svg");
@@ -154,7 +159,11 @@ export function createChatLayout(contentEl: HTMLElement): ChatLayoutRefs {
   ringSvg.append(trackCircle, fillCircle);
   contextCapacityEl.appendChild(ringSvg);
 
-  const composerFooterActions = composerFooter.createDiv({ cls: "lmsa-chat-composer-footer-actions" });
+  // Compact persistent percent next to the ring, so the figure the tooltip carries is not
+  // mouse-hover-only. The exact "~Xk / Yk" breakdown stays in the hover tooltip.
+  contextCapacityEl.createSpan({ cls: "lmsa-context-ring-label" });
+
+  const composerFooterActions = composerFooterRow.createDiv({ cls: "lmsa-chat-composer-footer-actions" });
   const toolWrap = composerFooterActions.createDiv({ cls: "lmsa-chat-composer-tool-wrap" });
   const toolUseIndicatorEl = toolWrap.createDiv({ cls: "lmsa-chat-composer-tool-indicator" });
   setIcon(toolUseIndicatorEl, "wrench");

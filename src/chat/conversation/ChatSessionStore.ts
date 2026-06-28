@@ -198,6 +198,36 @@ export class ChatSessionStore {
     await this.plugin.saveSettings();
   }
 
+  /**
+   * Rename a conversation. The title is otherwise frozen to the first user message
+   * (ensureConversationTitleFromFirstUserMessage), so this is the only way to relabel a
+   * thread. Updates the drawer-facing meta and keeps the stored file's title in sync.
+   * Returns false when the id is unknown or the (trimmed) title is empty or unchanged.
+   */
+  async renameConversation(id: string, title: string): Promise<boolean> {
+    const trimmed = title.trim();
+    if (!trimmed) return false;
+
+    const meta = this.findMeta(id);
+    if (!meta || meta.title === trimmed) return false;
+
+    meta.title = trimmed;
+
+    if (id === this.memory.getActiveConversationId()) {
+      // The active conversation persists meta.title to its file and re-derives meta.
+      await this.persistActiveConversation();
+    } else {
+      // Non-active: keep the stored file's title aligned with the meta.
+      const conversation = await this.storage.load(id);
+      if (conversation) {
+        conversation.title = trimmed;
+        await this.storage.save(conversation);
+      }
+      await this.plugin.saveSettings();
+    }
+    return true;
+  }
+
   async deleteConversation(id: string): Promise<void> {
     const history = this.plugin.settings.chatHistory;
     const isActiveConversation = id === this.memory.getActiveConversationId();

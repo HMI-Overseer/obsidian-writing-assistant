@@ -166,6 +166,83 @@ export class EditReviewController {
     }
   }
 
+  /**
+   * Accept every still-pending, anchorable hunk in one {@link applyHunksLive} pass,
+   * the batch counterpart to {@link accept}. Hunks whose source region overlaps an
+   * already-applied hunk (or another hunk chosen for this batch) are skipped, mirroring
+   * the single-accept overlap guard: the one-at-a-time re-anchor would otherwise no-op or
+   * land wrong. Emits one broadcast per applied hunk so both renderers stay in sync.
+   */
+  async acceptAll(): Promise<void> {
+    if (this.isProcessing) return;
+    const pending = this.pendingHunks();
+    if (pending.length === 0) return;
+
+    // Greedily pick a non-overlapping batch: start from the already-applied set and add
+    // each pending hunk only if it doesn't overlap the running set (detectOverlaps sorts
+    // by offset, so this is order-independent).
+    const baseline = this.proposal.hunks.filter((h) => h.status === "accepted");
+    const batch: DiffHunk[] = [];
+    for (const hunk of pending) {
+      const conflicts = detectOverlaps([...baseline, hunk]).some(
+        ([first, second]) => first === hunk.id || second === hunk.id
+      );
+      if (conflicts) continue;
+      batch.push(hunk);
+      baseline.push(hunk);
+    }
+
+    if (batch.length === 0) {
+      new Notice("These edits overlap edits you already applied. Undo those first to apply these.");
+      return;
+    }
+
+    this.isProcessing = true;
+    try {
+      const result = await applyHunksLive(this.app, this.proposal.targetFilePath, batch);
+      if (result.appliedHunkIds.length === 0) {
+        new Notice("These edits no longer match the document and were not applied.");
+        return;
+      }
+
+      const appliedSet = new Set(result.appliedHunkIds);
+      for (const hunk of batch) {
+        if (!appliedSet.has(hunk.id)) continue;
+        // Batch offsets are recorded at splice time (descending order), so a higher-offset
+        // hunk's offset can be stale after a lower splice; undo verifies the offset and
+        // falls back to indexOf, so this stays safe.
+        const appliedOffset = result.appliedOffsets.get(hunk.id);
+        if (appliedOffset !== undefined) this.appliedOffsets.set(hunk.id, appliedOffset);
+        hunk.status = "accepted";
+      }
+      this.updateAppliedRecord(result.postContent, result.appliedHunkIds);
+
+      this.callbacks.onHunksChanged(this.proposal);
+      if (this.appliedRecord) this.callbacks.onApplied(this.appliedRecord);
+      for (const id of result.appliedHunkIds) {
+        this.emit({ hunkId: id, status: "accepted" });
+      }
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : "Unknown error";
+      new Notice(`Failed to apply edits: ${msg}`);
+    } finally {
+      this.isProcessing = false;
+    }
+  }
+
+  /** Reject every still-pending hunk (including no-match ones), the batch counterpart to {@link reject}. */
+  rejectAll(): void {
+    if (this.isProcessing) return;
+    const pending = this.proposal.hunks.filter((h) => h.status === "pending");
+    if (pending.length === 0) return;
+
+    for (const hunk of pending) {
+      hunk.status = "rejected";
+      this.emit({ hunkId: hunk.id, status: "rejected" });
+    }
+    this.callbacks.onHunksChanged(this.proposal);
+  }
+
   // -----------------------------------------------------------------------
   // Reject, marks the hunk skipped, no document change
   // -----------------------------------------------------------------------

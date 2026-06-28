@@ -21,6 +21,7 @@ export type RegenerateOptions = {
   setActiveAbortController: (controller: AbortController | null) => void;
   syncConversationUi: () => Promise<void>;
   onCalibrate?: (estimatedTokens: number, actualTokens: number) => void;
+  onEnterAutoApply?: () => void;
 };
 
 export async function regenerateMessage(options: RegenerateOptions): Promise<void> {
@@ -37,6 +38,7 @@ export async function regenerateMessage(options: RegenerateOptions): Promise<voi
     setActiveAbortController,
     syncConversationUi,
     onCalibrate,
+    onEnterAutoApply,
   } = options;
 
   if (getIsGenerating()) return;
@@ -92,5 +94,6 @@ export async function regenerateMessage(options: RegenerateOptions): Promise<voi
     setIsGenerating,
     setActiveAbortController,
     onCalibrate,
+    onEnterAutoApply,
   });
 }

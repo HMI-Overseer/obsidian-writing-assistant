@@ -24,6 +24,7 @@ export type SendMessageOptions = {
   setActiveAbortController: (controller: AbortController | null) => void;
   syncConversationUi: () => Promise<void>;
   onCalibrate?: (estimatedTokens: number, actualTokens: number) => void;
+  onEnterAutoApply?: () => void;
   promptOverride?: string;
   autoInsertAfterResponse?: boolean;
   posture: ApprovalPosture;
@@ -42,6 +43,7 @@ export async function sendMessage(options: SendMessageOptions): Promise<void> {
     setActiveAbortController,
     syncConversationUi,
     onCalibrate,
+    onEnterAutoApply,
     promptOverride,
     autoInsertAfterResponse = false,
     posture,
@@ -74,10 +76,12 @@ export async function sendMessage(options: SendMessageOptions): Promise<void> {
   // of being re-read into the prefix every send. There is no live document re-read
   // anymore (ambient editing, §6.3/§10/§13); the model reads current content via
   // tools when it edits.
+  // Unknown vision capability is treated as allow-the-attempt (mirrors the composer attach
+  // gate), so an unprobed model's image rides the turn instead of being silently dropped.
   const supportsVision =
     validated.activeModel.vision
     ?? plugin.services.modelAvailability.getVision(validated.activeModel.modelId)
-    ?? false;
+    ?? true;
   const noteAttachments = await snapshotNoteAttachments(plugin.app, {
     activeNoteAttached: composer.isActiveNoteAttached(),
     extraContextItems: composer.getExtraContextItems(),
@@ -127,5 +131,6 @@ export async function sendMessage(options: SendMessageOptions): Promise<void> {
     setIsGenerating,
     setActiveAbortController,
     onCalibrate,
+    onEnterAutoApply,
   });
 }

@@ -312,7 +312,10 @@ export class VaultReviewTimelineView {
     }
 
     if (awaiting && op.gate === "auto") {
-      controls.createSpan({ cls: "lmsa-vault-step-state", text: "auto" });
+      // Auto-applied ops reach the same "approved" state a user-approved op does, with
+      // no distinct "auto" marker (Theme E, scoped): the standing posture pill already
+      // signals the session is auto-applying.
+      controls.createSpan({ cls: "lmsa-vault-step-state", text: "Approved" });
       return;
     }
 
@@ -324,10 +327,9 @@ export class VaultReviewTimelineView {
       return;
     }
     if (op.status === "applied") {
-      controls.createSpan({
-        cls: "lmsa-vault-step-state",
-        text: op.gate === "auto" ? "Applied · auto" : "Applied",
-      });
+      // No distinct "auto" suffix: an auto-applied op is shown in the same applied state
+      // a user-approved op reaches (Theme E, scoped).
+      controls.createSpan({ cls: "lmsa-vault-step-state", text: "Applied" });
       return;
     }
     if (op.status === "failed") {

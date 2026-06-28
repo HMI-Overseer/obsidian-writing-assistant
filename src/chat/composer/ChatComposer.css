@@ -79,7 +79,7 @@
     -webkit-backdrop-filter: blur(18px);
     box-shadow:
       0 18px 48px rgba(0, 0, 0, 0.12),
-      inset 0 1px 0 rgba(255, 255, 255, 0.06);
+      inset 0 1px 0 var(--lmsa-inset-highlight);
     transition: border-color 200ms ease, box-shadow 200ms ease;
   }
 
@@ -89,7 +89,7 @@
     box-shadow:
       0 24px 60px rgba(0, 0, 0, 0.14),
       0 0 0 1px color-mix(in srgb, var(--lmsa-mode-accent) 24%, transparent),
-      inset 0 1px 0 rgba(255, 255, 255, 0.08);
+      inset 0 1px 0 var(--lmsa-inset-highlight);
   }
 
   /* Idle ring, wide shimmer sweep, fades out on interaction */
@@ -237,10 +237,20 @@
   /* ── Footer ──────────────────────────────────────────────────────────────── */
 
   .lmsa-chat-composer-footer {
-    @apply lmsa-relative lmsa-mt-1 lmsa-flex lmsa-items-center lmsa-justify-between lmsa-gap-3 lmsa-pt-1.5;
+    @apply lmsa-relative lmsa-mt-1 lmsa-pt-1.5;
     border-top: 1px solid color-mix(in srgb, var(--background-modifier-border) 78%, transparent);
     container-type: inline-size;
     container-name: lmsa-composer-footer;
+  }
+
+  /* The in-flow footer line. `overflow: clip` guarantees no horizontal scrollbar can ever
+     appear if content briefly exceeds the width between breakpoints; the tool/knowledge
+     popovers are children of the footer (not this row), so they are never clipped. The
+     clip margin keeps focus rings from being shaved. */
+  .lmsa-chat-composer-footer-row {
+    @apply lmsa-flex lmsa-items-center lmsa-justify-between lmsa-gap-3;
+    overflow: clip;
+    overflow-clip-margin: 6px;
   }
 
   .lmsa-chat-composer-footer-actions {
@@ -257,8 +267,27 @@
   /* ── Context capacity ring ────────────────────────────────────────────────── */
 
   .lmsa-chat-composer-context-capacity {
-    @apply lmsa-relative lmsa-inline-flex lmsa-flex-none lmsa-items-center lmsa-justify-center;
+    @apply lmsa-relative lmsa-inline-flex lmsa-flex-none lmsa-items-center lmsa-justify-center lmsa-gap-1.5;
     cursor: default;
+  }
+
+  .lmsa-context-ring-label {
+    font-size: var(--font-ui-smaller);
+    color: var(--text-faint);
+    font-variant-numeric: tabular-nums;
+    /* Fixed lane wide enough for "100%" so the digit count changing (8% -> 100%) never
+       reflows the footer; flex-none so it can't be squeezed before it is dropped. */
+    flex: none;
+    min-width: 2.6em;
+    text-align: right;
+  }
+
+  .lmsa-chat-composer-context-capacity.is-warning .lmsa-context-ring-label {
+    color: var(--text-warning, #e6a700);
+  }
+
+  .lmsa-chat-composer-context-capacity.is-danger .lmsa-context-ring-label {
+    color: var(--text-error, #e93147);
   }
 
   .lmsa-context-ring-svg {
@@ -483,10 +512,18 @@
   }
 
   /* ── Responsive (container query, reacts to panel width, not viewport) ──
-     Degradation order as the footer narrows: vision → knowledge → tool
-     indicators, then mode-toggle labels (icon-only), then the capacity ring. */
+     Degradation order as the footer narrows: the context % label (lowest-priority
+     extra) goes first, then vision → knowledge → tool indicators, then mode-toggle
+     labels (icon-only), then the capacity ring itself. Dropping the % first keeps the
+     footer from being squeezed (which shoved the actions and jittered the composer). */
 
-  @container lmsa-composer-footer (max-width: 420px) {
+  @container lmsa-composer-footer (max-width: 470px) {
+    .lmsa-context-ring-label {
+      display: none;
+    }
+  }
+
+  @container lmsa-composer-footer (max-width: 435px) {
     .lmsa-chat-composer-vision-indicator {
       display: none;
     }
@@ -498,13 +535,13 @@
     }
   }
 
-  @container lmsa-composer-footer (max-width: 360px) {
+  @container lmsa-composer-footer (max-width: 365px) {
     .lmsa-chat-composer-tool-wrap {
       display: none;
     }
   }
 
-  @container lmsa-composer-footer (max-width: 340px) {
+  @container lmsa-composer-footer (max-width: 330px) {
     .lmsa-chat-composer-mode-toggle-label {
       display: none;
     }

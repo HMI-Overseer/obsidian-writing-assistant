@@ -90,6 +90,21 @@ export class ChatConversationController {
     }
   }
 
+  async renameConversation(id: string, title: string): Promise<void> {
+    const store = this.deps.getStore();
+    if (!store) return;
+
+    const renamed = await store.renameConversation(id, title);
+    if (!renamed) return;
+
+    await this.deps.syncConversationUi();
+
+    const drawer = this.deps.getDrawer();
+    if (drawer?.isOpen()) {
+      drawer.refresh(store.getConversations(), store.getActiveConversationId());
+    }
+  }
+
   toggleHistoryDrawer(): void {
     const drawer = this.deps.getDrawer();
     const store = this.deps.getStore();

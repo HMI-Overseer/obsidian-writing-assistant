@@ -20,7 +20,7 @@
   }
 
   .lmsa-chat-window-diff-hunk[data-status="applied"] {
-    border-color: var(--text-success, #4ade80);
+    border-color: var(--text-success, var(--color-green, var(--interactive-accent)));
     opacity: 0.8;
   }
 
@@ -195,8 +195,8 @@
   }
 
   .lmsa-chat-window-diff-hunk-badge--applied {
-    background: color-mix(in srgb, var(--text-success, #4ade80) 15%, var(--background-primary));
-    color: var(--text-success, #4ade80);
+    background: color-mix(in srgb, var(--text-success, var(--color-green, var(--interactive-accent))) 15%, var(--background-primary));
+    color: var(--text-success, var(--color-green, var(--interactive-accent)));
   }
 
   .lmsa-chat-window-diff-hunk-badge--skipped {
@@ -248,12 +248,12 @@
   }
 
   .lmsa-chat-window-diff-line--added {
-    background: color-mix(in srgb, var(--text-success, #4ade80) 10%, var(--background-primary));
+    background: color-mix(in srgb, var(--text-success, var(--color-green, var(--interactive-accent))) 10%, var(--background-primary));
     color: var(--text-normal);
   }
 
   .lmsa-chat-window-diff-line--added .lmsa-chat-window-diff-prefix {
-    color: var(--text-success, #4ade80);
+    color: var(--text-success, var(--color-green, var(--interactive-accent)));
   }
 
   /* Word-level change highlighting within paired lines */
@@ -263,7 +263,7 @@
   }
 
   .lmsa-chat-window-diff-line--added .lmsa-chat-window-diff-highlight {
-    background: color-mix(in srgb, var(--text-success, #4ade80) 25%, transparent);
+    background: color-mix(in srgb, var(--text-success, var(--color-green, var(--interactive-accent))) 25%, transparent);
     border-radius: 2px;
   }
 

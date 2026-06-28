@@ -17,6 +17,7 @@ import { executeVaultOpTool, buildPendingOverlay } from "../../tools/vault-ops/h
 import { THINK_TOOL_NAME } from "../../tools/think/definition";
 import { extractToolInput } from "../../tools/metadata";
 import { normalizeVaultToolCall } from "../../tools/paths";
+import { streamWithRetry } from "../../api/retry";
 import type { LiveVaultReview } from "./liveVaultReview";
 
 export type { VaultToolContext, ToolExecutionContext };
@@ -152,11 +153,19 @@ export async function runToolLoop(
     const roundRequest = { ...baseRequest, messages: requestMessages };
 
     const { onToolCallStreaming } = callbacks;
-    const streamResult = client.stream(
-      roundRequest, model, params, signal,
-      onToolCallStreaming
-        ? (_idx, name) => { if (ALL_LOOP_TOOL_NAMES.has(name)) onToolCallStreaming(name); }
-        : undefined,
+    // Retry the stream on a transient first-error (429 / 5xx incl. Anthropic 529),
+    // matching the protection withRetry already gives the non-streaming complete()
+    // path. Retry is safe only before the first delta reaches the bubble; once
+    // tokens stream we are committed to the attempt (streamWithRetry enforces this).
+    const streamResult = streamWithRetry(
+      () =>
+        client.stream(
+          roundRequest, model, params, signal,
+          onToolCallStreaming
+            ? (_idx, name) => { if (ALL_LOOP_TOOL_NAMES.has(name)) onToolCallStreaming(name); }
+            : undefined,
+        ),
+      { signal },
     );
 
     // In agentic mode, buffer deltas internally, only the timeline receives

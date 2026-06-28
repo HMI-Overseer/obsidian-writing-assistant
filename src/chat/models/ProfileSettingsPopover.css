@@ -40,7 +40,7 @@
     -webkit-backdrop-filter: blur(22px);
     box-shadow:
       0 22px 56px rgba(0, 0, 0, 0.22),
-      inset 0 1px 0 rgba(255, 255, 255, 0.04);
+      inset 0 1px 0 var(--lmsa-inset-highlight-subtle);
     transform-origin: top left;
   }
 
@@ -162,6 +162,20 @@
 
   .lmsa-profile-create-input:focus {
     border-color: var(--lmsa-mode-accent);
+  }
+
+  /* ── Delete profile confirm inline ──────────────────────────────────── */
+
+  .lmsa-profile-delete-inline {
+    @apply lmsa-flex lmsa-items-center lmsa-gap-2;
+    margin-bottom: 0.5rem;
+  }
+
+  .lmsa-profile-delete-prompt {
+    @apply lmsa-flex-1;
+    font-size: var(--font-ui-smaller);
+    color: var(--text-muted);
+    min-width: 0;
   }
 
   /* ── Cache settings rows ────────────────────────────────────────────── */

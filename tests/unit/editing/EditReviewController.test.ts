@@ -231,6 +231,103 @@ describe("EditReviewController", () => {
     expect(state.content).toBe("ALPHA beta GAMMA delta");
   });
 
+  it("acceptAll applies every pending disjoint hunk in one pass", async () => {
+    const doc = "alpha beta gamma delta";
+    const { app, state } = makeApp(doc);
+    const proposal = makeProposal(doc, [
+      { search: "alpha", replace: "ALPHA" },
+      { search: "gamma", replace: "GAMMA" },
+    ]);
+    const cb = makeCallbacks();
+    const controller = new EditReviewController(app, proposal, cb);
+    const [a, b] = proposal.hunks;
+
+    await controller.acceptAll();
+
+    expect(state.content).toBe("ALPHA beta GAMMA delta");
+    expect(controller.getStatus(a.id)).toBe("accepted");
+    expect(controller.getStatus(b.id)).toBe("accepted");
+    expect(controller.hasPendingHunks()).toBe(false);
+    // One applied-record update, one broadcast per hunk.
+    expect(cb.applied).toHaveBeenCalledTimes(1);
+  });
+
+  it("acceptAll skips a hunk overlapping one already applied, applying the rest", async () => {
+    const doc = "The quick brown fox jumps far.";
+    const { app, state } = makeApp(doc);
+    const proposal = makeProposal(doc, [
+      { search: "quick brown", replace: "slow" },
+      { search: "brown fox", replace: "red dog" }, // overlaps the first
+      { search: "far", replace: "near" },
+    ]);
+    const controller = new EditReviewController(app, proposal, makeCallbacks());
+    const [a, b, c] = proposal.hunks;
+
+    await controller.acceptAll();
+
+    expect(controller.getStatus(a.id)).toBe("accepted");
+    expect(controller.getStatus(b.id)).toBe("pending"); // overlapped, left for manual review
+    expect(controller.getStatus(c.id)).toBe("accepted");
+    expect(state.content).toBe("The slow fox jumps near.");
+  });
+
+  it("acceptAll broadcasts each applied hunk to subscribers", async () => {
+    const doc = "alpha beta gamma delta";
+    const { app } = makeApp(doc);
+    const proposal = makeProposal(doc, [
+      { search: "alpha", replace: "ALPHA" },
+      { search: "gamma", replace: "GAMMA" },
+    ]);
+    const controller = new EditReviewController(app, proposal, makeCallbacks());
+    const [a, b] = proposal.hunks;
+    const listener = vi.fn();
+    controller.subscribe(listener);
+
+    await controller.acceptAll();
+
+    expect(listener).toHaveBeenCalledWith({ hunkId: a.id, status: "accepted" });
+    expect(listener).toHaveBeenCalledWith({ hunkId: b.id, status: "accepted" });
+  });
+
+  it("rejectAll marks every pending hunk skipped without touching the document", () => {
+    const doc = "alpha beta gamma delta";
+    const { app, state } = makeApp(doc);
+    const proposal = makeProposal(doc, [
+      { search: "alpha", replace: "ALPHA" },
+      { search: "gamma", replace: "GAMMA" },
+    ]);
+    const cb = makeCallbacks();
+    const controller = new EditReviewController(app, proposal, cb);
+    const [a, b] = proposal.hunks;
+
+    controller.rejectAll();
+
+    expect(state.content).toBe(doc);
+    expect(controller.getStatus(a.id)).toBe("rejected");
+    expect(controller.getStatus(b.id)).toBe("rejected");
+    expect(controller.hasPendingHunks()).toBe(false);
+    expect(cb.applied).not.toHaveBeenCalled();
+    expect(cb.hunksChanged).toHaveBeenCalledTimes(1);
+  });
+
+  it("rejectAll leaves already-accepted hunks untouched", async () => {
+    const doc = "alpha beta gamma delta";
+    const { app, state } = makeApp(doc);
+    const proposal = makeProposal(doc, [
+      { search: "alpha", replace: "ALPHA" },
+      { search: "gamma", replace: "GAMMA" },
+    ]);
+    const controller = new EditReviewController(app, proposal, makeCallbacks());
+    const [a, b] = proposal.hunks;
+
+    await controller.accept(a.id);
+    controller.rejectAll();
+
+    expect(controller.getStatus(a.id)).toBe("accepted");
+    expect(controller.getStatus(b.id)).toBe("rejected");
+    expect(state.content).toBe("ALPHA beta gamma delta");
+  });
+
   it("re-allows an overlapping accept once the conflicting hunk is undone", async () => {
     const doc = "The quick brown fox jumps.";
     const { app, state } = makeApp(doc);

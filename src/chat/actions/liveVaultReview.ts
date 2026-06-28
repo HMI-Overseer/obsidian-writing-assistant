@@ -72,6 +72,8 @@ export interface LiveEditReviewDeps {
   inlineDiff: InlineDiffManager;
   /** Resolver tuning from settings (context lines, min confidence). */
   resolveOptions: { contextLines: number; minConfidence: number };
+  /** Flip the session to auto-apply; powers the timeline's "Accept all this session". */
+  onEnterAutoApply?: () => void;
 }
 
 export interface LiveVaultReviewOptions {
@@ -724,6 +726,7 @@ export class LiveVaultReview implements VaultOpReviewer {
       app: this.app,
       controller: this.editController,
       live: true,
+      ...(deps.onEnterAutoApply && { onEnterAutoApply: deps.onEnterAutoApply }),
     });
     deps.inlineDiff.attach(this.editController);
   }

@@ -28,7 +28,7 @@
   --lmsa-shimmer-opacity: 0.85;
 
   /* ── Status colors ────────────────────────────────────────────────────── */
-  --lmsa-status-success:  var(--color-green,  var(--text-success, #4ade80));
+  --lmsa-status-success:  var(--color-green,  var(--text-success, var(--interactive-accent)));
   --lmsa-status-warning:  var(--color-yellow, var(--text-warning, #f59e0b));
   --lmsa-status-error:    var(--text-error);
   --lmsa-status-error-bg: var(--background-modifier-error);
@@ -37,8 +37,10 @@
   --lmsa-shadow-subtle:          rgba(0, 0, 0, 0.06);
   --lmsa-shadow-medium:          rgba(0, 0, 0, 0.1);
   --lmsa-shadow-strong:          rgba(0, 0, 0, 0.15);
-  --lmsa-inset-highlight:        rgba(255, 255, 255, 0.05);
-  --lmsa-inset-highlight-subtle: rgba(255, 255, 255, 0.03);
+  /* Theme-aware bevel (derived from the theme border), so it exists in light + dark
+     instead of the raw white that vanished on light themes. */
+  --lmsa-inset-highlight:        color-mix(in srgb, var(--background-modifier-border) 55%, transparent);
+  --lmsa-inset-highlight-subtle: color-mix(in srgb, var(--background-modifier-border) 35%, transparent);
 
   /* ── Contrast surface (toggle knob, etc.) ─────────────────────────────── */
   --lmsa-surface-contrast: #fff;

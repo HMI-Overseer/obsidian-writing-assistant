@@ -21,12 +21,15 @@ export type BubbleActionCallbacks = {
 };
 
 const AUTO_SCROLL_BOTTOM_THRESHOLD_PX = 10;
+/** Past this much scroll-up, the jump-to-latest button appears (above the tiny re-arm zone). */
+const SCROLL_TO_BOTTOM_VISIBILITY_PX = 120;
 
 export class ChatTranscript {
   private bubblesByMessageId = new Map<string, BubbleRefs>();
   private renderedMessageIds: string[] = [];
   private shouldAutoScroll = true;
   private readonly markdownRenderer: MarkdownBubbleRenderer;
+  private readonly scrollToBottomBtn: HTMLElement | null;
 
   constructor(
     private readonly owner: Component,
@@ -37,9 +40,41 @@ export class ChatTranscript {
     this.markdownRenderer =
       markdownRenderer ??
       new MarkdownItBubbleRenderer(this.app);
+    this.scrollToBottomBtn = this.createScrollToBottomButton();
     this.owner.registerDomEvent(this.refs.messagesEl, "scroll", () => {
       this.shouldAutoScroll = this.isNearBottom();
+      this.updateScrollToBottomButton();
     });
+  }
+
+  /**
+   * Floating jump-to-latest affordance. Auto-follow silently disengages when the reader
+   * scrolls up mid-stream (shouldAutoScroll goes false), so without this new tokens land
+   * off-screen with no way back short of dragging to the very bottom. Mounted on the
+   * (positioned) messages pane so it floats over the scroll area.
+   */
+  private createScrollToBottomButton(): HTMLElement | null {
+    const pane = this.refs.messagesEl.parentElement;
+    if (!pane) return null;
+    const btn = pane.createEl("button", {
+      cls: "lmsa-scroll-to-bottom lmsa-hidden",
+      attr: { "aria-label": "Scroll to latest", title: "Scroll to latest" },
+    });
+    setIcon(btn, "chevron-down");
+    this.owner.registerDomEvent(btn, "click", () => this.scrollToBottom(true));
+    return btn;
+  }
+
+  private updateScrollToBottomButton(): void {
+    if (!this.scrollToBottomBtn) return;
+    const distanceFromBottom =
+      this.refs.messagesEl.scrollHeight -
+      this.refs.messagesEl.scrollTop -
+      this.refs.messagesEl.clientHeight;
+    this.scrollToBottomBtn.toggleClass(
+      "lmsa-hidden",
+      distanceFromBottom <= SCROLL_TO_BOTTOM_VISIBILITY_PX
+    );
   }
 
   async renderMessages(
@@ -258,10 +293,11 @@ export class ChatTranscript {
   }
 
   scrollToBottom(force = false): void {
-    if (!force && !this.shouldAutoScroll) return;
-
-    this.refs.messagesEl.scrollTop = this.refs.messagesEl.scrollHeight;
-    this.shouldAutoScroll = true;
+    if (force || this.shouldAutoScroll) {
+      this.refs.messagesEl.scrollTop = this.refs.messagesEl.scrollHeight;
+      this.shouldAutoScroll = true;
+    }
+    this.updateScrollToBottomButton();
   }
 
   clear(): void {
@@ -270,6 +306,7 @@ export class ChatTranscript {
     this.renderedMessageIds = [];
     this.refs.messagesEl.empty();
     this.shouldAutoScroll = true;
+    this.updateScrollToBottomButton();
   }
 
   destroy(): void {

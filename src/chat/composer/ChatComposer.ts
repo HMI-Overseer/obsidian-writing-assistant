@@ -277,10 +277,13 @@ export class ChatComposer {
    * Called alongside the vision indicator refresh so image attachment stays in sync.
    */
   refreshVisionSupport(activeModel: CompletionModel | null): void {
+    // Treat an unprobed model (capability unknown) as allow-the-attempt rather than a hard
+    // block: a never-checked local model would otherwise present as "no vision" and refuse a
+    // legitimate image attach. A model known to lack vision (explicit false) still blocks.
     this.supportsVision = activeModel
       ? (activeModel.vision
         ?? this.plugin.services.modelAvailability.getVision(activeModel.modelId)
-        ?? false)
+        ?? true)
       : false;
   }
 

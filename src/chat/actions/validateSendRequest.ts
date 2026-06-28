@@ -16,7 +16,11 @@ export async function validateSendRequest(
   isGenerating: boolean,
   promptOverride?: string
 ): Promise<ValidatedSendContext | null> {
-  if (isGenerating || modelSelector.isCheckingStatus()) return null;
+  if (isGenerating) return null;
+  if (modelSelector.isCheckingStatus()) {
+    new Notice("Checking model status, try again in a moment.");
+    return null;
+  }
 
   const text = (promptOverride ?? composer.getDraft()).trim();
   const hasAttachments = composer.getAttachments().length > 0;
@@ -40,6 +44,11 @@ export async function validateSendRequest(
   const availabilityState = await modelSelector.refreshAvailability();
   if (availabilityState !== "loaded" && availabilityState !== "cloud") {
     modelSelector.retriggerAttention();
+    new Notice(
+      availabilityState === "unloaded"
+        ? "Model not loaded. Start LM Studio and load the model, or pick another profile."
+        : "Could not reach the model. Make sure the local server (e.g. LM Studio) is running, or pick another profile."
+    );
     return null;
   }
 

@@ -348,6 +348,7 @@ export class ChatView extends ItemView {
       onSelect: (id) => void this.conversation.switchConversation(id),
       onNew: () => void this.conversation.startNewConversation(),
       onDelete: (id) => void this.conversation.deleteConversation(id),
+      onRename: (id, title) => void this.conversation.renameConversation(id, title),
       onClose: () => this.historyDrawer?.close(),
     });
 
@@ -454,6 +455,7 @@ export class ChatView extends ItemView {
             bubble,
             message,
             this.plugin.inlineDiff,
+            { onEnterAutoApply: () => this.composer?.setPosture("auto") },
           );
         }
       }

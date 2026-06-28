@@ -47,6 +47,8 @@ export interface LlmGenerationOptions {
   setIsGenerating: (v: boolean) => void;
   setActiveAbortController: (c: AbortController | null) => void;
   onCalibrate?: (estimated: number, actual: number) => void;
+  /** Flip the session to auto-apply; powers the edit review's "Accept all this session". */
+  onEnterAutoApply?: () => void;
 }
 
 function isAbortError(error: unknown): boolean {
@@ -89,6 +91,7 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
     setIsGenerating,
     setActiveAbortController,
     onCalibrate,
+    onEnterAutoApply,
   } = options;
 
   const activeProfile = getActiveProfile(plugin.settings, activeModel.provider);
@@ -99,11 +102,18 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
   const editsActive = writesPermitted(plugin.settings.vaultOpPolicy, posture);
   const activeFilePath = plugin.app.workspace.getActiveFile()?.path;
 
+  // Arm the abort controller BEFORE the awaited prep (RAG query rewrite + retrieval) so
+  // Stop cancels during context preparation instead of being a visible no-op until the
+  // first delta. The liveReview cancel listener is attached later, once liveReview exists.
+  const abortController = new AbortController();
+  setActiveAbortController(abortController);
+
   const apiMessages = await prepareApiMessages({
     app: plugin.app,
     store,
     settings: plugin.settings,
     posture,
+    signal: abortController.signal,
     ragService: plugin.services.ragService,
     activeProvider: activeModel.provider,
     modelCapabilities: {
@@ -120,9 +130,11 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
     // are attached just below; prepareApiMessages needs the flag up front to choose the
     // tool emission.
     anthropicCacheEnabled: activeProfile.anthropicCacheSettings.enabled,
+    // Unknown vision capability is treated as allow-the-attempt: keep image attachments in
+    // the request for an unprobed model rather than stripping them (matches the attach gate).
     supportsVision: activeModel.vision
       ?? plugin.services.modelAvailability.getVision(activeModel.modelId)
-      ?? false,
+      ?? true,
   });
 
   const ragSources = apiMessages.ragContext?.map(
@@ -211,6 +223,7 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
           contextLines: plugin.settings.diffContextLines,
           minConfidence: plugin.settings.diffMinMatchConfidence,
         },
+        ...(onEnterAutoApply && { onEnterAutoApply }),
       },
     }),
   });
@@ -219,10 +232,9 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
   // review; the coordinator rebuilds the pending overlay per round.
   const vaultOpToolContext: VaultOpToolContext = { app: plugin.app, liveReview };
 
-  const abortController = new AbortController();
-  setActiveAbortController(abortController);
   // Abort (stop button, or a new user turn superseding this one) must resolve any
-  // op parked on the user, or a suspended loop would hang forever on the await.
+  // op parked on the user, or a suspended loop would hang forever on the await. The
+  // controller itself was armed before prepareApiMessages so Stop also cancels prep.
   abortController.signal.addEventListener("abort", () => liveReview.cancelPending());
 
   const editRenderer = renderer instanceof EditStreamingRenderer ? renderer : null;
@@ -317,6 +329,7 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
 
     await renderer.flush();
     assistantBubble.bodyEl.removeClass("is-streaming");
+    timeline?.finalize();
 
     const agenticSteps = timeline?.getSteps();
 
@@ -356,6 +369,7 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
         prebuiltVaultOpRecord: liveReview.getAppliedRecord() ?? undefined,
         prebuiltEditProposal: liveReview.getEditProposal() ?? undefined,
         prebuiltEditRecord: liveReview.getEditAppliedRecord() ?? undefined,
+        ...(onEnterAutoApply && { onEnterAutoApply }),
       });
     } else if (finalization.kind === "replace") {
       const response = chatRenderer?.getCurrentRoundResponse() ?? "";
@@ -391,6 +405,7 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
   } catch (error) {
     await renderer.flush();
     assistantBubble.bodyEl.removeClass("is-streaming");
+    timeline?.finalize();
 
     if (isAbortError(error)) {
       const partialSteps = timeline?.getSteps();
@@ -412,6 +427,7 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
           prebuiltVaultOpRecord: liveReview.getAppliedRecord() ?? undefined,
           prebuiltEditProposal: liveReview.getEditProposal() ?? undefined,
           prebuiltEditRecord: liveReview.getEditAppliedRecord() ?? undefined,
+          ...(onEnterAutoApply && { onEnterAutoApply }),
         });
       } else if (finalization.kind === "replace") {
         const response = chatRenderer?.getCurrentRoundResponse() ?? "";

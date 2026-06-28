@@ -28,6 +28,7 @@ export class ContextCapacityUpdater {
   private debounceTimer: number | null = null;
 
   private readonly fillCircle: SVGCircleElement | null;
+  private readonly ringLabelEl: HTMLElement | null;
   private readonly tooltipEl: HTMLElement;
   private readonly tooltipContextEl: HTMLElement;
   private readonly tooltipUsageEl: HTMLElement;
@@ -37,6 +38,7 @@ export class ContextCapacityUpdater {
 
   constructor(private readonly capacityEl: HTMLElement) {
     this.fillCircle = capacityEl.querySelector(".lmsa-context-ring-fill");
+    this.ringLabelEl = capacityEl.querySelector(".lmsa-context-ring-label");
 
     this.tooltipEl = document.body.createDiv({ cls: "lmsa-context-ring-tooltip" });
     this.tooltipContextEl = this.tooltipEl.createEl("span", { cls: "lmsa-context-ring-tooltip-context" });
@@ -161,6 +163,10 @@ export class ContextCapacityUpdater {
     if (this.fillCircle) {
       const offset = RING_CIRCUMFERENCE * (1 - ratio);
       this.fillCircle.setAttribute("stroke-dashoffset", String(Math.max(offset, 0)));
+    }
+
+    if (this.ringLabelEl) {
+      this.ringLabelEl.setText(`${percent}%`);
     }
 
     if (this.tooltipContextEl) {

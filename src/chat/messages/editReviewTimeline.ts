@@ -33,6 +33,13 @@ export interface EditReviewTimelineOptions {
   controller: EditReviewController;
   /** Live in-loop mount renders by hunk status; durable/history honors the applied record. */
   live?: boolean;
+  /**
+   * Flip the session into auto-apply ("Edit automatically"). When provided, the bulk bar
+   * offers an "Accept all this session" action that accepts the current pending hunks and
+   * calls this so the rest of the session's edits apply without gating. Absent on history
+   * mounts where there is no live session to change.
+   */
+  onEnterAutoApply?: () => void;
 }
 
 /** Per-hunk state class on the step element, drives the status dot tint. */
@@ -69,6 +76,7 @@ export class EditReviewTimelineView {
   private readonly entries = new Map<string, HunkEntry>();
   private readonly syntheticSteps = new Map<string, HTMLElement>();
   private fallbackListEl: HTMLElement | null = null;
+  private bulkBarEl: HTMLElement | null = null;
   // Side-by-side is the default review view; the per-card toggle still offers unified.
   private diffMode: DiffMode = "split";
   private readonly unsubscribe: () => void;
@@ -97,6 +105,7 @@ export class EditReviewTimelineView {
   private cleanPriorDecorations(): void {
     const t = this.opts.timelineEl;
     t.querySelectorAll(".lmsa-edit-review-fallback").forEach((e) => e.remove());
+    t.querySelectorAll(".lmsa-edit-review-bulk").forEach((e) => e.remove());
     t.querySelectorAll(".lmsa-edit-step-controls, .lmsa-edit-timeline-hunk").forEach((e) =>
       e.remove(),
     );
@@ -110,6 +119,50 @@ export class EditReviewTimelineView {
     const fileName = this.fileName();
     for (const hunk of this.opts.controller.proposal.hunks) {
       this.decorateStep(this.locateStep(hunk, used), hunk, fileName);
+    }
+    this.renderBulkBar();
+  }
+
+  /**
+   * Proposal-level accept-all / reject-all bar, shown only for multi-hunk proposals with
+   * work still pending. Saves clicking down a long timeline; per-hunk controls stay for
+   * granular review. The optional third action also flips the session to auto-apply.
+   */
+  private renderBulkBar(): void {
+    const pendingCount = this.opts.controller.pendingHunks().length;
+    if (pendingCount < 2) {
+      this.bulkBarEl?.remove();
+      this.bulkBarEl = null;
+      return;
+    }
+
+    if (!this.bulkBarEl) {
+      this.bulkBarEl = this.opts.timelineEl.createDiv({ cls: "lmsa-edit-review-bulk" });
+      this.bulkBarEl.addEventListener("click", (e) => e.stopPropagation());
+    }
+    this.bulkBarEl.empty();
+
+    const acceptAll = this.bulkBarEl.createEl("button", {
+      cls: "lmsa-ui-compact-btn lmsa-edit-bulk-btn lmsa-edit-bulk-btn--accept",
+      text: `Accept all (${pendingCount})`,
+    });
+    acceptAll.addEventListener("click", () => void this.opts.controller.acceptAll());
+
+    const rejectAll = this.bulkBarEl.createEl("button", {
+      cls: "lmsa-ui-compact-btn lmsa-ui-compact-btn-secondary lmsa-edit-bulk-btn",
+      text: "Reject all",
+    });
+    rejectAll.addEventListener("click", () => this.opts.controller.rejectAll());
+
+    if (this.opts.onEnterAutoApply) {
+      const session = this.bulkBarEl.createEl("button", {
+        cls: "lmsa-ui-compact-btn lmsa-ui-compact-btn-secondary lmsa-edit-bulk-btn",
+        text: "Accept all this session",
+      });
+      session.addEventListener("click", () => {
+        void this.opts.controller.acceptAll();
+        this.opts.onEnterAutoApply?.();
+      });
     }
   }
 
@@ -295,5 +348,6 @@ export class EditReviewTimelineView {
     entry.stepEl.classList.add(stateClass(view, entry.noMatch));
     entry.diffView.setStatus(change.status);
     this.renderControls(entry, view);
+    this.renderBulkBar();
   }
 }

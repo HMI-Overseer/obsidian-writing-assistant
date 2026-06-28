@@ -16,6 +16,7 @@ import { TOOL_ICONS, TOOL_LABELS, isMutatingTool } from "../../tools/metadata";
  */
 export class AgenticTimeline {
   private readonly steps: AgenticStep[] = [];
+  private readonly detailsEl: HTMLDetailsElement;
   private readonly summaryLabelEl: HTMLElement;
   private readonly listEl: HTMLElement;
 
@@ -32,6 +33,7 @@ export class AgenticTimeline {
       cls: "lmsa-agentic-timeline",
     });
     detailsEl.open = true;
+    this.detailsEl = detailsEl;
 
     const summaryEl = detailsEl.createEl("summary", {
       cls: "lmsa-agentic-timeline-summary",
@@ -206,6 +208,25 @@ export class AgenticTimeline {
 
   getSteps(): AgenticStep[] {
     return [...this.steps];
+  }
+
+  /**
+   * Settle the timeline once the turn ends: swap the present-tense "Thinking…" summary for
+   * a terminal label so a finished turn never reads as still in progress. A think-only turn
+   * (no tool calls, so no pending approvals) also collapses; tool turns stay expanded since
+   * they may carry pending review controls.
+   */
+  finalize(): void {
+    const toolCount = this.steps.filter(
+      (s) => s.type === "tool_call" && s.toolName !== "think",
+    ).length;
+    if (toolCount === 0) {
+      this.summaryLabelEl.textContent = "Thought for a moment";
+      this.detailsEl.open = false;
+      return;
+    }
+    this.summaryLabelEl.textContent =
+      toolCount === 1 ? "Used 1 tool" : `Used ${toolCount} tools`;
   }
 
   /** Re-render all steps from stored data (e.g. loading a historical message). */

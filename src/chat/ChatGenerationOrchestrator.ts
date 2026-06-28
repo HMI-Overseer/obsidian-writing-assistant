@@ -78,6 +78,7 @@ export class ChatGenerationOrchestrator {
       },
       syncConversationUi: () => this.deps.syncConversationUi(),
       onCalibrate: (est, actual) => this.deps.getContextUpdater()?.calibrate(est, actual),
+      onEnterAutoApply: () => this.enterAutoApply(),
       promptOverride,
       autoInsertAfterResponse,
       posture,
@@ -107,6 +108,7 @@ export class ChatGenerationOrchestrator {
       },
       syncConversationUi: () => this.deps.syncConversationUi(),
       onCalibrate: (est, actual) => this.deps.getContextUpdater()?.calibrate(est, actual),
+      onEnterAutoApply: () => this.enterAutoApply(),
     });
     await this.deps.postGenerationSync();
   }
@@ -183,8 +185,15 @@ export class ChatGenerationOrchestrator {
         this.activeAbortController = c;
       },
       onCalibrate: (est, actual) => this.deps.getContextUpdater()?.calibrate(est, actual),
+      onEnterAutoApply: () => this.enterAutoApply(),
     });
     await this.deps.postGenerationSync();
+  }
+
+  /** Flip the composer into auto-apply ("Edit automatically"), used by the edit review's
+   * "Accept all this session" action so subsequent turns apply edits without gating. */
+  private enterAutoApply(): void {
+    this.deps.getComposer()?.setPosture("auto");
   }
 
   private setIsGeneratingAndSync(generating: boolean): void {

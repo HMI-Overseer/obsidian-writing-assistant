@@ -80,6 +80,8 @@ export interface FinalizeEditOptions {
   prebuiltEditProposal?: EditProposal;
   /** The applied edit record (auto + accepted hunks) for {@link prebuiltEditProposal}. */
   prebuiltEditRecord?: AppliedEditRecord;
+  /** Flip the session to auto-apply; powers the review's "Accept all this session" action. */
+  onEnterAutoApply?: () => void;
 }
 
 /**
@@ -101,7 +103,7 @@ export async function finalizeEditResponse(options: FinalizeEditOptions): Promis
     app, owner, store, transcript, bubble, renderer, plugin, modelId, provider, usage,
     toolCalls, agenticSteps, stoppedForMaxTokens,
     prebuiltVaultOpProposal, prebuiltVaultOpRecord,
-    prebuiltEditProposal, prebuiltEditRecord,
+    prebuiltEditProposal, prebuiltEditRecord, onEnterAutoApply,
   } = options;
 
   const fullResponse = renderer.getFullResponse();
@@ -191,6 +193,7 @@ export async function finalizeEditResponse(options: FinalizeEditOptions): Promis
   // its auto-gated ops on mount.
   renderProposalPanels(app, owner, store, bubble, assistantMessage, plugin.inlineDiff, {
     autoApplyVaultOps: !prebuiltVaultOpProposal,
+    ...(onEnterAutoApply && { onEnterAutoApply }),
   });
 }
 
@@ -309,7 +312,7 @@ export function renderProposalPanels(
   bubble: BubbleRefs,
   message: ConversationMessage,
   inlineDiff: InlineDiffManager,
-  opts?: { autoApplyVaultOps?: boolean },
+  opts?: { autoApplyVaultOps?: boolean; onEnterAutoApply?: () => void },
 ): void {
   bubble.contentEl.empty();
   bubble.contentEl.removeClass("lmsa-message-content--plain", "lmsa-message-content--markdown");
@@ -331,7 +334,12 @@ export function renderProposalPanels(
       makeEditCallbacks(store, message.editProposal),
       message.appliedEdit,
     );
-    new EditReviewTimelineView({ timelineEl: bubble.timelineEl, app, controller });
+    new EditReviewTimelineView({
+      timelineEl: bubble.timelineEl,
+      app,
+      controller,
+      ...(opts?.onEnterAutoApply && { onEnterAutoApply: opts.onEnterAutoApply }),
+    });
     inlineDiff.attach(controller);
   } else if (message.vaultOpProposal?.prose) {
     renderProseInto(app, bubble.contentEl, message.vaultOpProposal.prose);

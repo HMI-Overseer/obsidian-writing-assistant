@@ -1,4 +1,30 @@
 @layer components {
+  /* Floating jump-to-latest, shown when the reader has scrolled up off the bottom. */
+  .lmsa-scroll-to-bottom {
+    @apply lmsa-absolute lmsa-z-10 lmsa-inline-flex lmsa-h-8 lmsa-w-8 lmsa-cursor-pointer lmsa-items-center lmsa-justify-center lmsa-rounded-full lmsa-border lmsa-border-obsidian-border;
+    left: 50%;
+    bottom: 12px;
+    transform: translateX(-50%);
+    color: var(--text-muted);
+    background: var(--background-secondary) !important;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18);
+    transition: background 120ms ease, color 120ms ease, opacity 120ms ease;
+  }
+
+  .lmsa-scroll-to-bottom:hover {
+    color: var(--text-normal);
+    background: var(--background-modifier-hover) !important;
+  }
+
+  .lmsa-scroll-to-bottom.lmsa-hidden {
+    display: none;
+  }
+
+  .lmsa-scroll-to-bottom svg {
+    width: 18px;
+    height: 18px;
+  }
+
   .lmsa-chat-window-message {
     @apply lmsa-flex lmsa-w-full lmsa-flex-wrap;
     gap: 0 0.75rem;

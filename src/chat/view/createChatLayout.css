@@ -18,6 +18,11 @@
     --lmsa-chat-border-emphasis: color-mix(in srgb, var(--lmsa-mode-accent) 30%, var(--background-modifier-border));
     --lmsa-chat-glow-ring: color-mix(in srgb, var(--lmsa-mode-accent) 22%, transparent);
 
+    /* Raised-surface top-edge bevel. Derived from the theme border so it exists in both
+       light and dark themes, unlike the raw white it replaces (which vanished on light). */
+    --lmsa-inset-highlight: color-mix(in srgb, var(--background-modifier-border) 55%, transparent);
+    --lmsa-inset-highlight-subtle: color-mix(in srgb, var(--background-modifier-border) 35%, transparent);
+
     background:
       radial-gradient(circle at top, color-mix(in srgb, var(--lmsa-mode-accent) 9%, transparent), transparent 42%),
       linear-gradient(180deg, var(--background-primary), var(--background-secondary-alt, var(--background-secondary)) 120%);
@@ -27,6 +32,17 @@
   /* "ask" posture keeps the base --interactive-accent (no override needed). */
   .lmsa-root[data-posture="auto"] {
     --lmsa-mode-accent: var(--color-orange, #e8a84b);
+  }
+
+  /* OS-level appearance handling. Obsidian's own theme variables (resolved above via
+     color-mix) are the primary, authoritative signal, so the surfaces already adapt to a
+     light Obsidian theme. This reinforces the bevel for an explicit light OS preference,
+     where a near-transparent edge is least visible against a bright backdrop. */
+  @media (prefers-color-scheme: light) {
+    .lmsa-root {
+      --lmsa-inset-highlight: color-mix(in srgb, var(--background-modifier-border) 70%, transparent);
+      --lmsa-inset-highlight-subtle: color-mix(in srgb, var(--background-modifier-border) 45%, transparent);
+    }
   }
 
   /* ── Shell ───────────────────────────────────────────────────────────────── */
@@ -186,17 +202,17 @@
     left: 50%;
     top: 0;
     transform: translate(-50%, calc(-100% - 10px));
-    border: 1px solid rgba(255, 255, 255, 0.3);
+    /* Theme-aware fill + border so the control reads on light themes too (was hardcoded
+       white glass that ghosted out). The SVG url(#lmsa-glass) backdrop-filter is dropped:
+       a fragile Chromium effect that can render as nothing; the solid tinted fill stands in. */
+    border: 1px solid color-mix(in srgb, var(--lmsa-mode-accent) 38%, var(--background-modifier-border));
     background-color: transparent !important;
     background-image: linear-gradient(
       135deg,
-      rgba(255, 255, 255, 0.2) 0%,
-      rgba(255, 255, 255, 0.08) 50%,
-      rgba(255, 255, 255, 0.03) 100%
+      color-mix(in srgb, var(--lmsa-mode-accent) 14%, var(--background-secondary)) 0%,
+      color-mix(in srgb, var(--background-secondary) 90%, transparent) 100%
     );
     box-shadow: none !important;
-    backdrop-filter: url(#lmsa-glass);
-    -webkit-backdrop-filter: url(#lmsa-glass);
     transition: all 0.8s cubic-bezier(0.175, 0.885, 0.32, 2.2);
   }
 

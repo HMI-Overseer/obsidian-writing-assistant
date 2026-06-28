@@ -20,8 +20,8 @@
     margin: 2px 0 6px;
     padding: 6px 10px;
     border-radius: 6px;
-    border-left: 3px solid var(--text-success, #4ade80);
-    background: color-mix(in srgb, var(--text-success, #4ade80) 8%, var(--background-primary));
+    border-left: 3px solid var(--text-success, var(--color-green, var(--interactive-accent)));
+    background: color-mix(in srgb, var(--text-success, var(--color-green, var(--interactive-accent))) 8%, var(--background-primary));
   }
 
   .lmsa-inline-diff-added {
@@ -56,8 +56,8 @@
   }
 
   .lmsa-inline-diff-btn--accept:hover {
-    border-color: var(--text-success, #4ade80);
-    color: var(--text-success, #4ade80);
+    border-color: var(--text-success, var(--color-green, var(--interactive-accent)));
+    color: var(--text-success, var(--color-green, var(--interactive-accent)));
   }
 
   .lmsa-inline-diff-btn--reject:hover {

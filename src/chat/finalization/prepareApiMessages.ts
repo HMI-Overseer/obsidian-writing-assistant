@@ -66,6 +66,12 @@ export interface PrepareMessagesOptions {
    * setting). False / absent keeps the Layer-1 emission.
    */
   anthropicCacheEnabled?: boolean;
+  /**
+   * Abort signal armed by the caller before this awaited prep runs, so Stop cancels the
+   * pre-stream RAG query rewrite (an LLM call) and retrieval instead of being a no-op
+   * until streaming begins. An interrupted prep simply yields no retrieved context.
+   */
+  signal?: AbortSignal;
 }
 
 export async function prepareApiMessages(
@@ -85,6 +91,7 @@ export async function prepareApiMessages(
     disableBuiltinSystemPrompts = false,
     supportsVision = false,
     anthropicCacheEnabled = false,
+    signal,
   } = options;
 
   // Claude Code reports as tool-capable, but it bridges the plugin's tools via its
@@ -149,6 +156,7 @@ export async function prepareApiMessages(
           messages,
           chatClient,
           completionModelId,
+          signal,
         );
         if (retrievalQuery !== lastUserMessage.content) {
           rewrittenQuery = retrievalQuery;
@@ -157,10 +165,14 @@ export async function prepareApiMessages(
       // Pre-injection is best-effort: if the embedding backend is unreachable,
       // retrieve() throws. Degrade silently to no context here, the in-loop
       // semantic_search tool is the surface that reports the failure to the model.
-      try {
-        ragContext = await ragService.retrieve(retrievalQuery, activeFilePath);
-      } catch {
-        ragContext = null;
+      // If Stop was pressed during the rewrite above, skip retrieval entirely so an
+      // interrupted prep yields no context rather than firing an embedding request.
+      if (!signal?.aborted) {
+        try {
+          ragContext = await ragService.retrieve(retrievalQuery, activeFilePath);
+        } catch {
+          ragContext = null;
+        }
       }
     }
   }

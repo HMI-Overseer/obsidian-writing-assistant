@@ -73,10 +73,49 @@ export class ProfileSelectorUI {
     this.deleteBtn.addEventListener("click", (e) => {
       e.stopPropagation();
       if (!this.selectEl) return;
-      const selectedId = this.selectEl.value;
-      void this.callbacks.onProfileDelete(selectedId).then(() => {
+      // Deleting a profile discards a hand-tuned system prompt and params with no
+      // undo, so gate it behind the same lightweight two-step confirm the history
+      // drawer and create-profile flows use.
+      this.showDeleteConfirmInline(row, this.selectEl.value);
+    });
+  }
+
+  private showDeleteConfirmInline(row: HTMLElement, profileId: string): void {
+    const existing = row.parentElement?.querySelector(".lmsa-profile-delete-inline");
+    if (existing) return;
+
+    const inline = row.insertAdjacentElement(
+      "afterend",
+      document.createElement("div"),
+    ) as HTMLElement;
+    inline.className = "lmsa-profile-delete-inline";
+
+    inline.createSpan({
+      cls: "lmsa-profile-delete-prompt",
+      text: "Delete this profile?",
+    });
+
+    const confirmBtn = inline.createEl("button", {
+      cls: "lmsa-ui-compact-btn lmsa-ui-compact-btn-danger",
+      text: "Delete",
+    }) as HTMLButtonElement;
+
+    const cancelBtn = inline.createEl("button", {
+      cls: "lmsa-ui-compact-btn lmsa-ui-compact-btn-secondary",
+      text: "Cancel",
+    }) as HTMLButtonElement;
+
+    confirmBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      void this.callbacks.onProfileDelete(profileId).then(() => {
+        inline.remove();
         this.onRerender?.();
       });
+    });
+
+    cancelBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      inline.remove();
     });
   }
 

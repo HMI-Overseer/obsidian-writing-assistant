@@ -33,6 +33,11 @@ export class ChatHistoryDrawer {
     this.backdropEl = containerEl.createDiv({ cls: "lmsa-history-backdrop" });
     this.backdropEl.addEventListener("click", () => this.callbacks.onClose());
     this.drawerEl = containerEl.createDiv({ cls: "lmsa-history-drawer" });
+    // Clicks inside the drawer must not bubble to the view's document-level
+    // "click anywhere dismisses overlays" handler, which would otherwise close
+    // the drawer the instant you click the search input. The backdrop still
+    // handles outside-clicks; conversation select/new close it explicitly.
+    this.drawerEl.addEventListener("click", (event) => event.stopPropagation());
     this.buildShell();
   }
 

@@ -19,11 +19,6 @@ const POSTURE_OPTIONS: { posture: ApprovalPosture; label: string; icon: string }
   { posture: "auto", icon: "zap", label: "Edit automatically" },
 ];
 
-const POSTURE_PLACEHOLDERS: Record<ApprovalPosture, string> = {
-  ask: "Send a message to the model...",
-  auto: "Send a message (edits apply automatically)...",
-};
-
 type ChatComposerCallbacks = {
   onDraftChange: (draft: string) => void;
   onSendRequest: () => void;
@@ -172,7 +167,6 @@ export class ChatComposer {
   setPosture(posture: ApprovalPosture): void {
     this.currentPosture = posture;
     this.syncPostureToggle();
-    this.refs.textareaEl.placeholder = POSTURE_PLACEHOLDERS[posture];
     this.updateContextChips();
     this.callbacks.onPostureChange(posture);
   }

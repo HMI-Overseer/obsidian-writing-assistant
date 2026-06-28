@@ -14,13 +14,16 @@
 
   /* ── Context chips ───────────────────────────────────────────────────────── */
 
+  /* This row sits at the TOP of the bottom-anchored composer panel, so anything that grows
+     it pushes the panel's top edge — and the whole row — upward. A chip pill is taller than
+     the bare + button, so we hold a constant min-height of one chip row: attaching or
+     removing the first chip then never reflows the row, and the composer never jolts upward.
+     No bottom padding — that was only cosmetic breathing room and just made the row taller.
+     30px ≈ one chip (~28px); border-box so min-height is the outer box. */
   .lmsa-chat-composer-chips {
-    @apply lmsa-flex lmsa-flex-wrap lmsa-items-center lmsa-gap-1.5 lmsa-px-1 lmsa-pb-1;
-  }
-
-  /* Only add bottom breathing room when actual context chips are present */
-  .lmsa-chat-composer-chips:has(.lmsa-chat-composer-chip) {
-    padding-bottom: 0.625rem; /* pb-2.5 */
+    @apply lmsa-flex lmsa-flex-wrap lmsa-items-center lmsa-gap-1.5 lmsa-px-1;
+    box-sizing: border-box;
+    min-height: 30px;
   }
 
   .lmsa-chat-composer-chip {
@@ -203,9 +206,14 @@
 
   /* ── Drag-drop feedback ─────────────────────────────────────────────────── */
 
+  /* Draw the drag ring as an OUTLINE, not by mutating the border. The panel's 1px border has
+     no border-style in the normal state (Tailwind preflight is off, so it defaults to `none`,
+     which collapses the reserved width to 0). Forcing `border-style: dashed` would activate
+     that 1px on all sides and shove the content inward by 1px. An outline is painted outside
+     the box and never affects layout, so the dashed ring appears with zero shift. */
   .lmsa-chat-composer-panel.is-dragover {
-    border-color: var(--lmsa-mode-accent) !important;
-    border-style: dashed !important;
+    outline: 1px dashed var(--lmsa-mode-accent);
+    outline-offset: -1px;
     background: color-mix(in srgb, var(--lmsa-mode-accent) 6%, var(--background-primary)) !important;
   }
 
@@ -276,10 +284,12 @@
     color: var(--text-faint);
     font-variant-numeric: tabular-nums;
     /* Fixed lane wide enough for "100%" so the digit count changing (8% -> 100%) never
-       reflows the footer; flex-none so it can't be squeezed before it is dropped. */
+       reflows the footer; flex-none so it can't be squeezed before it is dropped.
+       Left-aligned so the digits hug the ring instead of drifting to the far edge of the
+       lane; the unused width trails off into the ml-auto gap before the footer actions. */
     flex: none;
     min-width: 2.6em;
-    text-align: right;
+    text-align: left;
   }
 
   .lmsa-chat-composer-context-capacity.is-warning .lmsa-context-ring-label {
@@ -513,11 +523,13 @@
 
   /* ── Responsive (container query, reacts to panel width, not viewport) ──
      Degradation order as the footer narrows: the context % label (lowest-priority
-     extra) goes first, then vision → knowledge → tool indicators, then mode-toggle
-     labels (icon-only), then the capacity ring itself. Thresholds are derived from the
-     measured footprints: full content glues at ~516px; each drop is the prior threshold
-     minus that item's footprint (its width + the gap it frees) — % 37, each icon 40 —
-     so an item leaves exactly when the row would otherwise run out of room. */
+     extra) goes first, then vision → knowledge → tool indicators, then the mode-toggle
+     labels collapse to icons. That icon-only toggle is the final stage: the panel's own
+     minimum width keeps the footer wider than any tighter breakpoint, so the ring and the
+     toggle padding never need to drop. Thresholds are derived from the measured footprints:
+     full content glues at ~516px; each drop is the prior threshold minus that item's
+     footprint (its width + the gap it frees) — % 37, each icon 40 — so an item leaves
+     exactly when the row would otherwise run out of room. */
 
   @container lmsa-composer-footer (max-width: 516px) {
     .lmsa-context-ring-label {
@@ -546,21 +558,6 @@
   @container lmsa-composer-footer (max-width: 359px) {
     .lmsa-chat-composer-mode-toggle-label {
       display: none;
-    }
-  }
-
-  @container lmsa-composer-footer (max-width: 200px) {
-    .lmsa-chat-composer-context-capacity {
-      display: none;
-    }
-
-    .lmsa-chat-composer-footer-actions {
-      gap: 0.375rem; /* gap-1.5 */
-    }
-
-    .lmsa-chat-composer-mode-toggle-btn {
-      padding-left: 0.5rem;
-      padding-right: 0.5rem;
     }
   }
 }

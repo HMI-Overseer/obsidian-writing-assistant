@@ -1,6 +1,6 @@
 import type { SamplingParams, AnthropicCacheSettings } from "../shared/types";
 import type { ChatRequest, NoteImageContextItem } from "../shared/chatRequest";
-import type { AnthropicTool } from "../tools/formatters/anthropic";
+import type { AnthropicToolEntry } from "../tools/formatters/anthropic";
 import { formatRagContext } from "../rag/formatContext";
 import {
   formatAdditionalContextItem,
@@ -324,7 +324,7 @@ export function buildAnthropicPayload(
   messages: AnthropicMessage[],
   params: SamplingParams,
   stream: boolean,
-  tools?: AnthropicTool[],
+  tools?: AnthropicToolEntry[],
 ): string {
   const body: Record<string, unknown> = {
     model,

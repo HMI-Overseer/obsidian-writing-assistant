@@ -10,6 +10,7 @@ import {
   CORE_READ_TOOL_NAMES,
   isCoreReadTool,
   anthropicNonDeferredToolNames,
+  anthropicLayer2ToolSet,
   toolNotAllowedFailure,
   type ToolSurfaceOptions,
 } from "../../../src/tools/toolSurface";
@@ -217,5 +218,83 @@ describe("Layer 2 progressive-disclosure core (ADR-0009 / §6.2.5)", () => {
     expect(isCoreReadTool("write_file")).toBe(false);
     // think is core only on the native path, added separately, not a "read".
     expect(isCoreReadTool("think")).toBe(false);
+  });
+});
+
+describe("anthropicLayer2ToolSet (the direct-API L2 emission)", () => {
+  it("emits the non-deferred core (core reads + think) then the deferred tail", () => {
+    const got = names(anthropicLayer2ToolSet(opts()));
+    // Core reads first (CORE_READ_TOOLS order), then think.
+    expect(got.slice(0, 6)).toEqual([
+      "list_directory",
+      "semantic_search",
+      "search_content",
+      "read_file",
+      "get_outline",
+      "read_section",
+    ]);
+    expect(got[6]).toBe("think");
+    // Then the six deferred tail reads, then the posture/policy-permitted writes.
+    expect(got.slice(7)).toEqual([
+      "directory_tree",
+      "search_files",
+      "find_notes_by_tag",
+      "get_backlinks",
+      "get_outgoing_links",
+      "get_frontmatter",
+      ...EDIT_NAMES,
+      ...VAULT_OP_NAMES,
+    ]);
+  });
+
+  it("includes every read tool exactly once (core + tail = the full read suite)", () => {
+    const got = names(anthropicLayer2ToolSet(opts()));
+    for (const readName of VAULT_TOOL_NAMES) {
+      expect(got.filter((n) => n === readName)).toHaveLength(1);
+    }
+  });
+
+  it("omits think when the think tool is not offered", () => {
+    expect(names(anthropicLayer2ToolSet(opts({ useThinkTool: false })))).not.toContain("think");
+  });
+
+  it("excludes a deny-classed write from the catalogue (open seam closes at discovery)", () => {
+    // The deferred catalogue is what tool search can discover. A deny-classed write must be
+    // absent from it entirely (ADR-0009 open seam), not merely refused at execution.
+    const policy: VaultOpPolicy = { ...DEFAULT_VAULT_OP_POLICY, trash: "deny" };
+    const got = names(anthropicLayer2ToolSet(opts({ policy })));
+    expect(got).not.toContain("trash_file");
+    expect(got).not.toContain("trash_folder");
+    // A non-denied write is still present (and will be deferred at the wire layer).
+    expect(got).toContain("move_file");
+  });
+
+  it("read-only (deny-all policy) emits core reads + think + tail reads, no writes", () => {
+    const got = names(anthropicLayer2ToolSet(opts({ policy: DENY_ALL })));
+    expect(got.some((n) => EDIT_TOOL_NAMES.has(n) || VAULT_OPS_TOOL_NAMES.has(n))).toBe(false);
+    expect(got).toContain("think");
+    expect(got).toContain("read_file"); // a core read
+    expect(got).toContain("get_frontmatter"); // a tail read still offered
+  });
+
+  it("defers exactly the names outside the non-deferred core (disjoint, non-empty tail)", () => {
+    // The wire layer defers every emitted name not in anthropicNonDeferredToolNames, so the
+    // two sets partition the catalogue: the tail must be non-empty and disjoint from the core.
+    const nonDeferred = anthropicNonDeferredToolNames();
+    const deferred = names(anthropicLayer2ToolSet(opts())).filter((n) => !nonDeferred.has(n));
+    expect(deferred.length).toBeGreaterThan(0);
+    for (const n of deferred) expect(nonDeferred.has(n)).toBe(false);
+    // And the non-deferred core stays exactly the six reads + think (held small, §6.2.5).
+    expect([...nonDeferred].sort()).toEqual(
+      [
+        "get_outline",
+        "list_directory",
+        "read_file",
+        "read_section",
+        "search_content",
+        "semantic_search",
+        "think",
+      ],
+    );
   });
 });

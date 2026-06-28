@@ -14,6 +14,20 @@ export interface AdditionalContextItem {
   content: string;
 }
 
+/**
+ * Layer-2 tool-search configuration (ADR-0009 / prompt-cache design §6.2). Present only on
+ * the direct `anthropic` agentic path when caching is on: it tells the Anthropic formatter
+ * to prepend the native tool-search entry and mark every emitted tool whose name is not in
+ * `nonDeferredToolNames` with `defer_loading`, so the long tail loads on demand and stays
+ * out of the cached prefix. Absent everywhere else, so the Layer-1 emission is unchanged.
+ */
+export interface ToolSearchConfig {
+  /** The native tool-search variant. Regex today (the one swappable wire entry). */
+  variant: "regex";
+  /** Tool names kept non-deferred (the core reads + `think`); everything else defers. */
+  nonDeferredToolNames: string[];
+}
+
 /** Document context attached to the request. */
 export interface DocumentContext {
   /** File path within the vault. */
@@ -102,6 +116,13 @@ export interface ChatRequest {
    * or when there are no tools.
    */
   allowedToolNames?: string[];
+  /**
+   * Layer-2 progressive disclosure (ADR-0009). When set, the Anthropic client prepends the
+   * native tool-search entry and marks every tool outside `nonDeferredToolNames` with
+   * `defer_loading`, so the long tail loads on demand and stays out of the cached prefix.
+   * Set only on the direct `anthropic` agentic path under caching; absent = Layer 1.
+   */
+  toolSearch?: ToolSearchConfig;
   /** Additional context notes manually attached by the user. */
   additionalContextItems?: AdditionalContextItem[];
   /** Local image embeds resolved from attached notes for vision-capable models only. */

@@ -115,6 +115,11 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
     completionModelId: activeModel.modelId,
     profileSystemPrompt: activeProfile.systemPrompt,
     disableBuiltinSystemPrompts: activeProfile.disableBuiltinSystemPrompts,
+    // Layer-2 enablement rides this same toggle (ADR-0009): tool search activates on the
+    // direct anthropic agentic path only when caching is on. The cache settings themselves
+    // are attached just below; prepareApiMessages needs the flag up front to choose the
+    // tool emission.
+    anthropicCacheEnabled: activeProfile.anthropicCacheSettings.enabled,
     supportsVision: activeModel.vision
       ?? plugin.services.modelAvailability.getVision(activeModel.modelId)
       ?? false,

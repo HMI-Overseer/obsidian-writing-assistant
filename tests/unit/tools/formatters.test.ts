@@ -1,5 +1,10 @@
 import { describe, test, expect } from "vitest";
-import { formatAnthropicTools } from "../../../src/tools/formatters/anthropic";
+import {
+  formatAnthropicTools,
+  formatAnthropicToolsWithSearch,
+  TOOL_SEARCH_REGEX_ENTRY,
+  type AnthropicTool,
+} from "../../../src/tools/formatters/anthropic";
 import { formatOpenAITools } from "../../../src/tools/formatters/openai";
 import type { CanonicalToolDefinition } from "../../../src/tools/types";
 
@@ -41,6 +46,64 @@ describe("formatAnthropicTools", () => {
     expect(result).toHaveLength(2);
     expect(result[0].name).toBe("propose_edit");
     expect(result[1].name).toBe("other");
+  });
+
+  // Layer 1 (no tool search): the flat formatter must never set defer_loading, or every
+  // tool would be excluded from the cached prefix even when caching is off.
+  test("never sets defer_loading", () => {
+    const result = formatAnthropicTools([SAMPLE_TOOL]);
+    expect(result[0]).not.toHaveProperty("defer_loading");
+  });
+});
+
+describe("formatAnthropicToolsWithSearch (Layer 2 defer split)", () => {
+  const READ_TOOL: CanonicalToolDefinition = {
+    name: "read_file",
+    description: "Read a file.",
+    parameters: { type: "object", properties: {}, required: [] },
+  };
+  const TAIL_TOOL: CanonicalToolDefinition = {
+    name: "write_file",
+    description: "Write a file.",
+    parameters: { type: "object", properties: {}, required: [] },
+  };
+
+  function build() {
+    return formatAnthropicToolsWithSearch([READ_TOOL, TAIL_TOOL], {
+      variant: "regex",
+      nonDeferredToolNames: ["read_file"],
+    });
+  }
+
+  test("prepends the regex tool-search entry, non-deferred", () => {
+    const result = build();
+    expect(result[0]).toEqual(TOOL_SEARCH_REGEX_ENTRY);
+    expect(result[0]).not.toHaveProperty("defer_loading");
+    // The wire ids are the regex variant (ADR-0009 settled, the one swappable entry).
+    expect(TOOL_SEARCH_REGEX_ENTRY).toEqual({
+      type: "tool_search_tool_regex_20251119",
+      name: "tool_search_tool_regex",
+    });
+  });
+
+  test("keeps a non-deferred-listed tool out of the deferred set", () => {
+    const read = build().find((t) => t.name === "read_file") as AnthropicTool;
+    expect(read).toBeDefined();
+    expect(read).not.toHaveProperty("defer_loading");
+    // Still a fully formatted tool (schema intact), just non-deferred.
+    expect(read.input_schema.type).toBe("object");
+  });
+
+  test("marks every tool outside the non-deferred set with defer_loading", () => {
+    const write = build().find((t) => t.name === "write_file") as AnthropicTool;
+    expect(write.defer_loading).toBe(true);
+  });
+
+  test("keeps at least one non-deferred tool so the wire 'all deferred' rule cannot trip", () => {
+    // The search entry must not defer, and at least one tool must stay non-deferred, else
+    // the API 400s with "All tools have defer_loading set". Here: search entry + read_file.
+    const nonDeferred = build().filter((t) => !("defer_loading" in t && t.defer_loading));
+    expect(nonDeferred.length).toBeGreaterThanOrEqual(2);
   });
 });
 

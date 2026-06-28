@@ -3,7 +3,8 @@ import type { ChatRequest } from "../shared/chatRequest";
 import type { ChatClient } from "./chatClient";
 import type { UsageResult, StreamResult, CompletionResult, StopReason } from "./usageTypes";
 import type { ToolCall } from "../tools/types";
-import { formatAnthropicTools } from "../tools/formatters/anthropic";
+import { formatAnthropicTools, formatAnthropicToolsWithSearch } from "../tools/formatters/anthropic";
+import type { AnthropicToolEntry } from "../tools/formatters/anthropic";
 import { nodeRequestWithHeaders } from "./httpTransport";
 import { withRetry } from "./retry";
 import { streamNode } from "./streamingTransport";
@@ -26,6 +27,19 @@ const anthropicDeltaExtractor: DeltaExtractor = (json: unknown): string | null =
   }
   return null;
 };
+
+/**
+ * Formats the request's tools for the wire. With {@link ChatRequest.toolSearch} set
+ * (Layer 2, ADR-0009) it prepends the native tool-search entry and defers the tail;
+ * otherwise it emits the Layer-1 flat list. Undefined when there are no tools, so the
+ * payload omits `tools` entirely.
+ */
+function formatRequestTools(request: ChatRequest): AnthropicToolEntry[] | undefined {
+  if (!request.tools?.length) return undefined;
+  return request.toolSearch
+    ? formatAnthropicToolsWithSearch(request.tools, request.toolSearch)
+    : formatAnthropicTools(request.tools);
+}
 
 function extractUsageFromJson(json: Record<string, unknown>): UsageResult | null {
   const usage = json.usage as Record<string, unknown> | undefined;
@@ -63,9 +77,7 @@ export class AnthropicClient implements ChatClient {
   ): Promise<CompletionResult> {
     const cacheSettings = request.anthropicCacheSettings;
     const { system, messages } = buildAnthropicMessages(request, cacheSettings, model);
-    const anthropicTools = request.tools?.length
-      ? formatAnthropicTools(request.tools)
-      : undefined;
+    const anthropicTools = formatRequestTools(request);
     const payload = buildAnthropicPayload(model, system, messages, params, false, anthropicTools);
 
     // Wrap the request in withRetry so a transient 429 / 5xx (incl. 529
@@ -130,9 +142,7 @@ export class AnthropicClient implements ChatClient {
   ): StreamResult {
     const cacheSettings = request.anthropicCacheSettings;
     const { system, messages } = buildAnthropicMessages(request, cacheSettings, model);
-    const anthropicTools = request.tools?.length
-      ? formatAnthropicTools(request.tools)
-      : undefined;
+    const anthropicTools = formatRequestTools(request);
     const payload = buildAnthropicPayload(model, system, messages, params, true, anthropicTools);
     const url = `${ANTHROPIC_BASE_URL}/v1/messages`;
 
@@ -255,6 +265,19 @@ export class AnthropicClient implements ChatClient {
 
 }
 
+/**
+ * Maps Anthropic's `stop_reason` onto the provider-independent {@link StopReason}.
+ *
+ * Layer 2 (ADR-0009) adds the native tool-search server tool. The common tool-search
+ * turn ends with `tool_use`: the server resolves the search inline, appends the matched
+ * schema, and the model emits a (client-side) tool_use the loop then executes, so no new
+ * stop reason is needed. The edge case is `pause_turn`: the server-tool loop can hit its
+ * ~10-iteration cap (e.g. many back-to-back searches) and pause for resumption. The
+ * plugin tool loop does not resume paused turns, so `pause_turn` falls through to
+ * `"unknown"` here and, if the paused turn carried no client tool_use and no text, the
+ * loop surfaces it as a failed round (recoverable by regenerating). Resumption is a
+ * follow-up if the Claude Code / direct-API live gates ever observe it in practice.
+ */
 function mapAnthropicStopReason(raw: string | undefined): StopReason {
   switch (raw) {
     case "end_turn": return "end_turn";

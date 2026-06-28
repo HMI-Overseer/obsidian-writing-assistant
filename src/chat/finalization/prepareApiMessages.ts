@@ -1,5 +1,5 @@
 import type { ConversationMessage, PluginSettings, ProviderOption, ApprovalPosture } from "../../shared/types";
-import type { ChatRequest, ChatTurn, RagContextBlock } from "../../shared/chatRequest";
+import type { ChatRequest, ChatTurn, RagContextBlock, ToolSearchConfig } from "../../shared/chatRequest";
 import { shouldUseToolCall } from "../../tools/registry";
 import { EDIT_TOOL_NAMES } from "../../tools/editing/definition";
 import { buildEditToolSystemPrompt } from "../../tools/editing/systemPrompt";
@@ -13,6 +13,8 @@ import { buildVaultOpToolSystemPrompt } from "../../tools/vault-ops/systemPrompt
 import { buildVaultToolSystemPrompt } from "../../tools/vault/systemPrompt";
 import {
   CLOUD_STABLE_TOOL_SET,
+  anthropicLayer2ToolSet,
+  anthropicNonDeferredToolNames,
   cloudAllowedToolNames,
   cloudAllowedToolSet,
   resolveLocalToolSet,
@@ -25,6 +27,16 @@ import type { RagService } from "../../rag";
 import type { ChatClient } from "../../api/chatClient";
 import { rewriteQueryForRetrieval } from "../../rag/queryRewriter";
 import type { EditProposal } from "../../editing/editTypes";
+
+/**
+ * Layer-2 tail note (ADR-0009): on the direct anthropic path with tool search, the read
+ * tail and every write defer behind the search entry, so the model must search to load a
+ * deferred tool's schema before calling it. Carried in the uncached modeTail (not the
+ * cached prefix), so it does not affect the 4096-token cacheable-prefix floor.
+ */
+const TOOL_SEARCH_TAIL_NOTE =
+  "Additional read, edit, and vault-op tools are available via tool search. " +
+  "Use the tool-search tool to locate a tool by name or capability before calling it.";
 
 export interface PrepareMessagesOptions {
   app: App;
@@ -47,6 +59,13 @@ export interface PrepareMessagesOptions {
   profileSystemPrompt?: string;
   /** When true, all built-in additions are omitted, only profileSystemPrompt is sent. */
   disableBuiltinSystemPrompts?: boolean;
+  /**
+   * Whether Anthropic prompt caching is enabled for this turn (the active profile's
+   * `anthropicCacheSettings.enabled`). The sole Layer-2 enablement gate: tool search
+   * rides the cache toggle on the direct `anthropic` agentic path (ADR-0009, no new user
+   * setting). False / absent keeps the Layer-1 emission.
+   */
+  anthropicCacheEnabled?: boolean;
 }
 
 export async function prepareApiMessages(
@@ -65,6 +84,7 @@ export async function prepareApiMessages(
     profileSystemPrompt = "",
     disableBuiltinSystemPrompts = false,
     supportsVision = false,
+    anthropicCacheEnabled = false,
   } = options;
 
   // Claude Code reports as tool-capable, but it bridges the plugin's tools via its
@@ -174,23 +194,47 @@ export async function prepareApiMessages(
   };
   const availability = ragService?.availability() ?? "no-backend";
 
-  // Emission diverges by path. The direct Anthropic path emits the full stable
-  // superset and holds it byte-identical across postures (Layer 1, keeps the prompt
-  // cache warm); a runtime allow-list (allowedToolNames, enforced in the tool loop)
-  // restricts what may actually be called, so posture/policy never shrink the emitted
-  // block. semantic_search stays in the superset and reports unavailability at call
-  // time. Local providers materialize exactly their allowed set; the shared filter
-  // drops semantic_search when the backend is cold (so the two routes can't drift).
+  // Layer 2 enablement (ADR-0009, settled): ride the Anthropic cache toggle. Tool search
+  // defers the long tail only on the direct anthropic agentic path when caching is on, with
+  // no new user setting. This is the single gate, so disabling Layer 2 (e.g. if the
+  // 4096-token cacheable-prefix floor measurement fails) is a one-line change here.
+  const useToolSearch = activeProvider === "anthropic" && useVaultTools && anthropicCacheEnabled;
+
+  // Emission diverges by path. The direct Anthropic path emits a posture-invariant block
+  // (Layer 1: the full stable superset; Layer 2: the non-deferred core + a deferred tail
+  // behind the tool-search entry) and keeps the prompt cache warm; a runtime allow-list
+  // (allowedToolNames, enforced in the tool loop) restricts what may actually be called, so
+  // posture/policy never shrink the emitted block. semantic_search stays in the superset and
+  // reports unavailability at call time. Local providers materialize exactly their allowed
+  // set; the shared filter drops semantic_search when the backend is cold (so the two routes
+  // can't drift).
   let tools: CanonicalToolDefinition[] | undefined;
   let allowedToolNames: string[] | undefined;
+  let toolSearch: ToolSearchConfig | undefined;
   // The tools whose guidance the tail describes: what the model may actually use this
   // turn (the allowed subset on cloud, the emitted lean set on local).
   let guidanceTools: CanonicalToolDefinition[] = [];
   if (useVaultTools) {
     if (activeProvider === "anthropic") {
-      tools = CLOUD_STABLE_TOOL_SET;
+      // The runtime allow-list and the tail guidance are identical on both layers; only the
+      // emitted `tools` block (and the toolSearch flag) differ.
       allowedToolNames = cloudAllowedToolNames(surfaceOpts);
       guidanceTools = filterSemanticSearchByAvailability(cloudAllowedToolSet(surfaceOpts), availability);
+      if (useToolSearch) {
+        // Layer 2: a small non-deferred core (core reads + think) stays in the cached
+        // prefix; the read tail + every permitted write defers behind the native tool-search
+        // entry. Deny-classed writes are already excluded by resolveWriteTools (inside
+        // anthropicLayer2ToolSet), so they are not in the emitted tail = not discoverable,
+        // closing the open seam at the discovery layer (ADR-0009).
+        tools = filterSemanticSearchByAvailability(anthropicLayer2ToolSet(surfaceOpts), availability);
+        toolSearch = {
+          variant: "regex",
+          nonDeferredToolNames: [...anthropicNonDeferredToolNames()],
+        };
+      } else {
+        // Layer 1: the full stable superset, held byte-identical across postures.
+        tools = CLOUD_STABLE_TOOL_SET;
+      }
     } else {
       const lean = filterSemanticSearchByAvailability(resolveLocalToolSet(surfaceOpts), availability);
       tools = lean;
@@ -218,10 +262,15 @@ export async function prepareApiMessages(
   // it (agentic edits are described by editGuidance instead).
   const regexEditGuidanceBody = useRegexEditGuidance ? EDIT_SYSTEM_PROMPT : "";
   const regexEditGuidance = useRegexEditGuidance ? "\n\n" + regexEditGuidanceBody : "";
+  // Layer-2 tail note: tells the model the read tail + writes defer behind tool search, so
+  // it must search to load a deferred tool's schema before calling it. Only when tool
+  // search is active; rides the uncached tail, never the cached prefix.
+  const toolSearchNoteBody = useToolSearch ? TOOL_SEARCH_TAIL_NOTE : "";
+  const toolSearchNote = useToolSearch ? "\n\n" + toolSearchNoteBody : "";
 
   const finalSystemPrompt = disableBuiltinSystemPrompts
     ? profileSystemPrompt
-    : systemPrompt + groundingNote + vaultGuidance + editGuidance + vaultOpGuidance + regexEditGuidance;
+    : systemPrompt + groundingNote + vaultGuidance + editGuidance + vaultOpGuidance + toolSearchNote + regexEditGuidance;
 
   // Layer 1 (prompt-cache design §6.1.2): on the billed paths that have a tail
   // mechanism, hold the cached `system` block invariant (profile prompt only) and
@@ -241,6 +290,7 @@ export async function prepareApiMessages(
       vaultGuidanceBody,
       editGuidanceBody,
       vaultOpGuidanceBody,
+      toolSearchNoteBody,
       regexEditGuidanceBody,
     ],
   });
@@ -254,6 +304,7 @@ export async function prepareApiMessages(
     messages,
     tools,
     ...(allowedToolNames ? { allowedToolNames } : {}),
+    ...(toolSearch ? { toolSearch } : {}),
   };
 }
 

@@ -183,6 +183,32 @@ export function anthropicNonDeferredToolNames(): Set<string> {
 }
 
 /**
+ * The Layer-2 tool set emitted on the direct `anthropic` path (ADR-0009 / §6.2.5): the
+ * non-deferred core reads + `think`, then the deferred tail (the remaining reads + the
+ * posture/policy-permitted writes). The wire layer
+ * ({@link ../tools/formatters/anthropic.formatAnthropicToolsWithSearch}) marks every name
+ * outside {@link anthropicNonDeferredToolNames} with `defer_loading`, so the tail loads on
+ * demand and sits outside the cached prefix; the small non-deferred core is what stays
+ * warm turn over turn.
+ *
+ * The tail's writes come from {@link resolveWriteTools}, so a `deny`-classed write under
+ * the `ask` posture is absent from this catalogue entirely. It is therefore never
+ * discoverable via tool search, closing the open seam at the discovery layer rather than
+ * only refusing it at execution (ADR-0009 open seam / {@link toolNotAllowedFailure},
+ * ADR-0003). The runtime allow-list ({@link cloudAllowedToolNames}) still guards execution
+ * as defense in depth.
+ */
+export function anthropicLayer2ToolSet(opts: ToolSurfaceOptions): CanonicalToolDefinition[] {
+  const tailReads = ALL_VAULT_TOOLS.filter((tool) => !isCoreReadTool(tool.name));
+  return [
+    ...CORE_READ_TOOLS,
+    ...(opts.useThinkTool ? [THINK_TOOL] : []),
+    ...tailReads,
+    ...resolveWriteTools(opts),
+  ];
+}
+
+/**
  * The recovery-shaped refusal returned when the runtime allow-list blocks a call the
  * stable surface advertised but the session does not permit (a `deny`-classed write
  * under the `ask` posture). Built on the spin-guard precedent

@@ -147,3 +147,38 @@ describe("AnthropicClient.stream tool-call parsing", () => {
     expect(toolCalls).toEqual([{ id: "toolu_1", name: "propose_edit", arguments: {} }]);
   });
 });
+
+describe("AnthropicClient.complete Layer-2 block tolerance", () => {
+  beforeEach(() => {
+    mockRequest.mockReset();
+  });
+
+  // The native tool-search turn (Layer 2, ADR-0009) interleaves server_tool_use and
+  // tool_search_tool_result blocks with the model's text and the client tool_use it
+  // ultimately emits. The parser handles only text + tool_use, so the server-tool blocks
+  // pass through harmlessly — text and the client tool_use must survive intact.
+  test("ignores server_tool_use / tool_search_tool_result blocks, keeps text + tool_use", async () => {
+    mockRequest.mockResolvedValueOnce({
+      body: JSON.stringify({
+        content: [
+          { type: "text", text: "searching" },
+          { type: "server_tool_use", id: "srv_1", name: "tool_search_tool_regex", input: { query: "read" } },
+          { type: "tool_search_tool_result", tool_use_id: "srv_1", content: [] },
+          { type: "tool_use", id: "toolu_1", name: "read_file", input: { path: "a.md" } },
+        ],
+        usage: { input_tokens: 5, output_tokens: 7 },
+        stop_reason: "tool_use",
+      }),
+      headers: {},
+    });
+
+    const client = new AnthropicClient("test-key");
+    const result = await client.complete(makeRequest(), "claude-opus-4-8", makeParams());
+
+    expect(result.text).toBe("searching");
+    expect(result.toolCalls).toEqual([
+      { id: "toolu_1", name: "read_file", arguments: { path: "a.md" } },
+    ]);
+    expect(result.stopReason).toBe("tool_use");
+  });
+});

@@ -27,6 +27,12 @@ import type {
   SDKMessage,
   SDKUserMessage,
 } from "@anthropic-ai/claude-agent-sdk";
+import { patchRendererAbortSignal } from "./rendererCompat";
+
+// The SDK's query() setup hands a Blink AbortSignal to Node's events module,
+// which the Electron renderer realm rejects. Patch the signal prototype once, at
+// load, before any query() runs ({@link ./rendererCompat}).
+patchRendererAbortSignal();
 
 export { AbortError, createSdkMcpServer, query, tool };
 export type {

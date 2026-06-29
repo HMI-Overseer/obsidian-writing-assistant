@@ -413,6 +413,38 @@ describe("buildAnthropicPayload", () => {
     );
     expect(json).not.toHaveProperty("tools");
   });
+
+  // Force one tool call per assistant turn so the in-loop approval gate is a genuine
+  // per-tool gate: the model pauses on a single call and reads the user's
+  // approve/decline before writing the next, instead of committing to a parallel
+  // batch the user can only rubber-stamp after the fact. tool_choice stays a constant
+  // value, so it never thrashes the prompt cache (changing it touches only the
+  // messages tier, and it never changes here).
+  test("forces sequential tool use via tool_choice when tools are present", () => {
+    const tools = [{
+      name: "create_directory",
+      description: "Make a folder.",
+      input_schema: { type: "object" as const, properties: {}, required: [] },
+    }];
+    const json = JSON.parse(
+      buildAnthropicPayload("claude-3", "sys", [], makeParams(), false, tools)
+    );
+    expect(json.tool_choice).toEqual({ type: "auto", disable_parallel_tool_use: true });
+  });
+
+  test("omits tool_choice when no tools are attached", () => {
+    const json = JSON.parse(
+      buildAnthropicPayload("claude-3", "sys", [], makeParams(), false)
+    );
+    expect(json).not.toHaveProperty("tool_choice");
+  });
+
+  test("omits tool_choice when tools is an empty array", () => {
+    const json = JSON.parse(
+      buildAnthropicPayload("claude-3", "sys", [], makeParams(), false, [])
+    );
+    expect(json).not.toHaveProperty("tool_choice");
+  });
 });
 
 describe("buildAnthropicPayload sampling-param gate (by model family)", () => {

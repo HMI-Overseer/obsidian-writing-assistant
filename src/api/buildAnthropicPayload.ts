@@ -341,6 +341,17 @@ export function buildAnthropicPayload(
   const hasTools = tools !== undefined && tools.length > 0;
   if (hasTools) {
     body.tools = tools;
+    // Force one tool call per assistant turn (`disable_parallel_tool_use`). The in-loop
+    // approval gate (ask mode) pauses on each tool call and feeds the user's
+    // approve/decline back to the model before it writes the next; that gate is only a
+    // real per-tool gate when a round holds a single call. Without this, a model emitting
+    // parallel tool_use blocks commits to the whole batch up front, so the serial
+    // approval UI can no longer let it respond to feedback between calls. The value is
+    // constant, so it never thrashes the prompt cache: changing `tool_choice` would
+    // invalidate only the messages tier, and it never changes here (tools + system stay
+    // cached). It is also held off the tool-free thinking path above (thinking is gated
+    // on `!hasTools`), so the two never co-occur.
+    body.tool_choice = { type: "auto", disable_parallel_tool_use: true };
   }
 
   // Reasoning: map the profile reasoning level to adaptive thinking + the effort control

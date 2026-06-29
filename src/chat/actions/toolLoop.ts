@@ -198,8 +198,16 @@ export async function runToolLoop(
     // Translate any absolute paths to vault-relative *once*, here, so every
     // downstream consumer, overlay, accumulation, finalization, timeline, sees
     // the same resolved path (tools/paths.ts).
-    const toolCalls =
+    const normalizedCalls =
       rawToolCalls && app ? rawToolCalls.map((tc) => normalizeVaultToolCall(app, tc)) : rawToolCalls;
+    // Enforce one mutation per round (see capRoundToMutation). The model emits an
+    // assistant message atomically, so the in-loop approval gate can only feed the
+    // user's approve/decline back to it *between* rounds; a round carrying several
+    // mutations means the model committed to the whole batch before any was reviewed.
+    // The request-level parallel_tool_calls:false / disable_parallel_tool_use flags ask
+    // the provider for this, but local OpenAI-compatible servers (LM Studio / llama.cpp)
+    // accept and ignore them, so this is the engine-independent backstop.
+    const toolCalls = normalizedCalls ? capRoundToMutation(normalizedCalls) : normalizedCalls;
     const stopReason = await streamResult.stopReason;
 
     if (usage && callbacks.onCalibrate && !calibrated) {
@@ -430,6 +438,38 @@ export interface ClassifiedCalls {
   vaultOpCalls: ToolCall[];
   vaultCalls: ToolCall[];
   thinkCalls: ToolCall[];
+}
+
+/**
+ * Cap a round to a single mutation so the in-loop approval gate is a genuine per-tool
+ * gate. A model emits its assistant message atomically, so it can only receive the
+ * user's approve/decline *between* rounds; a round carrying several mutating calls means
+ * the model committed to the whole batch before any of them was reviewed (the symptom:
+ * five `create_directory` ops where only the first shows "pending approval" and the rest
+ * say "waiting for the previous step").
+ *
+ * Keeps every read-only / think call up to and including the first mutating
+ * (edit / vault-op / unknown-write) call and drops the rest; the model re-emits the
+ * dropped mutations on the next round, now with the first decision in hand. A pure
+ * read-only / think round is returned unchanged, those need no approval and run in
+ * parallel, so multi-search rounds keep their concurrency.
+ *
+ * This is the engine-independent backstop for the request-level
+ * `parallel_tool_calls:false` (OpenAI) / `disable_parallel_tool_use` (Anthropic) flags,
+ * which cloud providers honor but local OpenAI-compatible servers (LM Studio / llama.cpp)
+ * accept and silently ignore. Pure (no state, no callbacks), so the boundary is
+ * unit-testable in isolation.
+ */
+export function capRoundToMutation(toolCalls: ToolCall[]): ToolCall[] {
+  const isMutating = (tc: ToolCall): boolean =>
+    EDIT_TOOL_NAMES.has(tc.name) ||
+    VAULT_OPS_TOOL_NAMES.has(tc.name) ||
+    // Unknown tools accumulate as write calls for finalization, so treat them as
+    // mutating too (conservative: never batch an unrecognized call behind another).
+    !ALL_LOOP_TOOL_NAMES.has(tc.name);
+  const firstMutation = toolCalls.findIndex(isMutating);
+  if (firstMutation === -1) return toolCalls;
+  return toolCalls.slice(0, firstMutation + 1);
 }
 
 /**

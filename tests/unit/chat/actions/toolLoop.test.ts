@@ -3,6 +3,7 @@ import type { App } from "obsidian";
 import {
   runToolLoop,
   classifyToolCalls,
+  capRoundToMutation,
   resolveVaultOps,
   resolveEdits,
   applyIdenticalCallGuard,
@@ -339,7 +340,10 @@ describe("runToolLoop callback-sequence characterization", () => {
     const client = countingClient([
       // Round 0: read-only reasoning round (vault search + think) → committed reasoning.
       { deltas: ["Let me look around. "], toolCalls: [vr0, th0], stopReason: "tool_use" },
-      // Round 1: all three concurrent channels + mutating narration → answer-track.
+      // Round 1: read + vault-op + edit, but the mutation cap keeps only up to the first
+      // mutation (vr1 + vo1) and drops the second mutation (ed1) so the model gets the
+      // vault-op's approval result before it re-emits the edit. Mutating narration →
+      // answer-track.
       { deltas: ["Now I'll make changes."], toolCalls: [vr1, vo1, ed1], stopReason: "tool_use" },
       // Round 2: final answer → single post-loop flush.
       { deltas: ["All done."], toolCalls: null, stopReason: "end_turn" },
@@ -368,21 +372,18 @@ describe("runToolLoop callback-sequence characterization", () => {
       `recorded:${vaultName}:vr-0`,
       `recorded:${THINK_TOOL_NAME}:th-0`,
       "newRound",
-      // Round 1 — mutating round: answer-track reasoning discarded, then the three
-      // concurrent channels fire their synchronous prefixes in array order
-      // (read-only status, then vault-op status+record, then edit status+record),
-      // and the post-await processing records the read-only step and reports the
-      // vault-op / edit dispositions.
+      // Round 1 — mutating round: answer-track reasoning discarded. The mutation cap
+      // dropped the trailing edit (ed1), so only the read-only and vault-op channels
+      // fire their synchronous prefixes in array order (read-only status, then vault-op
+      // status+record), and the post-await processing records the read-only step and
+      // reports the single vault-op disposition. The edit is re-emitted next round.
       "rdelta:Now I'll make changes.",
       "rrf:false:1",
       `status:${vaultName}`,
       `status:${vaultOpName}`,
       `recorded:${vaultOpName}:vo-1`,
-      `status:${editName}`,
-      `recorded:${editName}:ed-1`,
       `recorded:${vaultName}:vr-1`,
       "result:vo-1:ok",
-      "result:ed-1:ok",
       "newRound",
       // Round 2 — final answer: committed false, loop breaks, single bubble flush.
       "rdelta:All done.",
@@ -429,6 +430,72 @@ describe("classifyToolCalls", () => {
     expect(c.vaultOpCalls).toEqual([]);
     expect(c.vaultCalls).toEqual([]);
     expect(c.thinkCalls).toEqual([]);
+  });
+});
+
+describe("capRoundToMutation", () => {
+  const ids = (calls: ToolCall[]): string[] => calls.map((c) => c.id);
+  const vaultName = [...VAULT_TOOL_NAMES][0];
+  const vaultOpName = [...VAULT_OPS_TOOL_NAMES][0];
+  const editName = [...EDIT_TOOL_NAMES][0];
+
+  it("keeps only the first of several vault-op mutations (the screenshot case)", () => {
+    // Five create_directory-style ops emitted in one assistant message: only the first
+    // survives so the approval gate can feed its decision back before the next.
+    const calls: ToolCall[] = ["a", "b", "c", "d", "e"].map((id) => ({
+      id,
+      name: vaultOpName,
+      arguments: {},
+    }));
+    expect(ids(capRoundToMutation(calls))).toEqual(["a"]);
+  });
+
+  it("keeps read-only / think calls that precede the first mutation, drops the rest", () => {
+    const calls: ToolCall[] = [
+      { id: "v", name: vaultName, arguments: {} },
+      { id: "t", name: THINK_TOOL_NAME, arguments: {} },
+      { id: "o", name: vaultOpName, arguments: {} },
+      { id: "e", name: editName, arguments: {} },
+    ];
+    // Reads + think + the first mutation (vault-op) stay; the trailing edit is dropped.
+    expect(ids(capRoundToMutation(calls))).toEqual(["v", "t", "o"]);
+  });
+
+  it("treats an edit as a mutation", () => {
+    const calls: ToolCall[] = [
+      { id: "e1", name: editName, arguments: {} },
+      { id: "e2", name: editName, arguments: {} },
+    ];
+    expect(ids(capRoundToMutation(calls))).toEqual(["e1"]);
+  });
+
+  it("treats an unknown (non-loop) tool as a mutation", () => {
+    const calls: ToolCall[] = [
+      { id: "u1", name: "custom_write", arguments: {} },
+      { id: "u2", name: "custom_write", arguments: {} },
+    ];
+    expect(ids(capRoundToMutation(calls))).toEqual(["u1"]);
+  });
+
+  it("leaves a pure read-only / think round untouched (reads stay parallel)", () => {
+    const calls: ToolCall[] = [
+      { id: "v1", name: vaultName, arguments: {} },
+      { id: "v2", name: vaultName, arguments: {} },
+      { id: "t", name: THINK_TOOL_NAME, arguments: {} },
+    ];
+    expect(ids(capRoundToMutation(calls))).toEqual(["v1", "v2", "t"]);
+  });
+
+  it("leaves a single-mutation round untouched", () => {
+    const calls: ToolCall[] = [
+      { id: "v", name: vaultName, arguments: {} },
+      { id: "o", name: vaultOpName, arguments: {} },
+    ];
+    expect(ids(capRoundToMutation(calls))).toEqual(["v", "o"]);
+  });
+
+  it("returns an empty round unchanged", () => {
+    expect(capRoundToMutation([])).toEqual([]);
   });
 });
 

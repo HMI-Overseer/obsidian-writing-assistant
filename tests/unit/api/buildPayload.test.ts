@@ -143,6 +143,36 @@ describe("buildCompletionPayload", () => {
     expect(json).not.toHaveProperty("tools");
   });
 
+  // Parallel tool calls are disabled whenever tools are present so each round emits
+  // at most one tool call: the in-loop approval gate then pauses on that single call
+  // and the model sees the user's approve/decline before it writes the next tool,
+  // rather than committing to a whole batch up front (the per-round gate is only a
+  // genuine per-tool gate when a round holds one tool).
+  test("disables parallel tool calls when tools are present", () => {
+    const tools = [{
+      type: "function" as const,
+      function: { name: "create_directory", description: "Make a folder.", parameters: {} },
+    }];
+    const json = JSON.parse(
+      buildCompletionPayload("m", MESSAGES, makeParams(), false, tools)
+    );
+    expect(json.parallel_tool_calls).toBe(false);
+  });
+
+  test("omits parallel_tool_calls when no tools are attached", () => {
+    const json = JSON.parse(
+      buildCompletionPayload("m", MESSAGES, makeParams(), false)
+    );
+    expect(json).not.toHaveProperty("parallel_tool_calls");
+  });
+
+  test("omits parallel_tool_calls when tools is an empty array", () => {
+    const json = JSON.parse(
+      buildCompletionPayload("m", MESSAGES, makeParams(), false, [])
+    );
+    expect(json).not.toHaveProperty("parallel_tool_calls");
+  });
+
   test("requests usage accounting via stream_options when includeUsage on a stream", () => {
     const json = JSON.parse(
       buildCompletionPayload("m", MESSAGES, makeParams(), true, undefined, true)

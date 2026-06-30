@@ -30,7 +30,7 @@ import type { Options, Query, SDKMessage, SDKUserMessage } from "./claudeAgentSd
  */
 
 /** Idle sessions are disposed after this long unused (kills the `claude` process). */
-const DEFAULT_IDLE_MS = 5 * 60 * 1000;
+const DEFAULT_IDLE_MS = 15 * 60 * 1000;
 /** How often the registry sweeps for idle sessions. */
 const SWEEP_INTERVAL_MS = 60 * 1000;
 
@@ -142,6 +142,16 @@ export class SdkSession {
 
   get isDisposed(): boolean {
     return this.disposed;
+  }
+
+  /**
+   * True while a turn is in flight, streaming, or parked waiting on a user
+   * approval. The idle sweep ({@link SdkSessionRegistry.evictIdle}) skips busy
+   * sessions: disposing one mid-turn kills the live `claude` process and surfaces
+   * to the user as "Claude Code session ended unexpectedly".
+   */
+  get isBusy(): boolean {
+    return this.busy;
   }
 
   /**
@@ -386,10 +396,15 @@ export class SdkSessionRegistry {
     this.stopSweeping();
   }
 
-  /** Disposes sessions unused for longer than the idle window. */
+  /**
+   * Disposes sessions unused for longer than the idle window. A busy session, a turn
+   * in flight (possibly parked on a user approval), is never evicted: disposing it
+   * mid-turn kills the live process and surfaces as "Claude Code session ended
+   * unexpectedly". Its idle clock starts ticking only once the turn completes.
+   */
   evictIdle(now: number = Date.now()): void {
     for (const [id, session] of this.sessions) {
-      if (now - session.lastUsedAt > this.idleMs) {
+      if (!session.isBusy && now - session.lastUsedAt > this.idleMs) {
         session.dispose();
         this.sessions.delete(id);
       }

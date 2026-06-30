@@ -84,7 +84,7 @@ export function renderVaultOpsTab(container: HTMLElement, plugin: WritingAssista
   new SettingItem(limits.bodyEl)
     .setName("Max auto operations per turn")
     .setDesc(
-      `Circuit breaker: once this many operations auto-apply in a single turn, the rest fall back to Ask. Default: ${DEFAULT_VAULT_OP_POLICY.maxAutoOps}.`
+      `Circuit breaker for the per-class auto-apply policy: once this many operations auto-apply in a single turn, the rest fall back to Ask. "Edit automatically" is unbounded and ignores this. Default: ${DEFAULT_VAULT_OP_POLICY.maxAutoOps}.`
     )
     .addText((text) => {
       text.setPlaceholder(String(DEFAULT_VAULT_OP_POLICY.maxAutoOps));

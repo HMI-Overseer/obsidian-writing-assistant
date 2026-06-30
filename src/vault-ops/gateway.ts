@@ -39,7 +39,12 @@ export interface VaultOpPolicy {
   edit: Gate;
   /** Folder prefixes eligible for "auto"; empty ⇒ whole vault. */
   scopes: string[];
-  /** Circuit breaker: once this many auto ops accrue in a turn, the rest downgrade to ask. */
+  /**
+   * Circuit breaker for the per-class `auto` policy: once this many auto ops accrue
+   * in a turn, the rest downgrade to ask. The session-level "Edit automatically"
+   * posture is an explicit opt-in to unattended operation and ignores this cap (see
+   * {@link resolveGate}).
+   */
   maxAutoOps: number;
 }
 
@@ -57,7 +62,7 @@ export const DEFAULT_VAULT_OP_POLICY: VaultOpPolicy = {
   createDir: "ask",
   edit: "ask",
   scopes: [],
-  maxAutoOps: 20,
+  maxAutoOps: 50,
 };
 
 /**
@@ -115,8 +120,10 @@ function trimSlashes(value: string): string {
  * resolved to "auto" this turn. `posture` is the session-level override
  * (prompt-cache design §6.3): under `"auto"` ("Edit automatically") every op
  * auto-applies, overriding the per-class gate (ask AND deny) and the scope
- * restriction, bounded only by the `maxAutoOps` runaway backstop. Under `"ask"`
- * (the default) the per-class policy fires as configured, with the usual
+ * restriction, with no per-turn cap, an explicit opt-in to unattended operation.
+ * The path-boundary refusal in {@link ../chat/actions/liveVaultReview} is the real
+ * safety net; `maxAutoOps` only governs the implicit per-class `auto` policy. Under
+ * `"ask"` (the default) the per-class policy fires as configured, with the usual
  * tightening-only downgrades: out-of-scope auto→ask, over-budget auto→ask,
  * "deny" short-circuits.
  */
@@ -126,9 +133,7 @@ export function resolveGate(
   autoSoFar: number,
   posture: ApprovalPosture = "ask",
 ): Gate {
-  if (posture === "auto") {
-    return autoSoFar >= policy.maxAutoOps ? "ask" : "auto";
-  }
+  if (posture === "auto") return "auto";
   const base = policy[classOf(op)];
   if (base === "deny") return "deny";
   if (!inScope(targetPaths(op), policy.scopes)) return "ask";
@@ -161,7 +166,8 @@ export function writesPermitted(policy: VaultOpPolicy, posture: ApprovalPosture)
  * {@link VaultOperation} union (their apply path is the EditReviewController), so
  * they gate by file path against the same `edit` policy, scope, and auto-budget
  * downgrades as {@link resolveGate}. The same `autoSoFar` budget is threaded
- * across both channels so a turn's auto operations are counted together.
+ * across both channels so a turn's auto operations are counted together. Like
+ * {@link resolveGate}, the `"auto"` posture is unbounded (no `maxAutoOps` cap).
  */
 export function resolveEditGate(
   policy: VaultOpPolicy,
@@ -169,9 +175,7 @@ export function resolveEditGate(
   autoSoFar: number,
   posture: ApprovalPosture = "ask",
 ): Gate {
-  if (posture === "auto") {
-    return autoSoFar >= policy.maxAutoOps ? "ask" : "auto";
-  }
+  if (posture === "auto") return "auto";
   const base = policy.edit;
   if (base === "deny") return "deny";
   if (!inScope([filePath], policy.scopes)) return "ask";

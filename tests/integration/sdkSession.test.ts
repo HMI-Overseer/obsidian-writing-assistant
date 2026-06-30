@@ -463,6 +463,41 @@ describe("SdkSessionRegistry", () => {
     expect(registry.size).toBe(0);
   });
 
+  it("does not evict a session that is busy mid-turn", async () => {
+    // A turn that hangs before its terminal result (e.g. parked on a user approval)
+    // keeps the session busy. The idle sweep must not dispose it out from under the
+    // live process, doing so is the "session ended unexpectedly" bug.
+    let release!: () => void;
+    const hang = new Promise<void>((r) => {
+      release = r;
+    });
+    queryMock.mockImplementation((params: { prompt: AsyncIterable<{ message: { content: string } }> }) => {
+      const input = params.prompt;
+      return (async function* () {
+        for await (const msg of input) {
+          yield textDeltaMessage(`echo:${msg.message.content}`);
+          await hang; // stay mid-turn (busy) until released
+          yield successResult();
+        }
+      })();
+    });
+
+    const gen = registry.runTurn("c1", turnRequest([{ role: "user", content: "hi" }], "hi"));
+    // Pull the first delta so the turn is in flight (busy).
+    expect((await gen.next()).value).toBe("echo:user:hi");
+
+    // The idle window has elapsed, but the session is mid-turn → not evicted.
+    registry.evictIdle(Date.now() + 120_000);
+    expect(registry.size).toBe(1);
+
+    // Release the turn; once it completes the session is idle and evicts as normal.
+    release();
+    await drain(gen);
+    expect(registry.size).toBe(1);
+    registry.evictIdle(Date.now() + 120_000);
+    expect(registry.size).toBe(0);
+  });
+
   it("disposes all sessions on unload", async () => {
     installEchoQuery();
     await drain(registry.runTurn("c1", turnRequest([{ role: "user", content: "hi" }], "hi")));

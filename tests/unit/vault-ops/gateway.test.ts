@@ -156,8 +156,10 @@ describe("resolveEditGate", () => {
 
 // The "Edit automatically" posture (prompt-cache design §6.3) is a session-level
 // blanket override: every op auto-applies, overriding the per-class gate (ask AND
-// deny) and the scope restriction, bounded only by the maxAutoOps runaway backstop.
-// The default "ask" posture leaves resolveGate / resolveEditGate exactly as before.
+// deny) and the scope restriction, with no per-turn cap, an explicit opt-in to
+// unattended operation (the path-boundary refusal is the real safety net). The
+// default "ask" posture leaves resolveGate / resolveEditGate exactly as before,
+// including the maxAutoOps backstop on a per-class `auto` policy.
 describe("approval posture override", () => {
   test("default posture is 'ask': the per-class policy fires unchanged", () => {
     // deny stays deny, auto stays auto, ask stays ask, scope/budget downgrades hold.
@@ -185,12 +187,13 @@ describe("approval posture override", () => {
     expect(resolveGate(create("elsewhere/a.md"), policy, 0, "auto")).toBe("auto");
   });
 
-  test("'auto' posture still respects the maxAutoOps runaway backstop", () => {
+  test("'auto' posture is unbounded: it ignores the maxAutoOps backstop", () => {
+    // "Edit automatically" is an explicit opt-in to unattended operation, so the
+    // per-turn cap never trips, however many ops have already auto-applied.
     const policy = { ...basePolicy, maxAutoOps: 2 };
-    expect(resolveGate({ kind: "trash", path: "a.md", expect: FP, snapshot: "" }, policy, 1, "auto"))
-      .toBe("auto");
-    expect(resolveGate({ kind: "trash", path: "a.md", expect: FP, snapshot: "" }, policy, 2, "auto"))
-      .toBe("ask");
-    expect(resolveEditGate(policy, "Story.md", 2, "auto")).toBe("ask");
+    const trash: VaultOperation = { kind: "trash", path: "a.md", expect: FP, snapshot: "" };
+    expect(resolveGate(trash, policy, 2, "auto")).toBe("auto");
+    expect(resolveGate(trash, policy, 999, "auto")).toBe("auto");
+    expect(resolveEditGate(policy, "Story.md", 999, "auto")).toBe("auto");
   });
 });

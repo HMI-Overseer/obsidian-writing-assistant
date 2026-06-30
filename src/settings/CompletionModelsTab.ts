@@ -1,8 +1,21 @@
 import type { ModelDigest } from "../api/types";
 import type WritingAssistantChat from "../main";
-import type { CompletionModel } from "../shared/types";
+import type { CompletionModel, ProviderOption } from "../shared/types";
 import { CompletionModelModal } from "./modals";
 import { renderModelProfileTab } from "./ModelProfileTab";
+import type { ModelProfileTabConfig } from "./ModelProfileTab";
+
+/**
+ * Providers that offer completion-model discovery, and are therefore addable,
+ * both from this settings tab and inline from the chat model selector. Single
+ * source of truth: the tab's discovery list and the selector's inline-add
+ * provider choices are both derived from this array, so they can't drift.
+ */
+export const COMPLETION_ADDABLE_PROVIDERS: ProviderOption[] = [
+  "lmstudio",
+  "anthropic",
+  "claudecode",
+];
 
 function formatContextLength(value?: number): string {
   if (!value || value <= 0) return "Context window unavailable";
@@ -30,6 +43,12 @@ export function renderCompletionModelsTab(
 ): void {
   const { settings } = plugin;
 
+  const fetchCandidates: ModelProfileTabConfig<CompletionModel>["fetchCandidates"] = {};
+  for (const provider of COMPLETION_ADDABLE_PROVIDERS) {
+    fetchCandidates[provider] = (opts) =>
+      plugin.services.modelAvailability.discoverCompletionCandidates(provider, opts);
+  }
+
   renderModelProfileTab<CompletionModel>(container, plugin, {
     kind: "completion",
     profileNoun: "completion profile",
@@ -51,10 +70,6 @@ export function renderCompletionModelsTab(
     openModal: (app, p, source, onSave, prefill) => {
       new CompletionModelModal(app, p, source, onSave, prefill).open();
     },
-    fetchCandidates: {
-      lmstudio: (opts) => plugin.services.modelAvailability.discoverCompletionCandidates("lmstudio", opts),
-      anthropic: (opts) => plugin.services.modelAvailability.discoverCompletionCandidates("anthropic", opts),
-      claudecode: (opts) => plugin.services.modelAvailability.discoverCompletionCandidates("claudecode", opts),
-    },
+    fetchCandidates,
   });
 }

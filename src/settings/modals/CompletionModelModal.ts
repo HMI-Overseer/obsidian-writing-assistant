@@ -1,8 +1,6 @@
 import { SettingItem } from "../ui";
-import type { LMStudioModelsService } from "../../api";
-import type { AnthropicModelsService } from "../../api/AnthropicModelsService";
 import type { ModelCandidateResult, ModelDigest } from "../../api/types";
-import type { CompletionModel } from "../../shared/types";
+import type { CompletionModel, ProviderOption } from "../../shared/types";
 import { generateId } from "../../utils";
 import { getProviderDescriptor } from "../../providers/registry";
 import { ModelProfileModal } from "./ModelProfileModal";
@@ -37,16 +35,11 @@ export class CompletionModelModal extends ModelProfileModal<CompletionModel> {
     return "lmsa-completion-models-list";
   }
 
-  protected getLMStudioCandidates(
-    service: LMStudioModelsService
+  protected discoverCandidates(
+    provider: ProviderOption,
+    options: { forceRefresh: boolean }
   ): Promise<ModelCandidateResult> {
-    return service.getCompletionCandidates();
-  }
-
-  protected getAnthropicCandidates(
-    service: AnthropicModelsService
-  ): Promise<ModelCandidateResult> {
-    return service.getCompletionCandidates();
+    return this.plugin.services.modelAvailability.discoverCompletionCandidates(provider, options);
   }
 
   protected renderExtraFields(contentEl: HTMLElement): void {

@@ -10,6 +10,8 @@ type ChatModelSelectorOptions = {
   getActiveProfileId: () => string;
   getModels: () => CompletionModel[];
   onSelectModel: (model: CompletionModel) => Promise<void>;
+  /** Open the inline add-model flow. Persistence + selection are the host's job. */
+  onAddModel: () => void;
 };
 
 export class ChatModelSelector {
@@ -181,8 +183,9 @@ export class ChatModelSelector {
     if (models.length === 0) {
       listEl.createDiv({
         cls: "lmsa-model-dropdown-empty",
-        text: "No profiles configured. Add one in Settings.",
+        text: "No models configured yet.",
       });
+      this.renderAddModelRow(listEl, false);
       return;
     }
 
@@ -218,5 +221,27 @@ export class ChatModelSelector {
         this.close();
       });
     }
+
+    this.renderAddModelRow(listEl, true);
+  }
+
+  private renderAddModelRow(listEl: HTMLElement, withSeparator: boolean): void {
+    if (withSeparator) {
+      listEl.createDiv({ cls: "lmsa-model-dropdown-separator" });
+    }
+
+    const addRow = listEl.createDiv({ cls: "lmsa-model-dropdown-add" });
+    const iconEl = addRow.createEl("span", { cls: "lmsa-model-dropdown-add-icon" });
+    setIcon(iconEl, "plus");
+    addRow.createEl("span", {
+      cls: "lmsa-model-dropdown-add-label",
+      text: "Add model…",
+    });
+
+    addRow.addEventListener("click", (event) => {
+      event.stopPropagation();
+      this.close();
+      this.options.onAddModel();
+    });
   }
 }

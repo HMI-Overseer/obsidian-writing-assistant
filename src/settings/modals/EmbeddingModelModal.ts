@@ -1,7 +1,5 @@
-import type { LMStudioModelsService } from "../../api";
-import type { AnthropicModelsService } from "../../api/AnthropicModelsService";
 import type { ModelCandidateResult } from "../../api/types";
-import type { EmbeddingModel } from "../../shared/types";
+import type { EmbeddingModel, ProviderOption } from "../../shared/types";
 import { generateId } from "../../utils";
 import { ModelProfileModal } from "./ModelProfileModal";
 
@@ -19,16 +17,11 @@ export class EmbeddingModelModal extends ModelProfileModal<EmbeddingModel> {
     return "lmsa-embedding-models-list";
   }
 
-  protected getLMStudioCandidates(
-    service: LMStudioModelsService
+  protected discoverCandidates(
+    _provider: ProviderOption,
+    options: { forceRefresh: boolean }
   ): Promise<ModelCandidateResult> {
-    return service.getEmbeddingCandidates();
-  }
-
-  protected getAnthropicCandidates(
-    service: AnthropicModelsService
-  ): Promise<ModelCandidateResult> {
-    return service.getEmbeddingCandidates();
+    return this.plugin.services.modelAvailability.discoverEmbeddingCandidates(options);
   }
 
   protected renderExtraFields(): void {

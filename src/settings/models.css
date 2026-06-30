@@ -146,6 +146,43 @@
     margin-bottom: 12px;
   }
 
+  /* ── Inline add-model discovery (modal standalone mode) ──────────────── */
+
+  .lmsa-modal-discovery {
+    @apply lmsa-flex lmsa-flex-col lmsa-gap-2;
+    margin-top: 4px;
+  }
+
+  .lmsa-modal-discovery-header {
+    @apply lmsa-flex lmsa-items-center lmsa-justify-between lmsa-gap-3;
+  }
+
+  .lmsa-modal-discovery-title {
+    @apply lmsa-font-semibold;
+    color: var(--lmsa-text-primary);
+  }
+
+  .lmsa-modal-discovery-list {
+    @apply lmsa-flex lmsa-flex-col lmsa-gap-1 lmsa-overflow-y-auto;
+    max-height: 220px;
+  }
+
+  .lmsa-modal-discovery-row {
+    @apply lmsa-flex lmsa-cursor-pointer lmsa-flex-col lmsa-gap-1 lmsa-rounded-lg;
+    padding: 8px 10px;
+    border: 1px solid transparent;
+    transition: background 120ms ease, border-color 120ms ease;
+  }
+
+  .lmsa-modal-discovery-row:hover {
+    background: color-mix(in srgb, var(--background-modifier-hover) 60%, transparent);
+    border-color: color-mix(in srgb, var(--lmsa-section-accent) 36%, var(--lmsa-border-default));
+  }
+
+  .lmsa-modal-discovery-row-header {
+    @apply lmsa-flex lmsa-flex-wrap lmsa-items-center lmsa-gap-2;
+  }
+
   @media (max-width: 700px) {
     .lmsa-item-row {
       @apply lmsa-flex-col lmsa-items-stretch;

@@ -6,6 +6,8 @@ import type WritingAssistantChat from "../main";
 import { VIEW_TYPE_CHAT, makeDefaultProfile } from "../constants";
 import { getActiveProfile, getProfilesForProvider, generateProfileId } from "../shared/profileUtils";
 import { PROVIDER_DESCRIPTORS } from "../providers/descriptors";
+import { CompletionModelModal } from "../settings/modals";
+import { COMPLETION_ADDABLE_PROVIDERS } from "../settings/CompletionModelsTab";
 import { getActiveNoteText } from "../context/noteContext";
 import { ChatBubbleActionHandler } from "./ChatBubbleActionHandler";
 import { ChatGenerationOrchestrator } from "./ChatGenerationOrchestrator";
@@ -161,6 +163,34 @@ export class ChatView extends ItemView {
         await this.syncConversationUi();
         await this.modelSelector?.refreshAvailability();
         this.refreshComposerIndicators();
+      },
+      onAddModel: () => {
+        const active = this.sessionStore?.getResolvedConversationModel() ?? null;
+        const defaultProvider =
+          active && COMPLETION_ADDABLE_PROVIDERS.includes(active.provider)
+            ? active.provider
+            : COMPLETION_ADDABLE_PROVIDERS[0];
+
+        new CompletionModelModal(
+          this.app,
+          this.plugin,
+          null,
+          async (model) => {
+            // Same array the settings tab writes, persisted the same way: the
+            // selector stays one more view over completionModels, not a second store.
+            this.plugin.settings.completionModels.push(model);
+            await this.plugin.saveSettings();
+            if (!this.sessionStore) return;
+            // Auto-select the freshly added model (mirrors onSelectModel).
+            this.contextUpdater?.resetCalibration();
+            await this.sessionStore.setActiveConversationModel(model);
+            await this.syncConversationUi();
+            await this.modelSelector?.refreshAvailability();
+            this.refreshComposerIndicators();
+          },
+          { provider: defaultProvider },
+          COMPLETION_ADDABLE_PROVIDERS,
+        ).open();
       },
     });
 

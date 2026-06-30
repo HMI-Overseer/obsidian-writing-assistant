@@ -6,6 +6,10 @@ export type ContextPickerPopoverCallbacks = {
   isActiveNoteAttached: () => boolean;
   getActiveFileName: () => string | null;
   onAddActiveNote: () => void;
+  /** Whether the active note auto-attaches to every new conversation (the persistent default). */
+  isAutoAttachEnabled: () => boolean;
+  /** Flip the persistent auto-attach default. Affects new conversations only, not the current send. */
+  onToggleAutoAttach: (value: boolean) => void;
   onAddVaultNote: (filePath: string, fileName: string) => void;
   canAttachImages: () => boolean;
   onAttachImage: () => void;
@@ -94,18 +98,25 @@ export class ContextPickerPopover {
   private renderMenuView(el: HTMLElement): void {
     const activeFileName = this.callbacks.getActiveFileName();
     const isAttached = this.callbacks.isActiveNoteAttached() && !!activeFileName;
-    // Disabled when already attached OR when there is no active file to attach
-    const noteDisabled = isAttached || !activeFileName;
+    // One-shot attach is unavailable when already attached OR when there is no
+    // active file to attach. The trailing auto-attach pin stays live regardless.
+    const attachDisabled = isAttached || !activeFileName;
 
     // ── "Add current note" row ───────────────────────────────────────────────
     const noteRow = el.createDiv({
-      cls: ["lmsa-context-picker-row", noteDisabled ? "is-disabled" : ""].filter(Boolean).join(" "),
+      cls: ["lmsa-context-picker-row", attachDisabled ? "is-attach-disabled" : ""]
+        .filter(Boolean)
+        .join(" "),
     });
 
-    const noteIcon = noteRow.createEl("span", { cls: "lmsa-context-picker-row-icon" });
+    // Main group: the one-shot manual-attach target. Kept separate from the
+    // trailing pin so the persistent default stays reachable while this is dimmed.
+    const noteMain = noteRow.createDiv({ cls: "lmsa-context-picker-row-main" });
+
+    const noteIcon = noteMain.createEl("span", { cls: "lmsa-context-picker-row-icon" });
     setIcon(noteIcon, "file-text");
 
-    const noteLabel = noteRow.createEl("span", { cls: "lmsa-context-picker-row-label" });
+    const noteLabel = noteMain.createEl("span", { cls: "lmsa-context-picker-row-label" });
     noteLabel.createEl("span", { cls: "lmsa-context-picker-row-title", text: "Add current note" });
     noteLabel.createEl("span", {
       cls: "lmsa-context-picker-row-hint",
@@ -113,16 +124,20 @@ export class ContextPickerPopover {
     });
 
     if (isAttached) {
-      const checkIcon = noteRow.createEl("span", { cls: "lmsa-context-picker-row-check" });
+      const checkIcon = noteMain.createEl("span", { cls: "lmsa-context-picker-row-check" });
       setIcon(checkIcon, "check");
     }
 
-    if (!noteDisabled) {
-      noteRow.addEventListener("click", () => {
+    if (!attachDisabled) {
+      noteMain.addEventListener("click", () => {
         this.close();
         this.callbacks.onAddActiveNote();
       });
     }
+
+    // Trailing pin: reads/writes the persistent auto-attach default. Distinct
+    // control from the one-shot attach above; sets the default for new chats only.
+    this.renderAutoAttachPin(noteRow);
 
     // ── "Add note from vault" row ────────────────────────────────────────────
     const vaultRow = el.createDiv({ cls: "lmsa-context-picker-row" });
@@ -152,6 +167,40 @@ export class ContextPickerPopover {
         this.callbacks.onAttachImage();
       });
     }
+  }
+
+  /**
+   * Trailing pin on the "Add current note" row that toggles the persistent
+   * `includeNoteContext` default. This is a view over the single setting (the
+   * same field the General settings tab edits), not a parallel store. Toggling
+   * it sets the default for new conversations and never touches the current send.
+   */
+  private renderAutoAttachPin(row: HTMLElement): void {
+    const enabled = this.callbacks.isAutoAttachEnabled();
+
+    const pin = row.createEl("button", {
+      cls: ["lmsa-context-picker-pin", enabled ? "is-active" : ""].filter(Boolean).join(" "),
+      attr: { type: "button" },
+    });
+    setIcon(pin, "pin");
+
+    const applyState = (on: boolean): void => {
+      pin.toggleClass("is-active", on);
+      pin.setAttribute("aria-pressed", String(on));
+      const label = on
+        ? "Stop attaching the open note to new chats by default"
+        : "Attach the open note to new chats by default";
+      pin.setAttribute("aria-label", label);
+      pin.setAttribute("title", label);
+    };
+    applyState(enabled);
+
+    pin.addEventListener("click", (event) => {
+      event.stopPropagation();
+      const next = !this.callbacks.isAutoAttachEnabled();
+      this.callbacks.onToggleAutoAttach(next);
+      applyState(next);
+    });
   }
 
   private enterSearchMode(): void {

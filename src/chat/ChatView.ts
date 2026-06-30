@@ -330,6 +330,11 @@ export class ChatView extends ItemView {
       onAddActiveNote: () => {
         this.composer?.attachActiveNote();
       },
+      isAutoAttachEnabled: () => this.plugin.settings.includeNoteContext,
+      onToggleAutoAttach: (value) => {
+        this.plugin.settings.includeNoteContext = value;
+        void this.plugin.saveSettings();
+      },
       onAddVaultNote: (filePath, fileName) => {
         this.composer?.addExtraContextItem({ filePath, fileName });
       },

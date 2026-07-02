@@ -217,6 +217,14 @@ export class AgenticTimeline {
    * they may carry pending review controls.
    */
   finalize(): void {
+    // Sweep any pending placeholders that were announced during streaming but never
+    // claimed by a recorded step, e.g. a mutation batch abandoned at the round cap or a
+    // turn aborted mid-drain, so none linger forever as a "…" pending row.
+    for (const [, queue] of this.pendingToolCallEls) {
+      for (const { stepEl } of queue) stepEl.remove();
+    }
+    this.pendingToolCallEls.clear();
+
     const toolCount = this.steps.filter(
       (s) => s.type === "tool_call" && s.toolName !== "think",
     ).length;

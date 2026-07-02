@@ -206,6 +206,78 @@ describe("runToolLoop round cap", () => {
   });
 });
 
+/**
+ * Buffer-and-drain of a deferred mutation batch. A model that ignores
+ * parallel_tool_calls (LM Studio / llama.cpp) emits its whole batch in one assistant
+ * message. The cap keeps one mutation per round; the rest are buffered and drained on
+ * the following rounds with NO model stream, so a local model that never re-emits the
+ * surplus (it thinks it is done) still has its full intent honored. This is the
+ * regression lock for the "some ops finish, the rest hang pending and never run" symptom.
+ */
+describe("runToolLoop deferred-mutation drain", () => {
+  const app = {
+    vault: { adapter: {}, getName: () => "", getAbstractFileByPath: () => null },
+  } as unknown as App;
+  const vaultOpName = [...VAULT_OPS_TOOL_NAMES][0];
+
+  it("drains a batched mutation set across rounds without the model re-emitting", async () => {
+    const cb = makeCallbacks();
+    const a: ToolCall = { id: "vo-a", name: vaultOpName, arguments: { path: "A" } };
+    const b: ToolCall = { id: "vo-b", name: vaultOpName, arguments: { path: "B" } };
+    const c: ToolCall = { id: "vo-c", name: vaultOpName, arguments: { path: "C" } };
+
+    // The live review approves every op it is handed, one round at a time.
+    const resolveRound = vi.fn(async (calls: ToolCall[]) =>
+      calls.map((tc) => ({ tc, result: { isError: false, content: "op ok" } })),
+    );
+    const liveReview = {
+      resolveRound,
+      resolveEdits: vi.fn(async () => []),
+    } as unknown as LiveVaultReview;
+
+    // All three ops arrive in ONE assistant message; then the model (like a local model
+    // that believes it has finished) says nothing further. The cap would classically
+    // drop b and c for the model to re-emit; buffer-and-drain runs them regardless.
+    const client = countingClient([
+      { deltas: ["Making three folders."], toolCalls: [a, b, c], stopReason: "tool_use" },
+      { deltas: ["Done."], toolCalls: null, stopReason: "end_turn" },
+    ]);
+
+    const result = await runToolLoop(
+      client,
+      baseRequest,
+      "test-model",
+      "lmstudio",
+      {} as never,
+      signal(),
+      cb,
+      20, // maxRounds high, so the cap can't interfere
+      true,
+      undefined,
+      undefined,
+      { app, liveReview },
+    );
+
+    // Streamed exactly twice: the batch, then the final "Done." — rounds for b and c
+    // were replayed from the buffer with no stream.
+    expect(client.stream).toHaveBeenCalledTimes(2);
+    // Every op reached the gate, one per round, in emission order.
+    expect(resolveRound).toHaveBeenCalledTimes(3);
+    expect(resolveRound.mock.calls.map((mc) => (mc[0] as ToolCall[])[0].id)).toEqual([
+      "vo-a",
+      "vo-b",
+      "vo-c",
+    ]);
+    // Every op recorded a timeline step — none silently lost.
+    const recorded = (cb.onStepRecorded as ReturnType<typeof vi.fn>).mock.calls.map(
+      (cc) => cc[0].toolCallId,
+    );
+    expect(recorded).toEqual(["vo-a", "vo-b", "vo-c"]);
+    // All three accumulate as write calls for finalization.
+    expect(result.writeToolCalls?.map((w) => w.id)).toEqual(["vo-a", "vo-b", "vo-c"]);
+  });
+});
+
 describe("runToolLoop abort handling", () => {
   it("flushes partial answer text to the bubble when the stream throws mid-round", async () => {
     const cb = makeCallbacks();
@@ -341,11 +413,13 @@ describe("runToolLoop callback-sequence characterization", () => {
       // Round 0: read-only reasoning round (vault search + think) → committed reasoning.
       { deltas: ["Let me look around. "], toolCalls: [vr0, th0], stopReason: "tool_use" },
       // Round 1: read + vault-op + edit, but the mutation cap keeps only up to the first
-      // mutation (vr1 + vo1) and drops the second mutation (ed1) so the model gets the
-      // vault-op's approval result before it re-emits the edit. Mutating narration →
+      // mutation (vr1 + vo1) and defers the second mutation (ed1) so the model gets the
+      // vault-op's approval result before the edit is gated. Mutating narration →
       // answer-track.
       { deltas: ["Now I'll make changes."], toolCalls: [vr1, vo1, ed1], stopReason: "tool_use" },
-      // Round 2: final answer → single post-loop flush.
+      // Round 3: final answer → single post-loop flush. (Round 2 is the drained edit,
+      // replayed from the buffer with no model stream, so the model is streamed 3 times
+      // across 4 rounds.)
       { deltas: ["All done."], toolCalls: null, stopReason: "end_turn" },
     ]);
 
@@ -373,10 +447,10 @@ describe("runToolLoop callback-sequence characterization", () => {
       `recorded:${THINK_TOOL_NAME}:th-0`,
       "newRound",
       // Round 1 — mutating round: answer-track reasoning discarded. The mutation cap
-      // dropped the trailing edit (ed1), so only the read-only and vault-op channels
-      // fire their synchronous prefixes in array order (read-only status, then vault-op
-      // status+record), and the post-await processing records the read-only step and
-      // reports the single vault-op disposition. The edit is re-emitted next round.
+      // kept vr1 + vo1 and deferred the trailing edit (ed1), so only the read-only and
+      // vault-op channels fire their synchronous prefixes in array order (read-only
+      // status, then vault-op status+record), and the post-await processing records the
+      // read-only step and reports the single vault-op disposition.
       "rdelta:Now I'll make changes.",
       "rrf:false:1",
       `status:${vaultName}`,
@@ -385,9 +459,16 @@ describe("runToolLoop callback-sequence characterization", () => {
       `recorded:${vaultName}:vr-1`,
       "result:vo-1:ok",
       "newRound",
-      // Round 2 — final answer: committed false, loop breaks, single bubble flush.
-      "rdelta:All done.",
+      // Round 2 — DRAIN of the deferred edit (ed1): no model stream (no rdelta), the
+      // mutating branch discards reasoning, and the edit channel gates the buffered op.
       "rrf:false:2",
+      `status:${editName}`,
+      `recorded:${editName}:ed-1`,
+      "result:ed-1:ok",
+      "newRound",
+      // Round 3 — final answer: committed false, loop breaks, single bubble flush.
+      "rdelta:All done.",
+      "rrf:false:3",
       "delta:Now I'll make changes.\n\nAll done.",
     ]);
   });

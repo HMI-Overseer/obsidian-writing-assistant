@@ -142,6 +142,19 @@ export async function runToolLoop(
   // reasoning instead. Solves the model saying its piece, e.g. a fenced code
   // block, alongside a write and having it stranded as plain-text reasoning.
   let answerProse = "";
+  // Mutations the round cap deferred (see capRoundToMutation), waiting to be drained.
+  // A model that ignores parallel_tool_calls (LM Studio / llama.cpp) emits its whole
+  // batch in one assistant message; rather than discard the surplus and rely on the
+  // model to re-emit it next round (which local models routinely don't, silently
+  // losing the intent), the loop buffers it here and drains one mutation per
+  // subsequent round WITHOUT a model round-trip. The batch is thus honored in full,
+  // each op still gated one at a time. `deferredStopReason` carries the emitting
+  // round's stop reason so a max_tokens truncation on the batch's tail is not lost.
+  let deferredCalls: ToolCall[] = [];
+  let deferredStopReason: StopReason = "tool_use";
+  // Rounds where the model was actually streamed; drain rounds don't count. The round
+  // cap limits model turns, not replayed drains, so a large batch can't exhaust it.
+  let modelRounds = 0;
 
   // The app, used only to translate absolute paths a model may emit into
   // vault-relative ones (normalizeVaultToolCall). Any context carries it.
@@ -149,91 +162,124 @@ export async function runToolLoop(
     vaultOpToolContext?.app ?? editToolContext?.app ?? vaultToolContext?.app;
 
   for (let round = 0; ; round++) {
-    const requestMessages = [...baseRequest.messages, ...toolLoopTurns];
-    const roundRequest = { ...baseRequest, messages: requestMessages };
+    // A round's tool calls come from one of two sources: a fresh model stream, or the
+    // buffer of mutations a prior round's cap deferred. The buffer is drained first, so
+    // the model's whole batch is honored before it is streamed again.
+    let toolCalls: ToolCall[] | null;
+    let stopReason: StopReason;
+    let roundText: string;
+    let usage: UsageResult | null = null;
+    const streamedThisRound = deferredCalls.length === 0;
 
-    const { onToolCallStreaming } = callbacks;
-    // Retry the stream on a transient first-error (429 / 5xx incl. Anthropic 529),
-    // matching the protection withRetry already gives the non-streaming complete()
-    // path. Retry is safe only before the first delta reaches the bubble; once
-    // tokens stream we are committed to the attempt (streamWithRetry enforces this).
-    const streamResult = streamWithRetry(
-      () =>
-        client.stream(
-          roundRequest, model, params, signal,
-          onToolCallStreaming
-            ? (_idx, name) => { if (ALL_LOOP_TOOL_NAMES.has(name)) onToolCallStreaming(name); }
-            : undefined,
-        ),
-      { signal },
-    );
+    if (!streamedThisRound) {
+      // Drain: replay the next buffered mutation (plus any read-only calls that led up
+      // to it) with no model call. capRoundToMutation keeps this to a single mutation,
+      // so a drained round is still one gated op; the remainder stays buffered and the
+      // buffer shrinks monotonically, so the drain sequence always terminates.
+      const next = capRoundToMutation(deferredCalls);
+      deferredCalls = deferredCalls.slice(next.length);
+      toolCalls = next;
+      stopReason = deferredStopReason;
+      roundText = "";
+    } else {
+      const requestMessages = [...baseRequest.messages, ...toolLoopTurns];
+      const roundRequest = { ...baseRequest, messages: requestMessages };
 
-    // In agentic mode, buffer deltas internally, only the timeline receives
-    // live updates per round. Answer-track prose is accumulated and flushed to
-    // the bubble once, after the loop. In non-agentic mode, deltas flow directly
-    // to the bubble as they arrive.
-    let roundBuffer = "";
-    try {
-      for await (const delta of streamResult.deltas) {
-        fullText += delta;
-        roundBuffer += delta;
-        if (!agenticMode) {
-          callbacks.onDelta(delta);
+      const { onToolCallStreaming } = callbacks;
+      // Retry the stream on a transient first-error (429 / 5xx incl. Anthropic 529),
+      // matching the protection withRetry already gives the non-streaming complete()
+      // path. Retry is safe only before the first delta reaches the bubble; once
+      // tokens stream we are committed to the attempt (streamWithRetry enforces this).
+      const streamResult = streamWithRetry(
+        () =>
+          client.stream(
+            roundRequest, model, params, signal,
+            onToolCallStreaming
+              ? (_idx, name) => { if (ALL_LOOP_TOOL_NAMES.has(name)) onToolCallStreaming(name); }
+              : undefined,
+          ),
+        { signal },
+      );
+
+      // In agentic mode, buffer deltas internally, only the timeline receives
+      // live updates per round. Answer-track prose is accumulated and flushed to
+      // the bubble once, after the loop. In non-agentic mode, deltas flow directly
+      // to the bubble as they arrive.
+      let roundBuffer = "";
+      try {
+        for await (const delta of streamResult.deltas) {
+          fullText += delta;
+          roundBuffer += delta;
+          if (!agenticMode) {
+            callbacks.onDelta(delta);
+          }
+          callbacks.onReasoningDelta?.(delta);
         }
-        callbacks.onReasoningDelta?.(delta);
+      } catch (e) {
+        // On abort (or other errors), flush whatever we have so partial text is
+        // preserved in the renderer for finalizeAbortedResponse: earlier rounds'
+        // answer prose plus this round's partial buffer.
+        if (agenticMode) {
+          const partial = appendAnswerProse(answerProse, roundBuffer);
+          if (partial) callbacks.onDelta(partial);
+        }
+        throw e;
       }
-    } catch (e) {
-      // On abort (or other errors), flush whatever we have so partial text is
-      // preserved in the renderer for finalizeAbortedResponse: earlier rounds'
-      // answer prose plus this round's partial buffer.
-      if (agenticMode) {
-        const partial = appendAnswerProse(answerProse, roundBuffer);
-        if (partial) callbacks.onDelta(partial);
+
+      usage = await streamResult.usage;
+      const rawToolCalls = await streamResult.toolCalls;
+      // Translate any absolute paths to vault-relative *once*, here, so every
+      // downstream consumer, overlay, accumulation, finalization, timeline, sees
+      // the same resolved path (tools/paths.ts).
+      const normalizedCalls =
+        rawToolCalls && app ? rawToolCalls.map((tc) => normalizeVaultToolCall(app, tc)) : rawToolCalls;
+      // Enforce one mutation per round (see capRoundToMutation). The model emits an
+      // assistant message atomically, so the in-loop approval gate can only feed the
+      // user's approve/decline back to it *between* rounds. The request-level
+      // parallel_tool_calls:false / disable_parallel_tool_use flags ask the provider for
+      // this, but local OpenAI-compatible servers (LM Studio / llama.cpp) accept and
+      // ignore them, so this cap is the engine-independent backstop. The mutations it
+      // drops are NOT discarded: they are buffered and drained on the following rounds
+      // (above), so the batch's full intent survives without relying on the model to
+      // re-emit it.
+      const roundStopReason = await streamResult.stopReason;
+      const capped = normalizedCalls ? capRoundToMutation(normalizedCalls) : normalizedCalls;
+      if (normalizedCalls && capped && capped.length < normalizedCalls.length) {
+        deferredCalls = normalizedCalls.slice(capped.length);
+        deferredStopReason = roundStopReason;
       }
-      throw e;
+      toolCalls = capped;
+      stopReason = roundStopReason;
+
+      if (usage && callbacks.onCalibrate && !calibrated) {
+        callbacks.onCalibrate(roundRequest, usage);
+        calibrated = true;
+      }
+      if (usage) finalUsage = usage;
+
+      roundText = fullText.slice(previousRoundsText.length);
     }
-
-    const usage = await streamResult.usage;
-    const rawToolCalls = await streamResult.toolCalls;
-    // Translate any absolute paths to vault-relative *once*, here, so every
-    // downstream consumer, overlay, accumulation, finalization, timeline, sees
-    // the same resolved path (tools/paths.ts).
-    const normalizedCalls =
-      rawToolCalls && app ? rawToolCalls.map((tc) => normalizeVaultToolCall(app, tc)) : rawToolCalls;
-    // Enforce one mutation per round (see capRoundToMutation). The model emits an
-    // assistant message atomically, so the in-loop approval gate can only feed the
-    // user's approve/decline back to it *between* rounds; a round carrying several
-    // mutations means the model committed to the whole batch before any was reviewed.
-    // The request-level parallel_tool_calls:false / disable_parallel_tool_use flags ask
-    // the provider for this, but local OpenAI-compatible servers (LM Studio / llama.cpp)
-    // accept and ignore them, so this is the engine-independent backstop.
-    const toolCalls = normalizedCalls ? capRoundToMutation(normalizedCalls) : normalizedCalls;
-    const stopReason = await streamResult.stopReason;
-
-    if (usage && callbacks.onCalibrate && !calibrated) {
-      callbacks.onCalibrate(roundRequest, usage);
-      calibrated = true;
-    }
-    if (usage) finalUsage = usage;
-
-    const roundText = fullText.slice(previousRoundsText.length);
 
     const hasToolCalls = toolCalls !== null && toolCalls.length > 0;
 
-    // Detect failed tool calls: model stopped but produced nothing useful.
-    checkForFailedToolCall({
-      hasToolCalls,
-      roundText,
-      stopReason,
-      round,
-      maxRounds,
-      usage,
-      model,
-      provider,
-      agenticMode,
-      toolCount: baseRequest.tools?.length ?? 0,
-      mode: baseRequest.documentContext ? "edit" : "chat",
-    });
+    // Only a streamed round can end with no tool calls (a drain always carries one), so
+    // the empty-response classification runs on streamed rounds only. `modelRounds` (not
+    // the raw loop index, which drains inflate) drives the round-count diagnostics.
+    if (streamedThisRound) {
+      checkForFailedToolCall({
+        hasToolCalls,
+        roundText,
+        stopReason,
+        round: modelRounds,
+        maxRounds,
+        usage,
+        model,
+        provider,
+        agenticMode,
+        toolCount: baseRequest.tools?.length ?? 0,
+        mode: baseRequest.documentContext ? "edit" : "chat",
+      });
+    }
 
     if (!hasToolCalls || !toolCalls) {
       // Final round: its prose is the answer (or its tail). Accumulate it and
@@ -306,8 +352,9 @@ export async function runToolLoop(
 
     // Cap reached: push terminal error results to keep history valid, then let
     // the model produce one synthesis response. If it calls tools again after
-    // the warning, hard-stop.
-    if (capHit || round >= maxRounds) {
+    // the warning, hard-stop. The cap counts streamed model turns (`modelRounds`),
+    // so replayed buffer drains never trip it.
+    if (capHit || modelRounds >= maxRounds) {
       if (capHit) {
         // Model ignored the cap warning and called tools again, hard stop.
         answerProse = appendAnswerProse(answerProse, roundText);
@@ -315,6 +362,9 @@ export async function runToolLoop(
         break;
       }
       capHit = true;
+      // Out of model rounds: abandon any buffered mutations rather than draining
+      // them past the cap (finalize() sweeps their orphaned pending placeholders).
+      deferredCalls = [];
       toolLoopTurns.push({
         role: "assistant",
         content: roundText || null,
@@ -413,6 +463,8 @@ export async function runToolLoop(
 
     previousRoundsText = fullText;
     callbacks.onNewRound?.();
+    // Only a streamed round counts toward the model-turn cap; drains are free.
+    if (streamedThisRound) modelRounds++;
   }
 
   // Deliver the accumulated answer to the bubble in one shot. In non-agentic
@@ -449,10 +501,12 @@ export interface ClassifiedCalls {
  * say "waiting for the previous step").
  *
  * Keeps every read-only / think call up to and including the first mutating
- * (edit / vault-op / unknown-write) call and drops the rest; the model re-emits the
- * dropped mutations on the next round, now with the first decision in hand. A pure
- * read-only / think round is returned unchanged, those need no approval and run in
- * parallel, so multi-search rounds keep their concurrency.
+ * (edit / vault-op / unknown-write) call and returns the rest as the deferred tail.
+ * The loop buffers that tail and drains it one mutation per subsequent round (see the
+ * drain branch in {@link runToolLoop}), so the model's whole batch is honored, each op
+ * gated in turn, without relying on the model to re-emit the dropped calls (local
+ * models routinely don't). A pure read-only / think round is returned unchanged, those
+ * need no approval and run in parallel, so multi-search rounds keep their concurrency.
  *
  * This is the engine-independent backstop for the request-level
  * `parallel_tool_calls:false` (OpenAI) / `disable_parallel_tool_use` (Anthropic) flags,

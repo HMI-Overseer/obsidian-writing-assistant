@@ -387,6 +387,12 @@ export class ChatView extends ItemView {
       onClose: () => this.historyDrawer?.close(),
     });
 
+    this.registerDomEvent(this.layout.newChatBtn, "click", (event) => {
+      event.stopPropagation();
+      this.dismissAllOverlays();
+      void this.conversation.startNewConversation();
+    });
+
     this.registerDomEvent(this.layout.historyBtn, "click", (event) => {
       event.stopPropagation();
       this.dismissAllOverlays({ keepHistory: true });

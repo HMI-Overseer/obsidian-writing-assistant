@@ -80,6 +80,11 @@ export function createChatLayout(contentEl: HTMLElement): ChatLayoutRefs {
   const profileSettingsPopoverEl = headerMetaWrap.createDiv({ cls: "lmsa-profile-popover lmsa-hidden" });
 
   const headerActions = header.createDiv({ cls: "lmsa-chat-header-actions" });
+  const newChatBtn = headerActions.createEl("button", {
+    cls: "lmsa-chat-header-btn lmsa-ui-icon-btn",
+    attr: { "aria-label": "New chat" },
+  }) as HTMLButtonElement;
+  setIcon(newChatBtn, "file-pen");
   const historyBtn = headerActions.createEl("button", {
     cls: "lmsa-chat-header-btn lmsa-ui-icon-btn",
     attr: { "aria-label": "Chat history" },
@@ -188,6 +193,7 @@ export function createChatLayout(contentEl: HTMLElement): ChatLayoutRefs {
     rootEl: contentEl,
     messagesPaneEl,
     headerMetaEl: headerMetaLabel,
+    newChatBtn,
     historyBtn,
     shellEl: shell,
     messagesEl,

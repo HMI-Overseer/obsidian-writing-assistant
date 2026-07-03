@@ -1,10 +1,17 @@
 import type { AnthropicCacheSettings, Attachment, ImageMimeType } from "./types";
 import type { CanonicalToolDefinition } from "../tools/types";
 
-/** A context item manually attached by the user via the context picker. */
+/** A context item manually attached by the user via the context picker or drag-and-drop. */
 export interface ExtraContextItem {
   filePath: string;
   fileName: string;
+  /**
+   * Inline content captured at attach time for files that live outside the vault
+   * (dragged in from the OS file system). When present, the send-time snapshot uses
+   * this text directly instead of resolving `filePath` against the vault. Absent for
+   * vault notes, which are re-read from disk at send so their snapshot stays fresh.
+   */
+  content?: string;
 }
 
 /** A resolved extra context item ready to be sent to the provider. */

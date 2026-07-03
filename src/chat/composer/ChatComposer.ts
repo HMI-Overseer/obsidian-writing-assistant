@@ -12,7 +12,16 @@ import { getActiveFileName } from "../../context/noteContext";
 import type { ExtraContextItem } from "../../shared/chatRequest";
 import type { ChatLayoutRefs } from "../types";
 import { generateId } from "../../utils";
-import { MAX_IMAGE_SIZE_BYTES, SUPPORTED_IMAGE_TYPES } from "../../constants";
+import {
+  MAX_IMAGE_SIZE_BYTES,
+  MAX_TEXT_ATTACHMENT_BYTES,
+  SUPPORTED_IMAGE_TYPES,
+} from "../../constants";
+import {
+  getDraggedVaultMarkdownFiles,
+  getDroppedVaultMarkdownFiles,
+  isMarkdownDropFile,
+} from "./vaultDrag";
 
 const POSTURE_OPTIONS: { posture: ApprovalPosture; label: string; icon: string }[] = [
   { posture: "ask", icon: "circle-check", label: "Ask before edits" },
@@ -45,7 +54,7 @@ export class ChatComposer {
   private readonly handleActionClick: () => void;
   private readonly handlePaste: (event: ClipboardEvent) => void;
   private readonly handleDragOver: (event: DragEvent) => void;
-  private readonly handleDragLeave: () => void;
+  private readonly handleDragLeave: (event: DragEvent) => void;
   private readonly handleDrop: (event: DragEvent) => void;
 
   constructor(
@@ -109,25 +118,57 @@ export class ChatComposer {
     this.refs.textareaEl.addEventListener("paste", this.handlePaste);
 
     this.handleDragOver = (event: DragEvent) => {
+      // Only claim drags we can actually accept (vault notes or OS files), so unrelated
+      // drags (text selections, tabs) pass through untouched instead of flashing the ring.
+      if (!this.canAcceptDrop(event)) return;
+      // preventDefault ONLY. Two things we must NOT do: (1) stopPropagation, or Obsidian's
+      // document-level dragover stops firing over the composer and its drag ghost (the
+      // floating file-name pill) freezes at our border; (2) force dropEffect, since
+      // Obsidian's internal file drags advertise their own effectAllowed and an
+      // incompatible "copy" makes the browser reject the drop. preventDefault alone marks
+      // us a valid drop target; the browser's default effect is always compatible.
       event.preventDefault();
-      event.stopPropagation();
-      const composerPanel = this.refs.textareaEl.parentElement;
-      composerPanel?.addClass("is-dragover");
+      this.refs.textareaEl.parentElement?.addClass("is-dragover");
     };
-    this.handleDragLeave = () => {
+    this.handleDragLeave = (event: DragEvent) => {
+      // dragleave also fires when crossing into a child (chips, textarea, footer); keep the
+      // ring lit while the pointer is still anywhere inside the panel.
       const composerPanel = this.refs.textareaEl.parentElement;
+      const related = event.relatedTarget as Node | null;
+      if (related && composerPanel?.contains(related)) return;
       composerPanel?.removeClass("is-dragover");
     };
     this.handleDrop = (event: DragEvent) => {
+      // preventDefault only: do NOT stopPropagation here. Obsidian removes its drag ghost
+      // (the floating file-name pill) in a document-level drop handler; halting the bubble
+      // strands that ghost inside the composer. Letting the drop reach the document lets
+      // Obsidian finalize the drag while we've already consumed the payload below.
       event.preventDefault();
-      event.stopPropagation();
-      const composerPanel = this.refs.textareaEl.parentElement;
-      composerPanel?.removeClass("is-dragover");
+      this.refs.textareaEl.parentElement?.removeClass("is-dragover");
+
+      // Vault file-explorer drag: route markdown notes to context chips, identical to
+      // picking them from the context picker (resolved from the vault at send time).
+      const vaultFiles = getDroppedVaultMarkdownFiles(this.app, event);
+      if (vaultFiles.length > 0) {
+        for (const file of vaultFiles) {
+          this.addExtraContextItem({ filePath: file.path, fileName: file.name });
+        }
+        this.refs.textareaEl.focus();
+        return;
+      }
+
+      // OS file-system drag: images stay image attachments; markdown files become inline
+      // context notes captured now (they have no vault path to re-read later).
       const files = event.dataTransfer?.files;
       if (!files || files.length === 0) return;
-      const imageFiles = Array.from(files).filter((f) => SUPPORTED_IMAGE_TYPES.has(f.type));
-      if (imageFiles.length === 0) return;
-      this.processImageFiles(imageFiles);
+      const dropped = Array.from(files);
+      const imageFiles = dropped.filter((f) => SUPPORTED_IMAGE_TYPES.has(f.type));
+      const textFiles = dropped.filter((f) => isMarkdownDropFile(f));
+      if (imageFiles.length > 0) this.processImageFiles(imageFiles);
+      if (textFiles.length > 0) {
+        void this.processExternalTextFiles(textFiles);
+        this.refs.textareaEl.focus();
+      }
     };
     const composerPanel = this.refs.textareaEl.parentElement;
     if (composerPanel) {
@@ -305,7 +346,10 @@ export class ChatComposer {
     }
 
     for (const item of this.extraContextItems) {
-      this.renderChip("file-text", item.fileName, () => {
+      // External (dragged-in) files carry inline content; a distinct icon signals they
+      // are a frozen import rather than a live vault note re-read at send.
+      const icon = item.content !== undefined ? "file-input" : "file-text";
+      this.renderChip(icon, item.fileName, () => {
         this.extraContextItems = this.extraContextItems.filter(
           (i) => i.filePath !== item.filePath,
         );
@@ -419,6 +463,39 @@ export class ChatComposer {
    */
   canAttachImages(): boolean {
     return this.supportsVision;
+  }
+
+  /**
+   * Whether the current drag holds content the composer accepts: a vault markdown note
+   * (via Obsidian's drag manager) or any OS file (its type is unreadable until drop, so
+   * we accept optimistically and filter to images/markdown in the drop handler).
+   */
+  private canAcceptDrop(event: DragEvent): boolean {
+    if (getDraggedVaultMarkdownFiles(this.app).length > 0) return true;
+    const types = event.dataTransfer?.types;
+    return !!types && Array.from(types).includes("Files");
+  }
+
+  /**
+   * Read OS-dropped markdown files and stage them as inline context notes. The content is
+   * frozen at drop time (there is no vault path to re-read), then flows through the same
+   * snapshot pipeline as vault notes via {@link ExtraContextItem.content}.
+   */
+  private async processExternalTextFiles(files: File[]): Promise<void> {
+    for (const file of files) {
+      if (file.size > MAX_TEXT_ATTACHMENT_BYTES) {
+        new Notice(`File too large: ${file.name}. Maximum size is 2 MB.`);
+        continue;
+      }
+      let content: string;
+      try {
+        content = await file.text();
+      } catch {
+        new Notice(`Could not read ${file.name}.`);
+        continue;
+      }
+      this.addExtraContextItem({ filePath: file.name, fileName: file.name, content });
+    }
   }
 
   private processImageFiles(files: File[]): void {

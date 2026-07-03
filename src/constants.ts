@@ -26,6 +26,8 @@ export const SUPPORTED_IMAGE_MIME_BY_EXTENSION: Readonly<Record<string, ImageMim
   gif: "image/gif",
   webp: "image/webp",
 };
+/** Upper bound on an OS-dropped markdown file read into context (guards against huge files). */
+export const MAX_TEXT_ATTACHMENT_BYTES = 2 * 1024 * 1024; // 2 MB
 export const MAX_NOTE_CONTEXT_IMAGES = 4;
 export const MAX_NOTE_CONTEXT_IMAGE_SIZE_BYTES = 5 * 1024 * 1024; // 5 MB
 export const MAX_NOTE_CONTEXT_TOTAL_BYTES = 12 * 1024 * 1024; // 12 MB

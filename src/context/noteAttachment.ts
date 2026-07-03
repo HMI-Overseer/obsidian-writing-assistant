@@ -43,6 +43,12 @@ export async function snapshotNoteAttachments(
   }
 
   for (const item of extraContextItems) {
+    // External file (dragged from the OS file system): its content was captured at
+    // drop time and has no vault file to re-read or resolve embedded images from.
+    if (item.content !== undefined) {
+      notes.push(makeNoteAttachment(item.filePath, item.fileName, item.content, 0, maxContextChars));
+      continue;
+    }
     const file = app.vault.getFileByPath(item.filePath);
     if (!file) continue;
     const raw = await app.vault.read(file);

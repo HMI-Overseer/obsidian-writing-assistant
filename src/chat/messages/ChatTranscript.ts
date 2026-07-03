@@ -58,9 +58,11 @@ export class ChatTranscript {
     if (!pane) return null;
     const btn = pane.createEl("button", {
       cls: "lmsa-scroll-to-bottom lmsa-hidden",
-      attr: { "aria-label": "Scroll to latest", title: "Scroll to latest" },
+      attr: { "aria-label": "Jump to latest" },
     });
-    setIcon(btn, "chevron-down");
+    const icon = btn.createEl("span", { cls: "lmsa-scroll-to-bottom-icon" });
+    setIcon(icon, "chevron-down");
+    btn.createEl("span", { text: "Jump to latest" });
     this.owner.registerDomEvent(btn, "click", () => this.scrollToBottom(true));
     return btn;
   }

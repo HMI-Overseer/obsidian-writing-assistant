@@ -1,28 +1,42 @@
 @layer components {
   /* Floating jump-to-latest, shown when the reader has scrolled up off the bottom. */
   .lmsa-scroll-to-bottom {
-    @apply lmsa-absolute lmsa-z-10 lmsa-inline-flex lmsa-h-8 lmsa-w-8 lmsa-cursor-pointer lmsa-items-center lmsa-justify-center lmsa-rounded-full lmsa-border lmsa-border-obsidian-border;
+    @apply lmsa-absolute lmsa-z-10 lmsa-inline-flex lmsa-cursor-pointer lmsa-items-center lmsa-justify-center lmsa-gap-1.5 lmsa-whitespace-nowrap lmsa-rounded-full lmsa-px-3 lmsa-py-[7px];
+    font-size: var(--font-ui-small);
     left: 50%;
     bottom: 12px;
     transform: translateX(-50%);
-    color: var(--text-muted);
-    background: var(--background-secondary) !important;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18);
-    transition: background 120ms ease, color 120ms ease, opacity 120ms ease;
+    /* Accent-tinted pill so it reads as a live control, matching the composer's
+       "Generate response" affordance (was a muted grey icon and easy to miss). */
+    color: var(--lmsa-mode-accent);
+    border: 1px solid color-mix(in srgb, var(--lmsa-mode-accent) 38%, var(--background-modifier-border));
+    background-color: transparent !important;
+    background-image: linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--lmsa-mode-accent) 14%, var(--background-secondary)) 0%,
+      color-mix(in srgb, var(--background-secondary) 90%, transparent) 100%
+    );
+    box-shadow: 0 4px 12px color-mix(in srgb, var(--lmsa-mode-accent) 22%, transparent);
+    transition: transform 0.8s cubic-bezier(0.175, 0.885, 0.32, 2.2),
+      color 120ms ease, box-shadow 120ms ease;
   }
 
   .lmsa-scroll-to-bottom:hover {
-    color: var(--text-normal);
-    background: var(--background-modifier-hover) !important;
+    transform: translateX(-50%) scale(1.05);
+    box-shadow: 0 6px 16px color-mix(in srgb, var(--lmsa-mode-accent) 32%, transparent);
   }
 
   .lmsa-scroll-to-bottom.lmsa-hidden {
     display: none;
   }
 
-  .lmsa-scroll-to-bottom svg {
-    width: 18px;
-    height: 18px;
+  .lmsa-scroll-to-bottom-icon {
+    @apply lmsa-inline-flex lmsa-items-center;
+  }
+
+  .lmsa-scroll-to-bottom-icon svg {
+    width: 16px;
+    height: 16px;
   }
 
   .lmsa-chat-window-message {

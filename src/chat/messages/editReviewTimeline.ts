@@ -30,7 +30,12 @@ import type { DiffMode } from "./DiffHunkView";
 export interface EditReviewTimelineOptions {
   timelineEl: HTMLElement;
   app: App;
-  controller: EditReviewController;
+  /**
+   * One controller per edited file (ADR-0010). Hunks map to steps by tool-call id
+   * across all controllers, so N files render one card per hunk on a single timeline,
+   * with one aggregate bulk bar spanning them.
+   */
+  controllers: EditReviewController[];
   /** Live in-loop mount renders by hunk status; durable/history honors the applied record. */
   live?: boolean;
   /**
@@ -66,6 +71,8 @@ function toEditStatus(view: InitialHunkView): EditStatus {
 /** Per-hunk decoration handles, so a controller broadcast can update in place. */
 interface HunkEntry {
   hunk: DiffHunk;
+  /** The controller (file) this hunk belongs to; routes accept/reject/undo/open. */
+  controller: EditReviewController;
   diffView: DiffHunkView;
   controlsEl: HTMLElement;
   stepEl: HTMLElement;
@@ -79,17 +86,18 @@ export class EditReviewTimelineView {
   private bulkBarEl: HTMLElement | null = null;
   // Side-by-side is the default review view; the per-card toggle still offers unified.
   private diffMode: DiffMode = "split";
-  private readonly unsubscribe: () => void;
+  private readonly unsubscribes: Array<() => void>;
 
   constructor(private readonly opts: EditReviewTimelineOptions) {
     this.cleanPriorDecorations();
     this.paint();
-    this.unsubscribe = this.opts.controller.subscribe((change) => this.onChange(change));
+    // Subscribe to every file's controller so a change to any of them repaints in place.
+    this.unsubscribes = this.opts.controllers.map((c) => c.subscribe((change) => this.onChange(change)));
   }
 
-  /** Drop the controller subscription (for callers re-rendering over a kept controller). */
+  /** Drop every controller subscription (for callers re-rendering over kept controllers). */
   destroy(): void {
-    this.unsubscribe();
+    for (const unsub of this.unsubscribes) unsub();
   }
 
   // -----------------------------------------------------------------------
@@ -116,20 +124,30 @@ export class EditReviewTimelineView {
 
   private paint(): void {
     const used = new Set<HTMLElement>();
-    const fileName = this.fileName();
-    for (const hunk of this.opts.controller.proposal.hunks) {
-      this.decorateStep(this.locateStep(hunk, used), hunk, fileName);
+    // One card per hunk across every file's controller; the file name is derived per
+    // controller so a multi-file turn labels each card with its own note (ADR-0010).
+    for (const controller of this.opts.controllers) {
+      const fileName = fileNameOf(controller);
+      for (const hunk of controller.proposal.hunks) {
+        this.decorateStep(this.locateStep(hunk, used), hunk, controller, fileName);
+      }
     }
     this.renderBulkBar();
   }
 
+  /** Pending hunks across every file's controller (the aggregate the bulk bar acts on). */
+  private allPendingCount(): number {
+    return this.opts.controllers.reduce((n, c) => n + c.pendingHunks().length, 0);
+  }
+
   /**
-   * Proposal-level accept-all / reject-all bar, shown only for multi-hunk proposals with
-   * work still pending. Saves clicking down a long timeline; per-hunk controls stay for
-   * granular review. The optional third action also flips the session to auto-apply.
+   * Turn-level accept-all / reject-all bar spanning every edited file, shown only when
+   * two or more hunks are still pending across the turn. Saves clicking down a long
+   * timeline; per-hunk controls stay for granular review. The optional third action
+   * also flips the session to auto-apply.
    */
   private renderBulkBar(): void {
-    const pendingCount = this.opts.controller.pendingHunks().length;
+    const pendingCount = this.allPendingCount();
     if (pendingCount < 2) {
       this.bulkBarEl?.remove();
       this.bulkBarEl = null;
@@ -146,13 +164,13 @@ export class EditReviewTimelineView {
       cls: "lmsa-ui-compact-btn lmsa-edit-bulk-btn lmsa-edit-bulk-btn--accept",
       text: `Accept all (${pendingCount})`,
     });
-    acceptAll.addEventListener("click", () => void this.opts.controller.acceptAll());
+    acceptAll.addEventListener("click", () => void this.acceptAllFiles());
 
     const rejectAll = this.bulkBarEl.createEl("button", {
       cls: "lmsa-ui-compact-btn lmsa-ui-compact-btn-secondary lmsa-edit-bulk-btn",
       text: "Reject all",
     });
-    rejectAll.addEventListener("click", () => this.opts.controller.rejectAll());
+    rejectAll.addEventListener("click", () => this.opts.controllers.forEach((c) => c.rejectAll()));
 
     if (this.opts.onEnterAutoApply) {
       const session = this.bulkBarEl.createEl("button", {
@@ -160,15 +178,15 @@ export class EditReviewTimelineView {
         text: "Accept all this session",
       });
       session.addEventListener("click", () => {
-        void this.opts.controller.acceptAll();
+        void this.acceptAllFiles();
         this.opts.onEnterAutoApply?.();
       });
     }
   }
 
-  private fileName(): string {
-    const path = this.opts.controller.targetFilePath;
-    return path.split("/").pop() ?? path;
+  /** Accept every pending hunk across all files. */
+  private async acceptAllFiles(): Promise<void> {
+    for (const controller of this.opts.controllers) await controller.acceptAll();
   }
 
   /**
@@ -223,11 +241,16 @@ export class EditReviewTimelineView {
     return stepEl;
   }
 
-  private decorateStep(stepEl: HTMLElement, hunk: DiffHunk, fileName: string): void {
+  private decorateStep(
+    stepEl: HTMLElement,
+    hunk: DiffHunk,
+    controller: EditReviewController,
+    fileName: string,
+  ): void {
     const noMatch = hunk.resolvedEdit.confidence === 0;
     const view = this.opts.live
-      ? this.opts.controller.liveHunkView(hunk.id)
-      : this.opts.controller.initialHunkView(hunk.id);
+      ? controller.liveHunkView(hunk.id)
+      : controller.initialHunkView(hunk.id);
 
     stepEl.classList.remove(...ALL_EDIT_STATE_CLASSES);
     stepEl.classList.add(stateClass(view, noMatch));
@@ -258,7 +281,7 @@ export class EditReviewTimelineView {
         onReject: () => undefined,
         onUndo: () => undefined,
         onModeChange: (mode) => this.handleModeChange(mode),
-        onOpenFile: (evt) => this.openTargetFile(evt, hunk.resolvedEdit.startLine),
+        onOpenFile: (evt) => this.openTargetFile(evt, controller, hunk.resolvedEdit.startLine),
       },
       { fileName },
       this.diffMode,
@@ -266,20 +289,20 @@ export class EditReviewTimelineView {
     );
     diffView.setStatus(toEditStatus(view));
 
-    const entry: HunkEntry = { hunk, diffView, controlsEl, stepEl, noMatch };
+    const entry: HunkEntry = { hunk, controller, diffView, controlsEl, stepEl, noMatch };
     this.entries.set(hunk.id, entry);
     this.renderControls(entry, view);
   }
 
   /** Inline approve/decline (pending) or status + undo (terminal) on the step row. */
   private renderControls(entry: HunkEntry, view: InitialHunkView): void {
-    const { controlsEl, hunk, noMatch } = entry;
+    const { controlsEl, hunk, noMatch, controller } = entry;
     controlsEl.empty();
 
     if (view === "applied") {
       controlsEl.createSpan({ cls: "lmsa-edit-step-state", text: "Applied" });
       const undo = this.iconButton(controlsEl, "undo-2", "Undo", "undo");
-      undo.addEventListener("click", () => void this.opts.controller.undo(hunk.id));
+      undo.addEventListener("click", () => void controller.undo(hunk.id));
       return;
     }
     if (view === "skipped") {
@@ -291,15 +314,15 @@ export class EditReviewTimelineView {
     if (noMatch) {
       controlsEl.createSpan({ cls: "lmsa-edit-step-state is-error", text: "No match" });
       const decline = this.iconButton(controlsEl, "x", "Dismiss", "decline");
-      decline.addEventListener("click", () => this.opts.controller.reject(hunk.id));
+      decline.addEventListener("click", () => controller.reject(hunk.id));
       return;
     }
 
     controlsEl.createSpan({ cls: "lmsa-edit-step-pending", text: "pending review" });
     const approve = this.iconButton(controlsEl, "check", "Accept", "approve");
-    approve.addEventListener("click", () => void this.opts.controller.accept(hunk.id));
+    approve.addEventListener("click", () => void controller.accept(hunk.id));
     const decline = this.iconButton(controlsEl, "x", "Reject", "decline");
-    decline.addEventListener("click", () => this.opts.controller.reject(hunk.id));
+    decline.addEventListener("click", () => controller.reject(hunk.id));
   }
 
   private iconButton(
@@ -324,9 +347,9 @@ export class EditReviewTimelineView {
     }
   }
 
-  private openTargetFile(evt: MouseEvent, startLine: number): void {
+  private openTargetFile(evt: MouseEvent, controller: EditReviewController, startLine: number): void {
     void this.opts.app.workspace.openLinkText(
-      this.opts.controller.targetFilePath,
+      controller.targetFilePath,
       "",
       Keymap.isModEvent(evt),
       { eState: { line: Math.max(0, startLine - 1) } },
@@ -350,4 +373,10 @@ export class EditReviewTimelineView {
     this.renderControls(entry, view);
     this.renderBulkBar();
   }
+}
+
+/** The leaf note name for a controller's file, shown on that file's diff cards. */
+function fileNameOf(controller: EditReviewController): string {
+  const path = controller.targetFilePath;
+  return path.split("/").pop() ?? path;
 }

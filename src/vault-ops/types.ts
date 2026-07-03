@@ -30,14 +30,26 @@ export interface TargetFingerprint {
  * `moveFolder` and `trashFolder` are the folder-level siblings of `move`/`trash`.
  * Unlike a file, a folder has no meaningful `{mtime,size}`, so they carry no
  * {@link TargetFingerprint}: their conflict guard is purely existence-based
- * (re-checked at pre-flight), and `trashFolder` is scoped to *empty* folders only
- * (enforced at apply via `folderIsEmpty`), so its inverse is a trivial `createDir`
- * with no recursive content snapshot. They gate as `move`/`trash` (see `classOf`).
+ * (re-checked at pre-flight), and `trashFolder` is scoped to folders that hold no
+ * *notes* (enforced at apply via `collectFolderSubtree`, ADR-0012): it may remove a
+ * husk of empty subfolders in one call, so its inverse is a `createDir` carrying the
+ * captured subtree to restore, never a recursive content snapshot. They gate as
+ * `move`/`trash` (see `classOf`).
  */
 export type VaultOperation =
   | { kind: "create"; path: string; content: string }
   | { kind: "overwrite"; path: string; content: string; expect: TargetFingerprint }
-  | { kind: "createDir"; path: string }
+  | {
+      kind: "createDir";
+      path: string;
+      /**
+       * Undo-only (ADR-0012). Set only on the inverse of a `trashFolder` that removed a
+       * husk of empty subfolders: the full parent-first list of folder paths to re-create
+       * on undo (root included), so the whole husk is restored, not just its root. A
+       * `create_directory` tool call never sets it.
+       */
+      subtree?: string[];
+    }
   | { kind: "move"; from: string; to: string; expect: TargetFingerprint }
   | { kind: "trash"; path: string; expect: TargetFingerprint; snapshot: string }
   | { kind: "moveFolder"; from: string; to: string }

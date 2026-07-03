@@ -38,7 +38,7 @@ describe("dispositionMessage", () => {
     const moveFolder: VaultOperation = { kind: "moveFolder", from: "Drafts/X", to: "Manuscript/X" };
     const trashFolder: VaultOperation = { kind: "trashFolder", path: "Drafts/X" };
     expect(dispositionMessage(moveFolder, "applied")).toBe('Moved folder "Drafts/X" → "Manuscript/X".');
-    expect(dispositionMessage(trashFolder, "applied")).toBe('Trashed empty folder "Drafts/X".');
+    expect(dispositionMessage(trashFolder, "applied")).toBe('Trashed folder "Drafts/X".');
     expect(dispositionMessage(trashFolder, "failed", "the folder is not empty")).toBe(
       'Error: could not trash folder "Drafts/X", the folder is not empty.',
     );

@@ -7,6 +7,7 @@ import type {
   ConversationMessage,
   MessageVersion,
 } from "../../shared/types";
+import type { AppliedEditRecord, EditProposal } from "../../editing/editTypes";
 import { generateId } from "../../utils";
 
 export function generateConversationTitle(firstUserMessage: string): string {
@@ -130,13 +131,13 @@ export function normalizeConversation(raw: Record<string, unknown>): Conversatio
             }
           }
 
-          // Preserve edit proposal and applied edit records if present and valid
-          if (isValidEditProposal(message.editProposal)) {
-            base.editProposal = message.editProposal as ConversationMessage["editProposal"];
-          }
-          if (isValidAppliedEditRecord(message.appliedEdit)) {
-            base.appliedEdit = message.appliedEdit as ConversationMessage["appliedEdit"];
-          }
+          // Preserve edit proposals + applied records, migrating the legacy single-file
+          // fields into the ADR-0010 arrays so the in-memory model is always plural
+          // (read sites need not know which format a conversation was saved in).
+          const editProposals = migrateEditProposals(message);
+          if (editProposals.length > 0) base.editProposals = editProposals;
+          const appliedEdits = migrateAppliedEdits(message);
+          if (appliedEdits.length > 0) base.appliedEdits = appliedEdits;
 
           // Preserve vault-op proposal and applied records if present and valid
           if (isValidVaultOpProposal(message.vaultOpProposal)) {
@@ -241,6 +242,44 @@ function isValidAppliedEditRecord(value: unknown): boolean {
     typeof obj.targetFilePath === "string" &&
     Array.isArray(obj.appliedHunkIds)
   );
+}
+
+/**
+ * Normalize a raw persisted message's edit proposals into the ADR-0010 array,
+ * accepting either the new `editProposals[]` or the legacy single `editProposal`
+ * (older conversations), so a reload never loses an edit review regardless of the
+ * format it was saved in.
+ */
+function migrateEditProposals(message: Record<string, unknown>): EditProposal[] {
+  if (Array.isArray(message.editProposals)) {
+    return message.editProposals.filter(isValidEditProposal) as EditProposal[];
+  }
+  return isValidEditProposal(message.editProposal) ? [message.editProposal as EditProposal] : [];
+}
+
+/** The applied-edit-record sibling of {@link migrateEditProposals} (new array or legacy single). */
+function migrateAppliedEdits(message: Record<string, unknown>): AppliedEditRecord[] {
+  if (Array.isArray(message.appliedEdits)) {
+    return message.appliedEdits.filter(isValidAppliedEditRecord) as AppliedEditRecord[];
+  }
+  return isValidAppliedEditRecord(message.appliedEdit) ? [message.appliedEdit as AppliedEditRecord] : [];
+}
+
+/**
+ * All edit proposals on an in-memory message (ADR-0010), folding the legacy singular
+ * field so read sites need one accessor regardless of a message's provenance
+ * (migrated on load, or freshly built as an array). Prefer this over touching the
+ * fields directly.
+ */
+export function editProposalsOf(message: ConversationMessage): EditProposal[] {
+  if (message.editProposals?.length) return message.editProposals;
+  return message.editProposal ? [message.editProposal] : [];
+}
+
+/** The applied-edit-record sibling of {@link editProposalsOf}. */
+export function appliedEditsOf(message: ConversationMessage): AppliedEditRecord[] {
+  if (message.appliedEdits?.length) return message.appliedEdits;
+  return message.appliedEdit ? [message.appliedEdit] : [];
 }
 
 function isValidVaultOpProposal(value: unknown): boolean {

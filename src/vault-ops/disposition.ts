@@ -46,7 +46,7 @@ function appliedVerb(op: VaultOperation): string {
     case "moveFolder":
       return "Moved folder";
     case "trashFolder":
-      return "Trashed empty folder";
+      return "Trashed folder";
     case "replaceInVault":
       return "Replaced";
   }

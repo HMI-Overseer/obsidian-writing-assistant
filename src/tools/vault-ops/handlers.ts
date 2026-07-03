@@ -76,7 +76,7 @@ export function executeVaultOpTool(call: ToolCall, ctx: VaultOpContext): ToolRes
     case "trash_folder": {
       const v = validateTrashFolder(call.arguments, resolve);
       if (!v.ok) return fail("trash_folder", v.error);
-      return queued(`Trash empty folder "${v.args.path}"`);
+      return queued(`Trash folder "${v.args.path}"`);
     }
     case "replace_in_vault": {
       // Validate + acknowledge only; the scan (which files, how many matches) runs at

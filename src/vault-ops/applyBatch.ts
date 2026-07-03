@@ -182,11 +182,14 @@ export function guardVaultUndo(app: App, record: AppliedVaultOpRecord): string[]
         break;
       }
       case "createDir": {
-        // Produced as the inverse of a trashFolder (re-create the empty folder we
-        // trashed). Refuse only if a *file* now occupies the path, recreating a folder
-        // over it would fail; an existing folder is a harmless idempotent no-op.
-        if (diskState(app, inverse.path) === "file") {
-          reasons.push(`"${inverse.path}" is a file now, won't recreate the folder over it.`);
+        // Produced as the inverse of a trashFolder (re-create the husk we trashed: the
+        // root plus any empty subfolders it carried, ADR-0012). Refuse only if a *file*
+        // now occupies one of those paths, recreating a folder over it would fail; an
+        // existing folder is a harmless idempotent no-op.
+        for (const p of inverse.subtree ?? [inverse.path]) {
+          if (diskState(app, p) === "file") {
+            reasons.push(`"${p}" is a file now, won't recreate the folder over it.`);
+          }
         }
         break;
       }

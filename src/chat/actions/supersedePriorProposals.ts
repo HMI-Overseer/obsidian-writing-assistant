@@ -1,4 +1,5 @@
 import type { ConversationMessage } from "../../shared/types";
+import { editProposalsOf } from "../conversation/conversationUtils";
 
 /**
  * Finalise every prior proposal at a user-turn boundary (Finding B).
@@ -29,8 +30,9 @@ export function supersedePriorProposals(history: ConversationMessage[]): boolean
   let changed = false;
 
   for (const msg of history) {
-    if (msg.editProposal) {
-      for (const hunk of msg.editProposal.hunks) {
+    // Every file's proposal is superseded (ADR-0010: a turn may edit N files).
+    for (const proposal of editProposalsOf(msg)) {
+      for (const hunk of proposal.hunks) {
         if (hunk.status === "pending") {
           hunk.status = "rejected";
           changed = true;

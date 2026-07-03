@@ -60,9 +60,9 @@ describe("summarizeOp", () => {
     expect(summarizeOp(op)).toBe("Move folder Drafts/Act II → Manuscript/Act II");
   });
 
-  it("summarizes a folder trash, naming the empty-only scope", () => {
+  it("summarizes a folder trash", () => {
     const op: VaultOperation = { kind: "trashFolder", path: "Drafts/Act II" };
-    expect(summarizeOp(op)).toBe("Trash empty folder Drafts/Act II");
+    expect(summarizeOp(op)).toBe("Trash folder Drafts/Act II");
   });
 
   it("summarizes a replaceInVault with its terms, note count, and match count", () => {
@@ -189,6 +189,6 @@ describe("opDetailText", () => {
     expect(opDetailText({ kind: "moveFolder", from: "Drafts/X", to: "Manuscript/X" })).toBe(
       "folder moved from Drafts/X",
     );
-    expect(opDetailText({ kind: "trashFolder", path: "Drafts/X" })).toBe("trash empty folder");
+    expect(opDetailText({ kind: "trashFolder", path: "Drafts/X" })).toBe("trash folder");
   });
 });

@@ -349,6 +349,42 @@ describe("LiveVaultReview", () => {
     expect(result.content).toBe('Applied edit to "Notes/A.md" (auto-applied).');
   });
 
+  it("edits two different files in one turn, one proposal per file (ADR-0010, no cross-file rejection)", async () => {
+    // The exact case the old single-file guard broke: a second file in the same turn
+    // was rejected with "edit … in a separate message". It must now accumulate instead.
+    const app = makeApp({
+      files: ["Notes/A.md", "Notes/B.md"],
+      content: "She nodded. He waited.",
+    });
+    const review = new LiveVaultReview({
+      app,
+      timelineEl: TIMELINE_EL,
+      policy: POLICY({ edit: "auto" }),
+      edit: EDIT_DEPS(),
+    });
+
+    const results = await review.resolveEdits([
+      { id: "e1", name: "propose_edit", arguments: { path: "Notes/A.md", search: "She nodded.", replace: "She smiled." } },
+      { id: "e2", name: "propose_edit", arguments: { path: "Notes/B.md", search: "He waited.", replace: "He left." } },
+    ]);
+
+    // Neither edit is rejected, and the second is NOT turned away for touching a
+    // different file (the old failure mode).
+    expect(results.map((r) => r.result.isError)).toEqual([false, false]);
+    expect(results[1].result.content).not.toContain("separate message");
+
+    // One proposal + one applied record per edited file accumulated.
+    const proposals = review.getEditProposals();
+    expect(proposals.map((p) => p.targetFilePath).sort()).toEqual(["Notes/A.md", "Notes/B.md"]);
+    expect(review.getEditAppliedRecords()).toHaveLength(2);
+
+    // Snapshot isolation: each edit hit only its own file (B's "She nodded." is untouched).
+    const readA = await app.vault.read(app.vault.getFileByPath("Notes/A.md") as never);
+    const readB = await app.vault.read(app.vault.getFileByPath("Notes/B.md") as never);
+    expect(readA).toBe("She smiled. He waited.");
+    expect(readB).toBe("She nodded. He left.");
+  });
+
   it("resolveOne binds the op to the supplied tool-call id (Claude Code path)", async () => {
     const review = new LiveVaultReview({
       app: makeApp(),

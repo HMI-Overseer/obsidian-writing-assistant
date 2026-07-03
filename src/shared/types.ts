@@ -240,9 +240,22 @@ export interface ConversationMessage {
   versions?: MessageVersion[];
   /** Index into `versions` for the active version. Defaults to last when undefined. */
   activeVersionIndex?: number;
-  /** Present when this assistant message contains document edit proposals. */
+  /**
+   * Present when this assistant message contains document edit proposals, one per
+   * edited file (ADR-0010: a turn may edit N files). Each file stays a self-contained
+   * single-file {@link EditProposal}; the array is the turn's collection of them.
+   */
+  editProposals?: EditProposal[];
+  /** Present after edits from this message have been applied, one record per edited file. */
+  appliedEdits?: AppliedEditRecord[];
+  /**
+   * @deprecated Legacy single-file fields (pre-ADR-0010). Read only by the load-time
+   * migration ({@link ../chat/conversation/conversationUtils}), which folds them into
+   * {@link editProposals} / {@link appliedEdits}. Never written by new code; use the
+   * arrays (via `editProposalsOf` / `appliedEditsOf`) everywhere else.
+   */
   editProposal?: EditProposal;
-  /** Present after edits from this message have been applied. */
+  /** @deprecated Legacy single-file field (pre-ADR-0010); migrated into {@link appliedEdits}. */
   appliedEdit?: AppliedEditRecord;
   /** Present when this assistant message contains vault-operation proposals (ADR-0002). */
   vaultOpProposal?: VaultOperationProposal;

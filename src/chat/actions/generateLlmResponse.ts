@@ -367,8 +367,8 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
         posture,
         prebuiltVaultOpProposal: liveReview.getProposal() ?? undefined,
         prebuiltVaultOpRecord: liveReview.getAppliedRecord() ?? undefined,
-        prebuiltEditProposal: liveReview.getEditProposal() ?? undefined,
-        prebuiltEditRecord: liveReview.getEditAppliedRecord() ?? undefined,
+        prebuiltEditProposals: liveReview.getEditProposals(),
+        prebuiltEditRecords: liveReview.getEditAppliedRecords(),
         ...(onEnterAutoApply && { onEnterAutoApply }),
       });
     } else if (finalization.kind === "replace") {
@@ -425,8 +425,8 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
           posture,
           prebuiltVaultOpProposal: liveReview.getProposal() ?? undefined,
           prebuiltVaultOpRecord: liveReview.getAppliedRecord() ?? undefined,
-          prebuiltEditProposal: liveReview.getEditProposal() ?? undefined,
-          prebuiltEditRecord: liveReview.getEditAppliedRecord() ?? undefined,
+          prebuiltEditProposals: liveReview.getEditProposals(),
+          prebuiltEditRecords: liveReview.getEditAppliedRecords(),
           ...(onEnterAutoApply && { onEnterAutoApply }),
         });
       } else if (finalization.kind === "replace") {

@@ -84,10 +84,10 @@ export function preflight(ops: VaultOperation[], disk: DiskSnapshot): PreflightR
         if (disk.state(op.to) !== "absent") add(`destination "${op.to}" already exists.`);
         break;
       case "trashFolder":
-        // Existence only here. Emptiness is enforced authoritatively at apply
-        // (folderIsEmpty), not at pre-flight, so a same-batch move that empties this
-        // folder first (moves are ordered before folder trashes) is not false-flagged
-        // as a conflict against the pre-move disk snapshot.
+        // Existence only here. The files-safe check is enforced authoritatively at apply
+        // (collectFolderSubtree, ADR-0012), not at pre-flight, so a same-batch move that
+        // empties this folder first (moves are ordered before folder trashes) is not
+        // false-flagged as a conflict against the pre-move disk snapshot.
         if (disk.state(op.path) !== "dir") add(`"${op.path}" is not a folder, or no longer exists.`);
         break;
     }
@@ -186,6 +186,12 @@ export interface InverseContext {
   preContent?: string;
   /** createDir: whether the folder already existed (⇒ the create was a no-op). */
   dirPreExisted?: boolean;
+  /**
+   * trashFolder: the parent-first list of folder paths the trash removed (root +
+   * empty subfolders), captured at apply so the inverse can re-create the whole husk
+   * (ADR-0012), not just its root.
+   */
+  folderSubtree?: string[];
   /** Conflict guard embedded in the inverse, captured from post-apply state. */
   fingerprint?: TargetFingerprint;
   /**
@@ -218,10 +224,16 @@ export function inverseOf(op: VaultOperation, ctx: InverseContext = {}): VaultOp
     case "moveFolder":
       // Symmetric: move the folder back. No fingerprint, existence guard suffices.
       return { kind: "moveFolder", from: op.to, to: op.from };
-    case "trashFolder":
-      // The folder was empty when trashed (apply enforces folderIsEmpty), so undo is a
-      // plain re-create of an empty folder, no recursive content snapshot to restore.
-      return { kind: "createDir", path: op.path };
+    case "trashFolder": {
+      // The folder held no notes when trashed (apply enforces files-safe, ADR-0012), so
+      // undo is a plain re-create, never a recursive content snapshot. When the trash
+      // also removed empty *subfolders*, the captured subtree rides along so undo restores
+      // the whole husk; a lone-root husk stays a trivial createDir (backward-compatible).
+      const subtree = ctx.folderSubtree;
+      return subtree && subtree.length > 1
+        ? { kind: "createDir", path: op.path, subtree }
+        : { kind: "createDir", path: op.path };
+    }
     case "replaceInVault": {
       // Restore each rewritten file to its prior content. The inverse is itself a
       // replaceInVault whose targets carry the pre-content as their `content`, so

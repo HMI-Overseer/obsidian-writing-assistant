@@ -213,7 +213,7 @@ describe("normalizeConversation, editProposal / appliedEdit validation", () => {
     };
   }
 
-  test("preserves a well-formed editProposal after round-trip", () => {
+  test("migrates a legacy single editProposal into editProposals[] (ADR-0010)", () => {
     const msg: ConversationMessage = {
       id: "msg-1",
       role: "assistant",
@@ -225,10 +225,31 @@ describe("normalizeConversation, editProposal / appliedEdit validation", () => {
     const result = normalizeConversation(raw);
     const normalized = result!.messages[0];
 
-    expect(normalized.editProposal).toBeDefined();
-    expect(normalized.editProposal!.id).toBe("ep-1");
-    expect(normalized.editProposal!.targetFilePath).toBe("notes/test.md");
-    expect(normalized.editProposal!.hunks).toHaveLength(1);
+    // The legacy singular field folds into the array without loss.
+    expect(normalized.editProposals).toHaveLength(1);
+    expect(normalized.editProposals![0].id).toBe("ep-1");
+    expect(normalized.editProposals![0].targetFilePath).toBe("notes/test.md");
+    expect(normalized.editProposals![0].hunks).toHaveLength(1);
+  });
+
+  test("round-trips a multi-file editProposals[] without loss (ADR-0010)", () => {
+    const second = { ...makeEditProposal(), id: "ep-2", targetFilePath: "notes/other.md" };
+    const msg: ConversationMessage = {
+      id: "msg-1",
+      role: "assistant",
+      content: "Edit response",
+      editProposals: [makeEditProposal(), second] as ConversationMessage["editProposals"],
+    };
+
+    const raw = jsonRoundTrip(makeConversation([msg])) as Record<string, unknown>;
+    const result = normalizeConversation(raw);
+    const normalized = result!.messages[0];
+
+    expect(normalized.editProposals).toHaveLength(2);
+    expect(normalized.editProposals!.map((p) => p.targetFilePath)).toEqual([
+      "notes/test.md",
+      "notes/other.md",
+    ]);
   });
 
   test("drops editProposal missing required fields", () => {
@@ -246,7 +267,7 @@ describe("normalizeConversation, editProposal / appliedEdit validation", () => {
     const result = normalizeConversation(raw);
     const normalized = result!.messages[0];
 
-    expect(normalized.editProposal).toBeUndefined();
+    expect(normalized.editProposals).toBeUndefined();
   });
 
   test("drops non-object truthy editProposal", () => {
@@ -263,10 +284,10 @@ describe("normalizeConversation, editProposal / appliedEdit validation", () => {
     const result = normalizeConversation(raw);
     const normalized = result!.messages[0];
 
-    expect(normalized.editProposal).toBeUndefined();
+    expect(normalized.editProposals).toBeUndefined();
   });
 
-  test("preserves a well-formed appliedEdit after round-trip", () => {
+  test("migrates a legacy single appliedEdit into appliedEdits[] (ADR-0010)", () => {
     const msg: ConversationMessage = {
       id: "msg-1",
       role: "assistant",
@@ -279,9 +300,9 @@ describe("normalizeConversation, editProposal / appliedEdit validation", () => {
     const result = normalizeConversation(raw);
     const normalized = result!.messages[0];
 
-    expect(normalized.appliedEdit).toBeDefined();
-    expect(normalized.appliedEdit!.proposalId).toBe("ep-1");
-    expect(normalized.appliedEdit!.appliedHunkIds).toEqual(["h1"]);
+    expect(normalized.appliedEdits).toHaveLength(1);
+    expect(normalized.appliedEdits![0].proposalId).toBe("ep-1");
+    expect(normalized.appliedEdits![0].appliedHunkIds).toEqual(["h1"]);
   });
 
   test("drops malformed appliedEdit", () => {
@@ -298,7 +319,7 @@ describe("normalizeConversation, editProposal / appliedEdit validation", () => {
     const result = normalizeConversation(raw);
     const normalized = result!.messages[0];
 
-    expect(normalized.appliedEdit).toBeUndefined();
+    expect(normalized.appliedEdits).toBeUndefined();
   });
 });
 

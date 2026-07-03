@@ -36,7 +36,7 @@ export function summarizeOp(op: VaultOperation): string {
     case "moveFolder":
       return `Move folder ${op.from} → ${op.to}`;
     case "trashFolder":
-      return `Trash empty folder ${op.path}`;
+      return `Trash folder ${op.path}`;
     case "replaceInVault":
       return `Replace "${op.search}" → "${op.replace}" in ${noteCountLabel(op.targets.length)} (${op.occurrences} matches)`;
   }
@@ -118,7 +118,7 @@ export function opDetailText(op: VaultOperation): string {
     case "moveFolder":
       return `folder moved from ${op.from}`;
     case "trashFolder":
-      return "trash empty folder";
+      return "trash folder";
     case "replaceInVault":
       return `replace · ${op.occurrences} match${op.occurrences === 1 ? "" : "es"}`;
   }

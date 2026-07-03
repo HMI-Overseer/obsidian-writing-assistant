@@ -276,7 +276,7 @@ describe("applyVaultOpBatch — folder ops", () => {
     });
   });
 
-  it("trashes an empty folder and records a createDir inverse", async () => {
+  it("trashes an empty folder and records a lone-root createDir inverse", async () => {
     const vault = makeVault();
     await vault.app.vault.createFolder("Drafts/Husk");
     expect(vault.folders.has("Drafts/Husk")).toBe(true);
@@ -286,23 +286,50 @@ describe("applyVaultOpBatch — folder ops", () => {
 
     expect(result.ok).toBe(true);
     expect(vault.folders.has("Drafts/Husk")).toBe(false);
+    // No empty subfolders ⇒ the inverse stays the trivial lone-root createDir.
     expect(result.applied[0].inverse).toEqual({ kind: "createDir", path: "Drafts/Husk" });
   });
 
-  it("refuses to trash a NON-empty folder, preserving its contents (empty-only guarantee)", async () => {
-    // The load-bearing data-loss guard: a populated folder must never be trashed, even
-    // though the disk primitive (trashFile) would happily take the whole subtree.
+  it("trashes a husk of empty subfolders in ONE call, recording a subtree createDir inverse (ADR-0012)", async () => {
+    // The reorg-cleanup win: a folder whose only contents are empty subfolders goes in a
+    // single call instead of bottom-up, one leaf at a time.
+    const vault = makeVault();
+    await vault.app.vault.createFolder("Story/Prequel");
+    await vault.app.vault.createFolder("Story/Prequel/Dialogues");
+    await vault.app.vault.createFolder("Story/Prequel/Locations");
+
+    const op: VaultOperation = { kind: "trashFolder", path: "Story/Prequel" };
+    const result = await applyVaultOpBatch(vault.app, [{ id: "tf", op }]);
+
+    expect(result.ok).toBe(true);
+    expect(vault.folders.has("Story/Prequel")).toBe(false);
+    expect(vault.folders.has("Story/Prequel/Dialogues")).toBe(false);
+    expect(vault.folders.has("Story/Prequel/Locations")).toBe(false);
+    // The inverse carries the whole parent-first husk so undo restores it, not just the root.
+    expect(result.applied[0].inverse).toEqual({
+      kind: "createDir",
+      path: "Story/Prequel",
+      subtree: ["Story/Prequel", "Story/Prequel/Dialogues", "Story/Prequel/Locations"],
+    });
+  });
+
+  it("refuses to trash a folder holding a note nested in a subfolder, naming it (files-safe guarantee)", async () => {
+    // The load-bearing data-loss guard: a note anywhere in the subtree must never be
+    // trashed, even though the disk primitive (trashFile) would take the whole subtree.
+    // The refusal lists the blocking note so the model can clear exactly it.
     const vault = makeVault();
     vault.folders.add("Drafts/Act II");
-    vault.seedFile("Drafts/Act II/Scene.md", "precious words");
+    vault.folders.add("Drafts/Act II/Scenes");
+    vault.seedFile("Drafts/Act II/Scenes/One.md", "precious words");
 
     const op: VaultOperation = { kind: "trashFolder", path: "Drafts/Act II" };
     const result = await applyVaultOpBatch(vault.app, [{ id: "tf", op }]);
 
     expect(result.ok).toBe(false);
-    expect(result.error).toMatch(/not empty/i);
+    expect(result.error).toMatch(/contains 1 note/i);
+    expect(result.error).toContain("Drafts/Act II/Scenes/One.md"); // blocker named
     expect(vault.folders.has("Drafts/Act II")).toBe(true); // folder kept...
-    expect(vault.files.get("Drafts/Act II/Scene.md")?.content).toBe("precious words"); // ...contents safe.
+    expect(vault.files.get("Drafts/Act II/Scenes/One.md")?.content).toBe("precious words"); // ...contents safe.
   });
 
   it("reorg end-to-end: a same-batch move empties the husk, then trash_folder removes it", async () => {
@@ -447,6 +474,31 @@ describe("undoVaultOpBatch", () => {
 
     expect(undo.ok).toBe(true);
     expect(vault.folders.has("Drafts/Husk")).toBe(true);
+  });
+
+  it("round-trips a husk trashFolder: undo re-creates the empty subfolders too (ADR-0012)", async () => {
+    const vault = makeVault();
+    await vault.app.vault.createFolder("Story/Prequel");
+    await vault.app.vault.createFolder("Story/Prequel/Dialogues");
+    await vault.app.vault.createFolder("Story/Prequel/Locations");
+
+    const apply = await applyVaultOpBatch(vault.app, [
+      { id: "tf", op: { kind: "trashFolder", path: "Story/Prequel" } },
+    ]);
+    expect(apply.ok).toBe(true);
+    expect(vault.folders.has("Story/Prequel")).toBe(false);
+
+    const undo = await undoVaultOpBatch(vault.app, {
+      proposalId: "p",
+      applied: apply.applied,
+      appliedAt: 0,
+    });
+
+    expect(undo.ok).toBe(true);
+    // The whole husk comes back, not just the root.
+    expect(vault.folders.has("Story/Prequel")).toBe(true);
+    expect(vault.folders.has("Story/Prequel/Dialogues")).toBe(true);
+    expect(vault.folders.has("Story/Prequel/Locations")).toBe(true);
   });
 
   it("round-trips a replaceInVault: undo restores every original file", async () => {
@@ -628,6 +680,28 @@ describe("undoVaultOpBatch drift guard (§3-B amendment 3)", () => {
     expect(undo.ok).toBe(false);
     expect(undo.refused).toBe(true);
     expect(vault.files.get("Drafts/Husk")?.content).toBe("a note now lives at the old folder path");
+  });
+
+  it("refuses to undo a husk trashFolder when a file now occupies a SUBFOLDER path (ADR-0012)", async () => {
+    const vault = makeVault();
+    await vault.app.vault.createFolder("Story/Prequel");
+    await vault.app.vault.createFolder("Story/Prequel/Dialogues");
+    const apply = await applyVaultOpBatch(vault.app, [
+      { id: "tf", op: { kind: "trashFolder", path: "Story/Prequel" } },
+    ]);
+    expect(apply.ok).toBe(true);
+    // A note now lives where an empty subfolder used to be; undo must not recreate a folder over it.
+    vault.seedFile("Story/Prequel/Dialogues", "a note took the old subfolder path");
+
+    const undo = await undoVaultOpBatch(vault.app, {
+      proposalId: "p",
+      applied: apply.applied,
+      appliedAt: 0,
+    });
+
+    expect(undo.ok).toBe(false);
+    expect(undo.refused).toBe(true);
+    expect(vault.files.get("Story/Prequel/Dialogues")?.content).toBe("a note took the old subfolder path");
   });
 
   it("still undoes cleanly when nothing drifted", async () => {

@@ -51,6 +51,27 @@ describe("supersedePriorProposals", () => {
     ]);
   });
 
+  it("rejects pending hunks across ALL of a turn's edit proposals (ADR-0010 multi-file)", () => {
+    const a = {
+      id: "eA", targetFilePath: "A.md", documentSnapshot: "", snapshotTimestamp: 0, prose: "",
+      hunks: [{ id: "a0", status: "pending" }],
+    } as unknown as EditProposal;
+    const b = {
+      id: "eB", targetFilePath: "B.md", documentSnapshot: "", snapshotTimestamp: 0, prose: "",
+      hunks: [{ id: "b0", status: "pending" }, { id: "b1", status: "accepted" }],
+    } as unknown as EditProposal;
+    const msg: ConversationMessage = {
+      id: "m1", role: "assistant", content: "", editProposals: [a, b],
+    };
+
+    const changed = supersedePriorProposals([msg]);
+
+    expect(changed).toBe(true);
+    // Every file's pending hunk is superseded, not just the first proposal's.
+    expect(a.hunks.map((h) => h.status)).toEqual(["rejected"]);
+    expect(b.hunks.map((h) => h.status)).toEqual(["rejected", "accepted"]);
+  });
+
   it("rejects pending and accepted vault ops, leaving applied ones", () => {
     const msg = vaultMsg(["pending", "accepted", "applied"]);
     supersedePriorProposals([msg]);

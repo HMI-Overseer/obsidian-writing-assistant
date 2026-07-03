@@ -480,7 +480,7 @@ export class ChatView extends ItemView {
     // proposals. autoApply is omitted (false) so applied auto vault ops do not
     // re-run on a conversation switch, only the persisted applied record renders.
     for (const message of snapshot.messageHistory) {
-      if (message.editProposal || message.vaultOpProposal) {
+      if (message.editProposals?.length || message.editProposal || message.vaultOpProposal) {
         const bubble = this.transcript.getBubbleForMessage(message.id);
         if (bubble) {
           renderProposalPanels(

@@ -211,14 +211,14 @@ describe("executeVaultOpTool", () => {
   });
 
   describe("trash_folder", () => {
-    it("acknowledges trashing an empty folder", () => {
+    it("acknowledges trashing a folder", () => {
       const app = makeApp({ "Drafts/Act II": "dir" });
       const result = executeVaultOpTool(call("trash_folder", { path: "Drafts/Act II" }), {
         app,
         overlay: NO_OVERLAY,
       });
       expect(result.isError).toBeUndefined();
-      expect(result.content).toContain("Trash empty folder");
+      expect(result.content).toContain("Trash folder");
     });
 
     it("steers a file path to trash_file", () => {

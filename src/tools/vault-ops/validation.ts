@@ -198,9 +198,10 @@ export function validateTrashFolder(
   if (state === "file") {
     return err(`"${args.path}" is a file, use trash_file to trash a note.`);
   }
-  // Emptiness is *not* checked here (this validator sees only path state, not the
-  // folder's children): the empty-only guarantee is enforced authoritatively at apply
-  // via folderIsEmpty, after any same-batch moves have emptied the husk.
+  // The files-safe check is *not* done here (this validator sees only path state, not the
+  // folder's children): the "no notes inside" guarantee is enforced authoritatively at
+  // apply via collectFolderSubtree (ADR-0012), after any same-batch moves have emptied the
+  // husk, and its refusal lists the blocking notes.
   return ok({ path: args.path });
 }
 

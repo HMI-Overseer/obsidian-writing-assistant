@@ -32,12 +32,44 @@ export function diskState(app: App, path: string): PathState {
  * absent paths, count as empty, so the only `false` is a folder that has
  * gained contents. Used by the undo drift guard: a `createDir` is always made
  * empty, so any children present at undo time are drift and must block the
- * "trash the folder" inverse from deleting them (Finding E).
+ * "trash the folder" inverse from deleting them (Finding E). NB this is a
+ * *literal* emptiness (no children at all), distinct from the files-safe check
+ * the folder trash uses ({@link collectFolderSubtree}, ADR-0012).
  */
 export function folderIsEmpty(app: App, path: string): boolean {
   const file = app.vault.getAbstractFileByPath(normalizePath(path));
   if (!(file instanceof TFolder)) return true;
   return file.children.length === 0;
+}
+
+/**
+ * Walk a folder's whole subtree once, collecting every descendant note path and
+ * every folder path (ADR-0012). `files` is each {@link TFile} anywhere beneath
+ * `folder`; `folders` is `folder` itself plus every descendant folder in
+ * *parent-first* order, so re-creating them in sequence always makes a parent
+ * before its child.
+ *
+ * The folder trash reads both: `files` empty ⇒ the whole subtree is only empty
+ * folders and is safe to remove in one call (Obsidian's trash takes the subtree),
+ * and `folders` is captured as the undo payload so a husk of empty subfolders is
+ * restored whole, not just its root. When `files` is non-empty the trash is
+ * refused and the list names exactly what blocks it.
+ */
+export function collectFolderSubtree(folder: TFolder): { files: string[]; folders: string[] } {
+  const files: string[] = [];
+  const folders: string[] = [folder.path];
+  const walk = (dir: TFolder): void => {
+    for (const child of dir.children) {
+      if (child instanceof TFolder) {
+        folders.push(child.path);
+        walk(child);
+      } else if (child instanceof TFile) {
+        files.push(child.path);
+      }
+    }
+  };
+  walk(folder);
+  return { files, folders };
 }
 
 /** Live {mtime,size} for a file's conflict guard; null if absent or a folder. */
@@ -100,6 +132,17 @@ export async function applyOperation(
       return inverseOf(op, { preContent, fingerprint: diskFingerprint(app, path) ?? undefined });
     }
     case "createDir": {
+      // Undo of a subtree folder trash (ADR-0012): re-create every husk folder that
+      // was removed, parent-first, so the whole husk comes back and not just its root.
+      // Idempotent, skip any path a later file or folder already occupies. Its own
+      // inverse trashes the root (which takes the recreated subtree), staying symmetric.
+      if (op.subtree && op.subtree.length > 0) {
+        for (const raw of op.subtree) {
+          const p = normalizePath(raw);
+          if (diskState(app, p) === "absent") await app.vault.createFolder(p);
+        }
+        return inverseOf(op, { dirPreExisted: false });
+      }
       const path = normalizePath(op.path);
       const dirPreExisted = diskState(app, path) === "dir";
       if (!dirPreExisted) await app.vault.createFolder(path);
@@ -144,15 +187,19 @@ export async function applyOperation(
       if (!(folder instanceof TFolder)) {
         throw new Error(`trash target "${op.path}" is not a folder or no longer exists.`);
       }
-      // Empty-only guarantee (the safe carve-out of the v1 folder-removal ban): refuse a
-      // populated folder so a folder trash can never recursively delete notes. Any
-      // same-batch move out of this folder has already applied (ordered first), so a
-      // husk emptied this turn passes here.
-      if (!folderIsEmpty(app, path)) {
-        throw new Error(`folder "${op.path}" is not empty; only empty folders can be trashed.`);
+      // Files-safe guarantee (ADR-0012, the safe carve-out of the v1 folder-removal ban):
+      // a folder trash may remove a husk of empty subfolders in one call, but must never
+      // delete a note. Refuse the moment any file lives anywhere under it, naming the
+      // blockers so the model can move or trash them first. Any same-batch move out of
+      // this folder has already applied (ordered before folder trashes), so a husk emptied
+      // this turn passes here.
+      const { files, folders } = collectFolderSubtree(folder);
+      if (files.length > 0) {
+        throw new Error(nonEmptyFolderMessage(op.path, files));
       }
       await app.fileManager.trashFile(folder);
-      return inverseOf(op, {});
+      // Capture the emptied subtree so undo re-creates every husk folder, not just the root.
+      return inverseOf(op, { folderSubtree: folders });
     }
     case "replaceInVault": {
       // Rewrite each target to its precomputed content (the same vault.process
@@ -179,6 +226,25 @@ export async function applyOperation(
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
+
+/** Cap on note paths listed in a non-empty-folder refusal, so a large folder can't flood context. */
+const MAX_LISTED_BLOCKERS = 20;
+
+/**
+ * The refusal thrown when a folder trash is blocked by notes inside it (ADR-0012).
+ * Lists the offending note paths (capped) so the model can move or trash exactly
+ * those and retry, instead of blindly probing the subtree one folder at a time.
+ */
+function nonEmptyFolderMessage(path: string, files: string[]): string {
+  const shown = files.slice(0, MAX_LISTED_BLOCKERS);
+  const list = shown.map((f) => `  - ${f}`).join("\n");
+  const more = files.length > shown.length ? `\n  …and ${files.length - shown.length} more` : "";
+  const count = `${files.length} note${files.length === 1 ? "" : "s"}`;
+  return (
+    `folder "${path}" contains ${count}; only folders with no notes can be trashed ` +
+    `(empty subfolders are fine). Move or trash these first, then trash the folder:\n${list}${more}`
+  );
+}
 
 /** Ensure a file's parent folder exists, creating missing ancestors. */
 async function ensureParentFolder(app: App, filePath: string): Promise<void> {

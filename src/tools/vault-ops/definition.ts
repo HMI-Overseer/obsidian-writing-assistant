@@ -152,14 +152,18 @@ export const TRASH_FILE_TOOL: CanonicalToolDefinition = {
 export const TRASH_FOLDER_TOOL: CanonicalToolDefinition = {
   name: "trash_folder",
   description:
-    "Send an empty folder to trash. Empty folders only, a folder that still contains notes is refused. " +
+    "Send a folder to trash when it holds no notes. Empty subfolders inside it are removed along with " +
+    "it, so a whole husk of nested empty folders goes in a single call. A folder that still contains a " +
+    "note anywhere inside is refused, and the error lists the notes so you can clear them first. " +
     "Use it to clean up the husk left behind after moving a folder's contents elsewhere. " +
     "Honors the user's deleted-files preference (system trash or .trash). " +
     "The change is shown to the user for review before it is applied, and can be undone.",
   strategyHint:
-    "remove an empty folder, e.g. the husk left after moving its notes out. Empty folders only.",
+    "remove a folder that holds no notes (its empty subfolders go with it), e.g. the husk left after " +
+    "moving its notes out. Refused, with the blocking notes listed, if any note remains inside.",
   errorGuidance:
-    "If the folder still contains notes, move or trash its contents first, then trash the empty folder. " +
+    "If the folder still contains notes, the error lists them: move or trash those first, then trash the " +
+    "folder in one call (empty subfolders need not be removed one by one). " +
     "If the path is a single note, use trash_file instead. If it does not exist, verify the path first.",
   annotations: { destructiveHint: true },
   parameters: {
@@ -167,7 +171,9 @@ export const TRASH_FOLDER_TOOL: CanonicalToolDefinition = {
     properties: {
       path: {
         type: "string",
-        description: "Vault-relative path of the empty folder to trash (e.g., 'Drafts/Act II').",
+        description:
+          "Vault-relative path of the folder to trash (e.g., 'Drafts/Act II'). It must contain no notes, " +
+          "though empty subfolders inside it are fine and are removed with it.",
       },
     },
     required: ["path"],

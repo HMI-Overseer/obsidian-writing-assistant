@@ -21,7 +21,7 @@ import type {
   VaultOperationProposal,
 } from "../../vault-ops/types";
 import { generateId } from "../../utils";
-import { makeMessage } from "../conversation/conversationUtils";
+import { appliedEditsOf, editProposalsOf, makeMessage } from "../conversation/conversationUtils";
 import type { ChatSessionStore } from "../conversation/ChatSessionStore";
 import type { ChatTranscript } from "../messages/ChatTranscript";
 import { EditReviewTimelineView } from "../messages/editReviewTimeline";
@@ -72,14 +72,14 @@ export interface FinalizeEditOptions {
   /** The applied record (auto + approved ops) for {@link prebuiltVaultOpProposal}. */
   prebuiltVaultOpRecord?: AppliedVaultOpRecord;
   /**
-   * An edit proposal already built and (partly) resolved in-loop by
-   * {@link LiveVaultReview} (propose-edit-in-loop-blocking-review). When present,
-   * finalization persists it as-is instead of re-resolving the edit blocks, the
-   * hunks already carry their accepted/rejected status and applied content.
+   * Edit proposals already built and (partly) resolved in-loop by {@link LiveVaultReview}
+   * (propose-edit-in-loop-blocking-review), one per edited file (ADR-0010). When present,
+   * finalization persists them as-is instead of re-resolving the edit blocks, the hunks
+   * already carry their accepted/rejected status and applied content.
    */
-  prebuiltEditProposal?: EditProposal;
-  /** The applied edit record (auto + accepted hunks) for {@link prebuiltEditProposal}. */
-  prebuiltEditRecord?: AppliedEditRecord;
+  prebuiltEditProposals?: EditProposal[];
+  /** The applied edit records (auto + accepted hunks), one per edited file. */
+  prebuiltEditRecords?: AppliedEditRecord[];
   /** Flip the session to auto-apply; powers the review's "Accept all this session" action. */
   onEnterAutoApply?: () => void;
 }
@@ -103,7 +103,7 @@ export async function finalizeEditResponse(options: FinalizeEditOptions): Promis
     app, owner, store, transcript, bubble, renderer, plugin, modelId, provider, usage,
     toolCalls, agenticSteps, stoppedForMaxTokens,
     prebuiltVaultOpProposal, prebuiltVaultOpRecord,
-    prebuiltEditProposal, prebuiltEditRecord, onEnterAutoApply,
+    prebuiltEditProposals, prebuiltEditRecords, onEnterAutoApply,
   } = options;
 
   const fullResponse = renderer.getFullResponse();
@@ -128,19 +128,26 @@ export async function finalizeEditResponse(options: FinalizeEditOptions): Promis
     prose = parsed.prose;
   }
 
-  // A prebuilt proposal from the in-loop review is persisted as-is: its hunks are
-  // already resolved against the document and carry their accept/reject status, so
-  // we must NOT re-resolve. We only graft the turn's prose onto it.
-  let editProposal: EditProposal | null = null;
-  if (prebuiltEditProposal) {
-    editProposal = prebuiltEditProposal;
-    if (prose && !editProposal.prose) editProposal.prose = prose;
+  // Prebuilt proposals from the in-loop review are persisted as-is (one per edited
+  // file): their hunks are already resolved against each document and carry their
+  // accept/reject status, so we must NOT re-resolve. We only graft the turn's prose
+  // onto one of them (the first that lacks it) so it renders once.
+  let editProposals: EditProposal[] = [];
+  if (prebuiltEditProposals && prebuiltEditProposals.length > 0) {
+    editProposals = prebuiltEditProposals;
+    if (prose) {
+      const target = editProposals.find((p) => !p.prose);
+      if (target) target.prose = prose;
+    }
   } else if (blocks.length > 0) {
-    // Prefer the model's explicit `path` (tool-call edits); fall back to the active
-    // file for regex-parsed edit blocks, which have no path and target the open note.
-    const targetPath = blocks.find((b) => b.targetPath)?.targetPath ?? app.workspace.getActiveFile()?.path;
-    if (targetPath) {
-      editProposal = await buildEditProposal(app, plugin, targetPath, blocks, prose);
+    // Group edit blocks by their target file (tool-call edits carry an explicit `path`;
+    // regex-parsed blocks fall back to the active file), one single-file proposal per
+    // file (ADR-0010). The prose rides on the first successfully-built proposal only.
+    const groups = groupBlocksByTarget(blocks, app.workspace.getActiveFile()?.path);
+    for (const [path, groupBlocks] of groups) {
+      const proseForGroup = editProposals.length === 0 ? prose : "";
+      const built = await buildEditProposal(app, plugin, path, groupBlocks, proseForGroup);
+      if (built) editProposals.push(built);
     }
   }
 
@@ -151,15 +158,16 @@ export async function finalizeEditResponse(options: FinalizeEditOptions): Promis
   // A prebuilt proposal from the in-loop review (LiveVaultReview) is persisted
   // as-is: its gate is already resolved and its ops already applied/declined, so we
   // must NOT re-derive or re-apply. We only graft the turn's prose onto it.
+  const hasEdits = editProposals.length > 0;
   let vaultOpProposal: VaultOperationProposal | null = null;
   if (prebuiltVaultOpProposal) {
     vaultOpProposal = prebuiltVaultOpProposal;
-    if (!editProposal && prose && !vaultOpProposal.prose) vaultOpProposal.prose = prose;
+    if (!hasEdits && prose && !vaultOpProposal.prose) vaultOpProposal.prose = prose;
   } else if (vaultOpCalls.length > 0) {
     vaultOpProposal = await buildVaultOpProposal(
       app,
       vaultOpCalls,
-      editProposal ? undefined : prose,
+      hasEdits ? undefined : prose,
       stoppedForMaxTokens ?? false,
       plugin.settings.vaultOpPolicy,
       options.posture ?? "ask",
@@ -167,7 +175,7 @@ export async function finalizeEditResponse(options: FinalizeEditOptions): Promis
   }
 
   // Bail to a plain message ONLY when BOTH channels are empty.
-  if (!editProposal && !vaultOpProposal) {
+  if (!hasEdits && !vaultOpProposal) {
     if (!hasToolCalls && fullResponse.includes("<<<SEARCH")) {
       new Notice("Edit blocks were detected but couldn't be parsed.");
     }
@@ -177,8 +185,8 @@ export async function finalizeEditResponse(options: FinalizeEditOptions): Promis
 
   // Save the message with whichever proposals are present.
   const assistantMessage = makeMessage("assistant", fullResponse);
-  if (editProposal) assistantMessage.editProposal = editProposal;
-  if (prebuiltEditRecord) assistantMessage.appliedEdit = prebuiltEditRecord;
+  if (hasEdits) assistantMessage.editProposals = editProposals;
+  if (prebuiltEditRecords?.length) assistantMessage.appliedEdits = prebuiltEditRecords;
   if (vaultOpProposal) assistantMessage.vaultOpProposal = vaultOpProposal;
   if (prebuiltVaultOpRecord) assistantMessage.appliedVaultOps = prebuiltVaultOpRecord;
   if (hasToolCalls) assistantMessage.toolCalls = toolCalls;
@@ -195,6 +203,27 @@ export async function finalizeEditResponse(options: FinalizeEditOptions): Promis
     autoApplyVaultOps: !prebuiltVaultOpProposal,
     ...(onEnterAutoApply && { onEnterAutoApply }),
   });
+}
+
+/**
+ * Group edit blocks by the file they target, preserving first-seen order (ADR-0010:
+ * a turn may edit N files). Tool-call edits carry an explicit `targetPath`; regex-parsed
+ * blocks have none and fall back to `activeFilePath` (the open note). A block with no
+ * target and no active file is dropped, it has nowhere to land.
+ */
+function groupBlocksByTarget(
+  blocks: EditBlock[],
+  activeFilePath: string | undefined,
+): Map<string, EditBlock[]> {
+  const groups = new Map<string, EditBlock[]>();
+  for (const block of blocks) {
+    const path = block.targetPath ?? activeFilePath;
+    if (!path) continue;
+    const existing = groups.get(path);
+    if (existing) existing.push(block);
+    else groups.set(path, [block]);
+  }
+  return groups;
 }
 
 /**
@@ -321,25 +350,34 @@ export function renderProposalPanels(
   // so the body holds the explanatory text and the rails hold the interactive steps.
   // Prose belongs to whichever channel carries it; when both fire only the edit
   // channel does (finalize assigns prose to the edit proposal first). ---
-  if (message.editProposal) {
-    if (message.editProposal.prose) {
-      renderProseInto(app, bubble.contentEl, message.editProposal.prose);
+  const editProposals = editProposalsOf(message);
+  if (editProposals.length > 0) {
+    // Prose belongs to one card so it shows once (finalize assigns it to the first
+    // proposal that carries it).
+    const proseProposal = editProposals.find((p) => p.prose);
+    if (proseProposal?.prose) {
+      renderProseInto(app, bubble.contentEl, proseProposal.prose);
     }
-    // One controller owns the proposal's review; the timeline view and the in-note
-    // overlay are pure views over it, routing every mutation through it.
-    const controller = new EditReviewController(
-      app,
-      message.editProposal,
-      makeEditCallbacks(store, message.editProposal),
-      message.appliedEdit,
+    // One controller per edited file owns that file's review; a single composite
+    // timeline view spans them (one card per file, ADR-0010), and the in-note overlay
+    // attaches each so whichever file is open shows its diff.
+    const appliedEdits = appliedEditsOf(message);
+    const controllers = editProposals.map(
+      (proposal) =>
+        new EditReviewController(
+          app,
+          proposal,
+          makeEditCallbacks(store, proposal),
+          appliedEdits.find((r) => r.proposalId === proposal.id),
+        ),
     );
     new EditReviewTimelineView({
       timelineEl: bubble.timelineEl,
       app,
-      controller,
+      controllers,
       ...(opts?.onEnterAutoApply && { onEnterAutoApply: opts.onEnterAutoApply }),
     });
-    inlineDiff.attach(controller);
+    for (const controller of controllers) inlineDiff.attach(controller);
   } else if (message.vaultOpProposal?.prose) {
     renderProseInto(app, bubble.contentEl, message.vaultOpProposal.prose);
   }
@@ -368,31 +406,42 @@ function renderProseInto(app: App, el: HTMLElement, prose: string): void {
 }
 
 function makeEditCallbacks(store: ChatSessionStore, proposal: EditProposal): EditReviewCallbacks {
+  // The message holding this proposal, located by proposal id within its array (a turn
+  // may hold N proposals, one per file; ADR-0010).
   const find = (id: string) =>
-    store.getSnapshot().messageHistory.find((m) => m.editProposal?.id === id);
+    store.getSnapshot().messageHistory.find((m) => editProposalsOf(m).some((p) => p.id === id));
   return {
     onHunksChanged: (updated) => {
       const msg = find(updated.id);
-      if (msg) {
-        msg.editProposal = updated;
-        void store.persistActiveConversation();
-      }
+      if (!msg) return;
+      msg.editProposals = editProposalsOf(msg).map((p) => (p.id === updated.id ? updated : p));
+      msg.editProposal = undefined; // migrate off the legacy singular once we rewrite.
+      void store.persistActiveConversation();
     },
     onApplied: (record) => {
       const msg = find(proposal.id);
-      if (msg) {
-        msg.appliedEdit = record;
-        void store.persistActiveConversation();
-      }
+      if (!msg) return;
+      msg.appliedEdits = upsertAppliedEdit(appliedEditsOf(msg), record);
+      msg.appliedEdit = undefined;
+      void store.persistActiveConversation();
     },
     onUndone: () => {
       const msg = find(proposal.id);
-      if (msg) {
-        msg.appliedEdit = undefined;
-        void store.persistActiveConversation();
-      }
+      if (!msg) return;
+      msg.appliedEdits = appliedEditsOf(msg).filter((r) => r.proposalId !== proposal.id);
+      msg.appliedEdit = undefined;
+      void store.persistActiveConversation();
     },
   };
+}
+
+/** Replace the applied-edit record for a proposal, or append it if new (per-file, ADR-0010). */
+function upsertAppliedEdit(
+  records: AppliedEditRecord[],
+  record: AppliedEditRecord,
+): AppliedEditRecord[] {
+  const rest = records.filter((r) => r.proposalId !== record.proposalId);
+  return [...rest, record];
 }
 
 function makeVaultOpCallbacks(

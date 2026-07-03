@@ -53,6 +53,9 @@ function makeRealFsApp(root: string): App {
   const full = (p: string) => nodePath.join(root, normalizePath(p));
   // Real child listing for a folder, so the confusable-path resolver
   // (snapToExistingFile) can scan siblings exactly as it would in the live vault.
+  // Populated *recursively*, matching Obsidian's in-memory TFolder tree (each
+  // subfolder carries its own children), so a subtree walk (collectFolderSubtree,
+  // ADR-0012) sees notes nested any number of levels deep, against real disk.
   const childrenOf = (relDir: string): (TFile | TFolder)[] => {
     const abs = full(relDir);
     if (!fs.existsSync(abs)) return [];
@@ -60,7 +63,7 @@ function makeRealFsApp(root: string): App {
     return fs.readdirSync(abs, { withFileTypes: true }).map((entry) => {
       const childRel = normalizePath(norm ? `${norm}/${entry.name}` : entry.name);
       return entry.isDirectory()
-        ? Object.assign(new TFolder(), { path: childRel, children: [] })
+        ? Object.assign(new TFolder(), { path: childRel, children: childrenOf(childRel) })
         : Object.assign(new TFile(), { path: childRel });
     });
   };
@@ -360,20 +363,26 @@ describe("folder ops, real-filesystem resolution (§6.1)", () => {
     expect(fs.existsSync(nodePath.join(vaultRoot, "Drafts", "Act II"))).toBe(false);
   });
 
-  it("trash_folder removes an empty folder but refuses a populated one (empty-only, real disk)", async () => {
+  it("trash_folder removes a husk of empty subfolders but refuses one with a nested note (files-safe, real disk)", async () => {
     const app = makeRealFsApp(vaultRoot);
-    fs.mkdirSync(nodePath.join(vaultRoot, "Empty"), { recursive: true });
-    fs.mkdirSync(nodePath.join(vaultRoot, "Full"), { recursive: true });
-    fs.writeFileSync(nodePath.join(vaultRoot, "Full", "Note.md"), "precious");
+    // A husk whose only contents are nested empty subfolders (no notes anywhere).
+    fs.mkdirSync(nodePath.join(vaultRoot, "Husk", "Dialogues"), { recursive: true });
+    fs.mkdirSync(nodePath.join(vaultRoot, "Husk", "Locations"), { recursive: true });
+    // A folder holding a note two levels deep, must be refused.
+    fs.mkdirSync(nodePath.join(vaultRoot, "Full", "Sub"), { recursive: true });
+    fs.writeFileSync(nodePath.join(vaultRoot, "Full", "Sub", "Note.md"), "precious");
 
-    const emptyBatch = await applyVaultOpBatch(app, [{ id: "e", op: { kind: "trashFolder", path: "Empty" } }]);
-    expect(emptyBatch.ok).toBe(true);
-    expect(fs.existsSync(nodePath.join(vaultRoot, "Empty"))).toBe(false);
+    // The whole husk goes in ONE call, even though it has non-empty children (ADR-0012).
+    const huskBatch = await applyVaultOpBatch(app, [{ id: "h", op: { kind: "trashFolder", path: "Husk" } }]);
+    expect(huskBatch.ok).toBe(true);
+    expect(fs.existsSync(nodePath.join(vaultRoot, "Husk"))).toBe(false);
 
+    // A note buried in a subfolder blocks the trash and is named in the error.
     const fullBatch = await applyVaultOpBatch(app, [{ id: "f", op: { kind: "trashFolder", path: "Full" } }]);
     expect(fullBatch.ok).toBe(false);
-    expect(fullBatch.error).toMatch(/not empty/i);
-    expect(fs.readFileSync(nodePath.join(vaultRoot, "Full", "Note.md"), "utf8")).toBe("precious");
+    expect(fullBatch.error).toMatch(/contains 1 note/i);
+    expect(fullBatch.error).toContain("Full/Sub/Note.md");
+    expect(fs.readFileSync(nodePath.join(vaultRoot, "Full", "Sub", "Note.md"), "utf8")).toBe("precious");
   });
 
   it("reorg end-to-end on real disk: move the note out, then trash the empty husk", async () => {
@@ -383,7 +392,7 @@ describe("folder ops, real-filesystem resolution (§6.1)", () => {
     const st = fs.statSync(nodePath.join(vaultRoot, "Drafts", "Act II", "Scene.md"));
 
     // Folder trash is listed first; orderOps must run the move first so the husk is
-    // empty by apply time, and the apply-time folderIsEmpty check then passes on disk.
+    // empty by apply time, and the apply-time files-safe check then passes on disk.
     const batch = [
       { id: "tf", op: { kind: "trashFolder", path: "Drafts/Act II" } as VaultOperation },
       {

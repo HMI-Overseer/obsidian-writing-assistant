@@ -436,7 +436,7 @@ export class ClaudeCodeService {
     if (EDIT_TOOL_NAMES.has(call.name)) {
       // Live in-loop review: suspend on the edit until the user accepts/declines and
       // return the real disposition, mirroring vault ops (resolveEditOne). The diff
-      // proposal is built in-loop, so finalization persists it via getEditProposal();
+      // proposals are built in-loop, so finalization persists them via getEditProposals();
       // the collected call is only for the message's tool-call record.
       if (this.liveReview) {
         const result = await this.liveReview.resolveEditOne(call, toolCallId);

@@ -23,6 +23,7 @@ import { writesPermitted } from "../../vault-ops/gateway";
 import type { CanonicalToolDefinition } from "../../tools/types";
 import type { App } from "obsidian";
 import type { ChatSessionStore } from "../conversation/ChatSessionStore";
+import { editProposalsOf } from "../conversation/conversationUtils";
 import type { RagService } from "../../rag";
 import type { ChatClient } from "../../api/chatClient";
 import { rewriteQueryForRetrieval } from "../../rag/queryRewriter";
@@ -132,7 +133,7 @@ export async function prepareApiMessages(
       );
       return {
         role: message.role as "user" | "assistant",
-        content: message.editProposal
+        content: editProposalsOf(message).length > 0
           ? formatEditMessageContent(message)
           : message.content,
         ...(attachments?.length ? { attachments } : {}),
@@ -355,15 +356,18 @@ export function splitSystemForTail(opts: {
  * content is pure prose with no embedded blocks.
  */
 function formatEditMessageContent(message: ConversationMessage): string {
-  const { editProposal } = message;
-  if (!editProposal) return message.content;
+  const proposals = editProposalsOf(message);
+  if (proposals.length === 0) return message.content;
 
-  // Tool-call messages: content is pure prose, annotate with a summary.
+  // Tool-call messages: content is pure prose, annotate with a per-file summary
+  // across every edited file (ADR-0010).
   if (message.toolCalls && message.toolCalls.length > 0) {
-    return formatToolCallEditHistory(message.content, editProposal);
+    return formatToolCallEditHistory(message.content, proposals);
   }
 
-  // Regex-parsed messages: annotate inline SEARCH/REPLACE rawBlocks.
+  // Regex-parsed messages are single-file (the active document): annotate inline
+  // SEARCH/REPLACE rawBlocks on the sole proposal.
+  const editProposal = proposals[0];
   let content = message.content;
   let acceptedCount = 0;
   let rejectedCount = 0;
@@ -399,24 +403,28 @@ function formatEditMessageContent(message: ConversationMessage): string {
 }
 
 /**
- * Builds history text for a tool-call-based edit message.
- * Appends a per-hunk summary so the model knows what was accepted/rejected.
+ * Builds history text for a tool-call-based edit message, across every edited file
+ * (ADR-0010). Appends a per-hunk summary, each tagged with its file, so the model knows
+ * what was accepted/rejected and where.
  */
-function formatToolCallEditHistory(prose: string, proposal: EditProposal): string {
+function formatToolCallEditHistory(prose: string, proposals: EditProposal[]): string {
   const parts: string[] = [];
   if (prose) parts.push(prose);
 
   let acceptedCount = 0;
   let rejectedCount = 0;
 
-  for (const hunk of proposal.hunks) {
-    const status = hunk.status === "accepted" ? "ACCEPTED" : "REJECTED";
-    const search = hunk.resolvedEdit.editBlock.searchText;
-    const preview = search.length > 80 ? search.slice(0, 80) + "..." : search;
-    parts.push(`[Edit: "${preview}", ${status}]`);
+  for (const proposal of proposals) {
+    const file = proposal.targetFilePath.split("/").pop() ?? proposal.targetFilePath;
+    for (const hunk of proposal.hunks) {
+      const status = hunk.status === "accepted" ? "ACCEPTED" : "REJECTED";
+      const search = hunk.resolvedEdit.editBlock.searchText;
+      const preview = search.length > 80 ? search.slice(0, 80) + "..." : search;
+      parts.push(`[Edit in ${file}: "${preview}", ${status}]`);
 
-    if (hunk.status === "accepted") acceptedCount++;
-    else rejectedCount++;
+      if (hunk.status === "accepted") acceptedCount++;
+      else rejectedCount++;
+    }
   }
 
   const total = acceptedCount + rejectedCount;

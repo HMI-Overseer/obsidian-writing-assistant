@@ -197,8 +197,24 @@ describe("inverseOf", () => {
     expect(inverseOf(op)).toEqual({ kind: "moveFolder", from: "B", to: "A" });
   });
 
-  test("trashFolder inverse re-creates the empty folder (no recursive snapshot)", () => {
+  test("trashFolder inverse re-creates a lone folder (no subtree captured)", () => {
     const op: VaultOperation = { kind: "trashFolder", path: "Drafts/Act II" };
+    // A lone-root husk (only the folder itself) stays a trivial createDir, backward-compatible.
+    expect(inverseOf(op, { folderSubtree: ["Drafts/Act II"] })).toEqual({
+      kind: "createDir",
+      path: "Drafts/Act II",
+    });
+    // No capture at all also degrades to the trivial inverse.
     expect(inverseOf(op)).toEqual({ kind: "createDir", path: "Drafts/Act II" });
+  });
+
+  test("trashFolder inverse restores the whole husk when empty subfolders were removed (ADR-0012)", () => {
+    const op: VaultOperation = { kind: "trashFolder", path: "Story/Prequel" };
+    const subtree = ["Story/Prequel", "Story/Prequel/Dialogues", "Story/Prequel/Locations"];
+    expect(inverseOf(op, { folderSubtree: subtree })).toEqual({
+      kind: "createDir",
+      path: "Story/Prequel",
+      subtree,
+    });
   });
 });

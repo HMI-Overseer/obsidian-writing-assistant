@@ -127,15 +127,18 @@ export class LiveVaultReview implements VaultOpReviewer {
 
   // --- Edit channel state (in-document edits; see resolveEdits). -----------
   private readonly editDeps?: LiveEditReviewDeps;
-  /** The single edit proposal accumulated across the turn's rounds, or null until the first hunk. */
-  private editProposal: EditProposal | null = null;
-  /** One controller for the whole turn, the single apply owner; the view re-renders over it. */
-  private editController: EditReviewController | null = null;
-  /** The live timeline review, re-rendered (destroy + recreate) per round over {@link editController}. */
+  /**
+   * One {@link EditReviewController} per edited file, keyed by vault path (ADR-0010:
+   * a turn may edit N files). Each file stays a self-contained single-file proposal;
+   * this map is the turn's growing collection, so a later round targeting a different
+   * file adds a controller instead of being rejected. Its proposal lives on
+   * `controller.proposal`.
+   */
+  private readonly editControllers = new Map<string, EditReviewController>();
+  /** Applied-edit record per edited file, keyed by the same vault path. */
+  private readonly editAppliedRecords = new Map<string, AppliedEditRecord>();
+  /** The one live timeline review, re-rendered (destroy + recreate) per round over every controller. */
   private editTimelineView: EditReviewTimelineView | null = null;
-  private editAppliedRecord: AppliedEditRecord | null = null;
-  /** The one note this turn edits, fixed by the first resolved edit (one file per turn). */
-  private editTargetPath: string | null = null;
 
   constructor(opts: LiveVaultReviewOptions) {
     this.app = opts.app;
@@ -303,20 +306,10 @@ export class LiveVaultReview implements VaultOpReviewer {
           continue;
         }
 
-        // One file per turn: the first resolved edit fixes the target; a different
-        // file is rejected with guidance to do it in a later turn.
-        if (this.editTargetPath && this.editTargetPath !== file.path) {
-          results.set(
-            call.id,
-            editError(
-              call,
-              `this turn already edits "${this.editTargetPath}"`,
-              "precondition",
-              `edit "${file.path}" in a separate message`,
-            ),
-          );
-          continue;
-        }
+        // A turn may edit N files (ADR-0010): each distinct path gets its own
+        // controller (ensureEditController), so a second file is accumulated, never
+        // rejected. The one-mutation-per-round cap still serializes edits one file per
+        // round; multi-file is the accumulation of those across rounds.
 
         let docText = docCache.get(file.path);
         if (docText === undefined) {
@@ -384,11 +377,14 @@ export class LiveVaultReview implements VaultOpReviewer {
         }
       }
 
-      if (this.editController) this.renderEditPanel();
+      if (this.editControllers.size > 0) this.renderEditPanel();
 
       for (const a of autoApplied) {
-        await this.editController?.accept(a.hunkId);
-        const applied = this.editController?.getStatus(a.hunkId) === "accepted";
+        // Accept through the controller that owns this file, so a multi-file turn
+        // applies each hunk against its own file's snapshot (ADR-0010 isolation).
+        const controller = this.editControllers.get(a.path);
+        await controller?.accept(a.hunkId);
+        const applied = controller?.getStatus(a.hunkId) === "accepted";
         const reason = applied ? undefined : "the edit could not be applied to the document";
         results.set(a.callId, {
           content: editDispositionMessage(
@@ -428,7 +424,7 @@ export class LiveVaultReview implements VaultOpReviewer {
 
     return calls.map((tc) => ({
       tc,
-      result: results.get(tc.id) ?? editCancelled(editKind(tc.name), this.editTargetPath ?? ""),
+      result: results.get(tc.id) ?? editCancelled(editKind(tc.name), pathArg(tc)),
     }));
   }
 
@@ -440,12 +436,16 @@ export class LiveVaultReview implements VaultOpReviewer {
     return this.appliedRecord;
   }
 
-  getEditProposal(): EditProposal | null {
-    return this.editProposal && this.editProposal.hunks.length > 0 ? this.editProposal : null;
+  /** Every edited file's proposal that produced at least one hunk (ADR-0010). */
+  getEditProposals(): EditProposal[] {
+    return [...this.editControllers.values()]
+      .map((c) => c.proposal)
+      .filter((p) => p.hunks.length > 0);
   }
 
-  getEditAppliedRecord(): AppliedEditRecord | null {
-    return this.editAppliedRecord;
+  /** Every edited file's applied-edit record (auto + accepted hunks). */
+  getEditAppliedRecords(): AppliedEditRecord[] {
+    return [...this.editAppliedRecords.values()];
   }
 
   /**
@@ -679,14 +679,15 @@ export class LiveVaultReview implements VaultOpReviewer {
   // --- Edit channel helpers ----------------------------------------------
 
   /**
-   * The turn's single {@link EditReviewController}, the apply owner. Created on the
-   * first resolved hunk so a turn with only no-matches mounts nothing. The panel
-   * re-renders over it each round; statuses persist on the proposal's hunks.
+   * The {@link EditReviewController} for a given file, the apply owner for that file,
+   * created on its first resolved hunk (so a file with only no-matches mounts nothing).
+   * One per edited path (ADR-0010); the panel re-renders over all of them each round,
+   * and each file's snapshot/record stay isolated to its own controller.
    */
   private ensureEditController(targetPath: string, docText: string): EditReviewController {
-    if (this.editController) return this.editController;
-    this.editTargetPath = targetPath;
-    this.editProposal = {
+    const existing = this.editControllers.get(targetPath);
+    if (existing) return existing;
+    const proposal: EditProposal = {
       id: generateId(),
       targetFilePath: targetPath,
       documentSnapshot: docText,
@@ -694,19 +695,20 @@ export class LiveVaultReview implements VaultOpReviewer {
       hunks: [],
       prose: "",
     };
-    this.editController = new EditReviewController(this.app, this.editProposal, {
+    const controller = new EditReviewController(this.app, proposal, {
       onHunksChanged: () => {
         /* statuses mutate in place; persistence happens at finalization. */
       },
       onApplied: (record) => {
-        this.editAppliedRecord = record;
+        this.editAppliedRecords.set(targetPath, record);
       },
       onUndone: () => {
-        this.editAppliedRecord = null;
+        this.editAppliedRecords.delete(targetPath);
       },
     });
-    this.editController.subscribe((change) => this.handleEditResolved(change.hunkId, change.status));
-    return this.editController;
+    controller.subscribe((change) => this.handleEditResolved(change.hunkId, change.status));
+    this.editControllers.set(targetPath, controller);
+    return controller;
   }
 
   /** Populate a structural block (frontmatter) against its target file; pass others through. */
@@ -716,19 +718,25 @@ export class LiveVaultReview implements VaultOpReviewer {
     return resolved ?? block;
   }
 
-  /** Re-render the live edit review on the timeline over the kept controller and refresh the overlay. */
+  /**
+   * Re-render the live edit review on the timeline over every file's controller and
+   * refresh each in-note overlay. One composite {@link EditReviewTimelineView} spans
+   * all controllers (one card per file, ADR-0010); the inline overlay attaches each so
+   * whichever file is open shows its diff.
+   */
   private renderEditPanel(): void {
     const deps = this.editDeps;
-    if (!deps || !this.editController) return;
+    const controllers = [...this.editControllers.values()];
+    if (!deps || controllers.length === 0) return;
     this.editTimelineView?.destroy();
     this.editTimelineView = new EditReviewTimelineView({
       timelineEl: this.timelineEl,
       app: this.app,
-      controller: this.editController,
+      controllers,
       live: true,
       ...(deps.onEnterAutoApply && { onEnterAutoApply: deps.onEnterAutoApply }),
     });
-    deps.inlineDiff.attach(this.editController);
+    for (const controller of controllers) deps.inlineDiff.attach(controller);
   }
 
   /** A hunk reached a terminal status in either renderer, resolve its parked promise. */
@@ -843,6 +851,12 @@ function editError(
 /** A parked edit cancelled before the user decided (abort / new turn). */
 function editCancelled(kind: EditOpKind, path: string): ToolResult {
   return { content: editDispositionMessage(kind, path, "cancelled"), isReadOnly: false };
+}
+
+/** The vault path an edit call names, for the defensive cancelled fallback message. */
+function pathArg(call: ToolCall): string {
+  const p = (call.arguments as Record<string, unknown>).path;
+  return typeof p === "string" ? p : "";
 }
 
 /** Map an edit tool name to the disposition kind that shapes its model-facing wording. */

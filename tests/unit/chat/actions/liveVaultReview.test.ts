@@ -385,6 +385,36 @@ describe("LiveVaultReview", () => {
     expect(readB).toBe("She nodded. He left.");
   });
 
+  it("auto-applies a second edit to the same paragraph in a later round (double-edit bug, ADR-0013)", async () => {
+    // Each round re-reads the file, so the round-2 hunk is anchored to the post-round-1
+    // document. Pre-fix, the overlap guard compared its offsets against the applied
+    // round-1 hunk's stale offsets (two different baselines), saw a numeric collision,
+    // and refused: "the edit could not be applied to the document".
+    const app = makeApp({ files: ["Notes/A.md"], content: "She nodded. He waited." });
+    const review = new LiveVaultReview({
+      app,
+      timelineEl: TIMELINE_EL,
+      policy: POLICY({ edit: "auto" }),
+      edit: EDIT_DEPS(),
+    });
+
+    const [first] = await review.resolveEdits([
+      { id: "e1", name: "propose_edit", arguments: { path: "Notes/A.md", search: "She nodded.", replace: "She smiled warmly." } },
+    ]);
+    expect(first.result.isError).toBeFalsy();
+
+    // Next round, same paragraph, search text quoted from the CURRENT document (the
+    // model re-read the file), exactly the in-the-wild repro.
+    const [second] = await review.resolveEdits([
+      { id: "e2", name: "propose_edit", arguments: { path: "Notes/A.md", search: "She smiled warmly.", replace: "She beamed." } },
+    ]);
+
+    expect(second.result.isError).toBeFalsy();
+    expect(second.result.content).toBe('Applied edit to "Notes/A.md" (auto-applied).');
+    const read = await app.vault.read(app.vault.getFileByPath("Notes/A.md") as never);
+    expect(read).toBe("She beamed. He waited.");
+  });
+
   it("resolveOne binds the op to the supplied tool-call id (Claude Code path)", async () => {
     const review = new LiveVaultReview({
       app: makeApp(),

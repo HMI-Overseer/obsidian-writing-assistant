@@ -137,6 +137,16 @@ export class LiveVaultReview implements VaultOpReviewer {
   private readonly editControllers = new Map<string, EditReviewController>();
   /** Applied-edit record per edited file, keyed by the same vault path. */
   private readonly editAppliedRecords = new Map<string, AppliedEditRecord>();
+  /**
+   * Monotonic counter of edit rounds, stamped onto every hunk a round creates. Each
+   * round re-reads its target files (the per-round docCache), so hunks from different
+   * rounds are anchored to different document baselines; the controller's overlap
+   * guard only compares hunks with equal stamps (ADR-0013). Without the stamp, a
+   * second edit to an already-edited paragraph false-flags as overlapping the applied
+   * hunk (whose offsets are in the previous baseline's coordinate space) and is
+   * refused, the double-edit bug.
+   */
+  private editBaselineEpoch = 0;
   /** The one live timeline review, re-rendered (destroy + recreate) per round over every controller. */
   private editTimelineView: EditReviewTimelineView | null = null;
 
@@ -255,6 +265,10 @@ export class LiveVaultReview implements VaultOpReviewer {
     // on `ask` edits happens outside so a held edit never blocks the next round.
     const toPark = await this.runExclusive(async () => {
       const docCache = new Map<string, string>();
+      // One baseline per round: every hunk below is resolved against this docCache's
+      // reads, so they share a coordinate space with each other and with nothing from
+      // earlier or later rounds (ADR-0013).
+      const baselineEpoch = ++this.editBaselineEpoch;
       const autoApplied: Parked[] = [];
       const parked: Parked[] = [];
 
@@ -363,7 +377,7 @@ export class LiveVaultReview implements VaultOpReviewer {
         }
 
         const controller = this.ensureEditController(file.path, docText);
-        const hunk: DiffHunk = { id: generateId(), resolvedEdit: resolved, status: "pending" };
+        const hunk: DiffHunk = { id: generateId(), resolvedEdit: resolved, status: "pending", baselineEpoch };
         controller.proposal.hunks.push(hunk);
 
         const matchType = resolved.matchType;

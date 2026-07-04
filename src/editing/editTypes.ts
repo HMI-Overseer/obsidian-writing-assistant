@@ -74,6 +74,14 @@ export interface DiffHunk {
   id: string;
   resolvedEdit: ResolvedEdit;
   status: EditStatus;
+  /**
+   * The document baseline this hunk's offsets were resolved against, for proposals that
+   * accumulate hunks across tool-loop rounds: each round re-reads the file, so hunks from
+   * different rounds live in different coordinate spaces and their offsets are not
+   * comparable. The overlap guard only compares hunks sharing a baseline (ADR-0013).
+   * Absent on single-snapshot proposals, where every hunk shares `documentSnapshot`.
+   */
+  baselineEpoch?: number;
 }
 
 /** The full edit proposal attached to an assistant message. */

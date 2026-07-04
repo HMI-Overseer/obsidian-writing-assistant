@@ -112,15 +112,32 @@ export class EditReviewController {
   // -----------------------------------------------------------------------
 
   /**
+   * True when `a` and `b` were resolved against the same document baseline, i.e. their
+   * offsets share a coordinate space and are comparable. Hunks from different tool-loop
+   * rounds are anchored to different reads of the file, so comparing their offsets is
+   * meaningless: a later-round hunk with a fresh anchor would false-flag as overlapping
+   * an applied earlier-round hunk at the same position (the double-edit bug, ADR-0013).
+   * Two absent epochs match: a single-snapshot proposal is one baseline.
+   */
+  private sameBaseline(a: DiffHunk, b: DiffHunk): boolean {
+    return a.baselineEpoch === b.baselineEpoch;
+  }
+
+  /**
    * True when accepting `hunk` would conflict with one already applied: their source
-   * regions intersect. Delegates the geometry to the engine's {@link detectOverlaps} over
-   * the accepted set plus this hunk, then checks whether the new hunk landed in a
+   * regions intersect *within the same baseline* ({@link sameBaseline}, ADR-0013).
+   * Delegates the geometry to the engine's {@link detectOverlaps} over the comparable
+   * accepted set plus this hunk, then checks whether the new hunk landed in a
    * conflicting pair. Already-accepted hunks are pairwise-disjoint (each passed this same
    * check), so detectOverlaps' adjacent-pair sweep is exact for the single hunk added, and
-   * the result is order-independent (detectOverlaps sorts by offset).
+   * the result is order-independent (detectOverlaps sorts by offset). Cross-baseline
+   * conflicts are instead caught at apply time by the indexOf re-anchor, which fails
+   * honestly when the anchor text no longer exists.
    */
   private overlapsAppliedHunk(hunk: DiffHunk): boolean {
-    const accepted = this.proposal.hunks.filter((h) => h.status === "accepted");
+    const accepted = this.proposal.hunks.filter(
+      (h) => h.status === "accepted" && this.sameBaseline(h, hunk)
+    );
     if (accepted.length === 0) return false;
     return detectOverlaps([...accepted, hunk]).some(
       ([first, second]) => first === hunk.id || second === hunk.id
@@ -132,13 +149,13 @@ export class EditReviewController {
     const hunk = this.proposal.hunks.find((h) => h.id === hunkId);
     if (!hunk || hunk.status !== "pending") return;
 
-    // Refuse an accept whose source region overlaps a hunk that's already applied.
-    // Accepts splice into the live document one-at-a-time and re-anchor by `indexOf` at
-    // apply time, so an overlapping hunk would either silently no-op (its matched text was
-    // already overwritten) or re-anchor to the wrong place, an order-dependent outcome
-    // (diff-engine-real-document-robustness, symptom D / P1-9). The engine reports the
-    // conflict via detectOverlaps; the controller, sole owner of accept, decides: block and
-    // point the user at the fix.
+    // Refuse an accept whose source region overlaps an already-applied hunk from the
+    // same baseline (ADR-0013). Accepts splice into the live document one-at-a-time and
+    // re-anchor by `indexOf` at apply time, so an overlapping same-snapshot hunk would
+    // either silently no-op (its matched text was already overwritten) or re-anchor to
+    // the wrong place, an order-dependent outcome (diff-engine-real-document-robustness,
+    // symptom D / P1-9). The engine reports the conflict via detectOverlaps; the
+    // controller, sole owner of accept, decides: block and point the user at the fix.
     if (this.overlapsAppliedHunk(hunk)) {
       new Notice("This edit overlaps one you already applied. Undo that edit first to apply this one.");
       return;
@@ -147,7 +164,13 @@ export class EditReviewController {
     this.isProcessing = true;
     try {
       const result = await applyHunksLive(this.app, this.proposal.targetFilePath, [hunk]);
-      if (result.appliedHunkIds.length === 0) return;
+      if (result.appliedHunkIds.length === 0) {
+        // The re-anchor found no match (the document changed since resolution, e.g. a
+        // conflicting hunk from another baseline was applied first). Say so; a silent
+        // return would leave an unexplained dead Apply button.
+        new Notice("This edit no longer matches the document and was not applied.");
+        return;
+      }
 
       const appliedOffset = result.appliedOffsets.get(hunkId);
       if (appliedOffset !== undefined) this.appliedOffsets.set(hunkId, appliedOffset);
@@ -180,16 +203,20 @@ export class EditReviewController {
 
     // Greedily pick a non-overlapping batch: start from the already-applied set and add
     // each pending hunk only if it doesn't overlap the running set (detectOverlaps sorts
-    // by offset, so this is order-independent).
-    const baseline = this.proposal.hunks.filter((h) => h.status === "accepted");
+    // by offset, so this is order-independent). Only hunks sharing the candidate's
+    // baseline are compared ({@link sameBaseline}, ADR-0013); offsets from different
+    // baselines aren't comparable, and a cross-baseline conflict no-ops honestly at
+    // apply time instead.
+    const running = this.proposal.hunks.filter((h) => h.status === "accepted");
     const batch: DiffHunk[] = [];
     for (const hunk of pending) {
-      const conflicts = detectOverlaps([...baseline, hunk]).some(
+      const comparable = running.filter((h) => this.sameBaseline(h, hunk));
+      const conflicts = detectOverlaps([...comparable, hunk]).some(
         ([first, second]) => first === hunk.id || second === hunk.id
       );
       if (conflicts) continue;
       batch.push(hunk);
-      baseline.push(hunk);
+      running.push(hunk);
     }
 
     if (batch.length === 0) {

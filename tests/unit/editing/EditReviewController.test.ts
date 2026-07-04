@@ -3,7 +3,7 @@ import type { App } from "obsidian";
 import { Notice } from "obsidian";
 import { EditReviewController, type EditReviewCallbacks } from "../../../src/editing/EditReviewController";
 import { resolveEdits, buildHunks } from "../../../src/editing/diffEngine";
-import type { AppliedEditRecord, EditBlock, EditProposal } from "../../../src/editing/editTypes";
+import type { AppliedEditRecord, DiffHunk, EditBlock, EditProposal } from "../../../src/editing/editTypes";
 
 // The overlap guard's only observable signal is the warning Notice, so replace the
 // no-op mock class with a spyable constructor for this file.
@@ -347,5 +347,105 @@ describe("EditReviewController", () => {
 
     expect(controller.getStatus(b.id)).toBe("accepted");
     expect(state.content).toBe("The quick red dog jumps.");
+  });
+
+  /**
+   * Resolve one edit against `doc` (the document as it stands at that round) and return a
+   * hunk stamped with that round's baseline, the way the tool loop builds hunks (ADR-0013).
+   */
+  function laterRoundHunk(
+    doc: string,
+    edit: { search: string; replace: string },
+    baselineEpoch: number
+  ): DiffHunk {
+    const [resolved] = resolveEdits(
+      [{ id: `b-e${baselineEpoch}`, searchText: edit.search, replaceText: edit.replace, rawBlock: "" }],
+      doc,
+      { contextLines: 2, minConfidence: 0.7 }
+    );
+    return { id: `h-e${baselineEpoch}`, resolvedEdit: resolved, status: "pending", baselineEpoch };
+  }
+
+  it("allows a later-round edit to the same region, its baseline is fresh (double-edit bug)", async () => {
+    // Round 1, resolved against V0 and applied.
+    const doc = "The quick brown fox jumps.";
+    const { app, state } = makeApp(doc);
+    const proposal = makeProposal(doc, [{ search: "quick brown", replace: "slow" }]);
+    proposal.hunks[0].baselineEpoch = 1;
+    const controller = new EditReviewController(app, proposal, makeCallbacks());
+    await controller.accept(proposal.hunks[0].id);
+    expect(state.content).toBe("The slow fox jumps.");
+
+    // Round 2, the tool loop re-reads the file and resolves against the CURRENT text, so
+    // this hunk's anchor is fresh even though its offsets ([4,12) in V1 space) numerically
+    // collide with the applied hunk's stale V0-space offsets ([4,15)). The guard must not
+    // compare offsets across baselines.
+    const second = laterRoundHunk(state.content, { search: "slow fox", replace: "swift cat" }, 2);
+    proposal.hunks.push(second);
+
+    await controller.accept(second.id);
+
+    expect(controller.getStatus(second.id)).toBe("accepted");
+    expect(state.content).toBe("The swift cat jumps.");
+    expect(Notice).not.toHaveBeenCalled();
+  });
+
+  it("still blocks overlapping accepts within one baseline (P1-9 holds per round)", async () => {
+    const doc = "The quick brown fox jumps.";
+    const { app, state } = makeApp(doc);
+    const proposal = makeProposal(doc, [
+      { search: "quick brown", replace: "slow" },
+      { search: "brown fox", replace: "red dog" },
+    ]);
+    for (const h of proposal.hunks) h.baselineEpoch = 1; // same round, same coordinate space
+    const controller = new EditReviewController(app, proposal, makeCallbacks());
+    const [a, b] = proposal.hunks;
+
+    await controller.accept(a.id);
+    await controller.accept(b.id);
+
+    expect(Notice).toHaveBeenCalledWith(expect.stringContaining("overlaps"));
+    expect(controller.getStatus(b.id)).toBe("pending");
+    expect(state.content).toBe("The slow fox jumps.");
+  });
+
+  it("acceptAll applies a fresh-baseline hunk whose offsets collide with an applied one", async () => {
+    const doc = "The quick brown fox jumps.";
+    const { app, state } = makeApp(doc);
+    const proposal = makeProposal(doc, [{ search: "quick brown", replace: "slow" }]);
+    proposal.hunks[0].baselineEpoch = 1;
+    const controller = new EditReviewController(app, proposal, makeCallbacks());
+    await controller.accept(proposal.hunks[0].id);
+
+    const second = laterRoundHunk(state.content, { search: "slow fox", replace: "swift cat" }, 2);
+    proposal.hunks.push(second);
+
+    await controller.acceptAll();
+
+    expect(controller.getStatus(second.id)).toBe("accepted");
+    expect(state.content).toBe("The swift cat jumps.");
+  });
+
+  it("notifies instead of silently no-opping when an accept's anchor no longer exists", async () => {
+    // Cross-baseline conflicts are not overlap-guarded (offsets aren't comparable across
+    // baselines); the indexOf re-anchor catches them at apply time and must say so.
+    const doc = "The quick brown fox jumps.";
+    const { app, state } = makeApp(doc);
+    const proposal = makeProposal(doc, [{ search: "quick brown", replace: "slow" }]);
+    proposal.hunks[0].baselineEpoch = 1; // parked, never applied this round
+    const controller = new EditReviewController(app, proposal, makeCallbacks());
+
+    // Round 2 (file unchanged, round-1 hunk still parked): an overlapping edit applies first.
+    const second = laterRoundHunk(doc, { search: "brown fox", replace: "red dog" }, 2);
+    proposal.hunks.push(second);
+    await controller.accept(second.id);
+    expect(state.content).toBe("The quick red dog jumps.");
+
+    // The parked hunk's anchor ("quick brown") was consumed; accepting it must fail loudly.
+    await controller.accept(proposal.hunks[0].id);
+
+    expect(controller.getStatus(proposal.hunks[0].id)).toBe("pending");
+    expect(state.content).toBe("The quick red dog jumps.");
+    expect(Notice).toHaveBeenCalledWith(expect.stringContaining("no longer matches"));
   });
 });

@@ -24,6 +24,7 @@ import { ToolUsePopover } from "./composer/ToolUsePopover";
 import { ChatSessionStore } from "./conversation/ChatSessionStore";
 import { ChatTranscript } from "./messages/ChatTranscript";
 import { ChatModelSelector } from "./models/ChatModelSelector";
+import { pluginModelDropdownDeps } from "./models/ModelDropdownView";
 import { ProfileSettingsPopover } from "./models/ProfileSettingsPopover";
 import type { ChatLayoutRefs } from "./types";
 import { ChatHistoryDrawer } from "./view/ChatHistoryDrawer";
@@ -236,11 +237,7 @@ export class ChatView extends ItemView {
       },
       getEmbeddingModels: () => getSelectableEmbeddingModels(this.plugin.settings),
       getActiveEmbeddingModelId: () => this.plugin.settings.rag.activeEmbeddingModelId,
-      getAvailability: (modelId, provider) =>
-        this.plugin.services.modelAvailability.getAvailability(modelId, provider).state,
-      refreshLocalModels: async () => {
-        await this.plugin.services.modelAvailability.refreshLocalModels({ forceRefresh: true });
-      },
+      getModelDeps: () => pluginModelDropdownDeps(this.plugin),
       onRagToggle: async (enabled) => {
         this.plugin.settings.rag.enabled = enabled;
         await this.plugin.saveSettings();

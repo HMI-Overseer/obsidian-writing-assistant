@@ -1,9 +1,9 @@
 import { setIcon } from "obsidian";
 import type { IndexingState } from "../../rag/types";
 import type { GraphBuildState } from "../../rag/graph/types";
-import type { EmbeddingModel, ModelAvailabilityState, ProviderOption } from "../../shared/types";
+import type { EmbeddingModel } from "../../shared/types";
 import { Toggle, createModelSelector } from "../../settings/ui";
-import type { ModelSelectorRefs } from "../../settings/ui";
+import type { ModelDropdownDeps, ModelSelectorRefs } from "../../settings/ui";
 import type { ChatLayoutRefs } from "../types";
 
 export type RagSnapshot = {
@@ -28,8 +28,8 @@ export type KnowledgePopoverCallbacks = {
   getGraphSnapshot: () => GraphSnapshot;
   getEmbeddingModels: () => EmbeddingModel[];
   getActiveEmbeddingModelId: () => string | null;
-  getAvailability: (modelId: string, provider: ProviderOption) => ModelAvailabilityState;
-  refreshLocalModels: () => Promise<void>;
+  /** Deps for the shared model dropdown (availability, favorites, refresh). */
+  getModelDeps: () => ModelDropdownDeps;
   onRagToggle: (enabled: boolean) => Promise<void>;
   onGraphToggle: (enabled: boolean) => Promise<void>;
   onEmbeddingModelSelect: (modelId: string | null) => Promise<void>;
@@ -144,11 +144,7 @@ export class KnowledgePopover {
     const activeId = this.callbacks.getActiveEmbeddingModelId();
     const activeModel = models.find((m) => m.id === activeId) ?? null;
 
-    const modelSelector = createModelSelector(selectorContainer, models, {
-      getAvailability: (modelId, provider) =>
-        this.callbacks.getAvailability(modelId, provider),
-      refreshLocalModels: () => this.callbacks.refreshLocalModels(),
-    }, {
+    const modelSelector = createModelSelector(selectorContainer, models, this.callbacks.getModelDeps(), {
       initial: activeModel,
       placeholder: "Select model...",
       onSelect: (model) => {

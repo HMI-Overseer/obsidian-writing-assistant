@@ -1,12 +1,11 @@
 import type WritingAssistantChat from "../main";
 import type { GraphBuildState } from "../rag/graph";
 import type { ModelAvailabilityState } from "../shared/types";
-import { getProviderDescriptor } from "../providers/registry";
 import {
   getSelectableCompletionModels,
   getSelectableEmbeddingModels,
 } from "../providers/selectableModels";
-import { createSettingsSection, createModelSelector, Button, SettingItem } from "./ui";
+import { createSettingsSection, createModelSelector, pluginModelDropdownDeps, Button, SettingItem } from "./ui";
 
 /**
  * Renders the Knowledge Graph settings tab.
@@ -78,18 +77,7 @@ export function renderKnowledgeGraphTab(
   const models = getSelectableCompletionModels(plugin.settings);
   const currentModel = models.find((m) => m.id === kg.activeCompletionModelId) ?? null;
 
-  const modelSelector = createModelSelector(completionItem.settingEl, models, {
-    getAvailability: (modelId, provider) =>
-      plugin.services.modelAvailability.getAvailability(modelId, provider).state,
-    refreshLocalModels: async () => {
-      if (currentModel) {
-        const desc = getProviderDescriptor(currentModel.provider);
-        if (desc.kind !== "cloud") {
-          await plugin.services.modelAvailability.refreshLocalModels({ forceRefresh: true });
-        }
-      }
-    },
-  }, {
+  const modelSelector = createModelSelector(completionItem.settingEl, models, pluginModelDropdownDeps(plugin), {
     initial: currentModel,
     placeholder: "None selected",
     onSelect: async (model) => {
@@ -112,18 +100,7 @@ export function renderKnowledgeGraphTab(
   const embModels = getSelectableEmbeddingModels(plugin.settings);
   const currentEmbModel = embModels.find((m) => m.id === kg.activeEmbeddingModelId) ?? null;
 
-  const embModelSelector = createModelSelector(embeddingItem.settingEl, embModels, {
-    getAvailability: (modelId, provider) =>
-      plugin.services.modelAvailability.getAvailability(modelId, provider).state,
-    refreshLocalModels: async () => {
-      if (currentEmbModel) {
-        const desc = getProviderDescriptor(currentEmbModel.provider);
-        if (desc.kind !== "cloud") {
-          await plugin.services.modelAvailability.refreshLocalModels({ forceRefresh: true });
-        }
-      }
-    },
-  }, {
+  const embModelSelector = createModelSelector(embeddingItem.settingEl, embModels, pluginModelDropdownDeps(plugin), {
     initial: currentEmbModel,
     placeholder: "None selected",
     onSelect: async (model) => {

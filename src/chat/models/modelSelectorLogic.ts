@@ -1,23 +1,31 @@
-import type { CompletionModel, ProviderOption } from "../../shared/types";
+import type { ProviderOption } from "../../shared/types";
 
 /**
- * Pure logic behind the chat model selector's rail + search + favorites UI,
- * extracted from {@link ChatModelSelector} so it is unit-testable without DOM.
+ * Pure logic behind the model dropdown's rail + search + favorites UI,
+ * extracted from {@link ModelDropdownView} so it is unit-testable without DOM.
  *
  * Favorites are display markup over the composed selectable set, never a
  * second model source: every function here takes the already-composed model
- * list from `getSelectableCompletionModels()` and only filters / reorders it,
- * so a disabled provider's models can never leak in through a stale favorite
- * key. Membership is checked against `CompletionModel.id`, which is the
- * composed `provider:modelId` key everywhere (catalog, discovery cache,
- * custom entries).
+ * list from `getSelectableCompletionModels()` / `getSelectableEmbeddingModels()`
+ * and only filters / reorders it, so a disabled provider's models can never
+ * leak in through a stale favorite key. Membership is checked against the
+ * model's `id`, which is the composed `provider:modelId` key everywhere
+ * (catalog, discovery cache, custom entries).
  */
+
+/** The structural shape every selectable model (completion or embedding) shares. */
+export interface SelectableModelLike {
+  id: string;
+  name: string;
+  modelId: string;
+  provider: ProviderOption;
+}
 
 /** The rail's categories: favorites on top, then one entry per provider. */
 export type ModelSelectorCategory = "favorites" | ProviderOption;
 
 export function isFavoriteModel(
-  model: CompletionModel,
+  model: SelectableModelLike,
   favoriteKeys: readonly string[]
 ): boolean {
   return favoriteKeys.includes(model.id);
@@ -28,11 +36,11 @@ export function isFavoriteModel(
  * set filtered by key membership; a provider category floats its starred
  * models to the top, keeping catalog order within each group.
  */
-export function modelsForCategory(
-  models: readonly CompletionModel[],
+export function modelsForCategory<T extends SelectableModelLike>(
+  models: readonly T[],
   category: ModelSelectorCategory,
   favoriteKeys: readonly string[]
-): CompletionModel[] {
+): T[] {
   if (category === "favorites") {
     return models.filter((model) => isFavoriteModel(model, favoriteKeys));
   }
@@ -44,10 +52,10 @@ export function modelsForCategory(
 }
 
 /** Case-insensitive substring filter over display name and model id. */
-export function filterModelsByQuery(
-  models: readonly CompletionModel[],
+export function filterModelsByQuery<T extends SelectableModelLike>(
+  models: readonly T[],
   query: string
-): CompletionModel[] {
+): T[] {
   const needle = query.trim().toLowerCase();
   if (!needle) return [...models];
   return models.filter(
@@ -64,9 +72,9 @@ export function filterModelsByQuery(
  * provider, then favorites, for the degenerate empty cases).
  */
 export function resolveLandingCategory(
-  models: readonly CompletionModel[],
+  models: readonly SelectableModelLike[],
   favoriteKeys: readonly string[],
-  activeModel: CompletionModel | null,
+  activeModel: SelectableModelLike | null,
   enabledProviders: readonly ProviderOption[]
 ): ModelSelectorCategory {
   if (models.some((model) => isFavoriteModel(model, favoriteKeys))) return "favorites";

@@ -174,7 +174,8 @@
   }
 
   .lmsa-model-dropdown-item.is-active {
-    color: var(--lmsa-mode-accent);
+    /* Fallback: settings surfaces don't define the chat root's mode accent. */
+    color: var(--lmsa-mode-accent, var(--interactive-accent));
   }
 
   .lmsa-model-dropdown-item.is-active:hover {
@@ -191,7 +192,7 @@
   }
 
   .lmsa-model-dropdown-item.is-active .lmsa-model-dropdown-check {
-    color: var(--lmsa-mode-accent);
+    color: var(--lmsa-mode-accent, var(--interactive-accent));
   }
 
   .lmsa-model-dropdown-check svg {

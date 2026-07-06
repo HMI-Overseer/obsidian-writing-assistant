@@ -1,9 +1,8 @@
 import type WritingAssistantChat from "../main";
 import type { IndexingState } from "../rag/types";
 import type { ModelAvailabilityState } from "../shared/types";
-import { getProviderDescriptor } from "../providers/registry";
 import { getSelectableEmbeddingModels } from "../providers/selectableModels";
-import { createSettingsSection, createModelSelector, Button, SettingItem } from "./ui";
+import { createSettingsSection, createModelSelector, pluginModelDropdownDeps, Button, SettingItem } from "./ui";
 import { DEFAULT_RAG_SETTINGS } from "../constants";
 
 /**
@@ -51,18 +50,7 @@ export function renderRagTab(
   const models = getSelectableEmbeddingModels(plugin.settings);
   const currentModel = models.find((m) => m.id === rag.activeEmbeddingModelId) ?? null;
 
-  const modelSelector = createModelSelector(embeddingItem.settingEl, models, {
-    getAvailability: (modelId, provider) =>
-      plugin.services.modelAvailability.getAvailability(modelId, provider).state,
-    refreshLocalModels: async () => {
-      if (currentModel) {
-        const desc = getProviderDescriptor(currentModel.provider);
-        if (desc.kind !== "cloud") {
-          await plugin.services.modelAvailability.refreshLocalModels({ forceRefresh: true });
-        }
-      }
-    },
-  }, {
+  const modelSelector = createModelSelector(embeddingItem.settingEl, models, pluginModelDropdownDeps(plugin), {
     initial: currentModel,
     placeholder: "None selected",
     onSelect: async (model) => {

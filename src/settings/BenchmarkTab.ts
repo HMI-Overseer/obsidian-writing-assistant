@@ -6,10 +6,10 @@ import type {
   ProviderProfile,
 } from "../shared/types";
 import { MAX_BENCHMARK_HISTORY } from "../constants";
-import { getProviderDescriptor, createChatClient } from "../providers/registry";
+import { createChatClient } from "../providers/registry";
 import { PROVIDER_DESCRIPTORS } from "../providers/descriptors";
 import { getSelectableCompletionModels } from "../providers/selectableModels";
-import { createSettingsSection, createModelSelector, SettingItem } from "./ui";
+import { createSettingsSection, createModelSelector, pluginModelDropdownDeps, SettingItem } from "./ui";
 import { getTestSuites } from "./benchmark/testSuites";
 import { runBenchmarkTest, runAllBenchmarks } from "./benchmark/benchmarkRunner";
 import type { BenchmarkTestCase, BenchmarkTestSuite, BenchmarkRunResult } from "./benchmark/types";
@@ -76,18 +76,7 @@ export function renderBenchmarkTab(
     .setName("Completion model")
     .setDesc("The model used to run benchmark tests.");
 
-  const selector = createModelSelector(modelItem.settingEl, models, {
-    getAvailability: (modelId, provider) =>
-      plugin.services.modelAvailability.getAvailability(modelId, provider).state,
-    refreshLocalModels: async () => {
-      if (selectedModel) {
-        const descriptor = getProviderDescriptor(selectedModel.provider);
-        if (descriptor.kind !== "cloud") {
-          await plugin.services.modelAvailability.refreshLocalModels({ forceRefresh: true });
-        }
-      }
-    },
-  }, {
+  const selector = createModelSelector(modelItem.settingEl, models, pluginModelDropdownDeps(plugin), {
     initial: selectedModel,
     onSelect: (model) => {
       selectedModel = model as CompletionModel | null;

@@ -1,5 +1,10 @@
 import { setIcon } from "obsidian";
 import type { ModelAvailabilityState, ProviderOption } from "../shared/types";
+import { ModelDropdownView } from "../chat/models/ModelDropdownView";
+import type { ModelDropdownDeps } from "../chat/models/ModelDropdownView";
+
+export { pluginModelDropdownDeps } from "../chat/models/ModelDropdownView";
+export type { ModelDropdownDeps } from "../chat/models/ModelDropdownView";
 
 /* ════════════════════════════════════════════════════════════════════════════
  *  Sub-components, lightweight wrappers around native HTML elements
@@ -226,11 +231,6 @@ export interface ModelSelectorItem {
   provider: ProviderOption;
 }
 
-export interface ModelSelectorDeps {
-  getAvailability: (modelId: string, provider: ProviderOption) => ModelAvailabilityState;
-  refreshLocalModels: () => Promise<void>;
-}
-
 export interface ModelSelectorRefs {
   wrapEl: HTMLElement;
   /** Programmatically update the selected model and refresh the UI. */
@@ -244,14 +244,15 @@ export interface ModelSelectorRefs {
 }
 
 /**
- * Creates a custom model selector with a status dot, dropdown list, and
- * per-item availability indicators. Mirrors the Benchmark tab's selector
- * without the profile-settings popover.
+ * Creates a custom model selector: a trigger with a status dot, opening the
+ * shared {@link ModelDropdownView} interior (search, provider rail, favorite
+ * stars). Same anatomy as the chat header's selector, minus its
+ * profile-settings popover.
  */
 export function createModelSelector(
   containerEl: HTMLElement,
   models: ModelSelectorItem[],
-  deps: ModelSelectorDeps,
+  deps: ModelDropdownDeps,
   opts: {
     initial: ModelSelectorItem | null;
     placeholder?: string;
@@ -285,8 +286,11 @@ export function createModelSelector(
     statusEl.addClass(`is-${state}`);
   }
 
+  /** Refresh local discovery only when the selection could need it (non-cloud). */
   async function refreshAvailability(): Promise<void> {
-    try { await deps.refreshLocalModels(); } catch { /* handled by service */ }
+    if (selected?.modelId && deps.getAvailability(selected.modelId, selected.provider) !== "cloud") {
+      try { await deps.refreshLocalModels(); } catch { /* handled by service */ }
+    }
     updateStatus();
   }
 
@@ -316,29 +320,19 @@ export function createModelSelector(
     chevronEl.empty();
     setIcon(chevronEl, "chevron-up");
 
-    const listEl = dropdownEl.createDiv({ cls: "lmsa-model-dropdown-list" });
-
-    for (const m of models) {
-      const item = listEl.createDiv({ cls: "lmsa-model-dropdown-item" });
-      const checkSpan = item.createEl("span", { cls: "lmsa-model-dropdown-check" });
-      if (selected && m.id === selected.id) {
-        item.addClass("is-active");
-        setIcon(checkSpan, "check");
-      }
-      const copy = item.createDiv({ cls: "lmsa-model-dropdown-copy" });
-      copy.createEl("span", { cls: "lmsa-model-dropdown-name", text: m.name });
-      const itemState = deps.getAvailability(m.modelId, m.provider);
-      item.createEl("span", { cls: `lmsa-model-dropdown-state is-${itemState}` });
-
-      item.addEventListener("click", (e) => {
-        e.stopPropagation();
-        selected = m;
-        labelEl.setText(m.name);
+    const view = new ModelDropdownView<ModelSelectorItem>(deps, dropdownEl, {
+      getModels: () => models,
+      getSelectedId: () => selected?.id ?? "",
+      onSelect: (model) => {
+        selected = model;
+        labelEl.setText(model.name);
         updateStatus();
         close();
-        opts.onSelect(m);
-      });
-    }
+        opts.onSelect(model);
+      },
+      onAfterRefresh: () => updateStatus(),
+    });
+    view.render();
   }
 
   // ── Events ──
@@ -346,6 +340,12 @@ export function createModelSelector(
   btn.addEventListener("click", (e) => {
     e.stopPropagation();
     if (isOpen) close(); else open();
+  });
+
+  // Interior clicks (search field, rail, star toggles) must not reach the
+  // document click-away handler above.
+  dropdownEl.addEventListener("click", (e) => {
+    e.stopPropagation();
   });
 
   // ── Attention effect ──
@@ -371,8 +371,7 @@ export function createModelSelector(
       updateStatus();
     },
     async refreshAvailability(): Promise<ModelAvailabilityState> {
-      try { await deps.refreshLocalModels(); } catch { /* handled by service */ }
-      updateStatus();
+      await refreshAvailability();
       if (!selected?.modelId) return "unknown";
       return deps.getAvailability(selected.modelId, selected.provider);
     },

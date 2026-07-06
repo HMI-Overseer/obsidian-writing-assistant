@@ -100,6 +100,29 @@ describe("normalizePluginSettings", () => {
     const result = normalizePluginSettings({ commands: "nope" as unknown as never });
     expect(result.commands).toEqual([]);
   });
+
+  it("normalizes favoriteModelKeys: keeps composed keys, drops junk, dedupes", () => {
+    const result = normalizePluginSettings({
+      favoriteModelKeys: [
+        "anthropic:claude-fable-5",
+        "anthropic:claude-fable-5", // duplicate
+        "lmstudio:qwen3-8b",
+        "model-1", // legacy synthetic id, not a composed key
+        "notaprovider:thing", // prefix is not a valid provider
+        42,
+        "",
+      ] as unknown as string[],
+    });
+    expect(result.favoriteModelKeys).toEqual(["anthropic:claude-fable-5", "lmstudio:qwen3-8b"]);
+  });
+
+  it("defaults favoriteModelKeys to [] when missing or non-array", () => {
+    expect(normalizePluginSettings({}).favoriteModelKeys).toEqual([]);
+    const wrongType = normalizePluginSettings({
+      favoriteModelKeys: "anthropic:claude-fable-5" as unknown as string[],
+    });
+    expect(wrongType.favoriteModelKeys).toEqual([]);
+  });
 });
 
 describe("normalizeGate", () => {

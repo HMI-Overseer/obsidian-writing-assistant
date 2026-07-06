@@ -544,6 +544,13 @@ export interface PluginSettings {
   maxToolRounds: number;
   /** Benchmark report folder and persisted run history. */
   benchmark: BenchmarkSettings;
+  /**
+   * Starred models in the chat selector, as composed `provider:modelId` keys.
+   * Display markup over the selectable set, never a second model source: a key
+   * whose model is not currently selectable simply doesn't render, and is kept
+   * so re-enabling its provider restores the star.
+   */
+  favoriteModelKeys: string[];
   /** Approval policy for vault write operations (create/overwrite/move/trash/createDir). */
   vaultOpPolicy: VaultOpPolicy;
 }

@@ -2,7 +2,7 @@ import { setIcon } from "obsidian";
 import type WritingAssistantChat from "../main";
 import type { CustomModelEntry, ModelRole, ProviderOption } from "../shared/types";
 import { normalizeLMStudioBaseUrl } from "../api";
-import { PROVIDER_DESCRIPTORS } from "../providers/descriptors";
+import { PROVIDER_DESCRIPTORS, PROVIDER_ICONS } from "../providers/descriptors";
 import { getCatalogEntries } from "../providers/catalog";
 import {
   getSelectableCompletionModels,
@@ -22,13 +22,6 @@ import { Button, Dropdown, SettingItem, TextInput, Toggle } from "./ui";
  * last-seen. Nobody authors model rows; the custom-model list on cloud cards
  * is the escape hatch for fine-tunes and uncurated ids.
  */
-
-const PROVIDER_ICONS: Record<ProviderOption, string> = {
-  lmstudio: "cpu",
-  anthropic: "sparkles",
-  openai: "bot",
-  claudecode: "terminal",
-};
 
 /** Expansion survives the tab's full re-renders within a settings session. */
 const expandedProviders = new Set<ProviderOption>();

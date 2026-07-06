@@ -139,4 +139,5 @@ export const DEFAULT_SETTINGS: PluginSettings = {
   maxToolRounds: DEFAULT_MAX_TOOL_ROUNDS,
   benchmark: { ...DEFAULT_BENCHMARK_SETTINGS },
   vaultOpPolicy: { ...DEFAULT_VAULT_OP_POLICY, scopes: [...DEFAULT_VAULT_OP_POLICY.scopes] },
+  favoriteModelKeys: [],
 };

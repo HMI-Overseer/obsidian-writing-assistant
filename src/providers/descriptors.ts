@@ -100,3 +100,14 @@ export const PROVIDER_DESCRIPTORS: Record<ProviderOption, ProviderDescriptor> = 
   openai,
   claudecode,
 };
+
+/**
+ * Lucide icon per provider. Lives at the descriptor layer so the Providers tab
+ * cards and the chat model selector rail share one source per fact.
+ */
+export const PROVIDER_ICONS: Record<ProviderOption, string> = {
+  lmstudio: "cpu",
+  anthropic: "sparkles",
+  openai: "bot",
+  claudecode: "terminal",
+};

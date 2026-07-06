@@ -377,6 +377,10 @@ export class ChatView extends ItemView {
       this.dismissAllOverlays({ keepModelSelector: true });
     });
 
+    this.registerDomEvent(this.layout.profileSettingsBtn, "click", () => {
+      this.dismissAllOverlays({ keepProfile: true });
+    });
+
     this.registerDomEvent(document, "click", () => {
       this.dismissAllOverlays();
     });
@@ -568,9 +572,10 @@ export class ChatView extends ItemView {
   private dismissAllOverlays(options?: {
     keepModelSelector?: boolean;
     keepHistory?: boolean;
+    keepProfile?: boolean;
   }): void {
     if (!options?.keepModelSelector) this.modelSelector?.close();
-    if (this.profilePopover?.isOpen()) this.profilePopover.close();
+    if (!options?.keepProfile && this.profilePopover?.isOpen()) this.profilePopover.close();
     if (this.contextPickerPopover?.isOpen()) this.contextPickerPopover.close();
     if (this.knowledgePopover?.isOpen()) this.knowledgePopover.close();
     if (this.toolUsePopover?.isOpen()) this.toolUsePopover.close();

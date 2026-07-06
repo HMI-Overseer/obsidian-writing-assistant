@@ -41,7 +41,7 @@ import {
 import { DEFAULT_VAULT_OP_POLICY, type Gate, type VaultOpPolicy } from "../vault-ops/gateway";
 import { PROVIDER_DESCRIPTORS } from "../providers/descriptors";
 import { getCatalogEntries } from "../providers/catalog";
-import { modelKey } from "../shared/modelKeys";
+import { modelKey, parseModelKey } from "../shared/modelKeys";
 import { normalizeChatHistory } from "../chat/conversation/conversationUtils";
 
 export function normalizeKnowledgeGraphSettings(raw: unknown): KnowledgeGraphSettings {
@@ -424,6 +424,20 @@ function migrateMaxToolRounds(data: Partial<PluginSettings> | null): number {
   return DEFAULT_SETTINGS.maxToolRounds;
 }
 
+/**
+ * Starred models are composed `provider:modelId` keys; anything else (wrong
+ * type, malformed key, duplicate) is dropped rather than carried forever.
+ */
+function normalizeFavoriteModelKeys(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return [];
+  const keys: string[] = [];
+  for (const key of raw) {
+    if (typeof key !== "string" || parseModelKey(key) === null) continue;
+    if (!keys.includes(key)) keys.push(key);
+  }
+  return keys;
+}
+
 export function normalizePluginSettings(data: Partial<PluginSettings> | null): PluginSettings {
   const legacyCompletion = readLegacyModelRows(data, "completionModels");
   const legacyEmbedding = readLegacyModelRows(data, "embeddingModels");
@@ -508,5 +522,6 @@ export function normalizePluginSettings(data: Partial<PluginSettings> | null): P
     maxToolRounds: migrateMaxToolRounds(data),
     benchmark: normalizeBenchmarkSettings(data?.benchmark),
     vaultOpPolicy: normalizeVaultOpPolicy(data?.vaultOpPolicy),
+    favoriteModelKeys: normalizeFavoriteModelKeys(data?.favoriteModelKeys),
   };
 }

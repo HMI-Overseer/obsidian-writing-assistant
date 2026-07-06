@@ -133,7 +133,13 @@ export function createChatLayout(contentEl: HTMLElement): ChatLayoutRefs {
   // below stay direct children of the (positioned) footer, so the clip does not hide them.
   const composerFooterRow = composerFooter.createDiv({ cls: "lmsa-chat-composer-footer-row" });
 
-  const contextCapacityEl = composerFooterRow.createDiv({ cls: "lmsa-chat-composer-context-capacity lmsa-hidden" });
+  // Left cluster: capacity ring + reasoning pill. Grouped so the row keeps its
+  // two-child justify-between geometry, and so the right-side indicators keep
+  // their measured container-query degradation thresholds (the pill must not
+  // add width to the actions row those thresholds were calculated from).
+  const composerFooterLeft = composerFooterRow.createDiv({ cls: "lmsa-chat-composer-footer-left" });
+
+  const contextCapacityEl = composerFooterLeft.createDiv({ cls: "lmsa-chat-composer-context-capacity lmsa-hidden" });
 
   const ringSvg = document.createElementNS(SVG_NS, "svg");
   ringSvg.classList.add("lmsa-context-ring-svg");
@@ -168,17 +174,7 @@ export function createChatLayout(contentEl: HTMLElement): ChatLayoutRefs {
   // mouse-hover-only. The exact "~Xk / Yk" breakdown stays in the hover tooltip.
   contextCapacityEl.createSpan({ cls: "lmsa-context-ring-label" });
 
-  const composerFooterActions = composerFooterRow.createDiv({ cls: "lmsa-chat-composer-footer-actions" });
-  const toolWrap = composerFooterActions.createDiv({ cls: "lmsa-chat-composer-tool-wrap" });
-  const toolUseIndicatorEl = toolWrap.createDiv({ cls: "lmsa-chat-composer-tool-indicator" });
-  setIcon(toolUseIndicatorEl, "wrench");
-  const knowledgeWrap = composerFooterActions.createDiv({ cls: "lmsa-chat-composer-knowledge-wrap" });
-  const knowledgeIndicatorEl = knowledgeWrap.createDiv({ cls: "lmsa-chat-composer-knowledge-indicator" });
-  setIcon(knowledgeIndicatorEl, "database");
-  const visionIndicatorEl = composerFooterActions.createDiv({ cls: "lmsa-chat-composer-vision-indicator" });
-  setIcon(visionIndicatorEl, "eye");
-
-  const reasoningPillEl = composerFooterActions.createEl("button", {
+  const reasoningPillEl = composerFooterLeft.createEl("button", {
     cls: "lmsa-chat-composer-reasoning-pill lmsa-hidden",
     attr: { "aria-label": "Reasoning effort" },
   }) as HTMLButtonElement;
@@ -188,6 +184,15 @@ export function createChatLayout(contentEl: HTMLElement): ChatLayoutRefs {
   setIcon(reasoningPillIcon, "brain");
   reasoningPillEl.createEl("span", { cls: "lmsa-chat-composer-reasoning-pill-label" });
 
+  const composerFooterActions = composerFooterRow.createDiv({ cls: "lmsa-chat-composer-footer-actions" });
+  const toolWrap = composerFooterActions.createDiv({ cls: "lmsa-chat-composer-tool-wrap" });
+  const toolUseIndicatorEl = toolWrap.createDiv({ cls: "lmsa-chat-composer-tool-indicator" });
+  setIcon(toolUseIndicatorEl, "wrench");
+  const knowledgeWrap = composerFooterActions.createDiv({ cls: "lmsa-chat-composer-knowledge-wrap" });
+  const knowledgeIndicatorEl = knowledgeWrap.createDiv({ cls: "lmsa-chat-composer-knowledge-indicator" });
+  setIcon(knowledgeIndicatorEl, "database");
+  const visionIndicatorEl = composerFooterActions.createDiv({ cls: "lmsa-chat-composer-vision-indicator" });
+  setIcon(visionIndicatorEl, "eye");
   const modeToggleEl = composerFooterActions.createDiv({ cls: "lmsa-chat-composer-mode-toggle" });
 
   const actionBtn = composerFooterActions.createEl("button", {

@@ -1,8 +1,10 @@
 @layer components {
   /* ── Reasoning pill ──────────────────────────────────────────────────────
-     Footer control reading the active model's reasoning level, same visual
-     language as the posture toggle beside it: low-chrome rounded pill, muted
-     until it carries an explicit (non-default) level. */
+     Footer control reading the active model's reasoning level, sitting in the
+     LEFT cluster next to the capacity ring (so the right-side indicators keep
+     their measured degradation thresholds). Same visual language as the
+     posture toggle: low-chrome rounded pill, muted until it carries an
+     explicit (non-default) level. */
 
   .lmsa-chat-composer-reasoning-pill {
     @apply lmsa-relative lmsa-inline-flex lmsa-flex-none lmsa-cursor-pointer lmsa-items-center lmsa-gap-1.5 lmsa-px-3 lmsa-py-1.5;
@@ -50,7 +52,9 @@
     @apply lmsa-absolute lmsa-z-[120] lmsa-flex-col lmsa-rounded-xl lmsa-border lmsa-border-obsidian-border lmsa-p-1;
     display: flex;
     bottom: calc(100% + 8px);
-    right: 50px;
+    /* The pill lives in the footer's left cluster (next to the capacity ring),
+       so the menu opens above-left, roughly over the pill. */
+    left: 8px;
     min-width: 132px;
     background:
       linear-gradient(
@@ -63,7 +67,7 @@
     box-shadow:
       0 -12px 48px rgba(0, 0, 0, 0.18),
       inset 0 -1px 0 var(--lmsa-inset-highlight-subtle);
-    transform-origin: bottom right;
+    transform-origin: bottom left;
   }
 
   .lmsa-reasoning-menu.lmsa-hidden {
@@ -97,9 +101,10 @@
     height: 12px;
   }
 
-  /* Narrow footer: collapse the pill to icon-only alongside the posture-toggle
-     labels; the passive indicators have already yielded by this width. */
-  @container lmsa-composer-footer (max-width: 359px) {
+  /* Narrow footer: the pill's text label collapses at the same width the
+     ring's % label drops, keeping the left cluster to two compact glyphs while
+     the right side degrades on its own original thresholds. */
+  @container lmsa-composer-footer (max-width: 516px) {
     .lmsa-chat-composer-reasoning-pill-label {
       display: none;
     }

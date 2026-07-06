@@ -261,6 +261,13 @@
     overflow-clip-margin: 6px;
   }
 
+  /* Left cluster: capacity ring + reasoning pill, left-aligned. Keeping the pill
+     out of the actions row preserves the measured degradation thresholds below,
+     which were calculated from the right-side items' exact footprints. */
+  .lmsa-chat-composer-footer-left {
+    @apply lmsa-flex lmsa-min-w-0 lmsa-items-center lmsa-gap-2;
+  }
+
   .lmsa-chat-composer-footer-actions {
     @apply lmsa-ml-auto lmsa-flex lmsa-items-center lmsa-gap-3;
   }

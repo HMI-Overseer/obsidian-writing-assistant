@@ -100,14 +100,14 @@ export function renderBenchmarkTab(
     { profileSettingsBtn, profileSettingsPopoverEl },
     {
       getActiveModel: () => selectedModel,
+      isProviderEnabled: (provider) => plugin.settings.providerSettings[provider].enabled,
       getProfilesForProvider: (provider) =>
         getProfilesForProvider(plugin.settings, provider),
       getActiveProfile: (provider) =>
         getActiveProfile(plugin.settings, provider),
       getProviderDescriptor: (provider) => PROVIDER_DESCRIPTORS[provider],
-      onProfileSelect: async (profileId) => {
-        if (!selectedModel) return;
-        plugin.settings.activeProfileIds[selectedModel.provider] = profileId;
+      onProfileSelect: async (profileId, provider) => {
+        plugin.settings.activeProfileIds[provider] = profileId;
         await plugin.saveSettings();
       },
       onProfileCreate: async (name, provider) => {

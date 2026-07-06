@@ -12,6 +12,7 @@
 @import "../chat/messages/AgenticTimeline.css";
 @import "../chat/messages/InlineMessageEditor.css";
 @import "../chat/models/ChatModelSelector.css";
+@import "../chat/models/ProviderRail.css";
 @import "../chat/models/ProfileSettingsPopover.css";
 @import "../chat/composer/ChatComposer.css";
 @import "../chat/composer/ContextPickerPopover.css";

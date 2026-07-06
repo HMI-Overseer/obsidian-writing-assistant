@@ -171,15 +171,14 @@ export class ChatView extends ItemView {
 
     this.profilePopover = new ProfileSettingsPopover(this.layout, {
       getActiveModel: () => this.sessionStore?.getResolvedConversationModel() ?? null,
+      isProviderEnabled: (provider) => this.plugin.settings.providerSettings[provider].enabled,
       getProfilesForProvider: (provider) =>
         getProfilesForProvider(this.plugin.settings, provider),
       getActiveProfile: (provider) =>
         getActiveProfile(this.plugin.settings, provider),
       getProviderDescriptor: (provider) => PROVIDER_DESCRIPTORS[provider],
-      onProfileSelect: async (profileId) => {
-        const model = this.sessionStore?.getResolvedConversationModel();
-        if (!model) return;
-        this.plugin.settings.activeProfileIds[model.provider] = profileId;
+      onProfileSelect: async (profileId, provider) => {
+        this.plugin.settings.activeProfileIds[provider] = profileId;
         await this.plugin.saveSettings();
       },
       onProfileCreate: async (name, provider) => {

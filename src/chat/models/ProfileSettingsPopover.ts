@@ -3,9 +3,11 @@ import type {
   ProviderOption,
   ProviderProfile,
 } from "../../shared/types";
+import { PROVIDER_OPTIONS } from "../../shared/modelKeys";
 import type { ProviderDescriptor, SamplingParamSupport } from "../../providers/types";
 import type { ChatLayoutRefs } from "../types";
 import { ProfileSelectorUI } from "./ProfileSelectorUI";
+import { providerRailEntry, renderProviderRail } from "./ProviderRail";
 import {
   TemperatureControl,
   SliderParamControl,
@@ -16,10 +18,11 @@ import {
 
 export type ProfileSettingsCallbacks = {
   getActiveModel: () => CompletionModel | null;
+  isProviderEnabled: (provider: ProviderOption) => boolean;
   getProfilesForProvider: (provider: ProviderOption) => ProviderProfile[];
   getActiveProfile: (provider: ProviderOption) => ProviderProfile;
   getProviderDescriptor: (provider: ProviderOption) => ProviderDescriptor;
-  onProfileSelect: (profileId: string) => Promise<void>;
+  onProfileSelect: (profileId: string, provider: ProviderOption) => Promise<void>;
   onProfileCreate: (name: string, provider: ProviderOption) => Promise<ProviderProfile>;
   onProfileDelete: (profileId: string) => Promise<void>;
   onProfileUpdate: (profileId: string, patch: Partial<ProviderProfile>) => Promise<void>;
@@ -27,6 +30,12 @@ export type ProfileSettingsCallbacks = {
 
 export class ProfileSettingsPopover {
   private popoverOpen = false;
+  /**
+   * The provider whose profiles are on screen. Opens on the active model's
+   * provider; the rail navigates to any other enabled provider so its profiles
+   * can be edited (or copied from) without switching models.
+   */
+  private viewedProvider: ProviderOption | null = null;
   private saveTimer: ReturnType<typeof setTimeout> | null = null;
   private readonly onBtnClick: (event: MouseEvent) => void;
   private readonly onPopoverClick: (event: MouseEvent) => void;
@@ -74,8 +83,9 @@ export class ProfileSettingsPopover {
     if (!model) return;
 
     this.popoverOpen = true;
+    this.viewedProvider = model.provider;
     this.refs.profileSettingsPopoverEl.removeClass("lmsa-hidden");
-    this.renderContent(model);
+    this.renderContent();
   }
 
   close(): void {
@@ -99,39 +109,47 @@ export class ProfileSettingsPopover {
   // Content rendering
   // ---------------------------------------------------------------------------
 
-  private renderContent(model: CompletionModel): void {
+  private renderContent(): void {
+    const model = this.callbacks.getActiveModel();
+    if (!model) return;
+    const provider = this.viewedProvider ?? model.provider;
+    this.viewedProvider = provider;
+
     const el = this.refs.profileSettingsPopoverEl;
     el.empty();
     this.profileSelector = null;
     this.promptTextareaEl = null;
 
-    const provider = model.provider;
     const descriptor = this.callbacks.getProviderDescriptor(provider);
     const profile = this.callbacks.getActiveProfile(provider);
 
-    const title = el.createDiv({
+    const layout = el.createDiv({ cls: "lmsa-profile-popover-layout" });
+    this.renderRail(layout.createDiv({ cls: "lmsa-provider-rail" }), provider);
+    const contentEl = layout.createDiv({ cls: "lmsa-profile-popover-content" });
+
+    const title = contentEl.createDiv({
       cls: "lmsa-profile-popover-title",
       text: "Model parameters",
     });
     title.createEl("span", {
       cls: "lmsa-profile-popover-subtitle",
-      text: model.name,
+      text:
+        provider === model.provider
+          ? model.name
+          : `${descriptor.label} (not the active model)`,
     });
 
     // Profile selector
-    this.profileSelector = new ProfileSelectorUI(el, {
+    this.profileSelector = new ProfileSelectorUI(contentEl, {
       getProfilesForProvider: this.callbacks.getProfilesForProvider,
       onProfileSelect: this.callbacks.onProfileSelect,
       onProfileCreate: this.callbacks.onProfileCreate,
       onProfileDelete: this.callbacks.onProfileDelete,
     });
-    this.profileSelector.setRerenderCallback(() => {
-      const m = this.callbacks.getActiveModel();
-      if (m) this.renderContent(m);
-    });
+    this.profileSelector.setRerenderCallback(() => this.renderContent());
     this.profileSelector.render(provider, profile);
 
-    const body = el.createDiv({ cls: "lmsa-profile-popover-body" });
+    const body = contentEl.createDiv({ cls: "lmsa-profile-popover-body" });
 
     // Default profile hint
     if (profile.isDefault) {
@@ -157,6 +175,34 @@ export class ProfileSettingsPopover {
 
     // Disable all controls when on default profile
     this.setControlsDisabled(profile.isDefault);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Provider rail
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Same fixed shape as the model dropdown's rail minus favorites: enabled
+   * providers in PROVIDER_OPTIONS order, then, behind a divider, the disabled
+   * ones grayed out and non-interactive.
+   */
+  private renderRail(railEl: HTMLElement, active: ProviderOption): void {
+    const enabled = PROVIDER_OPTIONS.filter((p) => this.callbacks.isProviderEnabled(p));
+    const disabled = PROVIDER_OPTIONS.filter((p) => !this.callbacks.isProviderEnabled(p));
+    renderProviderRail(
+      railEl,
+      [
+        enabled.map((provider) => providerRailEntry(provider, true)),
+        disabled.map((provider) => providerRailEntry(provider, false)),
+      ],
+      active,
+      (provider) => {
+        // A pending system-prompt edit belongs to the provider being left.
+        this.flushPendingSave();
+        this.viewedProvider = provider;
+        this.renderContent();
+      }
+    );
   }
 
   // ---------------------------------------------------------------------------
@@ -310,9 +356,9 @@ export class ProfileSettingsPopover {
   // ---------------------------------------------------------------------------
 
   private emitProfileUpdate(patch: Partial<ProviderProfile>): void {
-    const model = this.callbacks.getActiveModel();
-    if (!model) return;
-    const profile = this.callbacks.getActiveProfile(model.provider);
+    const provider = this.viewedProvider;
+    if (!provider) return;
+    const profile = this.callbacks.getActiveProfile(provider);
     if (profile.isDefault) return;
     void this.callbacks.onProfileUpdate(profile.id, patch);
   }

@@ -25,11 +25,10 @@
   /* ── Popover shell ──────────────────────────────────────────────────── */
 
   .lmsa-profile-popover {
-    @apply lmsa-absolute lmsa-left-0 lmsa-z-[120] lmsa-flex-col lmsa-rounded-2xl lmsa-border lmsa-border-obsidian-border lmsa-p-4;
+    @apply lmsa-absolute lmsa-left-0 lmsa-z-[120] lmsa-flex lmsa-flex-col lmsa-overflow-hidden lmsa-rounded-2xl lmsa-border lmsa-border-obsidian-border lmsa-p-4;
     top: calc(100% + 6px);
-    width: min(340px, calc(100vw - 48px));
+    width: min(400px, calc(100vw - 48px));
     max-height: min(500px, calc(100vh - 120px));
-    overflow-y: auto;
     background:
       linear-gradient(
         180deg,
@@ -62,6 +61,17 @@
     line-height: 1.4;
   }
 
+  /* Rail + scrollable content, mirroring the model dropdown's body row. */
+  .lmsa-profile-popover-layout {
+    @apply lmsa-flex lmsa-min-h-0 lmsa-flex-1 lmsa-items-stretch lmsa-gap-2;
+  }
+
+  .lmsa-profile-popover-content {
+    @apply lmsa-flex lmsa-min-w-0 lmsa-flex-1 lmsa-flex-col lmsa-overflow-y-auto;
+    /* Keep focus rings and the scrollbar from colliding with the controls. */
+    padding-right: 2px;
+  }
+
   .lmsa-profile-popover-body {
     @apply lmsa-flex lmsa-flex-col lmsa-gap-4;
   }
@@ -92,24 +102,108 @@
   /* ── Profile selector ───────────────────────────────────────────────── */
 
   .lmsa-profile-selector-row {
-    @apply lmsa-flex lmsa-items-center lmsa-gap-2;
+    @apply lmsa-relative lmsa-flex lmsa-items-center lmsa-justify-between lmsa-gap-2;
     margin-bottom: 0.5rem;
   }
 
-  .lmsa-profile-selector-select {
-    @apply lmsa-flex-1 lmsa-rounded-lg lmsa-border lmsa-border-obsidian-border lmsa-px-3 lmsa-py-1.5;
-    font-family: var(--font-text);
-    font-size: var(--font-ui-small);
-    color: var(--text-normal);
-    background: var(--background-secondary);
-    outline: none;
-    cursor: pointer;
-    min-width: 0;
-    transition: border-color 120ms ease;
+  .lmsa-profile-selector-actions {
+    @apply lmsa-flex lmsa-flex-none lmsa-items-center lmsa-gap-2;
   }
 
-  .lmsa-profile-selector-select:focus {
-    border-color: var(--lmsa-mode-accent);
+  /* Trigger mirrors the chat header's model selector (lmsa-chat-header-meta),
+     stretched so the hit area runs edge to edge up to the row actions. */
+  .lmsa-profile-trigger {
+    @apply lmsa-inline-flex lmsa-min-w-0 lmsa-flex-1 lmsa-cursor-pointer lmsa-items-center lmsa-gap-1.5 lmsa-text-obsidian-muted;
+    font-size: var(--font-ui-small);
+    line-height: 1.45;
+    padding: 2px 6px;
+    margin-left: -6px;
+    border-radius: 6px;
+    transition: background-color 140ms ease, color 140ms ease;
+  }
+
+  .lmsa-profile-trigger:hover {
+    background: color-mix(in srgb, var(--background-modifier-hover) 60%, transparent);
+    color: var(--text-normal);
+  }
+
+  .lmsa-profile-trigger.is-open {
+    color: var(--text-normal);
+  }
+
+  .lmsa-profile-trigger-label {
+    @apply lmsa-min-w-0 lmsa-truncate lmsa-whitespace-nowrap;
+  }
+
+  .lmsa-profile-trigger-chevron {
+    @apply lmsa-inline-flex lmsa-flex-none lmsa-items-center;
+    margin-left: auto;
+    opacity: 0.4;
+    transition: opacity 140ms ease;
+  }
+
+  .lmsa-profile-trigger:hover .lmsa-profile-trigger-chevron,
+  .lmsa-profile-trigger.is-open .lmsa-profile-trigger-chevron {
+    opacity: 0.75;
+  }
+
+  .lmsa-profile-trigger-chevron svg {
+    width: 12px;
+    height: 12px;
+  }
+
+  /* Profile dropdown, a pocket edition of the model dropdown's list. */
+  .lmsa-profile-menu {
+    @apply lmsa-absolute lmsa-left-0 lmsa-z-[130] lmsa-flex lmsa-flex-col lmsa-gap-0.5 lmsa-rounded-xl lmsa-border lmsa-border-obsidian-border lmsa-p-1.5;
+    top: calc(100% + 4px);
+    min-width: 180px;
+    max-width: 100%;
+    background:
+      linear-gradient(
+        180deg,
+        color-mix(in srgb, var(--background-primary) 97%, transparent),
+        color-mix(in srgb, var(--background-secondary) 94%, transparent)
+      );
+    backdrop-filter: blur(22px);
+    -webkit-backdrop-filter: blur(22px);
+    box-shadow:
+      0 16px 40px rgba(0, 0, 0, 0.22),
+      inset 0 1px 0 var(--lmsa-inset-highlight-subtle);
+  }
+
+  .lmsa-profile-menu-item {
+    @apply lmsa-flex lmsa-w-full lmsa-cursor-pointer lmsa-items-center lmsa-gap-2 lmsa-text-obsidian-muted;
+    font-size: var(--font-ui-small);
+    padding: 5px 8px;
+    border-radius: 6px;
+    transition: background-color 140ms ease, color 140ms ease;
+  }
+
+  .lmsa-profile-menu-item:hover {
+    background: color-mix(in srgb, var(--background-modifier-hover) 60%, transparent);
+    color: var(--text-normal);
+  }
+
+  .lmsa-profile-menu-item.is-active {
+    color: var(--lmsa-mode-accent, var(--interactive-accent));
+  }
+
+  .lmsa-profile-menu-check {
+    @apply lmsa-inline-flex lmsa-h-4 lmsa-w-4 lmsa-flex-none lmsa-items-center lmsa-justify-center;
+    color: transparent;
+  }
+
+  .lmsa-profile-menu-item.is-active .lmsa-profile-menu-check {
+    color: var(--lmsa-mode-accent, var(--interactive-accent));
+  }
+
+  .lmsa-profile-menu-check svg {
+    width: 13px;
+    height: 13px;
+  }
+
+  .lmsa-profile-menu-name {
+    @apply lmsa-min-w-0 lmsa-truncate lmsa-whitespace-nowrap;
   }
 
   .lmsa-profile-action-btn {

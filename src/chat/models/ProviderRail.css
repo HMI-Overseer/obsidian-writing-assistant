@@ -1,0 +1,43 @@
+@layer components {
+  /* Shared by the model dropdown and the profile settings popover. */
+
+  .lmsa-provider-rail {
+    @apply lmsa-flex lmsa-flex-none lmsa-flex-col lmsa-items-center lmsa-gap-0.5;
+    padding-right: 6px;
+    border-right: 1px solid var(--background-modifier-border);
+  }
+
+  .lmsa-provider-rail-item {
+    @apply lmsa-flex lmsa-h-8 lmsa-w-8 lmsa-flex-none lmsa-cursor-pointer lmsa-items-center lmsa-justify-center lmsa-rounded-md;
+    /* Brand color where a tint class is present; active/hover show as chips. */
+    color: var(--lmsa-brand-color, var(--text-muted));
+    transition: background-color 140ms ease, color 140ms ease;
+  }
+
+  .lmsa-provider-rail-item svg {
+    width: 18px;
+    height: 18px;
+  }
+
+  .lmsa-provider-rail-item:not(.is-disabled):hover {
+    background: color-mix(in srgb, var(--background-modifier-hover) 60%, transparent);
+  }
+
+  .lmsa-provider-rail-item.is-active {
+    background: color-mix(in srgb, var(--background-modifier-hover) 60%, transparent);
+  }
+
+  .lmsa-provider-rail-item.is-disabled {
+    @apply lmsa-cursor-default;
+    color: var(--text-faint);
+    opacity: 0.45;
+  }
+
+  .lmsa-provider-rail-divider {
+    @apply lmsa-flex-none;
+    width: 18px;
+    height: 1px;
+    margin: 3px 0;
+    background: var(--background-modifier-border);
+  }
+}

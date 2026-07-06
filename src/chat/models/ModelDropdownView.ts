@@ -2,7 +2,8 @@ import { setIcon } from "obsidian";
 import type WritingAssistantChat from "../../main";
 import type { ModelAvailabilityState, ProviderOption } from "../../shared/types";
 import { PROVIDER_OPTIONS } from "../../shared/modelKeys";
-import { PROVIDER_DESCRIPTORS, PROVIDER_ICONS } from "../../providers/descriptors";
+import { PROVIDER_DESCRIPTORS } from "../../providers/descriptors";
+import { providerRailEntry, renderProviderRail } from "./ProviderRail";
 import {
   filterModelsByQuery,
   isFavoriteModel,
@@ -138,7 +139,7 @@ export class ModelDropdownView<T extends SelectableModelLike> {
     this.refreshBtn = refreshBtn;
 
     const body = this.containerEl.createDiv({ cls: "lmsa-model-dropdown-body" });
-    this.railEl = body.createDiv({ cls: "lmsa-model-dropdown-rail" });
+    this.railEl = body.createDiv({ cls: "lmsa-provider-rail" });
     this.listEl = body.createDiv({ cls: "lmsa-model-dropdown-list" });
 
     this.renderRail();
@@ -181,52 +182,28 @@ export class ModelDropdownView<T extends SelectableModelLike> {
    * The rail has a fixed shape: favorites on top behind its own divider, then
    * enabled providers in PROVIDER_OPTIONS order, then, behind another divider,
    * the disabled providers, grayed out and non-interactive, a hint that more
-   * providers exist.
+   * providers exist. Favorites keeps the muted default; only providers get a
+   * brand tint.
    */
   private renderRail(): void {
     const railEl = this.railEl;
     if (!railEl) return;
-    railEl.empty();
 
-    const addEntry = (
-      category: ModelSelectorCategory,
-      icon: string,
-      label: string,
-      enabled: boolean
-    ): void => {
-      const entry = railEl.createDiv({ cls: "lmsa-model-dropdown-rail-item" });
-      // Favorites keeps the muted default; only providers get a brand tint.
-      if (category !== "favorites") entry.addClass(`lmsa-brand-tint-${category}`);
-      setIcon(entry, icon);
-      entry.setAttr("title", label);
-      if (!enabled) {
-        entry.addClass("is-disabled");
-        return;
-      }
-      if (category === this.activeCategory) entry.addClass("is-active");
-      entry.addEventListener("click", () => {
-        if (this.activeCategory === category) return;
+    const disabled = PROVIDER_OPTIONS.filter((provider) => !this.deps.isProviderEnabled(provider));
+    renderProviderRail<ModelSelectorCategory>(
+      railEl,
+      [
+        [{ key: "favorites", icon: "star", label: "Favorites", enabled: true }],
+        this.enabledProviders().map((provider) => providerRailEntry(provider, true)),
+        disabled.map((provider) => providerRailEntry(provider, false)),
+      ],
+      this.activeCategory,
+      (category) => {
         this.activeCategory = category;
         this.renderRail();
         this.renderList();
-      });
-    };
-
-    const addProviderEntries = (providers: readonly ProviderOption[], enabled: boolean): void => {
-      for (const provider of providers) {
-        addEntry(provider, PROVIDER_ICONS[provider], PROVIDER_DESCRIPTORS[provider].label, enabled);
       }
-    };
-
-    addEntry("favorites", "star", "Favorites", true);
-    railEl.createDiv({ cls: "lmsa-model-dropdown-rail-divider" });
-
-    const disabled = PROVIDER_OPTIONS.filter((provider) => !this.deps.isProviderEnabled(provider));
-    addProviderEntries(this.enabledProviders(), true);
-    if (disabled.length > 0) {
-      railEl.createDiv({ cls: "lmsa-model-dropdown-rail-divider" });
-      addProviderEntries(disabled, false);
-    }
+    );
   }
 
   private renderList(): void {

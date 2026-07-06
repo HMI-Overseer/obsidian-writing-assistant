@@ -3,16 +3,17 @@ import type { ProviderOption, ProviderProfile } from "../../shared/types";
 
 export type ProfileSelectorCallbacks = {
   getProfilesForProvider: (provider: ProviderOption) => ProviderProfile[];
-  onProfileSelect: (profileId: string) => Promise<void>;
+  onProfileSelect: (profileId: string, provider: ProviderOption) => Promise<void>;
   onProfileCreate: (name: string, provider: ProviderOption) => Promise<ProviderProfile>;
   onProfileDelete: (profileId: string) => Promise<void>;
 };
 
 /**
- * Profile selector dropdown with create/delete actions.
+ * Profile selector with create/delete actions. The trigger reuses the chat
+ * header's model selector look: a subtle text label with a chevron that
+ * expands into a dropdown of profiles.
  */
 export class ProfileSelectorUI {
-  private selectEl: HTMLSelectElement | null = null;
   private deleteBtn: HTMLButtonElement | null = null;
   private onRerender: (() => void) | null = null;
 
@@ -29,27 +30,24 @@ export class ProfileSelectorUI {
   render(provider: ProviderOption, activeProfile: ProviderProfile): void {
     const row = this.container.createDiv({ cls: "lmsa-profile-selector-row" });
 
-    this.selectEl = row.createEl("select", {
-      cls: "lmsa-profile-selector-select",
-    }) as HTMLSelectElement;
+    const trigger = row.createDiv({ cls: "lmsa-profile-trigger" });
+    trigger.createSpan({ cls: "lmsa-profile-trigger-label", text: activeProfile.name });
+    const chevron = trigger.createSpan({ cls: "lmsa-profile-trigger-chevron" });
+    setIcon(chevron, "chevron-down");
 
-    const profiles = this.callbacks.getProfilesForProvider(provider);
-    for (const p of profiles) {
-      this.selectEl.createEl("option", {
-        text: p.name,
-        attr: { value: p.id },
-      });
-    }
-    this.selectEl.value = activeProfile.id;
+    const menu = row.createDiv({ cls: "lmsa-profile-menu lmsa-hidden" });
+    this.renderMenuItems(menu, provider, activeProfile);
 
-    this.selectEl.addEventListener("change", () => {
-      if (!this.selectEl) return;
-      void this.callbacks.onProfileSelect(this.selectEl.value).then(() => {
-        this.onRerender?.();
-      });
+    trigger.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const open = menu.hasClass("lmsa-hidden");
+      menu.toggleClass("lmsa-hidden", !open);
+      trigger.toggleClass("is-open", open);
     });
 
-    const createBtn = row.createEl("button", {
+    const actions = row.createDiv({ cls: "lmsa-profile-selector-actions" });
+
+    const createBtn = actions.createEl("button", {
       cls: "lmsa-profile-action-btn",
       attr: { "aria-label": "Create profile" },
     }) as HTMLButtonElement;
@@ -60,7 +58,7 @@ export class ProfileSelectorUI {
       this.showCreateProfileInline(row, provider);
     });
 
-    this.deleteBtn = row.createEl("button", {
+    this.deleteBtn = actions.createEl("button", {
       cls: "lmsa-profile-action-btn lmsa-profile-action-btn--danger",
       attr: { "aria-label": "Delete profile" },
     }) as HTMLButtonElement;
@@ -72,12 +70,38 @@ export class ProfileSelectorUI {
 
     this.deleteBtn.addEventListener("click", (e) => {
       e.stopPropagation();
-      if (!this.selectEl) return;
       // Deleting a profile discards a hand-tuned system prompt and params with no
       // undo, so gate it behind the same lightweight two-step confirm the history
       // drawer and create-profile flows use.
-      this.showDeleteConfirmInline(row, this.selectEl.value);
+      this.showDeleteConfirmInline(row, activeProfile.id);
     });
+  }
+
+  private renderMenuItems(
+    menu: HTMLElement,
+    provider: ProviderOption,
+    activeProfile: ProviderProfile,
+  ): void {
+    for (const profile of this.callbacks.getProfilesForProvider(provider)) {
+      const item = menu.createDiv({ cls: "lmsa-profile-menu-item" });
+      const check = item.createSpan({ cls: "lmsa-profile-menu-check" });
+      if (profile.id === activeProfile.id) {
+        item.addClass("is-active");
+        setIcon(check, "check");
+      }
+      item.createSpan({ cls: "lmsa-profile-menu-name", text: profile.name });
+
+      item.addEventListener("click", (e) => {
+        e.stopPropagation();
+        if (profile.id === activeProfile.id) {
+          menu.addClass("lmsa-hidden");
+          return;
+        }
+        void this.callbacks.onProfileSelect(profile.id, provider).then(() => {
+          this.onRerender?.();
+        });
+      });
+    }
   }
 
   private showDeleteConfirmInline(row: HTMLElement, profileId: string): void {

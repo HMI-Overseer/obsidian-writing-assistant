@@ -98,14 +98,14 @@ function wireCallbacks(
 
   const callbacks: ProfileSettingsCallbacks = {
     getActiveModel: () => activeModel,
+    isProviderEnabled: () => true,
     getProfilesForProvider: (provider) =>
       getProfilesForProvider(settings, provider),
     getActiveProfile: (provider) =>
       getActiveProfile(settings, provider),
     getProviderDescriptor: (provider) => PROVIDER_DESCRIPTORS[provider],
-    onProfileSelect: async (profileId) => {
-      if (!activeModel) return;
-      settings.activeProfileIds[activeModel.provider] = profileId;
+    onProfileSelect: async (profileId, provider) => {
+      settings.activeProfileIds[provider] = profileId;
       await saveSettings();
     },
     onProfileCreate: async (name, provider) => {
@@ -165,14 +165,26 @@ describe("Profile settings, profile CRUD callbacks", () => {
     const { callbacks, getSaveCount } = wireCallbacks(settings, makeLMStudioModel());
 
     const created = await callbacks.onProfileCreate("Test", "lmstudio");
-    await callbacks.onProfileSelect("lmstudio-default");
+    await callbacks.onProfileSelect("lmstudio-default", "lmstudio");
 
     expect(settings.activeProfileIds.lmstudio).toBe("lmstudio-default");
     expect(getSaveCount()).toBe(2);
 
     // Switch back to user profile
-    await callbacks.onProfileSelect(created.id);
+    await callbacks.onProfileSelect(created.id, "lmstudio");
     expect(settings.activeProfileIds.lmstudio).toBe(created.id);
+  });
+
+  test("onProfileSelect for a rail-viewed provider leaves the active model's provider alone", async () => {
+    // Active model is LM Studio, but the popover rail is viewing Anthropic.
+    const settings = makeFakeSettings();
+    const { callbacks } = wireCallbacks(settings, makeLMStudioModel());
+
+    const created = await callbacks.onProfileCreate("Claude prompt", "anthropic");
+    await callbacks.onProfileSelect(created.id, "anthropic");
+
+    expect(settings.activeProfileIds.anthropic).toBe(created.id);
+    expect(settings.activeProfileIds.lmstudio).toBe("lmstudio-default");
   });
 
   test("onProfileDelete removes the profile and resets to default", async () => {

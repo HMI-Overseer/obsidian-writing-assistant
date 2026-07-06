@@ -66,8 +66,23 @@ function buildMessageUsage(modelId: string, usage: UsageResult): MessageUsage {
     outputTokens: usage.outputTokens,
     ...(usage.cacheCreationInputTokens !== undefined && { cacheCreationInputTokens: usage.cacheCreationInputTokens }),
     ...(usage.cacheReadInputTokens !== undefined && { cacheReadInputTokens: usage.cacheReadInputTokens }),
-    estimatedCostUsd: estimateCost(modelId, usage) ?? undefined,
+    ...(usage.contextTokens !== undefined && { contextTokens: usage.contextTokens }),
+    // Provider-reported cost wins over the price-table estimate (mirrors
+    // finalizeResponse): Claude Code's aliases have no price-table entry at all.
+    estimatedCostUsd: usage.costUsd ?? estimateCost(modelId, usage) ?? undefined,
   };
+}
+
+/**
+ * The tokens actually occupying the context window for a request, for capacity
+ * calibration. Cached prompt tokens are still context, so cache reads/writes
+ * count; `inputTokens` alone is just the uncached remainder and collapses the
+ * correction ratio toward zero on well-cached turns.
+ */
+function contextTokensOf(usage: UsageResult): number {
+  return (
+    usage.inputTokens + (usage.cacheCreationInputTokens ?? 0) + (usage.cacheReadInputTokens ?? 0)
+  );
 }
 
 /**
@@ -315,8 +330,13 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
           : undefined,
         onCalibrate: onCalibrate
           ? (request, usage) => {
+              // A provider that reports its context size directly (Claude Code)
+              // doesn't use ratio correction, the ring anchors on the persisted
+              // per-message contextTokens instead. Its huge fixed harness
+              // overhead over a small transcript would poison the ratio (~65x).
+              if (usage.contextTokens !== undefined) return;
               const estimated = estimateTokenCount(request);
-              onCalibrate(estimated, usage.inputTokens);
+              onCalibrate(estimated, contextTokensOf(usage));
             }
           : undefined,
       },
@@ -330,6 +350,16 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
     await renderer.flush();
     assistantBubble.bodyEl.removeClass("is-streaming");
     timeline?.finalize();
+
+    // Claude Code reports its own context window per turn (its catalog aliases
+    // carry no static size); record it so the capacity ring's fallback lookup
+    // resolves from the next recalculation on.
+    if (finalUsage?.contextWindow) {
+      plugin.services.modelAvailability.reportContextWindow(
+        activeModel.modelId,
+        finalUsage.contextWindow,
+      );
+    }
 
     const agenticSteps = timeline?.getSteps();
 

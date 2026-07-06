@@ -1,6 +1,7 @@
 import { describe, test, expect } from "vitest";
-import { estimateTokenCount } from "../../../src/shared/tokenEstimation";
+import { estimateTokenCount, anchoredContextEstimate } from "../../../src/shared/tokenEstimation";
 import type { ChatRequest } from "../../../src/shared/chatRequest";
+import type { ConversationMessage } from "../../../src/shared/types";
 
 function makeRequest(overrides: Partial<ChatRequest> = {}): ChatRequest {
   return {
@@ -107,5 +108,93 @@ describe("estimateTokenCount", () => {
     function result(req: ChatRequest): number {
       return estimateTokenCount(req);
     }
+  });
+});
+
+describe("anchoredContextEstimate", () => {
+  function msg(overrides: Partial<ConversationMessage>): ConversationMessage {
+    return { id: "m", role: "user", content: "", ...overrides };
+  }
+
+  test("returns null when no message carries a reported context size", () => {
+    const messages = [
+      msg({ role: "user", content: "Hello" }),
+      msg({ role: "assistant", content: "Hi!", usage: { inputTokens: 10, outputTokens: 5 } }),
+    ];
+    expect(anchoredContextEstimate(messages)).toBeNull();
+  });
+
+  test("anchors on the reported context size, adding only content after the anchor", () => {
+    const messages = [
+      msg({ role: "user", content: "X".repeat(4000) }),
+      msg({
+        role: "assistant",
+        content: "R".repeat(400), // the anchored reply itself: not in its own prompt
+        usage: { inputTokens: 7, outputTokens: 100, contextTokens: 16700 },
+      }),
+      msg({ role: "user", content: "Y".repeat(80) }),
+    ];
+    // 16700 + reply(400) + later user turn(80) + draft(20), /4 for the char parts.
+    // The 4000-char user turn before the anchor must NOT be re-counted.
+    expect(anchoredContextEstimate(messages, "D".repeat(20))).toBe(16700 + (400 + 80 + 20) / 4);
+  });
+
+  test("uses the LAST anchored message and skips error messages", () => {
+    const messages = [
+      msg({
+        role: "assistant",
+        content: "old",
+        usage: { inputTokens: 1, outputTokens: 1, contextTokens: 99999 },
+      }),
+      msg({
+        role: "assistant",
+        content: "E".repeat(40),
+        usage: { inputTokens: 2, outputTokens: 2, contextTokens: 20000 },
+      }),
+      msg({ role: "assistant", content: "Z".repeat(4000), isError: true }),
+    ];
+    expect(anchoredContextEstimate(messages)).toBe(20000 + 40 / 4);
+  });
+
+  test("ignores anchors reported by a different provider than the active one", () => {
+    const messages = [
+      msg({
+        role: "assistant",
+        content: "from claude code",
+        provider: "claudecode",
+        usage: { inputTokens: 1, outputTokens: 1, contextTokens: 16700 },
+      }),
+    ];
+    // Conversation switched to LM Studio: the Claude Code anchor carries that
+    // harness's fixed overhead, which LM Studio won't have. Fall back (null).
+    expect(anchoredContextEstimate(messages, "", "lmstudio")).toBeNull();
+    // Still on Claude Code: the anchor applies.
+    expect(anchoredContextEstimate(messages, "", "claudecode")).toBe(16700 + 4);
+  });
+
+  test("counts note attachments on turns after the anchor", () => {
+    const messages = [
+      msg({
+        role: "assistant",
+        content: "",
+        usage: { inputTokens: 1, outputTokens: 1, contextTokens: 5000 },
+      }),
+      msg({
+        role: "user",
+        content: "",
+        attachments: [
+          {
+            type: "note",
+            id: "n1",
+            filePath: "a.md",
+            fileName: "a.md",
+            content: "N".repeat(120),
+            truncated: false,
+            mtimeSnapshot: 1,
+          },
+        ],
+      }),
+    ];
+    expect(anchoredContextEstimate(messages)).toBe(5000 + Math.ceil(("a.md".length + 120 + 30) / 4));
   });
 });

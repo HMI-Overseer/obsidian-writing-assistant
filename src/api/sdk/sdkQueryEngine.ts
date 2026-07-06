@@ -1,6 +1,10 @@
 import type { SamplingParams } from "../../shared/types";
 import { createAbortError } from "../httpTransport";
-import type { ClaudeCodeResultUsage } from "../claudeCodeProcess";
+import {
+  extractClaudeCodeContextTokens,
+  extractClaudeCodeContextWindow,
+  type ClaudeCodeResultUsage,
+} from "../claudeCodeProcess";
 import { AbortError, query } from "./claudeAgentSdk";
 import type { McpSdkServerConfigWithInstance, Options, SDKMessage } from "./claudeAgentSdk";
 
@@ -94,12 +98,15 @@ export async function* streamSdkTurn(opts: SdkTurnOptions): AsyncGenerator<strin
 
   try {
     const session = query({ prompt: opts.prompt, options: buildSdkOptions(opts, abortController) });
+    let contextTokens: number | null = null;
     for await (const message of session) {
       const text = textDelta(message);
       if (text) {
         yield text;
         continue;
       }
+
+      contextTokens = extractClaudeCodeContextTokens(message) ?? contextTokens;
 
       if (message.type === "assistant" && message.error) {
         throw new Error(`Claude Code error: ${message.error}`);
@@ -109,7 +116,7 @@ export async function* streamSdkTurn(opts: SdkTurnOptions): AsyncGenerator<strin
         if (message.subtype !== "success" || message.is_error) {
           throw new Error(resultErrorMessage(message));
         }
-        opts.onResult?.(resultUsage(message));
+        opts.onResult?.(resultUsage(message, contextTokens));
       }
     }
   } catch (error) {
@@ -208,8 +215,15 @@ export function textDelta(message: SDKMessage): string | null {
   return null;
 }
 
-/** Maps a successful SDK `result` message onto the plugin's usage/cost shape. */
-export function resultUsage(message: Extract<SDKMessage, { type: "result" }>): ClaudeCodeResultUsage {
+/**
+ * Maps a successful SDK `result` message onto the plugin's usage/cost shape.
+ * `contextTokens` is the last per-call context size the caller observed via
+ * {@link extractClaudeCodeContextTokens} while streaming this turn.
+ */
+export function resultUsage(
+  message: Extract<SDKMessage, { type: "result" }>,
+  contextTokens?: number | null,
+): ClaudeCodeResultUsage {
   const usage = message.usage;
   const result: ClaudeCodeResultUsage = {
     inputTokens: usage.input_tokens ?? 0,
@@ -223,6 +237,9 @@ export function resultUsage(message: Extract<SDKMessage, { type: "result" }>): C
   if (typeof usage.cache_read_input_tokens === "number") {
     result.cacheReadInputTokens = usage.cache_read_input_tokens;
   }
+  const contextWindow = extractClaudeCodeContextWindow(message.modelUsage);
+  if (contextWindow !== null) result.contextWindow = contextWindow;
+  if (typeof contextTokens === "number") result.contextTokens = contextTokens;
   return result;
 }
 

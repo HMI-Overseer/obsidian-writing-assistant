@@ -92,6 +92,40 @@ describe("streamSdkTurn", () => {
     });
   });
 
+  it("captures the context window and the last API call's context size", async () => {
+    const assistantUsage = (input: number, cacheRead: number, cacheCreation: number) => ({
+      type: "assistant",
+      parent_tool_use_id: null,
+      message: {
+        usage: {
+          input_tokens: input,
+          cache_read_input_tokens: cacheRead,
+          cache_creation_input_tokens: cacheCreation,
+        },
+      },
+    });
+    feed([
+      assistantUsage(10, 50000, 2000),
+      textDeltaMessage("Hi"),
+      assistantUsage(4, 60000, 500),
+      successResult({
+        modelUsage: {
+          "claude-opus-4-8": { contextWindow: 200000, inputTokens: 14, cacheReadInputTokens: 110000 },
+          // Sub-model with a bigger window but a fraction of the traffic: ignored.
+          "claude-sonnet-4-5[1m]": { contextWindow: 1000000, inputTokens: 40 },
+        },
+      }),
+    ]);
+
+    let captured: ClaudeCodeResultUsage | null = null;
+    await drain(streamSdkTurn(baseOptions({ onResult: (r) => (captured = r) })));
+
+    // The last assistant call's prompt (uncached + cache read + cache write) is the
+    // session's current context size; the aggregate result usage is not.
+    expect(captured!.contextTokens).toBe(60504);
+    expect(captured!.contextWindow).toBe(200000);
+  });
+
   it("passes the resolved binary, model, and disabled persistence to the SDK", async () => {
     feed([successResult()]);
     await drain(streamSdkTurn(baseOptions()));

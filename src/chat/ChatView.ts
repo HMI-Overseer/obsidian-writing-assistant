@@ -641,6 +641,7 @@ export class ChatView extends ItemView {
       draft: draft ?? this.composer?.getDraft() ?? "",
       contextWindowSize: activeModel?.contextWindowSize
         ?? this.plugin.services.modelAvailability.getActiveContextLength(activeModel?.modelId ?? ""),
+      activeProvider: activeModel?.provider,
     };
   }
 }

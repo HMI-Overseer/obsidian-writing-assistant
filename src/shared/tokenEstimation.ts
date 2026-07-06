@@ -1,4 +1,5 @@
 import type { ChatRequest } from "./chatRequest";
+import type { ConversationMessage, ProviderOption } from "./types";
 
 /**
  * Approximate character-to-token ratio for English text.
@@ -59,4 +60,61 @@ export function estimateTokenCount(request: ChatRequest, draft?: string): number
   }
 
   return Math.ceil(totalChars / CHARS_PER_TOKEN);
+}
+
+/**
+ * Context estimate anchored on a provider-reported context size.
+ *
+ * Providers that report their real context occupancy per turn (Claude Code's
+ * `contextTokens`, persisted on the message's usage) make the multiplicative
+ * correction-ratio approach wrong: their context is a large FIXED harness
+ * overhead plus the transcript, and a ratio learned against a small transcript
+ * multiplies that overhead into every subsequent keystroke (a ~16k first turn
+ * over a ~250-token "Hello" learns ~65x and shows a 2k conversation as 119k+).
+ *
+ * Instead: take the newest message carrying a reported size and add a plain
+ * `chars / 4` estimate of only what the provider hasn't seen yet, the anchored
+ * reply itself (it was not part of its own prompt), any later turns, and the
+ * live draft. Returns null when no message carries a reported size (callers
+ * fall back to ratio-corrected estimation).
+ *
+ * An anchor is only valid for the provider that reported it: its size includes
+ * that harness's fixed overhead, which a different provider won't carry. When
+ * the conversation has been switched to another provider, mismatched anchors
+ * are ignored and the caller falls back to plain estimation.
+ */
+export function anchoredContextEstimate(
+  messages: readonly ConversationMessage[],
+  draft?: string,
+  activeProvider?: ProviderOption,
+): number | null {
+  let anchorIndex = -1;
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const message = messages[i];
+    if (
+      !message.isError &&
+      message.usage?.contextTokens !== undefined &&
+      message.provider === activeProvider
+    ) {
+      anchorIndex = i;
+      break;
+    }
+  }
+  if (anchorIndex === -1) return null;
+
+  const anchor = messages[anchorIndex].usage?.contextTokens ?? 0;
+  let tailChars = 0;
+  for (let i = anchorIndex; i < messages.length; i++) {
+    const message = messages[i];
+    if (message.isError) continue;
+    tailChars += message.content.length;
+    for (const attachment of message.attachments ?? []) {
+      if (attachment.type === "note") {
+        tailChars += attachment.filePath.length + attachment.content.length + 30;
+      }
+    }
+  }
+  tailChars += draft?.length ?? 0;
+
+  return anchor + Math.ceil(tailChars / CHARS_PER_TOKEN);
 }

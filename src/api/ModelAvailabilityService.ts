@@ -21,6 +21,13 @@ export interface ModelAvailabilityInfo {
 
 export class ModelAvailabilityService {
   private availabilityMap = new Map<string, ModelAvailabilityInfo>();
+  /**
+   * Context windows reported by a provider's own responses (Claude Code's
+   * `modelUsage.contextWindow`), keyed by model id. Kept apart from
+   * `availabilityMap`, which is rebuilt from LM Studio discovery on every
+   * refresh and would silently drop provider-reported entries.
+   */
+  private reportedContextWindows = new Map<string, number>();
   private lmService: LMStudioModelsService | null = null;
   private lastFetchedAt = 0;
   private lastLmBaseUrl = "";
@@ -101,7 +108,20 @@ export class ModelAvailabilityService {
   }
 
   getActiveContextLength(modelId: string): number | undefined {
-    return this.availabilityMap.get(modelId)?.activeContextLength;
+    return (
+      this.availabilityMap.get(modelId)?.activeContextLength ??
+      this.reportedContextWindows.get(modelId)
+    );
+  }
+
+  /**
+   * Records a context window the provider itself reported for a model (Claude
+   * Code turns carry it in their result). Fills the same lookup the capacity
+   * ring and the pre-send capacity notice already fall back to for models whose
+   * catalog entry carries no static window.
+   */
+  reportContextWindow(modelId: string, contextWindow: number): void {
+    this.reportedContextWindows.set(modelId, contextWindow);
   }
 
   getTrainedForToolUse(modelId: string): boolean | undefined {

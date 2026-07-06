@@ -206,6 +206,14 @@ export interface MessageUsage {
   sessionReused?: boolean;
   /** Claude Code only: when the session cold-rebuilt, the change that drove it. */
   sessionRebuildReason?: SessionRebuildReason;
+  /**
+   * The provider-reported context size (tokens) when this response was
+   * generated (Claude Code: prompt of the turn's last internal API call). The
+   * capacity ring anchors on the newest of these instead of scaling a char
+   * estimate, so a provider's fixed harness overhead is added once, not
+   * multiplied into every keystroke.
+   */
+  contextTokens?: number;
 }
 
 /** A RAG source reference attached to an assistant message. */

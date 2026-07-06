@@ -1,5 +1,5 @@
 import { createAbortError } from "../httpTransport";
-import type { ClaudeCodeResultUsage } from "../claudeCodeProcess";
+import { extractClaudeCodeContextTokens, type ClaudeCodeResultUsage } from "../claudeCodeProcess";
 import {
   decideReuse,
   fingerprint,
@@ -208,6 +208,7 @@ export class SdkSession {
     ctx.signal?.addEventListener("abort", onAbort, { once: true });
 
     let assistantText = "";
+    let contextTokens: number | null = null;
     try {
       this.input.push(userMessage(prompt));
       // Manual iteration (not `for await`): a `for await` that `break`s on the
@@ -224,6 +225,8 @@ export class SdkSession {
           yield text;
           continue;
         }
+
+        contextTokens = extractClaudeCodeContextTokens(message) ?? contextTokens;
 
         if (isCompactBoundary(message)) {
           // The session summarized its context mid-turn. Finish streaming the reply,
@@ -243,7 +246,7 @@ export class SdkSession {
             // Bank the partial reply as the covered assistant turn, it equals the
             // streamed deltas the chat layer persists on abort, so the next turn can
             // reuse the live session, then surface the abort to the chat layer.
-            ctx.onResult?.(resultUsage(message));
+            ctx.onResult?.(resultUsage(message, contextTokens));
             this.advanceWatermark(ctx.turns, assistantText);
             this.interruptedCleanly = true;
             this.lastUsedAt = Date.now();
@@ -252,7 +255,7 @@ export class SdkSession {
           if (message.subtype !== "success" || message.is_error) {
             throw new Error(resultErrorMessage(message));
           }
-          ctx.onResult?.(resultUsage(message));
+          ctx.onResult?.(resultUsage(message, contextTokens));
           this.advanceWatermark(ctx.turns, assistantText);
           this.lastUsedAt = Date.now();
           return;

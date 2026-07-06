@@ -24,6 +24,19 @@ export interface UsageResult {
   sessionReused?: boolean;
   /** Claude Code only: when the session cold-rebuilt, the change that drove it. */
   sessionRebuildReason?: SessionRebuildReason;
+  /**
+   * Claude Code only: the model's context-window size (tokens) as the CLI itself
+   * reports it (`modelUsage.contextWindow`). Feeds the capacity ring for a
+   * provider whose catalog entries are CLI aliases with no static window.
+   */
+  contextWindow?: number;
+  /**
+   * Claude Code only: prompt tokens (uncached + cache read + cache write) of the
+   * turn's last internal API call, i.e. the session's current context size. The
+   * aggregate `inputTokens`/`cache*` fields sum every internal call of an agentic
+   * turn, so they cannot stand in for context occupancy.
+   */
+  contextTokens?: number;
 }
 
 /**

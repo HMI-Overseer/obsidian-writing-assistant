@@ -7,6 +7,7 @@ import type { CompletionResult, StreamResult, StopReason, UsageResult } from "./
 import {
   streamClaudeCode,
   extractClaudeCodeResult,
+  extractClaudeCodeContextTokens,
   resolveClaudeBinary,
   type ClaudeCodeResultUsage,
 } from "./claudeCodeProcess";
@@ -217,6 +218,7 @@ export class ClaudeCodeClient implements ChatClient {
       });
     }
 
+    let contextTokens: number | null = null;
     return streamClaudeCode({
       command: this.command,
       args: this.buildLegacyArgs(request, model),
@@ -225,8 +227,12 @@ export class ClaudeCodeClient implements ChatClient {
       prompt,
       signal,
       onEvent: (json) => {
+        contextTokens = extractClaudeCodeContextTokens(json) ?? contextTokens;
         const result = extractClaudeCodeResult(json);
-        if (result) onResult(result);
+        if (result) {
+          if (contextTokens !== null) result.contextTokens = contextTokens;
+          onResult(result);
+        }
       },
     });
   }
@@ -303,6 +309,8 @@ function toUsageResult(result: ClaudeCodeResultUsage | null): UsageResult | null
     usage.cacheReadInputTokens = result.cacheReadInputTokens;
   }
   if (result.costUsd !== undefined) usage.costUsd = result.costUsd;
+  if (result.contextWindow !== undefined) usage.contextWindow = result.contextWindow;
+  if (result.contextTokens !== undefined) usage.contextTokens = result.contextTokens;
   return usage;
 }
 

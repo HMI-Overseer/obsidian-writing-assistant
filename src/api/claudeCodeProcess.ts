@@ -100,6 +100,19 @@ export interface ClaudeCodeResultUsage {
   costUsd?: number;
   /** Session id for future `--resume` continuation. */
   sessionId?: string;
+  /**
+   * The model's context-window size (tokens) as Claude Code reports it in the
+   * result's `modelUsage`, the CLI's own ground truth, so the plugin never has
+   * to guess what window an alias like "opus" resolves to.
+   */
+  contextWindow?: number;
+  /**
+   * Prompt tokens (uncached + cache read + cache write) of the turn's *last*
+   * internal API call, i.e. the session's current context size. The top-level
+   * `usage` aggregates every internal call of an agentic turn, so it overcounts
+   * context; this is the number the capacity ring should calibrate against.
+   */
+  contextTokens?: number;
 }
 
 export interface ClaudeCodeSpawnOptions {
@@ -165,7 +178,62 @@ export function extractClaudeCodeResult(json: unknown): ClaudeCodeResultUsage | 
   if (typeof record.session_id === "string") {
     result.sessionId = record.session_id;
   }
+  const contextWindow = extractClaudeCodeContextWindow(record.modelUsage);
+  if (contextWindow !== null) result.contextWindow = contextWindow;
   return result;
+}
+
+/**
+ * The main model's `contextWindow` from the result's per-model `modelUsage`.
+ * A turn can touch helper models alongside the main one, so "largest window"
+ * is wrong (a bigger-windowed helper would win); the main model is the entry
+ * that consumed the most prompt-side tokens. Entries without token counts fall
+ * back to largest-window. Null when the CLI predates `modelUsage`.
+ * Shared by the legacy stream-json parser and the SDK result mapper
+ * ({@link ./sdk/sdkQueryEngine.resultUsage}), the payload shape is identical.
+ */
+export function extractClaudeCodeContextWindow(modelUsage: unknown): number | null {
+  if (!modelUsage || typeof modelUsage !== "object") return null;
+
+  const num = (value: unknown): number => (typeof value === "number" ? value : 0);
+  let best: { window: number; traffic: number } | null = null;
+  for (const raw of Object.values(modelUsage)) {
+    const entry = raw as Record<string, unknown> | null;
+    const window = entry?.contextWindow;
+    if (typeof window !== "number") continue;
+    const traffic =
+      num(entry?.inputTokens) + num(entry?.cacheReadInputTokens) + num(entry?.cacheCreationInputTokens);
+    if (
+      !best ||
+      traffic > best.traffic ||
+      (traffic === best.traffic && window > best.window)
+    ) {
+      best = { window, traffic };
+    }
+  }
+  return best?.window ?? null;
+}
+
+/**
+ * Current context size from a top-level `assistant` event: the prompt tokens
+ * (uncached + cache read + cache write) of that internal API call. Subagent
+ * messages (`parent_tool_use_id` set) run in their own context and are ignored.
+ * Returns null for anything else; callers keep the last non-null value, which
+ * by the final event is {@link ClaudeCodeResultUsage.contextTokens}.
+ */
+export function extractClaudeCodeContextTokens(json: unknown): number | null {
+  const record = json as Record<string, unknown>;
+  if (record.type !== "assistant" || record.parent_tool_use_id) return null;
+  const message = record.message as Record<string, unknown> | undefined;
+  const usage = message?.usage as Record<string, unknown> | undefined;
+  if (!usage) return null;
+
+  const count = (value: unknown): number => (typeof value === "number" ? value : 0);
+  const total =
+    count(usage.input_tokens) +
+    count(usage.cache_creation_input_tokens) +
+    count(usage.cache_read_input_tokens);
+  return total > 0 ? total : null;
 }
 
 /** Returns the error message from a `result` event with `is_error: true`, else null. */

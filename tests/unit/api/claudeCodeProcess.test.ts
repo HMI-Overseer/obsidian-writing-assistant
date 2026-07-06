@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   extractClaudeCodeDelta,
   extractClaudeCodeResult,
+  extractClaudeCodeContextTokens,
   extractClaudeCodeError,
   resolveClaudeBinary,
 } from "../../../src/api/claudeCodeProcess";
@@ -58,6 +59,74 @@ describe("extractClaudeCodeResult", () => {
 
   it("returns null for non-result events", () => {
     expect(extractClaudeCodeResult({ type: "stream_event" })).toBeNull();
+  });
+
+  it("reads the context window of the MAIN model (most input tokens), not the largest window", () => {
+    const result = extractClaudeCodeResult({
+      type: "result",
+      usage: { input_tokens: 1, output_tokens: 2 },
+      modelUsage: {
+        // Helper model with a bigger window but almost no traffic must not win.
+        "claude-sonnet-4-5[1m]": { contextWindow: 1000000, inputTokens: 3, cacheReadInputTokens: 0 },
+        "claude-opus-4-8": {
+          contextWindow: 200000,
+          inputTokens: 2700,
+          cacheReadInputTokens: 0,
+          cacheCreationInputTokens: 14000,
+        },
+      },
+    });
+    expect(result?.contextWindow).toBe(200000);
+  });
+
+  it("falls back to the largest window when entries carry no token counts", () => {
+    const result = extractClaudeCodeResult({
+      type: "result",
+      modelUsage: {
+        "claude-haiku-4-5": { contextWindow: 200000 },
+        "claude-opus-4-8": { contextWindow: 500000 },
+      },
+    });
+    expect(result?.contextWindow).toBe(500000);
+  });
+
+  it("omits contextWindow when modelUsage is absent or carries no numbers", () => {
+    expect(extractClaudeCodeResult({ type: "result" })?.contextWindow).toBeUndefined();
+    expect(
+      extractClaudeCodeResult({
+        type: "result",
+        modelUsage: { "claude-opus-4-8": { contextWindow: "big" } },
+      })?.contextWindow,
+    ).toBeUndefined();
+  });
+});
+
+describe("extractClaudeCodeContextTokens", () => {
+  it("sums prompt + cache tokens from a top-level assistant message", () => {
+    const tokens = extractClaudeCodeContextTokens({
+      type: "assistant",
+      parent_tool_use_id: null,
+      message: {
+        usage: {
+          input_tokens: 7,
+          cache_creation_input_tokens: 1200,
+          cache_read_input_tokens: 90000,
+        },
+      },
+    });
+    expect(tokens).toBe(91207);
+  });
+
+  it("ignores subagent messages and events without usage", () => {
+    expect(
+      extractClaudeCodeContextTokens({
+        type: "assistant",
+        parent_tool_use_id: "toolu_123",
+        message: { usage: { input_tokens: 5 } },
+      }),
+    ).toBeNull();
+    expect(extractClaudeCodeContextTokens({ type: "assistant", message: {} })).toBeNull();
+    expect(extractClaudeCodeContextTokens({ type: "result" })).toBeNull();
   });
 });
 

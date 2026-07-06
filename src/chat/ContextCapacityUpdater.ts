@@ -1,6 +1,6 @@
-import type { ConversationMessage } from "../shared/types";
+import type { ConversationMessage, ProviderOption } from "../shared/types";
 import type { DocumentContext } from "../shared/chatRequest";
-import { estimateTokenCount } from "../shared/tokenEstimation";
+import { estimateTokenCount, anchoredContextEstimate } from "../shared/tokenEstimation";
 import { sumConversationUsage } from "./usageSummary";
 import { CONTEXT_WARNING_THRESHOLD, CONTEXT_DANGER_THRESHOLD } from "../constants";
 
@@ -12,6 +12,8 @@ export interface ContextInputs {
   messages: ConversationMessage[];
   draft: string;
   contextWindowSize: number | undefined;
+  /** Active provider; provider-reported context anchors from another provider are ignored. */
+  activeProvider: ProviderOption | undefined;
 }
 
 function formatTokens(n: number): string {
@@ -129,7 +131,8 @@ export class ContextCapacityUpdater {
   }
 
   private recalculate(inputs: ContextInputs): void {
-    const { systemPrompt, documentContext, messages, draft, contextWindowSize } = inputs;
+    const { systemPrompt, documentContext, messages, draft, contextWindowSize, activeProvider } =
+      inputs;
 
     if (!contextWindowSize) {
       this.capacityEl.addClass("lmsa-hidden");
@@ -144,11 +147,19 @@ export class ContextCapacityUpdater {
         ...(m.attachments?.length ? { attachments: m.attachments } : {}),
       }));
 
-    const rawEstimate = estimateTokenCount(
-      { systemPrompt, documentContext, ragContext: null, messages: chatTurns },
-      draft
-    );
-    const correctedEstimate = Math.round(rawEstimate * this.correctionRatio);
+    // A provider-reported context size (Claude Code) anchors the estimate: the
+    // real occupancy plus a char estimate of only what came after it. Fixed
+    // harness overhead must be added once, not scaled by the correction ratio,
+    // a ratio learned on a short transcript multiplies it into absurdity.
+    const anchored = anchoredContextEstimate(messages, draft, activeProvider);
+    const correctedEstimate =
+      anchored ??
+      Math.round(
+        estimateTokenCount(
+          { systemPrompt, documentContext, ragContext: null, messages: chatTurns },
+          draft
+        ) * this.correctionRatio
+      );
 
     const ratio = correctedEstimate / contextWindowSize;
     const percent = Math.min(Math.round(ratio * 100), 100);

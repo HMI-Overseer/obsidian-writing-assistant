@@ -6,8 +6,10 @@ import type WritingAssistantChat from "../main";
 import { VIEW_TYPE_CHAT, makeDefaultProfile } from "../constants";
 import { getActiveProfile, getProfilesForProvider, generateProfileId } from "../shared/profileUtils";
 import { PROVIDER_DESCRIPTORS } from "../providers/descriptors";
-import { CompletionModelModal } from "../settings/modals";
-import { COMPLETION_ADDABLE_PROVIDERS } from "../settings/CompletionModelsTab";
+import {
+  getSelectableCompletionModels,
+  getSelectableEmbeddingModels,
+} from "../providers/selectableModels";
 import { getActiveNoteText } from "../context/noteContext";
 import { ChatBubbleActionHandler } from "./ChatBubbleActionHandler";
 import { ChatGenerationOrchestrator } from "./ChatGenerationOrchestrator";
@@ -155,7 +157,7 @@ export class ChatView extends ItemView {
     this.modelSelector = new ChatModelSelector(this.plugin, this.layout, {
       getActiveModel: () => this.sessionStore?.getResolvedConversationModel() ?? null,
       getActiveProfileId: () => this.sessionStore?.getActiveConversationMeta()?.modelId ?? "",
-      getModels: () => this.plugin.settings.completionModels,
+      getModels: () => getSelectableCompletionModels(this.plugin.settings),
       onSelectModel: async (model) => {
         if (!this.sessionStore) return;
         this.contextUpdater?.resetCalibration();
@@ -163,34 +165,6 @@ export class ChatView extends ItemView {
         await this.syncConversationUi();
         await this.modelSelector?.refreshAvailability();
         this.refreshComposerIndicators();
-      },
-      onAddModel: () => {
-        const active = this.sessionStore?.getResolvedConversationModel() ?? null;
-        const defaultProvider =
-          active && COMPLETION_ADDABLE_PROVIDERS.includes(active.provider)
-            ? active.provider
-            : COMPLETION_ADDABLE_PROVIDERS[0];
-
-        new CompletionModelModal(
-          this.app,
-          this.plugin,
-          null,
-          async (model) => {
-            // Same array the settings tab writes, persisted the same way: the
-            // selector stays one more view over completionModels, not a second store.
-            this.plugin.settings.completionModels.push(model);
-            await this.plugin.saveSettings();
-            if (!this.sessionStore) return;
-            // Auto-select the freshly added model (mirrors onSelectModel).
-            this.contextUpdater?.resetCalibration();
-            await this.sessionStore.setActiveConversationModel(model);
-            await this.syncConversationUi();
-            await this.modelSelector?.refreshAvailability();
-            this.refreshComposerIndicators();
-          },
-          { provider: defaultProvider },
-          COMPLETION_ADDABLE_PROVIDERS,
-        ).open();
       },
     });
 
@@ -260,7 +234,7 @@ export class ChatView extends ItemView {
           buildState: this.plugin.services.graphService.getBuildState(),
         };
       },
-      getEmbeddingModels: () => this.plugin.settings.embeddingModels,
+      getEmbeddingModels: () => getSelectableEmbeddingModels(this.plugin.settings),
       getActiveEmbeddingModelId: () => this.plugin.settings.rag.activeEmbeddingModelId,
       getAvailability: (modelId, provider) =>
         this.plugin.services.modelAvailability.getAvailability(modelId, provider).state,
@@ -272,7 +246,7 @@ export class ChatView extends ItemView {
         await this.plugin.saveSettings();
         await this.plugin.services.ragService.configure(
           this.plugin.settings.rag,
-          this.plugin.settings.embeddingModels,
+          getSelectableEmbeddingModels(this.plugin.settings),
           this.plugin.settings.providerSettings,
         );
         this.composer?.refreshKnowledgeIndicator(
@@ -285,8 +259,8 @@ export class ChatView extends ItemView {
         await this.plugin.saveSettings();
         await this.plugin.services.graphService.configure(
           this.plugin.settings.knowledgeGraph,
-          this.plugin.settings.completionModels,
-          this.plugin.settings.embeddingModels,
+          getSelectableCompletionModels(this.plugin.settings),
+          getSelectableEmbeddingModels(this.plugin.settings),
           this.plugin.settings.providerSettings,
         );
         this.composer?.refreshKnowledgeIndicator(
@@ -299,7 +273,7 @@ export class ChatView extends ItemView {
         await this.plugin.saveSettings();
         await this.plugin.services.ragService.configure(
           this.plugin.settings.rag,
-          this.plugin.settings.embeddingModels,
+          getSelectableEmbeddingModels(this.plugin.settings),
           this.plugin.settings.providerSettings,
         );
       },
@@ -307,7 +281,7 @@ export class ChatView extends ItemView {
         const rag = this.plugin.settings.rag;
         await this.plugin.services.ragService.startIndexing(
           rag,
-          this.plugin.settings.embeddingModels,
+          getSelectableEmbeddingModels(this.plugin.settings),
           this.plugin.settings.providerSettings,
         );
       },
@@ -315,7 +289,7 @@ export class ChatView extends ItemView {
         const rag = this.plugin.settings.rag;
         await this.plugin.services.ragService.rebuild(
           rag,
-          this.plugin.settings.embeddingModels,
+          getSelectableEmbeddingModels(this.plugin.settings),
           this.plugin.settings.providerSettings,
         );
       },

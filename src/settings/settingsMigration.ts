@@ -18,8 +18,11 @@ import type {
   ChatHistory,
   CompletionModel,
   CustomCommand,
+  CustomModelEntry,
   EmbeddingModel,
   KnowledgeGraphSettings,
+  LmStudioModelCache,
+  ModelRole,
   PluginSettings,
   ProviderOption,
   ProviderProfile,
@@ -37,8 +40,9 @@ import {
 } from "../constants";
 import { DEFAULT_VAULT_OP_POLICY, type Gate, type VaultOpPolicy } from "../vault-ops/gateway";
 import { PROVIDER_DESCRIPTORS } from "../providers/descriptors";
+import { getCatalogEntries } from "../providers/catalog";
+import { modelKey } from "../shared/modelKeys";
 import { normalizeChatHistory } from "../chat/conversation/conversationUtils";
-import { normalizeCompletionModel, normalizeEmbeddingModel } from "../shared/normalizeModels";
 
 export function normalizeKnowledgeGraphSettings(raw: unknown): KnowledgeGraphSettings {
   const data = (typeof raw === "object" && raw !== null ? raw : {}) as Partial<KnowledgeGraphSettings>;
@@ -147,32 +151,52 @@ export function normalizeVaultOpPolicy(raw: unknown): VaultOpPolicy {
   };
 }
 
+/**
+ * Derive the per-provider `enabled` toggle. A saved boolean wins; absent
+ * (pre-Providers-tab data or first run) keyless providers default on and
+ * api-key providers default to "on exactly when a key is stored". Either way
+ * an api-key provider is clamped off without a key, so the enabled-but-broken
+ * state is unrepresentable at the data layer, not just in the UI.
+ */
+function deriveEnabled(saved: unknown, provider: ProviderOption, hasKey: boolean): boolean {
+  const keyGated = PROVIDER_DESCRIPTORS[provider].authType === "api-key";
+  if (keyGated && !hasKey) return false;
+  if (typeof saved === "boolean") return saved;
+  return true;
+}
+
 export function normalizeProviderSettingsMap(
   data: Partial<PluginSettings> | null,
 ): ProviderSettingsMap {
   const saved = data?.providerSettings;
   const defaults = DEFAULT_SETTINGS.providerSettings;
+  const anthropicKey = typeof saved?.anthropic?.apiKey === "string"
+    ? saved.anthropic.apiKey
+    : defaults.anthropic.apiKey;
+  const openaiKey = typeof saved?.openai?.apiKey === "string"
+    ? saved.openai.apiKey
+    : defaults.openai.apiKey;
   return {
     lmstudio: {
+      enabled: deriveEnabled(saved?.lmstudio?.enabled, "lmstudio", true),
       baseUrl: saved?.lmstudio?.baseUrl ?? defaults.lmstudio.baseUrl,
       bypassCors: typeof saved?.lmstudio?.bypassCors === "boolean"
         ? saved.lmstudio.bypassCors
         : defaults.lmstudio.bypassCors,
     },
     anthropic: {
-      apiKey: typeof saved?.anthropic?.apiKey === "string"
-        ? saved.anthropic.apiKey
-        : defaults.anthropic.apiKey,
+      enabled: deriveEnabled(saved?.anthropic?.enabled, "anthropic", anthropicKey.length > 0),
+      apiKey: anthropicKey,
     },
     openai: {
-      apiKey: typeof saved?.openai?.apiKey === "string"
-        ? saved.openai.apiKey
-        : defaults.openai.apiKey,
+      enabled: deriveEnabled(saved?.openai?.enabled, "openai", openaiKey.length > 0),
+      apiKey: openaiKey,
       baseUrl: typeof saved?.openai?.baseUrl === "string"
         ? saved.openai.baseUrl
         : defaults.openai.baseUrl,
     },
     claudecode: {
+      enabled: deriveEnabled(saved?.claudecode?.enabled, "claudecode", true),
       claudePath: typeof saved?.claudecode?.claudePath === "string"
         ? saved.claudecode.claudePath
         : defaults.claudecode.claudePath,
@@ -210,6 +234,165 @@ export function normalizeActiveProfileIds(raw: unknown): Record<ProviderOption, 
   return defaults;
 }
 
+// ---------------------------------------------------------------------------
+// Model identity migration (Providers-tab rework)
+//
+// The flat `completionModels` / `embeddingModels` profile arrays retired in
+// favor of composed `provider:modelId` identity. Saved blobs that still carry
+// them are read one last time here to seed the LM Studio last-seen cache and
+// the cloud custom-model lists, to build the id alias map, and to rewrite
+// stored pointers, then the arrays drop off disk on the next save.
+// ---------------------------------------------------------------------------
+
+interface LegacyModelRow {
+  id: string;
+  name: string;
+  modelId: string;
+  provider: ProviderOption;
+}
+
+function readLegacyModelRows(
+  data: Partial<PluginSettings> | null,
+  field: "completionModels" | "embeddingModels",
+): LegacyModelRow[] {
+  const raw = (data as Record<string, unknown> | null)?.[field];
+  if (!Array.isArray(raw)) return [];
+  const rows: LegacyModelRow[] = [];
+  for (const entry of raw) {
+    if (typeof entry !== "object" || entry === null) continue;
+    const row = entry as Record<string, unknown>;
+    if (typeof row.modelId !== "string" || row.modelId.length === 0) continue;
+    if (typeof row.provider !== "string" || !VALID_PROVIDERS.has(row.provider)) continue;
+    rows.push({
+      id: typeof row.id === "string" ? row.id : "",
+      name: typeof row.name === "string" && row.name.length > 0 ? row.name : row.modelId,
+      modelId: row.modelId,
+      provider: row.provider as ProviderOption,
+    });
+  }
+  return rows;
+}
+
+/**
+ * Cache rows are identity + display name only; capability fields are
+ * deliberately stripped so a stale snapshot can never shadow live discovery
+ * (the runtime falls back to the availability map when a row field is absent).
+ */
+function normalizeCacheRows<T extends CompletionModel | EmbeddingModel>(raw: unknown): T[] {
+  if (!Array.isArray(raw)) return [];
+  const rows: T[] = [];
+  const seen = new Set<string>();
+  for (const entry of raw) {
+    if (typeof entry !== "object" || entry === null) continue;
+    const row = entry as Record<string, unknown>;
+    if (typeof row.modelId !== "string" || row.modelId.length === 0) continue;
+    const id = modelKey("lmstudio", row.modelId);
+    if (seen.has(id)) continue;
+    seen.add(id);
+    rows.push({
+      id,
+      name: typeof row.name === "string" && row.name.length > 0 ? row.name : row.modelId,
+      modelId: row.modelId,
+      provider: "lmstudio",
+    } as T);
+  }
+  return rows;
+}
+
+function normalizeLmStudioModelCache(
+  data: Partial<PluginSettings> | null,
+  legacyCompletion: LegacyModelRow[],
+  legacyEmbedding: LegacyModelRow[],
+): LmStudioModelCache {
+  const raw = (data as Record<string, unknown> | null)?.lmStudioModelCache;
+  if (typeof raw === "object" && raw !== null) {
+    const cache = raw as Record<string, unknown>;
+    return {
+      completion: normalizeCacheRows<CompletionModel>(cache.completion),
+      embedding: normalizeCacheRows<EmbeddingModel>(cache.embedding),
+      discoveredAt: typeof cache.discoveredAt === "number" ? cache.discoveredAt : null,
+    };
+  }
+  // First pass over pre-rework data: seed from the retired arrays so the
+  // selector keeps rendering the user's models before the next discovery.
+  return {
+    completion: normalizeCacheRows<CompletionModel>(
+      legacyCompletion.filter((row) => row.provider === "lmstudio"),
+    ),
+    embedding: normalizeCacheRows<EmbeddingModel>(
+      legacyEmbedding.filter((row) => row.provider === "lmstudio"),
+    ),
+    discoveredAt: null,
+  };
+}
+
+const VALID_MODEL_ROLES = new Set<ModelRole>(["completion", "embedding"]);
+
+function normalizeCustomModels(
+  data: Partial<PluginSettings> | null,
+  legacyCompletion: LegacyModelRow[],
+  legacyEmbedding: LegacyModelRow[],
+): Partial<Record<ProviderOption, CustomModelEntry[]>> {
+  const raw = (data as Record<string, unknown> | null)?.customModels;
+  if (typeof raw === "object" && raw !== null) {
+    const result: Partial<Record<ProviderOption, CustomModelEntry[]>> = {};
+    for (const [provider, entries] of Object.entries(raw)) {
+      if (!VALID_PROVIDERS.has(provider) || !Array.isArray(entries)) continue;
+      const cleaned: CustomModelEntry[] = [];
+      for (const entry of entries) {
+        if (typeof entry !== "object" || entry === null) continue;
+        const row = entry as Record<string, unknown>;
+        if (typeof row.modelId !== "string" || row.modelId.length === 0) continue;
+        if (typeof row.role !== "string" || !VALID_MODEL_ROLES.has(row.role as ModelRole)) continue;
+        cleaned.push({
+          modelId: row.modelId,
+          name: typeof row.name === "string" && row.name.length > 0 ? row.name : row.modelId,
+          role: row.role as ModelRole,
+        });
+      }
+      if (cleaned.length > 0) result[provider as ProviderOption] = cleaned;
+    }
+    return result;
+  }
+  // First pass: cloud rows whose id the shipped catalog does not curate
+  // survive as custom entries (fine-tunes, hand-entered ids).
+  const result: Partial<Record<ProviderOption, CustomModelEntry[]>> = {};
+  const seedFrom = (rows: LegacyModelRow[], role: ModelRole) => {
+    for (const row of rows) {
+      if (row.provider === "lmstudio") continue;
+      const curated = getCatalogEntries(row.provider).some(
+        (entry) => entry.modelId === row.modelId && entry.role === role,
+      );
+      if (curated) continue;
+      const list = (result[row.provider] ??= []);
+      if (list.some((entry) => entry.modelId === row.modelId && entry.role === role)) continue;
+      list.push({ modelId: row.modelId, name: row.name, role });
+    }
+  };
+  seedFrom(legacyCompletion, "completion");
+  seedFrom(legacyEmbedding, "embedding");
+  return result;
+}
+
+function normalizeModelIdAliases(
+  data: Partial<PluginSettings> | null,
+  legacyCompletion: LegacyModelRow[],
+  legacyEmbedding: LegacyModelRow[],
+): Record<string, string> {
+  const aliases: Record<string, string> = {};
+  const raw = (data as Record<string, unknown> | null)?.modelIdAliases;
+  if (typeof raw === "object" && raw !== null) {
+    for (const [key, value] of Object.entries(raw)) {
+      if (typeof value === "string" && value.length > 0) aliases[key] = value;
+    }
+  }
+  for (const row of [...legacyCompletion, ...legacyEmbedding]) {
+    if (row.id.length === 0 || aliases[row.id]) continue;
+    aliases[row.id] = modelKey(row.provider, row.modelId);
+  }
+  return aliases;
+}
+
 /**
  * Build a fully-populated {@link PluginSettings} from whatever
  * `Plugin.loadData()` returned (a partial saved blob, or `null` on first run).
@@ -242,13 +425,16 @@ function migrateMaxToolRounds(data: Partial<PluginSettings> | null): number {
 }
 
 export function normalizePluginSettings(data: Partial<PluginSettings> | null): PluginSettings {
-  const completionModels: CompletionModel[] = Array.isArray(data?.completionModels)
-    ? data.completionModels.map((model, index) => normalizeCompletionModel(model, index))
-    : [];
+  const legacyCompletion = readLegacyModelRows(data, "completionModels");
+  const legacyEmbedding = readLegacyModelRows(data, "embeddingModels");
 
-  const embeddingModels: EmbeddingModel[] = Array.isArray(data?.embeddingModels)
-    ? data.embeddingModels.map((model, index) => normalizeEmbeddingModel(model, index))
-    : [];
+  const lmStudioModelCache = normalizeLmStudioModelCache(data, legacyCompletion, legacyEmbedding);
+  const customModels = normalizeCustomModels(data, legacyCompletion, legacyEmbedding);
+  const modelIdAliases = normalizeModelIdAliases(data, legacyCompletion, legacyEmbedding);
+
+  /** Map a stored model pointer onto its composed key; non-legacy ids pass through. */
+  const rekey = (id: string | null): string | null =>
+    id !== null && modelIdAliases[id] ? modelIdAliases[id] : id;
 
   const commands: CustomCommand[] = Array.isArray(data?.commands)
     ? data.commands.map((command, index) => ({
@@ -266,6 +452,16 @@ export function normalizePluginSettings(data: Partial<PluginSettings> | null): P
     data?.chatHistory && typeof data.chatHistory === "object"
       ? normalizeChatHistory(data.chatHistory)
       : { ...DEFAULT_CHAT_HISTORY };
+  for (const meta of chatHistory.conversations) {
+    meta.modelId = rekey(meta.modelId) ?? meta.modelId;
+  }
+
+  const rag = normalizeRagSettings(data?.rag);
+  rag.activeEmbeddingModelId = rekey(rag.activeEmbeddingModelId);
+
+  const knowledgeGraph = normalizeKnowledgeGraphSettings(data?.knowledgeGraph);
+  knowledgeGraph.activeCompletionModelId = rekey(knowledgeGraph.activeCompletionModelId);
+  knowledgeGraph.activeEmbeddingModelId = rekey(knowledgeGraph.activeEmbeddingModelId);
 
   const providerSettings = normalizeProviderSettingsMap(data);
 
@@ -283,8 +479,9 @@ export function normalizePluginSettings(data: Partial<PluginSettings> | null): P
       typeof data?.maxContextChars === "number"
         ? data.maxContextChars
         : DEFAULT_SETTINGS.maxContextChars,
-    completionModels,
-    embeddingModels,
+    lmStudioModelCache,
+    customModels,
+    modelIdAliases,
     commands,
     chatHistory,
     providerProfiles: normalizeProviderProfiles(data?.providerProfiles),
@@ -297,8 +494,8 @@ export function normalizePluginSettings(data: Partial<PluginSettings> | null): P
       typeof data?.diffMinMatchConfidence === "number"
         ? data.diffMinMatchConfidence
         : DEFAULT_SETTINGS.diffMinMatchConfidence,
-    rag: normalizeRagSettings(data?.rag),
-    knowledgeGraph: normalizeKnowledgeGraphSettings(data?.knowledgeGraph),
+    rag,
+    knowledgeGraph,
     systemPromptPrefix: migrateSystemPromptPrefix(data),
     apiKeysDisclaimerAccepted:
       typeof data?.apiKeysDisclaimerAccepted === "boolean"

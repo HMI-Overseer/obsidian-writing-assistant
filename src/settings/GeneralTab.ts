@@ -1,43 +1,15 @@
 import { setIcon } from "obsidian";
 import type WritingAssistantChat from "../main";
 import { DEFAULT_SETTINGS } from "../constants";
-import { ApiKeysModal, ApiKeysDisclaimerModal } from "./modals";
 import { createSettingsSection, SettingItem } from "./ui";
 
 const MIN_CONTEXT_CHARS = 1000;
 const MAX_CONTEXT_CHARS = 200000;
 
-function openApiKeysWithDisclaimer(plugin: WritingAssistantChat): void {
-  if (plugin.settings.apiKeysDisclaimerAccepted) {
-    new ApiKeysModal(plugin.app, plugin).open();
-    return;
-  }
-  new ApiKeysDisclaimerModal(plugin.app, plugin, () => {
-    new ApiKeysModal(plugin.app, plugin).open();
-  }).open();
-}
+// API keys moved into the Providers tab's per-provider cards, where each key
+// sits next to the provider it unlocks (the disclaimer gate moved with them).
 
 export function renderGeneralTab(container: HTMLElement, plugin: WritingAssistantChat): void {
-  // ── Provider API Keys ──────────────────────────────────────────────
-  const keys = createSettingsSection(
-    container,
-    "Provider API Keys",
-    "Manage API keys for cloud providers like Anthropic and OpenAI. Keys are stored locally and never shared.",
-    { icon: "key-round" }
-  );
-
-  new SettingItem(keys.bodyEl)
-    .setName("Configure API keys")
-    .setDesc("Open a window to enter or update your provider API keys.")
-    .addButton((button) =>
-      button
-        .setButtonText("Manage keys")
-        .setCta()
-        .onClick(() => {
-          openApiKeysWithDisclaimer(plugin);
-        })
-    );
-
   // ── Active Note ────────────────────────────────────────────────────
   const context = createSettingsSection(
     container,

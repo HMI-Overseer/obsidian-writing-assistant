@@ -107,10 +107,13 @@ export function makeDefaultProfile(provider: ProviderOption): ProviderProfile {
 
 export const DEFAULT_SETTINGS: PluginSettings = {
   providerSettings: {
-    lmstudio: { baseUrl: "http://localhost:1234/v1", bypassCors: true },
-    anthropic: { apiKey: "" },
-    openai: { apiKey: "", baseUrl: "https://api.openai.com/v1" },
-    claudecode: { claudePath: "" },
+    // Keyless providers ship enabled; api-key providers ship off with the
+    // toggle auth-gated until a key exists (normalizeProviderSettingsMap
+    // enforces the gate on every load).
+    lmstudio: { enabled: true, baseUrl: "http://localhost:1234/v1", bypassCors: true },
+    anthropic: { enabled: false, apiKey: "" },
+    openai: { enabled: false, apiKey: "", baseUrl: "https://api.openai.com/v1" },
+    claudecode: { enabled: true, claudePath: "" },
   },
   includeNoteContext: true,
   includeLocalAttachmentsAsContext: false,
@@ -121,8 +124,9 @@ export const DEFAULT_SETTINGS: PluginSettings = {
   maxContextChars: 24000,
   providerProfiles: [],
   activeProfileIds: { ...DEFAULT_ACTIVE_PROFILE_IDS },
-  completionModels: [],
-  embeddingModels: [],
+  lmStudioModelCache: { completion: [], embedding: [], discoveredAt: null },
+  customModels: {},
+  modelIdAliases: {},
   commands: [],
   chatHistory: { ...DEFAULT_CHAT_HISTORY },
   diffContextLines: 3,

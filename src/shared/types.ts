@@ -76,6 +76,9 @@ export interface Message {
 
 export type ProviderOption = "lmstudio" | "openai" | "anthropic" | "claudecode";
 
+/** Which selector a model belongs to: chat completions or embedding/RAG. */
+export type ModelRole = "completion" | "embedding";
+
 export type ModelAvailabilityState = "loaded" | "unloaded" | "unknown" | "cloud";
 
 export type CacheTtl = "default" | "1h";
@@ -85,6 +88,13 @@ export interface AnthropicCacheSettings {
   ttl: CacheTtl;
 }
 
+/**
+ * A selectable chat model. These rows are no longer authored or persisted as a
+ * flat settings array; they are composed at read time from the shipped cloud
+ * catalogs, the LM Studio last-seen discovery cache, and per-provider custom
+ * entries (see providers/selectableModels). `id` is the composed model key
+ * `provider:modelId` (see shared/modelKeys).
+ */
 export interface CompletionModel {
   id: string;
   name: string;
@@ -121,11 +131,36 @@ export interface ProviderProfile {
   anthropicCacheSettings: AnthropicCacheSettings;
 }
 
+/** A selectable embedding model; same composed identity rules as {@link CompletionModel}. */
 export interface EmbeddingModel {
   id: string;
   name: string;
   modelId: string;
   provider: ProviderOption;
+}
+
+/**
+ * A user-authored model id on a cloud provider card, the escape hatch for
+ * fine-tunes and ids the shipped catalog does not curate.
+ */
+export interface CustomModelEntry {
+  modelId: string;
+  name: string;
+  role: ModelRole;
+}
+
+/**
+ * Last-seen LM Studio discovery snapshot. A cache, not a source of truth: it
+ * keeps the Providers card and the active-model label rendering while the
+ * server is unreachable. Rows carry identity + display name only; capability
+ * data (context length, tool use, vision) always comes from the live
+ * availability map so a stale snapshot can never shadow fresh discovery.
+ */
+export interface LmStudioModelCache {
+  completion: CompletionModel[];
+  embedding: EmbeddingModel[];
+  /** Unix epoch ms of the last successful discovery; null = never discovered. */
+  discoveredAt: number | null;
 }
 
 export interface CustomCommand {
@@ -294,7 +329,7 @@ export interface Conversation {
   title: string;
   createdAt: number;
   updatedAt: number;
-  /** CompletionModel.id selected for this conversation. */
+  /** Composed model key (`provider:modelId`) selected for this conversation. Legacy synthetic ids resolve via `modelIdAliases`. */
   modelId: string;
   /** Display snapshot that survives model rename or deletion. */
   modelName: string;
@@ -335,21 +370,32 @@ export interface SamplingParams {
   reasoning: ReasoningLevel | null;
 }
 
+/**
+ * `enabled` is the Providers-tab headline toggle: enabled = this provider's
+ * models appear in model selection. Disabled providers keep their stored
+ * config but contribute nothing to any selector. For api-key providers the
+ * flag is auth-gated at normalization time (it can never be true without a
+ * key), so an enabled-but-unusable provider is unrepresentable.
+ */
 export interface LMStudioProviderSettings {
+  enabled: boolean;
   baseUrl: string;
   bypassCors: boolean;
 }
 
 export interface AnthropicProviderSettings {
+  enabled: boolean;
   apiKey: string;
 }
 
 export interface OpenAIProviderSettings {
+  enabled: boolean;
   apiKey: string;
   baseUrl: string;
 }
 
 export interface ClaudeCodeProviderSettings {
+  enabled: boolean;
   /**
    * Optional explicit path to the `claude` binary. Empty = resolve from PATH.
    * Not a secret, authentication uses the user's existing `claude` login session.
@@ -367,7 +413,7 @@ export interface ProviderSettingsMap {
 /** RAG-specific settings. */
 export interface RagSettings {
   enabled: boolean;
-  /** EmbeddingModel.id from the embeddingModels array. */
+  /** Composed model key (`provider:modelId`) of the selected embedding model. */
   activeEmbeddingModelId: string | null;
   /** Target chunk size in characters. */
   chunkSize: number;
@@ -390,9 +436,9 @@ export interface RagSettings {
 /** Knowledge graph settings. */
 export interface KnowledgeGraphSettings {
   enabled: boolean;
-  /** CompletionModel.id, the chat model used for entity extraction. */
+  /** Composed model key (`provider:modelId`) of the chat model used for entity extraction. */
   activeCompletionModelId: string | null;
-  /** EmbeddingModel.id, required for generating entity vectors at build time. */
+  /** Composed model key (`provider:modelId`), required for generating entity vectors at build time. */
   activeEmbeddingModelId: string | null;
   /** Glob patterns to exclude from graph extraction. */
   excludePatterns: string[];
@@ -459,8 +505,17 @@ export interface PluginSettings {
   includeNoteContext: boolean;
   includeLocalAttachmentsAsContext: boolean;
   maxContextChars: number;
-  completionModels: CompletionModel[];
-  embeddingModels: EmbeddingModel[];
+  /** Last-seen LM Studio discovery snapshot (see {@link LmStudioModelCache}). */
+  lmStudioModelCache: LmStudioModelCache;
+  /** Per-provider custom model ids, the cloud cards' escape hatch. */
+  customModels: Partial<Record<ProviderOption, CustomModelEntry[]>>;
+  /**
+   * Legacy synthetic profile id → composed `provider:modelId` key. Written
+   * once by the migration that retired the model-profile arrays, and consulted
+   * by the resolve helpers so conversation files saved before the migration
+   * still resolve their model without being rewritten on disk.
+   */
+  modelIdAliases: Record<string, string>;
   commands: CustomCommand[];
   chatHistory: ChatHistory;
   /** Provider-scoped parameter profiles. */

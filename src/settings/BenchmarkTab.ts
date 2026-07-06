@@ -8,6 +8,7 @@ import type {
 import { MAX_BENCHMARK_HISTORY } from "../constants";
 import { getProviderDescriptor, createChatClient } from "../providers/registry";
 import { PROVIDER_DESCRIPTORS } from "../providers/descriptors";
+import { getSelectableCompletionModels } from "../providers/selectableModels";
 import { createSettingsSection, createModelSelector, SettingItem } from "./ui";
 import { getTestSuites } from "./benchmark/testSuites";
 import { runBenchmarkTest, runAllBenchmarks } from "./benchmark/benchmarkRunner";
@@ -40,7 +41,7 @@ export function renderBenchmarkTab(
   plugin: WritingAssistantChat,
   _refresh: () => void
 ): () => void {
-  const models = plugin.settings.completionModels;
+  const models = getSelectableCompletionModels(plugin.settings);
   let selectedModel: CompletionModel | null = models[0] ?? null;
   let abortController: AbortController | null = null;
   let isRunning = false;
@@ -66,7 +67,7 @@ export function renderBenchmarkTab(
   if (models.length === 0) {
     modelSection.bodyEl.createEl("p", {
       cls: "lmsa-benchmark-empty",
-      text: "No completion models configured. Add one in the completion models tab first.",
+      text: "No models available. Enable a provider in settings first.",
     });
     return () => {};
   }

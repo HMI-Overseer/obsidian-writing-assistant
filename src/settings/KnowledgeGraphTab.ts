@@ -2,6 +2,10 @@ import type WritingAssistantChat from "../main";
 import type { GraphBuildState } from "../rag/graph";
 import type { ModelAvailabilityState } from "../shared/types";
 import { getProviderDescriptor } from "../providers/registry";
+import {
+  getSelectableCompletionModels,
+  getSelectableEmbeddingModels,
+} from "../providers/selectableModels";
 import { createSettingsSection, createModelSelector, Button, SettingItem } from "./ui";
 
 /**
@@ -58,8 +62,8 @@ export function renderKnowledgeGraphTab(
         await plugin.saveSettings();
         await plugin.services.graphService.configure(
           kg,
-          plugin.settings.completionModels,
-          plugin.settings.embeddingModels,
+          getSelectableCompletionModels(plugin.settings),
+          getSelectableEmbeddingModels(plugin.settings),
           plugin.settings.providerSettings,
         );
         renderConditionalSections();
@@ -71,7 +75,7 @@ export function renderKnowledgeGraphTab(
     .setName("Completion model")
     .setDesc("Generates structured entity and relationship data from your notes.");
 
-  const models = plugin.settings.completionModels;
+  const models = getSelectableCompletionModels(plugin.settings);
   const currentModel = models.find((m) => m.id === kg.activeCompletionModelId) ?? null;
 
   const modelSelector = createModelSelector(completionItem.settingEl, models, {
@@ -93,8 +97,8 @@ export function renderKnowledgeGraphTab(
       await plugin.saveSettings();
       await plugin.services.graphService.configure(
         kg,
-        plugin.settings.completionModels,
-        plugin.settings.embeddingModels,
+        getSelectableCompletionModels(plugin.settings),
+        getSelectableEmbeddingModels(plugin.settings),
         plugin.settings.providerSettings,
       );
     },
@@ -105,7 +109,7 @@ export function renderKnowledgeGraphTab(
     .setName("Embedding model")
     .setDesc("Encodes extracted entities as vectors for similarity search.");
 
-  const embModels = plugin.settings.embeddingModels;
+  const embModels = getSelectableEmbeddingModels(plugin.settings);
   const currentEmbModel = embModels.find((m) => m.id === kg.activeEmbeddingModelId) ?? null;
 
   const embModelSelector = createModelSelector(embeddingItem.settingEl, embModels, {
@@ -127,8 +131,8 @@ export function renderKnowledgeGraphTab(
       await plugin.saveSettings();
       await plugin.services.graphService.configure(
         kg,
-        plugin.settings.completionModels,
-        plugin.settings.embeddingModels,
+        getSelectableCompletionModels(plugin.settings),
+        getSelectableEmbeddingModels(plugin.settings),
         plugin.settings.providerSettings,
       );
     },
@@ -187,8 +191,8 @@ export function renderKnowledgeGraphTab(
       if (!await validateModelsReady()) return;
       await plugin.services.graphService.startBuild(
         kg,
-        plugin.settings.completionModels,
-        plugin.settings.embeddingModels,
+        getSelectableCompletionModels(plugin.settings),
+        getSelectableEmbeddingModels(plugin.settings),
         plugin.settings.providerSettings,
       );
     });
@@ -196,8 +200,8 @@ export function renderKnowledgeGraphTab(
       if (!await validateModelsReady()) return;
       await plugin.services.graphService.rebuild(
         kg,
-        plugin.settings.completionModels,
-        plugin.settings.embeddingModels,
+        getSelectableCompletionModels(plugin.settings),
+        getSelectableEmbeddingModels(plugin.settings),
         plugin.settings.providerSettings,
       );
     });
@@ -334,8 +338,8 @@ export function renderKnowledgeGraphTab(
             await plugin.services.graphService.startBuildFolder(
               folder,
               kg,
-              plugin.settings.completionModels,
-              plugin.settings.embeddingModels,
+              getSelectableCompletionModels(plugin.settings),
+              getSelectableEmbeddingModels(plugin.settings),
               plugin.settings.providerSettings,
             );
           });

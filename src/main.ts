@@ -20,7 +20,12 @@ export default class WritingAssistantChat extends Plugin {
     await this.loadSettings();
     const pluginDir =
       this.manifest.dir ?? `${this.app.vault.configDir}/plugins/${this.manifest.id}`;
-    this.services = new ServiceContainer(this.app, () => this.settings, pluginDir);
+    this.services = new ServiceContainer(
+      this.app,
+      () => this.settings,
+      pluginDir,
+      () => this.saveSettings(),
+    );
     await this.services.initialize();
 
     // In-note diff overlay: a CM6 extension renders pending edit proposals inline

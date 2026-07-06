@@ -4,6 +4,10 @@ import type { RagSettings } from "../rag/types";
 import type { KnowledgeGraphSettings } from "../rag/graph/types";
 import { ConversationStorage } from "../chat/conversation/ConversationStorage";
 import { ModelAvailabilityService } from "../api";
+import {
+  getSelectableCompletionModels,
+  getSelectableEmbeddingModels,
+} from "../providers/selectableModels";
 import { RagService } from "../rag";
 import { GraphService } from "../rag/graph";
 import { ClaudeCodeService } from "./ClaudeCodeService";
@@ -26,10 +30,16 @@ export class ServiceContainer {
     private readonly app: App,
     private readonly getSettings: () => PluginSettings,
     private readonly pluginDir: string,
+    private readonly persistSettings?: () => Promise<void>,
   ) {
     this.conversationStorage = new ConversationStorage(app, pluginDir);
     this.modelAvailability = new ModelAvailabilityService(
       () => this.getSettings().providerSettings,
+      async (completion, embedding) => {
+        const settings = this.getSettings();
+        settings.lmStudioModelCache = { completion, embedding, discoveredAt: Date.now() };
+        await this.persistSettings?.();
+      },
     );
     this.ragService = new RagService(app, pluginDir);
     this.graphService = new GraphService(app, pluginDir);
@@ -41,11 +51,11 @@ export class ServiceContainer {
 
     const s = this.getSettings();
 
-    await this.ragService.configure(s.rag, s.embeddingModels, s.providerSettings);
+    await this.ragService.configure(s.rag, getSelectableEmbeddingModels(s), s.providerSettings);
     await this.graphService.configure(
       s.knowledgeGraph,
-      s.completionModels,
-      s.embeddingModels,
+      getSelectableCompletionModels(s),
+      getSelectableEmbeddingModels(s),
       s.providerSettings,
     );
     this.ragService.setGraphService(this.graphService);

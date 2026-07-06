@@ -16,7 +16,7 @@
     "test:integration": "vitest run tests/integration",
     "test:coverage": "vitest run --coverage",
     "update-pricing": "node scripts/update-pricing.mjs",
-    "version": "node version-bump.mjs && node scripts/update-pricing.mjs && git add manifest.json versions.json src/api/pricingData.json"
+    "version": "node version-bump.mjs && node scripts/update-pricing.mjs && git add manifest.json versions.json src/api/pricingData.json src/providers/catalogData.json"
   },
   "keywords": [],
   "author": "Harbingers",

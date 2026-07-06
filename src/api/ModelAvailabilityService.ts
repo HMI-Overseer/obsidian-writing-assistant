@@ -1,9 +1,13 @@
-import type { ModelAvailabilityState, ProviderSettingsMap } from "../shared/types";
+import type {
+  CompletionModel,
+  EmbeddingModel,
+  ModelAvailabilityState,
+  ProviderSettingsMap,
+} from "../shared/types";
 import type { ModelCandidateResult } from "./types";
 import { LMStudioModelsService } from "./LMStudioModelsService";
-import { AnthropicModelsService } from "./AnthropicModelsService";
-import { ClaudeCodeModelsService } from "./ClaudeCodeModelsService";
 import { getProviderDescriptor } from "../providers/registry";
+import { modelKey } from "../shared/modelKeys";
 import type { ProviderOption } from "../shared/types";
 
 const AVAILABILITY_CACHE_TTL_MS = 30_000;
@@ -18,14 +22,23 @@ export interface ModelAvailabilityInfo {
 export class ModelAvailabilityService {
   private availabilityMap = new Map<string, ModelAvailabilityInfo>();
   private lmService: LMStudioModelsService | null = null;
-  private anthropicService: AnthropicModelsService | null = null;
-  private claudeCodeService: ClaudeCodeModelsService | null = null;
   private lastFetchedAt = 0;
   private lastLmBaseUrl = "";
   private lastLmBypassCors = true;
-  private lastAnthropicApiKey = "";
 
-  constructor(private readonly getProviderSettings: () => ProviderSettingsMap) {}
+  constructor(
+    private readonly getProviderSettings: () => ProviderSettingsMap,
+    /**
+     * Persists the last-seen LM Studio discovery snapshot into settings so the
+     * Providers card and the active-model label keep rendering while the
+     * server is unreachable. Best-effort: a persistence failure never breaks a
+     * refresh.
+     */
+    private readonly persistLastSeen?: (
+      completion: CompletionModel[],
+      embedding: EmbeddingModel[],
+    ) => Promise<void>,
+  ) {}
 
   getAvailability(modelId: string, provider: ProviderOption): ModelAvailabilityInfo {
     const descriptor = getProviderDescriptor(provider);
@@ -63,6 +76,28 @@ export class ModelAvailabilityService {
     }
 
     this.lastFetchedAt = Date.now();
+
+    if (this.persistLastSeen) {
+      // Cache rows are identity + name only; capabilities stay in the live
+      // availability map so a snapshot can never shadow fresh discovery.
+      const completion = completionResult.candidates.map<CompletionModel>((candidate) => ({
+        id: modelKey("lmstudio", candidate.targetModelId),
+        name: candidate.displayName,
+        modelId: candidate.targetModelId,
+        provider: "lmstudio",
+      }));
+      const embedding = embeddingResult.candidates.map<EmbeddingModel>((candidate) => ({
+        id: modelKey("lmstudio", candidate.targetModelId),
+        name: candidate.displayName,
+        modelId: candidate.targetModelId,
+        provider: "lmstudio",
+      }));
+      try {
+        await this.persistLastSeen(completion, embedding);
+      } catch (error) {
+        console.error("[models] Failed to persist LM Studio discovery snapshot", error);
+      }
+    }
   }
 
   getActiveContextLength(modelId: string): number | undefined {
@@ -91,32 +126,13 @@ export class ModelAvailabilityService {
     return this.lmService;
   }
 
-  getAnthropicService(): AnthropicModelsService {
-    const apiKey = this.getProviderSettings().anthropic.apiKey;
-    if (!this.anthropicService || this.lastAnthropicApiKey !== apiKey) {
-      this.anthropicService = new AnthropicModelsService(apiKey);
-      this.lastAnthropicApiKey = apiKey;
-    }
-    return this.anthropicService;
-  }
-
-  getClaudeCodeService(): ClaudeCodeModelsService {
-    if (!this.claudeCodeService) {
-      this.claudeCodeService = new ClaudeCodeModelsService();
-    }
-    return this.claudeCodeService;
-  }
-
+  // Cloud discovery retired with the Providers-tab rework: cloud model lists
+  // are the shipped curated catalogs (providers/catalog); only LM Studio keeps
+  // live discovery, which refreshLocalModels drives.
   async discoverCompletionCandidates(
-    provider: ProviderOption,
+    _provider: ProviderOption,
     options: { forceRefresh?: boolean; signal?: AbortSignal } = {},
   ): Promise<ModelCandidateResult> {
-    if (provider === "anthropic") {
-      return this.getAnthropicService().getCompletionCandidates(options);
-    }
-    if (provider === "claudecode") {
-      return this.getClaudeCodeService().getCompletionCandidates(options);
-    }
     return this.getLMStudioService().getCompletionCandidates(options);
   }
 
@@ -128,7 +144,6 @@ export class ModelAvailabilityService {
 
   invalidate(): void {
     this.lmService = null;
-    this.anthropicService = null;
     this.availabilityMap.clear();
     this.lastFetchedAt = 0;
   }

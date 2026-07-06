@@ -3,24 +3,22 @@ import { PluginSettingTab, setIcon, Setting } from "obsidian";
 import type WritingAssistantChat from "../main";
 import { renderAdvancedTab } from "./AdvancedTab";
 import { renderCommandsTab } from "./CommandsTab";
-import { renderCompletionModelsTab } from "./CompletionModelsTab";
-import { renderEmbeddingModelsTab } from "./EmbeddingModelsTab";
+import { renderProvidersTab } from "./ProvidersTab";
 import { renderGeneralTab } from "./GeneralTab";
 import { renderRagTab } from "./RagTab";
 import { renderKnowledgeGraphTab } from "./KnowledgeGraphTab";
 import { renderBenchmarkTab } from "./BenchmarkTab";
 import { renderVaultOpsTab } from "./VaultOpsTab";
 
-type TabName = "General" | "Completion Models" | "Embedding Models" | "Retrieval" | "Knowledge Graph" | "Commands" | "Vault Operations" | "Advanced" | "Benchmark";
+type TabName = "General" | "Providers" | "Retrieval" | "Knowledge Graph" | "Commands" | "Vault Operations" | "Advanced" | "Benchmark";
 
 type NavItem = { tab: TabName; rail: string; icon: string };
 type NavGroup = { label: string; items: NavItem[] };
 
 const NAV_GROUPS: NavGroup[] = [
   { label: "Plugin", items: [
-    { tab: "General",           rail: "General",    icon: "settings" },
-    { tab: "Completion Models",  rail: "Completion", icon: "cpu" },
-    { tab: "Embedding Models",   rail: "Embedding",  icon: "binary" },
+    { tab: "General",   rail: "General",   icon: "settings" },
+    { tab: "Providers", rail: "Providers", icon: "plug" },
   ]},
   { label: "Knowledge", items: [
     { tab: "Retrieval",        rail: "RAG",   icon: "search" },
@@ -41,8 +39,7 @@ type TabMeta = {
 
 const TAB_SLUGS: Record<TabName, string> = {
   "General": "general",
-  "Completion Models": "completion",
-  "Embedding Models": "embedding",
+  "Providers": "providers",
   "Retrieval": "retrieval",
   "Knowledge Graph": "knowledge-graph",
   "Commands": "commands",
@@ -56,13 +53,9 @@ const TAB_META: Record<TabName, TabMeta> = {
     title: "Connection and Context",
     description: "Configure how the plugin talks to LLM providers and how much note context is sent with each request.",
   },
-  "Completion Models": {
-    title: "Completion Model Profiles",
-    description: "Language models that generate text responses in chat.",
-  },
-  "Embedding Models": {
-    title: "Embedding Model Profiles",
-    description: "Models that encode text as vectors for semantic search and retrieval.",
+  "Providers": {
+    title: "Providers",
+    description: "Enable the LLM providers you use and manage their credentials and models in one place.",
   },
   "Retrieval": {
     title: "Retrieval (RAG)",
@@ -95,6 +88,7 @@ export class WritingAssistantSettingTab extends PluginSettingTab {
   private cleanupBenchmark: (() => void) | null = null;
   private cleanupRag: (() => void) | null = null;
   private cleanupKg: (() => void) | null = null;
+  private cleanupProviders: (() => void) | null = null;
 
   constructor(
     app: App,
@@ -110,6 +104,8 @@ export class WritingAssistantSettingTab extends PluginSettingTab {
     this.cleanupRag = null;
     this.cleanupKg?.();
     this.cleanupKg = null;
+    this.cleanupProviders?.();
+    this.cleanupProviders = null;
   }
 
   display(): void {
@@ -119,6 +115,8 @@ export class WritingAssistantSettingTab extends PluginSettingTab {
     this.cleanupRag = null;
     this.cleanupKg?.();
     this.cleanupKg = null;
+    this.cleanupProviders?.();
+    this.cleanupProviders = null;
     const { containerEl } = this;
     const activeMeta = TAB_META[this.activeTab];
 
@@ -169,11 +167,8 @@ export class WritingAssistantSettingTab extends PluginSettingTab {
       case "General":
         renderGeneralTab(content, this.plugin);
         break;
-      case "Completion Models":
-        renderCompletionModelsTab(content, this.plugin);
-        break;
-      case "Embedding Models":
-        renderEmbeddingModelsTab(content, this.plugin);
+      case "Providers":
+        this.cleanupProviders = renderProvidersTab(content, this.plugin, refresh);
         break;
       case "Retrieval":
         this.cleanupRag = renderRagTab(content, this.plugin);

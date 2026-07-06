@@ -2,6 +2,7 @@ import type WritingAssistantChat from "../main";
 import type { IndexingState } from "../rag/types";
 import type { ModelAvailabilityState } from "../shared/types";
 import { getProviderDescriptor } from "../providers/registry";
+import { getSelectableEmbeddingModels } from "../providers/selectableModels";
 import { createSettingsSection, createModelSelector, Button, SettingItem } from "./ui";
 import { DEFAULT_RAG_SETTINGS } from "../constants";
 
@@ -35,7 +36,7 @@ export function renderRagTab(
         await plugin.saveSettings();
         await plugin.services.ragService.configure(
           rag,
-          plugin.settings.embeddingModels,
+          getSelectableEmbeddingModels(plugin.settings),
           plugin.settings.providerSettings,
         );
         renderConditionalSections();
@@ -47,7 +48,7 @@ export function renderRagTab(
     .setName("Embedding model")
     .setDesc("Encodes vault content as vectors for similarity search.");
 
-  const models = plugin.settings.embeddingModels;
+  const models = getSelectableEmbeddingModels(plugin.settings);
   const currentModel = models.find((m) => m.id === rag.activeEmbeddingModelId) ?? null;
 
   const modelSelector = createModelSelector(embeddingItem.settingEl, models, {
@@ -69,7 +70,7 @@ export function renderRagTab(
       await plugin.saveSettings();
       await plugin.services.ragService.configure(
         rag,
-        plugin.settings.embeddingModels,
+        getSelectableEmbeddingModels(plugin.settings),
         plugin.settings.providerSettings,
       );
     },
@@ -124,7 +125,7 @@ export function renderRagTab(
       if (!await validateModelReady()) return;
       await plugin.services.ragService.startIndexing(
         rag,
-        plugin.settings.embeddingModels,
+        getSelectableEmbeddingModels(plugin.settings),
         plugin.settings.providerSettings,
       );
     });
@@ -132,7 +133,7 @@ export function renderRagTab(
       if (!await validateModelReady()) return;
       await plugin.services.ragService.rebuild(
         rag,
-        plugin.settings.embeddingModels,
+        getSelectableEmbeddingModels(plugin.settings),
         plugin.settings.providerSettings,
       );
     });

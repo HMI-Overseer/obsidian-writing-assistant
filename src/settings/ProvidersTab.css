@@ -1,0 +1,161 @@
+@layer components {
+  /* ── Provider cards ─────────────────────────────────────────────── */
+
+  .lmsa-provider-cards {
+    @apply lmsa-flex lmsa-flex-col lmsa-gap-3;
+  }
+
+  .lmsa-provider-card {
+    @apply lmsa-rounded-xl lmsa-overflow-hidden;
+    border: 1px solid var(--lmsa-border-subtle);
+    background: var(--background-primary);
+  }
+
+  .lmsa-provider-card.is-off .lmsa-provider-card-icon,
+  .lmsa-provider-card.is-off .lmsa-provider-card-name {
+    opacity: 0.55;
+  }
+
+  .lmsa-provider-card-header {
+    @apply lmsa-flex lmsa-items-center lmsa-gap-3 lmsa-px-4 lmsa-py-3 lmsa-cursor-pointer lmsa-select-none;
+  }
+
+  .lmsa-provider-card-header:hover {
+    background: color-mix(in srgb, var(--background-modifier-hover) 55%, transparent);
+  }
+
+  .lmsa-provider-card-icon {
+    @apply lmsa-flex lmsa-flex-none lmsa-items-center lmsa-justify-center lmsa-rounded-lg;
+    width: 34px;
+    height: 34px;
+    background: color-mix(in srgb, var(--lmsa-section-accent) 14%, transparent);
+    color: var(--lmsa-section-accent);
+  }
+
+  .lmsa-provider-card-info {
+    @apply lmsa-flex lmsa-min-w-0 lmsa-flex-1 lmsa-flex-col lmsa-gap-0.5;
+  }
+
+  .lmsa-provider-card-name {
+    @apply lmsa-text-sm lmsa-font-semibold;
+    color: var(--lmsa-text-primary);
+  }
+
+  .lmsa-provider-card-status {
+    @apply lmsa-truncate lmsa-text-xs;
+    color: var(--lmsa-text-muted);
+  }
+
+  .lmsa-provider-card-chevron {
+    @apply lmsa-flex lmsa-flex-none lmsa-items-center;
+    color: var(--lmsa-text-muted);
+  }
+
+  .lmsa-provider-card-toggle {
+    @apply lmsa-flex lmsa-flex-none lmsa-items-center;
+  }
+
+  .lmsa-toggle.is-disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+
+  .lmsa-provider-card-body {
+    @apply lmsa-flex lmsa-flex-col lmsa-gap-1 lmsa-px-4 lmsa-pb-4;
+    border-top: 1px solid var(--lmsa-border-subtle);
+  }
+
+  /* ── Model lists inside a card ──────────────────────────────────── */
+
+  .lmsa-provider-models {
+    @apply lmsa-mt-3;
+  }
+
+  .lmsa-provider-models-header {
+    @apply lmsa-flex lmsa-items-center lmsa-gap-2 lmsa-pb-1;
+  }
+
+  .lmsa-provider-models-title {
+    @apply lmsa-text-xs lmsa-font-semibold lmsa-uppercase lmsa-tracking-wide;
+    color: var(--lmsa-text-muted);
+  }
+
+  .lmsa-provider-models-meta {
+    @apply lmsa-flex-1 lmsa-truncate lmsa-text-xs;
+    color: var(--lmsa-text-faint, var(--lmsa-text-muted));
+  }
+
+  .lmsa-provider-models-empty {
+    @apply lmsa-my-2 lmsa-text-xs;
+    color: var(--lmsa-text-muted);
+  }
+
+  .lmsa-provider-model-row {
+    @apply lmsa-items-center lmsa-py-2;
+  }
+
+  .lmsa-provider-model-name {
+    @apply lmsa-text-sm;
+    color: var(--lmsa-text-primary);
+  }
+
+  .lmsa-provider-model-id {
+    @apply lmsa-truncate lmsa-text-xs;
+    font-family: var(--font-monospace);
+    color: var(--lmsa-text-muted);
+  }
+
+  .lmsa-provider-model-badges {
+    @apply lmsa-flex lmsa-flex-none lmsa-items-center lmsa-gap-1.5;
+  }
+
+  .lmsa-provider-role-chip,
+  .lmsa-provider-context-chip {
+    @apply lmsa-inline-flex lmsa-flex-none lmsa-items-center lmsa-rounded-full lmsa-px-2 lmsa-py-0.5 lmsa-text-xs;
+    background: color-mix(in srgb, var(--background-modifier-hover) 84%, transparent);
+    color: var(--lmsa-text-muted);
+  }
+
+  .lmsa-provider-role-chip {
+    background: color-mix(in srgb, var(--lmsa-section-accent) 12%, transparent);
+    color: color-mix(in srgb, var(--lmsa-section-accent) 80%, var(--lmsa-text-primary));
+  }
+
+  /* ── Custom-model add row ───────────────────────────────────────── */
+
+  .lmsa-provider-add-row {
+    @apply lmsa-flex lmsa-items-center lmsa-gap-2 lmsa-pt-2;
+  }
+
+  .lmsa-provider-add-row input {
+    @apply lmsa-min-w-0 lmsa-flex-1;
+  }
+
+  .lmsa-provider-remove-btn {
+    @apply lmsa-flex lmsa-flex-none lmsa-items-center lmsa-justify-center lmsa-px-2;
+  }
+
+  /* ── Detection status (Claude Code) ─────────────────────────────── */
+
+  .lmsa-provider-detection {
+    @apply lmsa-text-xs lmsa-font-medium;
+    color: var(--lmsa-text-muted);
+  }
+
+  .lmsa-provider-detection.is-ok {
+    color: var(--lmsa-status-success);
+  }
+
+  .lmsa-provider-detection.is-missing {
+    color: color-mix(in srgb, var(--lmsa-status-error-bg) 88%, var(--lmsa-text-primary));
+  }
+
+  .lmsa-provider-setup-link {
+    @apply lmsa-ml-1;
+  }
+
+  .lmsa-provider-footnote {
+    @apply lmsa-mt-4 lmsa-text-xs;
+    color: var(--lmsa-text-muted);
+  }
+}

@@ -63,6 +63,7 @@ export class TextAreaInput {
 export class Toggle {
   toggleEl: HTMLDivElement;
   private value = false;
+  private disabled = false;
   private changeCb?: (value: boolean) => unknown;
 
   constructor(containerEl: HTMLElement) {
@@ -81,8 +82,17 @@ export class Toggle {
   }
 
   private toggle(): void {
+    if (this.disabled) return;
     this.setValue(!this.value);
     this.changeCb?.(this.value);
+  }
+
+  /** An inert (auth-gated) toggle: rendered, but clicks and keys are ignored. */
+  setDisabled(disabled: boolean): this {
+    this.disabled = disabled;
+    this.toggleEl.classList.toggle("is-disabled", disabled);
+    this.toggleEl.setAttribute("aria-disabled", String(disabled));
+    return this;
   }
 
   setValue(on: boolean): this {

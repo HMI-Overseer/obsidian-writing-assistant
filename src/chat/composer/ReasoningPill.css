@@ -46,6 +46,24 @@
     height: 12px;
   }
 
+  /* Expandability affordance, same treatment as the header model selector's
+     chevron: faded until the control is hovered. Points up because the level
+     menu opens above the pill. */
+  .lmsa-chat-composer-reasoning-pill-chevron {
+    @apply lmsa-inline-flex lmsa-flex-none lmsa-items-center;
+    opacity: 0.4;
+    transition: opacity 140ms ease;
+  }
+
+  .lmsa-chat-composer-reasoning-pill:hover .lmsa-chat-composer-reasoning-pill-chevron {
+    opacity: 0.75;
+  }
+
+  .lmsa-chat-composer-reasoning-pill-chevron svg {
+    width: 12px;
+    height: 12px;
+  }
+
   /* ── Level menu ───────────────────────────────────────────────────────── */
 
   .lmsa-reasoning-menu {
@@ -101,11 +119,12 @@
     height: 12px;
   }
 
-  /* Narrow footer: the pill's text label collapses at the same width the
-     ring's % label drops, keeping the left cluster to two compact glyphs while
+  /* Narrow footer: the pill's text label collapses 5px before the ring's %
+     label drops (516px), keeping the left cluster to two compact glyphs while
      the right side degrades on its own original thresholds. */
-  @container lmsa-composer-footer (max-width: 516px) {
-    .lmsa-chat-composer-reasoning-pill-label {
+  @container lmsa-composer-footer (max-width: 521px) {
+    .lmsa-chat-composer-reasoning-pill-label,
+    .lmsa-chat-composer-reasoning-pill-chevron {
       display: none;
     }
   }

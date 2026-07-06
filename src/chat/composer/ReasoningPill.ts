@@ -59,12 +59,22 @@ export class ReasoningPill {
     this.callbacks.onBeforeOpen?.();
     this.menuOpen = true;
     this.refs.reasoningMenuEl.removeClass("lmsa-hidden");
+    this.setChevron(true);
     this.renderMenu();
   }
 
   close(): void {
     this.menuOpen = false;
     this.refs.reasoningMenuEl.addClass("lmsa-hidden");
+    this.setChevron(false);
+  }
+
+  /** Closed points up (the menu opens above the pill); open flips down, like the model selector. */
+  private setChevron(open: boolean): void {
+    const chevronEl = this.refs.reasoningPillEl.querySelector(
+      ".lmsa-chat-composer-reasoning-pill-chevron",
+    );
+    if (chevronEl instanceof HTMLElement) setIcon(chevronEl, open ? "chevron-down" : "chevron-up");
   }
 
   isOpen(): boolean {

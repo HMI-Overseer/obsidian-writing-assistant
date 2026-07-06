@@ -183,6 +183,11 @@ export function createChatLayout(contentEl: HTMLElement): ChatLayoutRefs {
   });
   setIcon(reasoningPillIcon, "brain");
   reasoningPillEl.createEl("span", { cls: "lmsa-chat-composer-reasoning-pill-label" });
+  // Chevron points up because the level menu opens above the pill.
+  const reasoningPillChevron = reasoningPillEl.createEl("span", {
+    cls: "lmsa-chat-composer-reasoning-pill-chevron",
+  });
+  setIcon(reasoningPillChevron, "chevron-up");
 
   const composerFooterActions = composerFooterRow.createDiv({ cls: "lmsa-chat-composer-footer-actions" });
   const toolWrap = composerFooterActions.createDiv({ cls: "lmsa-chat-composer-tool-wrap" });

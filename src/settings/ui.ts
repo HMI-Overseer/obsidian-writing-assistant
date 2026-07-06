@@ -244,6 +244,15 @@ export interface ModelSelectorRefs {
 }
 
 /**
+ * At most one settings model dropdown is open at a time. Trigger and interior
+ * clicks stopPropagation (so a dropdown doesn't dismiss itself), which also
+ * hides those clicks from every OTHER open selector's document click-away;
+ * without this registry, two adjacent selectors (e.g. the Knowledge Graph
+ * tab's completion + embedding pickers) would overlay each other.
+ */
+let closeOpenModelSelector: (() => void) | null = null;
+
+/**
  * Creates a custom model selector: a trigger with a status dot, opening the
  * shared {@link ModelDropdownView} interior (search, provider rail, favorite
  * stars). Same anatomy as the chat header's selector, minus its
@@ -303,6 +312,7 @@ export function createModelSelector(
   const onDocClick = (): void => { if (isOpen) close(); };
 
   function close(): void {
+    if (closeOpenModelSelector === close) closeOpenModelSelector = null;
     document.removeEventListener("click", onDocClick);
     dropdownEl.addClass("lmsa-hidden");
     isOpen = false;
@@ -312,6 +322,8 @@ export function createModelSelector(
   }
 
   function open(): void {
+    closeOpenModelSelector?.();
+    closeOpenModelSelector = close;
     document.addEventListener("click", onDocClick);
     dropdownEl.empty();
     dropdownEl.removeClass("lmsa-hidden");
@@ -387,6 +399,7 @@ export function createModelSelector(
     },
     destroy() {
       clearAttention();
+      if (closeOpenModelSelector === close) closeOpenModelSelector = null;
       document.removeEventListener("click", onDocClick);
     },
   };

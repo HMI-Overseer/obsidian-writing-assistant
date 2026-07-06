@@ -135,7 +135,7 @@ export const DEFAULT_SETTINGS: PluginSettings = {
   knowledgeGraph: { ...DEFAULT_KNOWLEDGE_GRAPH_SETTINGS },
   systemPromptPrefix: DEFAULT_SYSTEM_PROMPT_PREFIX,
   apiKeysDisclaimerAccepted: false,
-  agenticMode: false,
+  agenticMode: true,
   maxToolRounds: DEFAULT_MAX_TOOL_ROUNDS,
   benchmark: { ...DEFAULT_BENCHMARK_SETTINGS },
   vaultOpPolicy: { ...DEFAULT_VAULT_OP_POLICY, scopes: [...DEFAULT_VAULT_OP_POLICY.scopes] },

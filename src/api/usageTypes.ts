@@ -60,6 +60,13 @@ export interface StreamResult {
   toolCalls: Promise<ToolCall[] | null>;
   /** Resolves when the stream ends with the reason the model stopped. */
   stopReason: Promise<StopReason>;
+  /**
+   * Anthropic only: raw thinking / redacted_thinking blocks captured verbatim
+   * from this response, for the tool-use round trip (the tool loop attaches
+   * them to the assistant turn via {@link ../shared/chatRequest.ChatTurn}).
+   * Absent on providers without a thinking round-trip requirement.
+   */
+  thinkingBlocks?: Promise<unknown[] | null>;
 }
 
 /** Wrapper returned by ChatClient.complete(). */
@@ -68,4 +75,6 @@ export interface CompletionResult {
   usage: UsageResult | null;
   toolCalls?: ToolCall[] | null;
   stopReason?: StopReason;
+  /** Anthropic only: raw thinking blocks, mirroring {@link StreamResult.thinkingBlocks}. */
+  thinkingBlocks?: unknown[] | null;
 }

@@ -96,14 +96,19 @@ export class LMStudioClient implements ChatClient {
       : undefined;
     const payload = buildCompletionPayload(model, messages, params, false, openAITools);
 
-    const json = await requestJson(
-      "POST",
-      this.openAIBaseUrl,
-      "/chat/completions",
-      this.bypassCors,
-      payload,
-      signal
-    );
+    let json: unknown;
+    try {
+      json = await requestJson(
+        "POST",
+        this.openAIBaseUrl,
+        "/chat/completions",
+        this.bypassCors,
+        payload,
+        signal
+      );
+    } catch (error) {
+      throw decorateJinjaTemplateError(error, openAITools !== undefined);
+    }
     if (!isRecord(json)) {
       throw new Error("LM Studio returned an invalid chat completion response.");
     }
@@ -208,6 +213,8 @@ export class LMStudioClient implements ChatClient {
     async function* wrappedDeltas(): AsyncGenerator<string> {
       try {
         yield* rawDeltas;
+      } catch (error) {
+        throw decorateJinjaTemplateError(error, openAITools !== undefined);
       } finally {
         // Finalize any pending tool calls.
         for (const [, pending] of pendingToolCalls) {
@@ -329,4 +336,29 @@ function mapOpenAIStopReason(raw: string | undefined): StopReason {
     case "length": return "max_tokens";
     default: return "unknown";
   }
+}
+
+/**
+ * Turns LM Studio's generic jinja-template render error into an actionable one
+ * when the request carried tools. Empirically pinned by a live payload bisect
+ * (gemma4 fine-tune, 2026-07-06, recorded in
+ * docs/reference/external/lmstudio-api.md): a bare chat request renders fine,
+ * adding a single `tools` entry 400s with "Cannot call something that is not a
+ * function: got UndefinedValue". Some models advertise
+ * `trained_for_tool_use: true` while their (often fine-tuned) chat template's
+ * tools branch calls an undefined helper, so every agentic request dies at
+ * render. The capability flag can't predict this, so the remedy is surfaced at
+ * the failure instead: chat without tools, or fix the template.
+ */
+export function decorateJinjaTemplateError(error: unknown, hadTools: boolean): unknown {
+  if (!hadTools || !(error instanceof Error)) return error;
+  if (!error.message.includes("jinja template")) return error;
+  return new Error(
+    `${error.message}\n\n` +
+      "This request included the plugin's tool definitions, and this model's chat template " +
+      "failed while rendering them (the model reports tool-use support, but its template's " +
+      "tools section is broken). Workarounds: turn off Agentic mode (wrench icon) to chat " +
+      "with this model without tools, or fix the model's prompt template in LM Studio " +
+      "(My Models > Prompt Template), e.g. by copying it from an lmstudio-community variant.",
+  );
 }

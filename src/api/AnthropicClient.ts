@@ -107,6 +107,7 @@ export class AnthropicClient implements ChatClient {
     const content = json.content as Array<Record<string, unknown>> | undefined;
     const textParts: string[] = [];
     const toolCalls: ToolCall[] = [];
+    const thinkingBlocks: Record<string, unknown>[] = [];
 
     if (content) {
       for (const block of content) {
@@ -118,6 +119,9 @@ export class AnthropicClient implements ChatClient {
             name: block.name as string,
             arguments: (block.input as Record<string, unknown>) ?? {},
           });
+        } else if (block.type === "thinking" || block.type === "redacted_thinking") {
+          // Verbatim capture for the tool-use round trip (signature included).
+          thinkingBlocks.push(block);
         }
       }
     }
@@ -131,6 +135,7 @@ export class AnthropicClient implements ChatClient {
       usage,
       toolCalls: toolCalls.length > 0 ? toolCalls : null,
       stopReason,
+      thinkingBlocks: thinkingBlocks.length > 0 ? thinkingBlocks : null,
     };
   }
 
@@ -162,9 +167,22 @@ export class AnthropicClient implements ChatClient {
     const toolCallsPromise = new Promise<ToolCall[] | null>((r) => { resolveToolCalls = r; });
     const stopReasonPromise = new Promise<StopReason>((r) => { resolveStopReason = r; });
 
+    let resolveThinkingBlocks: (value: unknown[] | null) => void;
+    const thinkingBlocksPromise = new Promise<unknown[] | null>((r) => {
+      resolveThinkingBlocks = r;
+    });
+
     // Tool call accumulation state.
     const pendingToolCalls = new Map<number, { id: string; name: string; jsonChunks: string[] }>();
     const completedToolCalls: ToolCall[] = [];
+
+    // Thinking-block accumulation (adaptive thinking + tool use, P1-6 lift).
+    // Blocks are captured VERBATIM, signature included, because Anthropic
+    // requires them echoed back unmodified with the tool results; under the
+    // default display ("omitted" on current-gen models) the thinking text can
+    // legitimately be empty while the signature still matters.
+    const pendingThinking = new Map<number, { thinking: string; signature: string }>();
+    const completedThinkingBlocks: Record<string, unknown>[] = [];
 
     const onEvent = (json: unknown): void => {
       const record = json as Record<string, unknown>;
@@ -197,14 +215,26 @@ export class AnthropicClient implements ChatClient {
           const name = block.name as string;
           pendingToolCalls.set(idx, { id: block.id as string, name, jsonChunks: [] });
           onToolCallStreaming?.(idx, name);
+        } else if (block?.type === "thinking") {
+          pendingThinking.set(record.index as number, { thinking: "", signature: "" });
+        } else if (block?.type === "redacted_thinking") {
+          // Redacted blocks arrive whole (opaque data, no deltas); keep verbatim.
+          completedThinkingBlocks.push({ type: "redacted_thinking", data: block.data });
         }
       } else if (record.type === "content_block_delta") {
         const delta = record.delta as Record<string, unknown> | undefined;
         if (delta?.type === "input_json_delta") {
           pendingToolCalls.get(record.index as number)?.jsonChunks.push(delta.partial_json as string);
+        } else if (delta?.type === "thinking_delta") {
+          const pending = pendingThinking.get(record.index as number);
+          if (pending) pending.thinking += (delta.thinking as string) ?? "";
+        } else if (delta?.type === "signature_delta") {
+          const pending = pendingThinking.get(record.index as number);
+          if (pending) pending.signature = (delta.signature as string) ?? "";
         }
       } else if (record.type === "content_block_stop") {
-        const pending = pendingToolCalls.get(record.index as number);
+        const idx = record.index as number;
+        const pending = pendingToolCalls.get(idx);
         if (pending) {
           // Malformed (or empty) args surface as {} rather than dropping the call,
           // so the tool loop returns a self-correcting validation error on the
@@ -215,7 +245,16 @@ export class AnthropicClient implements ChatClient {
             name: pending.name,
             arguments: parseToolArguments(pending.jsonChunks.join("")),
           });
-          pendingToolCalls.delete(record.index as number);
+          pendingToolCalls.delete(idx);
+        }
+        const thinking = pendingThinking.get(idx);
+        if (thinking) {
+          completedThinkingBlocks.push({
+            type: "thinking",
+            thinking: thinking.thinking,
+            signature: thinking.signature,
+          });
+          pendingThinking.delete(idx);
         }
       }
     };
@@ -235,6 +274,7 @@ export class AnthropicClient implements ChatClient {
 
       resolveToolCalls(completedToolCalls.length > 0 ? completedToolCalls : null);
       resolveStopReason(streamStopReason);
+      resolveThinkingBlocks(completedThinkingBlocks.length > 0 ? completedThinkingBlocks : null);
     };
 
     // Wrap the raw generator so we can resolve usage + tool calls when it ends.
@@ -255,7 +295,13 @@ export class AnthropicClient implements ChatClient {
       }
     }
 
-    return { deltas: wrappedDeltas(), usage: usagePromise, toolCalls: toolCallsPromise, stopReason: stopReasonPromise };
+    return {
+      deltas: wrappedDeltas(),
+      usage: usagePromise,
+      toolCalls: toolCallsPromise,
+      stopReason: stopReasonPromise,
+      thinkingBlocks: thinkingBlocksPromise,
+    };
   }
 
 }

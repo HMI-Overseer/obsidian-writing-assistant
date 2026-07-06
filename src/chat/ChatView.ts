@@ -1,11 +1,12 @@
 import type { WorkspaceLeaf } from "obsidian";
 import { ItemView } from "obsidian";
-import type { ApprovalPosture, ProviderProfile } from "../shared/types";
+import type { ApprovalPosture, ProviderProfile, ReasoningLevel } from "../shared/types";
 import type { DocumentContext } from "../shared/chatRequest";
 import type WritingAssistantChat from "../main";
 import { VIEW_TYPE_CHAT, makeDefaultProfile } from "../constants";
 import { getActiveProfile, getProfilesForProvider, generateProfileId } from "../shared/profileUtils";
 import { PROVIDER_DESCRIPTORS } from "../providers/descriptors";
+import { resolveModelReasoning, resolveReasoningLevels } from "../providers/reasoningLevels";
 import {
   getSelectableCompletionModels,
   getSelectableEmbeddingModels,
@@ -18,6 +19,7 @@ import type { ContextInputs } from "./ContextCapacityUpdater";
 import { ContextCapacityUpdater } from "./ContextCapacityUpdater";
 import { renderProposalPanels } from "./finalization/finalizeEditResponse";
 import { ChatComposer } from "./composer/ChatComposer";
+import { ReasoningPill } from "./composer/ReasoningPill";
 import { ContextPickerPopover } from "./composer/ContextPickerPopover";
 import { KnowledgePopover } from "./composer/KnowledgePopover";
 import { ToolUsePopover } from "./composer/ToolUsePopover";
@@ -46,6 +48,7 @@ export class ChatView extends ItemView {
   private contextPickerPopover: ContextPickerPopover | null = null;
   private knowledgePopover: KnowledgePopover | null = null;
   private toolUsePopover: ToolUsePopover | null = null;
+  private reasoningPill: ReasoningPill | null = null;
   private historyDrawer: ChatHistoryDrawer | null = null;
   private contextUpdater: ContextCapacityUpdater | null = null;
   private orchestrator!: ChatGenerationOrchestrator;
@@ -210,6 +213,27 @@ export class ChatView extends ItemView {
         Object.assign(profile, patch);
         await this.plugin.saveSettings();
       },
+      getModelReasoning: () => {
+        const model = this.sessionStore?.getResolvedConversationModel() ?? null;
+        return model
+          ? resolveModelReasoning(
+              this.plugin.settings.reasoningByModelKey,
+              model,
+              this.plugin.services.modelAvailability,
+            )
+          : null;
+      },
+      getModelReasoningLevels: () => {
+        const model = this.sessionStore?.getResolvedConversationModel() ?? null;
+        return model
+          ? resolveReasoningLevels(model, this.plugin.services.modelAvailability)
+          : [];
+      },
+      onModelReasoningChange: async (level) => {
+        const model = this.sessionStore?.getResolvedConversationModel() ?? null;
+        if (!model) return;
+        await this.setModelReasoning(model.id, level);
+      },
     });
 
     this.knowledgePopover = new KnowledgePopover(this.layout, {
@@ -303,6 +327,7 @@ export class ChatView extends ItemView {
       onBeforeOpen: () => {
         if (this.toolUsePopover?.isOpen()) this.toolUsePopover.close();
         if (this.profilePopover?.isOpen()) this.profilePopover.close();
+        if (this.reasoningPill?.isOpen()) this.reasoningPill.close();
       },
     });
 
@@ -321,6 +346,17 @@ export class ChatView extends ItemView {
       onBeforeOpen: () => {
         if (this.knowledgePopover?.isOpen()) this.knowledgePopover.close();
         if (this.profilePopover?.isOpen()) this.profilePopover.close();
+        if (this.reasoningPill?.isOpen()) this.reasoningPill.close();
+      },
+    });
+
+    this.reasoningPill = new ReasoningPill(this.layout, {
+      getActiveModel: () => this.sessionStore?.getResolvedConversationModel() ?? null,
+      getReasoningByModelKey: () => this.plugin.settings.reasoningByModelKey,
+      getReasoningDiscovery: () => this.plugin.services.modelAvailability,
+      onReasoningChange: (modelKey, level) => this.setModelReasoning(modelKey, level),
+      onBeforeOpen: () => {
+        this.dismissAllOverlays();
       },
     });
 
@@ -346,6 +382,7 @@ export class ChatView extends ItemView {
         if (this.knowledgePopover?.isOpen()) this.knowledgePopover.close();
         if (this.toolUsePopover?.isOpen()) this.toolUsePopover.close();
         if (this.profilePopover?.isOpen()) this.profilePopover.close();
+        if (this.reasoningPill?.isOpen()) this.reasoningPill.close();
       },
     });
 
@@ -421,6 +458,7 @@ export class ChatView extends ItemView {
     this.contextPickerPopover?.destroy();
     this.knowledgePopover?.destroy();
     this.toolUsePopover?.destroy();
+    this.reasoningPill?.destroy();
     this.composer?.destroy();
   }
 
@@ -527,6 +565,7 @@ export class ChatView extends ItemView {
       this.sessionStore.getResolvedConversationModel()
     );
     this.modelSelector?.syncActiveModel();
+    this.reasoningPill?.refresh();
 
     this.profilePopover?.syncVisibility();
 
@@ -553,6 +592,7 @@ export class ChatView extends ItemView {
       this.plugin.services.ragService.isReady(),
       this.plugin.services.graphService.isReady(),
     );
+    this.reasoningPill?.refresh();
   }
 
   private updateHeader(): void {
@@ -575,7 +615,20 @@ export class ChatView extends ItemView {
     if (this.contextPickerPopover?.isOpen()) this.contextPickerPopover.close();
     if (this.knowledgePopover?.isOpen()) this.knowledgePopover.close();
     if (this.toolUsePopover?.isOpen()) this.toolUsePopover.close();
+    if (this.reasoningPill?.isOpen()) this.reasoningPill.close();
     if (!options?.keepHistory && this.historyDrawer?.isOpen()) this.historyDrawer.close();
+  }
+
+  /**
+   * The single write path for a model's reasoning entry, shared by the composer
+   * pill and the profile popover's control. Null clears the entry, so nothing
+   * is sent and the model runs on its own default.
+   */
+  private async setModelReasoning(modelKey: string, level: ReasoningLevel | null): Promise<void> {
+    if (level === null) delete this.plugin.settings.reasoningByModelKey[modelKey];
+    else this.plugin.settings.reasoningByModelKey[modelKey] = level;
+    await this.plugin.saveSettings();
+    this.reasoningPill?.refresh();
   }
 
   private handleWidthChange(width: number): void {

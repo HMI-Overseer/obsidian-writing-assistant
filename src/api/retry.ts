@@ -135,9 +135,11 @@ export function streamWithRetry(
   let resolveUsage!: (value: UsageResult | null) => void;
   let resolveToolCalls!: (value: ToolCall[] | null) => void;
   let resolveStopReason!: (value: StopReason) => void;
+  let resolveThinkingBlocks!: (value: unknown[] | null) => void;
   const usage = new Promise<UsageResult | null>((r) => { resolveUsage = r; });
   const toolCalls = new Promise<ToolCall[] | null>((r) => { resolveToolCalls = r; });
   const stopReason = new Promise<StopReason>((r) => { resolveStopReason = r; });
+  const thinkingBlocks = new Promise<unknown[] | null>((r) => { resolveThinkingBlocks = r; });
 
   // Forward a committed attempt's deferred fields onto ours. A failed attempt's own
   // generator already resolved its (discarded) promises in its finally; we ignore those.
@@ -145,6 +147,11 @@ export function streamWithRetry(
     void chosen.usage.then(resolveUsage, () => resolveUsage(null));
     void chosen.toolCalls.then(resolveToolCalls, () => resolveToolCalls(null));
     void chosen.stopReason.then(resolveStopReason, () => resolveStopReason("unknown"));
+    if (chosen.thinkingBlocks) {
+      void chosen.thinkingBlocks.then(resolveThinkingBlocks, () => resolveThinkingBlocks(null));
+    } else {
+      resolveThinkingBlocks(null);
+    }
   };
 
   async function* deltas(): AsyncGenerator<string> {
@@ -183,9 +190,10 @@ export function streamWithRetry(
       resolveUsage(null);
       resolveToolCalls(null);
       resolveStopReason("unknown");
+      resolveThinkingBlocks(null);
       throw error;
     }
   }
 
-  return { deltas: deltas(), usage, toolCalls, stopReason };
+  return { deltas: deltas(), usage, toolCalls, stopReason, thinkingBlocks };
 }

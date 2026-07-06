@@ -49,6 +49,14 @@
     pointer-events: none;
   }
 
+  /* Reasoning is per model, not a profile parameter: it stays live on the
+     default profile (same carve-out setControlsDisabled makes in TS). */
+  .lmsa-profile-popover.is-default-profile .lmsa-model-reasoning-section,
+  .lmsa-profile-popover.is-default-profile .lmsa-model-reasoning-section .lmsa-params-body {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
   .lmsa-profile-popover-title {
     @apply lmsa-flex lmsa-flex-col lmsa-gap-1 lmsa-font-bold lmsa-text-obsidian-text;
     font-size: var(--font-ui-small);

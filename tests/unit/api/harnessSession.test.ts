@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
+  canFlipEffortMidSession,
   decideReuse,
   diagnoseSessionReuse,
   fingerprint,
@@ -14,7 +15,6 @@ function cfg(overrides: Partial<SessionConfig> = {}): SessionConfig {
   return {
     model: "claude-sonnet-4-6",
     systemPrompt: "Be concise.",
-    reasoning: "off",
     agenticMode: true,
     toolNames: ["read_note", "search_vault"],
     ...overrides,
@@ -48,9 +48,27 @@ describe("fingerprint", () => {
     const base = fingerprint(cfg());
     expect(fingerprint(cfg({ model: "claude-opus-4-8" }))).not.toBe(base);
     expect(fingerprint(cfg({ systemPrompt: "different" }))).not.toBe(base);
-    expect(fingerprint(cfg({ reasoning: "high" }))).not.toBe(base);
     expect(fingerprint(cfg({ agenticMode: false }))).not.toBe(base);
     expect(fingerprint(cfg({ toolNames: ["a"] }))).not.toBe(base);
+  });
+});
+
+// Reasoning left the config fingerprint (§3.2): a low..xhigh change flips the
+// live session via applyFlagSettings; only non-flippable changes rebuild.
+describe("canFlipEffortMidSession", () => {
+  it("allows flips between flag-settable tiers (and from the default)", () => {
+    expect(canFlipEffortMidSession("low", "xhigh")).toBe(true);
+    expect(canFlipEffortMidSession("xhigh", "low")).toBe(true);
+    expect(canFlipEffortMidSession(null, "high")).toBe(true);
+  });
+
+  it("rebuilds for max in either direction (session-start Options.effort only)", () => {
+    expect(canFlipEffortMidSession("high", "max")).toBe(false);
+    expect(canFlipEffortMidSession("max", "high")).toBe(false);
+  });
+
+  it("rebuilds when returning to the model default (null is not a flag value)", () => {
+    expect(canFlipEffortMidSession("high", null)).toBe(false);
   });
 });
 
@@ -89,11 +107,11 @@ describe("isSessionUsable", () => {
     expect(isSessionUsable(meta, live, cfg({ model: "claude-opus-4-8" }))).toBe(false);
   });
 
-  it("rejects config drift (e.g. a reasoning change)", () => {
+  it("rejects config drift (e.g. a system-prompt change)", () => {
     const covered = turns(["user", "hi"], ["assistant", "yo"]);
     const meta = metaFor(covered, cfg());
     const live = [...covered, { role: "user", content: "next" }];
-    expect(isSessionUsable(meta, live, cfg({ reasoning: "high" }))).toBe(false);
+    expect(isSessionUsable(meta, live, cfg({ systemPrompt: "different" }))).toBe(false);
   });
 
   it("rejects an edit to a covered message (prefix hash)", () => {
@@ -136,7 +154,6 @@ describe("diagnoseSessionReuse", () => {
     const cases: [Partial<SessionConfig>, string][] = [
       [{ model: "claude-opus-4-8" }, "model-changed"],
       [{ systemPrompt: "different" }, "system-prompt-changed"],
-      [{ reasoning: "high" }, "reasoning-changed"],
       [{ agenticMode: false }, "agentic-mode-changed"],
       [{ toolNames: ["only_one"] }, "tools-changed"],
     ];
@@ -163,7 +180,7 @@ describe("diagnoseSessionReuse", () => {
 
   // Single-field attribution still names the highest-priority changed field when
   // several baked fields move at once (the masking the design doc notes); priority
-  // order is systemPrompt → reasoning → agentic → tools.
+  // order is systemPrompt, then agentic, then tools.
   it("names the highest-priority field when several change at once", () => {
     const meta = metaFor(covered, cfg());
     const drift = cfg({ systemPrompt: "different", toolNames: ["only_one"] });

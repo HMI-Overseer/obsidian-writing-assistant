@@ -15,8 +15,13 @@ const lmstudio: ProviderDescriptor = {
     topK: true,
     minP: true,
     repeatPenalty: true,
-    reasoning: true,
   },
+  // Deliberately empty: LM Studio reasoning support is strictly per model,
+  // discovered via `capabilities.reasoning.allowed_options`. A model without
+  // the capability can hard-fail on a forwarded reasoning value (jinja
+  // template render error), so an undiscovered model offers nothing, never a
+  // guessed vocabulary.
+  reasoningLevels: [],
   supportsModelDiscovery: true,
   supportsToolUse: false,
   defaultBaseUrl: "http://localhost:1234/v1",
@@ -37,8 +42,11 @@ const anthropic: ProviderDescriptor = {
     topK: true,
     minP: false,
     repeatPenalty: false,
-    reasoning: true,
   },
+  // Fallback for non-adaptive / unknown ids only: adaptive-capable Anthropic
+  // models resolve per model in reasoningLevels.ts (xhigh/max where honored,
+  // shipped with the tool-use thinking round trip).
+  reasoningLevels: ["off", "low", "medium", "high"],
   supportsModelDiscovery: true,
   supportsToolUse: true,
   defaultBaseUrl: null,
@@ -59,8 +67,10 @@ const openai: ProviderDescriptor = {
     topK: false,
     minP: false,
     repeatPenalty: false,
-    reasoning: true,
   },
+  // Unchanged pre-pill semantics: the OpenAI-compat payload forwards the level
+  // verbatim (`buildPayload`), so the offered set stays the historical one.
+  reasoningLevels: ["off", "low", "medium", "high", "on"],
   supportsModelDiscovery: true,
   supportsToolUse: true,
   defaultBaseUrl: "https://api.openai.com/v1",
@@ -82,8 +92,11 @@ const claudecode: ProviderDescriptor = {
     topK: false,
     minP: false,
     repeatPenalty: false,
-    reasoning: false,
   },
+  // Effort is not a sampling param; it is a harness-level control the CLI/SDK
+  // explicitly expose (`Options.effort` / `--effort`). No `off`: Fable 5 cannot
+  // disable thinking; no `on`: meaningless under effort tiers.
+  reasoningLevels: ["low", "medium", "high", "xhigh", "max"],
   supportsModelDiscovery: true,
   // Claude Code is tool-centric, so it reports as tool-capable. NOTE: it receives
   // the plugin's tools through the in-process MCP server, NOT via request.tools,

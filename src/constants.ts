@@ -100,7 +100,6 @@ export function makeDefaultProfile(provider: ProviderOption): ProviderProfile {
     topK: null,
     minP: null,
     repeatPenalty: null,
-    reasoning: null,
     anthropicCacheSettings: { enabled: false, ttl: "default" },
   };
 }
@@ -140,4 +139,6 @@ export const DEFAULT_SETTINGS: PluginSettings = {
   benchmark: { ...DEFAULT_BENCHMARK_SETTINGS },
   vaultOpPolicy: { ...DEFAULT_VAULT_OP_POLICY, scopes: [...DEFAULT_VAULT_OP_POLICY.scopes] },
   favoriteModelKeys: [],
+  reasoningByModelKey: {},
+  claudeCodeEffortLevels: {},
 };

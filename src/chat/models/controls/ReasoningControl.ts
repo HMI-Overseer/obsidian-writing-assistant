@@ -1,14 +1,18 @@
 import type { ReasoningLevel } from "../../../shared/types";
+import { REASONING_LEVEL_LABELS } from "../../../shared/reasoning";
 
 export interface ReasoningControlOptions {
   value: ReasoningLevel | null;
+  /** The levels the active model actually offers (resolved set, §3.1). */
+  levels: ReasoningLevel[];
   onChange: (value: ReasoningLevel | null) => void;
 }
 
-const REASONING_LEVELS: ReasoningLevel[] = ["off", "low", "medium", "high", "on"];
-
 /**
- * Toggle + dropdown for reasoning level selection.
+ * Toggle + dropdown for reasoning level selection. Off = null = the model's own
+ * default (nothing is sent). The dropdown offers only the model's resolved
+ * level set; with no stored value it rests on the middle level as a cursor
+ * affordance only, nothing is stored or sent until the user commits.
  */
 export class ReasoningControl {
   private toggleEl: HTMLInputElement | null = null;
@@ -37,17 +41,19 @@ export class ReasoningControl {
       cls: "lmsa-params-select",
     }) as HTMLSelectElement;
 
-    for (const level of REASONING_LEVELS) {
+    for (const level of this.opts.levels) {
       this.selectEl.createEl("option", {
-        text: level.charAt(0).toUpperCase() + level.slice(1),
+        text: REASONING_LEVEL_LABELS[level],
         attr: { value: level },
       });
     }
 
-    // Initialize from value
+    // Initialize from value; without one, rest the cursor on the middle level.
+    const levels = this.opts.levels;
+    const middle = levels[Math.floor((levels.length - 1) / 2)];
     const hasReasoning = this.opts.value !== null;
     this.toggleEl.checked = hasReasoning;
-    this.selectEl.value = this.opts.value ?? "off";
+    this.selectEl.value = this.opts.value ?? middle ?? "";
     this.row.toggleClass("is-disabled", !hasReasoning);
     this.selectEl.disabled = !hasReasoning;
 

@@ -4,6 +4,7 @@ import type {
   BenchmarkRunConditions,
   CompletionModel,
   ProviderProfile,
+  SamplingParams,
 } from "../shared/types";
 import { MAX_BENCHMARK_HISTORY } from "../constants";
 import { createChatClient } from "../providers/registry";
@@ -33,6 +34,7 @@ import type { SuiteReportSection } from "./benchmark/reportBuilder";
 import { writeBenchmarkReport } from "./benchmark/reportWriter";
 import { ProfileSettingsPopover } from "../chat/models/ProfileSettingsPopover";
 import { buildSamplingParams } from "../chat/finalization/buildSamplingParams";
+import { resolveModelReasoning, resolveReasoningLevels } from "../providers/reasoningLevels";
 import { getActiveProfile, getProfilesForProvider, generateProfileId } from "../shared/profileUtils";
 import { makeDefaultProfile } from "../constants";
 
@@ -136,6 +138,24 @@ export function renderBenchmarkTab(
         const profile = plugin.settings.providerProfiles.find((p) => p.id === profileId);
         if (!profile || profile.isDefault) return;
         Object.assign(profile, patch);
+        await plugin.saveSettings();
+      },
+      getModelReasoning: () =>
+        selectedModel
+          ? resolveModelReasoning(
+              plugin.settings.reasoningByModelKey,
+              selectedModel,
+              plugin.services.modelAvailability,
+            )
+          : null,
+      getModelReasoningLevels: () =>
+        selectedModel
+          ? resolveReasoningLevels(selectedModel, plugin.services.modelAvailability)
+          : [],
+      onModelReasoningChange: async (level) => {
+        if (!selectedModel) return;
+        if (level === null) delete plugin.settings.reasoningByModelKey[selectedModel.id];
+        else plugin.settings.reasoningByModelKey[selectedModel.id] = level;
         await plugin.saveSettings();
       },
     },
@@ -507,13 +527,25 @@ export function renderBenchmarkTab(
   // Run conditions, history & export
   // -----------------------------------------------------------------------
 
+  /** Sampling params for a run: profile fields + the model's per-model reasoning entry. */
+  function samplingFor(model: CompletionModel, profile: ProviderProfile): SamplingParams {
+    return buildSamplingParams(
+      profile,
+      resolveModelReasoning(
+        plugin.settings.reasoningByModelKey,
+        model,
+        plugin.services.modelAvailability,
+      ),
+    );
+  }
+
   function buildRunConditions(model: CompletionModel, profile: ProviderProfile): BenchmarkRunConditions {
     return {
       provider: model.provider,
       modelId: model.modelId,
       modelName: model.name,
       profileName: profile.name,
-      samplingParams: buildSamplingParams(profile),
+      samplingParams: samplingFor(model, profile),
       pluginVersion: plugin.manifest.version,
       timestamp: Date.now(),
       iterationCount,
@@ -608,7 +640,7 @@ export function renderBenchmarkTab(
         selectedModel,
         tc,
         iterationCount,
-        buildSamplingParams(profile),
+        samplingFor(selectedModel, profile),
         (_testId, iter) => {
           trackIterationPace(iter.durationMs);
           globalCompletedIterations++;
@@ -658,7 +690,7 @@ export function renderBenchmarkTab(
         selectedModel,
         suite.testCases,
         iterationCount,
-        buildSamplingParams(profile),
+        samplingFor(selectedModel, profile),
         (result, _index) => {
           completedThisRun.add(result.testId);
           updateCard(result.testId, result);
@@ -728,7 +760,7 @@ export function renderBenchmarkTab(
           selectedModel,
           suite.testCases,
           iterationCount,
-          buildSamplingParams(profile),
+          samplingFor(selectedModel, profile),
           (result, _index) => {
             completedThisRun.add(result.testId);
             updateCard(result.testId, result);

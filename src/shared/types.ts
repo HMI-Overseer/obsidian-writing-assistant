@@ -125,7 +125,6 @@ export interface ProviderProfile {
   topK: number | null;
   minP: number | null;
   repeatPenalty: number | null;
-  reasoning: ReasoningLevel | null;
 
   // Anthropic-specific (present on all profiles, only rendered/used for Anthropic)
   anthropicCacheSettings: AnthropicCacheSettings;
@@ -365,7 +364,15 @@ export interface ChatHistory {
   activeConversationId: string | null;
 }
 
-export type ReasoningLevel = "off" | "low" | "medium" | "high" | "on";
+/**
+ * The shared reasoning vocabulary, the superset across providers. Which subset a
+ * given model actually offers is resolved per model
+ * ({@link ../providers/reasoningLevels.resolveReasoningLevels}): Claude Code and
+ * the Claude API speak effort tiers (`low`..`max`), LM Studio's native API speaks
+ * `off`/`low`/`medium`/`high`/`on`, so `off`/`on` are first-class values, not
+ * legacy junk.
+ */
+export type ReasoningLevel = "off" | "low" | "medium" | "high" | "xhigh" | "max" | "on";
 
 /** Sampling parameters sent to the LM Studio API. */
 export interface SamplingParams {
@@ -561,4 +568,23 @@ export interface PluginSettings {
   favoriteModelKeys: string[];
   /** Approval policy for vault write operations (create/overwrite/move/trash/createDir). */
   vaultOpPolicy: VaultOpPolicy;
+  /**
+   * Reasoning level per model, keyed by the composed `provider:modelId` key.
+   * The single write target for both the composer pill and the profile
+   * popover's reasoning control, so they can never disagree. No entry means
+   * nothing is sent (the model runs on its true provider default); a stored
+   * level outside the model's currently resolved set is clamped to the default
+   * at request-build time, never rewritten on disk.
+   */
+  reasoningByModelKey: Record<string, ReasoningLevel>;
+  /**
+   * Last-seen effort-level lists from the Claude Code init handshake, keyed by
+   * the normalized picker alias (`opus`, `sonnet`; `[1m]` variants stripped).
+   * A cache, not a source of truth: seeded into the availability service at
+   * load so level support is the harness's own report from the very first
+   * render after an install's first session; the descriptor fallback covers
+   * only a truly fresh install. An empty list is meaningful (model reports no
+   * effort support).
+   */
+  claudeCodeEffortLevels: Record<string, ReasoningLevel[]>;
 }

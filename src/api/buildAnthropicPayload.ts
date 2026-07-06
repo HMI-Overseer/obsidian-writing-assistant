@@ -81,6 +81,26 @@ export function anthropicModelSupportsAdaptiveThinking(modelId: string): boolean
 }
 
 /**
+ * Model-id prefixes whose models accept `output_config.effort: "xhigh"`. Introduced
+ * with Opus 4.7; Opus 4.6 / Sonnet 4.6 lack it (Anthropic documents unsupported
+ * `xhigh` as silently falling back to `high`, but the level selector shouldn't
+ * offer what a model doesn't honor — the t3code assumption-as-fact lesson).
+ * `max` needs no gate of its own: every adaptive-capable model accepts it.
+ */
+const XHIGH_EFFORT_CAPABLE_PREFIXES = [
+  "claude-opus-4-7",
+  "claude-opus-4-8",
+  "claude-sonnet-5",
+  "claude-fable-5",
+  "claude-mythos-5",
+];
+
+/** Whether this Anthropic model accepts `output_config.effort: "xhigh"`. */
+export function anthropicModelSupportsXhighEffort(modelId: string): boolean {
+  return XHIGH_EFFORT_CAPABLE_PREFIXES.some((prefix) => modelId.startsWith(prefix));
+}
+
+/**
  * Model-id prefixes whose models accept a mid-conversation `{role:"system"}`
  * message in the `messages` array (no beta header). Verified against the bundled
  * claude-api reference: this is Claude Opus 4.8 ONLY today — Fable 5, Sonnet 4.6,
@@ -127,7 +147,14 @@ export type AnthropicContentBlock =
       input: Record<string, unknown>;
       cache_control?: AnthropicCacheControl;
     }
-  | { type: "tool_result"; tool_use_id: string; content: string; cache_control?: AnthropicCacheControl };
+  | { type: "tool_result"; tool_use_id: string; content: string; cache_control?: AnthropicCacheControl }
+  // Echoed verbatim from a prior response (thinking + tool use round trip).
+  // cache_control exists only for type uniformity: the breakpoint placer marks a
+  // turn's LAST block, and echoed thinking always precedes the tool_use block,
+  // so a breakpoint never actually lands here (adding one would modify a block
+  // the API requires unmodified).
+  | { type: "thinking"; thinking: string; signature: string; cache_control?: AnthropicCacheControl }
+  | { type: "redacted_thinking"; data: string; cache_control?: AnthropicCacheControl };
 
 export interface AnthropicMessage {
   // `system` is the mid-conversation operator channel: a {role:"system"} message
@@ -164,8 +191,14 @@ export function buildAnthropicMessages(
   const messages: AnthropicMessage[] = [];
   for (const turn of request.messages) {
     if (turn.role === "assistant" && turn.toolCalls && turn.toolCalls.length > 0) {
-      // Assistant turn with tool calls: use content block array.
+      // Assistant turn with tool calls: use content block array. Captured
+      // thinking blocks come FIRST and unmodified — with thinking enabled on a
+      // tool-use turn, Anthropic requires them echoed back exactly as received
+      // (signatures included; text may be empty under display "omitted").
       const blocks: AnthropicContentBlock[] = [];
+      for (const block of turn.anthropicThinkingBlocks ?? []) {
+        blocks.push(block as AnthropicContentBlock);
+      }
       if (turn.content) {
         blocks.push({ type: "text", text: turn.content });
       }
@@ -349,21 +382,22 @@ export function buildAnthropicPayload(
     // approval UI can no longer let it respond to feedback between calls. The value is
     // constant, so it never thrashes the prompt cache: changing `tool_choice` would
     // invalidate only the messages tier, and it never changes here (tools + system stay
-    // cached). It is also held off the tool-free thinking path above (thinking is gated
-    // on `!hasTools`), so the two never co-occur.
+    // cached). Compatible with adaptive thinking: only FORCED tool_choice
+    // ({type:"tool"} / "any") conflicts with thinking, `auto` +
+    // disable_parallel_tool_use does not.
     body.tool_choice = { type: "auto", disable_parallel_tool_use: true };
   }
 
-  // Reasoning: map the profile reasoning level to adaptive thinking + the effort control
+  // Reasoning: map the resolved reasoning level to adaptive thinking + the effort control
   // for models that support it. Adaptive is the only on-mode on current-gen models; effort
-  // (low/medium/high) sets depth, and "on" leaves the model default. "off"/null emit no
-  // thinking. Gated to tool-free requests: the native tool loop does not round-trip the
-  // thinking blocks Anthropic requires on a tool-use turn, so emitting thinking there would
-  // 400 the follow-up. Older / unknown models fail safe (no thinking field). See P1-6.
+  // (low..max) sets depth, and "on" leaves the model default. "off"/null emit no
+  // thinking. The former tool-free gate is lifted (P1-6): the tool loop now
+  // round-trips the thinking blocks Anthropic requires on a tool-use turn
+  // (captured verbatim in AnthropicClient, echoed first in the assistant content
+  // by buildAnthropicMessages). Older / unknown models fail safe (no thinking field).
   const emitThinking =
     params.reasoning !== null &&
     params.reasoning !== "off" &&
-    !hasTools &&
     anthropicModelSupportsAdaptiveThinking(model);
   if (emitThinking) {
     body.thinking = { type: "adaptive" };

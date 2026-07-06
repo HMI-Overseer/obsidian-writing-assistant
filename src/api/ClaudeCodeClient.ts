@@ -11,11 +11,10 @@ import {
   resolveClaudeBinary,
   type ClaudeCodeResultUsage,
 } from "./claudeCodeProcess";
-import { streamSdkTurn, thinkingBudget, DISALLOWED_NATIVE_TOOLS } from "./sdk/sdkQueryEngine";
+import { streamSdkTurn, DISALLOWED_NATIVE_TOOLS } from "./sdk/sdkQueryEngine";
+import { isEffortLevel } from "../shared/reasoning";
 import type { McpSdkServerConfigWithInstance } from "./sdk/claudeAgentSdk";
 import type { SessionReuseDiagnosis, SessionTurn } from "./harnessSession";
-
-export { thinkingBudget };
 
 /**
  * One turn's input to the persistent-session path. The client builds both prompt
@@ -221,9 +220,9 @@ export class ClaudeCodeClient implements ChatClient {
     let contextTokens: number | null = null;
     return streamClaudeCode({
       command: this.command,
-      args: this.buildLegacyArgs(request, model),
+      args: this.buildLegacyArgs(request, model, params),
       cwd: this.runtime.vaultRoot,
-      env: this.buildLegacyEnv(params),
+      env: this.buildLegacyEnv(),
       prompt,
       signal,
       onEvent: (json) => {
@@ -244,22 +243,21 @@ export class ClaudeCodeClient implements ChatClient {
   /**
    * Legacy subprocess environment, inherited from the plugin's process plus speed
    * tuning. `*_NONESSENTIAL_*` mute the CLI's boot-time update checks, telemetry,
-   * and background model calls (the dominant cold-start tax), and
-   * `MAX_THINKING_TOKENS` gates extended thinking on the profile's reasoning level
-   * so the first visible token isn't delayed by silent thinking.
+   * and background model calls (the dominant cold-start tax). Reasoning rides the
+   * `--effort` flag ({@link buildLegacyArgs}) now, the retired
+   * `MAX_THINKING_TOKENS` budget only ever applied to pre-adaptive models.
    */
-  private buildLegacyEnv(params: SamplingParams): NodeJS.ProcessEnv {
+  private buildLegacyEnv(): NodeJS.ProcessEnv {
     return {
       ...process.env,
       CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC:
         process.env.CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC ?? "1",
       DISABLE_NON_ESSENTIAL_MODEL_CALLS:
         process.env.DISABLE_NON_ESSENTIAL_MODEL_CALLS ?? "1",
-      MAX_THINKING_TOKENS: thinkingBudget(params.reasoning).toString(),
     };
   }
 
-  private buildLegacyArgs(request: ChatRequest, model: string): string[] {
+  private buildLegacyArgs(request: ChatRequest, model: string, params: SamplingParams): string[] {
     const args = [
       "--print",
       "--output-format", "stream-json",
@@ -268,6 +266,12 @@ export class ClaudeCodeClient implements ChatClient {
       "--no-session-persistence",
       "--model", model,
     ];
+
+    // Only sent for an explicit selection: omitted, the CLI runs on the model's
+    // own default, mirroring the SDK path's null → send-nothing behavior.
+    if (isEffortLevel(params.reasoning)) {
+      args.push("--effort", params.reasoning);
+    }
 
     if (request.systemPrompt.trim()) {
       args.push("--append-system-prompt", request.systemPrompt);

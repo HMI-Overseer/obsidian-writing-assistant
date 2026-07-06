@@ -21,6 +21,7 @@ import {
 } from "@anthropic-ai/claude-agent-sdk";
 import type {
   McpSdkServerConfigWithInstance,
+  ModelInfo,
   Options,
   Query,
   SdkMcpToolDefinition,
@@ -37,6 +38,7 @@ patchRendererAbortSignal();
 export { AbortError, createSdkMcpServer, query, tool };
 export type {
   McpSdkServerConfigWithInstance,
+  ModelInfo,
   Options,
   Query,
   SdkMcpToolDefinition,

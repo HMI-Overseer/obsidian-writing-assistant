@@ -1,4 +1,5 @@
 import type { SamplingParams } from "../../shared/types";
+import { isEffortLevel } from "../../shared/reasoning";
 import { createAbortError } from "../httpTransport";
 import {
   extractClaudeCodeContextTokens,
@@ -42,25 +43,6 @@ export const DISALLOWED_NATIVE_TOOLS: readonly string[] = [
   "SlashCommand",
   "ExitPlanMode",
 ];
-
-/**
- * Extended-thinking budget (tokens) for each reasoning level. Thinking is emitted
- * before the visible answer, so a non-zero budget delays the first user-facing
- * token, we keep it at 0 unless the profile explicitly asks for reasoning, which
- * keeps time-to-first-token low.
- */
-const THINKING_BUDGET_BY_LEVEL: Record<NonNullable<SamplingParams["reasoning"]>, number> = {
-  off: 0,
-  low: 4096,
-  medium: 10000,
-  high: 24000,
-  on: 10000,
-};
-
-/** Maps the profile's reasoning level to a thinking-token budget (0 when unset). */
-export function thinkingBudget(reasoning: SamplingParams["reasoning"]): number {
-  return reasoning ? THINKING_BUDGET_BY_LEVEL[reasoning] : 0;
-}
 
 export interface SdkTurnOptions {
   /** Flat prompt carrying the full transcript + context (R1 sends everything each turn). */
@@ -155,7 +137,6 @@ export function buildSdkOptions(
   opts: SdkOptionsConfig,
   abortController: AbortController,
 ): Options {
-  const budget = thinkingBudget(opts.reasoning);
   const systemPrompt = opts.systemPrompt.trim();
 
   const options: Options = {
@@ -174,7 +155,12 @@ export function buildSdkOptions(
       preset: "claude_code",
       ...(systemPrompt ? { append: systemPrompt } : {}),
     },
-    thinking: budget > 0 ? { type: "enabled", budgetTokens: budget } : { type: "disabled" },
+    // Effort tiers drive reasoning depth on adaptive-thinking models (the fixed
+    // thinking-budget mechanism they replaced only applied to pre-adaptive
+    // models, and Fable 5 ignores a disabled budget entirely). null = send
+    // nothing, the model runs on its own default; the resolved-set clamp
+    // upstream guarantees no non-tier level reaches this provider.
+    ...(isEffortLevel(opts.reasoning) ? { effort: opts.reasoning } : {}),
     env: {
       ...process.env,
       CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC:

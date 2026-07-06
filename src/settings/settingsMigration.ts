@@ -28,6 +28,7 @@ import type {
   ProviderProfile,
   ProviderSettingsMap,
   RagSettings,
+  ReasoningLevel,
 } from "../shared/types";
 import {
   DEFAULT_ACTIVE_PROFILE_IDS,
@@ -39,6 +40,7 @@ import {
   MAX_BENCHMARK_HISTORY,
 } from "../constants";
 import { DEFAULT_VAULT_OP_POLICY, type Gate, type VaultOpPolicy } from "../vault-ops/gateway";
+import { isReasoningLevel } from "../shared/reasoning";
 import { PROVIDER_DESCRIPTORS } from "../providers/descriptors";
 import { getCatalogEntries } from "../providers/catalog";
 import { modelKey, parseModelKey } from "../shared/modelKeys";
@@ -211,15 +213,61 @@ const VALID_PROVIDERS = new Set<string>(Object.keys(PROVIDER_DESCRIPTORS));
 
 export function normalizeProviderProfiles(raw: unknown): ProviderProfile[] {
   if (!Array.isArray(raw)) return [];
-  return raw.filter(
-    (p): p is ProviderProfile =>
-      typeof p === "object" &&
-      p !== null &&
-      typeof p.id === "string" &&
-      typeof p.name === "string" &&
-      VALID_PROVIDERS.has(p.provider) &&
-      !p.isDefault,
-  );
+  return raw
+    .filter(
+      (p): p is ProviderProfile =>
+        typeof p === "object" &&
+        p !== null &&
+        typeof p.id === "string" &&
+        typeof p.name === "string" &&
+        VALID_PROVIDERS.has(p.provider) &&
+        !p.isDefault,
+    )
+    .map((profile) => {
+      // One-way migration: reasoning moved from the profile to the per-model
+      // `reasoningByModelKey` map. Provider-wide values are deliberately not
+      // carried over (capability sets vary per model; every model starts on its
+      // true default), so the retired key is simply dropped on the next save.
+      const cleaned = { ...profile } as ProviderProfile & { reasoning?: unknown };
+      delete cleaned.reasoning;
+      return cleaned;
+    });
+}
+
+/**
+ * Per-model reasoning entries: keys must be composed `provider:modelId` keys
+ * and values known levels; anything else is dropped rather than carried
+ * forever. Levels a model no longer offers are kept, the request-time clamp
+ * (resolveModelReasoning) neutralizes them without rewriting user intent.
+ */
+export function normalizeReasoningByModelKey(raw: unknown): Record<string, ReasoningLevel> {
+  if (typeof raw !== "object" || raw === null) return {};
+  const result: Record<string, ReasoningLevel> = {};
+  for (const [key, value] of Object.entries(raw)) {
+    if (parseModelKey(key) === null) continue;
+    if (!isReasoningLevel(value)) continue;
+    result[key] = value;
+  }
+  return result;
+}
+
+/**
+ * Last-seen Claude Code handshake harvest: keys are normalized picker aliases
+ * (plain non-empty strings), values arrays of known levels. An empty array is
+ * kept, it means "model reports no effort support" and hides the pill; a
+ * non-array or junk-only value drops the key so it degrades to the descriptor
+ * fallback rather than persisting garbage.
+ */
+export function normalizeClaudeCodeEffortLevels(raw: unknown): Record<string, ReasoningLevel[]> {
+  if (typeof raw !== "object" || raw === null) return {};
+  const result: Record<string, ReasoningLevel[]> = {};
+  for (const [key, value] of Object.entries(raw)) {
+    if (key.length === 0 || !Array.isArray(value)) continue;
+    const levels = value.filter(isReasoningLevel);
+    if (levels.length === 0 && value.length > 0) continue;
+    result[key] = levels;
+  }
+  return result;
 }
 
 export function normalizeActiveProfileIds(raw: unknown): Record<ProviderOption, string> {
@@ -523,5 +571,7 @@ export function normalizePluginSettings(data: Partial<PluginSettings> | null): P
     benchmark: normalizeBenchmarkSettings(data?.benchmark),
     vaultOpPolicy: normalizeVaultOpPolicy(data?.vaultOpPolicy),
     favoriteModelKeys: normalizeFavoriteModelKeys(data?.favoriteModelKeys),
+    reasoningByModelKey: normalizeReasoningByModelKey(data?.reasoningByModelKey),
+    claudeCodeEffortLevels: normalizeClaudeCodeEffortLevels(data?.claudeCodeEffortLevels),
   };
 }

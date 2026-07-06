@@ -6,6 +6,7 @@ import type {
   LMStudioQuantization,
 } from "./types";
 import type { LMStudioModelListSource } from "./types";
+import { isReasoningLevel, type ReasoningCapability } from "../shared/reasoning";
 import {
   isRecord,
   readString,
@@ -62,12 +63,35 @@ export function normalizeLoadedInstance(value: unknown): LMStudioLoadedInstance 
   };
 }
 
+/**
+ * Parses `capabilities.reasoning` (`{ allowed_options, default }`). Absent or
+ * malformed → undefined, which downstream means "no reasoning support": LM
+ * Studio omits the field for models without it, and sending a reasoning value
+ * anyway can break the request (native API 400s; some models' chat templates
+ * fail to render even on the compat endpoint).
+ */
+export function normalizeReasoningCapability(value: unknown): ReasoningCapability | undefined {
+  if (!isRecord(value)) return undefined;
+
+  const allowedOptions = Array.isArray(value.allowed_options)
+    ? value.allowed_options.filter(isReasoningLevel)
+    : [];
+  if (allowedOptions.length === 0) return undefined;
+
+  const fallback = readString(value.default);
+  return {
+    allowedOptions,
+    ...(isReasoningLevel(fallback) ? { default: fallback } : {}),
+  };
+}
+
 export function normalizeCapabilities(value: unknown): LMStudioModelCapabilities | undefined {
   if (!isRecord(value)) return undefined;
 
   const capabilities: LMStudioModelCapabilities = {
     vision: readBoolean(value.vision),
     trainedForToolUse: readBoolean(value.trained_for_tool_use),
+    reasoning: normalizeReasoningCapability(value.reasoning),
   };
 
   if (Object.values(capabilities).every((entry) => entry === undefined)) {

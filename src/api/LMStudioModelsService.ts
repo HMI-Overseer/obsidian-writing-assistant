@@ -89,6 +89,7 @@ function toDigest(model: LMStudioModel, kind: ModelKind): ModelDigest {
     summary: buildSummary(model, kind),
     trainedForToolUse: model.capabilities?.trainedForToolUse,
     vision: model.capabilities?.vision,
+    reasoning: model.capabilities?.reasoning,
   };
 }
 

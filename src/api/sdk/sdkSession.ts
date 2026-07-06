@@ -1,6 +1,9 @@
+import type { ReasoningLevel } from "../../shared/types";
+import type { FlagSettableEffort } from "../../shared/reasoning";
 import { createAbortError } from "../httpTransport";
 import { extractClaudeCodeContextTokens, type ClaudeCodeResultUsage } from "../claudeCodeProcess";
 import {
+  canFlipEffortMidSession,
   decideReuse,
   fingerprint,
   hashPrefix,
@@ -11,7 +14,7 @@ import {
 } from "../harnessSession";
 import { resultErrorMessage, resultUsage, textDelta } from "./sdkQueryEngine";
 import { AbortError, query } from "./claudeAgentSdk";
-import type { Options, Query, SDKMessage, SDKUserMessage } from "./claudeAgentSdk";
+import type { ModelInfo, Options, Query, SDKMessage, SDKUserMessage } from "./claudeAgentSdk";
 
 /**
  * Model B, the persistent in-memory Claude Code session.
@@ -116,6 +119,13 @@ export class SdkSession {
   readonly meta: HarnessSession;
   /** Epoch ms of the last turn, drives idle eviction. */
   lastUsedAt: number;
+  /**
+   * Effort the live session currently runs at: the mint-time `Options.effort`
+   * (null = nothing sent, model default), then whatever the last
+   * {@link setEffort} flip applied. Deliberately outside the config fingerprint,
+   * the registry compares it per turn and flips or rebuilds (§3.2).
+   */
+  effort: ReasoningLevel | null;
 
   private readonly input = new SessionInputStream();
   private readonly query: Query;
@@ -133,8 +143,13 @@ export class SdkSession {
    *   controller; called once at construction so model / system prompt / MCP
    *   server are baked for the session's lifetime (config drift → new session).
    */
-  constructor(buildOptions: (abortController: AbortController) => Options, meta: HarnessSession) {
+  constructor(
+    buildOptions: (abortController: AbortController) => Options,
+    meta: HarnessSession,
+    effort: ReasoningLevel | null = null,
+  ) {
     this.meta = meta;
+    this.effort = effort;
     this.lastUsedAt = Date.now();
     this.query = query({ prompt: this.input, options: buildOptions(this.abortController) });
     this.iterator = this.query[Symbol.asyncIterator]();
@@ -271,6 +286,27 @@ export class SdkSession {
   }
 
   /**
+   * Flips the live session's effort via the SDK's mid-session flag-settings
+   * control request (E3-verified: honored next turn, overrides mint-time
+   * `Options.effort`; the process, in-memory context, and transcript are all
+   * retained). Costs one API prompt-cache re-write on the next turn, the same
+   * cache cost a cold rebuild pays, minus the respawn and transcript resend.
+   */
+  async setEffort(level: FlagSettableEffort): Promise<void> {
+    await this.query.applyFlagSettings({ effortLevel: level });
+    this.effort = level;
+  }
+
+  /**
+   * The handshake's model list (`supportedModels()` control request), the
+   * §3.1 layer-2 discovery source: each entry carries `supportedEffortLevels`
+   * for the effort-level harvest.
+   */
+  supportedModels(): Promise<ModelInfo[]> {
+    return this.query.supportedModels();
+  }
+
+  /**
    * Disposes the session: closes the input stream, signals abort, and returns the
    * Query generator (which terminates the SDK process). Idempotent.
    */
@@ -301,6 +337,13 @@ export class SdkSession {
 export interface SessionTurnRequest {
   /** Config the turn runs under, gates reuse and is baked into a fresh session. */
   cfg: SessionConfig;
+  /**
+   * Effort the turn should run at (null = model default, nothing sent). Not part
+   * of {@link SessionConfig}: a `low..xhigh` change flips the live session via
+   * {@link SdkSession.setEffort} instead of rebuilding; only non-flippable
+   * changes (to/from `max`, back to default) take the rebuild path.
+   */
+  effort: ReasoningLevel | null;
   /** Full live transcript including the new user turn being sent. */
   turns: readonly SessionTurn[];
   /** Prompt sent on a cold mint, the full transcript. */
@@ -316,6 +359,13 @@ export interface SessionTurnRequest {
    * cache instrumentation). Fires exactly once per turn.
    */
   onReuseDecision?: (decision: SessionReuseDiagnosis) => void;
+  /**
+   * Receives the handshake's model list when a fresh session is minted (never
+   * on reuse), the §3.1 layer-2 effort-level harvest. Fired fire-and-forget:
+   * the turn streams without waiting, and a failed control request is
+   * swallowed (the descriptor fallback keeps covering).
+   */
+  onModelsDiscovered?: (models: ModelInfo[]) => void;
 }
 
 /**
@@ -342,7 +392,25 @@ export class SdkSessionRegistry {
    */
   async *runTurn(conversationId: string, req: SessionTurnRequest): AsyncGenerator<string> {
     const existing = this.sessions.get(conversationId);
-    const decision = decideReuse(existing, req.turns, req.cfg);
+    const effort = req.effort ?? null;
+    let decision = decideReuse(existing, req.turns, req.cfg);
+
+    // Effort is compared outside the config fingerprint: a flippable change is
+    // applied to the live session (one control request, context retained); a
+    // non-flippable one (to/from `max`, back to default) or a failed control
+    // request downgrades to the classic reasoning-changed cold rebuild.
+    if (decision.reuse && existing && existing.effort !== effort) {
+      if (canFlipEffortMidSession(existing.effort, effort)) {
+        try {
+          await existing.setEffort(effort as FlagSettableEffort);
+        } catch {
+          decision = { reuse: false, reason: "reasoning-changed" };
+        }
+      } else {
+        decision = { reuse: false, reason: "reasoning-changed" };
+      }
+    }
+
     req.onReuseDecision?.(decision);
     const reuse = decision.reuse;
 
@@ -353,9 +421,20 @@ export class SdkSessionRegistry {
       prompt = req.deltaPrompt;
     } else {
       existing?.dispose();
-      session = new SdkSession(req.buildOptions, mintMeta(req.cfg));
+      session = new SdkSession(req.buildOptions, mintMeta(req.cfg), effort);
       this.sessions.set(conversationId, session);
       prompt = req.fullPrompt;
+
+      // Mint-time harvest (§3.1 layer 2): ask the fresh process for its model
+      // list in the background. Failures are ignored, discovery is an upgrade
+      // over the descriptor fallback, never a turn dependency.
+      if (req.onModelsDiscovered) {
+        const onModelsDiscovered = req.onModelsDiscovered;
+        void session
+          .supportedModels()
+          .then((models) => onModelsDiscovered(models))
+          .catch(() => {});
+      }
     }
 
     this.ensureSweeping();

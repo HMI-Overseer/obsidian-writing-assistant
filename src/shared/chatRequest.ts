@@ -68,6 +68,15 @@ export interface ChatTurn {
   toolCallId?: string;
   /** For assistant turns that contain tool calls: the tool calls made. */
   toolCalls?: Array<{ id: string; name: string; arguments: Record<string, unknown> }>;
+  /**
+   * Anthropic only: the raw thinking / redacted_thinking blocks the model
+   * emitted with this assistant tool-call turn, captured verbatim (signatures
+   * included). With thinking enabled on a tool-use turn, Anthropic requires
+   * them echoed back unmodified, first in the assistant content, when the tool
+   * results are sent; other providers ignore the field. In-memory only (one
+   * generation's tool loop), never persisted.
+   */
+  anthropicThinkingBlocks?: unknown[];
   /** File attachments (images, future: documents). Only present on user turns. */
   attachments?: Attachment[];
 }

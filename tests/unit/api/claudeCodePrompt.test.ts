@@ -2,7 +2,6 @@ import { describe, it, expect } from "vitest";
 import {
   buildClaudeCodePrompt,
   buildDeltaPrompt,
-  thinkingBudget,
 } from "../../../src/api/ClaudeCodeClient";
 import type { ChatRequest } from "../../../src/shared/chatRequest";
 
@@ -151,22 +150,5 @@ describe("buildDeltaPrompt", () => {
       }),
     );
     expect(prompt).toBe("Planning mode framing.\n\nSecond");
-  });
-});
-
-describe("thinkingBudget", () => {
-  it("maps no reasoning to a zero budget so the first token isn't delayed by thinking", () => {
-    expect(thinkingBudget(null)).toBe(0);
-    expect(thinkingBudget("off")).toBe(0);
-  });
-
-  it("scales the budget with the reasoning level", () => {
-    expect(thinkingBudget("low")).toBeGreaterThan(0);
-    expect(thinkingBudget("low")).toBeLessThan(thinkingBudget("medium"));
-    expect(thinkingBudget("medium")).toBeLessThan(thinkingBudget("high"));
-  });
-
-  it("treats a bare 'on' as a non-zero default", () => {
-    expect(thinkingBudget("on")).toBeGreaterThan(0);
   });
 });

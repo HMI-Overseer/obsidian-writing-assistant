@@ -1,0 +1,107 @@
+@layer components {
+  /* ── Reasoning pill ──────────────────────────────────────────────────────
+     Footer control reading the active model's reasoning level, same visual
+     language as the posture toggle beside it: low-chrome rounded pill, muted
+     until it carries an explicit (non-default) level. */
+
+  .lmsa-chat-composer-reasoning-pill {
+    @apply lmsa-relative lmsa-inline-flex lmsa-flex-none lmsa-cursor-pointer lmsa-items-center lmsa-gap-1.5 lmsa-px-3 lmsa-py-1.5;
+    border-radius: 999px;
+    border: 1px solid var(--background-modifier-border) !important;
+    font-size: var(--font-ui-smaller);
+    font-weight: 500;
+    line-height: 1.25;
+    color: var(--text-muted);
+    background: transparent !important;
+    box-shadow: none !important;
+    outline: none;
+    appearance: none;
+    min-height: unset;
+    transition: color 0.15s ease, border-color 0.15s ease;
+  }
+
+  .lmsa-chat-composer-reasoning-pill:hover {
+    color: var(--text-normal);
+  }
+
+  .lmsa-chat-composer-reasoning-pill:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--lmsa-mode-accent) 20%, transparent) !important;
+  }
+
+  /* An explicit level reads as "set": accent tint, like the active posture. */
+  .lmsa-chat-composer-reasoning-pill:not(.is-default) {
+    color: var(--lmsa-mode-accent);
+    border-color: color-mix(in srgb, var(--lmsa-mode-accent) 45%, var(--background-modifier-border)) !important;
+  }
+
+  .lmsa-chat-composer-reasoning-pill-icon {
+    @apply lmsa-inline-flex lmsa-items-center;
+  }
+
+  .lmsa-chat-composer-reasoning-pill-icon svg {
+    width: 12px;
+    height: 12px;
+  }
+
+  /* ── Level menu ───────────────────────────────────────────────────────── */
+
+  .lmsa-reasoning-menu {
+    @apply lmsa-absolute lmsa-z-[120] lmsa-flex-col lmsa-rounded-xl lmsa-border lmsa-border-obsidian-border lmsa-p-1;
+    display: flex;
+    bottom: calc(100% + 8px);
+    right: 50px;
+    min-width: 132px;
+    background:
+      linear-gradient(
+        180deg,
+        color-mix(in srgb, var(--background-primary) 97%, transparent),
+        color-mix(in srgb, var(--background-secondary) 94%, transparent)
+      );
+    backdrop-filter: blur(22px);
+    -webkit-backdrop-filter: blur(22px);
+    box-shadow:
+      0 -12px 48px rgba(0, 0, 0, 0.18),
+      inset 0 -1px 0 var(--lmsa-inset-highlight-subtle);
+    transform-origin: bottom right;
+  }
+
+  .lmsa-reasoning-menu.lmsa-hidden {
+    display: none;
+  }
+
+  .lmsa-reasoning-menu-item {
+    @apply lmsa-flex lmsa-cursor-pointer lmsa-items-center lmsa-justify-between lmsa-gap-2 lmsa-rounded-lg lmsa-px-2.5 lmsa-py-1.5;
+    font-size: var(--font-ui-smaller);
+    color: var(--text-muted);
+    transition: background 120ms ease, color 120ms ease;
+  }
+
+  .lmsa-reasoning-menu-item:hover {
+    background: var(--background-modifier-hover);
+    color: var(--text-normal);
+  }
+
+  .lmsa-reasoning-menu-item.is-selected {
+    color: var(--text-normal);
+    font-weight: 500;
+  }
+
+  .lmsa-reasoning-menu-item-check {
+    @apply lmsa-inline-flex lmsa-items-center;
+    color: var(--lmsa-mode-accent);
+  }
+
+  .lmsa-reasoning-menu-item-check svg {
+    width: 12px;
+    height: 12px;
+  }
+
+  /* Narrow footer: collapse the pill to icon-only alongside the posture-toggle
+     labels; the passive indicators have already yielded by this width. */
+  @container lmsa-composer-footer (max-width: 359px) {
+    .lmsa-chat-composer-reasoning-pill-label {
+      display: none;
+    }
+  }
+}

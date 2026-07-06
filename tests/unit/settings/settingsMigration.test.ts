@@ -1,8 +1,10 @@
 import { describe, it, expect } from "vitest";
 import {
+  normalizeClaudeCodeEffortLevels,
   normalizeGate,
   normalizePluginSettings,
   normalizeProviderProfiles,
+  normalizeReasoningByModelKey,
   normalizeVaultOpPolicy,
   normalizeActiveProfileIds,
   normalizeRagSettings,
@@ -198,6 +200,67 @@ describe("normalizeProviderProfiles", () => {
     // If VALID_PROVIDERS were a stale hardcoded list missing a descriptor key,
     // that provider's profile would be dropped and the lengths would diverge.
     expect(normalizeProviderProfiles(profiles)).toHaveLength(keys.length);
+  });
+
+  it("drops the retired per-profile reasoning field (one-way migration to the per-model map)", () => {
+    const profiles = normalizeProviderProfiles([
+      { id: "a", name: "A", provider: "anthropic", isDefault: false, reasoning: "high" },
+    ]);
+    expect(profiles[0]).not.toHaveProperty("reasoning");
+  });
+});
+
+describe("normalizeReasoningByModelKey", () => {
+  it("keeps composed-key entries with known levels", () => {
+    expect(
+      normalizeReasoningByModelKey({
+        "claudecode:opus": "xhigh",
+        "lmstudio:qwen3.5": "on",
+      }),
+    ).toEqual({ "claudecode:opus": "xhigh", "lmstudio:qwen3.5": "on" });
+  });
+
+  it("drops malformed keys, unknown levels, and non-string values", () => {
+    expect(
+      normalizeReasoningByModelKey({
+        "not-a-composed-key": "high", // no provider prefix
+        "madeup:model": "high", // unknown provider
+        "claudecode:opus": "ultra", // not a level
+        "openai:gpt": 3, // not a string
+      }),
+    ).toEqual({});
+  });
+
+  it("returns an empty map for non-object input", () => {
+    expect(normalizeReasoningByModelKey(null)).toEqual({});
+    expect(normalizeReasoningByModelKey("high")).toEqual({});
+  });
+});
+
+describe("normalizeClaudeCodeEffortLevels", () => {
+  it("keeps alias-keyed level lists, including meaningful empty lists", () => {
+    expect(
+      normalizeClaudeCodeEffortLevels({
+        opus: ["low", "medium", "high", "xhigh", "max"],
+        haiku: [],
+      }),
+    ).toEqual({ opus: ["low", "medium", "high", "xhigh", "max"], haiku: [] });
+  });
+
+  it("drops junk values but filters mixed lists", () => {
+    expect(
+      normalizeClaudeCodeEffortLevels({
+        opus: "high", // not an array
+        sonnet: ["ultracode"], // junk-only → dropped, degrade to fallback
+        fable: ["high", "ultracode"], // mixed → filtered
+        "": ["high"], // empty key
+      }),
+    ).toEqual({ fable: ["high"] });
+  });
+
+  it("returns an empty map for non-object input", () => {
+    expect(normalizeClaudeCodeEffortLevels(null)).toEqual({});
+    expect(normalizeClaudeCodeEffortLevels([])).toEqual({});
   });
 });
 

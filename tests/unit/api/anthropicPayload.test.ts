@@ -70,6 +70,34 @@ describe("buildAnthropicMessages", () => {
     expect(system).toBe("You are helpful.");
   });
 
+  // Thinking + tool use round trip (P1-6): captured thinking blocks are echoed
+  // back FIRST in the assistant content, verbatim, ahead of text and tool_use.
+  test("echoes captured thinking blocks first on an assistant tool-call turn", () => {
+    const thinking = [
+      { type: "thinking", thinking: "consider the edit", signature: "sig-1" },
+      { type: "redacted_thinking", data: "opaque" },
+    ];
+    const turns: ChatTurn[] = [
+      { role: "user", content: "Fix the intro" },
+      {
+        role: "assistant",
+        content: "Editing now.",
+        toolCalls: [{ id: "tc1", name: "propose_edit", arguments: { path: "a.md" } }],
+        anthropicThinkingBlocks: thinking,
+      },
+      { role: "tool", content: "ok", toolCallId: "tc1" },
+    ];
+    const { messages } = buildAnthropicMessages(makeRequest({ messages: turns }));
+    const assistant = messages[1];
+    expect(assistant.role).toBe("assistant");
+    expect(assistant.content).toEqual([
+      { type: "thinking", thinking: "consider the edit", signature: "sig-1" },
+      { type: "redacted_thinking", data: "opaque" },
+      { type: "text", text: "Editing now." },
+      { type: "tool_use", id: "tc1", name: "propose_edit", input: { path: "a.md" } },
+    ]);
+  });
+
   // The 1-hour extended cache TTL is applied via `ttl: "1h"` on the cache_control block
   // (verified against the claude-api skill + docs/reference/external/anthropic-api.md).
   // Previously the block hardcoded `{ type: "ephemeral" }` with no ttl, so a user who
@@ -501,6 +529,8 @@ describe("buildAnthropicPayload reasoning → adaptive thinking + effort (by mod
     ["low", "low"],
     ["medium", "medium"],
     ["high", "high"],
+    ["xhigh", "xhigh"],
+    ["max", "max"],
   ])("maps reasoning '%s' to adaptive thinking + effort '%s' on a capable model", (level, effort) => {
     const json = JSON.parse(
       buildAnthropicPayload(
@@ -552,9 +582,11 @@ describe("buildAnthropicPayload reasoning → adaptive thinking + effort (by mod
     expect(json).not.toHaveProperty("output_config");
   });
 
-  // The native tool loop does not round-trip thinking blocks, and a tool-use turn missing
-  // its thinking block 400s on the follow-up. So thinking is gated to tool-free requests.
-  test("omits thinking when the request carries tools", () => {
+  // The tool-free gate is lifted (P1-6): the tool loop now round-trips thinking
+  // blocks, so thinking + effort co-occur with tools. tool_choice stays
+  // auto + disable_parallel_tool_use, which is compatible with thinking (only
+  // FORCED tool_choice conflicts).
+  test("emits thinking + effort alongside tools (gate lifted)", () => {
     const tools = [{
       name: "propose_edit",
       description: "Edit.",
@@ -567,9 +599,10 @@ describe("buildAnthropicPayload reasoning → adaptive thinking + effort (by mod
         false, tools
       )
     );
-    expect(json).not.toHaveProperty("thinking");
-    expect(json).not.toHaveProperty("output_config");
+    expect(json.thinking).toEqual({ type: "adaptive" });
+    expect(json.output_config).toEqual({ effort: "high" });
     expect(json.tools).toEqual(tools);
+    expect(json.tool_choice).toEqual({ type: "auto", disable_parallel_tool_use: true });
   });
 
   // Opus 4.6 / Sonnet 4.6 accept sampling AND adaptive thinking. When reasoning is on,

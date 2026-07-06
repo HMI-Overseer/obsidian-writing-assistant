@@ -42,16 +42,33 @@ function successResult(overrides: Record<string, unknown> = {}) {
   };
 }
 
-/** A fake `query()` that echoes each pushed user message as a turn, staying alive. */
+/**
+ * A fake `query()` that echoes each pushed user message as a turn, staying alive.
+ * The returned Query also carries an `applyFlagSettings` spy so the mid-session
+ * effort-flip path can be exercised; returned for assertions.
+ */
 function installEchoQuery(perTurn: (text: string) => unknown[] = (t) => [textDeltaMessage(`echo:${t}`), successResult()]) {
+  const applyFlagSettings = vi.fn(() => Promise.resolve());
+  const supportedModels = vi.fn(() =>
+    Promise.resolve([
+      { value: "opus", displayName: "Opus", description: "", supportsEffort: true, supportedEffortLevels: ["low", "medium", "high", "xhigh", "max"] },
+    ]),
+  );
   queryMock.mockImplementation((params: { prompt: AsyncIterable<{ message: { content: string } }> }) => {
     const input = params.prompt;
-    return (async function* () {
+    const gen = (async function* () {
       for await (const msg of input) {
         for (const m of perTurn(msg.message.content)) yield m;
       }
-    })();
+    })() as AsyncGenerator<unknown> & {
+      applyFlagSettings: typeof applyFlagSettings;
+      supportedModels: typeof supportedModels;
+    };
+    gen.applyFlagSettings = applyFlagSettings;
+    gen.supportedModels = supportedModels;
+    return gen;
   });
+  return { applyFlagSettings, supportedModels };
 }
 
 /**
@@ -83,7 +100,6 @@ function cfg(overrides: Partial<SessionConfig> = {}): SessionConfig {
   return {
     model: "claude-sonnet-4-6",
     systemPrompt: "Be concise.",
-    reasoning: "off",
     agenticMode: true,
     toolNames: ["read_note"],
     ...overrides,
@@ -100,6 +116,7 @@ async function drain(gen: AsyncGenerator<string>): Promise<string> {
 function turnRequest(turns: SessionTurn[], deltaText: string, overrides: Partial<SessionTurnRequest> = {}): SessionTurnRequest {
   return {
     cfg: cfg(),
+    effort: null,
     turns,
     fullPrompt: turns.map((t) => `${t.role}:${t.content}`).join("\n"),
     deltaPrompt: deltaText,
@@ -340,6 +357,146 @@ describe("SdkSessionRegistry", () => {
     // still reports it exactly once; the failure then disposes the session.
     expect(decisions).toEqual([{ reuse: false, reason: "no-session" }]);
     expect(registry.size).toBe(0);
+  });
+
+  it("flips effort on the live session instead of rebuilding (low..xhigh)", async () => {
+    const { applyFlagSettings } = installEchoQuery();
+    const decisions: unknown[] = [];
+    const onReuseDecision = (d: unknown) => decisions.push(d);
+
+    const reply = await drain(
+      registry.runTurn(
+        "c1",
+        turnRequest([{ role: "user", content: "hi" }], "hi", { effort: "low", onReuseDecision }),
+      ),
+    );
+    await drain(
+      registry.runTurn(
+        "c1",
+        turnRequest(
+          [
+            { role: "user", content: "hi" },
+            { role: "assistant", content: reply },
+            { role: "user", content: "again" },
+          ],
+          "again",
+          { effort: "xhigh", onReuseDecision },
+        ),
+      ),
+    );
+
+    // Same live process (one query()), the flip rode the control request.
+    expect(queryMock).toHaveBeenCalledTimes(1);
+    expect(applyFlagSettings).toHaveBeenCalledExactlyOnceWith({ effortLevel: "xhigh" });
+    expect(decisions).toEqual([{ reuse: false, reason: "no-session" }, { reuse: true }]);
+  });
+
+  it("harvests the model list on mint only, never on reuse", async () => {
+    installEchoQuery();
+    const harvested: unknown[] = [];
+    const onModelsDiscovered = (models: unknown) => harvested.push(models);
+
+    const reply = await drain(
+      registry.runTurn("c1", turnRequest([{ role: "user", content: "hi" }], "hi", { onModelsDiscovered })),
+    );
+    await drain(
+      registry.runTurn(
+        "c1",
+        turnRequest(
+          [
+            { role: "user", content: "hi" },
+            { role: "assistant", content: reply },
+            { role: "user", content: "again" },
+          ],
+          "again",
+          { onModelsDiscovered },
+        ),
+      ),
+    );
+
+    // One mint → one harvest, carrying the handshake's ModelInfo entries.
+    expect(harvested).toHaveLength(1);
+    expect(harvested[0]).toMatchObject([{ value: "opus" }]);
+  });
+
+  it("streams the turn even when the harvest control request fails", async () => {
+    const { supportedModels } = installEchoQuery();
+    supportedModels.mockRejectedValueOnce(new Error("control request failed"));
+
+    const reply = await drain(
+      registry.runTurn(
+        "c1",
+        turnRequest([{ role: "user", content: "hi" }], "hi", { onModelsDiscovered: () => {} }),
+      ),
+    );
+    expect(reply).toBe("echo:user:hi");
+  });
+
+  it("cold-rebuilds for a flip to max (not expressible in flag settings)", async () => {
+    installEchoQuery();
+    const decisions: unknown[] = [];
+    const onReuseDecision = (d: unknown) => decisions.push(d);
+
+    const reply = await drain(
+      registry.runTurn(
+        "c1",
+        turnRequest([{ role: "user", content: "hi" }], "hi", { effort: "high", onReuseDecision }),
+      ),
+    );
+    await drain(
+      registry.runTurn(
+        "c1",
+        turnRequest(
+          [
+            { role: "user", content: "hi" },
+            { role: "assistant", content: reply },
+            { role: "user", content: "again" },
+          ],
+          "again",
+          { effort: "max", onReuseDecision },
+        ),
+      ),
+    );
+
+    expect(queryMock).toHaveBeenCalledTimes(2);
+    expect(decisions).toEqual([
+      { reuse: false, reason: "no-session" },
+      { reuse: false, reason: "reasoning-changed" },
+    ]);
+  });
+
+  it("falls back to a cold rebuild when the flip control request fails", async () => {
+    const { applyFlagSettings } = installEchoQuery();
+    applyFlagSettings.mockRejectedValueOnce(new Error("control request failed"));
+    const decisions: unknown[] = [];
+    const onReuseDecision = (d: unknown) => decisions.push(d);
+
+    const reply = await drain(
+      registry.runTurn(
+        "c1",
+        turnRequest([{ role: "user", content: "hi" }], "hi", { effort: "low", onReuseDecision }),
+      ),
+    );
+    await drain(
+      registry.runTurn(
+        "c1",
+        turnRequest(
+          [
+            { role: "user", content: "hi" },
+            { role: "assistant", content: reply },
+            { role: "user", content: "again" },
+          ],
+          "again",
+          { effort: "high", onReuseDecision },
+        ),
+      ),
+    );
+
+    expect(queryMock).toHaveBeenCalledTimes(2);
+    expect(decisions).toEqual([
+      { reuse: false, reason: "no-session" },
+      { reuse: false, reason: "reasoning-changed" },
+    ]);
   });
 
   it("cold-rebuilds (new process) when config drifts", async () => {

@@ -13,7 +13,7 @@ function makeProfile(overrides: Partial<ProviderProfile> = {}): ProviderProfile 
 
 describe("buildSamplingParams", () => {
   test("maps default profile to SamplingParams with nulls", () => {
-    const result = buildSamplingParams(makeProfile());
+    const result = buildSamplingParams(makeProfile(), null);
 
     expect(result).toEqual({
       temperature: 0.7,
@@ -26,7 +26,7 @@ describe("buildSamplingParams", () => {
     });
   });
 
-  test("maps all populated profile fields", () => {
+  test("maps all populated profile fields plus the resolved per-model reasoning", () => {
     const result = buildSamplingParams(
       makeProfile({
         temperature: 0.3,
@@ -35,8 +35,8 @@ describe("buildSamplingParams", () => {
         topK: 40,
         minP: 0.05,
         repeatPenalty: 1.1,
-        reasoning: "high",
       }),
+      "high",
     );
 
     expect(result).toEqual({
@@ -53,6 +53,7 @@ describe("buildSamplingParams", () => {
   test("preserves zero values (not treated as null)", () => {
     const result = buildSamplingParams(
       makeProfile({ temperature: 0, maxTokens: 0 }),
+      null,
     );
 
     expect(result.temperature).toBe(0);
@@ -60,7 +61,7 @@ describe("buildSamplingParams", () => {
   });
 
   test("anthropic default profile has maxTokens set", () => {
-    const result = buildSamplingParams(makeDefaultProfile("anthropic"));
+    const result = buildSamplingParams(makeDefaultProfile("anthropic"), null);
 
     expect(result.maxTokens).toBe(2000);
   });

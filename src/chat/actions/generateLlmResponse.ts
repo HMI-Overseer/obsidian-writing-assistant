@@ -1,6 +1,7 @@
 import type { Component } from "obsidian";
 import { Notice } from "obsidian";
 import { buildSamplingParams } from "../finalization/buildSamplingParams";
+import { resolveModelReasoning } from "../../providers/reasoningLevels";
 import type WritingAssistantChat from "../../main";
 import type { ChatClient } from "../../api/chatClient";
 import type { ChatSessionStore } from "../conversation/ChatSessionStore";
@@ -299,7 +300,14 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
       apiMessages,
       activeModel.modelId,
       activeModel.provider,
-      buildSamplingParams(activeProfile),
+      buildSamplingParams(
+        activeProfile,
+        resolveModelReasoning(
+          plugin.settings.reasoningByModelKey,
+          activeModel,
+          plugin.services.modelAvailability,
+        ),
+      ),
       abortController.signal,
       {
         onDelta: (delta) => renderer.appendDelta(delta),

@@ -177,6 +177,17 @@ export function createChatLayout(contentEl: HTMLElement): ChatLayoutRefs {
   setIcon(knowledgeIndicatorEl, "database");
   const visionIndicatorEl = composerFooterActions.createDiv({ cls: "lmsa-chat-composer-vision-indicator" });
   setIcon(visionIndicatorEl, "eye");
+
+  const reasoningPillEl = composerFooterActions.createEl("button", {
+    cls: "lmsa-chat-composer-reasoning-pill lmsa-hidden",
+    attr: { "aria-label": "Reasoning effort" },
+  }) as HTMLButtonElement;
+  const reasoningPillIcon = reasoningPillEl.createEl("span", {
+    cls: "lmsa-chat-composer-reasoning-pill-icon",
+  });
+  setIcon(reasoningPillIcon, "brain");
+  reasoningPillEl.createEl("span", { cls: "lmsa-chat-composer-reasoning-pill-label" });
+
   const modeToggleEl = composerFooterActions.createDiv({ cls: "lmsa-chat-composer-mode-toggle" });
 
   const actionBtn = composerFooterActions.createEl("button", {
@@ -188,6 +199,7 @@ export function createChatLayout(contentEl: HTMLElement): ChatLayoutRefs {
   // position relative to the full footer width and aren't clipped by narrow wraps.
   const toolUsePopoverEl = composerFooter.createDiv({ cls: "lmsa-tool-popover lmsa-hidden" });
   const knowledgePopoverEl = composerFooter.createDiv({ cls: "lmsa-knowledge-popover lmsa-hidden" });
+  const reasoningMenuEl = composerFooter.createDiv({ cls: "lmsa-reasoning-menu lmsa-hidden" });
 
   return {
     rootEl: contentEl,
@@ -206,6 +218,8 @@ export function createChatLayout(contentEl: HTMLElement): ChatLayoutRefs {
     knowledgeIndicatorEl,
     knowledgePopoverEl,
     visionIndicatorEl,
+    reasoningPillEl,
+    reasoningMenuEl,
     attachmentsEl,
     actionBtn,
     modelSelectorBtn: headerMetaBtn,

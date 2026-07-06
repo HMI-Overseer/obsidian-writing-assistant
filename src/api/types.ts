@@ -1,4 +1,5 @@
 import type { ProviderOption } from "../shared/types";
+import type { ReasoningCapability } from "../shared/reasoning";
 
 export type RequestMethod = "GET" | "POST";
 export type JsonRecord = Record<string, unknown>;
@@ -21,6 +22,8 @@ export interface ModelDigest {
   trainedForToolUse?: boolean;
   /** Whether the model supports vision (image input). */
   vision?: boolean;
+  /** Discovered reasoning capability; absent = the model reports none. */
+  reasoning?: ReasoningCapability;
 }
 
 export interface ModelCandidateResult {
@@ -93,4 +96,12 @@ export interface LMStudioLoadedInstance {
 export interface LMStudioModelCapabilities {
   vision?: boolean;
   trainedForToolUse?: boolean;
+  /**
+   * Per-model reasoning support from the native `/api/v1/models` payload.
+   * Models with no reasoning capability omit the field entirely, and the
+   * native chat API errors on an unsupported reasoning setting (some models'
+   * chat templates even fail to render on the compat endpoint), so absence
+   * must be preserved, never defaulted.
+   */
+  reasoning?: ReasoningCapability;
 }

@@ -1,4 +1,4 @@
-import type { ProviderOption } from "../shared/types";
+import type { ProviderOption, ReasoningLevel } from "../shared/types";
 
 export type ProviderKind = "local" | "cloud";
 export type BillingModel = "free" | "per-token";
@@ -13,7 +13,6 @@ export interface SamplingParamSupport {
   topK: boolean;
   minP: boolean;
   repeatPenalty: boolean;
-  reasoning: boolean;
 }
 
 export interface ProviderDescriptor {
@@ -24,6 +23,13 @@ export interface ProviderDescriptor {
   authType: AuthType;
   defaultContextStrategy: ContextStrategy;
   supportedParams: SamplingParamSupport;
+  /**
+   * Reasoning levels this provider's models accept, the descriptor-fallback
+   * layer of {@link ./reasoningLevels.resolveReasoningLevels} (per-model
+   * discovery/catalog data wins where available). Empty array = reasoning
+   * unsupported (no UI rendered, nothing sent).
+   */
+  reasoningLevels: ReasoningLevel[];
   supportsModelDiscovery: boolean;
   supportsToolUse: boolean;
   /** null = fixed URL (e.g. Anthropic). Non-null = configurable default. */

@@ -43,13 +43,30 @@ export class ServiceContainer {
     );
     this.ragService = new RagService(app, pluginDir);
     this.graphService = new GraphService(app, pluginDir);
-    this.claudeCode = new ClaudeCodeService(app, getSettings, () => this.ragService);
+    this.claudeCode = new ClaudeCodeService(
+      app,
+      getSettings,
+      () => this.ragService,
+      // Effort-level harvest from a fresh session's handshake (§3.1 layer 2):
+      // feed the live lookup and persist last-seen, so after one session the
+      // offered levels are the harness's own report, surviving restarts.
+      (levels) => {
+        this.modelAvailability.reportClaudeCodeEffortLevels(levels);
+        const settings = this.getSettings();
+        settings.claudeCodeEffortLevels = { ...settings.claudeCodeEffortLevels, ...levels };
+        void this.persistSettings?.();
+      },
+    );
   }
 
   async initialize(): Promise<void> {
     await this.migrateLegacyDataDir();
 
     const s = this.getSettings();
+
+    // Seed the effort-level lookup from the persisted last-seen harvest so a
+    // restart renders discovered levels before the first session mints.
+    this.modelAvailability.reportClaudeCodeEffortLevels(s.claudeCodeEffortLevels);
 
     await this.ragService.configure(s.rag, getSelectableEmbeddingModels(s), s.providerSettings);
     await this.graphService.configure(

@@ -93,6 +93,102 @@ function flushedAnswer(cb: ReturnType<typeof makeCallbacks>): string {
   return cb.onDelta.mock.calls[0][0];
 }
 
+describe("runToolLoop anthropic thinking round trip", () => {
+  // With adaptive thinking + tool use, Anthropic requires the response's
+  // thinking blocks echoed back on the assistant tool-call turn. The loop
+  // attaches whatever the client's StreamResult captured; the next round's
+  // request must carry them on that turn (buildAnthropicMessages then emits
+  // them first in the content array).
+  it("attaches captured thinking blocks to the round's assistant turn", async () => {
+    const thinking = [{ type: "thinking", thinking: "plan", signature: "sig" }];
+    const seenRequests: ChatRequest[] = [];
+    const rounds: Array<RoundScript & { thinkingBlocks?: unknown[] | null }> = [
+      {
+        deltas: ["considering"],
+        toolCalls: [call(THINK_TOOL_NAME)],
+        stopReason: "tool_use",
+        thinkingBlocks: thinking,
+      },
+      { deltas: ["done"], toolCalls: null, stopReason: "end_turn" },
+    ];
+    let i = 0;
+    const client = {
+      complete: vi.fn(),
+      stream: (request: ChatRequest): StreamResult => {
+        seenRequests.push(request);
+        const round = rounds[i++];
+        const deltas = (async function* () {
+          for (const d of round.deltas) yield d;
+        })();
+        return {
+          deltas,
+          usage: Promise.resolve(null),
+          toolCalls: Promise.resolve(round.toolCalls),
+          stopReason: Promise.resolve(round.stopReason),
+          thinkingBlocks: Promise.resolve(round.thinkingBlocks ?? null),
+        } as unknown as StreamResult;
+      },
+    } as unknown as ChatClient;
+
+    await runToolLoop(
+      client,
+      baseRequest,
+      "claude-opus-4-8",
+      "anthropic",
+      {} as never,
+      new AbortController().signal,
+      makeCallbacks(),
+      5,
+      true,
+    );
+
+    const round2Messages = seenRequests[1].messages;
+    const assistantTurn = round2Messages.find((t) => t.role === "assistant");
+    expect(assistantTurn?.anthropicThinkingBlocks).toEqual(thinking);
+  });
+
+  it("attaches nothing when the client captured no thinking (other providers)", async () => {
+    const seenRequests: ChatRequest[] = [];
+    const rounds: RoundScript[] = [
+      { deltas: ["considering"], toolCalls: [call(THINK_TOOL_NAME)], stopReason: "tool_use" },
+      { deltas: ["done"], toolCalls: null, stopReason: "end_turn" },
+    ];
+    let i = 0;
+    const client = {
+      complete: vi.fn(),
+      stream: (request: ChatRequest): StreamResult => {
+        seenRequests.push(request);
+        const round = rounds[i++];
+        const deltas = (async function* () {
+          for (const d of round.deltas) yield d;
+        })();
+        return {
+          deltas,
+          usage: Promise.resolve(null),
+          toolCalls: Promise.resolve(round.toolCalls),
+          stopReason: Promise.resolve(round.stopReason),
+        } as unknown as StreamResult;
+      },
+    } as unknown as ChatClient;
+
+    await runToolLoop(
+      client,
+      baseRequest,
+      "test-model",
+      "lmstudio",
+      {} as never,
+      new AbortController().signal,
+      makeCallbacks(),
+      5,
+      true,
+    );
+
+    const assistantTurn = seenRequests[1].messages.find((t) => t.role === "assistant");
+    expect(assistantTurn).toBeDefined();
+    expect(assistantTurn).not.toHaveProperty("anthropicThinkingBlocks");
+  });
+});
+
 describe("runToolLoop answer-track prose", () => {
   it("delivers prose that narrated a mutating action even with an empty final round", async () => {
     const cb = makeCallbacks();

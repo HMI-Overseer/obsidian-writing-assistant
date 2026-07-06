@@ -84,8 +84,12 @@ export async function* streamNode(
           let message = `HTTP ${res.statusCode}`;
           try {
             const parsed = JSON.parse(errorBody) as Record<string, unknown>;
-            const err = parsed.error as Record<string, unknown> | undefined;
-            if (typeof err?.message === "string") message += `: ${err.message}`;
+            const err = parsed.error as Record<string, unknown> | string | undefined;
+            // Anthropic/OpenAI wrap the text ({error:{message}}); LM Studio
+            // returns a bare string ({error:"…"}) — surface both, or the user
+            // sees a naked "HTTP 400" with the actionable text swallowed.
+            if (typeof err === "string") message += `: ${err}`;
+            else if (typeof err?.message === "string") message += `: ${err.message}`;
           } catch {
             if (errorBody.length > 0 && errorBody.length < 200) message += `: ${errorBody}`;
           }

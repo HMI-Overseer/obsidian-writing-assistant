@@ -138,6 +138,33 @@ describe("streamSdkTurn", () => {
     expect(params.options.settingSources).toEqual([]);
   });
 
+  it("passes an effort tier through as the SDK effort option", async () => {
+    feed([successResult()]);
+    await drain(streamSdkTurn(baseOptions({ reasoning: "xhigh" })));
+
+    const { options } = queryMock.mock.calls[0][0];
+    expect(options.effort).toBe("xhigh");
+    expect(options.thinking).toBeUndefined();
+  });
+
+  it("sends neither effort nor thinking when reasoning is unset (model default)", async () => {
+    feed([successResult()]);
+    await drain(streamSdkTurn(baseOptions({ reasoning: null })));
+
+    const { options } = queryMock.mock.calls[0][0];
+    expect(options.effort).toBeUndefined();
+    expect(options.thinking).toBeUndefined();
+  });
+
+  it("omits effort for non-tier levels (clamp fallback: model default)", async () => {
+    feed([successResult()]);
+    await drain(streamSdkTurn(baseOptions({ reasoning: "off" })));
+
+    const { options } = queryMock.mock.calls[0][0];
+    expect(options.effort).toBeUndefined();
+    expect(options.thinking).toBeUndefined();
+  });
+
   it("runs as a pure analyst (no tools) when no MCP bridge is supplied", async () => {
     feed([successResult()]);
     await drain(streamSdkTurn(baseOptions()));

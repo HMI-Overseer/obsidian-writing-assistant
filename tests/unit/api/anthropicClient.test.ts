@@ -148,6 +148,64 @@ describe("AnthropicClient.stream tool-call parsing", () => {
   });
 });
 
+describe("AnthropicClient.stream thinking-block capture (tool round trip)", () => {
+  beforeEach(() => {
+    mockStreamNode.mockReset();
+  });
+
+  async function collectThinkingBlocks(events: unknown[]) {
+    mockStreamNode.mockImplementation(streamNodeImpl(events));
+    const client = new AnthropicClient("test-key");
+    const result = client.stream(makeRequest(), "claude-opus-4-8", makeParams());
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    for await (const _delta of result.deltas) { /* no text deltas in these cases */ }
+    return result.thinkingBlocks;
+  }
+
+  test("assembles streamed thinking deltas + signature into a verbatim block", async () => {
+    const blocks = await collectThinkingBlocks([
+      { type: "content_block_start", index: 0, content_block: { type: "thinking", thinking: "" } },
+      { type: "content_block_delta", index: 0, delta: { type: "thinking_delta", thinking: "step one, " } },
+      { type: "content_block_delta", index: 0, delta: { type: "thinking_delta", thinking: "step two" } },
+      { type: "content_block_delta", index: 0, delta: { type: "signature_delta", signature: "sig-abc" } },
+      { type: "content_block_stop", index: 0 },
+    ]);
+    expect(blocks).toEqual([
+      { type: "thinking", thinking: "step one, step two", signature: "sig-abc" },
+    ]);
+  });
+
+  test("keeps an empty-text thinking block (display 'omitted' still carries the signature)", async () => {
+    const blocks = await collectThinkingBlocks([
+      { type: "content_block_start", index: 0, content_block: { type: "thinking", thinking: "" } },
+      { type: "content_block_delta", index: 0, delta: { type: "signature_delta", signature: "sig-empty" } },
+      { type: "content_block_stop", index: 0 },
+    ]);
+    expect(blocks).toEqual([{ type: "thinking", thinking: "", signature: "sig-empty" }]);
+  });
+
+  test("captures redacted_thinking blocks whole", async () => {
+    const blocks = await collectThinkingBlocks([
+      {
+        type: "content_block_start",
+        index: 0,
+        content_block: { type: "redacted_thinking", data: "opaque-bytes" },
+      },
+      { type: "content_block_stop", index: 0 },
+    ]);
+    expect(blocks).toEqual([{ type: "redacted_thinking", data: "opaque-bytes" }]);
+  });
+
+  test("resolves null when the response carried no thinking", async () => {
+    const blocks = await collectThinkingBlocks([
+      { type: "content_block_start", index: 0, content_block: { type: "text", text: "" } },
+      { type: "content_block_delta", index: 0, delta: { type: "text_delta", text: "hi" } },
+      { type: "content_block_stop", index: 0 },
+    ]);
+    expect(blocks).toBeNull();
+  });
+});
+
 describe("AnthropicClient.complete Layer-2 block tolerance", () => {
   beforeEach(() => {
     mockRequest.mockReset();

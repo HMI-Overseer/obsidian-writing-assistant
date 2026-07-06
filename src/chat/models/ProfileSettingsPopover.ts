@@ -2,6 +2,7 @@ import type {
   CompletionModel,
   ProviderOption,
   ProviderProfile,
+  ReasoningLevel,
 } from "../../shared/types";
 import { PROVIDER_OPTIONS } from "../../shared/modelKeys";
 import type { ProviderDescriptor, SamplingParamSupport } from "../../providers/types";
@@ -26,6 +27,16 @@ export type ProfileSettingsCallbacks = {
   onProfileCreate: (name: string, provider: ProviderOption) => Promise<ProviderProfile>;
   onProfileDelete: (profileId: string) => Promise<void>;
   onProfileUpdate: (profileId: string, patch: Partial<ProviderProfile>) => Promise<void>;
+  /** The active model's stored reasoning level, already clamped to its resolved set. */
+  getModelReasoning: () => ReasoningLevel | null;
+  /**
+   * The active model's resolved level set (discovery > catalog > descriptor).
+   * Resolved by the caller, which holds the availability service; empty = no
+   * reasoning control rendered.
+   */
+  getModelReasoningLevels: () => ReasoningLevel[];
+  /** Writes the active model's `reasoningByModelKey` entry (null clears it). */
+  onModelReasoningChange: (level: ReasoningLevel | null) => Promise<void>;
 };
 
 export class ProfileSettingsPopover {
@@ -162,6 +173,13 @@ export class ProfileSettingsPopover {
     // Sampling params section
     this.renderSamplingSection(body, descriptor.supportedParams, profile);
 
+    // Reasoning, remembered per model rather than per profile, so it only
+    // renders while viewing the active model's provider (there is no model to
+    // key the entry on for the others) and is never profile-gated.
+    if (provider === model.provider) {
+      this.renderModelReasoningSection(body);
+    }
+
     // Anthropic cache section
     if (provider === "anthropic") {
       new CacheSettingsControl(body, {
@@ -291,13 +309,38 @@ export class ProfileSettingsPopover {
         onChange: (v) => this.emitProfileUpdate({ repeatPenalty: v }),
       });
     }
+  }
 
-    if (supportedParams.reasoning) {
-      new ReasoningControl(paramsBody, {
-        value: profile.reasoning,
-        onChange: (v) => this.emitProfileUpdate({ reasoning: v }),
-      });
-    }
+  // ---------------------------------------------------------------------------
+  // Per-model reasoning
+  // ---------------------------------------------------------------------------
+
+  /**
+   * The popover-side reasoning control. Reads/writes the same per-model entry
+   * as the composer pill (they can never disagree) and stays enabled on the
+   * default profile, it is not a profile parameter.
+   */
+  private renderModelReasoningSection(body: HTMLElement): void {
+    const levels = this.callbacks.getModelReasoningLevels();
+    if (levels.length === 0) return;
+
+    const section = body.createDiv({
+      cls: "lmsa-profile-popover-section lmsa-model-reasoning-section",
+    });
+    section.createEl("div", {
+      cls: "lmsa-profile-popover-section-title",
+      text: "Reasoning",
+    });
+    const sectionBody = section.createDiv({ cls: "lmsa-params-body" });
+    new ReasoningControl(sectionBody, {
+      value: this.callbacks.getModelReasoning(),
+      levels,
+      onChange: (v) => void this.callbacks.onModelReasoningChange(v),
+    });
+    section.createEl("span", {
+      cls: "lmsa-profile-popover-hint",
+      text: "Remembered per model, off means the model default.",
+    });
   }
 
   // ---------------------------------------------------------------------------
@@ -370,6 +413,9 @@ export class ProfileSettingsPopover {
       ".lmsa-profile-popover-section input, .lmsa-profile-popover-section select",
     );
     for (const input of Array.from(inputs)) {
+      // Reasoning is per model, not a profile parameter; it stays editable on
+      // the default profile (only its own dropdown-follows-toggle state applies).
+      if (input.closest(".lmsa-model-reasoning-section")) continue;
       input.disabled = disabled;
     }
     el.toggleClass("is-default-profile", disabled);

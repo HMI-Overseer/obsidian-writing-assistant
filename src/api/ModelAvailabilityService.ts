@@ -3,8 +3,10 @@ import type {
   EmbeddingModel,
   ModelAvailabilityState,
   ProviderSettingsMap,
+  ReasoningLevel,
 } from "../shared/types";
 import type { ModelCandidateResult } from "./types";
+import type { ReasoningCapability } from "../shared/reasoning";
 import { LMStudioModelsService } from "./LMStudioModelsService";
 import { getProviderDescriptor } from "../providers/registry";
 import { modelKey } from "../shared/modelKeys";
@@ -17,6 +19,8 @@ export interface ModelAvailabilityInfo {
   activeContextLength?: number;
   trainedForToolUse?: boolean;
   vision?: boolean;
+  /** Discovered reasoning capability; absent = the model reports none. */
+  reasoning?: ReasoningCapability;
 }
 
 export class ModelAvailabilityService {
@@ -28,6 +32,14 @@ export class ModelAvailabilityService {
    * refresh and would silently drop provider-reported entries.
    */
   private reportedContextWindows = new Map<string, number>();
+  /**
+   * Effort-level lists from the Claude Code init handshake, keyed by the
+   * normalized picker alias (§3.1 layer 2). Like {@link reportedContextWindows}
+   * it survives LM Studio refreshes and invalidation, its source is a Claude
+   * Code session, not local discovery. Seeded from the persisted last-seen
+   * cache at load; updated on every session mint.
+   */
+  private claudeCodeEffortLevels = new Map<string, ReasoningLevel[]>();
   private lmService: LMStudioModelsService | null = null;
   private lastFetchedAt = 0;
   private lastLmBaseUrl = "";
@@ -79,6 +91,7 @@ export class ModelAvailabilityService {
         activeContextLength: candidate.activeContextLength,
         trainedForToolUse: candidate.trainedForToolUse,
         vision: candidate.vision,
+        reasoning: candidate.reasoning,
       });
     }
 
@@ -130,6 +143,34 @@ export class ModelAvailabilityService {
 
   getVision(modelId: string): boolean | undefined {
     return this.availabilityMap.get(modelId)?.vision;
+  }
+
+  /**
+   * Discovered per-model reasoning capability. LM Studio models resolve from
+   * live discovery (undefined both when the model reports no reasoning support
+   * and when it was never discovered; either way nothing is offered or sent,
+   * sending a reasoning value to a model without the capability can break the
+   * request outright). Claude Code models resolve from the last-seen handshake
+   * harvest, where an empty list is a *known* no-effort model and undefined
+   * (never harvested) falls back to the descriptor list.
+   */
+  getReasoningCapability(modelId: string): ReasoningCapability | undefined {
+    const discovered = this.availabilityMap.get(modelId)?.reasoning;
+    if (discovered) return discovered;
+    const harvested = this.claudeCodeEffortLevels.get(modelId);
+    return harvested ? { allowedOptions: harvested } : undefined;
+  }
+
+  /**
+   * Merges a Claude Code handshake harvest (or the persisted last-seen cache at
+   * load) into the effort-level lookup. Merge, not replace: a harvest names
+   * only the models the current CLI login can see, and a previously-seen model
+   * absent from today's list should keep its last-known levels.
+   */
+  reportClaudeCodeEffortLevels(levels: Record<string, ReasoningLevel[]>): void {
+    for (const [alias, list] of Object.entries(levels)) {
+      this.claudeCodeEffortLevels.set(alias, list);
+    }
   }
 
   getLMStudioService(): LMStudioModelsService {

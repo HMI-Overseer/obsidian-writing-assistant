@@ -169,6 +169,12 @@ export async function runToolLoop(
     let stopReason: StopReason;
     let roundText: string;
     let usage: UsageResult | null = null;
+    // Anthropic only: thinking blocks captured from this round's stream, echoed
+    // back on the round's assistant turn (required when thinking + tool use
+    // co-occur). Drain rounds are synthetic turns the model never emitted, so
+    // they carry none; with disable_parallel_tool_use Anthropic emits one call
+    // per round and drains effectively never occur there.
+    let roundThinkingBlocks: unknown[] | null = null;
     const streamedThisRound = deferredCalls.length === 0;
 
     if (!streamedThisRound) {
@@ -228,6 +234,9 @@ export async function runToolLoop(
 
       usage = await streamResult.usage;
       const rawToolCalls = await streamResult.toolCalls;
+      roundThinkingBlocks = streamResult.thinkingBlocks
+        ? await streamResult.thinkingBlocks
+        : null;
       // Translate any absolute paths to vault-relative *once*, here, so every
       // downstream consumer, overlay, accumulation, finalization, timeline, sees
       // the same resolved path (tools/paths.ts).
@@ -369,6 +378,7 @@ export async function runToolLoop(
         role: "assistant",
         content: roundText || null,
         toolCalls: loopCalls.map((tc) => ({ id: tc.id, name: tc.name, arguments: tc.arguments })),
+        ...(roundThinkingBlocks ? { anthropicThinkingBlocks: roundThinkingBlocks } : {}),
       });
       for (const tc of loopCalls) {
         toolLoopTurns.push({
@@ -397,6 +407,7 @@ export async function runToolLoop(
       role: "assistant",
       content: roundText || null,
       toolCalls: loopCalls.map((tc) => ({ id: tc.id, name: tc.name, arguments: tc.arguments })),
+      ...(roundThinkingBlocks ? { anthropicThinkingBlocks: roundThinkingBlocks } : {}),
     });
 
     // Read-only / think tools and the (possibly suspending) vault ops and edits run

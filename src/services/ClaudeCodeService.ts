@@ -1,13 +1,19 @@
 import type { App } from "obsidian";
 import { FileSystemAdapter } from "obsidian";
 import { execFile } from "child_process";
-import type { ApprovalPosture, PluginSettings, ProviderOption } from "../shared/types";
+import type {
+  ApprovalPosture,
+  PluginSettings,
+  ProviderOption,
+  ReasoningLevel,
+} from "../shared/types";
 import type { ClaudeCodeRuntime, SdkSessionTurnInput } from "../api/ClaudeCodeClient";
 import { resolveClaudeBinary } from "../api/claudeCodeProcess";
 import { isSdkAvailable } from "../api/sdk/claudeAgentSdk";
 import type { Options } from "../api/sdk/claudeAgentSdk";
 import { createVaultSdkMcpServer } from "../api/sdk/sdkMcpServer";
 import { buildSdkOptions } from "../api/sdk/sdkQueryEngine";
+import { harvestEffortLevels } from "../api/sdk/effortHarvest";
 import { SdkSessionRegistry } from "../api/sdk/sdkSession";
 import type { SessionConfig } from "../api/harnessSession";
 import { isCliVersionCompatible } from "../api/sdkVersionGuard";
@@ -132,6 +138,14 @@ export class ClaudeCodeService {
     private readonly app: App,
     private readonly getSettings: () => PluginSettings,
     private readonly getRagService: () => RagService,
+    /**
+     * Receives the normalized effort-level harvest whenever a fresh SDK session
+     * mints (§3.1 layer 2). The container merges it into the availability
+     * service and the persisted last-seen cache; absent in tests.
+     */
+    private readonly onEffortLevelsDiscovered?: (
+      levels: Record<string, ReasoningLevel[]>,
+    ) => void,
   ) {}
 
   /** Resolved `claude` executable (configured path, or auto-detected). */
@@ -182,9 +196,11 @@ export class ClaudeCodeService {
     // SDK path with a conversation id → persistent per-conversation session
     // (Model B): one live `claude` process reused across turns for context
     // retention + incremental caching. The session bakes model / systemPrompt /
-    // reasoning / agentic / toolNames; config drift cold-rebuilds it (see
+    // agentic / toolNames; config drift cold-rebuilds it (see
     // harnessSession.isSessionUsable). Mode is no longer baked, so plan↔chat↔edit
     // switches reuse the session, the per-run allow-list gates writes instead.
+    // Effort is compared outside the fingerprint: a low..xhigh change flips the
+    // live session via applyFlagSettings instead of rebuilding (§3.2).
     if (useSdk && options.conversationId) {
       const conversationId = options.conversationId;
       return {
@@ -247,7 +263,6 @@ export class ClaudeCodeService {
     const cfg: SessionConfig = {
       model: input.model,
       systemPrompt: input.systemPrompt,
-      reasoning: input.reasoning ?? "off",
       agenticMode: agentic,
       toolNames,
     };
@@ -276,6 +291,7 @@ export class ClaudeCodeService {
 
     return this.sessionRegistry.runTurn(conversationId, {
       cfg,
+      effort: input.reasoning ?? null,
       turns: input.turns,
       fullPrompt: input.fullPrompt,
       deltaPrompt: input.deltaPrompt,
@@ -283,6 +299,12 @@ export class ClaudeCodeService {
       signal: input.signal,
       onResult: input.onResult,
       onReuseDecision: input.onReuseDecision,
+      ...(this.onEffortLevelsDiscovered
+        ? {
+            onModelsDiscovered: (models) =>
+              this.onEffortLevelsDiscovered?.(harvestEffortLevels(models)),
+          }
+        : {}),
     });
   }
 

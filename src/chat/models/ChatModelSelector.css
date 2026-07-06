@@ -88,6 +88,38 @@
     outline: none;
   }
 
+  /* Two-class descendant selector to beat Obsidian's base button chrome. */
+  .lmsa-model-dropdown-search button.lmsa-model-dropdown-refresh {
+    @apply lmsa-inline-flex lmsa-flex-none lmsa-cursor-pointer lmsa-items-center lmsa-justify-center lmsa-rounded-md lmsa-border-none lmsa-p-1;
+    color: var(--text-muted);
+    min-height: unset;
+    background: transparent !important;
+    box-shadow: none !important;
+    outline: none;
+    appearance: none;
+    transition: background 120ms ease, color 120ms ease;
+  }
+
+  .lmsa-model-dropdown-search button.lmsa-model-dropdown-refresh:hover {
+    background: color-mix(in srgb, var(--background-modifier-hover) 60%, transparent) !important;
+    color: var(--text-normal);
+  }
+
+  .lmsa-model-dropdown-refresh svg {
+    width: 14px;
+    height: 14px;
+  }
+
+  .lmsa-model-dropdown-refresh.is-refreshing svg {
+    animation: lmsa-model-refresh-spin 900ms linear infinite;
+  }
+
+  @keyframes lmsa-model-refresh-spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
   .lmsa-model-dropdown-body {
     @apply lmsa-flex lmsa-min-h-0 lmsa-flex-1 lmsa-items-stretch lmsa-gap-1.5;
   }

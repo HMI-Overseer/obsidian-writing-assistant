@@ -237,6 +237,15 @@ export class ChatModelSelector {
       this.renderList();
     });
 
+    const refreshBtn = searchWrap.createEl("button", {
+      cls: "lmsa-model-dropdown-refresh",
+      attr: { "aria-label": "Refresh models" },
+    });
+    setIcon(refreshBtn, "refresh-cw");
+    refreshBtn.addEventListener("click", () => {
+      void this.handleRefreshClick(refreshBtn);
+    });
+
     const body = this.refs.modelDropdownEl.createDiv({ cls: "lmsa-model-dropdown-body" });
     this.railEl = body.createDiv({ cls: "lmsa-model-dropdown-rail" });
     this.listEl = body.createDiv({ cls: "lmsa-model-dropdown-list" });
@@ -244,6 +253,27 @@ export class ChatModelSelector {
     this.renderRail();
     this.renderList();
     searchInput.focus();
+  }
+
+  /**
+   * Force a local-discovery refresh and re-render in place. Goes straight to
+   * refreshLocalModels rather than refreshAvailability(), which short-circuits
+   * for cloud active models and would leave the LM Studio rows stale.
+   */
+  private async handleRefreshClick(refreshBtn: HTMLElement): Promise<void> {
+    if (refreshBtn.hasClass("is-refreshing")) return;
+    refreshBtn.addClass("is-refreshing");
+    try {
+      await this.plugin.services.modelAvailability.refreshLocalModels({ forceRefresh: true });
+    } catch {
+      // Discovery failure keeps the last-seen snapshot; dots render unknown.
+    } finally {
+      refreshBtn.removeClass("is-refreshing");
+    }
+    if (!this.modelDropdownOpen) return;
+    this.syncActiveModel();
+    this.openModels = this.options.getModels();
+    this.renderList();
   }
 
   /**

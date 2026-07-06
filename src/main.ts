@@ -7,6 +7,7 @@ import { BUILTIN_COMMAND_CATEGORIES, expandCommandTemplate } from "./commands";
 import { getActiveNoteText } from "./context/noteContext";
 import { InlineDiffManager } from "./editing/inlineDiff/InlineDiffManager";
 import { inlineDiffExtension } from "./editing/inlineDiff/inlineDiffState";
+import { registerBrandIcons, unregisterBrandIcons } from "./providers/brandIcons";
 import { normalizePluginSettings } from "./settings/settingsMigration";
 import { WritingAssistantSettingTab } from "./settings/SettingsTab";
 import { ServiceContainer } from "./services/ServiceContainer";
@@ -17,6 +18,7 @@ export default class WritingAssistantChat extends Plugin {
   inlineDiff!: InlineDiffManager;
 
   async onload(): Promise<void> {
+    registerBrandIcons();
     await this.loadSettings();
     const pluginDir =
       this.manifest.dir ?? `${this.app.vault.configDir}/plugins/${this.manifest.id}`;
@@ -138,6 +140,7 @@ export default class WritingAssistantChat extends Plugin {
   }
 
   onunload(): void {
+    unregisterBrandIcons();
     this.inlineDiff.destroy();
     this.services.destroy();
     // Obsidian handles view cleanup automatically on plugin unload.

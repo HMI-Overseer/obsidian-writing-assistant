@@ -32,8 +32,8 @@
     @apply lmsa-flex lmsa-items-center lmsa-justify-center lmsa-rounded-lg;
     width: 34px;
     height: 34px;
-    background: color-mix(in srgb, var(--lmsa-section-accent) 14%, transparent);
-    color: var(--lmsa-section-accent);
+    background: color-mix(in srgb, var(--lmsa-brand-color, var(--lmsa-section-accent)) 14%, transparent);
+    color: var(--lmsa-brand-color, var(--lmsa-section-accent));
   }
 
   /* Health dot pinned to the icon corner, ringed with the row background so

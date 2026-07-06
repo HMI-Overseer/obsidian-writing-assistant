@@ -6,6 +6,29 @@
    * Shared semantic primitives for plugin surfaces.
    * Keep these scoped to the plugin and based on Obsidian theme vars.
    */
+
+  /*
+   * Provider brand tints, consumed via var(--lmsa-brand-color) by the model
+   * selector rail and the Providers tab cards. Deliberately hardcoded hexes:
+   * these are brand identities, not theme colors, chosen at mid-tones so they
+   * read on both light and dark backgrounds (the official Anthropic/LM Studio
+   * marks are near-black and would vanish in dark theme).
+   */
+  .lmsa-brand-tint-lmstudio {
+    --lmsa-brand-color: #6366f1;
+  }
+
+  .lmsa-brand-tint-anthropic {
+    --lmsa-brand-color: #cc785c;
+  }
+
+  .lmsa-brand-tint-openai {
+    --lmsa-brand-color: #10a37f;
+  }
+
+  .lmsa-brand-tint-claudecode {
+    --lmsa-brand-color: #d97757;
+  }
   .lmsa-ui-surface {
     @apply lmsa-rounded-2xl lmsa-border lmsa-border-obsidian-border lmsa-bg-obsidian-surface-primary lmsa-shadow-panel;
   }

@@ -118,6 +118,7 @@ function renderProviderCard(
   const header = card.createDiv({ cls: "lmsa-provider-card-header" });
   const iconWrap = header.createDiv({ cls: "lmsa-provider-card-iconwrap" });
   const iconEl = iconWrap.createDiv({ cls: "lmsa-provider-card-icon" });
+  iconEl.addClass(`lmsa-brand-tint-${provider}`);
   setIcon(iconEl, PROVIDER_ICONS[provider]);
   const dotEl = iconWrap.createEl("span", { cls: "lmsa-provider-status-dot is-unknown" });
 

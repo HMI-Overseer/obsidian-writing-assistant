@@ -293,6 +293,8 @@ export class ChatModelSelector {
       enabled: boolean
     ): void => {
       const entry = railEl.createDiv({ cls: "lmsa-model-dropdown-rail-item" });
+      // Favorites keeps the muted default; only providers get a brand tint.
+      if (category !== "favorites") entry.addClass(`lmsa-brand-tint-${category}`);
       setIcon(entry, icon);
       entry.setAttr("title", label);
       if (!enabled) {

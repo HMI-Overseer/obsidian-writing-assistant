@@ -102,12 +102,14 @@ export const PROVIDER_DESCRIPTORS: Record<ProviderOption, ProviderDescriptor> = 
 };
 
 /**
- * Lucide icon per provider. Lives at the descriptor layer so the Providers tab
- * cards and the chat model selector rail share one source per fact.
+ * Icon id per provider. Lives at the descriptor layer so the Providers tab
+ * cards and the chat model selector rail share one source per fact. These are
+ * brand logomarks registered into Obsidian's icon library by
+ * `registerBrandIcons()` (brandIcons.ts) at plugin load, not Lucide names.
  */
 export const PROVIDER_ICONS: Record<ProviderOption, string> = {
-  lmstudio: "cpu",
-  anthropic: "sparkles",
-  openai: "bot",
-  claudecode: "terminal",
+  lmstudio: "lmsa-brand-lmstudio",
+  anthropic: "lmsa-brand-anthropic",
+  openai: "lmsa-brand-openai",
+  claudecode: "lmsa-brand-claudecode",
 };

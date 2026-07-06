@@ -53,6 +53,17 @@ export interface ChatTurn {
   role: "user" | "assistant" | "tool";
   /** Message content. null for assistant-only-tool-calls turns (OpenAI spec). */
   content: string | null;
+  /**
+   * The persisted, annotation-free content, set only when `content` was rewritten
+   * for presentation (edit-outcome annotations on tool-call edit turns) AND the model
+   * already received that information in-band (each write's disposition rides its
+   * tool result). The Claude Code live session hashed the raw streamed text, so its
+   * linearity check reads this instead of `content`, keeping reuse alive across
+   * edit turns. Absent everywhere the rewrite carries new information (regex-parsed
+   * edits), where invalidating the session is how the model learns the outcomes.
+   * (ADR-0014)
+   */
+  rawContent?: string;
   /** For tool result turns: the ID of the tool call this responds to. */
   toolCallId?: string;
   /** For assistant turns that contain tool calls: the tool calls made. */

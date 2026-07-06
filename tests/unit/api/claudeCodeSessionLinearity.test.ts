@@ -1,0 +1,130 @@
+import { describe, it, expect } from "vitest";
+import { ClaudeCodeClient, type SdkSessionTurnInput } from "../../../src/api/ClaudeCodeClient";
+import {
+  diagnoseSessionReuse,
+  fingerprint,
+  hashPrefix,
+  type HarnessSession,
+  type SessionConfig,
+  type SessionTurn,
+} from "../../../src/api/harnessSession";
+import type { ChatRequest, ChatTurn } from "../../../src/shared/chatRequest";
+import type { SamplingParams } from "../../../src/shared/types";
+
+/**
+ * Session linearity across annotated edit turns.
+ *
+ * The live-session watermark hashes the assistant reply as the raw streamed text
+ * (SdkSession.advanceWatermark). On the next send, prepareApiMessages rewrites
+ * edit-turn content with accept/reject annotations for the model's benefit, which
+ * used to make the linearity hash miss every turn after an edit ("history edited"
+ * cold rebuild on back-to-back edits). Tool-call edit turns received their real
+ * dispositions in-band (LiveVaultReview resolves each call's tool result), so the
+ * annotation is presentation-only there: ChatTurn.rawContent carries the raw
+ * persisted text, and the client builds the session turns from it.
+ */
+
+const RAW_USER = "Tighten the intro of chapter 3.";
+const RAW_REPLY = "Done. I trimmed the opening paragraph.";
+const ANNOTATED_REPLY =
+  RAW_REPLY +
+  '\n\n[Edit in chapter-3.md: "The opening", ACCEPTED]' +
+  "\n\n[Edit outcome: 1 accepted, 0 rejected out of 1 proposed changes]";
+
+function cfg(): SessionConfig {
+  return {
+    model: "claude-sonnet-4-6",
+    systemPrompt: "Be concise.",
+    reasoning: "off",
+    agenticMode: true,
+    toolNames: ["propose_edit"],
+  };
+}
+
+/** A session watermark advanced from the RAW streamed reply, what advanceWatermark hashes. */
+function watermarkMeta(config: SessionConfig): HarnessSession {
+  const covered: SessionTurn[] = [
+    { role: "user", content: RAW_USER },
+    { role: "assistant", content: RAW_REPLY },
+  ];
+  return {
+    provider: "claudecode",
+    model: config.model,
+    coveredCount: covered.length,
+    prefixHash: hashPrefix(covered, covered.length),
+    configFingerprint: fingerprint(config),
+    config,
+  };
+}
+
+function makeRequest(messages: ChatTurn[]): ChatRequest {
+  return { systemPrompt: "", documentContext: null, ragContext: null, messages };
+}
+
+/** Runs one turn through a capturing session stub and returns the input the client built. */
+async function captureTurnInput(messages: ChatTurn[]): Promise<SdkSessionTurnInput> {
+  let captured: SdkSessionTurnInput | undefined;
+  const client = new ClaudeCodeClient("claude", {
+    useSdk: true,
+    sdkSession: {
+      conversationId: "c1",
+      run: (input) => {
+        captured = input;
+        return (async function* () {
+          yield "ok";
+        })();
+      },
+    },
+  });
+  await client.complete(makeRequest(messages), cfg().model, { reasoning: "off" } as SamplingParams);
+  if (!captured) throw new Error("session stub was never invoked");
+  return captured;
+}
+
+describe("Claude Code session linearity across edit annotations", () => {
+  it("reuses the live session when the annotated turn carries rawContent (tool-call edits)", async () => {
+    const input = await captureTurnInput([
+      { role: "user", content: RAW_USER },
+      { role: "assistant", content: ANNOTATED_REPLY, rawContent: RAW_REPLY },
+      { role: "user", content: "Now do the outro." },
+    ]);
+    expect(diagnoseSessionReuse(watermarkMeta(cfg()), input.turns, cfg())).toEqual({
+      reuse: true,
+    });
+  });
+
+  it("still rebuilds when the raw content itself was edited (a real history edit)", async () => {
+    const input = await captureTurnInput([
+      { role: "user", content: RAW_USER },
+      { role: "assistant", content: ANNOTATED_REPLY, rawContent: "Something the model never said." },
+      { role: "user", content: "Now do the outro." },
+    ]);
+    expect(diagnoseSessionReuse(watermarkMeta(cfg()), input.turns, cfg())).toEqual({
+      reuse: false,
+      reason: "history-edited",
+    });
+  });
+
+  it("still rebuilds for annotated turns without rawContent (regex edits: outcomes ride the replay)", async () => {
+    const input = await captureTurnInput([
+      { role: "user", content: RAW_USER },
+      { role: "assistant", content: ANNOTATED_REPLY },
+      { role: "user", content: "Now do the outro." },
+    ]);
+    expect(diagnoseSessionReuse(watermarkMeta(cfg()), input.turns, cfg())).toEqual({
+      reuse: false,
+      reason: "history-edited",
+    });
+  });
+
+  it("keeps the annotated content in the cold-mint full prompt", async () => {
+    const input = await captureTurnInput([
+      { role: "user", content: RAW_USER },
+      { role: "assistant", content: ANNOTATED_REPLY, rawContent: RAW_REPLY },
+      { role: "user", content: "Now do the outro." },
+    ]);
+    // A genuinely cold rebuild has no in-band tool results to know outcomes from,
+    // so the replayed transcript must keep the annotations.
+    expect(input.fullPrompt).toContain("[Edit outcome: 1 accepted, 0 rejected");
+  });
+});

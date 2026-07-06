@@ -125,20 +125,7 @@ export async function prepareApiMessages(
   const messages: ChatTurn[] = store
     .getSnapshot()
     .messageHistory.filter((message) => !message.isError)
-    .map((message) => {
-      // Note snapshots always travel with the turn; image attachments only go to
-      // vision-capable models.
-      const attachments = message.attachments?.filter(
-        (a) => a.type !== "image" || supportsVision,
-      );
-      return {
-        role: message.role as "user" | "assistant",
-        content: editProposalsOf(message).length > 0
-          ? formatEditMessageContent(message)
-          : message.content,
-        ...(attachments?.length ? { attachments } : {}),
-      };
-    });
+    .map((message) => toHistoryTurn(message, supportsVision));
 
   // Retrieve RAG context based on the latest user message. Skipped when vault tools are
   // active: in agentic mode the model controls retrieval itself via semantic_search, and
@@ -344,6 +331,31 @@ export function splitSystemForTail(opts: {
   return {
     systemPrompt: opts.cachedSystemPrompt,
     ...(modeTail ? { modeTail } : {}),
+  };
+}
+
+/**
+ * Maps one persisted message onto its request {@link ChatTurn}.
+ *
+ * Note snapshots always travel with the turn; image attachments only go to
+ * vision-capable models. Edit turns get their content rewritten with accept/reject
+ * annotations ({@link formatEditMessageContent}); when that rewrite is
+ * presentation-only, tool-call edits, whose real dispositions already reached the
+ * model in-band as each call's tool result (LiveVaultReview), the raw persisted
+ * text rides along as `rawContent` so the Claude Code session linearity check
+ * hashes the same bytes its watermark covered. Regex-parsed edit turns had no
+ * in-band channel, so they stay content-only and deliberately invalidate the live
+ * session: the annotated cold-rebuild replay is how the model learns the outcomes.
+ * (ADR-0014)
+ */
+export function toHistoryTurn(message: ConversationMessage, supportsVision: boolean): ChatTurn {
+  const attachments = message.attachments?.filter((a) => a.type !== "image" || supportsVision);
+  const annotated = editProposalsOf(message).length > 0;
+  return {
+    role: message.role,
+    content: annotated ? formatEditMessageContent(message) : message.content,
+    ...(annotated && message.toolCalls?.length ? { rawContent: message.content } : {}),
+    ...(attachments?.length ? { attachments } : {}),
   };
 }
 

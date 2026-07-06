@@ -189,7 +189,14 @@ export class ClaudeCodeClient implements ChatClient {
         model,
         systemPrompt: request.systemPrompt,
         reasoning: params.reasoning,
-        turns: request.messages.map((turn) => ({ role: turn.role, content: turn.content })),
+        // Linearity turns hash the raw persisted text (`rawContent`) where the
+        // rendered content was rewritten presentation-only (edit-outcome
+        // annotations), matching the raw streamed bytes the session's watermark
+        // covered; see ChatTurn.rawContent (ADR-0014).
+        turns: request.messages.map((turn) => ({
+          role: turn.role,
+          content: turn.rawContent ?? turn.content,
+        })),
         signal,
         onResult,
         onReuseDecision,

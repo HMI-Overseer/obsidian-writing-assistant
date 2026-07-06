@@ -23,6 +23,28 @@ export const PROVIDER_PATTERNS = {
 };
 
 /**
+ * Feed entries that match a provider pattern but do not belong in the plugin's
+ * chat catalog:
+ *   - `-fast` is OpenRouter's routing alias for Anthropic fast mode, which the
+ *     first-party API selects via a request parameter, not a model id; the id
+ *     would 400 if sent to Anthropic directly.
+ *   - Dated OpenAI snapshots (`gpt-4o-2024-05-13`) duplicate their bare alias,
+ *     and `-latest` aliases drift under the same id.
+ *   - `gpt-oss-*` are open-weight releases OpenRouter hosts under the openai
+ *     prefix; api.openai.com does not serve them.
+ *   - Audio / image / search-preview / deep-research specializations are not
+ *     usable through the plugin's chat surface.
+ *   - The superseded gpt-3.5 / gpt-4-base families stay out; anything newer
+ *     auto-includes. A user who still wants an excluded id has the card's
+ *     custom-model escape hatch.
+ */
+export const EXCLUDED_MODEL_IDS = {
+  anthropic: /-fast$/,
+  openai:
+    /-\d{4}-\d{2}-\d{2}$|-latest$|^gpt-3\.5|^gpt-4(-|$)|^gpt-oss|audio|image|-search-preview$|-deep-research$/,
+};
+
+/**
  * Entries no feed carries. OpenRouter is a chat router, so OpenAI's embedding
  * models are seeded here; Claude Code selects models by CLI alias, not by API
  * id, so its catalog is fixed.
@@ -69,6 +91,7 @@ export function extractCatalog(payload, patterns = PROVIDER_PATTERNS) {
       if (model.id.includes(":")) continue; // variant slug, not a model
       if (!pattern.test(model.id)) continue;
       const modelId = toNativeModelId(provider, model.id);
+      if (EXCLUDED_MODEL_IDS[provider]?.test(modelId)) continue;
       if (entries.has(modelId)) continue;
       const contextWindowSize = Number(model.context_length);
       const modalities = model.architecture?.input_modalities;

@@ -28,7 +28,9 @@ const FEED = {
     orModel("anthropic/claude-opus-4.8", "Anthropic: Claude Opus 4.8", 1000000, ["text", "image"]),
     orModel("anthropic/claude-fable-5", "Anthropic: Claude Fable 5", 1000000, ["text", "image"]),
     orModel("anthropic/claude-opus-4.8:free", "Anthropic: Claude Opus 4.8 (free)", 1000000),
+    orModel("anthropic/claude-opus-4.8-fast", "Anthropic: Claude Opus 4.8 (Fast)", 1000000),
     orModel("openai/gpt-5.1", "OpenAI: GPT-5.1", 400000, ["text", "image"]),
+    orModel("openai/gpt-4o-2024-05-13", "OpenAI: GPT-4o (2024-05-13)", 128000, ["text", "image"]),
     orModel("mistralai/mistral-large", "Mistral Large", 128000),
   ],
 };
@@ -63,6 +65,15 @@ describe("extractCatalog", () => {
     expect(anthropicIds.filter((id: string) => id === "claude-opus-4-8")).toHaveLength(1);
     const all = Object.values(catalog).flat() as Array<{ modelId: string }>;
     expect(all.some((entry) => entry.modelId.includes("mistral"))).toBe(false);
+  });
+
+  it("excludes non-addressable and duplicate ids (-fast aliases, dated snapshots)", () => {
+    const catalog = extractCatalog(FEED);
+    const anthropicIds = catalog.anthropic.map((entry: { modelId: string }) => entry.modelId);
+    const openaiIds = catalog.openai.map((entry: { modelId: string }) => entry.modelId);
+    expect(anthropicIds).not.toContain("claude-opus-4-8-fast");
+    expect(openaiIds).not.toContain("gpt-4o-2024-05-13");
+    expect(openaiIds).toContain("gpt-5.1");
   });
 
   it("carries feed capabilities (context window, vision)", () => {

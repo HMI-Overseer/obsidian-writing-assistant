@@ -3,13 +3,14 @@ import type WritingAssistantChat from "../main";
 import type { CustomModelEntry, ModelRole, ProviderOption } from "../shared/types";
 import { normalizeLMStudioBaseUrl } from "../api";
 import { PROVIDER_DESCRIPTORS } from "../providers/descriptors";
-import { CATALOG_AS_OF, getCatalogEntries } from "../providers/catalog";
+import { getCatalogEntries } from "../providers/catalog";
 import {
   getSelectableCompletionModels,
   getSelectableEmbeddingModels,
 } from "../providers/selectableModels";
 import { PROVIDER_OPTIONS } from "../shared/modelKeys";
 import { CLAUDE_CODE_SETUP_URL } from "../services/ClaudeCodeService";
+import type { ClaudeCodeDetection } from "../services/ClaudeCodeService";
 import { ApiKeysDisclaimerModal } from "./modals";
 import { Button, Dropdown, SettingItem, TextInput, Toggle } from "./ui";
 
@@ -32,11 +33,31 @@ const PROVIDER_ICONS: Record<ProviderOption, string> = {
 /** Expansion survives the tab's full re-renders within a settings session. */
 const expandedProviders = new Set<ProviderOption>();
 
+/**
+ * Health dot semantics (independent of the enable toggle, matching the
+ * reference row anatomy): ok = enabled and contributing models, warn = off by
+ * choice or nothing discovered yet, error = blocked (missing key / CLI),
+ * unknown = still probing.
+ */
+type ProviderDot = "ok" | "warn" | "error" | "unknown";
+
+interface ProviderHeaderState {
+  dot: ProviderDot;
+  status: string;
+  /** Small muted chip after the name (e.g. the detected CLI version). */
+  version?: string;
+}
+
 function formatContextSize(tokens?: number): string | null {
   if (!tokens || tokens <= 0) return null;
   if (tokens >= 1_000_000) return `${Math.round(tokens / 1_000_000)}M context`;
   if (tokens >= 1_000) return `${Math.round(tokens / 1_000)}K context`;
   return `${tokens} context`;
+}
+
+/** `claude --version` reports "2.1.201 (Claude Code)"; the parenthetical is redundant next to the provider name. */
+function cleanCliVersion(version: string): string {
+  return version.replace(/\s*\(.*\)\s*$/, "");
 }
 
 function hasApiKey(plugin: WritingAssistantChat, provider: ProviderOption): boolean {
@@ -80,7 +101,7 @@ export function renderProvidersTab(
 
   const footnote = container.createEl("p", { cls: "lmsa-provider-footnote" });
   footnote.setText(
-    `Cloud model catalogs ship with the plugin (as of ${CATALOG_AS_OF}) and refresh with each release. Local models are discovered live from LM Studio.`,
+    "Cloud model catalogs ship with the plugin and refresh with each release. Local models are discovered live from LM Studio.",
   );
 
   return () => {
@@ -100,23 +121,50 @@ function renderProviderCard(
 
   const card = container.createDiv({ cls: "lmsa-provider-card" });
 
-  // ── Header: icon + name + status line + chevron + enable toggle ──
+  // ── Header: dotted icon + name/version + status line + chevron + toggle ──
   const header = card.createDiv({ cls: "lmsa-provider-card-header" });
-  const iconEl = header.createDiv({ cls: "lmsa-provider-card-icon" });
+  const iconWrap = header.createDiv({ cls: "lmsa-provider-card-iconwrap" });
+  const iconEl = iconWrap.createDiv({ cls: "lmsa-provider-card-icon" });
   setIcon(iconEl, PROVIDER_ICONS[provider]);
+  const dotEl = iconWrap.createEl("span", { cls: "lmsa-provider-status-dot is-unknown" });
 
   const infoEl = header.createDiv({ cls: "lmsa-provider-card-info" });
-  infoEl.createDiv({ cls: "lmsa-provider-card-name", text: descriptor.label });
+  const nameRow = infoEl.createDiv({ cls: "lmsa-provider-card-name-row" });
+  nameRow.createEl("span", { cls: "lmsa-provider-card-name", text: descriptor.label });
+  const versionEl = nameRow.createEl("span", {
+    cls: "lmsa-provider-card-version lmsa-hidden",
+  });
   const statusEl = infoEl.createDiv({ cls: "lmsa-provider-card-status" });
 
   const chevronEl = header.createEl("span", { cls: "lmsa-provider-card-chevron" });
+  setIcon(chevronEl, "chevron-down");
 
   // The toggle lives in the header but must not toggle expansion.
   const toggleWrap = header.createDiv({ cls: "lmsa-provider-card-toggle" });
   toggleWrap.addEventListener("click", (event) => event.stopPropagation());
   const toggle = new Toggle(toggleWrap);
 
-  const body = card.createDiv({ cls: "lmsa-provider-card-body" });
+  // Grid-track wrapper so expansion animates height (0fr -> 1fr). The clip
+  // layer between track and body must stay padding- and border-free: a grid
+  // track cannot shrink below an item's padding+border floor, so padding on
+  // the clipped element would leave a visible strip when collapsed.
+  const bodyWrap = card.createDiv({ cls: "lmsa-provider-card-bodywrap" });
+  const bodyClip = bodyWrap.createDiv({ cls: "lmsa-provider-card-bodyclip" });
+  const body = bodyClip.createDiv({ cls: "lmsa-provider-card-body" });
+
+  // Claude Code health is async: probe once per card, share the promise with
+  // the body, and re-sync the header when the result lands.
+  let detection: ClaudeCodeDetection | "pending" | null = null;
+  let detectionPromise: Promise<ClaudeCodeDetection> | null = null;
+  if (provider === "claudecode") {
+    detection = "pending";
+    detectionPromise = plugin.services.claudeCode.detect();
+    void detectionPromise.then((result) => {
+      if (isDisposed()) return;
+      detection = result;
+      syncHeader();
+    });
+  }
 
   const syncHeader = (): void => {
     const keyed = descriptor.authType === "api-key";
@@ -124,15 +172,21 @@ function renderProviderCard(
     toggle.setValue(settings.enabled);
     toggle.setDisabled(keyed && !keyPresent);
     card.toggleClass("is-off", !settings.enabled);
-    statusEl.setText(buildStatusLine(plugin, provider));
+
+    const state = buildHeaderState(plugin, provider, detection);
+    statusEl.setText(state.status);
+    dotEl.removeClass("is-ok", "is-warn", "is-error", "is-unknown");
+    dotEl.addClass(`is-${state.dot}`);
+    versionEl.toggleClass("lmsa-hidden", !state.version);
+    if (state.version) versionEl.setText(state.version);
   };
 
   const syncExpansion = (): void => {
     const expanded = expandedProviders.has(provider);
-    body.toggleClass("lmsa-hidden", !expanded);
     card.toggleClass("is-expanded", expanded);
-    chevronEl.empty();
-    setIcon(chevronEl, expanded ? "chevron-up" : "chevron-down");
+    // Collapsed content is clipped, not display:none, so keep it out of the
+    // tab order while hidden.
+    bodyWrap.inert = !expanded;
   };
 
   header.addEventListener("click", () => {
@@ -154,30 +208,56 @@ function renderProviderCard(
     renderLmStudioBody(body, plugin, refresh);
   } else if (descriptor.authType === "api-key") {
     renderKeyedCloudBody(body, plugin, provider as "anthropic" | "openai", syncHeader, refresh);
-  } else {
-    renderClaudeCodeBody(body, plugin, refresh, isDisposed);
+  } else if (detectionPromise) {
+    renderClaudeCodeBody(body, plugin, detectionPromise, refresh, isDisposed);
   }
 
   syncHeader();
   syncExpansion();
 }
 
-function buildStatusLine(plugin: WritingAssistantChat, provider: ProviderOption): string {
+function buildHeaderState(
+  plugin: WritingAssistantChat,
+  provider: ProviderOption,
+  detection: ClaudeCodeDetection | "pending" | null,
+): ProviderHeaderState {
   const descriptor = PROVIDER_DESCRIPTORS[provider];
   const enabled = plugin.settings.providerSettings[provider].enabled;
   const count = providerModelCount(plugin, provider);
   const models = `${count} model${count === 1 ? "" : "s"}`;
 
   if (descriptor.authType === "api-key" && !hasApiKey(plugin, provider)) {
-    return "Needs API key";
+    return { dot: "error", status: "Needs API key" };
   }
+
   if (provider === "lmstudio") {
     const discovered = plugin.settings.lmStudioModelCache.discoveredAt !== null;
-    if (!enabled) return "Disabled";
-    return discovered ? `${models} last seen` : "No models discovered yet";
+    if (!enabled) return { dot: "warn", status: "Disabled" };
+    if (!discovered || count === 0) return { dot: "warn", status: "No models discovered yet" };
+    return { dot: "ok", status: `Local server · ${models} last seen` };
   }
-  const auth = descriptor.authType === "api-key" ? "API key set" : "Uses your Claude Code login";
-  return enabled ? `${auth} · ${models} available in chat` : `${auth} · disabled`;
+
+  if (provider === "claudecode") {
+    if (detection === "pending" || detection === null) {
+      return { dot: "unknown", status: "Checking for the Claude Code CLI…" };
+    }
+    if (!detection.installed) {
+      return {
+        dot: "error",
+        status: "Not found · the Claude Code CLI is not installed or not on the system path",
+      };
+    }
+    const version = detection.version ? `v${cleanCliVersion(detection.version)}` : undefined;
+    if (!enabled) return { dot: "warn", status: "Disabled", version };
+    return {
+      dot: "ok",
+      status: `Authenticated via your Claude Code login · ${models} available in chat`,
+      version,
+    };
+  }
+
+  if (!enabled) return { dot: "warn", status: "Disabled · API key kept" };
+  return { dot: "ok", status: `API key set · ${models} available in chat` };
 }
 
 // ---------------------------------------------------------------------------
@@ -286,12 +366,7 @@ function renderLmStudioBody(
   headerRow.createEl("span", { cls: "lmsa-provider-models-title", text: "Models" });
 
   const cache = plugin.settings.lmStudioModelCache;
-  const metaEl = headerRow.createEl("span", { cls: "lmsa-provider-models-meta" });
-  metaEl.setText(
-    cache.discoveredAt !== null
-      ? `Last discovered ${new Date(cache.discoveredAt).toLocaleString()}`
-      : "Not discovered yet",
-  );
+  headerRow.createEl("span", { cls: "lmsa-provider-models-meta" });
 
   new Button(headerRow).setButtonText("Refresh").onClick(async () => {
     try {
@@ -342,6 +417,7 @@ function renderLmStudioBody(
 function renderClaudeCodeBody(
   body: HTMLElement,
   plugin: WritingAssistantChat,
+  detectionPromise: Promise<ClaudeCodeDetection>,
   refresh: () => void,
   isDisposed: () => boolean,
 ): void {
@@ -353,10 +429,12 @@ function renderClaudeCodeBody(
     text: "Checking…",
   });
 
-  void plugin.services.claudeCode.detect().then((detection) => {
+  void detectionPromise.then((detection) => {
     if (isDisposed()) return;
     if (detection.installed) {
-      statusEl.setText(detection.version ? `Detected (v${detection.version})` : "Detected");
+      statusEl.setText(
+        detection.version ? `Detected (v${cleanCliVersion(detection.version)})` : "Detected",
+      );
       statusEl.addClass("is-ok");
     } else {
       statusEl.setText("Not detected");
@@ -402,7 +480,7 @@ function renderCatalogList(
   headerRow.createEl("span", { cls: "lmsa-provider-models-title", text: "Models" });
   headerRow.createEl("span", {
     cls: "lmsa-provider-models-meta",
-    text: `Built-in catalog, as of ${CATALOG_AS_OF}`,
+    text: "Built-in catalog",
   });
 
   const list = section.createDiv({ cls: "lmsa-item-list" });

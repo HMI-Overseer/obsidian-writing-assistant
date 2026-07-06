@@ -1,8 +1,15 @@
 {
   "asOf": "2026-07-06",
-  "source": "hand-curated",
+  "source": "https://openrouter.ai/api/v1/models",
   "providers": {
     "anthropic": [
+      {
+        "modelId": "claude-3-haiku",
+        "name": "Claude 3 Haiku",
+        "role": "completion",
+        "contextWindowSize": 200000,
+        "vision": true
+      },
       {
         "modelId": "claude-fable-5",
         "name": "Claude Fable 5",
@@ -13,6 +20,27 @@
       {
         "modelId": "claude-haiku-4-5",
         "name": "Claude Haiku 4.5",
+        "role": "completion",
+        "contextWindowSize": 200000,
+        "vision": true
+      },
+      {
+        "modelId": "claude-opus-4",
+        "name": "Claude Opus 4",
+        "role": "completion",
+        "contextWindowSize": 200000,
+        "vision": true
+      },
+      {
+        "modelId": "claude-opus-4-1",
+        "name": "Claude Opus 4.1",
+        "role": "completion",
+        "contextWindowSize": 200000,
+        "vision": true
+      },
+      {
+        "modelId": "claude-opus-4-5",
+        "name": "Claude Opus 4.5",
         "role": "completion",
         "contextWindowSize": 200000,
         "vision": true
@@ -34,6 +62,20 @@
       {
         "modelId": "claude-opus-4-8",
         "name": "Claude Opus 4.8",
+        "role": "completion",
+        "contextWindowSize": 1000000,
+        "vision": true
+      },
+      {
+        "modelId": "claude-sonnet-4",
+        "name": "Claude Sonnet 4",
+        "role": "completion",
+        "contextWindowSize": 1000000,
+        "vision": true
+      },
+      {
+        "modelId": "claude-sonnet-4-5",
+        "name": "Claude Sonnet 4.5",
         "role": "completion",
         "contextWindowSize": 1000000,
         "vision": true
@@ -77,6 +119,83 @@
     ],
     "openai": [
       {
+        "modelId": "gpt-4.1",
+        "name": "GPT-4.1",
+        "role": "completion",
+        "contextWindowSize": 1047576,
+        "vision": true
+      },
+      {
+        "modelId": "gpt-4.1-mini",
+        "name": "GPT-4.1 Mini",
+        "role": "completion",
+        "contextWindowSize": 1047576,
+        "vision": true
+      },
+      {
+        "modelId": "gpt-4.1-nano",
+        "name": "GPT-4.1 Nano",
+        "role": "completion",
+        "contextWindowSize": 1047576,
+        "vision": true
+      },
+      {
+        "modelId": "gpt-4o",
+        "name": "GPT-4o",
+        "role": "completion",
+        "contextWindowSize": 128000,
+        "vision": true
+      },
+      {
+        "modelId": "gpt-4o-mini",
+        "name": "GPT-4o-mini",
+        "role": "completion",
+        "contextWindowSize": 128000,
+        "vision": true
+      },
+      {
+        "modelId": "gpt-5",
+        "name": "GPT-5",
+        "role": "completion",
+        "contextWindowSize": 400000,
+        "vision": true
+      },
+      {
+        "modelId": "gpt-5-chat",
+        "name": "GPT-5 Chat",
+        "role": "completion",
+        "contextWindowSize": 128000,
+        "vision": true
+      },
+      {
+        "modelId": "gpt-5-codex",
+        "name": "GPT-5 Codex",
+        "role": "completion",
+        "contextWindowSize": 400000,
+        "vision": true
+      },
+      {
+        "modelId": "gpt-5-mini",
+        "name": "GPT-5 Mini",
+        "role": "completion",
+        "contextWindowSize": 400000,
+        "vision": true
+      },
+      {
+        "modelId": "gpt-5-nano",
+        "name": "GPT-5 Nano",
+        "role": "completion",
+        "contextWindowSize": 400000,
+        "vision": true
+      },
+      {
+        "modelId": "gpt-5-pro",
+        "name": "GPT-5 Pro",
+        "role": "completion",
+        "contextWindowSize": 400000,
+        "vision": true
+      },
+      {
         "modelId": "gpt-5.1",
         "name": "GPT-5.1",
         "role": "completion",
@@ -84,10 +203,171 @@
         "vision": true
       },
       {
-        "modelId": "gpt-5.1-mini",
-        "name": "GPT-5.1 Mini",
+        "modelId": "gpt-5.1-chat",
+        "name": "GPT-5.1 Chat",
+        "role": "completion",
+        "contextWindowSize": 128000,
+        "vision": true
+      },
+      {
+        "modelId": "gpt-5.1-codex",
+        "name": "GPT-5.1-Codex",
         "role": "completion",
         "contextWindowSize": 400000,
+        "vision": true
+      },
+      {
+        "modelId": "gpt-5.1-codex-max",
+        "name": "GPT-5.1-Codex-Max",
+        "role": "completion",
+        "contextWindowSize": 400000,
+        "vision": true
+      },
+      {
+        "modelId": "gpt-5.1-codex-mini",
+        "name": "GPT-5.1-Codex-Mini",
+        "role": "completion",
+        "contextWindowSize": 400000,
+        "vision": true
+      },
+      {
+        "modelId": "gpt-5.2",
+        "name": "GPT-5.2",
+        "role": "completion",
+        "contextWindowSize": 400000,
+        "vision": true
+      },
+      {
+        "modelId": "gpt-5.2-chat",
+        "name": "GPT-5.2 Chat",
+        "role": "completion",
+        "contextWindowSize": 128000,
+        "vision": true
+      },
+      {
+        "modelId": "gpt-5.2-codex",
+        "name": "GPT-5.2-Codex",
+        "role": "completion",
+        "contextWindowSize": 400000,
+        "vision": true
+      },
+      {
+        "modelId": "gpt-5.2-pro",
+        "name": "GPT-5.2 Pro",
+        "role": "completion",
+        "contextWindowSize": 400000,
+        "vision": true
+      },
+      {
+        "modelId": "gpt-5.3-chat",
+        "name": "GPT-5.3 Chat",
+        "role": "completion",
+        "contextWindowSize": 128000,
+        "vision": true
+      },
+      {
+        "modelId": "gpt-5.3-codex",
+        "name": "GPT-5.3-Codex",
+        "role": "completion",
+        "contextWindowSize": 400000,
+        "vision": true
+      },
+      {
+        "modelId": "gpt-5.4",
+        "name": "GPT-5.4",
+        "role": "completion",
+        "contextWindowSize": 1050000,
+        "vision": true
+      },
+      {
+        "modelId": "gpt-5.4-mini",
+        "name": "GPT-5.4 Mini",
+        "role": "completion",
+        "contextWindowSize": 400000,
+        "vision": true
+      },
+      {
+        "modelId": "gpt-5.4-nano",
+        "name": "GPT-5.4 Nano",
+        "role": "completion",
+        "contextWindowSize": 400000,
+        "vision": true
+      },
+      {
+        "modelId": "gpt-5.4-pro",
+        "name": "GPT-5.4 Pro",
+        "role": "completion",
+        "contextWindowSize": 1050000,
+        "vision": true
+      },
+      {
+        "modelId": "gpt-5.5",
+        "name": "GPT-5.5",
+        "role": "completion",
+        "contextWindowSize": 1050000,
+        "vision": true
+      },
+      {
+        "modelId": "gpt-5.5-pro",
+        "name": "GPT-5.5 Pro",
+        "role": "completion",
+        "contextWindowSize": 1050000,
+        "vision": true
+      },
+      {
+        "modelId": "o1",
+        "name": "o1",
+        "role": "completion",
+        "contextWindowSize": 200000,
+        "vision": true
+      },
+      {
+        "modelId": "o1-pro",
+        "name": "o1-pro",
+        "role": "completion",
+        "contextWindowSize": 200000,
+        "vision": true
+      },
+      {
+        "modelId": "o3",
+        "name": "o3",
+        "role": "completion",
+        "contextWindowSize": 200000,
+        "vision": true
+      },
+      {
+        "modelId": "o3-mini",
+        "name": "o3 Mini",
+        "role": "completion",
+        "contextWindowSize": 200000,
+        "vision": false
+      },
+      {
+        "modelId": "o3-mini-high",
+        "name": "o3 Mini High",
+        "role": "completion",
+        "contextWindowSize": 200000,
+        "vision": false
+      },
+      {
+        "modelId": "o3-pro",
+        "name": "o3 Pro",
+        "role": "completion",
+        "contextWindowSize": 200000,
+        "vision": true
+      },
+      {
+        "modelId": "o4-mini",
+        "name": "o4 Mini",
+        "role": "completion",
+        "contextWindowSize": 200000,
+        "vision": true
+      },
+      {
+        "modelId": "o4-mini-high",
+        "name": "o4 Mini High",
+        "role": "completion",
+        "contextWindowSize": 200000,
         "vision": true
       },
       {

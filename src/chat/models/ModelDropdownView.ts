@@ -75,6 +75,7 @@ export class ModelDropdownView<T extends SelectableModelLike> {
   private models: T[] = [];
   private railEl: HTMLElement | null = null;
   private listEl: HTMLElement | null = null;
+  private refreshBtn: HTMLElement | null = null;
 
   constructor(
     private readonly deps: ModelDropdownDeps,
@@ -82,13 +83,23 @@ export class ModelDropdownView<T extends SelectableModelLike> {
     private readonly options: ModelDropdownViewOptions<T>
   ) {}
 
+  /** Renders instantly from the cached model list, then refreshes discovery. */
   render(): void {
+    this.renderStructure();
+    void this.refreshModels();
+  }
+
+  private renderStructure(): void {
     this.containerEl.empty();
+    this.railEl = null;
+    this.refreshBtn = null;
     this.models = this.options.getModels();
 
     if (this.models.length === 0) {
-      const listEl = this.containerEl.createDiv({ cls: "lmsa-model-dropdown-list" });
-      listEl.createDiv({
+      // Kept in this.listEl so a discovery pass can tell this render is still
+      // live and upgrade it to the full structure if models appear.
+      this.listEl = this.containerEl.createDiv({ cls: "lmsa-model-dropdown-list" });
+      this.listEl.createDiv({
         cls: "lmsa-model-dropdown-empty",
         text: "No models available. Enable a provider in settings.",
       });
@@ -122,8 +133,9 @@ export class ModelDropdownView<T extends SelectableModelLike> {
     });
     setIcon(refreshBtn, "refresh-cw");
     refreshBtn.addEventListener("click", () => {
-      void this.handleRefreshClick(refreshBtn);
+      void this.refreshModels();
     });
+    this.refreshBtn = refreshBtn;
 
     const body = this.containerEl.createDiv({ cls: "lmsa-model-dropdown-body" });
     this.railEl = body.createDiv({ cls: "lmsa-model-dropdown-rail" });
@@ -138,26 +150,38 @@ export class ModelDropdownView<T extends SelectableModelLike> {
     return PROVIDER_OPTIONS.filter((provider) => this.deps.isProviderEnabled(provider));
   }
 
-  private async handleRefreshClick(refreshBtn: HTMLElement): Promise<void> {
-    if (refreshBtn.hasClass("is-refreshing")) return;
-    refreshBtn.addClass("is-refreshing");
+  /** The discovery pass, shared by opening the dropdown and the refresh button. */
+  private async refreshModels(): Promise<void> {
+    const refreshBtn = this.refreshBtn;
+    if (refreshBtn?.hasClass("is-refreshing")) return;
+    refreshBtn?.addClass("is-refreshing");
     try {
       await this.deps.refreshLocalModels();
     } catch {
       // Discovery failure keeps the last-seen snapshot; dots render unknown.
     } finally {
-      refreshBtn.removeClass("is-refreshing");
+      refreshBtn?.removeClass("is-refreshing");
     }
-    if (!refreshBtn.isConnected) return;
+    // A later render (dropdown reopened) has replaced this one's DOM.
+    if (!this.listEl?.isConnected) return;
+
     this.options.onAfterRefresh?.();
+    const hadModels = this.models.length > 0;
     this.models = this.options.getModels();
+    if (hadModels !== (this.models.length > 0)) {
+      // Crossing the empty boundary changes the whole layout (search + rail
+      // appear or go away), not just the rows.
+      this.renderStructure();
+      return;
+    }
     this.renderList();
   }
 
   /**
-   * The rail has a fixed shape: favorites on top, then every provider in
-   * PROVIDER_OPTIONS order. Disabled providers render grayed out and
-   * non-interactive, a hint that more providers exist.
+   * The rail has a fixed shape: favorites on top behind its own divider, then
+   * enabled providers in PROVIDER_OPTIONS order, then, behind another divider,
+   * the disabled providers, grayed out and non-interactive, a hint that more
+   * providers exist.
    */
   private renderRail(): void {
     const railEl = this.railEl;
@@ -188,14 +212,20 @@ export class ModelDropdownView<T extends SelectableModelLike> {
       });
     };
 
+    const addProviderEntries = (providers: readonly ProviderOption[], enabled: boolean): void => {
+      for (const provider of providers) {
+        addEntry(provider, PROVIDER_ICONS[provider], PROVIDER_DESCRIPTORS[provider].label, enabled);
+      }
+    };
+
     addEntry("favorites", "star", "Favorites", true);
-    for (const provider of PROVIDER_OPTIONS) {
-      addEntry(
-        provider,
-        PROVIDER_ICONS[provider],
-        PROVIDER_DESCRIPTORS[provider].label,
-        this.deps.isProviderEnabled(provider)
-      );
+    railEl.createDiv({ cls: "lmsa-model-dropdown-rail-divider" });
+
+    const disabled = PROVIDER_OPTIONS.filter((provider) => !this.deps.isProviderEnabled(provider));
+    addProviderEntries(this.enabledProviders(), true);
+    if (disabled.length > 0) {
+      railEl.createDiv({ cls: "lmsa-model-dropdown-rail-divider" });
+      addProviderEntries(disabled, false);
     }
   }
 

@@ -138,21 +138,11 @@ export class ChatModelSelector {
   }
 
   private open(): void {
-    this.refs.modelDropdownEl.empty();
     this.refs.modelDropdownEl.removeClass("lmsa-hidden");
     this.modelDropdownOpen = true;
     this.refs.modelSelectorBtn.addClass("is-active");
     setIcon(this.refs.modelSelectorChevronEl, "chevron-up");
-
-    const loadingList = this.refs.modelDropdownEl.createDiv({
-      cls: "lmsa-model-dropdown-list",
-    });
-    loadingList.createDiv({
-      cls: "lmsa-model-dropdown-empty",
-      text: "Loading models...",
-    });
-
-    void this.renderDropdownContents();
+    this.renderDropdownContents();
   }
 
   private setModelAvailabilityState(state: ModelAvailabilityState): void {
@@ -173,10 +163,12 @@ export class ChatModelSelector {
     this.refs.modelSelectorStatusEl.addClass(`is-${state}`);
   }
 
-  private async renderDropdownContents(): Promise<void> {
-    await this.refreshAvailability();
-    if (!this.modelDropdownOpen) return;
-
+  /**
+   * Renders instantly from the cached catalog; the view runs a discovery
+   * refresh on open (spinner on its refresh button), and `onAfterRefresh`
+   * re-syncs the trigger's availability dot from the fresh state.
+   */
+  private renderDropdownContents(): void {
     const view = new ModelDropdownView<CompletionModel>(
       pluginModelDropdownDeps(this.plugin),
       this.refs.modelDropdownEl,

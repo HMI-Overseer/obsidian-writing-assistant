@@ -156,6 +156,14 @@
     opacity: 0.45;
   }
 
+  .lmsa-model-dropdown-rail-divider {
+    @apply lmsa-flex-none;
+    width: 18px;
+    height: 1px;
+    margin: 3px 0;
+    background: var(--background-modifier-border);
+  }
+
   .lmsa-model-dropdown-list {
     @apply lmsa-flex lmsa-min-w-0 lmsa-flex-1 lmsa-flex-col lmsa-gap-0.5 lmsa-overflow-y-auto;
   }

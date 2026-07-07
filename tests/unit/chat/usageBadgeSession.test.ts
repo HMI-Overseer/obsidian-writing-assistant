@@ -35,10 +35,18 @@ describe("describeSession", () => {
     ).toEqual({ text: "synthetic rebuild · tools changed", state: "rebuilt" });
   });
 
-  it("shows a bare 'synthetic rebuild' for a disposed prior session", () => {
+  it("labels an idle-evicted (disposed) prior session as 'expired'", () => {
+    // The disposal tombstone (Phase 1) makes `session-disposed` reachable again;
+    // the short-circuit that suppressed its label is fixed, so "expired" renders.
     expect(
       describeSession(usage({ sessionReused: false, sessionRebuildReason: "session-disposed" })),
-    ).toEqual({ text: "synthetic rebuild", state: "rebuilt" });
+    ).toEqual({ text: "synthetic rebuild · expired", state: "rebuilt" });
+  });
+
+  it("labels a compaction-driven rebuild as 'compacted'", () => {
+    expect(
+      describeSession(usage({ sessionReused: false, sessionRebuildReason: "compacted" })),
+    ).toEqual({ text: "synthetic rebuild · compacted", state: "rebuilt" });
   });
 
   it("falls back to a bare 'synthetic rebuild' when no reason was recorded", () => {

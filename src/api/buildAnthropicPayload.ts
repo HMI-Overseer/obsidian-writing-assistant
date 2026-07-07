@@ -32,7 +32,7 @@ const CONVERSATION_BREAKPOINT_BLOCK_STRIDE = 15;
  *
  * The gate is an allowlist on purpose: emit sampling only for a model known to accept
  * it, and omit for anything current-gen OR unrecognized. An unknown / future id (e.g.
- * the next Opus generation) therefore fails safe — it never 400s on a stale sampling
+ * the next Opus generation) therefore fails safe, it never 400s on a stale sampling
  * param. This is the tactical fix; the model-aware capability layer that subsumes it is
  * tracked in docs/work/issues/anthropic-native-payload-api-drift.md (P0-1).
  */
@@ -43,7 +43,7 @@ const SAMPLING_CAPABLE_PREFIXES = [
   "claude-opus-4-0", // Opus 4.0
   "claude-opus-4-1", // Opus 4.1
   "claude-opus-4-5", // Opus 4.5
-  "claude-opus-4-6", // Opus 4.6 — the last Opus tier to accept sampling params
+  "claude-opus-4-6", // Opus 4.6, the last Opus tier to accept sampling params
 ];
 
 /** Whether `temperature` / `top_p` / `top_k` are safe to send to this Anthropic model. */
@@ -61,7 +61,7 @@ export function anthropicModelSupportsSampling(modelId: string): boolean {
  *
  * Like the sampling gate, this is an allowlist: emit a thinking field only for a model known
  * to accept adaptive thinking, and omit for older families (Haiku 4.5, Sonnet 4.5, legacy
- * 3.x / 4.0 / 4.1 / 4.5 — these use the legacy budget_tokens path, intentionally out of scope
+ * 3.x / 4.0 / 4.1 / 4.5, these use the legacy budget_tokens path, intentionally out of scope
  * here) OR any unrecognized id. An unknown / future id therefore fails safe: no thinking
  * field, never a 400 on a stale reasoning setting. The model-aware capability layer that
  * subsumes this is tracked in docs/work/issues/anthropic-native-payload-api-drift.md (P1-6).
@@ -84,7 +84,7 @@ export function anthropicModelSupportsAdaptiveThinking(modelId: string): boolean
  * Model-id prefixes whose models accept `output_config.effort: "xhigh"`. Introduced
  * with Opus 4.7; Opus 4.6 / Sonnet 4.6 lack it (Anthropic documents unsupported
  * `xhigh` as silently falling back to `high`, but the level selector shouldn't
- * offer what a model doesn't honor — the t3code assumption-as-fact lesson).
+ * offer what a model doesn't honor, the t3code assumption-as-fact lesson).
  * `max` needs no gate of its own: every adaptive-capable model accepts it.
  */
 const XHIGH_EFFORT_CAPABLE_PREFIXES = [
@@ -103,7 +103,7 @@ export function anthropicModelSupportsXhighEffort(modelId: string): boolean {
 /**
  * Model-id prefixes whose models accept a mid-conversation `{role:"system"}`
  * message in the `messages` array (no beta header). Verified against the bundled
- * claude-api reference: this is Claude Opus 4.8 ONLY today — Fable 5, Sonnet 4.6,
+ * claude-api reference: this is Claude Opus 4.8 ONLY today, Fable 5, Sonnet 4.6,
  * and Opus 4.7 are not on the platform-availability list and return HTTP 400
  * (`role 'system' is not supported on this model`). So the gate is an allowlist:
  * any other / unrecognized id falls back to the `<system-reminder>` user-turn
@@ -158,7 +158,7 @@ export type AnthropicContentBlock =
 
 export interface AnthropicMessage {
   // `system` is the mid-conversation operator channel: a {role:"system"} message
-  // placed after the cached history (Opus 4.8+ only — see
+  // placed after the cached history (Opus 4.8+ only, see
   // anthropicModelSupportsSystemRole). It carries the per-mode tail without
   // touching the cached prefix.
   role: "user" | "assistant" | "system";
@@ -192,7 +192,7 @@ export function buildAnthropicMessages(
   for (const turn of request.messages) {
     if (turn.role === "assistant" && turn.toolCalls && turn.toolCalls.length > 0) {
       // Assistant turn with tool calls: use content block array. Captured
-      // thinking blocks come FIRST and unmodified — with thinking enabled on a
+      // thinking blocks come FIRST and unmodified, with thinking enabled on a
       // tool-use turn, Anthropic requires them echoed back exactly as received
       // (signatures included; text may be empty under display "omitted").
       const blocks: AnthropicContentBlock[] = [];
@@ -285,7 +285,7 @@ export function buildAnthropicMessages(
   // Per-mode wording rides the message tail so the cached `system` block stays
   // mode-invariant (Layer 1, prompt-cache design §6.1.3). On Opus 4.8+ it's a
   // non-spoofable {role:"system"} message appended after the cached history (it
-  // must follow a user turn and be the last entry — both hold here); older
+  // must follow a user turn and be the last entry, both hold here); older
   // models 400 on a system message, so it falls back to a <system-reminder>
   // block in the last user turn. Either way it sits after the breakpoint, so it
   // never invalidates the cached prefix.
@@ -468,7 +468,7 @@ function ensureAnthropicUserBlocks(message: AnthropicMessage): AnthropicContentB
  *
  * The newest breakpoint lands on the last *stable* turn (everything before the
  * latest user turn and any trailing modeTail system message), so the per-turn
- * volatile tail — note/doc/RAG context and the modeTail — stays after it and
+ * volatile tail, note/doc/RAG context and the modeTail, stays after it and
  * never voids the cached prefix. Stable string turns are first normalized to
  * single-block arrays so an anchored turn renders identically whether or not it
  * carries the breakpoint in a given request (the prefix-stability invariant);

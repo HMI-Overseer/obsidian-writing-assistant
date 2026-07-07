@@ -255,7 +255,7 @@ describe("applyVaultOpBatch", () => {
   });
 });
 
-describe("applyVaultOpBatch — folder ops", () => {
+describe("applyVaultOpBatch, folder ops", () => {
   it("moves a folder and its contents, recording a symmetric inverse", async () => {
     const vault = makeVault();
     vault.folders.add("Drafts/Act II");

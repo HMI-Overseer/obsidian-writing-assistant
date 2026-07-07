@@ -6,12 +6,15 @@ import { PRICING_AS_OF } from "../../api/pricing";
  * Short, human labels for each cold-rebuild cause, shown next to "synthetic
  * rebuild" in the Claude Code usage tooltip. The interesting measurement signal
  * is a config-driven rebuild (a mode switch changing the prompt / tools), which
- * the prompt-cache work targets; a first-turn mint ("no-session") and a disposed
- * prior session read as expected, not regressions, and are handled separately.
+ * the prompt-cache work targets; a first-turn mint ("no-session") reads as
+ * expected and is handled separately. Idle eviction ("expired") and compaction
+ * ("compacted") reach here via the registry's disposal tombstone
+ * (cold-rebuild-fidelity §6.2).
  */
 const SESSION_REBUILD_LABELS: Record<SessionRebuildReason, string> = {
   "no-session": "new",
   "session-disposed": "expired",
+  compacted: "compacted",
   "provider-mismatch": "provider changed",
   "model-changed": "model changed",
   "system-prompt-changed": "prompt changed",
@@ -26,7 +29,7 @@ const SESSION_REBUILD_LABELS: Record<SessionRebuildReason, string> = {
 /**
  * Whether the provider bills per token (Anthropic, OpenAI, Claude Code) versus a
  * free/local model (LM Studio). Used to tell "metered model with no price table
- * entry" apart from "free local model" — the former surfaces "price unavailable",
+ * entry" apart from "free local model", the former surfaces "price unavailable",
  * the latter shows nothing.
  */
 function isMeteredProvider(provider: ProviderOption | undefined): boolean {
@@ -77,7 +80,7 @@ export function buildHeadline(
  * The cache figures shown on the badge face for cache-capable providers
  * (Anthropic, Claude Code): the read total, plus the write total when one was
  * created. Tinted by whether the turn HIT the cache (read > 0, green) or MISSED
- * it (read === 0, amber) — a miss means the prefix was reprocessed from scratch.
+ * it (read === 0, amber), a miss means the prefix was reprocessed from scratch.
  * Null when the provider reports no cache fields (OpenAI, LM Studio). Pure,
  * unit-tested.
  */
@@ -130,9 +133,9 @@ export function composeUsageTooltip(
     usage.estimatedCostUsd !== undefined &&
     usage.estimatedCostUsd > 0
   ) {
-    lines.push(`~${formatCost(usage.estimatedCostUsd)} — estimated, pricing as of ${PRICING_AS_OF}`);
+    lines.push(`~${formatCost(usage.estimatedCostUsd)}, estimated, pricing as of ${PRICING_AS_OF}`);
   } else if (usage.estimatedCostUsd === undefined && isMeteredProvider(provider)) {
-    lines.push("Price unavailable — no local pricing for this model");
+    lines.push("Price unavailable, no local pricing for this model");
   }
 
   if (modelId && provider && provider !== "lmstudio") {
@@ -213,7 +216,11 @@ export function describeSession(
   if (usage.sessionReused) return { text: "session reused", state: "reused" };
   const reason = usage.sessionRebuildReason;
   if (reason === "no-session") return { text: "session started", state: "started" };
-  if (reason === undefined || reason === "session-disposed") {
+  // Only a genuinely reason-less rebuild (a hand-built / older persisted record)
+  // shows the bare label; every real cause, including an idle-evicted
+  // `session-disposed` ("expired") and a `compacted` session, names itself now that
+  // the disposal tombstone makes those reachable (cold-rebuild-fidelity §6.2).
+  if (reason === undefined) {
     return { text: "synthetic rebuild", state: "rebuilt" };
   }
   return { text: `synthetic rebuild · ${SESSION_REBUILD_LABELS[reason]}`, state: "rebuilt" };

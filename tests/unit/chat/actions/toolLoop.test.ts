@@ -354,7 +354,7 @@ describe("runToolLoop deferred-mutation drain", () => {
       { app, liveReview },
     );
 
-    // Streamed exactly twice: the batch, then the final "Done." — rounds for b and c
+    // Streamed exactly twice: the batch, then the final "Done.", rounds for b and c
     // were replayed from the buffer with no stream.
     expect(client.stream).toHaveBeenCalledTimes(2);
     // Every op reached the gate, one per round, in emission order.
@@ -364,7 +364,7 @@ describe("runToolLoop deferred-mutation drain", () => {
       "vo-b",
       "vo-c",
     ]);
-    // Every op recorded a timeline step — none silently lost.
+    // Every op recorded a timeline step, none silently lost.
     const recorded = (cb.onStepRecorded as ReturnType<typeof vi.fn>).mock.calls.map(
       (cc) => cc[0].toolCallId,
     );
@@ -535,14 +535,14 @@ describe("runToolLoop callback-sequence characterization", () => {
     );
 
     expect(seq).toEqual([
-      // Round 0 — read-only round: reasoning committed, then the read-only branch.
+      // Round 0, read-only round: reasoning committed, then the read-only branch.
       "rdelta:Let me look around. ",
       "rrf:true:0",
       `status:${vaultName}`,
       `recorded:${vaultName}:vr-0`,
       `recorded:${THINK_TOOL_NAME}:th-0`,
       "newRound",
-      // Round 1 — mutating round: answer-track reasoning discarded. The mutation cap
+      // Round 1, mutating round: answer-track reasoning discarded. The mutation cap
       // kept vr1 + vo1 and deferred the trailing edit (ed1), so only the read-only and
       // vault-op channels fire their synchronous prefixes in array order (read-only
       // status, then vault-op status+record), and the post-await processing records the
@@ -555,14 +555,14 @@ describe("runToolLoop callback-sequence characterization", () => {
       `recorded:${vaultName}:vr-1`,
       "result:vo-1:ok",
       "newRound",
-      // Round 2 — DRAIN of the deferred edit (ed1): no model stream (no rdelta), the
+      // Round 2, DRAIN of the deferred edit (ed1): no model stream (no rdelta), the
       // mutating branch discards reasoning, and the edit channel gates the buffered op.
       "rrf:false:2",
       `status:${editName}`,
       `recorded:${editName}:ed-1`,
       "result:ed-1:ok",
       "newRound",
-      // Round 3 — final answer: committed false, loop breaks, single bubble flush.
+      // Round 3, final answer: committed false, loop breaks, single bubble flush.
       "rdelta:All done.",
       "rrf:false:3",
       "delta:Now I'll make changes.\n\nAll done.",

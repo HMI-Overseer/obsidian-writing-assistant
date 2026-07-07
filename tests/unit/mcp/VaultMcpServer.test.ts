@@ -47,7 +47,7 @@ describe("VaultMcpServer", () => {
 
   it("rejects a same-length but wrong token (constant-time content check is load-bearing)", async () => {
     // Same length as the real token, so the length short-circuit can't be what
-    // rejects it — only the timingSafeEqual content comparison can.
+    // rejects it, only the timingSafeEqual content comparison can.
     const last = handle.token.slice(-1);
     const sameLengthWrong = handle.token.slice(0, -1) + (last === "0" ? "1" : "0");
     expect(sameLengthWrong.length).toBe(handle.token.length);

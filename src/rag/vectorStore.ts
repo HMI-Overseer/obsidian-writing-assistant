@@ -165,7 +165,7 @@ export class VectorStore {
   /**
    * Deserialize a stored index into this store. Returns false (so the caller
    * discards and rebuilds) if the model ID doesn't match or the index is
-   * dimensionally inconsistent — e.g. one written before vector-count validation
+   * dimensionally inconsistent, e.g. one written before vector-count validation
    * existed, holding empty/short vectors that would silently under-retrieve.
    * Decoded and validated up front so a rejected load leaves the store untouched.
    */

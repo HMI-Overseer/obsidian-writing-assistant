@@ -3,7 +3,7 @@
      Footer control reading the current approval posture ("Ask before edits" /
      "Edit automatically"), sitting in the right action cluster. Same visual
      language as the reasoning pill: low-chrome rounded pill with a chevron
-     that flips while its menu is open. Always accent-tinted — the posture is
+     that flips while its menu is open. Always accent-tinted, the posture is
      always an explicit, meaningful state, and the accent itself follows the
      posture via --lmsa-mode-accent. */
 

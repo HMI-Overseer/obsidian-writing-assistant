@@ -110,7 +110,7 @@ describe("buildAnthropicMessages", () => {
     ]);
   });
 
-  // Default (5-min) TTL is the wire default — omit `ttl` entirely; `ttl: "default"` is an
+  // Default (5-min) TTL is the wire default, omit `ttl` entirely; `ttl: "default"` is an
   // internal label, not a valid wire value.
   test("with cache enabled + default TTL omits ttl from the cache_control block", () => {
     const cache: AnthropicCacheSettings = { enabled: true, ttl: "default" };
@@ -330,7 +330,7 @@ describe("buildAnthropicHeaders", () => {
 
   // The 1-hour extended cache TTL is GA and needs NO beta header (verified against the
   // claude-api skill + docs/reference/external/anthropic-api.md). The legacy
-  // prompt-caching-2024-07-31 header must never be sent — the TTL rides on the
+  // prompt-caching-2024-07-31 header must never be sent, the TTL rides on the
   // cache_control block instead (see the buildAnthropicMessages tests above), so the
   // headers no longer depend on cache settings at all.
   test("never sends a prompt-caching beta header (1h TTL is GA, carried on the block)", () => {
@@ -673,7 +673,7 @@ describe("anthropicModelSupportsSystemRole", () => {
   );
 
   // Everything else 400s on a system message and must take the <system-reminder>
-  // fallback — including current-gen models that are otherwise capable, and any
+  // fallback, including current-gen models that are otherwise capable, and any
   // unknown / future id (fail safe to the fallback, never a 400).
   test.each([
     "claude-opus-4-7",
@@ -735,7 +735,7 @@ describe("buildAnthropicMessages conversation cache breakpoint", () => {
     expect(typeof messages[3].content).toBe("string");
 
     // System breakpoint still present: tools + system cache, conversation caches
-    // separately — 2 breakpoints total, within the 4-per-request budget.
+    // separately, 2 breakpoints total, within the 4-per-request budget.
     expect(Array.isArray(system)).toBe(true);
     expect((system as { cache_control?: unknown }[])[0].cache_control).toBeDefined();
   });

@@ -93,7 +93,7 @@ export class VaultMcpServer {
    * Constant-time bearer-token check. The loopback bind + per-session ephemeral
    * token already make a timing attack impractical; comparing in constant time is
    * defense in depth so the check itself leaks nothing about the token. The length
-   * guard short-circuits (lengths differ ⇒ reject) — the token length is fixed and
+   * guard short-circuits (lengths differ ⇒ reject), the token length is fixed and
    * not secret, and `timingSafeEqual` requires equal-length buffers.
    */
   private authorized(header: string | undefined): boolean {

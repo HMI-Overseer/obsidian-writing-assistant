@@ -239,4 +239,21 @@ describe("decideReuse", () => {
       reason: "system-prompt-changed",
     });
   });
+
+  it("attributes a rebuild to a prior disposal reason (tombstone) instead of no-session", () => {
+    // After idle eviction / compaction the session is gone, so decideReuse sees no
+    // held session. A recorded disposal reason overrides the neutral "no-session".
+    expect(decideReuse(undefined, live, cfg(), "session-disposed")).toEqual({
+      reuse: false,
+      reason: "session-disposed",
+    });
+    expect(decideReuse(undefined, live, cfg(), "compacted")).toEqual({
+      reuse: false,
+      reason: "compacted",
+    });
+  });
+
+  it("keeps no-session when there is neither a held session nor a tombstone", () => {
+    expect(decideReuse(undefined, live, cfg())).toEqual({ reuse: false, reason: "no-session" });
+  });
 });

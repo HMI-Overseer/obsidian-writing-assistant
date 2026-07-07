@@ -93,7 +93,7 @@ describe("estimateCost", () => {
 
   test("prices the current Opus family (4.6/4.7/4.8) at $5/$25, not the legacy $15/$75", () => {
     const usage = makeUsage({ inputTokens: 1_000_000, outputTokens: 1_000_000 });
-    // $5/M input + $25/M output = $30 — NOT the $90 the stale "claude-opus-4" prefix charged.
+    // $5/M input + $25/M output = $30, NOT the $90 the stale "claude-opus-4" prefix charged.
     expect(estimateCost("claude-opus-4-8", usage)).toBeCloseTo(30, 4);
     expect(estimateCost("claude-opus-4-7", usage)).toBeCloseTo(30, 4);
     expect(estimateCost("claude-opus-4-6", usage)).toBeCloseTo(30, 4);

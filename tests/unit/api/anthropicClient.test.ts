@@ -214,7 +214,7 @@ describe("AnthropicClient.complete Layer-2 block tolerance", () => {
   // The native tool-search turn (Layer 2, ADR-0009) interleaves server_tool_use and
   // tool_search_tool_result blocks with the model's text and the client tool_use it
   // ultimately emits. The parser handles only text + tool_use, so the server-tool blocks
-  // pass through harmlessly — text and the client tool_use must survive intact.
+  // pass through harmlessly, text and the client tool_use must survive intact.
   test("ignores server_tool_use / tool_search_tool_result blocks, keeps text + tool_use", async () => {
     mockRequest.mockResolvedValueOnce({
       body: JSON.stringify({

@@ -82,7 +82,7 @@ describe("chunkDocument", () => {
 
   test("does not relabel a short section's text under the previous section's heading", () => {
     // Regression (P1-10): a sub-50-char section must not glue onto the previous
-    // chunk and inherit its heading — that would index Scene 3 prose as Scene 2,
+    // chunk and inherit its heading, that would index Scene 3 prose as Scene 2,
     // a continuity error in the exact tool meant to prevent it.
     const content = [
       "# Chapter 1",

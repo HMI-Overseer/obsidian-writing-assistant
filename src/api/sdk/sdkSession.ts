@@ -1,4 +1,4 @@
-import type { ReasoningLevel } from "../../shared/types";
+import type { ReasoningLevel, SessionRebuildReason } from "../../shared/types";
 import type { FlagSettableEffort } from "../../shared/reasoning";
 import { createAbortError } from "../httpTransport";
 import { extractClaudeCodeContextTokens, type ClaudeCodeResultUsage } from "../claudeCodeProcess";
@@ -24,7 +24,11 @@ import type { ModelInfo, Options, Query, SDKMessage, SDKUserMessage } from "./cl
  * caches incrementally (the win one-shot processes can't give,
  * `docs/reference/architecture/claude-code-provider.md`). The session lives only in
  * process memory (`persistSession: false`), never on disk, so it's zero-footprint
- * and a process restart simply loses it → the next turn cold-rebuilds.
+ * and a process restart simply loses it → the next turn cold-rebuilds. The
+ * zero-footprint stance is superseded as a direction (Model A′: on-disk persistence
+ * plus a disk-resume recovery tier, decided 2026-07-07, unimplemented, see
+ * `docs/work/issues/claude-code-cold-rebuild-fidelity.md`); until that lands, this
+ * comment describes actual behavior.
  *
  * The plugin transcript stays authoritative; a session is a disposable cache reused
  * only when {@link isSessionUsable} confirms the live transcript cleanly extends what
@@ -376,6 +380,15 @@ export interface SessionTurnRequest {
  */
 export class SdkSessionRegistry {
   private readonly sessions = new Map<string, SdkSession>();
+  /**
+   * Disposal tombstones: conversation id → why its last session went away. Idle
+   * eviction and compaction *delete* the registry entry, so the next turn would
+   * otherwise decide `no-session` and the badge would read a misleading "session
+   * started". The tombstone lets {@link decideReuse} attribute the rebuild to its
+   * real cause instead (cold-rebuild-fidelity §6.2). One-shot: cleared the moment a
+   * fresh session is minted, so a tombstone present always implies no live session.
+   */
+  private readonly tombstones = new Map<string, SessionRebuildReason>();
   private sweepTimer: ReturnType<typeof setInterval> | null = null;
 
   constructor(private readonly idleMs: number = DEFAULT_IDLE_MS) {}
@@ -393,7 +406,7 @@ export class SdkSessionRegistry {
   async *runTurn(conversationId: string, req: SessionTurnRequest): AsyncGenerator<string> {
     const existing = this.sessions.get(conversationId);
     const effort = req.effort ?? null;
-    let decision = decideReuse(existing, req.turns, req.cfg);
+    let decision = decideReuse(existing, req.turns, req.cfg, this.tombstones.get(conversationId));
 
     // Effort is compared outside the config fingerprint: a flippable change is
     // applied to the live session (one control request, context retained); a
@@ -423,6 +436,9 @@ export class SdkSessionRegistry {
       existing?.dispose();
       session = new SdkSession(req.buildOptions, mintMeta(req.cfg), effort);
       this.sessions.set(conversationId, session);
+      // The tombstone has served its purpose (attributing this rebuild); a live
+      // session now owns the conversation, so drop it before it goes stale.
+      this.tombstones.delete(conversationId);
       prompt = req.fullPrompt;
 
       // Mint-time harvest (§3.1 layer 2): ask the fresh process for its model
@@ -447,11 +463,14 @@ export class SdkSessionRegistry {
       });
     } catch (error) {
       // A clean interrupt preserves the live process (its context now covers the
-      // partial reply), keep it for reuse. Any other error (SDK failure, unexpected
-      // end, hard abort) leaves the session tail indeterminate, so dispose it and let
-      // the next turn cold-rebuild from the authoritative transcript.
-      if (!session.wasInterruptedCleanly) {
-        this.disposeSession(conversationId, session);
+      // partial reply), so keep it for reuse. The exception is a mid-turn
+      // compaction, which desynced it from the authoritative transcript and must be
+      // disposed on every exit path (the post-turn `needsInvalidation` check below is
+      // unreachable when the turn throws, §6.7.1). Any other error (SDK failure,
+      // unexpected end, hard abort) leaves the tail indeterminate, so dispose it and
+      // cold-rebuild next turn.
+      if (!session.wasInterruptedCleanly || session.needsInvalidation) {
+        this.disposeSession(conversationId, session, session.needsInvalidation ? "compacted" : undefined);
       }
       throw error;
     }
@@ -459,15 +478,25 @@ export class SdkSessionRegistry {
     // Mid-turn compaction replaced the session's context with a summary; the
     // transcript stays authoritative, so invalidate now and cold-rebuild next turn.
     if (session.needsInvalidation) {
-      this.disposeSession(conversationId, session);
+      this.disposeSession(conversationId, session, "compacted");
     }
   }
 
-  /** Disposes a session and drops it from the registry (only if still the live one). */
-  private disposeSession(conversationId: string, session: SdkSession): void {
+  /**
+   * Disposes a session and drops it from the registry (only if still the live one).
+   * `reason` records a disposal tombstone so the next turn's rebuild is attributed to
+   * its cause rather than the neutral `no-session` (compaction here; idle eviction in
+   * {@link evictIdle}). A plain error passes no reason, matching today's silent drop.
+   */
+  private disposeSession(
+    conversationId: string,
+    session: SdkSession,
+    reason?: SessionRebuildReason,
+  ): void {
     session.dispose();
     if (this.sessions.get(conversationId) === session) {
       this.sessions.delete(conversationId);
+      if (reason) this.tombstones.set(conversationId, reason);
     }
   }
 
@@ -475,6 +504,7 @@ export class SdkSessionRegistry {
   disposeAll(): void {
     for (const session of this.sessions.values()) session.dispose();
     this.sessions.clear();
+    this.tombstones.clear();
     this.stopSweeping();
   }
 
@@ -489,6 +519,10 @@ export class SdkSessionRegistry {
       if (!session.isBusy && now - session.lastUsedAt > this.idleMs) {
         session.dispose();
         this.sessions.delete(id);
+        // Tombstone the eviction so the next turn's rebuild reads "expired", not the
+        // neutral "session started" (§6.2). The resume tier (phase 4) will later fold
+        // this into a "session resumed" outcome.
+        this.tombstones.set(id, "session-disposed");
       }
     }
     if (this.sessions.size === 0) this.stopSweeping();

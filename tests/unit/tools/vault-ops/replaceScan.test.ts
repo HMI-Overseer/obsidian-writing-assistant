@@ -46,13 +46,13 @@ describe("applyReplacement", () => {
   test("wholeWord still matches a short token at a string boundary (the rename motive)", () => {
     // Renaming a short character name (Sael → Sael the Younger) must hit the standalone
     // mentions but never the ones embedded in a longer word.
-    const { content, count } = applyReplacement("Sael spoke. Saelith watched. — Sael", {
+    const { content, count } = applyReplacement("Sael spoke. Saelith watched. Sael", {
       search: "Sael",
       replace: "Sael the Younger",
       wholeWord: true,
     });
     expect(count).toBe(2);
-    expect(content).toBe("Sael the Younger spoke. Saelith watched. — Sael the Younger");
+    expect(content).toBe("Sael the Younger spoke. Saelith watched. Sael the Younger");
   });
 
   test("empty replace deletes the term", () => {

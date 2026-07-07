@@ -72,7 +72,7 @@ describe("composeUsageTooltip", () => {
       [
         "12,300 in · 456 out",
         "8,100 cache read · 2,000 cache write",
-        `~$0.050 — estimated, pricing as of ${PRICING_AS_OF}`,
+        `~$0.050, estimated, pricing as of ${PRICING_AS_OF}`,
         "model: claude-opus-4-8",
       ].join("\n"),
     );
@@ -101,7 +101,7 @@ describe("composeUsageTooltip", () => {
 
   it("flags a metered model with no price entry", () => {
     const tip = composeUsageTooltip(usage(), "gpt-4o", "openai");
-    expect(tip).toContain("Price unavailable — no local pricing for this model");
+    expect(tip).toContain("Price unavailable, no local pricing for this model");
     expect(tip).toContain("model: gpt-4o");
   });
 });

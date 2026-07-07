@@ -27,14 +27,14 @@ function makeApp(content: string): App {
   } as unknown as App;
 }
 
-/** Returns one valid vector per input — a healthy embedding provider. */
+/** Returns one valid vector per input, a healthy embedding provider. */
 const healthyClient: EmbeddingClient = {
   async embed(texts) {
     return { vectors: texts.map(() => [1, 2, 3]), dimensions: 3 };
   },
 };
 
-/** Drops the last vector — simulates a truncated/partial provider response. */
+/** Drops the last vector, simulates a truncated/partial provider response. */
 const truncatingClient: EmbeddingClient = {
   async embed(texts) {
     const vectors = texts.slice(0, Math.max(0, texts.length - 1)).map(() => [1, 2, 3]);
@@ -144,7 +144,7 @@ const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
 
 /**
  * Drain the microtask queue several turns. Used under fake timers where
- * `flush()`'s real `setTimeout(0)` never fires — releasing a deferred embed
+ * `flush()`'s real `setTimeout(0)` never fires, releasing a deferred embed
  * advances an `indexFile` chain (read → embed → store → dirty re-run) purely
  * through microtasks.
  */
@@ -391,7 +391,7 @@ describe("VaultIndexer modify-watcher debounce and in-flight guard", () => {
       (file as unknown as { stat: { mtime: number } }).stat.mtime = 2;
       handlers.modify(file);
       await vi.advanceTimersByTimeAsync(MODIFY_DEBOUNCE_MS + 1);
-      expect(embed.pending.length).toBe(1); // still only A — B was marked dirty
+      expect(embed.pending.length).toBe(1); // still only A, B was marked dirty
 
       // Release embeds newest-first: the order that lets a stale run win when
       // unguarded. Guarded, A stores v1, then the dirty re-run reads and stores v2.

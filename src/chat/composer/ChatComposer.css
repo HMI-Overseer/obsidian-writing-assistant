@@ -15,10 +15,10 @@
   /* ── Context chips ───────────────────────────────────────────────────────── */
 
   /* This row sits at the TOP of the bottom-anchored composer panel, so anything that grows
-     it pushes the panel's top edge — and the whole row — upward. A chip pill is taller than
+     it pushes the panel's top edge, and the whole row, upward. A chip pill is taller than
      the bare + button, so we hold a constant min-height of one chip row: attaching or
      removing the first chip then never reflows the row, and the composer never jolts upward.
-     No bottom padding — that was only cosmetic breathing room and just made the row taller.
+     No bottom padding, that was only cosmetic breathing room and just made the row taller.
      30px ≈ one chip (~28px); border-box so min-height is the outer box. */
   .lmsa-chat-composer-chips {
     @apply lmsa-flex lmsa-flex-wrap lmsa-items-center lmsa-gap-1.5 lmsa-px-1;

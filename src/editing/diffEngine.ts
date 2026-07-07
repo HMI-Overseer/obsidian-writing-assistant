@@ -142,8 +142,8 @@ function resolveOneBlock(
   // a toolName and legitimately use an empty search to mean "insert at top" (e.g.
   // frontmatter into a note that has none), so they pass through; a plain prose edit
   // with no anchor is the model dropping its search, so return a clean no-match it can
-  // self-correct from. This lives in the engine so every entry — the regex-parse path
-  // and the finalize path included — is covered, mirroring the in-loop and tool-preflight
+  // self-correct from. This lives in the engine so every entry, the regex-parse path
+  // and the finalize path included, is covered, mirroring the in-loop and tool-preflight
   // guards rather than relying on them.
   if (block.toolName === undefined && searchText.trim().length === 0) {
     return unresolvedEdit(block, false);

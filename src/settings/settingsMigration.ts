@@ -207,7 +207,7 @@ export function normalizeProviderSettingsMap(
 }
 
 // Derived from the descriptor registry, so adding a provider (which already
-// requires a PROVIDER_DESCRIPTORS entry) extends this automatically — no second
+// requires a PROVIDER_DESCRIPTORS entry) extends this automatically, no second
 // hardcoded list to keep in sync.
 const VALID_PROVIDERS = new Set<string>(Object.keys(PROVIDER_DESCRIPTORS));
 

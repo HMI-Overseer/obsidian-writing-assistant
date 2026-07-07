@@ -4,7 +4,7 @@ import type { NoteAttachment } from "../../../src/shared/types";
 
 type SnapshotApp = Parameters<typeof snapshotNoteAttachments>[0];
 
-describe("snapshotNoteAttachments — external (inline content) items", () => {
+describe("snapshotNoteAttachments, external (inline content) items", () => {
   it("uses inline content without touching the vault", async () => {
     const app = {
       workspace: { getActiveFile: () => null },

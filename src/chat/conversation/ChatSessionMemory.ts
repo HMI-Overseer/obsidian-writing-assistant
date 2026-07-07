@@ -149,7 +149,7 @@ export class ChatSessionMemory {
    * onto the history unchanged. Used when a regeneration is aborted before any
    * text streams: the original content and its full version history must survive
    * exactly. Unlike {@link finalizeRegeneration} (which always appends the new
-   * content as a fresh version), this records no spurious duplicate version — a
+   * content as a fresh version), this records no spurious duplicate version, a
    * stopped attempt produced nothing to version.
    */
   restoreRegeneration(oldMessage: ConversationMessage): void {

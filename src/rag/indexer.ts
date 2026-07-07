@@ -249,7 +249,7 @@ export class VaultIndexer {
    * progress for this path, mark it dirty and re-run once with the latest
    * content when that run finishes, rather than starting an overlapping run
    * whose stale embed could resolve last, win the store, and stamp the latest
-   * mtime — poisoning the vector until a model change forces a re-index.
+   * mtime, poisoning the vector until a model change forces a re-index.
    */
   private async indexFileGuarded(file: TFile): Promise<void> {
     if (this.destroyed) return;

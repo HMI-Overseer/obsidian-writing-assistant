@@ -3,6 +3,7 @@ import type WritingAssistantChat from "../../main";
 import type { AgenticStep, ProviderOption, RagSourceRef } from "../../shared/types";
 import type { UsageResult } from "../../api/usageTypes";
 import type { BubbleRefs } from "../types";
+import { GENERATION_STOPPED_LABEL } from "../types";
 import { makeMessage } from "../conversation/conversationUtils";
 import type { ChatSessionStore } from "../conversation/ChatSessionStore";
 import type { ChatTranscript } from "../messages/ChatTranscript";
@@ -108,7 +109,22 @@ export async function finalizeAbortedResponse(
       await transcript.renderBubbleContent(bubble, response);
     }
   } else {
-    transcript.renderPlainTextContent(bubble, "Generation stopped.");
+    // A claudecode turn ALWAYS persists its aborted assistant message, even with
+    // zero text: the live session banked an empty assistant turn in its watermark,
+    // so the transcript must carry a matching empty turn or the next turn cold-
+    // rebuilds with a mislabeled `turn-count` reason (cold-rebuild-fidelity §6.1 /
+    // question 7). Partial steps ride it for replay fidelity. Other providers keep
+    // today's behavior (no empty turn appended, so their histories don't grow one).
+    if (provider === "claudecode") {
+      const assistantMessage = makeMessage("assistant", "");
+      attachUsageToMessage(assistantMessage, modelId, provider);
+      if (ragSources) assistantMessage.ragSources = ragSources;
+      if (rewrittenQuery) assistantMessage.rewrittenQuery = rewrittenQuery;
+      if (agenticSteps?.length) assistantMessage.agenticSteps = agenticSteps;
+      store.appendMessage(assistantMessage);
+      transcript.registerBubble(assistantMessage.id, bubble);
+    }
+    transcript.renderPlainTextContent(bubble, GENERATION_STOPPED_LABEL);
     bubble.bodyEl.addClass("is-muted");
   }
 }

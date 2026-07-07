@@ -45,7 +45,7 @@ describe("ChatSessionMemory.updateMessageContent", () => {
 describe("ChatSessionMemory.restoreRegeneration", () => {
   // Regression for the "regenerate then immediately Stop loses the original
   // message + its version history" data-loss bug. regenerateMessage pops the
-  // original up front; an empty-response abort must put it back EXACTLY — same
+  // original up front; an empty-response abort must put it back EXACTLY, same
   // object, same versions, no spurious duplicate version appended.
   test("re-appends the popped message with its version history untouched", () => {
     const memory = new ChatSessionMemory();

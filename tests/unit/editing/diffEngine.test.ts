@@ -184,7 +184,7 @@ describe("resolveEdits, duplicate-occurrence anchoring (symptom C)", () => {
 describe("resolveEdits, empty search guard (P1-8)", () => {
   it("returns no match for an empty search instead of a phantom exact at offset 0", () => {
     // indexOf("") === 0, so without the guard an empty search resolves as a confident
-    // exact match at the top of the file and prepends replaceText — a silent corruption.
+    // exact match at the top of the file and prepends replaceText, a silent corruption.
     const r = resolveOne("Some real document content.", "");
     expect(r.matchType).toBe("none");
     expect(r.confidence).toBe(0);

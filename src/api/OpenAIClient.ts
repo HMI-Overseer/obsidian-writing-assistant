@@ -103,7 +103,7 @@ export class OpenAIClient implements ChatClient {
     const stopReasonPromise = new Promise<StopReason>((r) => { resolveStopReason = r; });
 
     // Always observe events (not just on tool requests) so streamed usage is
-    // captured for plain chat too — the terminal include_usage chunk carries the
+    // captured for plain chat too, the terminal include_usage chunk carries the
     // final token counts even when no tools are involved.
     const onEvent = (json: unknown): void => {
       const record = json as Record<string, unknown>;

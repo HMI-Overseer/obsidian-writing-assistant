@@ -694,7 +694,7 @@ describe("get_backlinks", () => {
 });
 
 // ---------------------------------------------------------------------------
-// get_outgoing_links (M3 — the forward-link mirror of get_backlinks)
+// get_outgoing_links (M3, the forward-link mirror of get_backlinks)
 // ---------------------------------------------------------------------------
 
 describe("get_outgoing_links", () => {

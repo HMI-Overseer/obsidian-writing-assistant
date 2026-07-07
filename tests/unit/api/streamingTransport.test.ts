@@ -63,7 +63,7 @@ async function collect(gen: AsyncGenerator<string>): Promise<string[]> {
 }
 
 // --------------------------------------------------------------------------
-// streamFetch — the fetch()/ReadableStream SSE parser
+// streamFetch, the fetch()/ReadableStream SSE parser
 // --------------------------------------------------------------------------
 
 /** A hand-rolled reader that replays string chunks as UTF-8 Uint8Arrays. */
@@ -255,7 +255,7 @@ describe("streamFetch (SSE parser)", () => {
 });
 
 // --------------------------------------------------------------------------
-// streamNode — the Node http/https SSE parser (used when bypassCors is on)
+// streamNode, the Node http/https SSE parser (used when bypassCors is on)
 // --------------------------------------------------------------------------
 
 /** Build a mock IncomingMessage-like response emitter. */

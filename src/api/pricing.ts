@@ -56,7 +56,7 @@ const SONNET_4: ModelPricing = { inputPerMillionTokens: 3, outputPerMillionToken
  * falls to `null` (honestly unknown) rather than inheriting a neighbour's rate.
  */
 const ANTHROPIC_PRICING: [prefix: string, pricing: ModelPricing][] = [
-  // Current frontier — refreshed from pricingData.json each release.
+  // Current frontier, refreshed from pricingData.json each release.
   ["claude-opus-4-8", fromFeed("claude-opus-4-8")],
   ["claude-opus-4-7", fromFeed("claude-opus-4-7")],
   ["claude-opus-4-6", fromFeed("claude-opus-4-6")],
@@ -65,9 +65,9 @@ const ANTHROPIC_PRICING: [prefix: string, pricing: ModelPricing][] = [
   ["claude-fable-5", fromFeed("claude-fable-5")],
   // Mythos 5 (Project Glasswing only; absent from the public feed) mirrors Fable 5.
   ["claude-mythos-5", fromFeed("claude-fable-5")],
-  // Opus 4.5 — active but stable, kept off the refreshed set.
+  // Opus 4.5, active but stable, kept off the refreshed set.
   ["claude-opus-4-5", OPUS_4_5],
-  // Legacy Opus 4.0 / 4.1 — $15/$75, before the 4.5 price drop. Longest-prefix
+  // Legacy Opus 4.0 / 4.1, $15/$75, before the 4.5 price drop. Longest-prefix
   // match means the 4.5+ rows above win; the dated 4.0 ID has no shared prefix
   // with its alias, so it is listed explicitly.
   ["claude-opus-4-1", OPUS_LEGACY],

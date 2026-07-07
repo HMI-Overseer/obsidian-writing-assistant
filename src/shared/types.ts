@@ -181,6 +181,7 @@ export interface CustomCommand {
 export type SessionRebuildReason =
   | "no-session"
   | "session-disposed"
+  | "compacted"
   | "provider-mismatch"
   | "model-changed"
   | "system-prompt-changed"

@@ -113,7 +113,7 @@
 
   /* Animated expansion: the wrap is a one-track grid whose row grows from
      0fr to 1fr, so height animates without knowing the content size. The clip
-     layer carries overflow:hidden and nothing else — padding or a border here
+     layer carries overflow:hidden and nothing else, padding or a border here
      would set a minimum track size and leave a visible strip when collapsed. */
   .lmsa-provider-card-bodywrap {
     @apply lmsa-grid;

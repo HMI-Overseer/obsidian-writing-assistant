@@ -80,7 +80,7 @@ describe("getDraggedVaultMarkdownFiles", () => {
   });
 });
 
-describe("getDroppedVaultMarkdownFiles — dataTransfer fallback", () => {
+describe("getDroppedVaultMarkdownFiles, dataTransfer fallback", () => {
   it("prefers the drag manager when it is populated", () => {
     const file = tfile("Notes/idea.md");
     const app = makeApp({ draggable: { file }, files: [file] });

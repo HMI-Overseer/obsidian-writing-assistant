@@ -26,7 +26,7 @@ export interface EmbeddingClient {
  * exactly one vector per input, each a non-empty `number[]` of uniform length.
  *
  * A provider that truncates its response (fewer vectors than inputs) or returns
- * an empty/short vector otherwise poisons the index — the missing slot is stored
+ * an empty/short vector otherwise poisons the index, the missing slot is stored
  * as an `undefined`/empty vector that crashes `cosineSimilarity` at query time
  * (laundered into a misleading "could not reach the model" notice) and silently
  * under-retrieves after a reload. Throwing here, at the boundary, keeps holes out

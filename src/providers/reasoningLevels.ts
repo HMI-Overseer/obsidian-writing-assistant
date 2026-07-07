@@ -47,7 +47,7 @@ export function resolveReasoningLevels(
  * emitted request can never disagree): adaptive-capable models take effort
  * tiers up to `max`, with `xhigh` only where the API honors it (Opus 4.7+;
  * 4.6-family silently downgrades it, so it is not offered). Non-adaptive /
- * unknown ids keep the descriptor fallback — the payload emits no thinking for
+ * unknown ids keep the descriptor fallback, the payload emits no thinking for
  * them anyway, so the levels are inert legacy semantics.
  */
 function anthropicCatalogLevels(modelId: string): ReasoningLevel[] {

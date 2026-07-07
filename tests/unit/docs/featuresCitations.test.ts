@@ -20,7 +20,7 @@ const featuresPath = resolve(repoRoot, "docs/FEATURES.md");
 const SRC_CITATION = /`(src\/[\w./-]+\.(?:ts|tsx|css))`/g;
 
 describe("FEATURES.md source citations", () => {
-  // Skip rather than fail if the docs submodule isn't checked out — a missing
+  // Skip rather than fail if the docs submodule isn't checked out, a missing
   // submodule is an environment gap, not a broken citation.
   it.skipIf(!existsSync(featuresPath))("every cited src/ path exists on disk", () => {
     const text = readFileSync(featuresPath, "utf8");

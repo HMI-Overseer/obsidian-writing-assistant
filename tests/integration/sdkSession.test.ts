@@ -570,6 +570,96 @@ describe("SdkSessionRegistry", () => {
     expect(queryMock).toHaveBeenCalledTimes(1);
   });
 
+  it("disposes a compacted-then-interrupted session (compaction guard on the throw path)", async () => {
+    // The turn compacts mid-stream AND is cleanly interrupted. A clean interrupt
+    // normally preserves the session, but the mid-turn compaction desynced it from
+    // the authoritative transcript, so it must still be disposed (§6.7.1: the
+    // post-turn invalidation check is unreachable when the turn throws).
+    const interrupt = vi.fn(() => Promise.resolve());
+    queryMock.mockImplementation((params: { prompt: AsyncIterable<{ message: { content: string } }> }) => {
+      const input = params.prompt;
+      const gen = (async function* () {
+        for await (const msg of input) {
+          yield textDeltaMessage(`echo:${msg.message.content}`);
+          yield compactBoundaryMessage();
+          yield successResult();
+        }
+      })() as AsyncGenerator<unknown> & { interrupt: typeof interrupt };
+      gen.interrupt = interrupt;
+      return gen;
+    });
+
+    const ac = new AbortController();
+    const gen = registry.runTurn("c1", turnRequest([{ role: "user", content: "hi" }], "hi", { signal: ac.signal }));
+    const first = await gen.next();
+    expect(first.value).toBe("echo:user:hi");
+    ac.abort();
+    await expect(gen.next()).rejects.toMatchObject({ name: "AbortError" });
+
+    // Disposed despite the clean interrupt, because it compacted.
+    expect(registry.size).toBe(0);
+  });
+
+  it("attributes an idle-evicted rebuild to the disposal, not a neutral no-session", async () => {
+    installEchoQuery();
+    const decisions: unknown[] = [];
+
+    const reply = await drain(registry.runTurn("c1", turnRequest([{ role: "user", content: "hi" }], "hi")));
+    // Far enough in the future that the idle window has elapsed.
+    registry.evictIdle(Date.now() + 120_000);
+    expect(registry.size).toBe(0);
+
+    await drain(
+      registry.runTurn(
+        "c1",
+        turnRequest(
+          [
+            { role: "user", content: "hi" },
+            { role: "assistant", content: reply },
+            { role: "user", content: "again" },
+          ],
+          "again",
+          { onReuseDecision: (d) => decisions.push(d) },
+        ),
+      ),
+    );
+
+    // The disposal tombstone attributes the rebuild instead of the misleading
+    // neutral "no-session" (which the badge shows as "session started").
+    expect(decisions).toEqual([{ reuse: false, reason: "session-disposed" }]);
+  });
+
+  it("attributes a compacted rebuild to compaction, not a neutral no-session", async () => {
+    let turnNo = 0;
+    installEchoQuery((t) => {
+      turnNo += 1;
+      return turnNo === 1
+        ? [textDeltaMessage(`echo:${t}`), compactBoundaryMessage(), successResult()]
+        : [textDeltaMessage(`echo:${t}`), successResult()];
+    });
+    const decisions: unknown[] = [];
+
+    await drain(registry.runTurn("c1", turnRequest([{ role: "user", content: "hi" }], "hi")));
+    expect(registry.size).toBe(0);
+
+    await drain(
+      registry.runTurn(
+        "c1",
+        turnRequest(
+          [
+            { role: "user", content: "hi" },
+            { role: "assistant", content: "echo:user:hi" },
+            { role: "user", content: "again" },
+          ],
+          "again",
+          { onReuseDecision: (d) => decisions.push(d) },
+        ),
+      ),
+    );
+
+    expect(decisions).toEqual([{ reuse: false, reason: "compacted" }]);
+  });
+
   it("invalidates a compacted session so the next turn cold-rebuilds", async () => {
     // Only the first turn compacts; the second runs clean to prove a fresh mint.
     let turnNo = 0;

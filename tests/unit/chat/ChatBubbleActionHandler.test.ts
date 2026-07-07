@@ -54,7 +54,7 @@ function makeHandler(opts: { isGenerating: boolean }) {
   };
 }
 
-describe("ChatBubbleActionHandler — generation gate (P1-12)", () => {
+describe("ChatBubbleActionHandler, generation gate (P1-12)", () => {
   beforeEach(() => {
     vi.mocked(Notice).mockClear();
   });

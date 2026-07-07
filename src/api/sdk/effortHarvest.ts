@@ -11,7 +11,7 @@ import type { ModelInfo } from "./claudeAgentSdk";
  *
  * E2-verified quirks handled here (2026-07-06): the reported `value` strings
  * are picker ALIASES, not full model ids, so keys are normalized to match the
- * plugin's claudecode catalog ids — `[1m]` context-variant suffixes are
+ * plugin's claudecode catalog ids, `[1m]` context-variant suffixes are
  * stripped, the `default` pseudo-entry is skipped, and when both `opus` and
  * `opus[1m]` appear the bare entry wins. `supportsEffort: false` records an
  * empty list (a known no-effort model hides the pill); an entry with no

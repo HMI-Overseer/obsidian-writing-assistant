@@ -226,7 +226,7 @@ function hardSplit(text: string, chunkSize: number, chunkOverlap: number): strin
  * Merge chunks smaller than MIN_CHUNK_CHARS into the previous chunk, but only
  * when both belong to the same heading section. Merging across sections would
  * fold the small chunk's prose into the previous chunk and silently relabel it
- * with the wrong `headingPath` — e.g. a short "Scene 3" indexed as "Scene 2", a
+ * with the wrong `headingPath`, e.g. a short "Scene 3" indexed as "Scene 2", a
  * continuity error this tool exists to prevent. A small chunk that can't merge
  * back into its own section stays standalone; `buildEmbeddingText` still prefixes
  * it with its own heading breadcrumb, so it keeps correct scene attribution.

@@ -13,7 +13,7 @@ describe("assertEmbeddingVectors", () => {
   });
 
   test("throws an honest error when the response is truncated", () => {
-    // 3 inputs but only 2 vectors came back — the case that used to store an
+    // 3 inputs but only 2 vectors came back, the case that used to store an
     // undefined vector for the third chunk.
     expect(() => assertEmbeddingVectors(3, [[1, 2, 3], [4, 5, 6]])).toThrow(
       /returned 2 vectors for 3 input/i,

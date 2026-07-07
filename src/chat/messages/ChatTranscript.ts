@@ -2,6 +2,7 @@ import { setIcon } from "obsidian";
 import type { App, Component } from "obsidian";
 import type { Attachment, ConversationMessage } from "../../shared/types";
 import type { BubbleRefs, BubbleRenderOptions, ChatLayoutRefs } from "../types";
+import { GENERATION_STOPPED_LABEL } from "../types";
 import type { MarkdownBubbleRenderer } from "../rendering/MarkdownBubbleRenderer";
 import { MarkdownItBubbleRenderer } from "../rendering/MarkdownItBubbleRenderer";
 import { BubbleActionToolbar } from "./BubbleActionToolbar";
@@ -123,22 +124,34 @@ export class ChatTranscript {
     for (let i = startIndex; i < messages.length; i++) {
       const message = messages[i];
       const bubble = this.createBubble(message.role, message.id);
-
-      if (message.role === "assistant" && message.agenticSteps?.length) {
-        AgenticTimeline.render(bubble.timelineEl, message.agenticSteps);
-      }
-
-      if (message.isError) {
-        bubble.bodyEl.addClass("is-error");
-        this.renderPlainTextContent(bubble, message.content);
-      } else {
-        await this.renderBubbleContent(bubble, message.content, { attachments: message.attachments });
-      }
+      await this.renderMessageBody(bubble, message);
 
       if (actionCallbacks) {
         const isLastAssistant = i === lastAssistantIndex;
         this.attachBubbleActions(bubble, message, isLastAssistant, actionCallbacks);
       }
+    }
+  }
+
+  /**
+   * Renders a persisted message's timeline and body into its bubble. A persisted
+   * empty assistant turn is a stopped (aborted) claudecode generation
+   * (`GENERATION_STOPPED_LABEL` persist-always, cold-rebuild-fidelity §6.1): render
+   * the same muted face `finalizeAbortedResponse` shows live, not a blank bubble.
+   */
+  private async renderMessageBody(bubble: BubbleRefs, message: ConversationMessage): Promise<void> {
+    if (message.role === "assistant" && message.agenticSteps?.length) {
+      AgenticTimeline.render(bubble.timelineEl, message.agenticSteps);
+    }
+
+    if (message.isError) {
+      bubble.bodyEl.addClass("is-error");
+      this.renderPlainTextContent(bubble, message.content);
+    } else if (message.role === "assistant" && message.content === "") {
+      this.renderPlainTextContent(bubble, GENERATION_STOPPED_LABEL);
+      bubble.bodyEl.addClass("is-muted");
+    } else {
+      await this.renderBubbleContent(bubble, message.content, { attachments: message.attachments });
     }
   }
 
@@ -155,17 +168,7 @@ export class ChatTranscript {
     for (let i = 0; i < messages.length; i++) {
       const message = messages[i];
       const bubble = this.createBubble(message.role, message.id);
-
-      if (message.role === "assistant" && message.agenticSteps?.length) {
-        AgenticTimeline.render(bubble.timelineEl, message.agenticSteps);
-      }
-
-      if (message.isError) {
-        bubble.bodyEl.addClass("is-error");
-        this.renderPlainTextContent(bubble, message.content);
-      } else {
-        await this.renderBubbleContent(bubble, message.content, { attachments: message.attachments });
-      }
+      await this.renderMessageBody(bubble, message);
 
       if (actionCallbacks) {
         const isLastAssistant = i === lastAssistantIndex;

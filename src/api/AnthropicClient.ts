@@ -238,7 +238,7 @@ export class AnthropicClient implements ChatClient {
         if (pending) {
           // Malformed (or empty) args surface as {} rather than dropping the call,
           // so the tool loop returns a self-correcting validation error on the
-          // timeline step and the model can retry — a dropped call would silently
+          // timeline step and the model can retry, a dropped call would silently
           // vanish from the turn.
           completedToolCalls.push({
             id: pending.id,

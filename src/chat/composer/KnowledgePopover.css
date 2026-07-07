@@ -1,15 +1,21 @@
 @layer components {
   .lmsa-chat-composer-knowledge-indicator {
     cursor: pointer;
+    anchor-name: --lmsa-knowledge-chip;
   }
 
   /* ── Popover shell ────────────────────────────────────────────────── */
 
   .lmsa-knowledge-popover {
     @apply lmsa-absolute lmsa-z-[120] lmsa-flex-col lmsa-rounded-2xl lmsa-border lmsa-border-obsidian-border lmsa-p-4;
+    --lmsa-knowledge-popover-width: min(300px, calc(100% - 28px));
     bottom: calc(100% + 8px);
+    /* Anchored to the knowledge chip (see the tool popover for the rationale);
+       the first, static `right` is the pre-anchor-positioning fallback. */
     right: 25px;
-    width: min(300px, calc(100% - 28px));
+    position-anchor: --lmsa-knowledge-chip;
+    right: clamp(14px, anchor(right), calc(100% - 14px - var(--lmsa-knowledge-popover-width)));
+    width: var(--lmsa-knowledge-popover-width);
     background:
       linear-gradient(
         180deg,

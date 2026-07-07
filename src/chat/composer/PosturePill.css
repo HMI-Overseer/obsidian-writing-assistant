@@ -1,0 +1,139 @@
+@layer components {
+  /* ── Posture pill ────────────────────────────────────────────────────────
+     Footer control reading the current approval posture ("Ask before edits" /
+     "Edit automatically"), sitting in the right action cluster. Same visual
+     language as the reasoning pill: low-chrome rounded pill with a chevron
+     that flips while its menu is open. Always accent-tinted — the posture is
+     always an explicit, meaningful state, and the accent itself follows the
+     posture via --lmsa-mode-accent. */
+
+  .lmsa-chat-composer-posture-pill {
+    @apply lmsa-relative lmsa-inline-flex lmsa-flex-none lmsa-cursor-pointer lmsa-items-center lmsa-gap-1.5 lmsa-px-3 lmsa-py-1.5;
+    anchor-name: --lmsa-posture-pill;
+    border-radius: 999px;
+    border: 1px solid color-mix(in srgb, var(--lmsa-mode-accent) 45%, var(--background-modifier-border)) !important;
+    font-size: var(--font-ui-smaller);
+    font-weight: 500;
+    line-height: 1.25;
+    color: var(--lmsa-mode-accent);
+    background: transparent !important;
+    box-shadow: none !important;
+    outline: none;
+    appearance: none;
+    min-height: unset;
+    transition: color 0.15s ease, border-color 0.15s ease;
+  }
+
+  .lmsa-chat-composer-posture-pill:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--lmsa-mode-accent) 20%, transparent) !important;
+  }
+
+  .lmsa-chat-composer-posture-pill-icon {
+    @apply lmsa-inline-flex lmsa-items-center;
+  }
+
+  .lmsa-chat-composer-posture-pill-icon svg {
+    width: 12px;
+    height: 12px;
+  }
+
+  /* Expandability affordance, same treatment as the reasoning pill's chevron:
+     faded until the control is hovered. Points up because the menu opens above. */
+  .lmsa-chat-composer-posture-pill-chevron {
+    @apply lmsa-inline-flex lmsa-flex-none lmsa-items-center;
+    opacity: 0.4;
+    transition: opacity 140ms ease;
+  }
+
+  .lmsa-chat-composer-posture-pill:hover .lmsa-chat-composer-posture-pill-chevron {
+    opacity: 0.75;
+  }
+
+  .lmsa-chat-composer-posture-pill-chevron svg {
+    width: 12px;
+    height: 12px;
+  }
+
+  /* ── Posture menu ─────────────────────────────────────────────────────── */
+
+  .lmsa-posture-menu {
+    @apply lmsa-absolute lmsa-z-[120] lmsa-flex-col lmsa-rounded-xl lmsa-border lmsa-border-obsidian-border lmsa-p-1;
+    display: flex;
+    bottom: calc(100% + 8px);
+    /* Anchored to the pill (see the tool popover for the rationale): right
+       edges align since the pill sits in the right cluster, clamped so the
+       menu never leaves the footer (184px covers the menu's min-width). The
+       first, static `right` is the pre-anchor fallback. */
+    right: 8px;
+    position-anchor: --lmsa-posture-pill;
+    right: clamp(8px, anchor(right), calc(100% - 184px));
+    min-width: 168px;
+    background:
+      linear-gradient(
+        180deg,
+        color-mix(in srgb, var(--background-primary) 97%, transparent),
+        color-mix(in srgb, var(--background-secondary) 94%, transparent)
+      );
+    backdrop-filter: blur(22px);
+    -webkit-backdrop-filter: blur(22px);
+    box-shadow:
+      0 -12px 48px rgba(0, 0, 0, 0.18),
+      inset 0 -1px 0 var(--lmsa-inset-highlight-subtle);
+    transform-origin: bottom right;
+  }
+
+  .lmsa-posture-menu.lmsa-hidden {
+    display: none;
+  }
+
+  .lmsa-posture-menu-item {
+    @apply lmsa-flex lmsa-cursor-pointer lmsa-items-center lmsa-gap-2 lmsa-rounded-lg lmsa-px-2.5 lmsa-py-1.5;
+    font-size: var(--font-ui-smaller);
+    color: var(--text-muted);
+    transition: background 120ms ease, color 120ms ease;
+  }
+
+  .lmsa-posture-menu-item:hover {
+    background: var(--background-modifier-hover);
+    color: var(--text-normal);
+  }
+
+  .lmsa-posture-menu-item.is-selected {
+    color: var(--text-normal);
+    font-weight: 500;
+  }
+
+  .lmsa-posture-menu-item-icon {
+    @apply lmsa-inline-flex lmsa-flex-none lmsa-items-center;
+  }
+
+  .lmsa-posture-menu-item-icon svg {
+    width: 12px;
+    height: 12px;
+  }
+
+  .lmsa-posture-menu-item-label {
+    @apply lmsa-flex-1;
+  }
+
+  .lmsa-posture-menu-item-check {
+    @apply lmsa-inline-flex lmsa-items-center;
+    color: var(--lmsa-mode-accent);
+  }
+
+  .lmsa-posture-menu-item-check svg {
+    width: 12px;
+    height: 12px;
+  }
+
+  /* Narrow footer: the pill's text label collapses at the same 359px threshold
+     the former segmented toggle's labels used — the right-side degradation
+     thresholds are measured and must not move. */
+  @container lmsa-composer-footer (max-width: 359px) {
+    .lmsa-chat-composer-posture-pill-label,
+    .lmsa-chat-composer-posture-pill-chevron {
+      display: none;
+    }
+  }
+}

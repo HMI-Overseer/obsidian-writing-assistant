@@ -8,6 +8,7 @@
 
   .lmsa-chat-composer-reasoning-pill {
     @apply lmsa-relative lmsa-inline-flex lmsa-flex-none lmsa-cursor-pointer lmsa-items-center lmsa-gap-1.5 lmsa-px-3 lmsa-py-1.5;
+    anchor-name: --lmsa-reasoning-pill;
     border-radius: 999px;
     border: 1px solid var(--background-modifier-border) !important;
     font-size: var(--font-ui-smaller);
@@ -70,9 +71,12 @@
     @apply lmsa-absolute lmsa-z-[120] lmsa-flex-col lmsa-rounded-xl lmsa-border lmsa-border-obsidian-border lmsa-p-1;
     display: flex;
     bottom: calc(100% + 8px);
-    /* The pill lives in the footer's left cluster (next to the capacity ring),
-       so the menu opens above-left, roughly over the pill. */
+    /* Anchored to the pill (see the tool popover for the rationale): left edges
+       align, clamped so the menu never leaves the footer (148px covers the menu's
+       132px min-width). The first, static `left` is the pre-anchor fallback. */
     left: 8px;
+    position-anchor: --lmsa-reasoning-pill;
+    left: clamp(8px, anchor(left), calc(100% - 148px));
     min-width: 132px;
     background:
       linear-gradient(

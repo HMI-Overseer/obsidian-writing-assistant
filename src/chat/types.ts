@@ -30,7 +30,8 @@ export type ChatLayoutRefs = {
   emptyStateEl: HTMLElement;
   contextChipsEl: HTMLElement;
   textareaEl: HTMLTextAreaElement;
-  modeToggleEl: HTMLElement;
+  posturePillEl: HTMLButtonElement;
+  postureMenuEl: HTMLElement;
   toolUseIndicatorEl: HTMLElement;
   toolUsePopoverEl: HTMLElement;
   knowledgeIndicatorEl: HTMLElement;

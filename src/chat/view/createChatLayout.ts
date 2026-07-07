@@ -198,18 +198,30 @@ export function createChatLayout(contentEl: HTMLElement): ChatLayoutRefs {
   setIcon(knowledgeIndicatorEl, "database");
   const visionIndicatorEl = composerFooterActions.createDiv({ cls: "lmsa-chat-composer-vision-indicator" });
   setIcon(visionIndicatorEl, "eye");
-  const modeToggleEl = composerFooterActions.createDiv({ cls: "lmsa-chat-composer-mode-toggle" });
+  const posturePillEl = composerFooterActions.createEl("button", {
+    cls: "lmsa-chat-composer-posture-pill",
+    attr: { "aria-label": "Edit approval" },
+  }) as HTMLButtonElement;
+  posturePillEl.createEl("span", { cls: "lmsa-chat-composer-posture-pill-icon" });
+  posturePillEl.createEl("span", { cls: "lmsa-chat-composer-posture-pill-label" });
+  // Chevron points up because the posture menu opens above the pill.
+  const posturePillChevron = posturePillEl.createEl("span", {
+    cls: "lmsa-chat-composer-posture-pill-chevron",
+  });
+  setIcon(posturePillChevron, "chevron-up");
 
   const actionBtn = composerFooterActions.createEl("button", {
     cls: "lmsa-chat-composer-send-btn",
   }) as HTMLButtonElement;
   setIcon(actionBtn, "arrow-up");
 
-  // Popovers are children of the footer (not the small wrap divs) so they
-  // position relative to the full footer width and aren't clipped by narrow wraps.
+  // Popovers are children of the footer (not the small wrap divs) so the footer
+  // row's overflow clip can't chop them; each one tracks its own chip via CSS
+  // anchor positioning (anchor-name on the chip, position-anchor on the popover).
   const toolUsePopoverEl = composerFooter.createDiv({ cls: "lmsa-tool-popover lmsa-hidden" });
   const knowledgePopoverEl = composerFooter.createDiv({ cls: "lmsa-knowledge-popover lmsa-hidden" });
   const reasoningMenuEl = composerFooter.createDiv({ cls: "lmsa-reasoning-menu lmsa-hidden" });
+  const postureMenuEl = composerFooter.createDiv({ cls: "lmsa-posture-menu lmsa-hidden" });
 
   return {
     rootEl: contentEl,
@@ -222,7 +234,8 @@ export function createChatLayout(contentEl: HTMLElement): ChatLayoutRefs {
     emptyStateEl,
     contextChipsEl,
     textareaEl,
-    modeToggleEl,
+    posturePillEl,
+    postureMenuEl,
     toolUseIndicatorEl,
     toolUsePopoverEl,
     knowledgeIndicatorEl,

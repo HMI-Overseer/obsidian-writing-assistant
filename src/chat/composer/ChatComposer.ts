@@ -23,11 +23,6 @@ import {
   isMarkdownDropFile,
 } from "./vaultDrag";
 
-const POSTURE_OPTIONS: { posture: ApprovalPosture; label: string; icon: string }[] = [
-  { posture: "ask", icon: "circle-check", label: "Ask before edits" },
-  { posture: "auto", icon: "zap", label: "Edit automatically" },
-];
-
 type ChatComposerCallbacks = {
   onDraftChange: (draft: string) => void;
   onSendRequest: () => void;
@@ -48,7 +43,6 @@ export class ChatComposer {
   private supportsVision = false;
   private isSending = false;
   private currentPosture: ApprovalPosture = "ask";
-  private postureButtons = new Map<ApprovalPosture, HTMLButtonElement>();
   private readonly handleKeydown: (event: KeyboardEvent) => void;
   private readonly handleInput: () => void;
   private readonly handleActionClick: () => void;
@@ -64,7 +58,6 @@ export class ChatComposer {
       ChatLayoutRefs,
       | "contextChipsEl"
       | "textareaEl"
-      | "modeToggleEl"
       | "toolUseIndicatorEl"
       | "toolUsePopoverEl"
       | "knowledgeIndicatorEl"
@@ -176,8 +169,6 @@ export class ChatComposer {
       composerPanel.addEventListener("dragleave", this.handleDragLeave);
       composerPanel.addEventListener("drop", this.handleDrop);
     }
-
-    this.renderPostureToggle();
   }
 
   /**
@@ -207,7 +198,6 @@ export class ChatComposer {
 
   setPosture(posture: ApprovalPosture): void {
     this.currentPosture = posture;
-    this.syncPostureToggle();
     this.updateContextChips();
     this.callbacks.onPostureChange(posture);
   }
@@ -557,34 +547,6 @@ export class ChatComposer {
           this.renderAttachmentPreviews();
         });
       }
-    }
-  }
-
-  private renderPostureToggle(): void {
-    this.refs.modeToggleEl.empty();
-    this.postureButtons.clear();
-
-    for (const { posture, label, icon } of POSTURE_OPTIONS) {
-      const btn = this.refs.modeToggleEl.createEl("button", {
-        cls: "lmsa-chat-composer-mode-toggle-btn",
-        attr: { "aria-label": label, "data-posture": posture },
-      });
-      const iconEl = btn.createEl("span", { cls: "lmsa-chat-composer-mode-toggle-icon" });
-      setIcon(iconEl, icon);
-      btn.createEl("span", { cls: "lmsa-chat-composer-mode-toggle-label", text: label });
-      btn.addEventListener("click", () => this.setPosture(posture));
-      this.postureButtons.set(posture, btn);
-    }
-
-    this.refs.modeToggleEl.createDiv({ cls: "lmsa-chat-composer-mode-slider" });
-    this.syncPostureToggle();
-  }
-
-  private syncPostureToggle(): void {
-    const activeIndex = POSTURE_OPTIONS.findIndex((o) => o.posture === this.currentPosture);
-    this.refs.modeToggleEl.dataset.activeIndex = String(activeIndex);
-    for (const [posture, btn] of this.postureButtons) {
-      btn.toggleClass("is-active", posture === this.currentPosture);
     }
   }
 

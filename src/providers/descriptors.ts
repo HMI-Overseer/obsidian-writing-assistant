@@ -115,6 +115,18 @@ export const PROVIDER_DESCRIPTORS: Record<ProviderOption, ProviderDescriptor> = 
 };
 
 /**
+ * Whether the provider bills per token (Anthropic, OpenAI, Claude Code) versus a
+ * free/local model (LM Studio). Lives here so cost-facing surfaces (the message
+ * usage badge, the composer capacity ring) share one billing fact. Note Claude
+ * Code is metered here yet billed by subscription, so cost-display callers still
+ * special-case it: it reports a `total_cost_usd` they deliberately don't surface
+ * as a per-message charge.
+ */
+export function isMeteredProvider(provider: ProviderOption | undefined): boolean {
+  return provider !== undefined && PROVIDER_DESCRIPTORS[provider].billingModel === "per-token";
+}
+
+/**
  * Icon id per provider. Lives at the descriptor layer so the Providers tab
  * cards and the chat model selector rail share one source per fact. These are
  * brand logomarks registered into Obsidian's icon library by

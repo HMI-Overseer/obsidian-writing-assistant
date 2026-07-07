@@ -2,9 +2,46 @@ import type { ConversationMessage, ProviderOption } from "../shared/types";
 import type { DocumentContext } from "../shared/chatRequest";
 import { estimateTokenCount, anchoredContextEstimate } from "../shared/tokenEstimation";
 import { sumConversationUsage } from "./usageSummary";
+import type { UsageTotals } from "./usageSummary";
+import { isMeteredProvider } from "../providers/descriptors";
 import { CONTEXT_WARNING_THRESHOLD, CONTEXT_DANGER_THRESHOLD } from "../constants";
 
 const DEBOUNCE_MS = 150;
+
+function formatRingCost(usd: number): string {
+  if (usd < 0.01) return `$${usd.toFixed(4)}`;
+  if (usd < 1) return `$${usd.toFixed(3)}`;
+  return `$${usd.toFixed(2)}`;
+}
+
+/**
+ * The ring tooltip's usage line, a running conversation total. Cost leads only
+ * for a metered provider that reported a real price (Anthropic, OpenAI, what
+ * those users watch); Claude Code bills by subscription so it reads
+ * "Subscription", and free local models (LM Studio) fall back to a bare token
+ * figure. Mirrors the message usage badge's headline. Returns null when the
+ * conversation carries no usage yet. Pure, unit-tested.
+ */
+export function formatRingUsageLine(
+  totals: UsageTotals,
+  provider: ProviderOption | undefined
+): string | null {
+  if (!totals.hasUsage) return null;
+
+  const totalTokens = totals.totalInputTokens + totals.totalOutputTokens;
+  const tokenText =
+    totalTokens >= 1_000 ? `${(totalTokens / 1_000).toFixed(1)}k tokens` : `${totalTokens} tokens`;
+
+  const parts: string[] = [];
+  if (provider === "claudecode") {
+    parts.push("Subscription");
+  } else if (isMeteredProvider(provider) && totals.totalCost > 0) {
+    parts.push(formatRingCost(totals.totalCost));
+  }
+  parts.push(tokenText);
+
+  return parts.join(" · ");
+}
 
 export interface ContextInputs {
   systemPrompt: string;
@@ -100,33 +137,21 @@ export class ContextCapacityUpdater {
     }
   }
 
-  /** Update the tooltip's usage line from conversation messages. */
-  refreshUsage(messages: ConversationMessage[]): void {
+  /**
+   * Update the tooltip's usage line from conversation messages. Cost is shown
+   * only for a metered provider with a real price; a free local model (LM Studio)
+   * or Claude Code's subscription never shows a dollar figure.
+   */
+  refreshUsage(messages: ConversationMessage[], provider: ProviderOption | undefined): void {
     if (!this.tooltipUsageEl) return;
 
-    const totals = sumConversationUsage(messages);
-    if (!totals.hasUsage) {
+    const line = formatRingUsageLine(sumConversationUsage(messages), provider);
+    if (line === null) {
       this.tooltipUsageEl.addClass("lmsa-hidden");
       return;
     }
 
-    const totalTokens = totals.totalInputTokens + totals.totalOutputTokens;
-    const tokenText = totalTokens >= 1_000
-      ? `${(totalTokens / 1_000).toFixed(1)}k tokens`
-      : `${totalTokens} tokens`;
-
-    const parts: string[] = [];
-    if (totals.totalCost > 0) {
-      const costStr = totals.totalCost < 0.01
-        ? `$${totals.totalCost.toFixed(4)}`
-        : totals.totalCost < 1
-          ? `$${totals.totalCost.toFixed(3)}`
-          : `$${totals.totalCost.toFixed(2)}`;
-      parts.push(costStr);
-    }
-    parts.push(tokenText);
-
-    this.tooltipUsageEl.setText(parts.join(" \u00b7 "));
+    this.tooltipUsageEl.setText(line);
     this.tooltipUsageEl.removeClass("lmsa-hidden");
   }
 
@@ -186,7 +211,7 @@ export class ContextCapacityUpdater {
       );
     }
 
-    this.refreshUsage(messages);
+    this.refreshUsage(messages, activeProvider);
   }
 
   private positionTooltip(): void {

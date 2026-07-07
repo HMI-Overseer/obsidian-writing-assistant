@@ -622,7 +622,10 @@ export class ChatView extends ItemView {
       );
     }
 
-    this.contextUpdater?.refreshUsage(snapshot.messageHistory);
+    this.contextUpdater?.refreshUsage(
+      snapshot.messageHistory,
+      this.sessionStore?.getResolvedConversationModel()?.provider
+    );
     await this.refreshDocumentContext();
     this.contextUpdater?.immediateUpdate(this.buildContextInputs());
     this.orchestrator.updateGenerateResponseButton(snapshot.messageHistory);

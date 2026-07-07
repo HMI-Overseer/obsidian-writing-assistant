@@ -1,5 +1,5 @@
 import type { MessageUsage, ProviderOption, SessionRebuildReason } from "../../shared/types";
-import { PROVIDER_DESCRIPTORS } from "../../providers/descriptors";
+import { isMeteredProvider } from "../../providers/descriptors";
 import { PRICING_AS_OF } from "../../api/pricing";
 
 /**
@@ -25,16 +25,6 @@ const SESSION_REBUILD_LABELS: Record<SessionRebuildReason, string> = {
   "history-edited": "history edited",
   "turn-count": "history changed",
 };
-
-/**
- * Whether the provider bills per token (Anthropic, OpenAI, Claude Code) versus a
- * free/local model (LM Studio). Used to tell "metered model with no price table
- * entry" apart from "free local model", the former surfaces "price unavailable",
- * the latter shows nothing.
- */
-function isMeteredProvider(provider: ProviderOption | undefined): boolean {
-  return provider !== undefined && PROVIDER_DESCRIPTORS[provider].billingModel === "per-token";
-}
 
 /** Abbreviated count for the compact face (e.g. 12756 → "12.8k"). */
 function formatTokenCount(tokens: number): string {

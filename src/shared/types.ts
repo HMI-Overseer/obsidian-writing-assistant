@@ -352,6 +352,14 @@ export interface ConversationMessage {
   toolCalls?: ToolCall[];
   /** Agentic tool-call timeline for this response. Stored for display; never sent to the API. */
   agenticSteps?: AgenticStep[];
+  /**
+   * Set on an assistant message the user stopped mid-generation (partial or empty
+   * reply). The claudecode cold-rebuild replay reads it to append
+   * `[response interrupted by user]` so a rebuilt session does not treat a truncated
+   * turn as complete (issue §4.C / §6.1). Optional forever: absent on messages
+   * written before phase 3 and on any turn that finished on its own.
+   */
+  interrupted?: boolean;
   /** File attachments on user messages (images and note snapshots). */
   attachments?: Attachment[];
 }

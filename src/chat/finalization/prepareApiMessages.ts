@@ -20,6 +20,7 @@ import {
   resolveLocalToolSet,
 } from "../../tools/toolSurface";
 import { writesPermitted } from "../../vault-ops/gateway";
+import { formatAgenticReplayLines, INTERRUPTED_REPLAY_MARKER } from "../../tools/resultDigest";
 import type { CanonicalToolDefinition } from "../../tools/types";
 import type { App } from "obsidian";
 import type { ChatSessionStore } from "../conversation/ChatSessionStore";
@@ -125,7 +126,7 @@ export async function prepareApiMessages(
   const messages: ChatTurn[] = store
     .getSnapshot()
     .messageHistory.filter((message) => !message.isError)
-    .map((message) => toHistoryTurn(message, supportsVision));
+    .map((message) => toHistoryTurn(message, supportsVision, isClaudeCode));
 
   // Retrieve RAG context based on the latest user message. Skipped when vault tools are
   // active: in agentic mode the model controls retrieval itself via semantic_search, and
@@ -347,9 +348,37 @@ export function splitSystemForTail(opts: {
  * in-band channel, so they stay content-only and deliberately invalidate the live
  * session: the annotated cold-rebuild replay is how the model learns the outcomes.
  * (ADR-0014)
+ *
+ * `isClaudeCode` turns on the cold-rebuild replay shaping (§4.A / §4.C): an assistant
+ * turn's persisted tool activity ({@link ConversationMessage.agenticSteps}) and any
+ * interruption ({@link ConversationMessage.interrupted}) are appended as digest lines,
+ * which the flat prose transcript never held. Claude Code routes through
+ * `finalizeResponse` (never the edit finalizer), so it carries no `editProposals` and
+ * its edit outcomes arrive as step dispositions instead; this is therefore its sole
+ * annotation path, and it rides the same `content`/`rawContent` seam as edit turns.
  */
-export function toHistoryTurn(message: ConversationMessage, supportsVision: boolean): ChatTurn {
+export function toHistoryTurn(
+  message: ConversationMessage,
+  supportsVision: boolean,
+  isClaudeCode = false,
+): ChatTurn {
   const attachments = message.attachments?.filter((a) => a.type !== "image" || supportsVision);
+
+  if (isClaudeCode && message.role === "assistant") {
+    const replayed = annotateClaudeCodeReplay(message);
+    if (replayed !== message.content) {
+      return {
+        role: message.role,
+        content: replayed,
+        // The digest and marker ride `content`; the raw streamed bytes stay in
+        // `rawContent` so the live-session linearity hash is byte-for-byte untouched.
+        rawContent: message.content,
+        ...(attachments?.length ? { attachments } : {}),
+      };
+    }
+    // No steps and not interrupted: fall through to the byte-identical default.
+  }
+
   const annotated = editProposalsOf(message).length > 0;
   return {
     role: message.role,
@@ -357,6 +386,20 @@ export function toHistoryTurn(message: ConversationMessage, supportsVision: bool
     ...(annotated && message.toolCalls?.length ? { rawContent: message.content } : {}),
     ...(attachments?.length ? { attachments } : {}),
   };
+}
+
+/**
+ * Builds a claudecode assistant turn's replayed content: its raw prose, then one
+ * bracketed digest line per persisted tool call (§4.A), then the interruption marker
+ * for a stopped turn (§4.C). Returns the raw content unchanged when there is nothing
+ * to add, so an ordinary completed turn replays exactly as before.
+ */
+function annotateClaudeCodeReplay(message: ConversationMessage): string {
+  const parts: string[] = [];
+  if (message.content) parts.push(message.content);
+  if (message.agenticSteps?.length) parts.push(...formatAgenticReplayLines(message.agenticSteps));
+  if (message.interrupted) parts.push(INTERRUPTED_REPLAY_MARKER);
+  return parts.join("\n\n");
 }
 
 /**

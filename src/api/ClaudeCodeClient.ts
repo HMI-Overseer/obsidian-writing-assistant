@@ -347,6 +347,22 @@ function applyReuseDecision(
  * retrieves from the vault through the plugin's tools, but is included as a block
  * when supplied so the client also works as a plain (tool-less) analyst.
  */
+/**
+ * Framing preamble for the cold-mint blob (§4.B). Tells the rebuilt session it is
+ * resuming a replayed conversation, that it is the Assistant, and that the bracketed
+ * digest lines beneath an assistant turn (§4.A) record tool calls that already ran,
+ * so it must not repeat them or re-propose anything the user declined. Prepended only
+ * when a transcript is present, and only on the mint path: the delta path (session
+ * reuse) already holds this context, and keeping the preamble out of it plus stable
+ * across rebuilds is what stops it from becoming a linearity drift source (§5).
+ */
+const REPLAY_PREAMBLE =
+  "The following is a prior conversation, replayed after your session was restarted. " +
+  "You are the Assistant. Bracketed lines beneath an assistant turn record tool calls " +
+  "that already ran and how the user disposed of them: treat them as history, do not " +
+  "re-run those actions, and do not re-propose anything the user declined. Continue from " +
+  "the final User message below.";
+
 export function buildClaudeCodePrompt(request: ChatRequest): string {
   const blocks: string[] = [];
 
@@ -381,15 +397,28 @@ export function buildClaudeCodePrompt(request: ChatRequest): string {
     .join("\n\n");
   if (transcript) blocks.push(transcript);
 
-  return blocks.join("\n\n---\n\n");
+  const body = blocks.join("\n\n---\n\n");
+  // Frame the replay only when there is a transcript to frame; a transcript-less
+  // analyst blob (documentContext only) is not a replayed conversation.
+  return transcript ? `${REPLAY_PREAMBLE}\n\n${body}` : body;
 }
 
 function renderTurn(turn: ChatTurn, framing?: string): string {
   const body = renderTurnBody(turn);
   if (!body) return "";
   const speaker = turn.role === "assistant" ? "Assistant" : "User";
-  const framed = framing ? `${framing}\n\n${body}` : body;
+  // Escape line-leading speaker labels inside the body so a literal `User:` /
+  // `Assistant:` in the content can't be misread as a turn boundary (§1 symptom 3).
+  // Mint-path only: renderTurnBody stays unescaped for the delta path, which sends
+  // one live user turn with no transcript to shear.
+  const escaped = escapeSpeakerLabels(body);
+  const framed = framing ? `${framing}\n\n${escaped}` : escaped;
   return `${speaker}: ${framed}`;
+}
+
+/** Backslash-escapes a line-leading `User:` / `Assistant:` label within a turn body. */
+function escapeSpeakerLabels(body: string): string {
+  return body.replace(/^(User|Assistant):/gm, "\\$1:");
 }
 
 /**

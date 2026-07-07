@@ -98,6 +98,9 @@ export async function finalizeAbortedResponse(
     if (ragSources) assistantMessage.ragSources = ragSources;
     if (rewrittenQuery) assistantMessage.rewrittenQuery = rewrittenQuery;
     if (agenticSteps?.length) assistantMessage.agenticSteps = agenticSteps;
+    // A partial reply is a truncated turn; the claudecode replay marks it so a
+    // rebuild does not read it as complete (§4.C).
+    assistantMessage.interrupted = true;
     store.appendMessage(assistantMessage);
     store.setLastAssistantResponse(response);
     transcript.registerBubble(assistantMessage.id, bubble);
@@ -121,6 +124,9 @@ export async function finalizeAbortedResponse(
       if (ragSources) assistantMessage.ragSources = ragSources;
       if (rewrittenQuery) assistantMessage.rewrittenQuery = rewrittenQuery;
       if (agenticSteps?.length) assistantMessage.agenticSteps = agenticSteps;
+      // Even an empty stopped turn is interrupted: the replay gives it a body of its
+      // partial steps' digest plus the interruption marker (§4.C / §6.1).
+      assistantMessage.interrupted = true;
       store.appendMessage(assistantMessage);
       transcript.registerBubble(assistantMessage.id, bubble);
     }

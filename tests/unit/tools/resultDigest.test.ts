@@ -2,11 +2,15 @@ import { describe, it, expect } from "vitest";
 import {
   boundToolResult,
   captureStepFields,
+  formatAgenticReplayLines,
   formatResultDigest,
+  formatStepReplayLine,
+  INTERRUPTED_REPLAY_MARKER,
   RESULT_TRUNCATION_MARKER,
   TOOL_RESULT_CHAR_LIMIT,
 } from "../../../src/tools/resultDigest";
 import { SEMANTIC_SEARCH_UNAVAILABLE_MESSAGE } from "../../../src/tools/vault/definition";
+import type { AgenticStep } from "../../../src/shared/types";
 
 /**
  * Phase-2 capture contract for the claudecode cold rebuild
@@ -178,5 +182,128 @@ describe("captureStepFields", () => {
 
   it("returns nothing for a call with no content, disposition, or digest", () => {
     expect(captureStepFields("think", {}, { content: "" })).toEqual({});
+  });
+});
+
+/**
+ * Phase-3 replay line formatting (§4.A): the persisted capture fields become the
+ * compact bracketed lines a cold rebuild replays under each assistant turn.
+ */
+describe("formatStepReplayLine", () => {
+  it("returns null for a reasoning step (no tool to record)", () => {
+    expect(formatStepReplayLine({ type: "reasoning", round: 0, text: "thinking" })).toBeNull();
+  });
+
+  it("returns null for a tool_call step missing its tool name", () => {
+    expect(formatStepReplayLine({ type: "tool_call", round: 0 })).toBeNull();
+  });
+
+  it("renders a captured read as tool + key argument", () => {
+    expect(
+      formatStepReplayLine({
+        type: "tool_call",
+        round: 0,
+        toolName: "read_file",
+        toolInput: "Chapters/chapter-3.md",
+        resultRecord: "the chapter text",
+      }),
+    ).toBe("[read_file: Chapters/chapter-3.md]");
+  });
+
+  it("renders just the tool name when there is no key argument", () => {
+    expect(
+      formatStepReplayLine({ type: "tool_call", round: 0, toolName: "think", resultRecord: "a thought" }),
+    ).toBe("[think]");
+  });
+
+  it("returns null for a bare pre-phase-2 step (no capture fields): old transcripts replay unchanged", () => {
+    expect(
+      formatStepReplayLine({ type: "tool_call", round: 0, toolName: "read_file", toolInput: "a.md" }),
+    ).toBeNull();
+  });
+
+  it("appends a declined disposition as the steering signal", () => {
+    expect(
+      formatStepReplayLine({
+        type: "tool_call",
+        round: 0,
+        toolName: "create_directory",
+        toolInput: "Drafts/Arcs",
+        disposition: "declined",
+      }),
+    ).toBe("[create_directory: Drafts/Arcs, DECLINED by user]");
+  });
+
+  it("labels every disposition value the review can return", () => {
+    const cases: Record<NonNullable<AgenticStep["disposition"]>, string> = {
+      applied: "[move_file: a, applied]",
+      "auto-applied": "[move_file: a, auto-applied]",
+      declined: "[move_file: a, DECLINED by user]",
+      failed: "[move_file: a, FAILED]",
+      satisfied: "[move_file: a, already satisfied]",
+      cancelled: "[move_file: a, CANCELLED before review]",
+    };
+    for (const [disposition, expected] of Object.entries(cases)) {
+      expect(
+        formatStepReplayLine({
+          type: "tool_call",
+          round: 0,
+          toolName: "move_file",
+          toolInput: "a",
+          disposition: disposition as AgenticStep["disposition"],
+        }),
+      ).toBe(expected);
+    }
+  });
+
+  it("uses the precomputed discovery digest verbatim (pointers only)", () => {
+    const resultDigest = '[semantic_search: "oath", surfaced: Chapters/ch1.md > Vows]';
+    expect(
+      formatStepReplayLine({
+        type: "tool_call",
+        round: 0,
+        toolName: "semantic_search",
+        toolInput: "oath",
+        resultDigest,
+      }),
+    ).toBe(resultDigest);
+  });
+});
+
+describe("formatAgenticReplayLines", () => {
+  it("emits one line per tool_call step, in order, skipping reasoning steps", () => {
+    const steps: AgenticStep[] = [
+      { type: "reasoning", round: 0, text: "let me look" },
+      { type: "tool_call", round: 0, toolName: "read_file", toolInput: "Chapters/ch3.md", resultRecord: "text" },
+      {
+        type: "tool_call",
+        round: 1,
+        toolName: "semantic_search",
+        toolInput: "oath",
+        resultDigest: '[semantic_search: "oath", no results]',
+      },
+      {
+        type: "tool_call",
+        round: 1,
+        toolName: "create_directory",
+        toolInput: "Drafts/Arcs",
+        disposition: "declined",
+      },
+    ];
+    expect(formatAgenticReplayLines(steps)).toEqual([
+      "[read_file: Chapters/ch3.md]",
+      '[semantic_search: "oath", no results]',
+      "[create_directory: Drafts/Arcs, DECLINED by user]",
+    ]);
+  });
+
+  it("returns an empty array when no step records a tool call", () => {
+    expect(formatAgenticReplayLines([{ type: "reasoning", round: 0, text: "hmm" }])).toEqual([]);
+  });
+});
+
+describe("INTERRUPTED_REPLAY_MARKER", () => {
+  it("is the marker resolution C appends to an aborted turn", () => {
+    expect(INTERRUPTED_REPLAY_MARKER).toBe("[response interrupted by user]");
   });
 });

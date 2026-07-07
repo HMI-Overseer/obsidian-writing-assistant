@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { toHistoryTurn } from "../../../src/chat/finalization/prepareApiMessages";
-import type { ConversationMessage } from "../../../src/shared/types";
+import type { AgenticStep, ConversationMessage } from "../../../src/shared/types";
 import type { DiffHunk, EditProposal, EditStatus } from "../../../src/editing/editTypes";
 
 function makeHunk(id: string, rawBlock: string, searchText: string, status: EditStatus): DiffHunk {
@@ -87,5 +87,120 @@ describe("toHistoryTurn", () => {
     };
     expect(toHistoryTurn(message, false).attachments?.map((a) => a.type)).toEqual(["note"]);
     expect(toHistoryTurn(message, true).attachments?.map((a) => a.type)).toEqual(["image", "note"]);
+  });
+});
+
+/**
+ * Claude Code cold-rebuild replay (§4.A / §4.C). Only under the claudecode flag does
+ * an assistant turn gain its persisted tool-activity digest and interruption marker,
+ * as presentation-only annotations that ride `content`; `rawContent` keeps the raw
+ * streamed bytes so the live-session linearity hash is untouched (ADR-0014).
+ */
+describe("toHistoryTurn, Claude Code replay annotation", () => {
+  const steps: AgenticStep[] = [
+    { type: "tool_call", round: 0, toolName: "read_file", toolInput: "Chapters/ch3.md", resultRecord: "text" },
+    {
+      type: "tool_call",
+      round: 0,
+      toolName: "create_directory",
+      toolInput: "Drafts/Arcs",
+      disposition: "declined",
+    },
+  ];
+
+  it("appends the agentic digest and exposes the raw text as rawContent", () => {
+    const message: ConversationMessage = {
+      id: "m1",
+      role: "assistant",
+      content: "I read the chapter and tried to make a folder.",
+      provider: "claudecode",
+      agenticSteps: steps,
+    };
+    const turn = toHistoryTurn(message, false, true);
+    expect(turn.content).toBe(
+      "I read the chapter and tried to make a folder.\n\n" +
+        "[read_file: Chapters/ch3.md]\n\n" +
+        "[create_directory: Drafts/Arcs, DECLINED by user]",
+    );
+    expect(turn.rawContent).toBe("I read the chapter and tried to make a folder.");
+  });
+
+  it("does NOT annotate when the claudecode flag is off (other providers unaffected)", () => {
+    const message: ConversationMessage = {
+      id: "m1",
+      role: "assistant",
+      content: "Plain reply.",
+      provider: "claudecode",
+      agenticSteps: steps,
+    };
+    // Default third arg (false): byte-identical to today, no digest, no rawContent.
+    expect(toHistoryTurn(message, false)).toEqual({ role: "assistant", content: "Plain reply." });
+  });
+
+  it("degrades to today's behavior for a claudecode turn with no steps and no interruption", () => {
+    const message: ConversationMessage = {
+      id: "m1",
+      role: "assistant",
+      content: "Just prose.",
+      provider: "claudecode",
+    };
+    expect(toHistoryTurn(message, false, true)).toEqual({ role: "assistant", content: "Just prose." });
+  });
+
+  it("replays a pre-phase-2 turn byte-identically (steps carry no capture fields)", () => {
+    // An old conversation's steps predate phase-2 capture: no digest, no record, no
+    // disposition. They must produce no lines so the blob matches today's exactly.
+    const message: ConversationMessage = {
+      id: "m1",
+      role: "assistant",
+      content: "Old reply.",
+      provider: "claudecode",
+      agenticSteps: [{ type: "tool_call", round: 0, toolName: "read_file", toolInput: "a.md" }],
+    };
+    expect(toHistoryTurn(message, false, true)).toEqual({ role: "assistant", content: "Old reply." });
+  });
+
+  it("marks a partial (non-empty) aborted turn as interrupted after its digest", () => {
+    const message: ConversationMessage = {
+      id: "m1",
+      role: "assistant",
+      content: "Once upon a",
+      provider: "claudecode",
+      interrupted: true,
+      agenticSteps: [
+        { type: "tool_call", round: 0, toolName: "read_file", toolInput: "a.md", resultRecord: "text" },
+      ],
+    };
+    const turn = toHistoryTurn(message, false, true);
+    expect(turn.content).toBe("Once upon a\n\n[read_file: a.md]\n\n[response interrupted by user]");
+    expect(turn.rawContent).toBe("Once upon a");
+  });
+
+  it("gives an empty aborted turn a replay body of its digest + interruption marker", () => {
+    const message: ConversationMessage = {
+      id: "m1",
+      role: "assistant",
+      content: "",
+      provider: "claudecode",
+      interrupted: true,
+      agenticSteps: [
+        { type: "tool_call", round: 0, toolName: "read_file", toolInput: "a.md", resultRecord: "text" },
+      ],
+    };
+    const turn = toHistoryTurn(message, false, true);
+    expect(turn.content).toBe("[read_file: a.md]\n\n[response interrupted by user]");
+    // The raw bytes the watermark banked were empty; the hash must still see "".
+    expect(turn.rawContent).toBe("");
+  });
+
+  it("does not touch claudecode user turns", () => {
+    const message: ConversationMessage = {
+      id: "m1",
+      role: "user",
+      content: "read_file for me",
+      provider: "claudecode",
+      interrupted: true,
+    };
+    expect(toHistoryTurn(message, false, true)).toEqual({ role: "user", content: "read_file for me" });
   });
 });

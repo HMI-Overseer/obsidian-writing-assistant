@@ -13,12 +13,14 @@
  * unit-testable string by string.
  */
 
+import { assertNever } from "../utils";
+import type { AgenticStep } from "../shared/types";
 import type { VaultOpDisposition } from "../vault-ops/disposition";
 
 /**
- * Cline's production `TOOL_RESULT_CHAR_LIMIT` (§6.2.1, issue question 9): the cap on
- * a stored full-result record, so vault content riding the conversation JSON stays a
- * bounded, linear footprint rather than duplicating whole notes.
+ * Cap (chars) on a stored full-result record (issue question 9), so vault content
+ * riding the conversation JSON stays a bounded, linear footprint rather than
+ * duplicating whole notes.
  */
 export const TOOL_RESULT_CHAR_LIMIT = 2000;
 
@@ -195,4 +197,81 @@ function boundPointers(pointers: string[]): string {
     joined += "; …";
   }
   return joined;
+}
+
+// ---------------------------------------------------------------------------
+// Phase-3 replay (§4.A / §4.C): the persisted capture fields above become the
+// compact bracketed lines a cold rebuild replays under each assistant turn, and a
+// marker for an interrupted reply. The formatters live here beside the capture
+// contract so the digest string logic stays in one pure, unit-tested place; the
+// claudecode-specific history shaping that consumes them is in prepareApiMessages.
+// ---------------------------------------------------------------------------
+
+/** Resolution C's marker, appended at replay time to a partial or empty aborted turn. */
+export const INTERRUPTED_REPLAY_MARKER = "[response interrupted by user]";
+
+/**
+ * One replay line per persisted tool_call step (§4.A), in recorded order. Reasoning
+ * steps and any step without a tool name are dropped. The lines are presentation-only
+ * (they ride replayed `content`, never `rawContent`), so a rebuilt session learns
+ * what already ran and how the user disposed of it without re-executing anything.
+ */
+export function formatAgenticReplayLines(steps: AgenticStep[]): string[] {
+  const lines: string[] = [];
+  for (const step of steps) {
+    const line = formatStepReplayLine(step);
+    if (line !== null) lines.push(line);
+  }
+  return lines;
+}
+
+/**
+ * The replay line for a single step, or `null` when the step contributes none.
+ * Discovery tools replay their precomputed pointers-only
+ * {@link AgenticStep.resultDigest} verbatim (§A.1); every other captured tool renders
+ * as `[tool: keyArg]` with an always-shown disposition suffix when the call was
+ * reviewed (`DECLINED by user` is the steering signal a flat prose transcript loses,
+ * §2).
+ *
+ * A step earns a line only if it carries at least one phase-2 capture field
+ * ({@link AgenticStep.resultDigest}, {@link AgenticStep.resultRecord}, or
+ * {@link AgenticStep.disposition}). Steps persisted before phase 2 have none, so a
+ * pre-phase-2 conversation replays byte-identically to before (the §8 degradation
+ * invariant); computing lines from `toolName`/`toolInput` alone would silently
+ * rewrite those old transcripts.
+ */
+export function formatStepReplayLine(step: AgenticStep): string | null {
+  if (step.type !== "tool_call" || !step.toolName) return null;
+  if (
+    step.resultDigest === undefined &&
+    step.resultRecord === undefined &&
+    step.disposition === undefined
+  ) {
+    return null;
+  }
+  if (step.resultDigest) return step.resultDigest;
+  const key = step.toolInput?.trim();
+  const inner = key ? `${step.toolName}: ${key}` : step.toolName;
+  const dispo = step.disposition ? dispositionReplayLabel(step.disposition) : undefined;
+  return dispo ? `[${inner}, ${dispo}]` : `[${inner}]`;
+}
+
+/** The digest label for a reviewed op's disposition; declines/failures/cancels are emphasized. */
+function dispositionReplayLabel(disposition: VaultOpDisposition): string {
+  switch (disposition) {
+    case "applied":
+      return "applied";
+    case "auto-applied":
+      return "auto-applied";
+    case "declined":
+      return "DECLINED by user";
+    case "failed":
+      return "FAILED";
+    case "satisfied":
+      return "already satisfied";
+    case "cancelled":
+      return "CANCELLED before review";
+    default:
+      return assertNever(disposition);
+  }
 }

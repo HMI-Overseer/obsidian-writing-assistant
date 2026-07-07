@@ -8,8 +8,9 @@ import {
   type SessionConfig,
   type SessionTurn,
 } from "../../../src/api/harnessSession";
+import { toHistoryTurn } from "../../../src/chat/finalization/prepareApiMessages";
 import type { ChatRequest, ChatTurn } from "../../../src/shared/chatRequest";
-import type { SamplingParams } from "../../../src/shared/types";
+import type { AgenticStep, ConversationMessage, SamplingParams } from "../../../src/shared/types";
 
 /**
  * Session linearity across annotated edit turns.
@@ -115,6 +116,40 @@ describe("Claude Code session linearity across edit annotations", () => {
       reuse: false,
       reason: "history-edited",
     });
+  });
+
+  it("reuses the live session across an agentic-digest annotated claudecode turn (§5 drift canary)", async () => {
+    // Phase 3 resolution A: the agentic digest rides `content`, the raw streamed
+    // bytes stay in `rawContent`, so the linearity hash still matches the watermark.
+    // The pinning mutation (routing the digest into rawContent) makes this go red
+    // with a `history-edited` rebuild.
+    const steps: AgenticStep[] = [
+      { type: "tool_call", round: 0, toolName: "read_file", toolInput: "chapter-3.md", resultRecord: "text" },
+      {
+        type: "tool_call",
+        round: 0,
+        toolName: "create_directory",
+        toolInput: "Drafts/Arcs",
+        disposition: "declined",
+      },
+    ];
+    const message: ConversationMessage = {
+      id: "a1",
+      role: "assistant",
+      content: RAW_REPLY,
+      provider: "claudecode",
+      agenticSteps: steps,
+    };
+    const annotated = toHistoryTurn(message, false, true);
+    expect(annotated.content).not.toBe(RAW_REPLY); // the digest was appended
+    expect(annotated.rawContent).toBe(RAW_REPLY); // raw bytes preserved for the hash
+
+    const input = await captureTurnInput([
+      { role: "user", content: RAW_USER },
+      annotated,
+      { role: "user", content: "Now do the outro." },
+    ]);
+    expect(diagnoseSessionReuse(watermarkMeta(cfg()), input.turns, cfg())).toEqual({ reuse: true });
   });
 
   it("keeps the annotated content in the cold-mint full prompt", async () => {

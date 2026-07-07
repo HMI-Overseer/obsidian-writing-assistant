@@ -90,7 +90,67 @@ describe("buildClaudeCodePrompt", () => {
         ],
       }),
     );
-    expect(prompt).toBe("User: Only this");
+    // The null assistant turn renders no header; only the one user turn does.
+    expect(prompt.endsWith("User: Only this")).toBe(true);
+    expect(prompt).not.toMatch(/^Assistant:/m);
+  });
+
+  it("opens the mint blob with the framing preamble, byte-stable across rebuilds (§4.B)", () => {
+    const request = makeRequest({
+      messages: [
+        { role: "user", content: "First" },
+        { role: "assistant", content: "Ack" },
+        { role: "user", content: "Second" },
+      ],
+    });
+    const first = buildClaudeCodePrompt(request);
+    const second = buildClaudeCodePrompt(request);
+    expect(first.startsWith("The following is a prior conversation")).toBe(true);
+    // Two consecutive rebuilds of the same request produce identical bytes, so the
+    // preamble never becomes a linearity drift source (§5).
+    expect(first).toBe(second);
+  });
+
+  it("does not prepend a preamble to a transcript-less analyst blob", () => {
+    const prompt = buildClaudeCodePrompt(
+      makeRequest({
+        documentContext: { filePath: "a.md", content: "Body", isFull: true },
+      }),
+    );
+    expect(prompt).not.toContain("prior conversation");
+  });
+
+  it("escapes a line-leading User:/Assistant: label inside a turn body (§1 symptom 3)", () => {
+    const prompt = buildClaudeCodePrompt(
+      makeRequest({
+        messages: [
+          { role: "user", content: "hi" },
+          { role: "assistant", content: "Reply.\nUser: not a real turn\nAssistant: still me" },
+        ],
+      }),
+    );
+    // The literal labels are escaped so they can't be misread as turn boundaries.
+    expect(prompt).toContain("\\User: not a real turn");
+    expect(prompt).toContain("\\Assistant: still me");
+    // Exactly one real header of each role survives at a line start.
+    expect(prompt.match(/^User: /gm)?.length).toBe(1);
+    expect(prompt.match(/^Assistant: /gm)?.length).toBe(1);
+  });
+
+  it("renders digest lines in a turn body verbatim (they are not speaker labels)", () => {
+    const prompt = buildClaudeCodePrompt(
+      makeRequest({
+        messages: [
+          { role: "user", content: "hi" },
+          {
+            role: "assistant",
+            content: "Did it.\n\n[read_file: a.md]\n\n[create_directory: X, DECLINED by user]",
+          },
+        ],
+      }),
+    );
+    expect(prompt).toContain("[read_file: a.md]");
+    expect(prompt).toContain("[create_directory: X, DECLINED by user]");
   });
 
   it("prepends the mode tail to the latest user turn only", () => {
@@ -150,5 +210,20 @@ describe("buildDeltaPrompt", () => {
       }),
     );
     expect(prompt).toBe("Planning mode framing.\n\nSecond");
+  });
+
+  it("carries no preamble or interruption marker (reuse turns never see replay surface, §5)", () => {
+    const prompt = buildDeltaPrompt(
+      makeRequest({
+        messages: [
+          { role: "user", content: "First" },
+          { role: "assistant", content: "Ack" },
+          { role: "user", content: "Second" },
+        ],
+      }),
+    );
+    expect(prompt).toBe("Second");
+    expect(prompt).not.toContain("prior conversation");
+    expect(prompt).not.toContain("[response interrupted by user]");
   });
 });

@@ -84,7 +84,7 @@ export function anthropicModelSupportsAdaptiveThinking(modelId: string): boolean
  * Model-id prefixes whose models accept `output_config.effort: "xhigh"`. Introduced
  * with Opus 4.7; Opus 4.6 / Sonnet 4.6 lack it (Anthropic documents unsupported
  * `xhigh` as silently falling back to `high`, but the level selector shouldn't
- * offer what a model doesn't honor, the t3code assumption-as-fact lesson).
+ * offer what a model doesn't honor).
  * `max` needs no gate of its own: every adaptive-capable model accepts it.
  */
 const XHIGH_EFFORT_CAPABLE_PREFIXES = [

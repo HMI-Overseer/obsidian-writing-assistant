@@ -154,6 +154,10 @@ export function normalizeConversation(raw: Record<string, unknown>): Conversatio
             base.usage = message.usage as ConversationMessage["usage"];
           }
           if (message.isError === true) base.isError = true;
+          // A stopped turn's marker must survive reload so a later cold rebuild still
+          // replays it as interrupted (§4.C). Only ever `true`; never backfilled, so an
+          // uninterrupted or pre-phase-3 message stays `undefined`.
+          if (message.interrupted === true) base.interrupted = true;
           if (Array.isArray(message.ragSources)) {
             base.ragSources = message.ragSources as ConversationMessage["ragSources"];
           }

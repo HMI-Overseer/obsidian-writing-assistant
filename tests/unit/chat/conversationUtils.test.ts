@@ -378,6 +378,26 @@ describe("normalizeConversation, phase-2 agenticStep capture fields", () => {
   });
 });
 
+describe("normalizeConversation, interrupted marker (§4.C)", () => {
+  test("preserves interrupted on a stopped assistant turn across a JSON round-trip", () => {
+    const msg: ConversationMessage = {
+      id: "msg-1",
+      role: "assistant",
+      content: "Once upon a",
+      provider: "claudecode",
+      interrupted: true,
+    };
+    const raw = jsonRoundTrip(makeConversation([msg])) as Record<string, unknown>;
+    expect(normalizeConversation(raw)!.messages[0].interrupted).toBe(true);
+  });
+
+  test("a completed turn stays uninterrupted after load (no silent backfill)", () => {
+    const msg: ConversationMessage = { id: "msg-1", role: "assistant", content: "All done." };
+    const raw = jsonRoundTrip(makeConversation([msg])) as Record<string, unknown>;
+    expect(normalizeConversation(raw)!.messages[0].interrupted).toBeUndefined();
+  });
+});
+
 describe("toConversationMeta", () => {
   test("extracts metadata from full conversation", () => {
     const conv = makeConversation([

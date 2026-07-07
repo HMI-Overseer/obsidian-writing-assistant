@@ -1,4 +1,5 @@
 import type {
+  ApprovalPosture,
   ClaudeCodeResumeCursor,
   CompletionModel,
   Conversation,
@@ -56,6 +57,28 @@ export class ChatSessionStore {
 
   getActiveConversationMeta(): ConversationMeta | null {
     return this.findMeta(this.memory.getActiveConversationId());
+  }
+
+  /**
+   * The active conversation's approval posture. Sourced from the meta (the
+   * authoritative, settings-persisted copy, like the model), so it survives a
+   * reload even if the posture was changed without sending a turn. Defaults to
+   * `ask` for a legacy conversation whose meta predates the field.
+   */
+  getActivePosture(): ApprovalPosture {
+    return this.getActiveConversationMeta()?.approvalPosture ?? "ask";
+  }
+
+  /**
+   * Record a posture change for the active conversation and persist it. Writes
+   * the meta and saves settings (mirrors {@link setActiveConversationModel}); the
+   * next {@link persistActiveConversation} carries it onto the stored file.
+   */
+  setActivePosture(posture: ApprovalPosture): void {
+    const meta = this.findMeta(this.memory.getActiveConversationId());
+    if (!meta) return;
+    meta.approvalPosture = posture;
+    void this.plugin.saveSettings();
   }
 
   getConversations(): ConversationMeta[] {
@@ -294,6 +317,7 @@ export class ChatSessionStore {
       modelName: meta.modelName,
       messages: cleanMessages,
       draft: snapshot.draft,
+      approvalPosture: meta.approvalPosture ?? "ask",
     };
     await this.storage.save(conversation);
 

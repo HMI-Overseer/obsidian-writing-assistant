@@ -1,5 +1,9 @@
 import { describe, test, expect } from "vitest";
-import { estimateTokenCount, anchoredContextEstimate } from "../../../src/shared/tokenEstimation";
+import {
+  estimateTokenCount,
+  anchoredContextEstimate,
+  lastReportedContextWindow,
+} from "../../../src/shared/tokenEstimation";
 import type { ChatRequest } from "../../../src/shared/chatRequest";
 import type { ConversationMessage } from "../../../src/shared/types";
 
@@ -196,5 +200,33 @@ describe("anchoredContextEstimate", () => {
       }),
     ];
     expect(anchoredContextEstimate(messages)).toBe(5000 + Math.ceil(("a.md".length + 120 + 30) / 4));
+  });
+});
+
+describe("lastReportedContextWindow", () => {
+  function msg(overrides: Partial<ConversationMessage>): ConversationMessage {
+    return { id: "m", role: "assistant", content: "", ...overrides };
+  }
+
+  test("returns undefined when no message carries a window", () => {
+    const messages = [msg({ usage: { inputTokens: 1, outputTokens: 1 } })];
+    expect(lastReportedContextWindow(messages, "claudecode")).toBeUndefined();
+  });
+
+  test("returns the newest provider-matched window, skipping errors", () => {
+    const messages = [
+      msg({ provider: "claudecode", usage: { inputTokens: 1, outputTokens: 1, contextWindow: 200000 } }),
+      msg({ provider: "claudecode", usage: { inputTokens: 1, outputTokens: 1, contextWindow: 1000000 } }),
+      msg({ provider: "claudecode", isError: true, usage: { inputTokens: 1, outputTokens: 1, contextWindow: 42 } }),
+    ];
+    expect(lastReportedContextWindow(messages, "claudecode")).toBe(1000000);
+  });
+
+  test("ignores a window reported by a different provider than the active one", () => {
+    const messages = [
+      msg({ provider: "claudecode", usage: { inputTokens: 1, outputTokens: 1, contextWindow: 200000 } }),
+    ];
+    expect(lastReportedContextWindow(messages, "lmstudio")).toBeUndefined();
+    expect(lastReportedContextWindow(messages, "claudecode")).toBe(200000);
   });
 });

@@ -1,5 +1,6 @@
 import { MAX_CONVERSATIONS } from "../../constants";
 import type {
+  ApprovalPosture,
   Attachment,
   ChatHistory,
   Conversation,
@@ -9,6 +10,11 @@ import type {
 } from "../../shared/types";
 import type { AppliedEditRecord, EditProposal } from "../../editing/editTypes";
 import { generateId } from "../../utils";
+
+/** Coerce a raw persisted value to a known posture, defaulting to `ask`. */
+export function normalizePosture(raw: unknown): ApprovalPosture {
+  return raw === "auto" ? "auto" : "ask";
+}
 
 export function generateConversationTitle(firstUserMessage: string): string {
   const cleaned = firstUserMessage.replace(/\s+/g, " ").trim();
@@ -32,6 +38,7 @@ export function toConversationMeta(conversation: Conversation): ConversationMeta
     modelId: conversation.modelId,
     modelName: conversation.modelName,
     messageCount: conversation.messages.length,
+    approvalPosture: conversation.approvalPosture ?? "ask",
   };
 }
 
@@ -46,6 +53,7 @@ export function createConversation(modelId: string, modelName: string): Conversa
     modelName,
     messages: [],
     draft: "",
+    approvalPosture: "ask",
   };
 }
 
@@ -83,6 +91,7 @@ function normalizeConversationMeta(raw: Record<string, unknown>): ConversationMe
     modelId: typeof raw.modelId === "string" ? raw.modelId : "",
     modelName: typeof raw.modelName === "string" ? raw.modelName : "Unknown",
     messageCount: typeof raw.messageCount === "number" ? raw.messageCount : 0,
+    approvalPosture: normalizePosture(raw.approvalPosture),
   };
 }
 
@@ -176,7 +185,17 @@ export function normalizeConversation(raw: Record<string, unknown>): Conversatio
         })
     : [];
 
-  return { id, title, createdAt, updatedAt, modelId, modelName, messages, draft };
+  return {
+    id,
+    title,
+    createdAt,
+    updatedAt,
+    modelId,
+    modelName,
+    messages,
+    draft,
+    approvalPosture: normalizePosture(raw.approvalPosture),
+  };
 }
 
 /** Prune oldest conversations beyond the cap. Returns IDs of removed entries. */
@@ -207,6 +226,9 @@ export function createBranchConversation(
   const branch = createConversation(source.modelId, source.modelName);
   branch.title = `Branch of ${source.title || "Untitled"}`;
   branch.messages = structuredClone(messagesUpTo);
+  // A branch forks the same session, so it inherits the source's posture rather
+  // than resetting to the new-conversation default.
+  branch.approvalPosture = source.approvalPosture ?? "ask";
   branch.parentConversationId = source.id;
   branch.branchFromMessageId = branchMessageId;
   return branch;

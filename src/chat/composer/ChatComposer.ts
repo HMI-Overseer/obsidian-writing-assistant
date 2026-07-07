@@ -202,6 +202,17 @@ export class ChatComposer {
     this.callbacks.onPostureChange(posture);
   }
 
+  /**
+   * Set the live posture from a restored conversation (switch / branch / load).
+   * Unlike {@link setPosture} this fires no change callback and persists nothing:
+   * the value is already the conversation's stored posture. The caller refreshes
+   * the pill and the root `data-posture`.
+   */
+  restorePosture(posture: ApprovalPosture): void {
+    this.currentPosture = posture;
+    this.updateContextChips();
+  }
+
   seedPrompt(text: string): void {
     this.setDraft(text);
     this.refs.textareaEl.focus();

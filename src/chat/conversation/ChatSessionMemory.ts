@@ -231,6 +231,7 @@ export class ChatSessionMemory {
       modelName: meta.modelName,
       messages: [...this.messageHistory],
       draft: this.draft,
+      approvalPosture: meta.approvalPosture ?? "ask",
     };
   }
 

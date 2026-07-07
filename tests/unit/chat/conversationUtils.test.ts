@@ -1,10 +1,18 @@
 import { describe, test, expect } from "vitest";
 import {
+  createBranchConversation,
+  createConversation,
   normalizeChatHistory,
   normalizeConversation,
+  normalizePosture,
   toConversationMeta,
 } from "../../../src/chat/conversation/conversationUtils";
-import type { Conversation, ConversationMessage, MessageUsage } from "../../../src/shared/types";
+import type {
+  Conversation,
+  ConversationMessage,
+  ConversationMeta,
+  MessageUsage,
+} from "../../../src/shared/types";
 
 /**
  * Simulates a JSON round-trip through data.json, the object is serialized
@@ -413,5 +421,74 @@ describe("toConversationMeta", () => {
     expect(meta.modelId).toBe("profile-1");
     expect(meta.modelName).toBe("Claude Haiku 3");
     expect((meta as Record<string, unknown>)["messages"]).toBeUndefined();
+  });
+});
+
+describe("approval posture, per conversation", () => {
+  test("a new conversation defaults to ask", () => {
+    expect(createConversation("p1", "Model").approvalPosture).toBe("ask");
+  });
+
+  test("a branch inherits its source's posture, not the default", () => {
+    const source: ConversationMeta = {
+      id: "conv-1",
+      title: "Original",
+      createdAt: 1000,
+      updatedAt: 2000,
+      modelId: "p1",
+      modelName: "Model",
+      messageCount: 2,
+      approvalPosture: "auto",
+    };
+    const branch = createBranchConversation(
+      source,
+      [{ id: "m1", role: "user", content: "Hi" }],
+      "m1",
+    );
+    expect(branch.approvalPosture).toBe("auto");
+    expect(branch.parentConversationId).toBe("conv-1");
+  });
+
+  test("toConversationMeta carries the posture onto the meta", () => {
+    const conv = makeConversation([]);
+    conv.approvalPosture = "auto";
+    expect(toConversationMeta(conv).approvalPosture).toBe("auto");
+  });
+
+  test("toConversationMeta defaults a legacy conversation with no posture to ask", () => {
+    const conv = makeConversation([]);
+    delete conv.approvalPosture;
+    expect(toConversationMeta(conv).approvalPosture).toBe("ask");
+  });
+
+  test("normalizeConversation restores a persisted posture and defaults junk to ask", () => {
+    const auto = makeConversation([]);
+    auto.approvalPosture = "auto";
+    const rawAuto = jsonRoundTrip(auto) as Record<string, unknown>;
+    expect(normalizeConversation(rawAuto)!.approvalPosture).toBe("auto");
+
+    const rawJunk = jsonRoundTrip(makeConversation([])) as Record<string, unknown>;
+    rawJunk.approvalPosture = "plan"; // not a known posture
+    expect(normalizeConversation(rawJunk)!.approvalPosture).toBe("ask");
+  });
+
+  test("normalizeChatHistory restores the meta's posture and defaults a legacy entry", () => {
+    const raw = jsonRoundTrip({
+      conversations: [
+        { id: "conv-1", title: "A", createdAt: 1, updatedAt: 2, modelId: "p1", modelName: "M", messageCount: 0, approvalPosture: "auto" },
+        { id: "conv-2", title: "B", createdAt: 1, updatedAt: 2, modelId: "p1", modelName: "M", messageCount: 0 },
+      ],
+      activeConversationId: "conv-1",
+    });
+    const result = normalizeChatHistory(raw);
+    expect(result.conversations[0].approvalPosture).toBe("auto");
+    expect(result.conversations[1].approvalPosture).toBe("ask");
+  });
+
+  test("normalizePosture coerces to ask unless it is exactly auto", () => {
+    expect(normalizePosture("auto")).toBe("auto");
+    expect(normalizePosture("ask")).toBe("ask");
+    expect(normalizePosture(undefined)).toBe("ask");
+    expect(normalizePosture("something")).toBe("ask");
   });
 });

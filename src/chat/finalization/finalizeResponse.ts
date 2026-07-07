@@ -32,6 +32,7 @@ export function attachUsageToMessage(
       ...(usage.sessionRebuildReason !== undefined && { sessionRebuildReason: usage.sessionRebuildReason }),
       ...(usage.resumeCursor !== undefined && { resumeCursor: usage.resumeCursor }),
       ...(usage.contextTokens !== undefined && { contextTokens: usage.contextTokens }),
+      ...(usage.contextWindow !== undefined && { contextWindow: usage.contextWindow }),
       ...(costUsd !== undefined && { estimatedCostUsd: costUsd }),
     };
   }

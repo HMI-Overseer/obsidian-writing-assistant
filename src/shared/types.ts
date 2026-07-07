@@ -253,6 +253,14 @@ export interface MessageUsage {
    * multiplied into every keystroke.
    */
   contextTokens?: number;
+  /**
+   * The provider-reported context-window size (tokens) at this response
+   * (Claude Code: {@link UsageResult.contextWindow}). Persisted per message so
+   * the capacity ring's denominator survives a reload for a provider whose
+   * catalog aliases carry no static window; the ring reads the newest one for
+   * the active provider. Absent for providers with a static catalog window.
+   */
+  contextWindow?: number;
 }
 
 /** A RAG source reference attached to an assistant message. */
@@ -421,6 +429,14 @@ export interface Conversation {
   modelName: string;
   messages: ConversationMessage[];
   draft: string;
+  /**
+   * Approval posture for this conversation. Per-conversation so a reload or a
+   * switch restores the thread's own choice; a new conversation defaults to
+   * `ask`, a branch inherits its source's posture. The authoritative copy lives
+   * on {@link ConversationMeta} (persisted in settings, like `modelId`); this
+   * field carries it on the stored file and seeds a branch.
+   */
+  approvalPosture?: ApprovalPosture;
   /** Source conversation this was branched from; undefined unless branched. */
   parentConversationId?: string;
   /** Message id in the source conversation the branch was forked at. */
@@ -436,6 +452,8 @@ export interface ConversationMeta {
   modelId: string;
   modelName: string;
   messageCount: number;
+  /** Per-conversation approval posture; see {@link Conversation.approvalPosture}. */
+  approvalPosture?: ApprovalPosture;
 }
 
 export interface ChatHistory {

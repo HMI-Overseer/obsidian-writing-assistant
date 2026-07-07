@@ -92,6 +92,32 @@ export function estimateTokenCount(request: ChatRequest, draft?: string): number
  * the conversation has been switched to another provider, mismatched anchors
  * are ignored and the caller falls back to plain estimation.
  */
+/**
+ * The newest per-message context-window size reported by the active provider,
+ * the capacity ring's denominator for a provider whose catalog aliases carry no
+ * static window (Claude Code). Persisted on the message's usage, so it survives
+ * a reload and stays per-conversation. Provider-matched, like
+ * {@link anchoredContextEstimate}: a window reported by a different provider
+ * carries a different harness's size and must not anchor. Undefined when no
+ * message carries one (callers fall back to the static or live-discovered size).
+ */
+export function lastReportedContextWindow(
+  messages: readonly ConversationMessage[],
+  activeProvider?: ProviderOption,
+): number | undefined {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const message = messages[i];
+    if (
+      !message.isError &&
+      message.usage?.contextWindow !== undefined &&
+      message.provider === activeProvider
+    ) {
+      return message.usage.contextWindow;
+    }
+  }
+  return undefined;
+}
+
 export function anchoredContextEstimate(
   messages: readonly ConversationMessage[],
   draft?: string,

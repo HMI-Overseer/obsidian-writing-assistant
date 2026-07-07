@@ -17,6 +17,7 @@ import { ChatGenerationOrchestrator } from "./ChatGenerationOrchestrator";
 import { ChatConversationController } from "./ChatConversationController";
 import type { ContextInputs } from "./ContextCapacityUpdater";
 import { ContextCapacityUpdater } from "./ContextCapacityUpdater";
+import { lastReportedContextWindow } from "../shared/tokenEstimation";
 import { renderProposalPanels } from "./finalization/finalizeEditResponse";
 import { ChatComposer } from "./composer/ChatComposer";
 import { ComposerOverflowMenu } from "./composer/ComposerOverflowMenu";
@@ -135,6 +136,9 @@ export class ChatView extends ItemView {
         this.orchestrator.stopGeneration();
       },
       onPostureChange: (posture) => {
+        // Persist per conversation so a reload or a switch restores this thread's
+        // own choice (a new conversation resets to `ask`, a branch inherits).
+        this.sessionStore?.setActivePosture(posture);
         if (this.layout) {
           this.layout.rootEl.dataset.posture = posture;
         }
@@ -161,7 +165,7 @@ export class ChatView extends ItemView {
     });
 
     if (this.layout) {
-      this.layout.rootEl.dataset.posture = "ask";
+      this.layout.rootEl.dataset.posture = this.composer?.getPosture() ?? "ask";
     }
 
     this.modelSelector = new ChatModelSelector(this.plugin, this.layout, {
@@ -594,6 +598,13 @@ export class ChatView extends ItemView {
       snapshot.messageHistory.length === 0 && !this.orchestrator.getIsGenerating()
     );
     this.updateHeader();
+    // Restore this conversation's approval posture into the composer and chrome.
+    // syncUiChrome runs on every switch / branch / new / initial load, so this is
+    // the single point that re-seeds posture per conversation.
+    const posture = this.sessionStore.getActivePosture();
+    this.composer.restorePosture(posture);
+    if (this.layout) this.layout.rootEl.dataset.posture = posture;
+    this.posturePill?.refresh();
     this.composer.updateContextChips();
     this.composer.refreshToolUseIndicator(
       this.sessionStore.getResolvedConversationModel()
@@ -735,6 +746,7 @@ export class ChatView extends ItemView {
   private buildContextInputs(draft?: string): ContextInputs {
     const snapshot = this.sessionStore?.getSnapshot();
     const activeModel = this.sessionStore?.getResolvedConversationModel();
+    const messages = snapshot?.messageHistory ?? [];
 
     return {
       systemPrompt: getActiveProfile(
@@ -742,9 +754,14 @@ export class ChatView extends ItemView {
         activeModel?.provider ?? "lmstudio",
       ).systemPrompt,
       documentContext: this.cachedDocumentContext,
-      messages: snapshot?.messageHistory ?? [],
+      messages,
       draft: draft ?? this.composer?.getDraft() ?? "",
-      contextWindowSize: activeModel?.contextWindowSize
+      // Static catalog window first; then this conversation's last provider-
+      // reported window (persisted per message, so a reloaded Claude Code thread
+      // keeps its ring); then the live-discovered size as the in-session fallback.
+      contextWindowSize:
+        activeModel?.contextWindowSize
+        ?? lastReportedContextWindow(messages, activeModel?.provider)
         ?? this.plugin.services.modelAvailability.getActiveContextLength(activeModel?.modelId ?? ""),
       activeProvider: activeModel?.provider,
     };

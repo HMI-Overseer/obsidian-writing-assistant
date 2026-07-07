@@ -9,6 +9,15 @@ import type { ConversationMessage, ProviderOption } from "./types";
 const CHARS_PER_TOKEN = 4;
 
 /**
+ * Estimate the token count of a raw string with the same `chars / 4` heuristic
+ * {@link estimateTokenCount} uses. For measuring an already-assembled prompt
+ * blob (e.g. Claude Code's flat mint prompt) rather than a structured request.
+ */
+export function estimateStringTokens(text: string): number {
+  return Math.ceil(text.length / CHARS_PER_TOKEN);
+}
+
+/**
  * Estimate the token count of a ChatRequest before sending it to the API.
  *
  * Uses a `chars / 4` heuristic. The estimate is within ~15-25% of actual

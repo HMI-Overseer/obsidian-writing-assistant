@@ -2,6 +2,7 @@ import type { SamplingParams } from "../../shared/types";
 import { isEffortLevel } from "../../shared/reasoning";
 import { createAbortError } from "../httpTransport";
 import {
+  claudeCodeHarnessEnv,
   extractClaudeCodeContextTokens,
   extractClaudeCodeContextWindow,
   type ClaudeCodeResultUsage,
@@ -171,10 +172,7 @@ export function buildSdkOptions(
     ...(isEffortLevel(opts.reasoning) ? { effort: opts.reasoning } : {}),
     env: {
       ...process.env,
-      CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC:
-        process.env.CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC ?? "1",
-      DISABLE_NON_ESSENTIAL_MODEL_CALLS:
-        process.env.DISABLE_NON_ESSENTIAL_MODEL_CALLS ?? "1",
+      ...claudeCodeHarnessEnv(),
     },
   };
 

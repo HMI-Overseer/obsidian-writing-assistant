@@ -70,6 +70,31 @@ function extractExeFromShim(shimPath: string): string | null {
 }
 
 /**
+ * Environment overlay applied to every spawned `claude` process (both the SDK
+ * engine and the legacy subprocess), on top of the inherited `process.env`. Each
+ * var respects a pre-existing explicit override (`?? "1"`), so a user who sets one
+ * in their own environment is not overruled.
+ *
+ * - `*_NONESSENTIAL_*`: mute the CLI's boot-time update checks, telemetry, and
+ *   background model calls (the dominant cold-start tax).
+ * - `DISABLE_COMPACT`: turn CLI compaction off entirely (cold-rebuild fidelity
+ *   §6.4). The plugin transcript is the sole context authority, so the harness must
+ *   never silently summarize a too-large context mid-turn and answer from its own
+ *   summary. `DISABLE_COMPACT` (not the weaker `DISABLE_AUTO_COMPACT`) is the
+ *   binary-verified switch (§6.4 flag correction); with it set the `compact_boundary`
+ *   handler becomes a dead-man guard (should never fire) and the send-path preflight
+ *   ({@link claudeCodeContextPreflight}) enforces the ceiling before spend instead.
+ */
+export function claudeCodeHarnessEnv(): Record<string, string> {
+  return {
+    CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC:
+      process.env.CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC ?? "1",
+    DISABLE_NON_ESSENTIAL_MODEL_CALLS: process.env.DISABLE_NON_ESSENTIAL_MODEL_CALLS ?? "1",
+    DISABLE_COMPACT: process.env.DISABLE_COMPACT ?? "1",
+  };
+}
+
+/**
  * Spawns and streams the Claude Code CLI (`claude`) in headless mode.
  *
  * This is the subprocess analogue of `streamingTransport.ts`: it runs the binary

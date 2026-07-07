@@ -101,6 +101,12 @@ export interface ClaudeCodeRunOptions {
    * rebuilding. Absent ⇒ resume is not attempted.
    */
   resumeCursor?: ClaudeCodeResumeCursor;
+  /**
+   * The model's discovered context window, forwarded onto the runtime for the
+   * send-path preflight (§6.4, phase 5). Absent (first turn, none reported yet) ⇒
+   * the preflight is a passive no-op.
+   */
+  contextWindow?: number;
 }
 
 /** Official Claude Code install / setup documentation. */
@@ -192,6 +198,8 @@ export class ClaudeCodeService {
     this.collectedVaultOps = [];
     const useSdk = await this.isSdkUsable();
     const agentic = settings.agenticMode;
+    // Forwarded onto every runtime shape below for the send-path preflight (§6.4).
+    const contextWindow = options.contextWindow ? { contextWindow: options.contextWindow } : {};
 
     // Per-run allow-list, the same canonical resolver the API providers use: reads
     // unrestricted, writes follow the posture + policy. Held OFF the session
@@ -223,6 +231,7 @@ export class ClaudeCodeService {
       return {
         vaultRoot: this.vaultRoot,
         useSdk,
+        ...contextWindow,
         sdkSession: {
           conversationId,
           run: (input) => this.runSessionTurn(conversationId, input, agentic, resumeCursor),
@@ -237,6 +246,7 @@ export class ClaudeCodeService {
       return {
         vaultRoot: this.vaultRoot,
         useSdk,
+        ...contextWindow,
         ...(agentic
           ? {
               sdkMcp: {
@@ -249,13 +259,14 @@ export class ClaudeCodeService {
     }
 
     // Agentic mode off on the legacy path → pure analyst with no tools.
-    if (!agentic) return { vaultRoot: this.vaultRoot, useSdk };
+    if (!agentic) return { vaultRoot: this.vaultRoot, useSdk, ...contextWindow };
 
     // Fallback path (incompatible/missing CLI): the legacy loopback-HTTP bridge.
     const handle = await this.ensureMcpServer();
     return {
       vaultRoot: this.vaultRoot,
       useSdk,
+      ...contextWindow,
       mcp: {
         configJson: buildMcpConfigJson(MCP_SERVER_NAME, handle),
         allowedTools: `mcp__${MCP_SERVER_NAME}`,

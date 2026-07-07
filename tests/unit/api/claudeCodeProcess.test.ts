@@ -5,7 +5,26 @@ import {
   extractClaudeCodeContextTokens,
   extractClaudeCodeError,
   resolveClaudeBinary,
+  claudeCodeHarnessEnv,
 } from "../../../src/api/claudeCodeProcess";
+
+describe("claudeCodeHarnessEnv", () => {
+  it("disables CLI compaction and mutes non-essential traffic", () => {
+    const env = claudeCodeHarnessEnv();
+    expect(env.DISABLE_COMPACT).toBe("1");
+    expect(env.CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC).toBe("1");
+    expect(env.DISABLE_NON_ESSENTIAL_MODEL_CALLS).toBe("1");
+  });
+
+  it("uses the stronger DISABLE_COMPACT, never the weaker auto flag, and sets no context cap", () => {
+    // §6.4 flag correction: DISABLE_COMPACT (not DISABLE_AUTO_COMPACT) is the switch,
+    // and the plugin deliberately leaves CLAUDE_CODE_MAX_CONTEXT_TOKENS unset (the
+    // per-conversation preflight is the ceiling instead).
+    const env = claudeCodeHarnessEnv();
+    expect(env.DISABLE_AUTO_COMPACT).toBeUndefined();
+    expect(env.CLAUDE_CODE_MAX_CONTEXT_TOKENS).toBeUndefined();
+  });
+});
 
 describe("extractClaudeCodeDelta", () => {
   it("extracts text from a stream_event content_block_delta", () => {

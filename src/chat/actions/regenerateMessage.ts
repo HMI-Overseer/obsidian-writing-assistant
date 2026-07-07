@@ -82,6 +82,7 @@ export async function regenerateMessage(options: RegenerateOptions): Promise<voi
       // Regenerate rewinds the transcript, so the resume gate rejects this cursor and
       // the turn synthetically rebuilds (§6.3); passed for a uniform recovery path.
       resumeCursor: store.getClaudeCodeResumeCursor(),
+      contextWindow: plugin.services.modelAvailability.resolveContextWindow(activeModel),
     }),
   );
 

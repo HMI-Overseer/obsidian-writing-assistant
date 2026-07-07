@@ -128,6 +128,16 @@ export class ModelAvailabilityService {
   }
 
   /**
+   * The model's context window: its static catalog size when it has one, else the
+   * size discovered at runtime ({@link getActiveContextLength}). Claude Code aliases
+   * carry no static size, so their window resolves only from a prior turn's report;
+   * feeds the capacity ring and the Claude Code send-path preflight alike.
+   */
+  resolveContextWindow(model: CompletionModel): number | undefined {
+    return model.contextWindowSize ?? this.getActiveContextLength(model.modelId);
+  }
+
+  /**
    * Records a context window the provider itself reported for a model (Claude
    * Code turns carry it in their result). Fills the same lookup the capacity
    * ring and the pre-send capacity notice already fall back to for models whose

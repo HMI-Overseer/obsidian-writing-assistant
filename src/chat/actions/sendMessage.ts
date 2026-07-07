@@ -117,6 +117,7 @@ export async function sendMessage(options: SendMessageOptions): Promise<void> {
       activeFilePath: plugin.app.workspace.getActiveFile()?.path,
       conversationId: store.getActiveConversationId() ?? undefined,
       resumeCursor: store.getClaudeCodeResumeCursor(),
+      contextWindow: plugin.services.modelAvailability.resolveContextWindow(activeModel),
     }),
   );
 

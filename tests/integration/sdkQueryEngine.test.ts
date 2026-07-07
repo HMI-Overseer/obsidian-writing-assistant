@@ -246,4 +246,12 @@ describe("buildSdkOptions", () => {
     const options = buildSdkOptions({ ...base, resume: "sess-42" }, new AbortController());
     expect(options.resume).toBe("sess-42");
   });
+
+  it("disables CLI compaction in the spawned env (§6.4), never the weaker auto flag or a cap", () => {
+    const options = buildSdkOptions(base, new AbortController());
+    const env = options.env as Record<string, string | undefined>;
+    expect(env.DISABLE_COMPACT).toBe("1");
+    expect(env.DISABLE_AUTO_COMPACT).toBeUndefined();
+    expect(env.CLAUDE_CODE_MAX_CONTEXT_TOKENS).toBeUndefined();
+  });
 });

@@ -6,11 +6,13 @@ import type { ToolCall } from "../tools/types";
 import type { CompletionResult, StreamResult, StopReason, UsageResult } from "./usageTypes";
 import {
   streamClaudeCode,
+  claudeCodeHarnessEnv,
   extractClaudeCodeResult,
   extractClaudeCodeContextTokens,
   resolveClaudeBinary,
   type ClaudeCodeResultUsage,
 } from "./claudeCodeProcess";
+import { assertMintBlobFits } from "./claudeCodeContextPreflight";
 import { streamSdkTurn, DISALLOWED_NATIVE_TOOLS } from "./sdk/sdkQueryEngine";
 import { isEffortLevel } from "../shared/reasoning";
 import type { ClaudeCodeResumeCursor } from "../shared/types";
@@ -47,6 +49,15 @@ export interface SdkSessionTurnInput {
 export interface ClaudeCodeRuntime {
   /** Subprocess working directory, the vault root. */
   vaultRoot?: string;
+  /**
+   * The model's discovered context window (Claude Code reports it per turn; its
+   * catalog aliases carry no static size). Feeds the send-path preflight
+   * ({@link ./claudeCodeContextPreflight}), which refuses a mint blob that would
+   * overflow it, surfacing a clear "conversation too large" state before spend
+   * instead of an opaque mid-turn API error (§6.4). Absent on the first turn (none
+   * reported yet) ⇒ the preflight is a passive no-op.
+   */
+  contextWindow?: number;
   /**
    * Whether to drive Claude Code through the Agent SDK. False when the installed
    * CLI is missing or version-incompatible with the bundled SDK, the client then
@@ -178,8 +189,13 @@ export class ClaudeCodeClient implements ChatClient {
    * Runs one turn: through the persistent session when available (context
    * retention + caching), else the stateless SDK engine, else the legacy one-shot
    * subprocess on the version-mismatch fallback.
+   *
+   * An `async *` so the send-path preflight ({@link assertMintBlobFits}) runs on
+   * first consumption, before any dispatch: an oversized blob throws here and no
+   * `claude` process is ever spawned (zero spend), the throw surfacing through the
+   * ordinary streamed-error path (§6.4, phase 5).
    */
-  private runTurn(
+  private async *runTurn(
     request: ChatRequest,
     model: string,
     params: SamplingParams,
@@ -189,9 +205,13 @@ export class ClaudeCodeClient implements ChatClient {
     onSessionBanked?: (cursor: ClaudeCodeResumeCursor) => void,
   ): AsyncGenerator<string> {
     const prompt = buildClaudeCodePrompt(request);
+    // Passive preflight: refuse a mint blob that would overflow the discovered
+    // window (leaving no room for a reply) rather than let it die opaquely
+    // mid-turn once CLI compaction is disabled. Reads only, mutates nothing.
+    assertMintBlobFits(prompt, request.systemPrompt, this.runtime.contextWindow);
 
     if (this.runtime.sdkSession) {
-      return this.runtime.sdkSession.run({
+      yield* this.runtime.sdkSession.run({
         fullPrompt: prompt,
         deltaPrompt: buildDeltaPrompt(request),
         model,
@@ -210,10 +230,11 @@ export class ClaudeCodeClient implements ChatClient {
         onRecoveryDecision,
         onSessionBanked,
       });
+      return;
     }
 
     if (this.runtime.useSdk) {
-      return streamSdkTurn({
+      yield* streamSdkTurn({
         prompt,
         model,
         systemPrompt: request.systemPrompt,
@@ -224,10 +245,11 @@ export class ClaudeCodeClient implements ChatClient {
         signal,
         onResult,
       });
+      return;
     }
 
     let contextTokens: number | null = null;
-    return streamClaudeCode({
+    yield* streamClaudeCode({
       command: this.command,
       args: this.buildLegacyArgs(request, model, params),
       cwd: this.runtime.vaultRoot,
@@ -250,19 +272,16 @@ export class ClaudeCodeClient implements ChatClient {
   }
 
   /**
-   * Legacy subprocess environment, inherited from the plugin's process plus speed
-   * tuning. `*_NONESSENTIAL_*` mute the CLI's boot-time update checks, telemetry,
-   * and background model calls (the dominant cold-start tax). Reasoning rides the
-   * `--effort` flag ({@link buildLegacyArgs}) now, the retired
-   * `MAX_THINKING_TOKENS` budget only ever applied to pre-adaptive models.
+   * Legacy subprocess environment, inherited from the plugin's process plus the
+   * shared harness tuning ({@link claudeCodeHarnessEnv}: speed vars + disabled CLI
+   * compaction). Reasoning rides the `--effort` flag ({@link buildLegacyArgs}) now,
+   * the retired `MAX_THINKING_TOKENS` budget only ever applied to pre-adaptive
+   * models.
    */
   private buildLegacyEnv(): NodeJS.ProcessEnv {
     return {
       ...process.env,
-      CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC:
-        process.env.CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC ?? "1",
-      DISABLE_NON_ESSENTIAL_MODEL_CALLS:
-        process.env.DISABLE_NON_ESSENTIAL_MODEL_CALLS ?? "1",
+      ...claudeCodeHarnessEnv(),
     };
   }
 

@@ -171,9 +171,7 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
 
   await store.persistActiveConversation();
 
-  const contextWindow =
-    activeModel.contextWindowSize ??
-    plugin.services.modelAvailability.getActiveContextLength(activeModel.modelId);
+  const contextWindow = plugin.services.modelAvailability.resolveContextWindow(activeModel);
   if (contextWindow) {
     const estimatedTokens = estimateTokenCount(apiMessages);
     if (estimatedTokens / contextWindow >= CONTEXT_DANGER_THRESHOLD) {

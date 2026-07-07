@@ -399,12 +399,13 @@ export class LiveVaultReview implements VaultOpReviewer {
         const controller = this.editControllers.get(a.path);
         await controller?.accept(a.hunkId);
         const applied = controller?.getStatus(a.hunkId) === "accepted";
+        const disposition: VaultOpDisposition = applied ? "auto-applied" : "failed";
         const reason = applied ? undefined : "the edit could not be applied to the document";
         results.set(a.callId, {
           content: editDispositionMessage(
             a.kind,
             a.path,
-            applied ? "auto-applied" : "failed",
+            disposition,
             reason,
             a.matchType,
             a.occurrenceCount,
@@ -412,6 +413,8 @@ export class LiveVaultReview implements VaultOpReviewer {
           isReadOnly: false,
           isError: !applied,
           failure: applied ? undefined : { kind: "failed", recovery: reason },
+          // Auto-applied / failed edit outcome, captured for replay (§6 q6).
+          disposition,
         });
       }
       if (autoApplied.length > 0) this.renderEditPanel();
@@ -432,6 +435,8 @@ export class LiveVaultReview implements VaultOpReviewer {
           isReadOnly: false,
           isError: disposition === "failed",
           failure: disposition === "failed" ? { kind: "failed", recovery: reason } : undefined,
+          // The edit-channel sibling of dispoResult's disposition capture (§6 q6).
+          disposition,
         });
       }),
     );
@@ -833,6 +838,10 @@ function dispoResult(
     isReadOnly: false,
     isError: disposition === "failed",
     failure: disposition === "failed" ? { kind: "failed", recovery: reason } : undefined,
+    // Carry the real outcome to the tool-result choke points so a step persists it,
+    // a decline resolves isError:false and is otherwise indistinguishable from an
+    // applied op (cold-rebuild-fidelity §6 question 6).
+    disposition,
   };
 }
 

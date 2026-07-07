@@ -19,6 +19,7 @@ import type { SessionConfig } from "../api/harnessSession";
 import { isCliVersionCompatible } from "../api/sdkVersionGuard";
 import type { RagService } from "../rag/ragService";
 import type { CanonicalToolDefinition, ToolCall, ToolResult } from "../tools/types";
+import type { VaultOpDisposition } from "../vault-ops/disposition";
 import { VAULT_TOOL_NAMES } from "../tools/vault/definition";
 import { executeVaultTool } from "../tools/vault/handlers";
 import { toolFailure } from "../tools/toolFailure";
@@ -67,10 +68,17 @@ export type ClaudeCodeToolEvent =
       /**
        * The tool result text returned to Claude Code. Surfaced on the timeline step's
        * error block when `isError`, so a failed call (e.g. an edit's no-match) shows
-       * what the model saw, Claude Code's loop is otherwise opaque to the UI.
+       * what the model saw, Claude Code's loop is otherwise opaque to the UI. Also the
+       * source the step's replay digest + bounded record are computed from (phase 2).
        */
       content: string;
       toolCallId: string;
+      /**
+       * The reviewed op's real disposition, when this call went through the live
+       * review, so the step persists the outcome for the cold-rebuild replay digest
+       * (a decline resolves `isError: false`; §6 question 6). Absent on read tools.
+       */
+      disposition?: VaultOpDisposition;
     };
 
 /** Options for a single Claude Code run, set just before the subprocess is spawned. */
@@ -417,10 +425,14 @@ export class ClaudeCodeService {
         // The result text the model received, carried to the timeline so a failed
         // call shows its error. Defaults cover a thrown executor (no result object).
         let content = "The tool threw an unexpected error.";
+        // The reviewed op's real disposition, when present, so the persisted step
+        // records the outcome for the cold-rebuild replay digest (§6 question 6).
+        let disposition: VaultOpDisposition | undefined;
         try {
           const result = await this.executeTool(call, toolCallId);
           isError = result.isError ?? false;
           content = result.content;
+          disposition = result.disposition;
           return result;
         } finally {
           this.toolListener?.({
@@ -430,6 +442,7 @@ export class ClaudeCodeService {
             isError,
             content,
             toolCallId,
+            disposition,
           });
         }
       },

@@ -323,6 +323,61 @@ describe("normalizeConversation, editProposal / appliedEdit validation", () => {
   });
 });
 
+describe("normalizeConversation, phase-2 agenticStep capture fields", () => {
+  test("preserves disposition / resultDigest / resultRecord across a JSON round-trip", () => {
+    const msg: ConversationMessage = {
+      id: "msg-1",
+      role: "assistant",
+      content: "Done.",
+      agenticSteps: [
+        {
+          type: "tool_call",
+          round: 0,
+          toolName: "semantic_search",
+          toolCallId: "s-1",
+          resultDigest: '[semantic_search: "oath", surfaced: Chapters/ch1.md]',
+          resultRecord: 'Search results for: "oath"\n\n[Chapters/ch1.md] (score: 0.9)\nbody',
+        },
+        {
+          type: "tool_call",
+          round: 1,
+          toolName: "create_directory",
+          toolCallId: "d-1",
+          disposition: "declined",
+          resultRecord: 'Declined by user, "Drafts/Arcs" was not changed.',
+        },
+      ],
+    };
+
+    const raw = jsonRoundTrip(makeConversation([msg])) as Record<string, unknown>;
+    const steps = normalizeConversation(raw)!.messages[0].agenticSteps!;
+
+    expect(steps[0].resultDigest).toBe('[semantic_search: "oath", surfaced: Chapters/ch1.md]');
+    expect(steps[0].resultRecord).toContain("Search results for");
+    expect(steps[0].disposition).toBeUndefined();
+    expect(steps[1].disposition).toBe("declined");
+    expect(steps[1].resultDigest).toBeUndefined();
+  });
+
+  test("a step written before phase 2 stays field-free after load (no silent backfill)", () => {
+    // Guards against a serializer defaulting the new fields, which would fake
+    // provenance the old conversation never had.
+    const msg: ConversationMessage = {
+      id: "msg-1",
+      role: "assistant",
+      content: "Done.",
+      agenticSteps: [{ type: "tool_call", round: 0, toolName: "read_file", toolCallId: "r-1" }],
+    };
+
+    const raw = jsonRoundTrip(makeConversation([msg])) as Record<string, unknown>;
+    const step = normalizeConversation(raw)!.messages[0].agenticSteps![0];
+
+    expect(step.disposition).toBeUndefined();
+    expect(step.resultDigest).toBeUndefined();
+    expect(step.resultRecord).toBeUndefined();
+  });
+});
+
 describe("toConversationMeta", () => {
   test("extracts metadata from full conversation", () => {
     const conv = makeConversation([

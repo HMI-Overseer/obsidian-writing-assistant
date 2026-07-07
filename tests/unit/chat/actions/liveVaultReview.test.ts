@@ -431,3 +431,93 @@ describe("LiveVaultReview", () => {
     expect(review.getProposal()?.ops[0].sourceToolCallId).toBe("mcp-tool-id");
   });
 });
+
+/**
+ * Phase-2 disposition capture (cold-rebuild-fidelity §6 question 6). The tool result
+ * must carry the real {@link VaultOpDisposition} the review resolved, so a choke point
+ * can persist it onto the step. Pre-phase this was collapsed to `isError` alone, which
+ * cannot tell a decline (`isError: false`) from an applied op.
+ */
+describe("LiveVaultReview disposition capture", () => {
+  it("carries auto-applied on an auto-gated write", async () => {
+    const review = new LiveVaultReview({
+      app: makeApp(),
+      timelineEl: TIMELINE_EL,
+      policy: POLICY({ create: "auto" }),
+    });
+    const [{ result }] = await review.resolveRound([writeCall("c1", "Notes/A.md")]);
+    expect(result.disposition).toBe("auto-applied");
+  });
+
+  it("carries applied when the user approves an ask-gated op", async () => {
+    const review = new LiveVaultReview({
+      app: makeApp(),
+      timelineEl: TIMELINE_EL,
+      policy: POLICY({ create: "ask" }),
+    });
+    const pending = review.resolveRound([writeCall("c1", "Notes/A.md")]);
+    await flush();
+    captured.callbacks?.onOpResolved?.(captured.proposalOps[0].id, "applied");
+    const [{ result }] = await pending;
+    expect(result.disposition).toBe("applied");
+  });
+
+  it("carries declined when the user declines (the field a decline needs, isError is false)", async () => {
+    const review = new LiveVaultReview({
+      app: makeApp(),
+      timelineEl: TIMELINE_EL,
+      policy: POLICY({ create: "ask" }),
+    });
+    const pending = review.resolveRound([writeCall("c1", "Notes/A.md")]);
+    await flush();
+    captured.callbacks?.onOpResolved?.(captured.proposalOps[0].id, "declined");
+    const [{ result }] = await pending;
+    expect(result.isError).toBeFalsy();
+    expect(result.disposition).toBe("declined");
+  });
+
+  it("carries satisfied for a no-op create_directory on an existing folder", async () => {
+    const review = new LiveVaultReview({
+      app: makeApp({ folders: ["Notes"] }),
+      timelineEl: TIMELINE_EL,
+      policy: POLICY(),
+    });
+    const [{ result }] = await review.resolveRound([
+      { id: "d1", name: "create_directory", arguments: { path: "Notes" } },
+    ]);
+    expect(result.disposition).toBe("satisfied");
+  });
+
+  it("carries failed for a dependent stranded by a declined prerequisite", async () => {
+    const review = new LiveVaultReview({
+      app: makeApp(),
+      timelineEl: TIMELINE_EL,
+      policy: POLICY(),
+    });
+    const pending = review.resolveRound([
+      { id: "d1", name: "create_directory", arguments: { path: "Drafts" } },
+      writeCall("c1", "Drafts/A.md"),
+    ]);
+    await flush();
+    const dirOp = captured.proposalOps[0];
+    dirOp.status = "rejected";
+    captured.callbacks?.onOpResolved?.(dirOp.id, "declined");
+    const results = await pending;
+    expect(results[0].result.disposition).toBe("declined");
+    expect(results[1].result.isError).toBe(true);
+    expect(results[1].result.disposition).toBe("failed");
+  });
+
+  it("carries auto-applied on an auto-gated edit (edit channel sibling)", async () => {
+    const review = new LiveVaultReview({
+      app: makeApp({ files: ["Notes/A.md"], content: "She nodded. He waited." }),
+      timelineEl: TIMELINE_EL,
+      policy: POLICY({ edit: "auto" }),
+      edit: EDIT_DEPS(),
+    });
+    const [{ result }] = await review.resolveEdits([
+      { id: "e1", name: "propose_edit", arguments: { path: "Notes/A.md", search: "She nodded.", replace: "She smiled." } },
+    ]);
+    expect(result.disposition).toBe("auto-applied");
+  });
+});

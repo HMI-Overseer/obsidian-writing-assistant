@@ -24,6 +24,7 @@ import type { VaultToolContext, ToolExecutionContext, VaultOpToolContext } from 
 import { LiveVaultReview } from "./liveVaultReview";
 import { AgenticTimeline } from "../messages/AgenticTimeline";
 import { extractToolInput } from "../../tools/metadata";
+import { captureStepFields } from "../../tools/resultDigest";
 import { CONTEXT_DANGER_THRESHOLD } from "../../constants";
 
 /**
@@ -290,6 +291,14 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
             // A failed call (e.g. an edit no-match, which never reaches the review
             // overlay) flags its step red and reveals the error returned to the model.
             ...(event.isError && { isError: true, errorContent: event.content }),
+            // Phase-2 replay capture: disposition + discovery digest + bounded record.
+            // This is the Claude Code choke point (the MCP loop is otherwise opaque to
+            // the plugin transcript); the plugin tool loop is the sibling choke point.
+            ...captureStepFields(event.toolName, event.args, {
+              content: event.content,
+              isError: event.isError,
+              disposition: event.disposition,
+            }),
           });
         }
       });

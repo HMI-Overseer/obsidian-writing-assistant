@@ -1,3 +1,5 @@
+import type { VaultOpDisposition } from "../vault-ops/disposition";
+
 /** JSON Schema subset for tool parameter definitions. */
 export interface JsonSchemaProperty {
   type: "string" | "number" | "boolean" | "array" | "object";
@@ -122,6 +124,14 @@ export interface ToolResult {
    * error result means "not yet migrated to the contract," not "no failure."
    */
   failure?: ToolFailure;
+  /**
+   * The reviewed mutation's real disposition, set by the live vault-op / edit review
+   * ({@link ../chat/actions/liveVaultReview}). Read at the tool-result choke points
+   * so a step persists the outcome (a decline resolves `isError: false`, so nothing
+   * else distinguishes it). Absent on read tools and unreviewed calls. Not sent to
+   * the model, the disposition already lives in {@link content}.
+   */
+  disposition?: VaultOpDisposition;
 }
 
 /**

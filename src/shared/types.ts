@@ -1,6 +1,7 @@
 import type { EditProposal, AppliedEditRecord } from "../editing/editTypes";
 import type { VaultOperationProposal, AppliedVaultOpRecord } from "../vault-ops/types";
 import type { VaultOpPolicy } from "../vault-ops/gateway";
+import type { VaultOpDisposition } from "../vault-ops/disposition";
 import type { ToolCall } from "../tools/types";
 
 // ---------------------------------------------------------------------------
@@ -239,7 +240,16 @@ export interface MessageVersion {
   ragSources?: RagSourceRef[];
 }
 
-/** A single step recorded during agentic tool-call execution. Stored with the message but never sent to the API. */
+/**
+ * A single step recorded during agentic tool-call execution. Stored with the
+ * message. Still never sent to the API *verbatim*, but as of phase 2 it carries the
+ * replay-capture fields ({@link disposition}, {@link resultDigest},
+ * {@link resultRecord}) that the claudecode cold rebuild reads at replay time
+ * (phase 3), where it derives a compact digest from them (see
+ * docs/work/issues/claude-code-cold-rebuild-fidelity.md §4.A / §A.1). All three are
+ * optional forever: conversations written before phase 2 lack them and replay must
+ * degrade to today's behavior when they are absent.
+ */
 export interface AgenticStep {
   type: "tool_call" | "reasoning";
   round: number;
@@ -268,6 +278,28 @@ export interface AgenticStep {
   errorContent?: string;
   /** For reasoning: the model's prose emitted between tool rounds. */
   text?: string;
+  /**
+   * For tool_call: the real disposition of a reviewed vault-op / edit call
+   * (applied / declined / failed / ...), captured where {@link ../chat/actions/liveVaultReview.LiveVaultReview}
+   * returns the outcome to the model. A declined op resolves `isError: false`, so
+   * this is the only field that tells a decline from an applied op; the phase-3
+   * replay digest reads it to reconstruct the user's steering (issue §6 question 6).
+   */
+  disposition?: VaultOpDisposition;
+  /**
+   * For tool_call: a compact, pointers-only digest of a discovery-tool result (e.g.
+   * `[semantic_search: "q", surfaced: path > heading; ...]`), computed at capture
+   * time ({@link ../tools/resultDigest.formatResultDigest}). Discovery-class tools
+   * only; absent otherwise. No scores, no chunk content (issue §A.1).
+   */
+  resultDigest?: string;
+  /**
+   * For tool_call: the tool result text returned to the model, bounded to
+   * {@link ../tools/resultDigest.TOOL_RESULT_CHAR_LIMIT} chars. The richer source the
+   * replay digest is computed from and a future debugging record (issue §6
+   * questions 9/10); bounded so vault content in the conversation JSON stays small.
+   */
+  resultRecord?: string;
 }
 
 /**

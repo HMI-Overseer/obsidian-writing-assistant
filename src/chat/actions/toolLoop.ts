@@ -3,6 +3,8 @@ import type { ChatClient } from "../../api/chatClient";
 import type { ChatRequest, ChatTurn } from "../../shared/chatRequest";
 import type { AgenticStep, ProviderOption, SamplingParams } from "../../shared/types";
 import type { ToolCall, ToolResult } from "../../tools/types";
+import type { VaultOpDisposition } from "../../vault-ops/disposition";
+import { captureStepFields } from "../../tools/resultDigest";
 import type { UsageResult, StopReason } from "../../api/usageTypes";
 import { VAULT_TOOL_NAMES } from "../../tools/vault/definition";
 import { executeVaultTool } from "../../tools/vault/handlers";
@@ -62,9 +64,13 @@ export interface ToolLoopCallbacks {
   /**
    * Called once a vault-op / edit step resolves (it was recorded before the user
    * decided). Carries the tool result so the timeline can flag failures / declines /
-   * policy-denials and surface the model-facing error text.
+   * policy-denials and surface the model-facing error text, plus the real
+   * `disposition` the timeline persists for the cold-rebuild replay digest (phase 2).
    */
-  onStepResult?: (toolCallId: string, result: { isError?: boolean; content: string }) => void;
+  onStepResult?: (
+    toolCallId: string,
+    result: { isError?: boolean; content: string; disposition?: VaultOpDisposition },
+  ) => void;
   /** Called with each text delta during streaming for live reasoning display in the timeline. */
   onReasoningDelta?: (delta: string) => void;
   /**
@@ -463,13 +469,21 @@ export async function runToolLoop(
         // The result is in hand here, so a failed read-only tool flags its step
         // immediately (no separate onStepResult round-trip).
         ...(result.isError && { isError: true, errorContent: result.content }),
+        // Phase-2 replay capture (discovery digest + bounded record); the sibling
+        // choke point is Claude Code's callTool end event.
+        ...captureStepFields(tc.name, tc.arguments, result),
       });
     }
     // Vault-op and edit steps were already recorded before resolution, push results,
-    // and report the outcome so the timeline can flag failures / declines / denials.
+    // and report the outcome so the timeline can flag failures / declines / denials
+    // and capture the disposition + bounded record for replay (phase 2).
     for (const { tc, result } of [...vaultOpResults, ...editResults]) {
       toolLoopTurns.push({ role: "tool", content: result.content, toolCallId: tc.id });
-      callbacks.onStepResult?.(tc.id, { isError: result.isError, content: result.content });
+      callbacks.onStepResult?.(tc.id, {
+        isError: result.isError,
+        content: result.content,
+        disposition: result.disposition,
+      });
     }
 
     previousRoundsText = fullText;

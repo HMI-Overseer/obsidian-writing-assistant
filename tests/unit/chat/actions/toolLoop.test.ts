@@ -454,6 +454,112 @@ describe("runToolLoop step results", () => {
 });
 
 /**
+ * Phase-2 replay capture at the plugin tool-loop choke point (cold-rebuild-fidelity
+ * §A.1 / question 6 / question 9). The read channel records the digest + bounded
+ * record with the result in hand; the vault-op / edit channel threads the reviewed
+ * disposition through onStepResult. Pre-phase neither field existed.
+ */
+describe("runToolLoop phase-2 replay capture", () => {
+  const app = {
+    vault: { adapter: {}, getName: () => "", getAbstractFileByPath: () => null },
+  } as unknown as App;
+
+  const recordedStep = (cb: ReturnType<typeof makeCallbacks>, id: string) =>
+    (cb.onStepRecorded as ReturnType<typeof vi.fn>).mock.calls.map((c) => c[0]).find((s) => s.toolCallId === id);
+
+  it("captures a discovery digest + bounded record on the read choke point", async () => {
+    const cb = makeCallbacks();
+    // No vaultToolContext: the read resolves to an "unavailable" failure, which is
+    // enough to prove the fields are captured here without a live RAG backend.
+    const client = countingClient([
+      {
+        deltas: ["searching"],
+        toolCalls: [{ id: "s-1", name: "semantic_search", arguments: { query: "oath" } }],
+        stopReason: "tool_use",
+      },
+      { deltas: ["done"], toolCalls: null, stopReason: "end_turn" },
+    ]);
+    await runToolLoop(client, baseRequest, "test-model", "lmstudio", {} as never, signal(), cb, 20, true);
+
+    const step = recordedStep(cb, "s-1");
+    expect(step.resultRecord).toContain("vault tool context unavailable");
+    expect(step.resultDigest).toBe('[semantic_search: "oath", FAILED: vault tool context unavailable]');
+  });
+
+  it("captures a bounded record but no digest for a non-discovery read", async () => {
+    const cb = makeCallbacks();
+    const client = countingClient([
+      {
+        deltas: ["reading"],
+        toolCalls: [{ id: "r-1", name: "read_file", arguments: { path: "x.md" } }],
+        stopReason: "tool_use",
+      },
+      { deltas: ["done"], toolCalls: null, stopReason: "end_turn" },
+    ]);
+    await runToolLoop(client, baseRequest, "test-model", "lmstudio", {} as never, signal(), cb, 20, true);
+
+    const step = recordedStep(cb, "r-1");
+    expect(step.resultRecord).toContain("vault tool context unavailable");
+    expect(step.resultDigest).toBeUndefined();
+  });
+
+  it("threads a reviewed vault-op disposition through onStepResult (write choke point)", async () => {
+    const cb = { ...makeCallbacks(), onStepResult: vi.fn() };
+    const vaultOpName = [...VAULT_OPS_TOOL_NAMES][0];
+    const opCall: ToolCall = { id: "vo-1", name: vaultOpName, arguments: { path: "Drafts/Arcs" } };
+    const liveReview = {
+      resolveRound: vi.fn(async (calls: ToolCall[]) =>
+        calls.map((tc) => ({
+          tc,
+          result: { isError: false, content: "Declined by user.", disposition: "declined" as const },
+        })),
+      ),
+      resolveEdits: vi.fn(async () => []),
+    } as unknown as LiveVaultReview;
+
+    const client = countingClient([
+      { deltas: ["making a folder"], toolCalls: [opCall], stopReason: "tool_use" },
+      { deltas: ["done"], toolCalls: null, stopReason: "end_turn" },
+    ]);
+    await runToolLoop(
+      client, baseRequest, "test-model", "lmstudio", {} as never, signal(), cb, 20, true,
+      undefined, undefined, { app, liveReview },
+    );
+
+    expect(cb.onStepResult).toHaveBeenCalledWith("vo-1", {
+      isError: false,
+      content: "Declined by user.",
+      disposition: "declined",
+    });
+  });
+
+  it("threads each disposition value distinctly (applied / failed)", async () => {
+    const vaultOpName = [...VAULT_OPS_TOOL_NAMES][0];
+    for (const disposition of ["applied", "failed"] as const) {
+      const cb = { ...makeCallbacks(), onStepResult: vi.fn() };
+      const opCall: ToolCall = { id: "vo-x", name: vaultOpName, arguments: { path: "A" } };
+      const liveReview = {
+        resolveRound: vi.fn(async (calls: ToolCall[]) =>
+          calls.map((tc) => ({ tc, result: { isError: disposition === "failed", content: "outcome", disposition } })),
+        ),
+        resolveEdits: vi.fn(async () => []),
+      } as unknown as LiveVaultReview;
+
+      const client = countingClient([
+        { deltas: ["op"], toolCalls: [opCall], stopReason: "tool_use" },
+        { deltas: ["done"], toolCalls: null, stopReason: "end_turn" },
+      ]);
+      await runToolLoop(
+        client, baseRequest, "test-model", "lmstudio", {} as never, signal(), cb, 20, true,
+        undefined, undefined, { app, liveReview },
+      );
+
+      expect(cb.onStepResult).toHaveBeenCalledWith("vo-x", expect.objectContaining({ disposition }));
+    }
+  });
+});
+
+/**
  * Callback-sequence characterization. The P1-15 decomposition (lifting the
  * in-loop resolvers to module level + extracting call classification) is a
  * behavior-preserving refactor of streaming, concurrent, callback-heavy code,

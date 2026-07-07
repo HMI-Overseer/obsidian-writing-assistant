@@ -1,6 +1,8 @@
 import { setIcon } from "obsidian";
 import type { AgenticStep } from "../../shared/types";
+import type { VaultOpDisposition } from "../../vault-ops/disposition";
 import { TOOL_ICONS, TOOL_LABELS, isMutatingTool } from "../../tools/metadata";
+import { captureStepFields } from "../../tools/resultDigest";
 
 /**
  * A live-updating timeline of agentic tool calls and reasoning steps.
@@ -127,8 +129,15 @@ export class AgenticTimeline {
    * lands here. Updates the stored step (so {@link getSteps} persists it for history)
    * and the live DOM, in both directions: an error result decorates the step, a
    * non-error result strips any decoration so the two never drift.
+   *
+   * Also captures the phase-2 replay fields (disposition + bounded record) the
+   * pre-resolution record could not hold, via the same {@link captureStepFields} the
+   * read channel spreads at record time (cold-rebuild-fidelity §6 q6 / question 9).
    */
-  setStepResult(toolCallId: string, result: { isError?: boolean; content: string }): void {
+  setStepResult(
+    toolCallId: string,
+    result: { isError?: boolean; content: string; disposition?: VaultOpDisposition },
+  ): void {
     const step = this.steps.find(
       (s) => s.type === "tool_call" && s.toolCallId === toolCallId,
     );
@@ -140,6 +149,7 @@ export class AgenticTimeline {
         delete step.isError;
         delete step.errorContent;
       }
+      Object.assign(step, captureStepFields(step.toolName ?? "", step.toolArgs ?? {}, result));
     }
     const stepEl = this.listEl.querySelector<HTMLElement>(
       `[data-tool-call-id="${CSS.escape(toolCallId)}"]`,

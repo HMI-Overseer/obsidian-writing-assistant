@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   canFlipEffortMidSession,
+  decideRecovery,
   decideReuse,
   diagnoseSessionReuse,
   fingerprint,
@@ -10,6 +11,7 @@ import {
   type SessionConfig,
   type SessionTurn,
 } from "../../../src/api/harnessSession";
+import type { ClaudeCodeResumeCursor } from "../../../src/shared/types";
 
 function cfg(overrides: Partial<SessionConfig> = {}): SessionConfig {
   return {
@@ -255,5 +257,97 @@ describe("decideReuse", () => {
 
   it("keeps no-session when there is neither a held session nor a tombstone", () => {
     expect(decideReuse(undefined, live, cfg())).toEqual({ reuse: false, reason: "no-session" });
+  });
+});
+
+describe("decideRecovery", () => {
+  const covered = turns(["user", "hi"], ["assistant", "yo"]);
+  const live: SessionTurn[] = [...covered, { role: "user", content: "next" }];
+
+  function cursorFor(
+    transcript: SessionTurn[],
+    config: SessionConfig,
+    sessionId = "sess-1",
+  ): ClaudeCodeResumeCursor {
+    return {
+      sessionId,
+      coveredCount: transcript.length,
+      prefixHash: hashPrefix(transcript, transcript.length),
+      configFingerprint: fingerprint(config),
+    };
+  }
+
+  it("reuses a valid live session and never even reads the cursor", () => {
+    const existing = { isDisposed: false, meta: metaFor(covered, cfg()) };
+    // A cursor that would itself resume cleanly must NOT preempt the warm process.
+    expect(decideRecovery(existing, live, cfg(), cursorFor(covered, cfg()))).toEqual({
+      outcome: "reused",
+    });
+  });
+
+  it("rebuilds (never resumes) when a live session exists but is invalid", () => {
+    const existing = { isDisposed: false, meta: metaFor(covered, cfg()) };
+    // The live session's own diagnosis drives the reason; the resume tier is skipped
+    // entirely while any live process is held.
+    expect(
+      decideRecovery(existing, live, cfg({ systemPrompt: "different" }), cursorFor(covered, cfg())),
+    ).toEqual({ outcome: "rebuilt", reason: "system-prompt-changed" });
+  });
+
+  it("resumes from the cursor when no live session is held and the gate passes", () => {
+    const cursor = cursorFor(covered, cfg());
+    expect(decideRecovery(undefined, live, cfg(), cursor)).toEqual({
+      outcome: "resumed",
+      cursor,
+    });
+  });
+
+  it("resumes even after an idle-eviction tombstone (the cursor outranks it)", () => {
+    const cursor = cursorFor(covered, cfg());
+    expect(decideRecovery(undefined, live, cfg(), cursor, "session-disposed")).toEqual({
+      outcome: "resumed",
+      cursor,
+    });
+  });
+
+  it("rebuilds (history-edited) when the cursor's prefix hash mismatches", () => {
+    const tampered = cursorFor(covered, cfg());
+    tampered.prefixHash = "deadbeef";
+    expect(decideRecovery(undefined, live, cfg(), tampered)).toEqual({
+      outcome: "rebuilt",
+      reason: "history-edited",
+    });
+  });
+
+  it("rebuilds (config-changed) when the cursor's config fingerprint mismatches", () => {
+    // A model swap across the restart changes the fingerprint the cursor carries.
+    const cursor = cursorFor(covered, cfg());
+    expect(decideRecovery(undefined, live, cfg({ model: "claude-opus-4-8" }), cursor)).toEqual({
+      outcome: "rebuilt",
+      reason: "config-changed",
+    });
+  });
+
+  it("rebuilds (turn-count) when more than the new user turn is uncovered", () => {
+    const cursor = cursorFor(covered, cfg());
+    const extra: SessionTurn[] = [...live, { role: "assistant", content: "stray" }];
+    expect(decideRecovery(undefined, extra, cfg(), cursor)).toEqual({
+      outcome: "rebuilt",
+      reason: "turn-count",
+    });
+  });
+
+  it("rebuilds with the tombstone reason when there is no cursor to resume", () => {
+    expect(decideRecovery(undefined, live, cfg(), undefined, "session-disposed")).toEqual({
+      outcome: "rebuilt",
+      reason: "session-disposed",
+    });
+  });
+
+  it("rebuilds no-session with neither a live session, a cursor, nor a tombstone", () => {
+    expect(decideRecovery(undefined, live, cfg(), undefined)).toEqual({
+      outcome: "rebuilt",
+      reason: "no-session",
+    });
   });
 });

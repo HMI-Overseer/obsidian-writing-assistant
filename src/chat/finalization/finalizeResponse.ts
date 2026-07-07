@@ -28,7 +28,9 @@ export function attachUsageToMessage(
       ...(usage.cacheCreationInputTokens !== undefined && { cacheCreationInputTokens: usage.cacheCreationInputTokens }),
       ...(usage.cacheReadInputTokens !== undefined && { cacheReadInputTokens: usage.cacheReadInputTokens }),
       ...(usage.sessionReused !== undefined && { sessionReused: usage.sessionReused }),
+      ...(usage.sessionResumed !== undefined && { sessionResumed: usage.sessionResumed }),
       ...(usage.sessionRebuildReason !== undefined && { sessionRebuildReason: usage.sessionRebuildReason }),
+      ...(usage.resumeCursor !== undefined && { resumeCursor: usage.resumeCursor }),
       ...(usage.contextTokens !== undefined && { contextTokens: usage.contextTokens }),
       ...(costUsd !== undefined && { estimatedCostUsd: costUsd }),
     };

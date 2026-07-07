@@ -1,5 +1,5 @@
 import type { ToolCall } from "../tools/types";
-import type { SessionRebuildReason } from "../shared/types";
+import type { ClaudeCodeResumeCursor, SessionRebuildReason } from "../shared/types";
 
 /** Token usage returned by a provider after a completion request. */
 export interface UsageResult {
@@ -17,13 +17,25 @@ export interface UsageResult {
    */
   costUsd?: number;
   /**
-   * Claude Code only: whether this turn reused the live session (true) or
-   * cold-rebuilt it (false). Undefined for every other provider and for Claude
-   * Code turns without a persistent session (Phase 0 cache instrumentation).
+   * Claude Code only: whether this turn reused the warm live session (true) or did
+   * not (false, a disk resume or a synthetic rebuild). Undefined for every other
+   * provider and for Claude Code turns without a persistent session.
    */
   sessionReused?: boolean;
+  /**
+   * Claude Code only: whether this turn restored the session from disk (Model A′)
+   * rather than reusing a warm process or rebuilding. Mutually exclusive with
+   * {@link sessionReused}.
+   */
+  sessionResumed?: boolean;
   /** Claude Code only: when the session cold-rebuilt, the change that drove it. */
   sessionRebuildReason?: SessionRebuildReason;
+  /**
+   * Claude Code only: the on-disk resume cursor this turn's session banked (Model
+   * A′), forwarded so it can be persisted onto the assistant message and read back
+   * next turn as the conversation's resume point.
+   */
+  resumeCursor?: ClaudeCodeResumeCursor;
   /**
    * Claude Code only: the model's context-window size (tokens) as the CLI itself
    * reports it (`modelUsage.contextWindow`). Feeds the capacity ring for a

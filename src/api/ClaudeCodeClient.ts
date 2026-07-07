@@ -13,8 +13,9 @@ import {
 } from "./claudeCodeProcess";
 import { streamSdkTurn, DISALLOWED_NATIVE_TOOLS } from "./sdk/sdkQueryEngine";
 import { isEffortLevel } from "../shared/reasoning";
+import type { ClaudeCodeResumeCursor } from "../shared/types";
 import type { McpSdkServerConfigWithInstance } from "./sdk/claudeAgentSdk";
-import type { SessionReuseDiagnosis, SessionTurn } from "./harnessSession";
+import type { SessionRecovery, SessionTurn } from "./harnessSession";
 
 /**
  * One turn's input to the persistent-session path. The client builds both prompt
@@ -33,8 +34,10 @@ export interface SdkSessionTurnInput {
   turns: SessionTurn[];
   signal?: AbortSignal;
   onResult?: (result: ClaudeCodeResultUsage) => void;
-  /** Reports whether this turn reused the live session or cold-rebuilt it. */
-  onReuseDecision?: (decision: SessionReuseDiagnosis) => void;
+  /** Reports the recovery tier this turn took: reused / resumed / rebuilt. */
+  onRecoveryDecision?: (decision: SessionRecovery) => void;
+  /** Receives the resume cursor this turn banked, to persist as the resume point. */
+  onSessionBanked?: (cursor: ClaudeCodeResumeCursor) => void;
 }
 
 /**
@@ -102,7 +105,8 @@ export class ClaudeCodeClient implements ChatClient {
     signal?: AbortSignal,
   ): Promise<CompletionResult> {
     let captured: ClaudeCodeResultUsage | null = null;
-    let decision: SessionReuseDiagnosis | undefined;
+    let decision: SessionRecovery | undefined;
+    let bankedCursor: ClaudeCodeResumeCursor | undefined;
     const parts: string[] = [];
 
     const deltas = this.runTurn(
@@ -112,13 +116,14 @@ export class ClaudeCodeClient implements ChatClient {
       signal,
       (result) => { captured = result; },
       (d) => { decision = d; },
+      (cursor) => { bankedCursor = cursor; },
     );
 
     for await (const delta of deltas) parts.push(delta);
 
     return {
       text: parts.join(""),
-      usage: applyReuseDecision(toUsageResult(captured), decision),
+      usage: applyRecoveryDecision(toUsageResult(captured), decision, bankedCursor),
       toolCalls: null,
       stopReason: "end_turn",
     };
@@ -132,7 +137,8 @@ export class ClaudeCodeClient implements ChatClient {
     _onToolCallStreaming?: (index: number, name: string) => void,
   ): StreamResult {
     let captured: ClaudeCodeResultUsage | null = null;
-    let decision: SessionReuseDiagnosis | undefined;
+    let decision: SessionRecovery | undefined;
+    let bankedCursor: ClaudeCodeResumeCursor | undefined;
     let resolveUsage!: (value: UsageResult | null) => void;
     let resolveToolCalls!: (value: ToolCall[] | null) => void;
     let resolveStopReason!: (value: StopReason) => void;
@@ -148,6 +154,7 @@ export class ClaudeCodeClient implements ChatClient {
       signal,
       (result) => { captured = result; },
       (d) => { decision = d; },
+      (cursor) => { bankedCursor = cursor; },
     );
 
     // Mirror the AnthropicClient contract: deferred promises resolve only after
@@ -156,7 +163,7 @@ export class ClaudeCodeClient implements ChatClient {
       try {
         yield* rawDeltas;
       } finally {
-        resolveUsage(applyReuseDecision(toUsageResult(captured), decision));
+        resolveUsage(applyRecoveryDecision(toUsageResult(captured), decision, bankedCursor));
         // Claude Code runs its own tools internally via MCP, it never returns
         // plugin tool calls through the stream.
         resolveToolCalls(null);
@@ -178,7 +185,8 @@ export class ClaudeCodeClient implements ChatClient {
     params: SamplingParams,
     signal: AbortSignal | undefined,
     onResult: (result: ClaudeCodeResultUsage) => void,
-    onReuseDecision?: (decision: SessionReuseDiagnosis) => void,
+    onRecoveryDecision?: (decision: SessionRecovery) => void,
+    onSessionBanked?: (cursor: ClaudeCodeResumeCursor) => void,
   ): AsyncGenerator<string> {
     const prompt = buildClaudeCodePrompt(request);
 
@@ -199,7 +207,8 @@ export class ClaudeCodeClient implements ChatClient {
         })),
         signal,
         onResult,
-        onReuseDecision,
+        onRecoveryDecision,
+        onSessionBanked,
       });
     }
 
@@ -263,7 +272,6 @@ export class ClaudeCodeClient implements ChatClient {
       "--output-format", "stream-json",
       "--verbose",
       "--include-partial-messages",
-      "--no-session-persistence",
       "--model", model,
     ];
 
@@ -319,19 +327,24 @@ function toUsageResult(result: ClaudeCodeResultUsage | null): UsageResult | null
 }
 
 /**
- * Folds the session reuse-vs-rebuild decision onto the turn's usage so it rides
- * the same path to the usage badge (Phase 0 cache instrumentation). A turn with
- * no usage (error / abort) carries no decision; those aren't the baseline-
- * measurement target, and a token-less usage object would render a misleading
- * "0 in / 0 out" badge.
+ * Folds the session recovery decision (reused / resumed / rebuilt) and the banked
+ * resume cursor onto the turn's usage so both ride the same path to the usage badge
+ * and to persistence (Model A′). A turn with no usage (error / abort) carries
+ * neither; those aren't the baseline-measurement target, and a token-less usage
+ * object would render a misleading "0 in / 0 out" badge.
  */
-function applyReuseDecision(
+function applyRecoveryDecision(
   usage: UsageResult | null,
-  decision: SessionReuseDiagnosis | undefined,
+  decision: SessionRecovery | undefined,
+  bankedCursor: ClaudeCodeResumeCursor | undefined,
 ): UsageResult | null {
-  if (!usage || !decision) return usage;
-  usage.sessionReused = decision.reuse;
-  if (!decision.reuse) usage.sessionRebuildReason = decision.reason;
+  if (!usage) return usage;
+  if (decision) {
+    usage.sessionReused = decision.outcome === "reused";
+    if (decision.outcome === "resumed") usage.sessionResumed = true;
+    if (decision.outcome === "rebuilt") usage.sessionRebuildReason = decision.reason;
+  }
+  if (bankedCursor) usage.resumeCursor = bankedCursor;
   return usage;
 }
 

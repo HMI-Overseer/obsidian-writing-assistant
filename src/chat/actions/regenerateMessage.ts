@@ -79,6 +79,9 @@ export async function regenerateMessage(options: RegenerateOptions): Promise<voi
       posture,
       activeFilePath: plugin.app.workspace.getActiveFile()?.path,
       conversationId: store.getActiveConversationId() ?? undefined,
+      // Regenerate rewinds the transcript, so the resume gate rejects this cursor and
+      // the turn synthetically rebuilds (§6.3); passed for a uniform recovery path.
+      resumeCursor: store.getClaudeCodeResumeCursor(),
     }),
   );
 

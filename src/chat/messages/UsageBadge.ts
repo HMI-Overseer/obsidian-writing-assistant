@@ -198,11 +198,14 @@ export function renderUsageBadge(
 }
 
 /**
- * Maps a turn's session reuse fields to a label + visual state, or null when the
- * provider doesn't report session reuse (everything but Claude Code). `reused` is
- * a win (warm process), a first-turn `no-session` is a neutral cold mint, and any
- * other rebuild is the regression the prompt-cache work targets. Exported for unit
- * testing and reused by both the face warmth dot and the tooltip session line.
+ * Maps a turn's session recovery fields to a label + visual state, or null when the
+ * provider doesn't report session reuse (everything but Claude Code). The three-rung
+ * recovery ladder (Model A′) is mirrored truthfully: `reused` is a win (warm
+ * process), `resumed` is the middle rung (the process was gone but the session was
+ * restored from disk with its working context intact, only API cache warmth lost),
+ * a first-turn `no-session` is a neutral cold mint, and any other rebuild is the
+ * fidelity-losing state worth watching. Exported for unit testing and reused by both
+ * the face and the tooltip session line.
  *
  * "Synthetic rebuild" is this plugin's own term for a turn served by a session
  * reconstructed from the transcript. It is unrelated to the SDK's
@@ -211,9 +214,11 @@ export function renderUsageBadge(
  */
 export function describeSession(
   usage: MessageUsage,
-): { text: string; state: "reused" | "started" | "rebuilt" } | null {
+): { text: string; state: "reused" | "resumed" | "started" | "rebuilt" } | null {
   if (usage.sessionReused === undefined) return null;
   if (usage.sessionReused) return { text: "session reused", state: "reused" };
+  // Middle rung (Model A′): restored from disk, not a warm reuse and not a rebuild.
+  if (usage.sessionResumed) return { text: "session resumed", state: "resumed" };
   const reason = usage.sessionRebuildReason;
   if (reason === "no-session") return { text: "session started", state: "started" };
   // Only a genuinely reason-less rebuild (a hand-built / older persisted record)

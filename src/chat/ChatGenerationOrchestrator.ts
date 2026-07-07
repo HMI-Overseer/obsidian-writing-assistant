@@ -166,6 +166,7 @@ export class ChatGenerationOrchestrator {
         posture,
         activeFilePath: this.deps.plugin.app.workspace.getActiveFile()?.path,
         conversationId: store.getActiveConversationId() ?? undefined,
+        resumeCursor: store.getClaudeCodeResumeCursor(),
       }),
     );
 

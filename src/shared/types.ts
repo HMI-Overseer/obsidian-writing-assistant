@@ -193,6 +193,31 @@ export type SessionRebuildReason =
   | "history-edited"
   | "turn-count";
 
+/**
+ * The persisted resume cursor for a Claude Code conversation (Model A′). Written
+ * onto the turn's usage the moment its live session banks the watermark; the most
+ * recent claudecode assistant turn carrying one is the conversation's resume point.
+ * Read next turn, when no live process is held, to attempt an on-disk `resume`
+ * before falling all the way back to a synthetic rebuild.
+ *
+ * It carries the whole watermark, not just the session id, so "resume is evidence,
+ * never permission" holds across a restart: the same linearity/config gates the
+ * live-reuse path runs are re-checked against this cursor (our own transcript hash,
+ * never Claude Code's file) before a resume is attempted
+ * (docs/work/issues/claude-code-cold-rebuild-fidelity.md §6.3 / §6.5 item 1). Static
+ * per conversation: the CLI does not rotate the session id across a resume (§6.7.1).
+ */
+export interface ClaudeCodeResumeCursor {
+  /** The CLI session id to resume, from the turn's `result` usage. */
+  sessionId: string;
+  /** Transcript turns the banked session covered (its watermark's `coveredCount`). */
+  coveredCount: number;
+  /** Hash of the covered prefix; a mismatch (edit/insert) blocks the resume. */
+  prefixHash: string;
+  /** Hash of the session config; a mismatch (model/prompt/tool drift) blocks it. */
+  configFingerprint: string;
+}
+
 export interface MessageUsage {
   inputTokens: number;
   outputTokens: number;
@@ -200,13 +225,26 @@ export interface MessageUsage {
   cacheReadInputTokens?: number;
   estimatedCostUsd?: number;
   /**
-   * Claude Code only: whether this turn reused the live session (true) or
-   * cold-rebuilt it (false). Undefined for every other provider and for Claude
-   * Code turns that ran without a persistent session.
+   * Claude Code only: whether this turn reused the warm live session (true) or did
+   * not (false, a disk resume or a synthetic rebuild). Undefined for every other
+   * provider and for Claude Code turns that ran without a persistent session.
    */
   sessionReused?: boolean;
+  /**
+   * Claude Code only: whether this turn restored the session from disk (Model A′)
+   * rather than reusing a warm process or rebuilding. The middle recovery rung: the
+   * working context survived, only API cache warmth was lost. Mutually exclusive
+   * with {@link sessionReused}.
+   */
+  sessionResumed?: boolean;
   /** Claude Code only: when the session cold-rebuilt, the change that drove it. */
   sessionRebuildReason?: SessionRebuildReason;
+  /**
+   * Claude Code only: the on-disk resume cursor this turn's session banked (Model
+   * A′). The most recent turn carrying one is the conversation's resume point; it
+   * is read next turn to attempt a `resume` before a synthetic rebuild.
+   */
+  resumeCursor?: ClaudeCodeResumeCursor;
   /**
    * The provider-reported context size (tokens) when this response was
    * generated (Claude Code: prompt of the turn's last internal API call). The

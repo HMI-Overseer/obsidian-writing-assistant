@@ -17,7 +17,7 @@ vi.mock("../../src/api/sdk/claudeAgentSdk", () => ({
   isSdkAvailable: () => true,
 }));
 
-import { streamSdkTurn, type SdkTurnOptions } from "../../src/api/sdk/sdkQueryEngine";
+import { streamSdkTurn, buildSdkOptions, type SdkTurnOptions } from "../../src/api/sdk/sdkQueryEngine";
 import type { ClaudeCodeResultUsage } from "../../src/api/claudeCodeProcess";
 
 function textDeltaMessage(text: string) {
@@ -126,7 +126,7 @@ describe("streamSdkTurn", () => {
     expect(captured!.contextWindow).toBe(200000);
   });
 
-  it("passes the resolved binary, model, and disabled persistence to the SDK", async () => {
+  it("passes the resolved binary and model, leaves session persistence on, and resumes nothing", async () => {
     feed([successResult()]);
     await drain(streamSdkTurn(baseOptions()));
 
@@ -134,9 +134,13 @@ describe("streamSdkTurn", () => {
     expect(params.prompt).toBe("hello");
     expect(params.options.pathToClaudeCodeExecutable).toBe("/usr/bin/claude");
     expect(params.options.model).toBe("claude-sonnet-4-6");
-    expect(params.options.persistSession).toBe(false);
+    // Model A′: persistence is the SDK default (on), no longer forced off, so a
+    // turn's session id can later be resumed; the one-shot path resumes nothing.
+    expect(params.options.persistSession).toBeUndefined();
+    expect(params.options.resume).toBeUndefined();
     expect(params.options.settingSources).toEqual([]);
   });
+
 
   it("passes an effort tier through as the SDK effort option", async () => {
     feed([successResult()]);
@@ -225,5 +229,21 @@ describe("streamSdkTurn", () => {
       drain(streamSdkTurn(baseOptions({ signal: controller.signal }))),
     ).rejects.toMatchObject({ name: "AbortError" });
     expect(queryMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("buildSdkOptions", () => {
+  const base = { model: "claude-sonnet-4-6", systemPrompt: "Be concise.", reasoning: "off" as const, claudePath: "/usr/bin/claude" };
+
+  it("leaves session persistence at the SDK default (on) and sets no resume by default", () => {
+    const options = buildSdkOptions(base, new AbortController());
+    // Model A′: no longer forced off, so a session id can be resumed later.
+    expect(options.persistSession).toBeUndefined();
+    expect(options.resume).toBeUndefined();
+  });
+
+  it("sets the resume id when one is supplied (Model A′ disk resume)", () => {
+    const options = buildSdkOptions({ ...base, resume: "sess-42" }, new AbortController());
+    expect(options.resume).toBe("sess-42");
   });
 });

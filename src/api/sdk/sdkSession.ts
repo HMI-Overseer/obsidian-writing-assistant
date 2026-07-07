@@ -1,15 +1,19 @@
-import type { ReasoningLevel, SessionRebuildReason } from "../../shared/types";
+import type {
+  ClaudeCodeResumeCursor,
+  ReasoningLevel,
+  SessionRebuildReason,
+} from "../../shared/types";
 import type { FlagSettableEffort } from "../../shared/reasoning";
 import { createAbortError } from "../httpTransport";
 import { extractClaudeCodeContextTokens, type ClaudeCodeResultUsage } from "../claudeCodeProcess";
 import {
   canFlipEffortMidSession,
-  decideReuse,
+  decideRecovery,
   fingerprint,
   hashPrefix,
   type HarnessSession,
   type SessionConfig,
-  type SessionReuseDiagnosis,
+  type SessionRecovery,
   type SessionTurn,
 } from "../harnessSession";
 import { resultErrorMessage, resultUsage, textDelta } from "./sdkQueryEngine";
@@ -17,23 +21,26 @@ import { AbortError, query } from "./claudeAgentSdk";
 import type { ModelInfo, Options, Query, SDKMessage, SDKUserMessage } from "./claudeAgentSdk";
 
 /**
- * Model B, the persistent in-memory Claude Code session.
+ * The persistent Claude Code session and its recovery ladder (Model A′).
  *
  * One long-lived SDK `query()` per conversation, driven in streaming-input mode so
  * the `claude` process stays alive between turns, retains context in memory, and
  * caches incrementally (the win one-shot processes can't give,
- * `docs/reference/architecture/claude-code-provider.md`). The session lives only in
- * process memory (`persistSession: false`), never on disk, so it's zero-footprint
- * and a process restart simply loses it → the next turn cold-rebuilds. The
- * zero-footprint stance is superseded as a direction (Model A′: on-disk persistence
- * plus a disk-resume recovery tier, decided 2026-07-07, unimplemented, see
- * `docs/work/issues/claude-code-cold-rebuild-fidelity.md`); until that lands, this
- * comment describes actual behavior.
+ * `docs/reference/architecture/claude-code-provider.md`). Session persistence to
+ * disk is on (the SDK default; the earlier zero-footprint Model B forced it off), so
+ * when the live process is gone (idle eviction, Obsidian restart, plugin reload) the
+ * registry can `resume` the session from `~/.claude` before falling back to a
+ * synthetic rebuild. The three-rung recovery ladder is:
  *
- * The plugin transcript stays authoritative; a session is a disposable cache reused
- * only when {@link isSessionUsable} confirms the live transcript cleanly extends what
- * the session consumed (the registry below makes that call). On any doubt (abort, SDK
- * error, unexpected end) it is disposed and the next turn is cold.
+ *   live reuse (warm process) → disk resume (Model A′) → synthetic rebuild
+ *
+ * The plugin transcript stays authoritative throughout: a live session is reused,
+ * and a disk session resumed, only when {@link decideRecovery} confirms the live
+ * transcript cleanly extends what was banked (linearity + config gates, identical to
+ * live reuse, our own hash never Claude Code's file). On any doubt (abort, SDK error,
+ * unexpected end, config drift, a resume that can't start) it degrades one rung, and
+ * a synthetic rebuild is always the floor. See
+ * `docs/work/issues/claude-code-cold-rebuild-fidelity.md` §6.3.
  */
 
 /** Idle sessions are disposed after this long unused (kills the `claude` process). */
@@ -141,21 +148,35 @@ export class SdkSession {
   private interruptedCleanly = false;
   /** Set when the session compacted its context mid-turn, it must be rebuilt next turn. */
   private compacted = false;
+  /**
+   * The CLI session id observed on the last `result`, the id the persistent-session
+   * disk `resume` (Model A′) targets. On a resumed session it is the same id that was
+   * resumed (the CLI does not rotate it, §6.7.1). Undefined until the first result.
+   */
+  private sessionId: string | undefined;
 
   /**
    * @param buildOptions builds the SDK `Options` given the session's abort
-   *   controller; called once at construction so model / system prompt / MCP
-   *   server are baked for the session's lifetime (config drift → new session).
+   *   controller (and, on a disk resume, the session id to load); called once at
+   *   construction so model / system prompt / MCP server are baked for the session's
+   *   lifetime (config drift → new session).
+   * @param resumeSessionId when set, the session is `resume`d from that id on disk
+   *   (Model A′) rather than minted fresh, so the caller sends only the delta turn.
    */
   constructor(
-    buildOptions: (abortController: AbortController) => Options,
+    buildOptions: (abortController: AbortController, resumeSessionId?: string) => Options,
     meta: HarnessSession,
     effort: ReasoningLevel | null = null,
+    resumeSessionId?: string,
   ) {
     this.meta = meta;
     this.effort = effort;
     this.lastUsedAt = Date.now();
-    this.query = query({ prompt: this.input, options: buildOptions(this.abortController) });
+    this.sessionId = resumeSessionId;
+    this.query = query({
+      prompt: this.input,
+      options: buildOptions(this.abortController, resumeSessionId),
+    });
     this.iterator = this.query[Symbol.asyncIterator]();
   }
 
@@ -190,6 +211,16 @@ export class SdkSession {
    */
   get needsInvalidation(): boolean {
     return this.compacted;
+  }
+
+  /**
+   * The CLI session id this session runs under (from its last `result`), or
+   * undefined before the first result. The registry banks it into the conversation's
+   * resume cursor so a later turn, once the live process is gone, can `resume` it
+   * from disk (Model A′).
+   */
+  get bankedSessionId(): string | undefined {
+    return this.sessionId;
   }
 
   /**
@@ -265,7 +296,9 @@ export class SdkSession {
             // Bank the partial reply as the covered assistant turn, it equals the
             // streamed deltas the chat layer persists on abort, so the next turn can
             // reuse the live session, then surface the abort to the chat layer.
-            ctx.onResult?.(resultUsage(message, contextTokens));
+            const usage = resultUsage(message, contextTokens);
+            this.sessionId = usage.sessionId ?? this.sessionId;
+            ctx.onResult?.(usage);
             this.advanceWatermark(ctx.turns, assistantText);
             this.interruptedCleanly = true;
             this.lastUsedAt = Date.now();
@@ -274,7 +307,9 @@ export class SdkSession {
           if (message.subtype !== "success" || message.is_error) {
             throw new Error(resultErrorMessage(message));
           }
-          ctx.onResult?.(resultUsage(message, contextTokens));
+          const usage = resultUsage(message, contextTokens);
+          this.sessionId = usage.sessionId ?? this.sessionId;
+          ctx.onResult?.(usage);
           this.advanceWatermark(ctx.turns, assistantText);
           this.lastUsedAt = Date.now();
           return;
@@ -352,17 +387,36 @@ export interface SessionTurnRequest {
   turns: readonly SessionTurn[];
   /** Prompt sent on a cold mint, the full transcript. */
   fullPrompt: string;
-  /** Prompt sent on reuse, only the new user turn (the session holds the rest). */
+  /** Prompt sent on reuse *and on a disk resume*, only the new user turn. */
   deltaPrompt: string;
-  /** Builds SDK options for a fresh session (invoked only on a cold mint). */
-  buildOptions: (abortController: AbortController) => Options;
+  /**
+   * Builds SDK options for a session (invoked on a cold mint or a disk resume). The
+   * second argument is the session id to `resume` from disk (Model A′); absent on a
+   * fresh mint.
+   */
+  buildOptions: (abortController: AbortController, resumeSessionId?: string) => Options;
+  /**
+   * The persisted resume cursor for this conversation (Model A′), read from the last
+   * banked turn. When no live session is held, the registry re-checks it against this
+   * turn's transcript and, if it passes, `resume`s the session from disk instead of
+   * rebuilding. Absent ⇒ resume is not attempted.
+   */
+  resumeCursor?: ClaudeCodeResumeCursor;
   signal?: AbortSignal;
   onResult?: (usage: ClaudeCodeResultUsage) => void;
   /**
-   * Reports the reuse-vs-rebuild decision for this turn before it runs (Phase 0
-   * cache instrumentation). Fires exactly once per turn.
+   * Reports the recovery decision (reused / resumed / rebuilt) for this turn (Phase 0
+   * cache instrumentation, extended for Model A′). Fires exactly once per turn, with
+   * the *final* tier, so a resume that fails to start and drops to a rebuild reports
+   * the rebuild, not the abandoned resume.
    */
-  onReuseDecision?: (decision: SessionReuseDiagnosis) => void;
+  onRecoveryDecision?: (decision: SessionRecovery) => void;
+  /**
+   * Receives the resume cursor this turn's session banked (Model A′), so the chat
+   * layer can persist it as the conversation's next resume point. Fires once per
+   * turn that banks a watermark (a clean completion), never on error/abort.
+   */
+  onSessionBanked?: (cursor: ClaudeCodeResumeCursor) => void;
   /**
    * Receives the handshake's model list when a fresh session is minted (never
    * on reuse), the §3.1 layer-2 effort-level harvest. Fired fire-and-forget:
@@ -373,10 +427,11 @@ export interface SessionTurnRequest {
 }
 
 /**
- * Per-conversation registry of live SDK sessions. One session per conversation;
- * each turn either reuses the held session (when {@link isSessionUsable}) and sends
- * a delta, or disposes it and mints a fresh one from the full transcript. Idle
- * sessions are swept on a timer; {@link disposeAll} kills everything on unload.
+ * Per-conversation registry of live SDK sessions and the recovery ladder over them.
+ * One session per conversation; each turn reuses the held warm session when valid
+ * (delta), else, when the live process is gone, tries a disk `resume` (delta), else
+ * mints a fresh session from the full transcript. Idle sessions are swept on a timer;
+ * {@link disposeAll} kills everything on unload.
  */
 export class SdkSessionRegistry {
   private readonly sessions = new Map<string, SdkSession>();
@@ -384,9 +439,10 @@ export class SdkSessionRegistry {
    * Disposal tombstones: conversation id → why its last session went away. Idle
    * eviction and compaction *delete* the registry entry, so the next turn would
    * otherwise decide `no-session` and the badge would read a misleading "session
-   * started". The tombstone lets {@link decideReuse} attribute the rebuild to its
-   * real cause instead (cold-rebuild-fidelity §6.2). One-shot: cleared the moment a
-   * fresh session is minted, so a tombstone present always implies no live session.
+   * started". The tombstone lets {@link decideRecovery} attribute a rebuild to its
+   * real cause instead (cold-rebuild-fidelity §6.2) when there is no resume cursor to
+   * check. One-shot: cleared the moment a session is minted or resumed, so a
+   * tombstone present always implies no live session.
    */
   private readonly tombstones = new Map<string, SessionRebuildReason>();
   private sweepTimer: ReturnType<typeof setInterval> | null = null;
@@ -399,87 +455,192 @@ export class SdkSessionRegistry {
   }
 
   /**
-   * Runs one turn for `conversationId`, reusing the held session when valid and
-   * cold-rebuilding otherwise. Any failure disposes the session so the next turn
-   * starts clean, the transcript can always rebuild.
+   * Runs one turn for `conversationId` down the recovery ladder: reuse the warm
+   * session, else `resume` it from disk, else mint fresh. A resume that cannot even
+   * start (its session file was deleted by CLI retention) is a non-event: it drops to
+   * a synthetic rebuild *within the same turn* (§6.3). Any failure disposes the
+   * session so the next turn starts clean, the transcript can always rebuild.
    */
   async *runTurn(conversationId: string, req: SessionTurnRequest): AsyncGenerator<string> {
     const existing = this.sessions.get(conversationId);
     const effort = req.effort ?? null;
-    let decision = decideReuse(existing, req.turns, req.cfg, this.tombstones.get(conversationId));
+    let decision = decideRecovery(
+      existing,
+      req.turns,
+      req.cfg,
+      req.resumeCursor,
+      this.tombstones.get(conversationId),
+    );
 
     // Effort is compared outside the config fingerprint: a flippable change is
     // applied to the live session (one control request, context retained); a
     // non-flippable one (to/from `max`, back to default) or a failed control
-    // request downgrades to the classic reasoning-changed cold rebuild.
-    if (decision.reuse && existing && existing.effort !== effort) {
+    // request downgrades to the classic reasoning-changed cold rebuild. Only the
+    // warm-reuse tier holds a live process to flip; a resume mints a fresh process
+    // that bakes the requested effort at construction, so it needs no flip.
+    if (decision.outcome === "reused" && existing && existing.effort !== effort) {
       if (canFlipEffortMidSession(existing.effort, effort)) {
         try {
           await existing.setEffort(effort as FlagSettableEffort);
         } catch {
-          decision = { reuse: false, reason: "reasoning-changed" };
+          decision = { outcome: "rebuilt", reason: "reasoning-changed" };
         }
       } else {
-        decision = { reuse: false, reason: "reasoning-changed" };
+        decision = { outcome: "rebuilt", reason: "reasoning-changed" };
       }
     }
 
-    req.onReuseDecision?.(decision);
-    const reuse = decision.reuse;
+    // Resume tier: restore from disk and stream the delta. A resume that fails to
+    // produce a first chunk (session file gone) is caught here and rewritten to a
+    // synthetic rebuild, so `onRecoveryDecision` still fires exactly once, with the
+    // final tier. A resume that fails mid-stream, or is aborted, is a genuine failure
+    // and propagates like any other turn error.
+    if (decision.outcome === "resumed") {
+      const resumed = this.mintSession(conversationId, req, effort, decision.cursor);
+      const attempt = resumed.runTurn(req.deltaPrompt, this.turnCtx(req));
+      let first: IteratorResult<string> | undefined;
+      try {
+        first = await attempt.next();
+      } catch (error) {
+        if (isAbortError(error)) {
+          this.afterTurnError(conversationId, resumed);
+          throw error;
+        }
+        // The resume never started: drop a rung to a synthetic rebuild in this turn.
+        this.disposeSession(conversationId, resumed);
+        decision = { outcome: "rebuilt", reason: this.tombstones.get(conversationId) ?? "session-disposed" };
+      }
+      if (decision.outcome === "resumed" && first) {
+        req.onRecoveryDecision?.(decision);
+        try {
+          if (!first.done) {
+            yield first.value;
+            yield* attempt;
+          }
+          this.afterTurnSuccess(conversationId, resumed, req);
+        } catch (error) {
+          this.afterTurnError(conversationId, resumed);
+          throw error;
+        }
+        return;
+      }
+      // Fell through: `existing` was undefined here (no live session on the resume
+      // tier), so the mint/stream below starts clean with the rewritten decision.
+    }
+
+    req.onRecoveryDecision?.(decision);
 
     let session: SdkSession;
     let prompt: string;
-    if (reuse && existing) {
+    if (decision.outcome === "reused" && existing) {
       session = existing;
       prompt = req.deltaPrompt;
+      this.ensureSweeping();
     } else {
       existing?.dispose();
-      session = new SdkSession(req.buildOptions, mintMeta(req.cfg), effort);
-      this.sessions.set(conversationId, session);
-      // The tombstone has served its purpose (attributing this rebuild); a live
-      // session now owns the conversation, so drop it before it goes stale.
-      this.tombstones.delete(conversationId);
+      session = this.mintSession(conversationId, req, effort);
       prompt = req.fullPrompt;
-
-      // Mint-time harvest (§3.1 layer 2): ask the fresh process for its model
-      // list in the background. Failures are ignored, discovery is an upgrade
-      // over the descriptor fallback, never a turn dependency.
-      if (req.onModelsDiscovered) {
-        const onModelsDiscovered = req.onModelsDiscovered;
-        void session
-          .supportedModels()
-          .then((models) => onModelsDiscovered(models))
-          .catch(() => {});
-      }
     }
-
-    this.ensureSweeping();
 
     try {
-      yield* session.runTurn(prompt, {
-        turns: req.turns,
-        signal: req.signal,
-        onResult: req.onResult,
-      });
+      yield* session.runTurn(prompt, this.turnCtx(req));
     } catch (error) {
-      // A clean interrupt preserves the live process (its context now covers the
-      // partial reply), so keep it for reuse. The exception is a mid-turn
-      // compaction, which desynced it from the authoritative transcript and must be
-      // disposed on every exit path (the post-turn `needsInvalidation` check below is
-      // unreachable when the turn throws, §6.7.1). Any other error (SDK failure,
-      // unexpected end, hard abort) leaves the tail indeterminate, so dispose it and
-      // cold-rebuild next turn.
-      if (!session.wasInterruptedCleanly || session.needsInvalidation) {
-        this.disposeSession(conversationId, session, session.needsInvalidation ? "compacted" : undefined);
-      }
+      this.afterTurnError(conversationId, session);
       throw error;
     }
+    this.afterTurnSuccess(conversationId, session, req);
+  }
 
-    // Mid-turn compaction replaced the session's context with a summary; the
-    // transcript stays authoritative, so invalidate now and cold-rebuild next turn.
+  /**
+   * Mints (or resumes) a session, registers it as the conversation's live one, drops
+   * the disposal tombstone (a session now owns the conversation), and fires the
+   * mint-time model harvest. `resumeCursor` present ⇒ the session is `resume`d from
+   * disk and its watermark is seeded from the cursor; absent ⇒ a fresh cold mint.
+   */
+  private mintSession(
+    conversationId: string,
+    req: SessionTurnRequest,
+    effort: ReasoningLevel | null,
+    resumeCursor?: ClaudeCodeResumeCursor,
+  ): SdkSession {
+    const meta = resumeCursor ? resumeMeta(req.cfg, resumeCursor) : mintMeta(req.cfg);
+    const session = new SdkSession(req.buildOptions, meta, effort, resumeCursor?.sessionId);
+    this.sessions.set(conversationId, session);
+    this.tombstones.delete(conversationId);
+    this.ensureSweeping();
+
+    // Mint-time harvest (§3.1 layer 2): ask the fresh process for its model list in
+    // the background. Failures are ignored, discovery is an upgrade over the
+    // descriptor fallback, never a turn dependency. A resume spawns a fresh process
+    // too, so the harvest applies there as well.
+    if (req.onModelsDiscovered) {
+      const onModelsDiscovered = req.onModelsDiscovered;
+      void session
+        .supportedModels()
+        .then((models) => onModelsDiscovered(models))
+        .catch(() => {});
+    }
+    return session;
+  }
+
+  /** Per-turn context passed into {@link SdkSession.runTurn}. */
+  private turnCtx(req: SessionTurnRequest): SessionTurnContext {
+    return { turns: req.turns, signal: req.signal, onResult: req.onResult };
+  }
+
+  /**
+   * Post-turn bookkeeping after a session's stream completed cleanly: a mid-turn
+   * compaction desynced the session from the authoritative transcript, so invalidate
+   * it; otherwise bank the resume cursor for next turn.
+   */
+  private afterTurnSuccess(
+    conversationId: string,
+    session: SdkSession,
+    req: SessionTurnRequest,
+  ): void {
     if (session.needsInvalidation) {
       this.disposeSession(conversationId, session, "compacted");
+    } else {
+      this.bankCursor(session, req);
     }
+  }
+
+  /**
+   * Post-turn bookkeeping after a session's stream threw. A clean interrupt preserves
+   * the live process (its context now covers the partial reply), so keep it for
+   * reuse. The exception is a mid-turn compaction, which desynced it and must be
+   * disposed on every exit path (the {@link afterTurnSuccess} check is unreachable
+   * when the turn throws, §6.7.1). Any other error (SDK failure, unexpected end, hard
+   * abort) leaves the tail indeterminate, so dispose it and cold-rebuild next turn. No
+   * cursor is banked on a surviving interrupt: aborted turns persist no usage, so it
+   * would be dropped, and the live session covers the immediate next turn anyway.
+   */
+  private afterTurnError(conversationId: string, session: SdkSession): void {
+    if (!session.wasInterruptedCleanly || session.needsInvalidation) {
+      this.disposeSession(
+        conversationId,
+        session,
+        session.needsInvalidation ? "compacted" : undefined,
+      );
+    }
+  }
+
+  /**
+   * Banks the session's watermark into the conversation's resume cursor (Model A′),
+   * so a later turn can `resume` it once the live process is gone. Needs the session
+   * id, observed on the turn's `result`; without it (no result reached) nothing is
+   * banked.
+   */
+  private bankCursor(session: SdkSession, req: SessionTurnRequest): void {
+    if (!req.onSessionBanked) return;
+    const sessionId = session.bankedSessionId;
+    if (!sessionId) return;
+    req.onSessionBanked({
+      sessionId,
+      coveredCount: session.meta.coveredCount,
+      prefixHash: session.meta.prefixHash,
+      configFingerprint: session.meta.configFingerprint,
+    });
   }
 
   /**
@@ -519,9 +680,10 @@ export class SdkSessionRegistry {
       if (!session.isBusy && now - session.lastUsedAt > this.idleMs) {
         session.dispose();
         this.sessions.delete(id);
-        // Tombstone the eviction so the next turn's rebuild reads "expired", not the
-        // neutral "session started" (§6.2). The resume tier (phase 4) will later fold
-        // this into a "session resumed" outcome.
+        // Tombstone the eviction. The persisted resume cursor usually restores the
+        // session next turn ("session resumed", Model A′); the tombstone is the
+        // fallback attribution when there is no cursor to resume (or it fails its
+        // gate): "expired" rather than the neutral "session started" (§6.2).
         this.tombstones.set(id, "session-disposed");
       }
     }
@@ -553,4 +715,26 @@ function mintMeta(cfg: SessionConfig): HarnessSession {
     configFingerprint: fingerprint(cfg),
     config: cfg,
   };
+}
+
+/**
+ * Seeds session metadata from a resume cursor (Model A′): the disk session already
+ * covers `coveredCount` turns, so the watermark starts there and this turn's delta
+ * extends it exactly as a live-reuse turn would. `decideRecovery` already verified
+ * the cursor's fingerprint equals `fingerprint(cfg)`, so the config is aligned.
+ */
+function resumeMeta(cfg: SessionConfig, cursor: ClaudeCodeResumeCursor): HarnessSession {
+  return {
+    provider: "claudecode",
+    model: cfg.model,
+    coveredCount: cursor.coveredCount,
+    prefixHash: cursor.prefixHash,
+    configFingerprint: cursor.configFingerprint,
+    config: cfg,
+  };
+}
+
+/** Whether a thrown value is the abort signal (a cancelled turn), not a real error. */
+function isAbortError(error: unknown): boolean {
+  return error instanceof Error && error.name === "AbortError";
 }

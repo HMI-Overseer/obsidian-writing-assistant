@@ -1,4 +1,5 @@
 import type {
+  ClaudeCodeResumeCursor,
   Conversation,
   ConversationMeta,
   ConversationMessage,
@@ -46,6 +47,27 @@ export class ChatSessionMemory {
 
   getActiveCreatedAt(): number {
     return this.activeCreatedAt;
+  }
+
+  /**
+   * The conversation's current Claude Code resume cursor (Model A′): the cursor
+   * banked by the most recent claudecode assistant turn that carries one. Read at the
+   * start of a turn so the session registry can `resume` from disk once the live
+   * process is gone. Undefined when no claudecode turn has banked a cursor yet (a
+   * fresh conversation, an older transcript, or a non-claudecode thread).
+   */
+  getClaudeCodeResumeCursor(): ClaudeCodeResumeCursor | undefined {
+    for (let i = this.messageHistory.length - 1; i >= 0; i--) {
+      const message = this.messageHistory[i];
+      if (
+        message.role === "assistant" &&
+        message.provider === "claudecode" &&
+        message.usage?.resumeCursor
+      ) {
+        return message.usage.resumeCursor;
+      }
+    }
+    return undefined;
   }
 
   setDraft(draft: string): void {

@@ -3,6 +3,7 @@ import { FileSystemAdapter } from "obsidian";
 import { execFile } from "child_process";
 import type {
   ApprovalPosture,
+  ClaudeCodeResumeCursor,
   PluginSettings,
   ProviderOption,
   ReasoningLevel,
@@ -88,11 +89,18 @@ export interface ClaudeCodeRunOptions {
   /** Vault-relative path of the active note (edit target + search relevance). */
   activeFilePath?: string;
   /**
-   * Conversation id, keys the persistent SDK session (Model B). When present and
-   * the SDK path is usable, turns reuse one live `claude` process per conversation
-   * for context retention + incremental caching. Absent ⇒ stateless one-shot.
+   * Conversation id, keys the persistent SDK session. When present and the SDK path
+   * is usable, turns reuse one live `claude` process per conversation for context
+   * retention + incremental caching. Absent ⇒ stateless one-shot.
    */
   conversationId?: string;
+  /**
+   * The conversation's persisted resume cursor (Model A′), read from the last banked
+   * turn. When the live process is gone, the registry re-checks it against this turn's
+   * transcript and, if it passes, `resume`s the session from disk instead of
+   * rebuilding. Absent ⇒ resume is not attempted.
+   */
+  resumeCursor?: ClaudeCodeResumeCursor;
 }
 
 /** Official Claude Code install / setup documentation. */
@@ -211,12 +219,13 @@ export class ClaudeCodeService {
     // live session via applyFlagSettings instead of rebuilding (§3.2).
     if (useSdk && options.conversationId) {
       const conversationId = options.conversationId;
+      const resumeCursor = options.resumeCursor;
       return {
         vaultRoot: this.vaultRoot,
         useSdk,
         sdkSession: {
           conversationId,
-          run: (input) => this.runSessionTurn(conversationId, input, agentic),
+          run: (input) => this.runSessionTurn(conversationId, input, agentic, resumeCursor),
         },
       };
     }
@@ -264,6 +273,7 @@ export class ClaudeCodeService {
     conversationId: string,
     input: SdkSessionTurnInput,
     agentic: boolean,
+    resumeCursor?: ClaudeCodeResumeCursor,
   ): AsyncGenerator<string> {
     const toolNames = agentic
       ? this.createToolProvider().listTools().map((definition) => definition.name)
@@ -277,7 +287,7 @@ export class ClaudeCodeService {
 
     const command = this.command;
     const vaultRoot = this.vaultRoot;
-    const buildOptions = (abortController: AbortController): Options => {
+    const buildOptions = (abortController: AbortController, resumeSessionId?: string): Options => {
       const sdkMcp = agentic
         ? {
             server: createVaultSdkMcpServer(MCP_SERVER_NAME, this.createToolProvider()),
@@ -292,6 +302,9 @@ export class ClaudeCodeService {
           claudePath: command,
           vaultRoot,
           sdkMcp,
+          // Present only on a disk resume (Model A′): loads the session history from
+          // ~/.claude so only the delta turn need be sent.
+          ...(resumeSessionId ? { resume: resumeSessionId } : {}),
         },
         abortController,
       );
@@ -304,9 +317,11 @@ export class ClaudeCodeService {
       fullPrompt: input.fullPrompt,
       deltaPrompt: input.deltaPrompt,
       buildOptions,
+      ...(resumeCursor ? { resumeCursor } : {}),
       signal: input.signal,
       onResult: input.onResult,
-      onReuseDecision: input.onReuseDecision,
+      onRecoveryDecision: input.onRecoveryDecision,
+      onSessionBanked: input.onSessionBanked,
       ...(this.onEffortLevelsDiscovered
         ? {
             onModelsDiscovered: (models) =>

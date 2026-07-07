@@ -16,8 +16,10 @@ import type { McpSdkServerConfigWithInstance, Options, SDKMessage } from "./clau
  * CLI in place of the hand-spawned subprocess, mapping SDK messages onto the same
  * text-delta + `ClaudeCodeResultUsage` shape {@link ../claudeCodeProcess.streamClaudeCode}
  * produces, so {@link ../ClaudeCodeClient.ClaudeCodeClient} can consume either path
- * symmetrically. No session is retained, every turn sends the full transcript and
- * runs with `persistSession: false` (the persistent session lands in a later phase).
+ * symmetrically. This one-shot engine retains no in-memory session (every turn sends
+ * the full transcript); session persistence to disk is left on (the SDK default), so
+ * a turn that carries a session id can later be `resume`d by the persistent-session
+ * path (Model A′, {@link ./sdkSession.SdkSession}).
  */
 
 /**
@@ -40,7 +42,6 @@ export const DISALLOWED_NATIVE_TOOLS: readonly string[] = [
   "TodoWrite",
   "BashOutput",
   "KillShell",
-  "SlashCommand",
   "ExitPlanMode",
 ];
 
@@ -126,6 +127,12 @@ export interface SdkOptionsConfig {
   vaultRoot?: string;
   /** In-process MCP bridge; absent ⇒ the model runs as a pure analyst (no tools). */
   sdkMcp?: { server: McpSdkServerConfigWithInstance; serverName: string };
+  /**
+   * A CLI session id to resume from disk (Model A′). When present the SDK loads that
+   * session's conversation history instead of starting fresh, so only the delta turn
+   * need be sent. Absent ⇒ a fresh session (cold mint or one-shot).
+   */
+  resume?: string;
 }
 
 /**
@@ -144,8 +151,9 @@ export function buildSdkOptions(
     cwd: opts.vaultRoot,
     pathToClaudeCodeExecutable: opts.claudePath,
     model: opts.model,
-    // Model B's win lands later; R1 retains nothing on disk or in memory.
-    persistSession: false,
+    // Session persistence is left on (the SDK default) so a turn's session id can be
+    // resumed later (Model A′). Resume the session id when one was supplied.
+    ...(opts.resume ? { resume: opts.resume } : {}),
     // Controlled harness: ignore the user's global/project settings, hooks, and
     // other MCP servers, the plugin owns the entire tool + prompt surface.
     settingSources: [],

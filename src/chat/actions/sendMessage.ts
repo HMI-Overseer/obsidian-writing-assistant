@@ -116,6 +116,7 @@ export async function sendMessage(options: SendMessageOptions): Promise<void> {
       posture,
       activeFilePath: plugin.app.workspace.getActiveFile()?.path,
       conversationId: store.getActiveConversationId() ?? undefined,
+      resumeCursor: store.getClaudeCodeResumeCursor(),
     }),
   );
 

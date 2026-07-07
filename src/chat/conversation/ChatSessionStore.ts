@@ -1,4 +1,5 @@
 import type {
+  ClaudeCodeResumeCursor,
   CompletionModel,
   Conversation,
   ConversationMeta,
@@ -42,6 +43,15 @@ export class ChatSessionStore {
 
   getActiveConversationId(): string | null {
     return this.memory.getActiveConversationId();
+  }
+
+  /**
+   * The active conversation's Claude Code resume cursor (Model A′), read at the start
+   * of a turn so the session registry can attempt a disk `resume` before a synthetic
+   * rebuild. Undefined when no claudecode turn has banked one.
+   */
+  getClaudeCodeResumeCursor(): ClaudeCodeResumeCursor | undefined {
+    return this.memory.getClaudeCodeResumeCursor();
   }
 
   getActiveConversationMeta(): ConversationMeta | null {

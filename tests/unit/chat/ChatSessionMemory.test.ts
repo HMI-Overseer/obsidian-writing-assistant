@@ -1,6 +1,6 @@
 import { describe, test, expect } from "vitest";
 import { ChatSessionMemory } from "../../../src/chat/conversation/ChatSessionMemory";
-import type { Conversation } from "../../../src/shared/types";
+import type { ClaudeCodeResumeCursor, Conversation, ConversationMessage } from "../../../src/shared/types";
 
 function makeConversation(): Conversation {
   return {
@@ -189,5 +189,79 @@ describe("ChatSessionMemory.removeLastMessage", () => {
     memory.removeLastMessage();
 
     expect(memory.getSnapshot().lastAssistantResponse).toBe("");
+  });
+});
+
+describe("ChatSessionMemory.getClaudeCodeResumeCursor", () => {
+  const cursor = (sessionId: string): ClaudeCodeResumeCursor => ({
+    sessionId,
+    coveredCount: 2,
+    prefixHash: "h",
+    configFingerprint: "fp",
+  });
+
+  function convWith(messages: ConversationMessage[]): Conversation {
+    return { ...makeConversation(), messages };
+  }
+
+  test("returns the cursor from the most recent claudecode assistant turn", () => {
+    const memory = new ChatSessionMemory();
+    memory.hydrateFromConversation(
+      convWith([
+        { id: "u1", role: "user", content: "hi" },
+        {
+          id: "a1",
+          role: "assistant",
+          content: "one",
+          provider: "claudecode",
+          usage: { inputTokens: 1, outputTokens: 1, resumeCursor: cursor("old") },
+        },
+        { id: "u2", role: "user", content: "again" },
+        {
+          id: "a2",
+          role: "assistant",
+          content: "two",
+          provider: "claudecode",
+          usage: { inputTokens: 1, outputTokens: 1, resumeCursor: cursor("new") },
+        },
+      ]),
+    );
+
+    expect(memory.getClaudeCodeResumeCursor()?.sessionId).toBe("new");
+  });
+
+  test("returns undefined when no claudecode turn has banked a cursor", () => {
+    const memory = new ChatSessionMemory();
+    memory.hydrateFromConversation(
+      convWith([
+        { id: "u1", role: "user", content: "hi" },
+        {
+          id: "a1",
+          role: "assistant",
+          content: "one",
+          provider: "claudecode",
+          usage: { inputTokens: 1, outputTokens: 1 },
+        },
+      ]),
+    );
+
+    expect(memory.getClaudeCodeResumeCursor()).toBeUndefined();
+  });
+
+  test("ignores a cursor carried by a non-claudecode provider", () => {
+    const memory = new ChatSessionMemory();
+    memory.hydrateFromConversation(
+      convWith([
+        {
+          id: "a1",
+          role: "assistant",
+          content: "one",
+          provider: "anthropic",
+          usage: { inputTokens: 1, outputTokens: 1, resumeCursor: cursor("foreign") },
+        },
+      ]),
+    );
+
+    expect(memory.getClaudeCodeResumeCursor()).toBeUndefined();
   });
 });

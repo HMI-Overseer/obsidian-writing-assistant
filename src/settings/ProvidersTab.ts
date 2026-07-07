@@ -417,7 +417,11 @@ function renderClaudeCodeBody(
 ): void {
   const detectionItem = new SettingItem(body)
     .setName("Claude Code CLI")
-    .setDesc("Uses your existing Claude Code login; no API key is stored.");
+    .setDesc(
+      "Uses your existing Claude Code login; no API key is stored. Sessions mirror " +
+        "conversation and tool-read vault content into ~/.claude under Claude Code's " +
+        "own retention policy.",
+    );
   const statusEl = detectionItem.controlEl.createEl("span", {
     cls: "lmsa-provider-detection",
     text: "Checking…",

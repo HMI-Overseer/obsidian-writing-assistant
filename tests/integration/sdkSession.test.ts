@@ -18,7 +18,8 @@ vi.mock("../../src/api/sdk/claudeAgentSdk", () => ({
 }));
 
 import { SdkSession, SdkSessionRegistry, type SessionTurnRequest } from "../../src/api/sdk/sdkSession";
-import type { SessionConfig, SessionTurn } from "../../src/api/harnessSession";
+import { fingerprint, hashPrefix, type SessionConfig, type SessionTurn } from "../../src/api/harnessSession";
+import type { ClaudeCodeResumeCursor } from "../../src/shared/types";
 import type { Options } from "../../src/api/sdk/claudeAgentSdk";
 
 function textDeltaMessage(text: string) {
@@ -291,10 +292,10 @@ describe("SdkSessionRegistry", () => {
   it("reports the reuse decision per turn (no-session, then reuse)", async () => {
     installEchoQuery();
     const decisions: unknown[] = [];
-    const onReuseDecision = (d: unknown) => decisions.push(d);
+    const onRecoveryDecision = (d: unknown) => decisions.push(d);
 
     const reply = await drain(
-      registry.runTurn("c1", turnRequest([{ role: "user", content: "hi" }], "hi", { onReuseDecision })),
+      registry.runTurn("c1", turnRequest([{ role: "user", content: "hi" }], "hi", { onRecoveryDecision })),
     );
     await drain(
       registry.runTurn(
@@ -306,20 +307,20 @@ describe("SdkSessionRegistry", () => {
             { role: "user", content: "again" },
           ],
           "again",
-          { onReuseDecision },
+          { onRecoveryDecision },
         ),
       ),
     );
 
-    expect(decisions).toEqual([{ reuse: false, reason: "no-session" }, { reuse: true }]);
+    expect(decisions).toEqual([{ outcome: "rebuilt", reason: "no-session" }, { outcome: "reused" }]);
   });
 
   it("reports the field that drove a cold rebuild", async () => {
     installEchoQuery();
     const decisions: unknown[] = [];
-    const onReuseDecision = (d: unknown) => decisions.push(d);
+    const onRecoveryDecision = (d: unknown) => decisions.push(d);
 
-    await drain(registry.runTurn("c1", turnRequest([{ role: "user", content: "hi" }], "hi", { onReuseDecision })));
+    await drain(registry.runTurn("c1", turnRequest([{ role: "user", content: "hi" }], "hi", { onRecoveryDecision })));
     await drain(
       registry.runTurn(
         "c1",
@@ -330,12 +331,12 @@ describe("SdkSessionRegistry", () => {
             { role: "user", content: "again" },
           ],
           "again",
-          { cfg: cfg({ model: "claude-opus-4-8" }), onReuseDecision },
+          { cfg: cfg({ model: "claude-opus-4-8" }), onRecoveryDecision },
         ),
       ),
     );
 
-    expect(decisions).toEqual([{ reuse: false, reason: "no-session" }, { reuse: false, reason: "model-changed" }]);
+    expect(decisions).toEqual([{ outcome: "rebuilt", reason: "no-session" }, { outcome: "rebuilt", reason: "model-changed" }]);
   });
 
   it("reports the decision before a turn that then errors", async () => {
@@ -348,26 +349,26 @@ describe("SdkSessionRegistry", () => {
       drain(
         registry.runTurn(
           "c1",
-          turnRequest([{ role: "user", content: "hi" }], "hi", { onReuseDecision: (d) => decisions.push(d) }),
+          turnRequest([{ role: "user", content: "hi" }], "hi", { onRecoveryDecision: (d) => decisions.push(d) }),
         ),
       ),
     ).rejects.toThrow(/boom/);
 
     // The decision is emitted up front (before streaming), so an errored turn
     // still reports it exactly once; the failure then disposes the session.
-    expect(decisions).toEqual([{ reuse: false, reason: "no-session" }]);
+    expect(decisions).toEqual([{ outcome: "rebuilt", reason: "no-session" }]);
     expect(registry.size).toBe(0);
   });
 
   it("flips effort on the live session instead of rebuilding (low..xhigh)", async () => {
     const { applyFlagSettings } = installEchoQuery();
     const decisions: unknown[] = [];
-    const onReuseDecision = (d: unknown) => decisions.push(d);
+    const onRecoveryDecision = (d: unknown) => decisions.push(d);
 
     const reply = await drain(
       registry.runTurn(
         "c1",
-        turnRequest([{ role: "user", content: "hi" }], "hi", { effort: "low", onReuseDecision }),
+        turnRequest([{ role: "user", content: "hi" }], "hi", { effort: "low", onRecoveryDecision }),
       ),
     );
     await drain(
@@ -380,7 +381,7 @@ describe("SdkSessionRegistry", () => {
             { role: "user", content: "again" },
           ],
           "again",
-          { effort: "xhigh", onReuseDecision },
+          { effort: "xhigh", onRecoveryDecision },
         ),
       ),
     );
@@ -388,7 +389,7 @@ describe("SdkSessionRegistry", () => {
     // Same live process (one query()), the flip rode the control request.
     expect(queryMock).toHaveBeenCalledTimes(1);
     expect(applyFlagSettings).toHaveBeenCalledExactlyOnceWith({ effortLevel: "xhigh" });
-    expect(decisions).toEqual([{ reuse: false, reason: "no-session" }, { reuse: true }]);
+    expect(decisions).toEqual([{ outcome: "rebuilt", reason: "no-session" }, { outcome: "reused" }]);
   });
 
   it("harvests the model list on mint only, never on reuse", async () => {
@@ -435,12 +436,12 @@ describe("SdkSessionRegistry", () => {
   it("cold-rebuilds for a flip to max (not expressible in flag settings)", async () => {
     installEchoQuery();
     const decisions: unknown[] = [];
-    const onReuseDecision = (d: unknown) => decisions.push(d);
+    const onRecoveryDecision = (d: unknown) => decisions.push(d);
 
     const reply = await drain(
       registry.runTurn(
         "c1",
-        turnRequest([{ role: "user", content: "hi" }], "hi", { effort: "high", onReuseDecision }),
+        turnRequest([{ role: "user", content: "hi" }], "hi", { effort: "high", onRecoveryDecision }),
       ),
     );
     await drain(
@@ -453,15 +454,15 @@ describe("SdkSessionRegistry", () => {
             { role: "user", content: "again" },
           ],
           "again",
-          { effort: "max", onReuseDecision },
+          { effort: "max", onRecoveryDecision },
         ),
       ),
     );
 
     expect(queryMock).toHaveBeenCalledTimes(2);
     expect(decisions).toEqual([
-      { reuse: false, reason: "no-session" },
-      { reuse: false, reason: "reasoning-changed" },
+      { outcome: "rebuilt", reason: "no-session" },
+      { outcome: "rebuilt", reason: "reasoning-changed" },
     ]);
   });
 
@@ -469,12 +470,12 @@ describe("SdkSessionRegistry", () => {
     const { applyFlagSettings } = installEchoQuery();
     applyFlagSettings.mockRejectedValueOnce(new Error("control request failed"));
     const decisions: unknown[] = [];
-    const onReuseDecision = (d: unknown) => decisions.push(d);
+    const onRecoveryDecision = (d: unknown) => decisions.push(d);
 
     const reply = await drain(
       registry.runTurn(
         "c1",
-        turnRequest([{ role: "user", content: "hi" }], "hi", { effort: "low", onReuseDecision }),
+        turnRequest([{ role: "user", content: "hi" }], "hi", { effort: "low", onRecoveryDecision }),
       ),
     );
     await drain(
@@ -487,15 +488,15 @@ describe("SdkSessionRegistry", () => {
             { role: "user", content: "again" },
           ],
           "again",
-          { effort: "high", onReuseDecision },
+          { effort: "high", onRecoveryDecision },
         ),
       ),
     );
 
     expect(queryMock).toHaveBeenCalledTimes(2);
     expect(decisions).toEqual([
-      { reuse: false, reason: "no-session" },
-      { reuse: false, reason: "reasoning-changed" },
+      { outcome: "rebuilt", reason: "no-session" },
+      { outcome: "rebuilt", reason: "reasoning-changed" },
     ]);
   });
 
@@ -619,14 +620,14 @@ describe("SdkSessionRegistry", () => {
             { role: "user", content: "again" },
           ],
           "again",
-          { onReuseDecision: (d) => decisions.push(d) },
+          { onRecoveryDecision: (d) => decisions.push(d) },
         ),
       ),
     );
 
     // The disposal tombstone attributes the rebuild instead of the misleading
     // neutral "no-session" (which the badge shows as "session started").
-    expect(decisions).toEqual([{ reuse: false, reason: "session-disposed" }]);
+    expect(decisions).toEqual([{ outcome: "rebuilt", reason: "session-disposed" }]);
   });
 
   it("attributes a compacted rebuild to compaction, not a neutral no-session", async () => {
@@ -652,12 +653,12 @@ describe("SdkSessionRegistry", () => {
             { role: "user", content: "again" },
           ],
           "again",
-          { onReuseDecision: (d) => decisions.push(d) },
+          { onRecoveryDecision: (d) => decisions.push(d) },
         ),
       ),
     );
 
-    expect(decisions).toEqual([{ reuse: false, reason: "compacted" }]);
+    expect(decisions).toEqual([{ outcome: "rebuilt", reason: "compacted" }]);
   });
 
   it("invalidates a compacted session so the next turn cold-rebuilds", async () => {
@@ -751,5 +752,210 @@ describe("SdkSessionRegistry", () => {
     await drain(registry.runTurn("c2", turnRequest([{ role: "user", content: "hi" }], "hi")));
     registry.disposeAll();
     expect(registry.size).toBe(0);
+  });
+});
+
+describe("SdkSessionRegistry resume tier (Model A′)", () => {
+  let registry: SdkSessionRegistry;
+
+  beforeEach(() => {
+    queryMock.mockReset();
+    registry = new SdkSessionRegistry(60_000);
+  });
+  afterEach(() => registry.disposeAll());
+
+  /** A cursor whose watermark exactly covers `transcript` under the default cfg(). */
+  function cursorFor(transcript: SessionTurn[], sessionId: string): ClaudeCodeResumeCursor {
+    return {
+      sessionId,
+      coveredCount: transcript.length,
+      prefixHash: hashPrefix(transcript, transcript.length),
+      configFingerprint: fingerprint(cfg()),
+    };
+  }
+
+  it("banks a full resume cursor after a completed turn", async () => {
+    installEchoQuery();
+    let banked: ClaudeCodeResumeCursor | undefined;
+
+    await drain(
+      registry.runTurn(
+        "c1",
+        turnRequest([{ role: "user", content: "hi" }], "hi", {
+          onSessionBanked: (c) => (banked = c),
+        }),
+      ),
+    );
+
+    // sessionId from the result, coveredCount = 1 user + 1 generated assistant turn,
+    // plus the two hashes the resume gate re-checks next turn.
+    expect(banked).toMatchObject({ sessionId: "sess", coveredCount: 2 });
+    expect(typeof banked?.prefixHash).toBe("string");
+    expect(banked?.prefixHash).not.toBe("");
+    expect(typeof banked?.configFingerprint).toBe("string");
+  });
+
+  it("resumes from the persisted cursor when the live process is gone", async () => {
+    installEchoQuery();
+    let banked: ClaudeCodeResumeCursor | undefined;
+
+    // Turn 1 mints a session and banks its cursor.
+    const reply = await drain(
+      registry.runTurn(
+        "c1",
+        turnRequest([{ role: "user", content: "hi" }], "hi", {
+          onSessionBanked: (c) => (banked = c),
+        }),
+      ),
+    );
+
+    // Simulate an Obsidian restart: a fresh registry holds no live session, only the
+    // persisted cursor survives (as it would on disk / in the message history).
+    const restarted = new SdkSessionRegistry(60_000);
+    const decisions: unknown[] = [];
+    let resumeId: string | undefined = "UNSET";
+    const buildOptionsCapture = (_ac: AbortController, id?: string): Options => {
+      resumeId = id;
+      return {} as Options;
+    };
+
+    const out = await drain(
+      restarted.runTurn(
+        "c1",
+        turnRequest(
+          [
+            { role: "user", content: "hi" },
+            { role: "assistant", content: reply },
+            { role: "user", content: "again" },
+          ],
+          "again",
+          {
+            resumeCursor: banked,
+            buildOptions: buildOptionsCapture,
+            onRecoveryDecision: (d) => decisions.push(d),
+          },
+        ),
+      ),
+    );
+
+    expect(decisions).toEqual([{ outcome: "resumed", cursor: banked }]);
+    // Only the delta turn was sent (the disk session already holds the rest)…
+    expect(out).toBe("echo:again");
+    // …and the session id was handed to the SDK's `resume`.
+    expect(resumeId).toBe("sess");
+    expect(restarted.size).toBe(1);
+    restarted.disposeAll();
+  });
+
+  it("never resumes while a live session is held (resume never preempts reuse)", async () => {
+    installEchoQuery();
+    let banked: ClaudeCodeResumeCursor | undefined;
+    const decisions: unknown[] = [];
+
+    const reply = await drain(
+      registry.runTurn(
+        "c1",
+        turnRequest([{ role: "user", content: "hi" }], "hi", {
+          onSessionBanked: (c) => (banked = c),
+        }),
+      ),
+    );
+
+    // Same registry (the live process is still warm) AND a resume cursor is present.
+    await drain(
+      registry.runTurn(
+        "c1",
+        turnRequest(
+          [
+            { role: "user", content: "hi" },
+            { role: "assistant", content: reply },
+            { role: "user", content: "again" },
+          ],
+          "again",
+          { resumeCursor: banked, onRecoveryDecision: (d) => decisions.push(d) },
+        ),
+      ),
+    );
+
+    // The warm process wins; the cursor is never consulted, one underlying process.
+    expect(decisions).toEqual([{ outcome: "reused" }]);
+    expect(queryMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("falls through to a synthetic rebuild in the same turn when the resume can't start", async () => {
+    // First query() (the resume attempt) errors before any output, as it would if the
+    // on-disk session file was deleted by CLI retention; the second (the rebuild)
+    // streams normally.
+    let call = 0;
+    queryMock.mockImplementation((params: { prompt: AsyncIterable<{ message: { content: string } }> }) => {
+      call += 1;
+      if (call === 1) {
+        return (async function* () {
+          throw new Error("resume failed: no such session");
+        })();
+      }
+      const input = params.prompt;
+      return (async function* () {
+        for await (const msg of input) {
+          yield textDeltaMessage(`echo:${msg.message.content}`);
+          yield successResult();
+        }
+      })();
+    });
+
+    const covered: SessionTurn[] = [
+      { role: "user", content: "hi" },
+      { role: "assistant", content: "yo" },
+    ];
+    const turns: SessionTurn[] = [...covered, { role: "user", content: "again" }];
+    const decisions: unknown[] = [];
+
+    const out = await drain(
+      registry.runTurn(
+        "c1",
+        turnRequest(turns, "again", {
+          resumeCursor: cursorFor(covered, "gone"),
+          onRecoveryDecision: (d) => decisions.push(d),
+        }),
+      ),
+    );
+
+    // The abandoned resume is reported as a rebuild with the failure cause (expiry),
+    // exactly once, and the fresh mint replayed the full transcript.
+    expect(decisions).toEqual([{ outcome: "rebuilt", reason: "session-disposed" }]);
+    expect(out.startsWith("echo:")).toBe(true);
+    expect(queryMock).toHaveBeenCalledTimes(2);
+    expect(registry.size).toBe(1);
+  });
+
+  it("propagates an abort during a resume rather than falling through to a rebuild", async () => {
+    installEchoQuery();
+    const covered: SessionTurn[] = [
+      { role: "user", content: "hi" },
+      { role: "assistant", content: "yo" },
+    ];
+    const turns: SessionTurn[] = [...covered, { role: "user", content: "again" }];
+    const decisions: unknown[] = [];
+    const ac = new AbortController();
+    ac.abort(); // the user stopped before the resume produced anything
+
+    await expect(
+      drain(
+        registry.runTurn(
+          "c1",
+          turnRequest(turns, "again", {
+            resumeCursor: cursorFor(covered, "sess"),
+            signal: ac.signal,
+            onRecoveryDecision: (d) => decisions.push(d),
+          }),
+        ),
+      ),
+    ).rejects.toMatchObject({ name: "AbortError" });
+
+    // An abort is not a resume failure: no fall-through, no second process, and the
+    // turn committed to no tier so it reported no decision.
+    expect(queryMock).toHaveBeenCalledTimes(1);
+    expect(registry.size).toBe(0);
+    expect(decisions).toEqual([]);
   });
 });

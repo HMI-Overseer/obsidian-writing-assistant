@@ -19,6 +19,22 @@ describe("describeSession", () => {
     });
   });
 
+  it("labels a disk-resumed session as the middle recovery rung (Model A′)", () => {
+    // Process was gone, session restored from disk: not a warm reuse, not a rebuild.
+    expect(describeSession(usage({ sessionReused: false, sessionResumed: true }))).toEqual({
+      text: "session resumed",
+      state: "resumed",
+    });
+  });
+
+  it("prefers a warm reuse over the resumed flag when both somehow appear", () => {
+    // A live reuse is the strongest signal; sessionResumed never rides a reused turn,
+    // but the ordering must not misreport one if it did.
+    expect(
+      describeSession(usage({ sessionReused: true, sessionResumed: true })),
+    ).toEqual({ text: "session reused", state: "reused" });
+  });
+
   it("treats a first-turn cold mint as a neutral start, not a regression", () => {
     expect(describeSession(usage({ sessionReused: false, sessionRebuildReason: "no-session" }))).toEqual({
       text: "session started",

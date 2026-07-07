@@ -29,23 +29,23 @@ describe("describeSession", () => {
   it("names the cause of a config-driven rebuild", () => {
     expect(
       describeSession(usage({ sessionReused: false, sessionRebuildReason: "system-prompt-changed" })),
-    ).toEqual({ text: "session rebuilt · prompt changed", state: "rebuilt" });
+    ).toEqual({ text: "synthetic rebuild · prompt changed", state: "rebuilt" });
     expect(
       describeSession(usage({ sessionReused: false, sessionRebuildReason: "tools-changed" })),
-    ).toEqual({ text: "session rebuilt · tools changed", state: "rebuilt" });
+    ).toEqual({ text: "synthetic rebuild · tools changed", state: "rebuilt" });
   });
 
-  it("shows a bare 'session rebuilt' for a disposed prior session", () => {
+  it("shows a bare 'synthetic rebuild' for a disposed prior session", () => {
     expect(
       describeSession(usage({ sessionReused: false, sessionRebuildReason: "session-disposed" })),
-    ).toEqual({ text: "session rebuilt", state: "rebuilt" });
+    ).toEqual({ text: "synthetic rebuild", state: "rebuilt" });
   });
 
-  it("falls back to a bare 'session rebuilt' when no reason was recorded", () => {
+  it("falls back to a bare 'synthetic rebuild' when no reason was recorded", () => {
     // Defensive: a rebuild always carries a reason via the live path, but a
     // hand-built / older persisted record might not.
     expect(describeSession(usage({ sessionReused: false }))).toEqual({
-      text: "session rebuilt",
+      text: "synthetic rebuild",
       state: "rebuilt",
     });
   });

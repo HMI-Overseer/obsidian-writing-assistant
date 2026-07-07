@@ -3,8 +3,8 @@ import { PROVIDER_DESCRIPTORS } from "../../providers/descriptors";
 import { PRICING_AS_OF } from "../../api/pricing";
 
 /**
- * Short, human labels for each cold-rebuild cause, shown next to "session
- * rebuilt" in the Claude Code usage tooltip. The interesting measurement signal
+ * Short, human labels for each cold-rebuild cause, shown next to "synthetic
+ * rebuild" in the Claude Code usage tooltip. The interesting measurement signal
  * is a config-driven rebuild (a mode switch changing the prompt / tools), which
  * the prompt-cache work targets; a first-turn mint ("no-session") and a disposed
  * prior session read as expected, not regressions, and are handled separately.
@@ -187,7 +187,7 @@ export function renderUsageBadge(
   if (session?.state === "rebuilt") {
     badgeEl.createSpan({
       cls: "lmsa-chat-window-usage-session is-rebuilt",
-      text: "rebuilt",
+      text: "synthetic rebuild",
     });
   }
 
@@ -200,6 +200,11 @@ export function renderUsageBadge(
  * a win (warm process), a first-turn `no-session` is a neutral cold mint, and any
  * other rebuild is the regression the prompt-cache work targets. Exported for unit
  * testing and reused by both the face warmth dot and the tooltip session line.
+ *
+ * "Synthetic rebuild" is this plugin's own term for a turn served by a session
+ * reconstructed from the transcript. It is unrelated to the SDK's
+ * `SDKUserMessage.isSynthetic` flag (a per-message "injected by the harness"
+ * marker), which we never set.
  */
 export function describeSession(
   usage: MessageUsage,
@@ -209,7 +214,7 @@ export function describeSession(
   const reason = usage.sessionRebuildReason;
   if (reason === "no-session") return { text: "session started", state: "started" };
   if (reason === undefined || reason === "session-disposed") {
-    return { text: "session rebuilt", state: "rebuilt" };
+    return { text: "synthetic rebuild", state: "rebuilt" };
   }
-  return { text: `session rebuilt · ${SESSION_REBUILD_LABELS[reason]}`, state: "rebuilt" };
+  return { text: `synthetic rebuild · ${SESSION_REBUILD_LABELS[reason]}`, state: "rebuilt" };
 }

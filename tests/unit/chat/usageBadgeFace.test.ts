@@ -90,7 +90,7 @@ describe("composeUsageTooltip", () => {
       "claude-opus-4-8",
       "claudecode",
     );
-    expect(tip).toContain("session rebuilt · agentic mode changed");
+    expect(tip).toContain("synthetic rebuild · agentic mode changed");
     expect(tip).toContain("Subscription (no per-message cost)");
     expect(tip).not.toContain("estimated, pricing as of");
   });

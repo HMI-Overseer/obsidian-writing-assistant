@@ -10,6 +10,7 @@ import {
   type ReasoningDiscovery,
 } from "../../providers/reasoningLevels";
 import type { ChatLayoutRefs } from "../types";
+import { renderMenuItem, type MenuItemSpec } from "./menuItem";
 
 export type ReasoningPillCallbacks = {
   getActiveModel: () => CompletionModel | null;
@@ -20,6 +21,53 @@ export type ReasoningPillCallbacks = {
   onReasoningChange: (modelKey: string, level: ReasoningLevel | null) => Promise<void>;
   onBeforeOpen?: () => void;
 };
+
+/** The read-side callbacks a reasoning menu needs, shared with the overflow menu. */
+export type ReasoningMenuContext = Pick<
+  ReasoningPillCallbacks,
+  "getActiveModel" | "getReasoningByModelKey" | "getReasoningDiscovery"
+>;
+
+/** Active model + its resolved levels + clamped current value. */
+export type ReasoningMenuState = {
+  model: CompletionModel;
+  levels: ReasoningLevel[];
+  current: ReasoningLevel | null;
+  discoveredDefault: ReasoningLevel | null;
+};
+
+/** Resolves the menu's full state from live callbacks; null means no menu (no model or no levels). */
+export function resolveReasoningMenuState(context: ReasoningMenuContext): ReasoningMenuState | null {
+  const model = context.getActiveModel();
+  if (!model) return null;
+  const discovery = context.getReasoningDiscovery();
+  const levels = resolveReasoningLevels(model, discovery);
+  if (levels.length === 0) return null;
+  const current = resolveModelReasoning(context.getReasoningByModelKey(), model, discovery);
+  const discoveredDefault = discovery.getReasoningCapability(model.modelId)?.default ?? null;
+  return { model, levels, current, discoveredDefault };
+}
+
+/**
+ * Builds the level rows for a reasoning menu, one shared shape for the pill's
+ * own menu and the overflow menu's reasoning section. Null first: defaults are
+ * displayed, never fabricated, the model's own default is not assumed to be
+ * any particular level (§3.3).
+ */
+export function buildReasoningItemSpecs(
+  state: ReasoningMenuState,
+  onSelect: (modelKey: string, level: ReasoningLevel | null) => void,
+): MenuItemSpec[] {
+  const defaultLabel =
+    state.discoveredDefault !== null
+      ? `${REASONING_DEFAULT_LABEL} (${REASONING_LEVEL_LABELS[state.discoveredDefault]})`
+      : REASONING_DEFAULT_LABEL;
+  return [null, ...state.levels].map((level) => ({
+    label: level !== null ? REASONING_LEVEL_LABELS[level] : defaultLabel,
+    selected: level === state.current,
+    onSelect: () => onSelect(state.model.id, level),
+  }));
+}
 
 /**
  * The composer footer's reasoning pill: reads the active model's current level
@@ -117,24 +165,8 @@ export class ReasoningPill {
   }
 
   /** Active model + its resolved levels + clamped current value; null = no pill. */
-  private resolveState(): {
-    model: CompletionModel;
-    levels: ReasoningLevel[];
-    current: ReasoningLevel | null;
-    discoveredDefault: ReasoningLevel | null;
-  } | null {
-    const model = this.callbacks.getActiveModel();
-    if (!model) return null;
-    const discovery = this.callbacks.getReasoningDiscovery();
-    const levels = resolveReasoningLevels(model, discovery);
-    if (levels.length === 0) return null;
-    const current = resolveModelReasoning(
-      this.callbacks.getReasoningByModelKey(),
-      model,
-      discovery,
-    );
-    const discoveredDefault = discovery.getReasoningCapability(model.modelId)?.default ?? null;
-    return { model, levels, current, discoveredDefault };
+  private resolveState(): ReasoningMenuState | null {
+    return resolveReasoningMenuState(this.callbacks);
   }
 
   private renderMenu(): void {
@@ -144,43 +176,14 @@ export class ReasoningPill {
     const el = this.refs.reasoningMenuEl;
     el.empty();
 
-    // Null first: defaults are displayed, never fabricated, the model's own
-    // default is not assumed to be any particular level (§3.3).
-    this.renderItem(el, null, state);
-    for (const level of state.levels) {
-      this.renderItem(el, level, state);
-    }
-  }
-
-  private renderItem(
-    el: HTMLElement,
-    level: ReasoningLevel | null,
-    state: {
-      model: CompletionModel;
-      current: ReasoningLevel | null;
-      discoveredDefault: ReasoningLevel | null;
-    },
-  ): void {
-    const item = el.createDiv({ cls: "lmsa-reasoning-menu-item" });
-    const isCurrent = level === state.current;
-    item.toggleClass("is-selected", isCurrent);
-    const defaultLabel =
-      state.discoveredDefault !== null
-        ? `${REASONING_DEFAULT_LABEL} (${REASONING_LEVEL_LABELS[state.discoveredDefault]})`
-        : REASONING_DEFAULT_LABEL;
-    item.createEl("span", {
-      cls: "lmsa-reasoning-menu-item-label",
-      text: level !== null ? REASONING_LEVEL_LABELS[level] : defaultLabel,
-    });
-    if (isCurrent) {
-      const check = item.createEl("span", { cls: "lmsa-reasoning-menu-item-check" });
-      setIcon(check, "check");
-    }
-    item.addEventListener("click", () => {
-      void this.callbacks.onReasoningChange(state.model.id, level).then(() => {
+    const specs = buildReasoningItemSpecs(state, (modelKey, level) => {
+      void this.callbacks.onReasoningChange(modelKey, level).then(() => {
         this.close();
         this.refresh();
       });
     });
+    for (const spec of specs) {
+      renderMenuItem(el, spec);
+    }
   }
 }

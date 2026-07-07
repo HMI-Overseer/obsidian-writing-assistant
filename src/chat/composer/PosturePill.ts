@@ -1,6 +1,7 @@
 import { setIcon } from "obsidian";
 import type { ApprovalPosture } from "../../shared/types";
 import type { ChatLayoutRefs } from "../types";
+import { renderMenuItem, type MenuItemSpec } from "./menuItem";
 
 export const POSTURE_OPTIONS: { posture: ApprovalPosture; label: string; icon: string }[] = [
   { posture: "ask", icon: "hand", label: "Ask before edits" },
@@ -12,6 +13,22 @@ export type PosturePillCallbacks = {
   onPostureChange: (posture: ApprovalPosture) => void;
   onBeforeOpen?: () => void;
 };
+
+/**
+ * Builds the posture rows, one shared shape for the pill's own menu and the
+ * overflow menu's edit-approval section.
+ */
+export function buildPostureItemSpecs(
+  current: ApprovalPosture,
+  onSelect: (posture: ApprovalPosture) => void,
+): MenuItemSpec[] {
+  return POSTURE_OPTIONS.map((option) => ({
+    label: option.label,
+    icon: option.icon,
+    selected: option.posture === current,
+    onSelect: () => onSelect(option.posture),
+  }));
+}
 
 /**
  * The composer footer's approval-posture pill: shows the current posture at a
@@ -99,24 +116,14 @@ export class PosturePill {
   private renderMenu(): void {
     const el = this.refs.postureMenuEl;
     el.empty();
-    const current = this.callbacks.getPosture();
 
-    for (const option of POSTURE_OPTIONS) {
-      const item = el.createDiv({ cls: "lmsa-posture-menu-item" });
-      const isCurrent = option.posture === current;
-      item.toggleClass("is-selected", isCurrent);
-      const iconEl = item.createEl("span", { cls: "lmsa-posture-menu-item-icon" });
-      setIcon(iconEl, option.icon);
-      item.createEl("span", { cls: "lmsa-posture-menu-item-label", text: option.label });
-      if (isCurrent) {
-        const check = item.createEl("span", { cls: "lmsa-posture-menu-item-check" });
-        setIcon(check, "check");
-      }
-      item.addEventListener("click", () => {
-        this.callbacks.onPostureChange(option.posture);
-        this.close();
-        this.refresh();
-      });
+    const specs = buildPostureItemSpecs(this.callbacks.getPosture(), (posture) => {
+      this.callbacks.onPostureChange(posture);
+      this.close();
+      this.refresh();
+    });
+    for (const spec of specs) {
+      renderMenuItem(el, spec);
     }
   }
 }

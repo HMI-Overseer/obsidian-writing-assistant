@@ -39,6 +39,8 @@ export type ChatLayoutRefs = {
   visionIndicatorEl: HTMLElement;
   reasoningPillEl: HTMLButtonElement;
   reasoningMenuEl: HTMLElement;
+  overflowBtnEl: HTMLButtonElement;
+  overflowMenuEl: HTMLElement;
   attachmentsEl: HTMLElement;
   actionBtn: HTMLButtonElement;
   modelSelectorBtn: HTMLElement;

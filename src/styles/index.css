@@ -20,6 +20,8 @@
 @import "../chat/composer/ToolUsePopover.css";
 @import "../chat/composer/ReasoningPill.css";
 @import "../chat/composer/PosturePill.css";
+@import "../chat/composer/menuItem.css";
+@import "../chat/composer/ComposerOverflowMenu.css";
 @import "../chat/animations.css";
 
 /* Diff / Editing */

@@ -461,15 +461,17 @@
   }
 
   /* ── Responsive (container query, reacts to panel width, not viewport) ──
-     Degradation order as the footer narrows: the context % label (lowest-priority
-     extra) goes first, then vision → knowledge → tool indicators, then the posture
-     pill's label collapses to an icon (its 359px query lives in PosturePill.css).
-     That icon-only pill is the final stage: the panel's own minimum width keeps the
-     footer wider than any tighter breakpoint, so the ring and the pill padding never
-     need to drop. Thresholds are derived from the measured footprints: full content
-     glues at ~516px; each drop is the prior threshold minus that item's footprint
-     (its width + the gap it frees) — % 37, each icon 40 — so an item leaves exactly
-     when the row would otherwise run out of room. */
+     Degradation order as the footer narrows: at 521px the reasoning pill leaves
+     the left cluster and the overflow ("...") button appears in the actions row
+     (ReasoningPill.css / ComposerOverflowMenu.css); then the context % label
+     drops (516), then the vision indicator (479), the knowledge chip (439), the
+     tool chip (399), and finally the posture pill (359, PosturePill.css). Every
+     control that leaves the row resurfaces as a section of the overflow menu,
+     gated at the same breakpoint, so nothing becomes unreachable and nothing
+     shows twice. The drop thresholds predate the overflow button and still
+     hold: the button adds ~40px to the right cluster, but the departing
+     reasoning pill frees ~46px on the left at the same width, so each item
+     still leaves just before the row would run out of room. */
 
   @container lmsa-composer-footer (max-width: 516px) {
     .lmsa-context-ring-label {

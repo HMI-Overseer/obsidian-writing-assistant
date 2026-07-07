@@ -19,6 +19,7 @@ import type { ContextInputs } from "./ContextCapacityUpdater";
 import { ContextCapacityUpdater } from "./ContextCapacityUpdater";
 import { renderProposalPanels } from "./finalization/finalizeEditResponse";
 import { ChatComposer } from "./composer/ChatComposer";
+import { ComposerOverflowMenu } from "./composer/ComposerOverflowMenu";
 import { ReasoningPill } from "./composer/ReasoningPill";
 import { PosturePill } from "./composer/PosturePill";
 import { ContextPickerPopover } from "./composer/ContextPickerPopover";
@@ -51,6 +52,7 @@ export class ChatView extends ItemView {
   private toolUsePopover: ToolUsePopover | null = null;
   private reasoningPill: ReasoningPill | null = null;
   private posturePill: PosturePill | null = null;
+  private overflowMenu: ComposerOverflowMenu | null = null;
   private historyDrawer: ChatHistoryDrawer | null = null;
   private contextUpdater: ContextCapacityUpdater | null = null;
   private orchestrator!: ChatGenerationOrchestrator;
@@ -137,6 +139,7 @@ export class ChatView extends ItemView {
           this.layout.rootEl.dataset.posture = posture;
         }
         this.posturePill?.refresh();
+        this.overflowMenu?.refresh();
         this.composer?.refreshToolUseIndicator(
           this.sessionStore?.getResolvedConversationModel() ?? null
         );
@@ -332,6 +335,7 @@ export class ChatView extends ItemView {
         if (this.profilePopover?.isOpen()) this.profilePopover.close();
         if (this.reasoningPill?.isOpen()) this.reasoningPill.close();
         if (this.posturePill?.isOpen()) this.posturePill.close();
+        if (this.overflowMenu?.isOpen()) this.overflowMenu.close();
       },
     });
 
@@ -352,6 +356,7 @@ export class ChatView extends ItemView {
         if (this.profilePopover?.isOpen()) this.profilePopover.close();
         if (this.reasoningPill?.isOpen()) this.reasoningPill.close();
         if (this.posturePill?.isOpen()) this.posturePill.close();
+        if (this.overflowMenu?.isOpen()) this.overflowMenu.close();
       },
     });
 
@@ -368,6 +373,29 @@ export class ChatView extends ItemView {
     this.posturePill = new PosturePill(this.layout, {
       getPosture: () => this.composer?.getPosture() ?? "ask",
       onPostureChange: (posture) => this.composer?.setPosture(posture),
+      onBeforeOpen: () => {
+        this.dismissAllOverlays();
+      },
+    });
+
+    this.overflowMenu = new ComposerOverflowMenu(this.layout, {
+      getActiveModel: () => this.sessionStore?.getResolvedConversationModel() ?? null,
+      getReasoningByModelKey: () => this.plugin.settings.reasoningByModelKey,
+      getReasoningDiscovery: () => this.plugin.services.modelAvailability,
+      onReasoningChange: (modelKey, level) => this.setModelReasoning(modelKey, level),
+      getPosture: () => this.composer?.getPosture() ?? "ask",
+      onPostureChange: (posture) => this.composer?.setPosture(posture),
+      getVisionSupported: () => {
+        const model = this.sessionStore?.getResolvedConversationModel() ?? null;
+        if (!model) return null;
+        return (
+          model.vision ??
+          this.plugin.services.modelAvailability.getVision(model.modelId) ??
+          false
+        );
+      },
+      onOpenTools: () => this.toolUsePopover?.open(),
+      onOpenKnowledge: () => this.knowledgePopover?.open(),
       onBeforeOpen: () => {
         this.dismissAllOverlays();
       },
@@ -397,6 +425,7 @@ export class ChatView extends ItemView {
         if (this.profilePopover?.isOpen()) this.profilePopover.close();
         if (this.reasoningPill?.isOpen()) this.reasoningPill.close();
         if (this.posturePill?.isOpen()) this.posturePill.close();
+        if (this.overflowMenu?.isOpen()) this.overflowMenu.close();
       },
     });
 
@@ -474,6 +503,7 @@ export class ChatView extends ItemView {
     this.toolUsePopover?.destroy();
     this.reasoningPill?.destroy();
     this.posturePill?.destroy();
+    this.overflowMenu?.destroy();
     this.composer?.destroy();
   }
 
@@ -581,6 +611,7 @@ export class ChatView extends ItemView {
     );
     this.modelSelector?.syncActiveModel();
     this.reasoningPill?.refresh();
+    this.overflowMenu?.refresh();
 
     this.profilePopover?.syncVisibility();
 
@@ -608,6 +639,7 @@ export class ChatView extends ItemView {
       this.plugin.services.graphService.isReady(),
     );
     this.reasoningPill?.refresh();
+    this.overflowMenu?.refresh();
   }
 
   private updateHeader(): void {
@@ -632,6 +664,7 @@ export class ChatView extends ItemView {
     if (this.toolUsePopover?.isOpen()) this.toolUsePopover.close();
     if (this.reasoningPill?.isOpen()) this.reasoningPill.close();
     if (this.posturePill?.isOpen()) this.posturePill.close();
+    if (this.overflowMenu?.isOpen()) this.overflowMenu.close();
     if (!options?.keepHistory && this.historyDrawer?.isOpen()) this.historyDrawer.close();
   }
 
@@ -645,6 +678,7 @@ export class ChatView extends ItemView {
     else this.plugin.settings.reasoningByModelKey[modelKey] = level;
     await this.plugin.saveSettings();
     this.reasoningPill?.refresh();
+    this.overflowMenu?.refresh();
   }
 
   private handleWidthChange(width: number): void {

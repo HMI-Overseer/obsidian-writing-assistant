@@ -190,6 +190,18 @@ export function createChatLayout(contentEl: HTMLElement): ChatLayoutRefs {
   setIcon(reasoningPillChevron, "chevron-up");
 
   const composerFooterActions = composerFooterRow.createDiv({ cls: "lmsa-chat-composer-footer-actions" });
+
+  // Overflow trigger for narrow footers: controls that leave the row resurface
+  // as sections of its menu (ComposerOverflowMenu). Leftmost in the cluster so
+  // it appears where the departed controls used to sit, rather than wedged
+  // between the posture pill and send. CSS keeps it hidden while the footer is
+  // wide enough to show every control in place.
+  const overflowBtnEl = composerFooterActions.createEl("button", {
+    cls: "lmsa-chat-composer-overflow-btn",
+    attr: { "aria-label": "More options" },
+  }) as HTMLButtonElement;
+  setIcon(overflowBtnEl, "more-horizontal");
+
   const toolWrap = composerFooterActions.createDiv({ cls: "lmsa-chat-composer-tool-wrap" });
   const toolUseIndicatorEl = toolWrap.createDiv({ cls: "lmsa-chat-composer-tool-indicator" });
   setIcon(toolUseIndicatorEl, "wrench");
@@ -222,6 +234,7 @@ export function createChatLayout(contentEl: HTMLElement): ChatLayoutRefs {
   const knowledgePopoverEl = composerFooter.createDiv({ cls: "lmsa-knowledge-popover lmsa-hidden" });
   const reasoningMenuEl = composerFooter.createDiv({ cls: "lmsa-reasoning-menu lmsa-hidden" });
   const postureMenuEl = composerFooter.createDiv({ cls: "lmsa-posture-menu lmsa-hidden" });
+  const overflowMenuEl = composerFooter.createDiv({ cls: "lmsa-overflow-menu lmsa-hidden" });
 
   return {
     rootEl: contentEl,
@@ -243,6 +256,8 @@ export function createChatLayout(contentEl: HTMLElement): ChatLayoutRefs {
     visionIndicatorEl,
     reasoningPillEl,
     reasoningMenuEl,
+    overflowBtnEl,
+    overflowMenuEl,
     attachmentsEl,
     actionBtn,
     modelSelectorBtn: headerMetaBtn,

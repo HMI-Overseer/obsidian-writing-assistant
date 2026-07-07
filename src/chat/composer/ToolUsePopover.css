@@ -85,7 +85,10 @@
   }
 }
 
-@container lmsa-composer-footer (max-width: 320px) {
+/* Once the tool chip has left the footer row (399px and below) the popover is
+   opened from the overflow menu and its anchor no longer renders; span the
+   footer instead of relying on the anchored clamp. */
+@container lmsa-composer-footer (max-width: 399px) {
   .lmsa-tool-popover {
     @apply lmsa-left-0 lmsa-right-0;
     width: auto;

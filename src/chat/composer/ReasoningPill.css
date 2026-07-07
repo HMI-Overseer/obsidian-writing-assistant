@@ -96,39 +96,14 @@
     display: none;
   }
 
-  .lmsa-reasoning-menu-item {
-    @apply lmsa-flex lmsa-cursor-pointer lmsa-items-center lmsa-justify-between lmsa-gap-2 lmsa-rounded-lg lmsa-px-2.5 lmsa-py-1.5;
-    font-size: var(--font-ui-smaller);
-    color: var(--text-muted);
-    transition: background 120ms ease, color 120ms ease;
-  }
+  /* Rows are the shared .lmsa-footer-menu-item (menuItem.css). */
 
-  .lmsa-reasoning-menu-item:hover {
-    background: var(--background-modifier-hover);
-    color: var(--text-normal);
-  }
-
-  .lmsa-reasoning-menu-item.is-selected {
-    color: var(--text-normal);
-    font-weight: 500;
-  }
-
-  .lmsa-reasoning-menu-item-check {
-    @apply lmsa-inline-flex lmsa-items-center;
-    color: var(--lmsa-mode-accent);
-  }
-
-  .lmsa-reasoning-menu-item-check svg {
-    width: 12px;
-    height: 12px;
-  }
-
-  /* Narrow footer: the pill's text label collapses 5px before the ring's %
-     label drops (516px), keeping the left cluster to two compact glyphs while
-     the right side degrades on its own original thresholds. */
+  /* Narrow footer: at the 521px threshold the pill leaves the left cluster
+     entirely (formerly it collapsed to a bare icon) and its level list
+     resurfaces as the overflow menu's reasoning section; the overflow button
+     appears at this same width (ComposerOverflowMenu.css). */
   @container lmsa-composer-footer (max-width: 521px) {
-    .lmsa-chat-composer-reasoning-pill-label,
-    .lmsa-chat-composer-reasoning-pill-chevron {
+    .lmsa-chat-composer-reasoning-pill {
       display: none;
     }
   }

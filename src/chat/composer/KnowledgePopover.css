@@ -164,7 +164,10 @@
   }
 }
 
-@container lmsa-composer-footer (max-width: 320px) {
+/* Once the knowledge chip has left the footer row (439px and below) the
+   popover is opened from the overflow menu and its anchor no longer renders;
+   span the footer instead of relying on the anchored clamp. */
+@container lmsa-composer-footer (max-width: 439px) {
   .lmsa-knowledge-popover {
     @apply lmsa-left-0 lmsa-right-0;
     width: auto;

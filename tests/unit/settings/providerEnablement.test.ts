@@ -67,12 +67,44 @@ describe("modelKey helpers", () => {
 });
 
 describe("provider enabled flag", () => {
-  it("defaults keyless providers on and keyed providers off for a fresh install", () => {
+  it("enables only the local provider on a fresh install", () => {
     const settings = normalizePluginSettings(null);
     expect(settings.providerSettings.lmstudio.enabled).toBe(true);
-    expect(settings.providerSettings.claudecode.enabled).toBe(true);
+    // Cloud providers stay off until the user opts in: keyed clouds need a key,
+    // keyless Claude Code needs the privacy disclaimer accepted.
+    expect(settings.providerSettings.claudecode.enabled).toBe(false);
     expect(settings.providerSettings.anthropic.enabled).toBe(false);
     expect(settings.providerSettings.openai.enabled).toBe(false);
+  });
+
+  it("forces Claude Code off when a stale enabled=true has no disclaimer acceptance", () => {
+    // The old default shipped Claude Code enabled; without the privacy
+    // acknowledgement that saved flag must not keep a cloud provider on.
+    const settings = normalizePluginSettings({
+      apiKeysDisclaimerAccepted: false,
+      providerSettings: {
+        claudecode: { enabled: true, claudePath: "" },
+      },
+    } as unknown as Partial<PluginSettings>);
+    expect(settings.providerSettings.claudecode.enabled).toBe(false);
+  });
+
+  it("keeps Claude Code enabled once the disclaimer is accepted", () => {
+    const settings = normalizePluginSettings({
+      apiKeysDisclaimerAccepted: true,
+      providerSettings: {
+        claudecode: { enabled: true, claudePath: "" },
+      },
+    } as unknown as Partial<PluginSettings>);
+    expect(settings.providerSettings.claudecode.enabled).toBe(true);
+  });
+
+  it("does not silently enable Claude Code just because the disclaimer was accepted", () => {
+    // Acceptance unlocks the toggle; it does not flip a provider on by itself.
+    const settings = normalizePluginSettings({
+      apiKeysDisclaimerAccepted: true,
+    } as unknown as Partial<PluginSettings>);
+    expect(settings.providerSettings.claudecode.enabled).toBe(false);
   });
 
   it("enables a keyed provider on upgrade when a key is stored", () => {

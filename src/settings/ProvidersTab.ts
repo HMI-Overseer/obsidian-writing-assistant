@@ -189,12 +189,27 @@ function renderProviderCard(
     syncExpansion();
   });
 
-  toggle.onChange(async (value) => {
+  const applyEnabled = async (value: boolean): Promise<void> => {
     settings.enabled = value;
     await plugin.saveSettings();
     // Enablement changes what RAG / graph may select from; keep them honest.
     await reconfigureKnowledgeServices(plugin);
     syncHeader();
+  };
+
+  toggle.onChange(async (value) => {
+    // Enabling a cloud provider requires the one-time privacy acknowledgement.
+    // Claude Code is keyless, so this toggle is its only enable path; the keyed
+    // clouds are additionally gated at the API-key field. Declining or closing
+    // the modal leaves the provider off (revert the optimistic visual flip).
+    if (value && descriptor.kind === "cloud" && !plugin.settings.apiKeysDisclaimerAccepted) {
+      toggle.setValue(false);
+      new ApiKeysDisclaimerModal(plugin.app, plugin, () => {
+        void applyEnabled(true);
+      }).open();
+      return;
+    }
+    await applyEnabled(value);
   });
 
   // ── Body, driven by the descriptor rather than hardcoded per provider ──

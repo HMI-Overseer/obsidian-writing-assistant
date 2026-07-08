@@ -106,13 +106,14 @@ export function makeDefaultProfile(provider: ProviderOption): ProviderProfile {
 
 export const DEFAULT_SETTINGS: PluginSettings = {
   providerSettings: {
-    // Keyless providers ship enabled; api-key providers ship off with the
-    // toggle auth-gated until a key exists (normalizeProviderSettingsMap
-    // enforces the gate on every load).
+    // Only the local provider ships enabled. Cloud providers ship off: keyed
+    // clouds until a key exists, and keyless Claude Code until the user accepts
+    // the privacy disclaimer. normalizeProviderSettingsMap enforces both gates
+    // on every load.
     lmstudio: { enabled: true, baseUrl: "http://localhost:1234/v1", bypassCors: true },
     anthropic: { enabled: false, apiKey: "" },
     openai: { enabled: false, apiKey: "", baseUrl: "https://api.openai.com/v1" },
-    claudecode: { enabled: true, claudePath: "" },
+    claudecode: { enabled: false, claudePath: "" },
   },
   includeNoteContext: true,
   includeLocalAttachmentsAsContext: false,

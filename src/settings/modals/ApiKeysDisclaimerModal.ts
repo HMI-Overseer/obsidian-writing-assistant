@@ -7,27 +7,28 @@ Hello,
 
 A note on your data and privacy from the developer.
 
-When you connect to a cloud provider **such as OpenAI or Anthropic** your notes \
-and prompts are sent to their servers for processing. At that point, your data is \
+When you enable a cloud provider **such as OpenAI or Anthropic** your notes and \
+prompts are sent to their servers for processing. At that point, your data is \
 subject to each provider's own privacy policy and terms of service. I encourage \
 you to review them before use.
 
-I have taken steps into offering and implementing as efficient way I could, because \
-the moment you engage with these products, you see your money slowly burn. I cannot \
-claim that it's a perfect solution, only that I tried my best.
+I've tried to implement this as efficiently as I could, because every request \
+to a cloud provider costs you money, and I wanted to keep that overhead low. \
+I cannot claim that it's a perfect solution, only that I tried my best.
 
-When using Writing Assistant with a local provider **such as Ollama or LM Studio** \
-your data never leaves your machine. All processing happens locally, and nothing is \
-sent over the internet, and you can engage with the plugin fully offline.
+When using Writing Assistant with a local provider **such as LM Studio** your data \
+never leaves your machine. All processing happens locally, nothing is sent over the \
+internet, and you can use the plugin fully offline.
 
-I fully understand not everyone has the hardware that might be required to run the \
-environment you might wish for locally, but I encourage you to try local solutions first.
+I fully understand not everyone has the hardware that running a local environment \
+might require, but I encourage you to try local solutions first.
 
-There is **no telemetry** in the Writing Assistant plugin, if you have problems \
-or simply want to give feedback simply reach me out.
+There is **no telemetry** in Writing Assistant. If you have problems, or simply want \
+to give feedback, reach out to me.
 
-Writing Assistant itself **never** collects, stores, or transmits your data, everything \
-is stored on your machine, inside your vault, deleting the plugin erases your data.`;
+Writing Assistant itself **never** collects, stores, or transmits your data. Anything \
+it keeps lives on your machine, inside your vault. Removing the plugin clears that \
+plugin data.`;
 
 /**
  * One-time privacy disclaimer shown before the user can access API key management.

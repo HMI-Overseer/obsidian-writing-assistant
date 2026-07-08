@@ -160,11 +160,29 @@ export function normalizeVaultOpPolicy(raw: unknown): VaultOpPolicy {
  * an api-key provider is clamped off without a key, so the enabled-but-broken
  * state is unrepresentable at the data layer, not just in the UI.
  */
-function deriveEnabled(saved: unknown, provider: ProviderOption, hasKey: boolean): boolean {
-  const keyGated = PROVIDER_DESCRIPTORS[provider].authType === "api-key";
-  if (keyGated && !hasKey) return false;
-  if (typeof saved === "boolean") return saved;
-  return true;
+function deriveEnabled(
+  saved: unknown,
+  provider: ProviderOption,
+  hasKey: boolean,
+  disclaimerAccepted: boolean,
+): boolean {
+  const descriptor = PROVIDER_DESCRIPTORS[provider];
+  if (descriptor.authType === "api-key") {
+    // Keyed clouds gate on the key itself, whose entry is disclaimer-gated in
+    // the Providers tab. No key, never enabled; otherwise honor the saved flag
+    // (or auto-enable a freshly upgraded blob that already carries a key).
+    if (!hasKey) return false;
+    return typeof saved === "boolean" ? saved : true;
+  }
+  if (descriptor.kind === "cloud") {
+    // Keyless cloud (Claude Code) has no key to gate on, so it gates directly on
+    // the one-time privacy acknowledgement. A stale enabled=true left by the old
+    // ship-enabled default is forced off until the user opts in past the modal.
+    if (!disclaimerAccepted) return false;
+    return typeof saved === "boolean" ? saved : DEFAULT_SETTINGS.providerSettings[provider].enabled;
+  }
+  // Local provider (LM Studio) ships enabled.
+  return typeof saved === "boolean" ? saved : true;
 }
 
 export function normalizeProviderSettingsMap(
@@ -172,6 +190,7 @@ export function normalizeProviderSettingsMap(
 ): ProviderSettingsMap {
   const saved = data?.providerSettings;
   const defaults = DEFAULT_SETTINGS.providerSettings;
+  const disclaimerAccepted = data?.apiKeysDisclaimerAccepted === true;
   const anthropicKey = typeof saved?.anthropic?.apiKey === "string"
     ? saved.anthropic.apiKey
     : defaults.anthropic.apiKey;
@@ -180,25 +199,35 @@ export function normalizeProviderSettingsMap(
     : defaults.openai.apiKey;
   return {
     lmstudio: {
-      enabled: deriveEnabled(saved?.lmstudio?.enabled, "lmstudio", true),
+      enabled: deriveEnabled(saved?.lmstudio?.enabled, "lmstudio", true, disclaimerAccepted),
       baseUrl: saved?.lmstudio?.baseUrl ?? defaults.lmstudio.baseUrl,
       bypassCors: typeof saved?.lmstudio?.bypassCors === "boolean"
         ? saved.lmstudio.bypassCors
         : defaults.lmstudio.bypassCors,
     },
     anthropic: {
-      enabled: deriveEnabled(saved?.anthropic?.enabled, "anthropic", anthropicKey.length > 0),
+      enabled: deriveEnabled(
+        saved?.anthropic?.enabled,
+        "anthropic",
+        anthropicKey.length > 0,
+        disclaimerAccepted,
+      ),
       apiKey: anthropicKey,
     },
     openai: {
-      enabled: deriveEnabled(saved?.openai?.enabled, "openai", openaiKey.length > 0),
+      enabled: deriveEnabled(
+        saved?.openai?.enabled,
+        "openai",
+        openaiKey.length > 0,
+        disclaimerAccepted,
+      ),
       apiKey: openaiKey,
       baseUrl: typeof saved?.openai?.baseUrl === "string"
         ? saved.openai.baseUrl
         : defaults.openai.baseUrl,
     },
     claudecode: {
-      enabled: deriveEnabled(saved?.claudecode?.enabled, "claudecode", true),
+      enabled: deriveEnabled(saved?.claudecode?.enabled, "claudecode", true, disclaimerAccepted),
       claudePath: typeof saved?.claudecode?.claudePath === "string"
         ? saved.claudecode.claudePath
         : defaults.claudecode.claudePath,

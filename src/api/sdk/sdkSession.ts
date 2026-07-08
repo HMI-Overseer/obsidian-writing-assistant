@@ -40,7 +40,7 @@ import type { ModelInfo, Options, Query, SDKMessage, SDKUserMessage } from "./cl
  * live reuse, our own hash never Claude Code's file). On any doubt (abort, SDK error,
  * unexpected end, config drift, a resume that can't start) it degrades one rung, and
  * a synthetic rebuild is always the floor. See
- * `docs/work/issues/claude-code-cold-rebuild-fidelity.md` §6.3.
+ * `docs/work/issues/claude-code-cold-rebuild-fidelity.md` section 6.3.
  */
 
 /** Idle sessions are disposed after this long unused (kills the `claude` process). */
@@ -134,7 +134,7 @@ export class SdkSession {
    * Effort the live session currently runs at: the mint-time `Options.effort`
    * (null = nothing sent, model default), then whatever the last
    * {@link setEffort} flip applied. Deliberately outside the config fingerprint,
-   * the registry compares it per turn and flips or rebuilds (§3.2).
+   * the registry compares it per turn and flips or rebuilds (section 3.2).
    */
   effort: ReasoningLevel | null;
 
@@ -151,7 +151,7 @@ export class SdkSession {
   /**
    * The CLI session id observed on the last `result`, the id the persistent-session
    * disk `resume` (Model A′) targets. On a resumed session it is the same id that was
-   * resumed (the CLI does not rotate it, §6.7.1). Undefined until the first result.
+   * resumed (the CLI does not rotate it, section 6.7.1). Undefined until the first result.
    */
   private sessionId: string | undefined;
 
@@ -338,7 +338,7 @@ export class SdkSession {
 
   /**
    * The handshake's model list (`supportedModels()` control request), the
-   * §3.1 layer-2 discovery source: each entry carries `supportedEffortLevels`
+   * section 3.1 layer-2 discovery source: each entry carries `supportedEffortLevels`
    * for the effort-level harvest.
    */
   supportedModels(): Promise<ModelInfo[]> {
@@ -419,7 +419,7 @@ export interface SessionTurnRequest {
   onSessionBanked?: (cursor: ClaudeCodeResumeCursor) => void;
   /**
    * Receives the handshake's model list when a fresh session is minted (never
-   * on reuse), the §3.1 layer-2 effort-level harvest. Fired fire-and-forget:
+   * on reuse), the section 3.1 layer-2 effort-level harvest. Fired fire-and-forget:
    * the turn streams without waiting, and a failed control request is
    * swallowed (the descriptor fallback keeps covering).
    */
@@ -440,7 +440,7 @@ export class SdkSessionRegistry {
    * eviction and compaction *delete* the registry entry, so the next turn would
    * otherwise decide `no-session` and the badge would read a misleading "session
    * started". The tombstone lets {@link decideRecovery} attribute a rebuild to its
-   * real cause instead (cold-rebuild-fidelity §6.2) when there is no resume cursor to
+   * real cause instead (cold-rebuild-fidelity section 6.2) when there is no resume cursor to
    * check. One-shot: cleared the moment a session is minted or resumed, so a
    * tombstone present always implies no live session.
    */
@@ -458,7 +458,7 @@ export class SdkSessionRegistry {
    * Runs one turn for `conversationId` down the recovery ladder: reuse the warm
    * session, else `resume` it from disk, else mint fresh. A resume that cannot even
    * start (its session file was deleted by CLI retention) is a non-event: it drops to
-   * a synthetic rebuild *within the same turn* (§6.3). Any failure disposes the
+   * a synthetic rebuild *within the same turn* (section 6.3). Any failure disposes the
    * session so the next turn starts clean, the transcript can always rebuild.
    */
   async *runTurn(conversationId: string, req: SessionTurnRequest): AsyncGenerator<string> {
@@ -569,7 +569,7 @@ export class SdkSessionRegistry {
     this.tombstones.delete(conversationId);
     this.ensureSweeping();
 
-    // Mint-time harvest (§3.1 layer 2): ask the fresh process for its model list in
+    // Mint-time harvest (section 3.1 layer 2): ask the fresh process for its model list in
     // the background. Failures are ignored, discovery is an upgrade over the
     // descriptor fallback, never a turn dependency. A resume spawns a fresh process
     // too, so the harvest applies there as well.
@@ -610,7 +610,7 @@ export class SdkSessionRegistry {
    * the live process (its context now covers the partial reply), so keep it for
    * reuse. The exception is a mid-turn compaction, which desynced it and must be
    * disposed on every exit path (the {@link afterTurnSuccess} check is unreachable
-   * when the turn throws, §6.7.1). Any other error (SDK failure, unexpected end, hard
+   * when the turn throws, section 6.7.1). Any other error (SDK failure, unexpected end, hard
    * abort) leaves the tail indeterminate, so dispose it and cold-rebuild next turn. No
    * cursor is banked on a surviving interrupt: aborted turns persist no usage, so it
    * would be dropped, and the live session covers the immediate next turn anyway.
@@ -683,7 +683,7 @@ export class SdkSessionRegistry {
         // Tombstone the eviction. The persisted resume cursor usually restores the
         // session next turn ("session resumed", Model A′); the tombstone is the
         // fallback attribution when there is no cursor to resume (or it fails its
-        // gate): "expired" rather than the neutral "session started" (§6.2).
+        // gate): "expired" rather than the neutral "session started" (section 6.2).
         this.tombstones.set(id, "session-disposed");
       }
     }

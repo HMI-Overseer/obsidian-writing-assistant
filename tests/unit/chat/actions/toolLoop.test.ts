@@ -455,7 +455,7 @@ describe("runToolLoop step results", () => {
 
 /**
  * Phase-2 replay capture at the plugin tool-loop choke point (cold-rebuild-fidelity
- * §A.1 / question 6 / question 9). The read channel records the digest + bounded
+ * section A.1 / question 6 / question 9). The read channel records the digest + bounded
  * record with the result in hand; the vault-op / edit channel threads the reviewed
  * disposition through onStepResult. Pre-phase neither field existed.
  */
@@ -998,7 +998,7 @@ describe("applyIdenticalCallGuard", () => {
 });
 
 /**
- * Tool allow-list guard (§6.1.4/§6.3). The stable cloud surface advertises more than
+ * Tool allow-list guard (section 6.1.4/section 6.3). The stable cloud surface advertises more than
  * the session permits, so a call whose tool the session disallows (a deny-classed write
  * under the ask posture) is refused before it runs. Reads are unrestricted on cloud, so
  * only not-permitted writes are blocked. Local providers pass no allow-list (no-op).

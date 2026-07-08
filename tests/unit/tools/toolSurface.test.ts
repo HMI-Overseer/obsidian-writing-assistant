@@ -172,7 +172,7 @@ describe("toolNotAllowedFailure", () => {
   });
 });
 
-describe("Layer 2 progressive-disclosure core (ADR-0009 / §6.2.5)", () => {
+describe("Layer 2 progressive-disclosure core (ADR-0009 / section 6.2.5)", () => {
   // Layer 2 shipped. The long tail (the extra reads + every write) now defers behind the
   // native tool-search entry (anthropic) and the SDK `alwaysLoad` split (Claude Code), so
   // the OLD tripwire (whole catalogue must stay < 40) is obsolete: catalogue growth is now
@@ -180,13 +180,13 @@ describe("Layer 2 progressive-disclosure core (ADR-0009 / §6.2.5)", () => {
   // instead is the NON-DEFERRED CORE. It is the only part of the tool block that lives in
   // the cached prefix turn over turn, so each tool kept there is a permanent always-on tax
   // and a permanent draw on tool-selection quality; growing it re-bloats exactly the prefix
-  // Layer 2 exists to shrink. Crossing this guard should force the §6.2.5 "does this
+  // Layer 2 exists to shrink. Crossing this guard should force the section 6.2.5 "does this
   // primitive earn a non-deferred slot" conversation (the get_outline / read_section
   // watch-item), not a silent bump.
   // See docs/reference/adr/0009-layer-2-progressive-disclosure-deferred.md.
   const NON_DEFERRED_CORE_MAX = 8;
 
-  it("keeps the core read set to the six §6.2.5 primitives", () => {
+  it("keeps the core read set to the six section 6.2.5 primitives", () => {
     expect(names(CORE_READ_TOOLS)).toEqual([
       "list_directory",
       "semantic_search",
@@ -284,7 +284,7 @@ describe("anthropicLayer2ToolSet (the direct-API L2 emission)", () => {
     const deferred = names(anthropicLayer2ToolSet(opts())).filter((n) => !nonDeferred.has(n));
     expect(deferred.length).toBeGreaterThan(0);
     for (const n of deferred) expect(nonDeferred.has(n)).toBe(false);
-    // And the non-deferred core stays exactly the six reads + think (held small, §6.2.5).
+    // And the non-deferred core stays exactly the six reads + think (held small, section 6.2.5).
     expect([...nonDeferred].sort()).toEqual(
       [
         "get_outline",

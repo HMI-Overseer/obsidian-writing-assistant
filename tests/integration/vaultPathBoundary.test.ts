@@ -19,7 +19,7 @@ import type { VaultToolContext } from "../../src/tools/vault/handlers";
 import type { RagService } from "../../src/rag/ragService";
 
 /**
- * §6.1, verify the vault-write handler against its **real on-disk resolution**, not
+ * section 6.1, verify the vault-write handler against its **real on-disk resolution**, not
  * a string-keyed mock.
  *
  * The unit tests prove our *model* of the boundary: their `vault.create` writes to a
@@ -180,7 +180,7 @@ const ODD_BUT_CONTAINED_PATHS = [
   "trailing.dot./note.md",
 ];
 
-describe("vault path-boundary, real-filesystem resolution (§6.1)", () => {
+describe("vault path-boundary, real-filesystem resolution (section 6.1)", () => {
   it("control: an UNGUARDED adapter write with '../../' really escapes the vault on disk", () => {
     // Proves the harness genuinely detects a real escape, so the guarded assertions
     // below are meaningful, not vacuously passing. We call the raw adapter directly,
@@ -328,7 +328,7 @@ describe("vault path-boundary, real-filesystem resolution (§6.1)", () => {
   });
 });
 
-describe("folder ops, real-filesystem resolution (§6.1)", () => {
+describe("folder ops, real-filesystem resolution (section 6.1)", () => {
   it("refuses an escaping move_folder destination without moving the folder out of the vault", async () => {
     const app = makeRealFsApp(vaultRoot);
     fs.mkdirSync(nodePath.join(vaultRoot, "Drafts", "Act II"), { recursive: true });
@@ -415,7 +415,7 @@ describe("folder ops, real-filesystem resolution (§6.1)", () => {
   });
 });
 
-describe("insert_into_note path boundary (edit channel), real filesystem (§6.1)", () => {
+describe("insert_into_note path boundary (edit channel), real filesystem (section 6.1)", () => {
   it("executeEditTool refuses every escaping insert before touching the vault", async () => {
     const app = makeRealFsApp(vaultRoot);
 
@@ -475,7 +475,7 @@ describe("insert_into_note path boundary (edit channel), real filesystem (§6.1)
   });
 });
 
-describe("get_outline / read_section path boundary (read channel), real filesystem (§6.1)", () => {
+describe("get_outline / read_section path boundary (read channel), real filesystem (section 6.1)", () => {
   // The read channel only resolves an in-vault file (getFileByPath), but it still
   // names the boundary honestly via refuseOutsideVault rather than dead-ending the
   // model on "not found". Verify on real disk that every escaping outline/section
@@ -505,7 +505,7 @@ describe("get_outline / read_section path boundary (read channel), real filesyst
   });
 });
 
-describe("get_outgoing_links path boundary (read channel), real filesystem (§6.1)", () => {
+describe("get_outgoing_links path boundary (read channel), real filesystem (section 6.1)", () => {
   // The forward-link read mirror of get_backlinks: it only ever resolves an in-vault
   // file (getFileByPath), but still names the boundary honestly via refuseOutsideVault
   // rather than dead-ending the model on "not found". Verify on real disk that every

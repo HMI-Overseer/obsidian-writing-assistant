@@ -9,7 +9,7 @@
  * result, and a bounded copy of the full result text. Nothing here is sent to the
  * API this phase; phase 3's replay digest reads these fields.
  *
- * Pure: no Obsidian, no disk, so the four-outcome digest contract (§A.1) is
+ * Pure: no Obsidian, no disk, so the four-outcome digest contract (section A.1) is
  * unit-testable string by string.
  */
 
@@ -77,7 +77,7 @@ export function captureStepFields(
 
 /**
  * Discovery-class tools whose *results* are pointers the args don't already carry
- * (§A.1): the rebuilt model can re-ground any pointer in one cheap call, so replay
+ * (section A.1): the rebuilt model can re-ground any pointer in one cheap call, so replay
  * stays pointers rather than chunk content. Path→content tools (`read_file`,
  * `read_section`) and listing tools (`list_directory`) get no digest, their args
  * are the pointer, or the view is re-derivable.
@@ -90,13 +90,13 @@ const DISCOVERY_DIGEST_TOOLS = new Set([
   "find_notes_by_tag",
 ]);
 
-/** Max pointers a hits digest lists, and its char budget (§A.1). */
+/** Max pointers a hits digest lists, and its char budget (section A.1). */
 const MAX_DIGEST_POINTERS = 8;
 const MAX_DIGEST_CHARS = 500;
 
 /**
  * A compact, pointers-only digest of a discovery-tool result for phase-3 replay
- * (§A.1's four-outcome contract), or `undefined` for any non-discovery tool. Never
+ * (section A.1's four-outcome contract), or `undefined` for any non-discovery tool. Never
  * carries scores or chunk content, both non-reproducible and decision-irrelevant on
  * replay.
  */
@@ -200,7 +200,7 @@ function boundPointers(pointers: string[]): string {
 }
 
 // ---------------------------------------------------------------------------
-// Phase-3 replay (§4.A / §4.C): the persisted capture fields above become the
+// Phase-3 replay (section 4.A / section 4.C): the persisted capture fields above become the
 // compact bracketed lines a cold rebuild replays under each assistant turn, and a
 // marker for an interrupted reply. The formatters live here beside the capture
 // contract so the digest string logic stays in one pure, unit-tested place; the
@@ -211,7 +211,7 @@ function boundPointers(pointers: string[]): string {
 export const INTERRUPTED_REPLAY_MARKER = "[response interrupted by user]";
 
 /**
- * One replay line per persisted tool_call step (§4.A), in recorded order. Reasoning
+ * One replay line per persisted tool_call step (section 4.A), in recorded order. Reasoning
  * steps and any step without a tool name are dropped. The lines are presentation-only
  * (they ride replayed `content`, never `rawContent`), so a rebuilt session learns
  * what already ran and how the user disposed of it without re-executing anything.
@@ -228,15 +228,15 @@ export function formatAgenticReplayLines(steps: AgenticStep[]): string[] {
 /**
  * The replay line for a single step, or `null` when the step contributes none.
  * Discovery tools replay their precomputed pointers-only
- * {@link AgenticStep.resultDigest} verbatim (§A.1); every other captured tool renders
+ * {@link AgenticStep.resultDigest} verbatim (section A.1); every other captured tool renders
  * as `[tool: keyArg]` with an always-shown disposition suffix when the call was
  * reviewed (`DECLINED by user` is the steering signal a flat prose transcript loses,
- * §2).
+ * section 2).
  *
  * A step earns a line only if it carries at least one phase-2 capture field
  * ({@link AgenticStep.resultDigest}, {@link AgenticStep.resultRecord}, or
  * {@link AgenticStep.disposition}). Steps persisted before phase 2 have none, so a
- * pre-phase-2 conversation replays byte-identically to before (the §8 degradation
+ * pre-phase-2 conversation replays byte-identically to before (the section 8 degradation
  * invariant); computing lines from `toolName`/`toolInput` alone would silently
  * rewrite those old transcripts.
  */

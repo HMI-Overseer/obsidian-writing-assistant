@@ -17,7 +17,7 @@ describe("claudeCodeHarnessEnv", () => {
   });
 
   it("uses the stronger DISABLE_COMPACT, never the weaker auto flag, and sets no context cap", () => {
-    // §6.4 flag correction: DISABLE_COMPACT (not DISABLE_AUTO_COMPACT) is the switch,
+    // section 6.4 flag correction: DISABLE_COMPACT (not DISABLE_AUTO_COMPACT) is the switch,
     // and the plugin deliberately leaves CLAUDE_CODE_MAX_CONTEXT_TOKENS unset (the
     // per-conversation preflight is the ceiling instead).
     const env = claudeCodeHarnessEnv();

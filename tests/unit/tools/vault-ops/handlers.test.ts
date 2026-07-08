@@ -233,7 +233,7 @@ describe("executeVaultOpTool", () => {
   });
 });
 
-describe("buildPendingOverlay (intra-turn dependencies, spec §4)", () => {
+describe("buildPendingOverlay (intra-turn dependencies, spec section 4)", () => {
   it("lets a later move see an earlier write", () => {
     const app = makeApp({}); // A is not on disk
     const overlay = buildPendingOverlay(app, [

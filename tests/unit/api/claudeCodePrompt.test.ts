@@ -95,7 +95,7 @@ describe("buildClaudeCodePrompt", () => {
     expect(prompt).not.toMatch(/^Assistant:/m);
   });
 
-  it("opens the mint blob with the framing preamble, byte-stable across rebuilds (§4.B)", () => {
+  it("opens the mint blob with the framing preamble, byte-stable across rebuilds (section 4.B)", () => {
     const request = makeRequest({
       messages: [
         { role: "user", content: "First" },
@@ -107,7 +107,7 @@ describe("buildClaudeCodePrompt", () => {
     const second = buildClaudeCodePrompt(request);
     expect(first.startsWith("The following is a prior conversation")).toBe(true);
     // Two consecutive rebuilds of the same request produce identical bytes, so the
-    // preamble never becomes a linearity drift source (§5).
+    // preamble never becomes a linearity drift source (section 5).
     expect(first).toBe(second);
   });
 
@@ -120,7 +120,7 @@ describe("buildClaudeCodePrompt", () => {
     expect(prompt).not.toContain("prior conversation");
   });
 
-  it("escapes a line-leading User:/Assistant: label inside a turn body (§1 symptom 3)", () => {
+  it("escapes a line-leading User:/Assistant: label inside a turn body (section 1 symptom 3)", () => {
     const prompt = buildClaudeCodePrompt(
       makeRequest({
         messages: [
@@ -212,7 +212,7 @@ describe("buildDeltaPrompt", () => {
     expect(prompt).toBe("Planning mode framing.\n\nSecond");
   });
 
-  it("carries no preamble or interruption marker (reuse turns never see replay surface, §5)", () => {
+  it("carries no preamble or interruption marker (reuse turns never see replay surface, section 5)", () => {
     const prompt = buildDeltaPrompt(
       makeRequest({
         messages: [

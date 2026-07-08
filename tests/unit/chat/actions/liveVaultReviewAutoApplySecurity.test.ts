@@ -6,7 +6,7 @@ import type { VaultOpPolicy } from "../../../../src/vault-ops/gateway";
 import type { VaultOperation } from "../../../../src/vault-ops/types";
 
 /**
- * §6.2 lock-in: the auto-apply layer hard-refuses a security-breaching op *in its
+ * section 6.2 lock-in: the auto-apply layer hard-refuses a security-breaching op *in its
  * own right*.
  *
  * The normal flow rejects an out-of-vault path at conversion/validation (layer 1),
@@ -36,7 +36,7 @@ vi.mock("../../../../src/chat/messages/vaultReviewTimeline", () => ({
 
 // Simulate a future refactor that dropped the conversion-stage rejection: force the
 // conversion layer to emit a (directly constructed) op instead of an error, so an
-// escaping path reaches the auto-apply path. This is §6.2's "an op constructed
+// escaping path reaches the auto-apply path. This is section 6.2's "an op constructed
 // directly", bypassing the layer-1 validators.
 const injected = vi.hoisted(() => ({ op: null as VaultOperation | null }));
 vi.mock("../../../../src/tools/vault-ops/conversion", () => ({
@@ -98,7 +98,7 @@ beforeEach(() => {
   applyBatchSpy.mockClear();
 });
 
-describe("LiveVaultReview auto-apply vault-boundary guard (§6.2)", () => {
+describe("LiveVaultReview auto-apply vault-boundary guard (section 6.2)", () => {
   it("refuses an escaping create op forced into the auto path, never touching the batch", async () => {
     injected.op = { kind: "create", path: "../../outside-vault.md", content: "pwned" };
     const review = new LiveVaultReview({

@@ -102,7 +102,7 @@ export async function finalizeAbortedResponse(
     if (rewrittenQuery) assistantMessage.rewrittenQuery = rewrittenQuery;
     if (agenticSteps?.length) assistantMessage.agenticSteps = agenticSteps;
     // A partial reply is a truncated turn; the claudecode replay marks it so a
-    // rebuild does not read it as complete (§4.C).
+    // rebuild does not read it as complete (section 4.C).
     assistantMessage.interrupted = true;
     store.appendMessage(assistantMessage);
     store.setLastAssistantResponse(response);
@@ -118,7 +118,7 @@ export async function finalizeAbortedResponse(
     // A claudecode turn ALWAYS persists its aborted assistant message, even with
     // zero text: the live session banked an empty assistant turn in its watermark,
     // so the transcript must carry a matching empty turn or the next turn cold-
-    // rebuilds with a mislabeled `turn-count` reason (cold-rebuild-fidelity §6.1 /
+    // rebuilds with a mislabeled `turn-count` reason (cold-rebuild-fidelity section 6.1 /
     // question 7). Partial steps ride it for replay fidelity. Other providers keep
     // today's behavior (no empty turn appended, so their histories don't grow one).
     if (provider === "claudecode") {
@@ -128,7 +128,7 @@ export async function finalizeAbortedResponse(
       if (rewrittenQuery) assistantMessage.rewrittenQuery = rewrittenQuery;
       if (agenticSteps?.length) assistantMessage.agenticSteps = agenticSteps;
       // Even an empty stopped turn is interrupted: the replay gives it a body of its
-      // partial steps' digest plus the interruption marker (§4.C / §6.1).
+      // partial steps' digest plus the interruption marker (section 4.C / section 6.1).
       assistantMessage.interrupted = true;
       store.appendMessage(assistantMessage);
       transcript.registerBubble(assistantMessage.id, bubble);

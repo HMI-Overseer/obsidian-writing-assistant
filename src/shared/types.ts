@@ -204,8 +204,8 @@ export type SessionRebuildReason =
  * never permission" holds across a restart: the same linearity/config gates the
  * live-reuse path runs are re-checked against this cursor (our own transcript hash,
  * never Claude Code's file) before a resume is attempted
- * (docs/work/issues/claude-code-cold-rebuild-fidelity.md §6.3 / §6.5 item 1). Static
- * per conversation: the CLI does not rotate the session id across a resume (§6.7.1).
+ * (docs/work/issues/claude-code-cold-rebuild-fidelity.md section 6.3 / section 6.5 item 1). Static
+ * per conversation: the CLI does not rotate the session id across a resume (section 6.7.1).
  */
 export interface ClaudeCodeResumeCursor {
   /** The CLI session id to resume, from the turn's `result` usage. */
@@ -292,7 +292,7 @@ export interface MessageVersion {
  * replay-capture fields ({@link disposition}, {@link resultDigest},
  * {@link resultRecord}) that the claudecode cold rebuild reads at replay time
  * (phase 3), where it derives a compact digest from them (see
- * docs/work/issues/claude-code-cold-rebuild-fidelity.md §4.A / §A.1). All three are
+ * docs/work/issues/claude-code-cold-rebuild-fidelity.md section 4.A / section A.1). All three are
  * optional forever: conversations written before phase 2 lack them and replay must
  * degrade to today's behavior when they are absent.
  */
@@ -329,20 +329,20 @@ export interface AgenticStep {
    * (applied / declined / failed / ...), captured where {@link ../chat/actions/liveVaultReview.LiveVaultReview}
    * returns the outcome to the model. A declined op resolves `isError: false`, so
    * this is the only field that tells a decline from an applied op; the phase-3
-   * replay digest reads it to reconstruct the user's steering (issue §6 question 6).
+   * replay digest reads it to reconstruct the user's steering (issue section 6 question 6).
    */
   disposition?: VaultOpDisposition;
   /**
    * For tool_call: a compact, pointers-only digest of a discovery-tool result (e.g.
    * `[semantic_search: "q", surfaced: path > heading; ...]`), computed at capture
    * time ({@link ../tools/resultDigest.formatResultDigest}). Discovery-class tools
-   * only; absent otherwise. No scores, no chunk content (issue §A.1).
+   * only; absent otherwise. No scores, no chunk content (issue section A.1).
    */
   resultDigest?: string;
   /**
    * For tool_call: the tool result text returned to the model, bounded to
    * {@link ../tools/resultDigest.TOOL_RESULT_CHAR_LIMIT} chars. The richer source the
-   * replay digest is computed from and a future debugging record (issue §6
+   * replay digest is computed from and a future debugging record (issue section 6
    * questions 9/10); bounded so vault content in the conversation JSON stays small.
    */
   resultRecord?: string;
@@ -402,7 +402,7 @@ export interface ConversationMessage {
    * Set on an assistant message the user stopped mid-generation (partial or empty
    * reply). The claudecode cold-rebuild replay reads it to append
    * `[response interrupted by user]` so a rebuilt session does not treat a truncated
-   * turn as complete (issue §4.C / §6.1). Optional forever: absent on messages
+   * turn as complete (issue section 4.C / section 6.1). Optional forever: absent on messages
    * written before phase 3 and on any turn that finished on its own.
    */
   interrupted?: boolean;
@@ -608,7 +608,7 @@ export interface BenchmarkSettings {
 
 /**
  * Session-scoped approval posture, the cloud chat surface's replacement for the
- * plan/chat/edit mode selector (prompt-cache design §6.3). It routes the
+ * plan/chat/edit mode selector (prompt-cache design section 6.3). It routes the
  * apply-vs-ask decision at the vault-op gate and is cache-neutral: it changes
  * only the runtime allow-list / per-run gate, never the cached prefix or the
  * Claude Code fingerprint, so it can flip mid-session for free.
@@ -654,7 +654,7 @@ export interface PluginSettings {
   knowledgeGraph: KnowledgeGraphSettings;
   /**
    * The unified system prompt prefix, prepended before the profile's custom prompt on
-   * every turn (the plan/chat/edit modes are gone, §6.3). Edit-format guidance
+   * every turn (the plan/chat/edit modes are gone, section 6.3). Edit-format guidance
    * (tool-edit or non-agentic SEARCH/REPLACE) is appended dynamically, not stored here.
    */
   systemPromptPrefix: string;

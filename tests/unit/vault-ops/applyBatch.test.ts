@@ -539,7 +539,7 @@ describe("undoVaultOpBatch", () => {
   });
 });
 
-describe("undoVaultOpBatch drift guard (§3-B amendment 3)", () => {
+describe("undoVaultOpBatch drift guard (section 3-B amendment 3)", () => {
   it("refuses to undo a create when the created file changed since apply", async () => {
     const vault = makeVault();
     const apply = await applyVaultOpBatch(vault.app, [

@@ -14,7 +14,7 @@ import type { AgenticStep } from "../../../src/shared/types";
 
 /**
  * Phase-2 capture contract for the claudecode cold rebuild
- * (docs/work/issues/claude-code-cold-rebuild-fidelity.md §A.1, question 9).
+ * (docs/work/issues/claude-code-cold-rebuild-fidelity.md section A.1, question 9).
  * The digest is pointers only, never scores or chunk content; the record is a bounded
  * copy of the full result.
  */
@@ -39,7 +39,7 @@ describe("boundToolResult", () => {
   });
 });
 
-describe("formatResultDigest, semantic_search four-outcome contract (§A.1)", () => {
+describe("formatResultDigest, semantic_search four-outcome contract (section A.1)", () => {
   it("invalid-args: a blank-query failure digests as FAILED with the first sentence", () => {
     // The handler's blank-query failure (toolFailure invalid-args).
     const content = "Error: query is required. check the arguments against the tool's schema and retry.";
@@ -76,7 +76,7 @@ describe("formatResultDigest, semantic_search four-outcome contract (§A.1)", ()
   });
 });
 
-describe("formatResultDigest hit bounds (§A.1)", () => {
+describe("formatResultDigest hit bounds (section A.1)", () => {
   it("caps at 8 pointers, ~500 chars, and never leaks scores or chunk content", () => {
     const blocks: string[] = ['Search results for: "wide"', ""];
     for (let i = 0; i < 12; i++) {
@@ -186,7 +186,7 @@ describe("captureStepFields", () => {
 });
 
 /**
- * Phase-3 replay line formatting (§4.A): the persisted capture fields become the
+ * Phase-3 replay line formatting (section 4.A): the persisted capture fields become the
  * compact bracketed lines a cold rebuild replays under each assistant turn.
  */
 describe("formatStepReplayLine", () => {

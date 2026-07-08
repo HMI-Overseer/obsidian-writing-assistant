@@ -52,7 +52,7 @@ export function resolveReasoningMenuState(context: ReasoningMenuContext): Reason
  * Builds the level rows for a reasoning menu, one shared shape for the pill's
  * own menu and the overflow menu's reasoning section. Null first: defaults are
  * displayed, never fabricated, the model's own default is not assumed to be
- * any particular level (§3.3).
+ * any particular level (section 3.3).
  */
 export function buildReasoningItemSpecs(
   state: ReasoningMenuState,
@@ -72,7 +72,7 @@ export function buildReasoningItemSpecs(
 /**
  * The composer footer's reasoning pill: reads the active model's current level
  * at a glance, one click opens a compact menu of the model's resolved level set
- * (composer-reasoning-effort-selector §3.3). Same visual language as the
+ * (composer-reasoning-effort-selector section 3.3). Same visual language as the
  * posture toggle; hidden entirely for models with an empty resolved set. Writes
  * the same per-model entry as the profile popover's reasoning control.
  */
@@ -144,7 +144,7 @@ export class ReasoningPill {
     );
     // Defaults are displayed, never fabricated: where discovery reports one
     // (LM Studio) the null state names it ("On · default"); otherwise plain
-    // "Default" (§3.3).
+    // "Default" (section 3.3).
     const label =
       state.current !== null
         ? REASONING_LEVEL_LABELS[state.current]

@@ -44,7 +44,7 @@ export interface PrepareMessagesOptions {
   app: App;
   store: ChatSessionStore;
   settings: PluginSettings;
-  /** Session approval posture, the cloud surface's replacement for the plan/chat/edit mode (§6.3). */
+  /** Session approval posture, the cloud surface's replacement for the plan/chat/edit mode (section 6.3). */
   posture: ApprovalPosture;
   ragService?: RagService;
   /** Active provider, needed to decide tool use. */
@@ -106,7 +106,7 @@ export async function prepareApiMessages(
   const useVaultTools = settings.agenticMode && usePluginTools;
   const claudeCodeRetrievesViaMcp = isClaudeCode && settings.agenticMode;
 
-  // Ambient editing (prompt-cache design §6.3): with the plan/chat/edit modes gone, one
+  // Ambient editing (prompt-cache design section 6.3): with the plan/chat/edit modes gone, one
   // unified system prefix frames every turn. A non-agentic turn (no tools) still edits,
   // via SEARCH/REPLACE blocks the diff engine parses, so it carries the regex-edit format
   // guidance whenever editing is permitted but no tools carry it.
@@ -120,7 +120,7 @@ export async function prepareApiMessages(
   // point-in-time snapshot bound to the user turn at send time (snapshotNoteAttachments),
   // so they ride message.attachments and stay cache-stable. There is no live re-read of
   // the active document here, the model reads current content via tools when it edits
-  // (the §10/§13 cache-coupling anti-pattern is gone).
+  // (the section 10/section 13 cache-coupling anti-pattern is gone).
   const activeFilePath = app.workspace.getActiveFile()?.path;
 
   const messages: ChatTurn[] = store
@@ -181,7 +181,7 @@ export async function prepareApiMessages(
   // Build the tool surface. The only posture/policy-varying decision is the write gate
   // (which mutating tools the session permits); reads are unrestricted on the cloud
   // paths. The canonical resolver lives in src/tools/toolSurface.ts so every path reads
-  // one source (prompt-cache design §6.1.1/§6.1.4/§6.1.5).
+  // one source (prompt-cache design section 6.1.1/section 6.1.4/section 6.1.5).
   //
   // think is a meta-reasoning tool that benefits large cloud models. LM Studio (local
   // models) already struggle with multi-tool schemas, and Magistral-family reasoning
@@ -273,7 +273,7 @@ export async function prepareApiMessages(
     ? profileSystemPrompt
     : systemPrompt + groundingNote + vaultGuidance + editGuidance + vaultOpGuidance + toolSearchNote + regexEditGuidance;
 
-  // Layer 1 (prompt-cache design §6.1.2): on the billed paths that have a tail
+  // Layer 1 (prompt-cache design section 6.1.2): on the billed paths that have a tail
   // mechanism, hold the cached `system` block invariant (profile prompt only) and
   // carry the per-turn wording + tool guidance in the message tail. Local providers
   // (and disableBuiltinSystemPrompts) keep the full system prompt, byte-for-byte, with
@@ -311,7 +311,7 @@ export async function prepareApiMessages(
 
 /**
  * Layer 1 decomposition of the system prompt into an invariant cached block and a
- * per-turn tail (prompt-cache design §6.1.2).
+ * per-turn tail (prompt-cache design section 6.1.2).
  *
  * When `useModeTail` is false (local providers, or built-in prompts disabled),
  * returns the full system prompt unchanged with no tail. When true, the cached
@@ -349,7 +349,7 @@ export function splitSystemForTail(opts: {
  * session: the annotated cold-rebuild replay is how the model learns the outcomes.
  * (ADR-0014)
  *
- * `isClaudeCode` turns on the cold-rebuild replay shaping (§4.A / §4.C): an assistant
+ * `isClaudeCode` turns on the cold-rebuild replay shaping (section 4.A / section 4.C): an assistant
  * turn's persisted tool activity ({@link ConversationMessage.agenticSteps}) and any
  * interruption ({@link ConversationMessage.interrupted}) are appended as digest lines,
  * which the flat prose transcript never held. Claude Code routes through
@@ -390,8 +390,8 @@ export function toHistoryTurn(
 
 /**
  * Builds a claudecode assistant turn's replayed content: its raw prose, then one
- * bracketed digest line per persisted tool call (§4.A), then the interruption marker
- * for a stopped turn (§4.C). Returns the raw content unchanged when there is nothing
+ * bracketed digest line per persisted tool call (section 4.A), then the interruption marker
+ * for a stopped turn (section 4.C). Returns the raw content unchanged when there is nothing
  * to add, so an ordinary completed turn replays exactly as before.
  */
 function annotateClaudeCodeReplay(message: ConversationMessage): string {

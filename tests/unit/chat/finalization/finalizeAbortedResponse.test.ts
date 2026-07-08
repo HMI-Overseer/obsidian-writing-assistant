@@ -10,7 +10,7 @@ import type { AgenticStep, ConversationMessage } from "../../../../src/shared/ty
  * Phase 1 (claude-code cold-rebuild fidelity): a stopped claudecode turn now
  * persists its aborted assistant message ALWAYS, even with zero text, so the
  * transcript carries the empty assistant turn the live session already banked in
- * its watermark (§6.1 / question 7). Other providers keep today's behavior.
+ * its watermark (section 6.1 / question 7). Other providers keep today's behavior.
  */
 
 function makeStore() {
@@ -106,7 +106,7 @@ describe("finalizeAbortedResponse", () => {
 
     // Cross-module pin: renderer → finalizeAbortedResponse → store. The persisted
     // content must equal the exact concatenation of the streamed deltas, the
-    // byte-equality the interrupt watermark relies on (§6.1).
+    // byte-equality the interrupt watermark relies on (section 6.1).
     renderer.appendDelta("Once upon ");
     renderer.appendDelta("a time");
 

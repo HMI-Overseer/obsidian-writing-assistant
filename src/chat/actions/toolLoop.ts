@@ -642,7 +642,7 @@ export function applyIdenticalCallGuard(
 }
 
 /**
- * Tool allow-list guard (prompt-cache design §6.1.4/§6.3). The stable cloud surface
+ * Tool allow-list guard (prompt-cache design section 6.1.4/section 6.3). The stable cloud surface
  * advertises the full tool superset for cache stability, so the model can *see* a tool
  * the session does not permit (a deny-classed write under the `ask` posture); this
  * refuses any such call with a recovery-shaped

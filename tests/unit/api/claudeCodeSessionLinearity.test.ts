@@ -118,7 +118,7 @@ describe("Claude Code session linearity across edit annotations", () => {
     });
   });
 
-  it("reuses the live session across an agentic-digest annotated claudecode turn (§5 drift canary)", async () => {
+  it("reuses the live session across an agentic-digest annotated claudecode turn (section 5 drift canary)", async () => {
     // Phase 3 resolution A: the agentic digest rides `content`, the raw streamed
     // bytes stay in `rawContent`, so the linearity hash still matches the watermark.
     // The pinning mutation (routing the digest into rawContent) makes this go red

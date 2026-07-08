@@ -386,7 +386,7 @@ describe("normalizeConversation, phase-2 agenticStep capture fields", () => {
   });
 });
 
-describe("normalizeConversation, interrupted marker (§4.C)", () => {
+describe("normalizeConversation, interrupted marker (section 4.C)", () => {
   test("preserves interrupted on a stopped assistant turn across a JSON round-trip", () => {
     const msg: ConversationMessage = {
       id: "msg-1",

@@ -14,7 +14,7 @@ import { THINK_TOOL, THINK_TOOL_NAME } from "./think/definition";
 import { toolFailure } from "./toolFailure";
 
 /**
- * The canonical tool-surface resolver (prompt-cache design §6.1.1/§6.1.4/§6.1.5, §6.3).
+ * The canonical tool-surface resolver (prompt-cache design section 6.1.1/section 6.1.4/section 6.1.5, section 6.3).
  *
  * One module, read by every path, so the surfaces cannot drift (the defect that
  * produced the `semantic_search` silent-failure). The session-varying decision that
@@ -24,7 +24,7 @@ import { toolFailure } from "./toolFailure";
  * never diverge on what may write.
  *
  * Writes are no longer gated by an edit "mode" (the plan/chat/edit selector is gone,
- * §6.3); they are offered whenever the {@link ApprovalPosture} + per-class
+ * section 6.3); they are offered whenever the {@link ApprovalPosture} + per-class
  * {@link VaultOpPolicy} permit. Under the default `ask` posture a `deny`-classed
  * write is excluded (the hard read-only guarantee, ADR-0003); under the `auto`
  * posture ("Edit automatically") the policy is overruled and every write is offered
@@ -116,7 +116,7 @@ export const CLOUD_STABLE_TOOL_SET: CanonicalToolDefinition[] = [
 
 /**
  * The Claude Code analogue of {@link CLOUD_STABLE_TOOL_SET}: the same superset minus
- * `think` (which is never bridged over MCP, §6.2.5). Advertising it unchanged keeps
+ * `think` (which is never bridged over MCP, section 6.2.5). Advertising it unchanged keeps
  * the live session alive instead of cold-rebuilding (the `toolNames` fingerprint field
  * stops drifting).
  */
@@ -128,7 +128,7 @@ export const CLAUDE_CODE_STABLE_TOOL_SET: CanonicalToolDefinition[] = [
 
 /*
  * Layer 2, progressive disclosure (the bloat fix). Settled in ADR-0009 and the
- * prompt-cache design §6.2.5: under tool-search deferral the always-loaded surface
+ * prompt-cache design section 6.2.5: under tool-search deferral the always-loaded surface
  * shrinks to a small core of retrieval / navigation primitives, and the long tail
  * (the rest of the reads + every write) loads on demand. On the direct `anthropic`
  * path the core is non-deferred and the tail carries `defer_loading`; on Claude Code
@@ -145,7 +145,7 @@ export const CLAUDE_CODE_STABLE_TOOL_SET: CanonicalToolDefinition[] = [
 
 /**
  * The non-deferred Layer-2 core reads: the retrieval / navigation primitives kept
- * always-loaded on both billed paths (§6.2.5). It is {@link CORE_VAULT_TOOLS}
+ * always-loaded on both billed paths (section 6.2.5). It is {@link CORE_VAULT_TOOLS}
  * (list_directory, semantic_search, search_content, read_file) plus the section-level
  * {@link GET_OUTLINE_TOOL} / {@link READ_SECTION_TOOL} pair. Everything else, the read
  * tail and every write, defers.
@@ -173,7 +173,7 @@ export function isCoreReadTool(name: string): boolean {
 
 /**
  * The non-deferred tool NAMES on the direct `anthropic` path: the Layer-2 core reads
- * plus `think` (always-loaded on the native agentic path, §6.2.5; never bridged to
+ * plus `think` (always-loaded on the native agentic path, section 6.2.5; never bridged to
  * Claude Code). The native tool-search entry is non-deferred by construction at the
  * wire layer and is not a {@link CanonicalToolDefinition}, so it is not listed here.
  * Every emitted tool whose name is absent from this set carries `defer_loading: true`.
@@ -183,7 +183,7 @@ export function anthropicNonDeferredToolNames(): Set<string> {
 }
 
 /**
- * The Layer-2 tool set emitted on the direct `anthropic` path (ADR-0009 / §6.2.5): the
+ * The Layer-2 tool set emitted on the direct `anthropic` path (ADR-0009 / section 6.2.5): the
  * non-deferred core reads + `think`, then the deferred tail (the remaining reads + the
  * posture/policy-permitted writes). The wire layer
  * ({@link ../tools/formatters/anthropic.formatAnthropicToolsWithSearch}) marks every name

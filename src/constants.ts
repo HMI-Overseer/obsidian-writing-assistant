@@ -60,7 +60,7 @@ export const DEFAULT_KNOWLEDGE_GRAPH_SETTINGS: KnowledgeGraphSettings = {
   excludePatterns: ["templates/**"],
 };
 
-// The unified system prompt prefix (the plan/chat/edit modes are gone, §6.3). Edit
+// The unified system prompt prefix (the plan/chat/edit modes are gone, section 6.3). Edit
 // capability rides the dynamic tool/regex guidance, so the prefix stays general.
 export const DEFAULT_SYSTEM_PROMPT_PREFIX =
   "When asked to research, explore, or find information, search exhaustively before answering. " +

@@ -58,7 +58,7 @@ describe("assertMintBlobFits", () => {
 
 describe("mintBlobTokenLimit", () => {
   it("reserves CLAUDE_CODE_CONTEXT_RESERVE_TOKENS below the discovered window", () => {
-    // Ties the threshold to the single shared constant (§6.4 "one number"): a divergent
+    // Ties the threshold to the single shared constant (section 6.4 "one number"): a divergent
     // cap would be a test failure here rather than a silent drift.
     expect(mintBlobTokenLimit(200_000)).toBe(200_000 - CLAUDE_CODE_CONTEXT_RESERVE_TOKENS);
     expect(mintBlobTokenLimit(1_000_000)).toBe(1_000_000 - CLAUDE_CODE_CONTEXT_RESERVE_TOKENS);

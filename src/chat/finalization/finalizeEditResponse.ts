@@ -60,7 +60,7 @@ export interface FinalizeEditOptions {
   agenticSteps?: AgenticStep[];
   /** True when generation stopped for max_tokens, arms the write_file truncation guard. */
   stoppedForMaxTokens?: boolean;
-  /** Session approval posture; `auto` overrules the per-class policy to auto-apply (§6.3). */
+  /** Session approval posture; `auto` overrules the per-class policy to auto-apply (section 6.3). */
   posture?: ApprovalPosture;
   /**
    * A vault-op proposal already built and (partly) resolved in-loop by

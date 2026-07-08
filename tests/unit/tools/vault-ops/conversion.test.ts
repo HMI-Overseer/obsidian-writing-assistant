@@ -197,7 +197,7 @@ describe("toVaultOperations", () => {
     expect(sources).toEqual(["t1", "t3"]);
   });
 
-  describe("truncation guard (§6 1a)", () => {
+  describe("truncation guard (section 6 1a)", () => {
     test("refuses a trailing write_file when generation hit max_tokens", () => {
       const { ops, errors } = toVaultOperations(
         [call("write_file", { path: "a.md", content: "partial..." })],

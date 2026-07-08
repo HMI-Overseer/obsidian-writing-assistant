@@ -59,7 +59,7 @@ describe("normalizePluginSettings", () => {
   });
 
   // The plan/chat/edit mode prompts collapsed into one unified systemPromptPrefix
-  // (prompt-cache design §6.3). A user's customized legacy chat (then plan) prefix is
+  // (prompt-cache design section 6.3). A user's customized legacy chat (then plan) prefix is
   // carried forward; a new systemPromptPrefix wins over any legacy field.
   it("migrates a legacy chat/plan prompt prefix into systemPromptPrefix", () => {
     const fromChat = normalizePluginSettings({

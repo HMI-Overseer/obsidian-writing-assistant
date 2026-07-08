@@ -10,7 +10,7 @@ export interface AnthropicTool {
     required: string[];
   };
   /**
-   * Layer 2 (ADR-0009 / prompt-cache design §6.2). When true, the tool is excluded from
+   * Layer 2 (ADR-0009 / prompt-cache design section 6.2). When true, the tool is excluded from
    * the cached system-prompt prefix; its schema is appended inline (as a `tool_reference`
    * block) only once the model discovers it via tool search. Deferring the long tail keeps
    * the cached prefix small without ever voiding it.
@@ -60,7 +60,7 @@ export function formatAnthropicTools(tools: CanonicalToolDefinition[]): Anthropi
 }
 
 /**
- * Layer-2 builder (ADR-0009 / §6.2.5): prepends the non-deferred tool-search entry, then
+ * Layer-2 builder (ADR-0009 / section 6.2.5): prepends the non-deferred tool-search entry, then
  * emits each canonical tool with `defer_loading: true` unless its name is in
  * `config.nonDeferredToolNames` (the small always-loaded core, the core reads + `think`,
  * that stays in the cached prefix). The search entry and that core are the only

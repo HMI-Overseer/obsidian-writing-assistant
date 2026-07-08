@@ -33,7 +33,7 @@ import type { ConversationMessage } from "../../src/shared/types";
 
 /**
  * Phase 1 end-to-end: a zero-text clean interrupt banks coveredCount = turns + 1
- * with an empty assistant turn (§6.1). Pre-phase the chat layer persisted NO
+ * with an empty assistant turn (section 6.1). Pre-phase the chat layer persisted NO
  * assistant message for an empty abort, so the next turn's transcript was one
  * turn short → a guaranteed `turn-count` rebuild. Persist-always makes the
  * transcript match the banked prefix, so the next turn REUSES the live session.

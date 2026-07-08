@@ -8,8 +8,8 @@ import type { McpSdkServerConfigWithInstance, SdkMcpToolDefinition } from "./cla
 
 /**
  * Builds the SDK `tool()` definitions the bridge advertises, applying the Layer-2
- * core/tail split as per-tool `alwaysLoad` (ADR-0009 / prompt-cache design §6.2.4,
- * §6.2.5). This is the Claude Code analogue of the direct-API defer split: the core
+ * core/tail split as per-tool `alwaysLoad` (ADR-0009 / prompt-cache design section 6.2.4,
+ * section 6.2.5). This is the Claude Code analogue of the direct-API defer split: the core
  * reads ({@link isCoreReadTool}, the retrieval / navigation primitives) carry
  * `alwaysLoad: true` so they stay in the prompt, and the tail (the rest of the reads +
  * every write) is left deferrable, so once the CLI / model layer enables tool search the
@@ -22,7 +22,7 @@ import type { McpSdkServerConfigWithInstance, SdkMcpToolDefinition } from "./cla
  * advertised tool NAMES are untouched, so the `SessionConfig.toolNames` fingerprint, which
  * {@link ../../services/ClaudeCodeService} builds separately from the same
  * `provider.listTools()`, does not drift and the live session is not cold-rebuilt
- * (prompt-cache design §6.1.1). Extracted from {@link createVaultSdkMcpServer} so the split
+ * (prompt-cache design section 6.1.1). Extracted from {@link createVaultSdkMcpServer} so the split
  * is unit-testable without standing up the live MCP server instance.
  */
 export function buildVaultSdkTools(

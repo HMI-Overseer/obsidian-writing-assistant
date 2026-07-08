@@ -574,7 +574,7 @@ describe("SdkSessionRegistry", () => {
   it("disposes a compacted-then-interrupted session (compaction guard on the throw path)", async () => {
     // The turn compacts mid-stream AND is cleanly interrupted. A clean interrupt
     // normally preserves the session, but the mid-turn compaction desynced it from
-    // the authoritative transcript, so it must still be disposed (§6.7.1: the
+    // the authoritative transcript, so it must still be disposed (section 6.7.1: the
     // post-turn invalidation check is unreachable when the turn throws).
     const interrupt = vi.fn(() => Promise.resolve());
     queryMock.mockImplementation((params: { prompt: AsyncIterable<{ message: { content: string } }> }) => {

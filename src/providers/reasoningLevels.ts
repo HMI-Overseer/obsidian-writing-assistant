@@ -21,7 +21,7 @@ export interface ReasoningDiscovery {
  * the profile popover's reasoning control, and request-time validation all
  * read, so the offered set can never disagree between surfaces.
  *
- * Resolution is layered (composer-reasoning-effort-selector §3.1), discovered
+ * Resolution is layered (composer-reasoning-effort-selector section 3.1), discovered
  * beats declared: a per-model discovered capability (LM Studio's
  * `capabilities.reasoning.allowed_options`) wins outright; the provider
  * descriptor's `reasoningLevels` is the fallback. LM Studio's fallback is
@@ -29,7 +29,7 @@ export interface ReasoningDiscovery {
  * sending a level to a model without the capability can break the request
  * (the gemma4 jinja-template failure, 2026-07-06), so an undiscovered model
  * offers nothing rather than a guess. The Claude Code init-handshake harvest
- * (§3.1 layer 2) slots in here the same way when it lands.
+ * (section 3.1 layer 2) slots in here the same way when it lands.
  */
 export function resolveReasoningLevels(
   model: CompletionModel,
@@ -42,7 +42,7 @@ export function resolveReasoningLevels(
 }
 
 /**
- * The catalog layer for Anthropic (§3.1 layer 2 equivalent, keyed off the same
+ * The catalog layer for Anthropic (section 3.1 layer 2 equivalent, keyed off the same
  * capability gates the payload builder enforces, so the offered set and the
  * emitted request can never disagree): adaptive-capable models take effort
  * tiers up to `max`, with `xhigh` only where the API honors it (Opus 4.7+;

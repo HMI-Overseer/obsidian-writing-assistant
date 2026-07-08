@@ -54,7 +54,7 @@ export interface ClaudeCodeRuntime {
    * catalog aliases carry no static size). Feeds the send-path preflight
    * ({@link ./claudeCodeContextPreflight}), which refuses a mint blob that would
    * overflow it, surfacing a clear "conversation too large" state before spend
-   * instead of an opaque mid-turn API error (§6.4). Absent on the first turn (none
+   * instead of an opaque mid-turn API error (section 6.4). Absent on the first turn (none
    * reported yet) ⇒ the preflight is a passive no-op.
    */
   contextWindow?: number;
@@ -193,7 +193,7 @@ export class ClaudeCodeClient implements ChatClient {
    * An `async *` so the send-path preflight ({@link assertMintBlobFits}) runs on
    * first consumption, before any dispatch: an oversized blob throws here and no
    * `claude` process is ever spawned (zero spend), the throw surfacing through the
-   * ordinary streamed-error path (§6.4, phase 5).
+   * ordinary streamed-error path (section 6.4, phase 5).
    */
   private async *runTurn(
     request: ChatRequest,
@@ -380,13 +380,13 @@ function applyRecoveryDecision(
  * when supplied so the client also works as a plain (tool-less) analyst.
  */
 /**
- * Framing preamble for the cold-mint blob (§4.B). Tells the rebuilt session it is
+ * Framing preamble for the cold-mint blob (section 4.B). Tells the rebuilt session it is
  * resuming a replayed conversation, that it is the Assistant, and that the bracketed
- * digest lines beneath an assistant turn (§4.A) record tool calls that already ran,
+ * digest lines beneath an assistant turn (section 4.A) record tool calls that already ran,
  * so it must not repeat them or re-propose anything the user declined. Prepended only
  * when a transcript is present, and only on the mint path: the delta path (session
  * reuse) already holds this context, and keeping the preamble out of it plus stable
- * across rebuilds is what stops it from becoming a linearity drift source (§5).
+ * across rebuilds is what stops it from becoming a linearity drift source (section 5).
  */
 const REPLAY_PREAMBLE =
   "The following is a prior conversation, replayed after your session was restarted. " +
@@ -418,7 +418,7 @@ export function buildClaudeCodePrompt(request: ChatRequest): string {
 
   // Per-mode wording rides the latest user turn so request.systemPrompt stays
   // mode-invariant and the live session's configFingerprint stops rebuilding on
-  // mode switch (prompt-cache design §6.1.3). On a cold mint the whole transcript
+  // mode switch (prompt-cache design section 6.1.3). On a cold mint the whole transcript
   // is replayed, so the framing is prepended to the last user turn within it.
   const lastIdx = request.messages.length - 1;
   const transcript = request.messages
@@ -440,7 +440,7 @@ function renderTurn(turn: ChatTurn, framing?: string): string {
   if (!body) return "";
   const speaker = turn.role === "assistant" ? "Assistant" : "User";
   // Escape line-leading speaker labels inside the body so a literal `User:` /
-  // `Assistant:` in the content can't be misread as a turn boundary (§1 symptom 3).
+  // `Assistant:` in the content can't be misread as a turn boundary (section 1 symptom 3).
   // Mint-path only: renderTurnBody stays unescaped for the delta path, which sends
   // one live user turn with no transcript to shear.
   const escaped = escapeSpeakerLabels(body);
@@ -479,7 +479,7 @@ export function buildDeltaPrompt(request: ChatRequest): string {
     const body = renderTurnBody(last);
     if (body) {
       // The per-mode framing is prepended to the new user turn so the baked
-      // systemPrompt stays mode-invariant (prompt-cache design §6.1.3).
+      // systemPrompt stays mode-invariant (prompt-cache design section 6.1.3).
       return request.modeTail ? `${request.modeTail}\n\n${body}` : body;
     }
   }

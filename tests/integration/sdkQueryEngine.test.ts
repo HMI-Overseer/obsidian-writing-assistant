@@ -247,7 +247,7 @@ describe("buildSdkOptions", () => {
     expect(options.resume).toBe("sess-42");
   });
 
-  it("disables CLI compaction in the spawned env (§6.4), never the weaker auto flag or a cap", () => {
+  it("disables CLI compaction in the spawned env (section 6.4), never the weaker auto flag or a cap", () => {
     const options = buildSdkOptions(base, new AbortController());
     const env = options.env as Record<string, string | undefined>;
     expect(env.DISABLE_COMPACT).toBe("1");

@@ -77,14 +77,14 @@ export type ClaudeCodeToolEvent =
       /**
        * The reviewed op's real disposition, when this call went through the live
        * review, so the step persists the outcome for the cold-rebuild replay digest
-       * (a decline resolves `isError: false`; §6 question 6). Absent on read tools.
+       * (a decline resolves `isError: false`; section 6 question 6). Absent on read tools.
        */
       disposition?: VaultOpDisposition;
     };
 
 /** Options for a single Claude Code run, set just before the subprocess is spawned. */
 export interface ClaudeCodeRunOptions {
-  /** Session approval posture; gates which writes the per-run allow-list permits (§6.3). */
+  /** Session approval posture; gates which writes the per-run allow-list permits (section 6.3). */
   posture?: ApprovalPosture;
   /** Vault-relative path of the active note (edit target + search relevance). */
   activeFilePath?: string;
@@ -103,7 +103,7 @@ export interface ClaudeCodeRunOptions {
   resumeCursor?: ClaudeCodeResumeCursor;
   /**
    * The model's discovered context window, forwarded onto the runtime for the
-   * send-path preflight (§6.4, phase 5). Absent (first turn, none reported yet) ⇒
+   * send-path preflight (section 6.4, phase 5). Absent (first turn, none reported yet) ⇒
    * the preflight is a passive no-op.
    */
   contextWindow?: number;
@@ -136,7 +136,7 @@ export class ClaudeCodeService {
   /** Memoized SDK usability (SDK linked + CLI version-compatible). Probed once. */
   private sdkUsable: Promise<boolean> | null = null;
   /**
-   * Per-run tool allow-list (prompt-cache design §6.1.4). The MCP server advertises
+   * Per-run tool allow-list (prompt-cache design section 6.1.4). The MCP server advertises
    * the full stable superset always (so `toolNames` never drifts and the live session
    * survives mode switches); this names what the *current* run actually permits, and
    * {@link executeTool} refuses anything outside it. Reads are always present; writes
@@ -162,7 +162,7 @@ export class ClaudeCodeService {
     private readonly getRagService: () => RagService,
     /**
      * Receives the normalized effort-level harvest whenever a fresh SDK session
-     * mints (§3.1 layer 2). The container merges it into the availability
+     * mints (section 3.1 layer 2). The container merges it into the availability
      * service and the persisted last-seen cache; absent in tests.
      */
     private readonly onEffortLevelsDiscovered?: (
@@ -198,13 +198,13 @@ export class ClaudeCodeService {
     this.collectedVaultOps = [];
     const useSdk = await this.isSdkUsable();
     const agentic = settings.agenticMode;
-    // Forwarded onto every runtime shape below for the send-path preflight (§6.4).
+    // Forwarded onto every runtime shape below for the send-path preflight (section 6.4).
     const contextWindow = options.contextWindow ? { contextWindow: options.contextWindow } : {};
 
     // Per-run allow-list, the same canonical resolver the API providers use: reads
     // unrestricted, writes follow the posture + policy. Held OFF the session
     // fingerprint (it is not baked into SessionConfig), so a posture flip reuses the
-    // live session instead of cold-rebuilding (prompt-cache design §6.1.4/§6.3); the
+    // live session instead of cold-rebuilding (prompt-cache design section 6.1.4/section 6.3); the
     // gate in executeTool enforces it per turn. Empty when not agentic (no tools run).
     this.runAllowedTools = agentic
       ? new Set(
@@ -224,7 +224,7 @@ export class ClaudeCodeService {
     // harnessSession.isSessionUsable). Mode is no longer baked, so plan↔chat↔edit
     // switches reuse the session, the per-run allow-list gates writes instead.
     // Effort is compared outside the fingerprint: a low..xhigh change flips the
-    // live session via applyFlagSettings instead of rebuilding (§3.2).
+    // live session via applyFlagSettings instead of rebuilding (section 3.2).
     if (useSdk && options.conversationId) {
       const conversationId = options.conversationId;
       const resumeCursor = options.resumeCursor;
@@ -426,7 +426,7 @@ export class ClaudeCodeService {
     return {
       // Advertise the full stable superset (reads + edit + vault-ops) unchanged across
       // modes and RAG availability, so `toolNames` never drifts and the live session
-      // survives a mode switch instead of cold-rebuilding (prompt-cache design §6.1.1).
+      // survives a mode switch instead of cold-rebuilding (prompt-cache design section 6.1.1).
       // semantic_search stays advertised and reports unavailability at call time (the
       // handler's curated message); the runtime allow-list (runAllowedTools, enforced
       // in executeTool) restricts writes per mode, not this catalogue.
@@ -452,7 +452,7 @@ export class ClaudeCodeService {
         // call shows its error. Defaults cover a thrown executor (no result object).
         let content = "The tool threw an unexpected error.";
         // The reviewed op's real disposition, when present, so the persisted step
-        // records the outcome for the cold-rebuild replay digest (§6 question 6).
+        // records the outcome for the cold-rebuild replay digest (section 6 question 6).
         let disposition: VaultOpDisposition | undefined;
         try {
           const result = await this.executeTool(call, toolCallId);
@@ -479,7 +479,7 @@ export class ClaudeCodeService {
    *  `toolCallId` is the id minted in `callTool`; reused for the collected vault
    *  op so it shares the id of its timeline step (review binding). */
   private async executeTool(call: ToolCall, toolCallId: string): Promise<ToolResult> {
-    // Runtime allow-list (prompt-cache design §6.1.4): the MCP server advertises the
+    // Runtime allow-list (prompt-cache design section 6.1.4): the MCP server advertises the
     // full superset, so refuse a call the current run does not permit before it runs
     // or collects. Reads are always permitted; out-of-mode writes and policy-denied
     // ops (absent from the allow-list) are refused here, the primary deny gate, with

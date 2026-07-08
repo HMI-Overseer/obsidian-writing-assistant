@@ -34,7 +34,7 @@ export class ModelAvailabilityService {
   private reportedContextWindows = new Map<string, number>();
   /**
    * Effort-level lists from the Claude Code init handshake, keyed by the
-   * normalized picker alias (§3.1 layer 2). Like {@link reportedContextWindows}
+   * normalized picker alias (section 3.1 layer 2). Like {@link reportedContextWindows}
    * it survives LM Studio refreshes and invalidation, its source is a Claude
    * Code session, not local discovery. Seeded from the persisted last-seen
    * cache at load; updated on every session mint.

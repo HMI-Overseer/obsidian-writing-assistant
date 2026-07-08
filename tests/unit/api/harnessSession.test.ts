@@ -55,7 +55,7 @@ describe("fingerprint", () => {
   });
 });
 
-// Reasoning left the config fingerprint (§3.2): a low..xhigh change flips the
+// Reasoning left the config fingerprint (section 3.2): a low..xhigh change flips the
 // live session via applyFlagSettings; only non-flippable changes rebuild.
 describe("canFlipEffortMidSession", () => {
   it("allows flips between flag-settable tiers (and from the default)", () => {

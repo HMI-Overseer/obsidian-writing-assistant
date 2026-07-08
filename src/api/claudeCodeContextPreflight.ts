@@ -2,15 +2,15 @@ import { estimateStringTokens } from "../shared/tokenEstimation";
 
 /**
  * Passive send-path preflight for Claude Code's flat mint blob (cold-rebuild
- * fidelity §6.4, phase 5).
+ * fidelity section 6.4, phase 5).
  *
  * With CLI compaction disabled ({@link claudeCodeProcess.claudeCodeHarnessEnv}
  * sets `DISABLE_COMPACT`), the harness no longer summarizes a too-large context
  * mid-turn; an oversized request instead dies at the API with an opaque "Prompt
- * is too long" error (§6.2 Zone 2). This preflight catches that case *before* any
+ * is too long" error (section 6.2 Zone 2). This preflight catches that case *before* any
  * spend and surfaces a clear "conversation too large" state instead.
  *
- * It never removes context (§6.4: the user controls anything that removes
+ * It never removes context (section 6.4: the user controls anything that removes
  * context); it only refuses to send. It is best-effort: the estimate is the
  * `chars / 4` heuristic and the window is whatever the CLI last reported, so a
  * slight miss either way is acceptable for a passive guard the capacity ring
@@ -23,7 +23,7 @@ import { estimateStringTokens } from "../shared/tokenEstimation";
  * `claude_code` preset system prompt, and the MCP tool definitions (all consume
  * window but none ride the blob string). The one tunable number for this phase.
  *
- * Deliberately paired with NOT setting `CLAUDE_CODE_MAX_CONTEXT_TOKENS` (§6.4
+ * Deliberately paired with NOT setting `CLAUDE_CODE_MAX_CONTEXT_TOKENS` (section 6.4
  * ratification "flag and preflight must share one number"): a single process-wide
  * env cap cannot serve Claude Code models with different real windows (200k vs
  * 1M), and with compaction off it would only convert this legible plugin-side

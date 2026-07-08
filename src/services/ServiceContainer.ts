@@ -52,7 +52,7 @@ export class ServiceContainer {
       app,
       getSettings,
       () => this.ragService,
-      // Effort-level harvest from a fresh session's handshake (§3.1 layer 2):
+      // Effort-level harvest from a fresh session's handshake (section 3.1 layer 2):
       // feed the live lookup and persist last-seen, so after one session the
       // offered levels are the harness's own report, surviving restarts.
       (levels) => {

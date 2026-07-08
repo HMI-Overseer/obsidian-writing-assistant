@@ -135,7 +135,7 @@ export class AgenticTimeline {
    *
    * Also captures the phase-2 replay fields (disposition + bounded record) the
    * pre-resolution record could not hold, via the same {@link captureStepFields} the
-   * read channel spreads at record time (cold-rebuild-fidelity §6 q6 / question 9).
+   * read channel spreads at record time (cold-rebuild-fidelity section 6 q6 / question 9).
    */
   setStepResult(
     toolCallId: string,

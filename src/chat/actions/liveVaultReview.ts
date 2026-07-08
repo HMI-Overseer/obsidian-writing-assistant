@@ -81,7 +81,7 @@ export interface LiveVaultReviewOptions {
   /** The streaming bubble's timeline element, where the review decorates steps. */
   timelineEl: HTMLElement;
   policy: VaultOpPolicy;
-  /** Session approval posture; `auto` overrules the per-class policy to auto-apply (§6.3). */
+  /** Session approval posture; `auto` overrules the per-class policy to auto-apply (section 6.3). */
   posture: ApprovalPosture;
   /** Edit-channel dependencies. Absent when no writes are permitted (read-only). */
   edit?: LiveEditReviewDeps;
@@ -413,7 +413,7 @@ export class LiveVaultReview implements VaultOpReviewer {
           isReadOnly: false,
           isError: !applied,
           failure: applied ? undefined : { kind: "failed", recovery: reason },
-          // Auto-applied / failed edit outcome, captured for replay (§6 q6).
+          // Auto-applied / failed edit outcome, captured for replay (section 6 q6).
           disposition,
         });
       }
@@ -435,7 +435,7 @@ export class LiveVaultReview implements VaultOpReviewer {
           isReadOnly: false,
           isError: disposition === "failed",
           failure: disposition === "failed" ? { kind: "failed", recovery: reason } : undefined,
-          // The edit-channel sibling of dispoResult's disposition capture (§6 q6).
+          // The edit-channel sibling of dispoResult's disposition capture (section 6 q6).
           disposition,
         });
       }),
@@ -598,7 +598,7 @@ export class LiveVaultReview implements VaultOpReviewer {
     // future refactor of the conversion stage cannot open an auto-apply hole. A
     // single escaping op fails the *whole* auto batch, nothing reaches
     // applyVaultOpBatch or disk, the conservative all-or-nothing stance for a
-    // safety violation. See docs/work/issues/RESOLVED-vault-path-boundary-out-of-vault-escape.md §6.2.
+    // safety violation. See docs/work/issues/RESOLVED-vault-path-boundary-out-of-vault-escape.md section 6.2.
     if (this.refuseEscapingAuto(autoEntries, results)) return;
 
     const batch = autoEntries.map((e) => ({ id: e.reviewable.id, op: e.reviewable.op }));
@@ -852,7 +852,7 @@ function dispoResult(
     failure: disposition === "failed" ? { kind: "failed", recovery: reason } : undefined,
     // Carry the real outcome to the tool-result choke points so a step persists it,
     // a decline resolves isError:false and is otherwise indistinguishable from an
-    // applied op (cold-rebuild-fidelity §6 question 6).
+    // applied op (cold-rebuild-fidelity section 6 question 6).
     disposition,
   };
 }

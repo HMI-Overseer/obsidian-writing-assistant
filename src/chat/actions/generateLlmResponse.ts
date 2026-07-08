@@ -43,7 +43,7 @@ export interface LlmGenerationOptions {
   transcript: ChatTranscript;
   activeModel: CompletionModel;
   client: ChatClient;
-  /** Session approval posture, the replacement for the plan/chat/edit mode (§6.3). */
+  /** Session approval posture, the replacement for the plan/chat/edit mode (section 6.3). */
   posture: ApprovalPosture;
   finalization: FinalizationMode;
   setIsGenerating: (v: boolean) => void;
@@ -113,7 +113,7 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
 
   const activeProfile = getActiveProfile(plugin.settings, activeModel.provider);
 
-  // Ambient editing (prompt-cache design §6.3): the edit pipeline (edit renderer, edit
+  // Ambient editing (prompt-cache design section 6.3): the edit pipeline (edit renderer, edit
   // review channel, finalizeEditResponse) is active whenever the session permits any
   // write. A read-only session is exactly a deny-all policy under the `ask` posture.
   const editsActive = writesPermitted(plugin.settings.vaultOpPolicy, posture);

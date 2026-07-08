@@ -154,7 +154,7 @@ describe("resolveEditGate", () => {
   });
 });
 
-// The "Edit automatically" posture (prompt-cache design §6.3) is a session-level
+// The "Edit automatically" posture (prompt-cache design section 6.3) is a session-level
 // blanket override: every op auto-applies, overriding the per-class gate (ask AND
 // deny) and the scope restriction, with no per-turn cap, an explicit opt-in to
 // unattended operation (the path-boundary refusal is the real safety net). The

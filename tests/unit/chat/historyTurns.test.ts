@@ -91,7 +91,7 @@ describe("toHistoryTurn", () => {
 });
 
 /**
- * Claude Code cold-rebuild replay (§4.A / §4.C). Only under the claudecode flag does
+ * Claude Code cold-rebuild replay (section 4.A / section 4.C). Only under the claudecode flag does
  * an assistant turn gain its persisted tool-activity digest and interruption marker,
  * as presentation-only annotations that ride `content`; `rawContent` keeps the raw
  * streamed bytes so the live-session linearity hash is untouched (ADR-0014).

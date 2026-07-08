@@ -192,6 +192,54 @@ export function renderRagTab(
     // Subscribe to live state updates.
     plugin.services.ragService.onIndexingStateChange((state) => updateDisplay(state));
 
+    // ── Automatic reindexing ──────────────────────────────────────────
+    const autoReindex = createSettingsSection(
+      conditionalWrapper,
+      "Automatic reindexing",
+      "Keep the index current as your vault changes. Automatic runs never load a local embedding model that is not already running, they wait until it is.",
+      { icon: "refresh-cw" },
+    );
+
+    new SettingItem(autoReindex.bodyEl)
+      .setName("Reindex on startup")
+      .setDesc("When the plugin loads, scan for notes changed while it was off and index them.")
+      .addToggle((toggle) =>
+        toggle.setValue(rag.reindexOnStartup).onChange(async (value) => {
+          rag.reindexOnStartup = value;
+          await plugin.saveSettings();
+          await plugin.services.ragService.configure(
+            rag,
+            getSelectableEmbeddingModels(plugin.settings),
+            plugin.settings.providerSettings,
+          );
+        }),
+      );
+
+    new SettingItem(autoReindex.bodyEl)
+      .setName("Watch for changes")
+      .setDesc("Reindex each note as it is created, edited, renamed, or deleted.")
+      .addToggle((toggle) =>
+        toggle.setValue(rag.watchForChanges).onChange(async (value) => {
+          rag.watchForChanges = value;
+          await plugin.saveSettings();
+          await plugin.services.ragService.configure(
+            rag,
+            getSelectableEmbeddingModels(plugin.settings),
+            plugin.settings.providerSettings,
+          );
+        }),
+      );
+
+    new SettingItem(autoReindex.bodyEl)
+      .setName("Auto-reindex on cloud models")
+      .setDesc("Allow automatic runs to embed through a metered cloud model. Off keeps automatic reindexing local-only, so cloud embedding stays manual and avoids unexpected API cost.")
+      .addToggle((toggle) =>
+        toggle.setValue(rag.autoReindexOnCloud).onChange(async (value) => {
+          rag.autoReindexOnCloud = value;
+          await plugin.saveSettings();
+        }),
+      );
+
     // ── Retrieval ─────────────────────────────────────────────────────
     const retrieval = createSettingsSection(
       conditionalWrapper,

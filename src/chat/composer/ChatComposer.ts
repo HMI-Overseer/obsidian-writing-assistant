@@ -386,20 +386,25 @@ export class ChatComposer {
 
   /**
    * Updates the knowledge indicator based on RAG and knowledge graph readiness.
-   * Cyan when at least one knowledge source is active, gray otherwise.
+   * Cyan when at least one knowledge source is active, gray otherwise, and a
+   * muted amber when the retrieval index is out of date (a reindex is pending).
    */
-  refreshKnowledgeIndicator(ragReady: boolean, graphReady: boolean): void {
+  refreshKnowledgeIndicator(ragReady: boolean, graphReady: boolean, stale = false): void {
     const el = this.refs.knowledgeIndicatorEl;
     const active = ragReady || graphReady;
 
     el.toggleClass("is-active", active);
+    el.toggleClass("is-stale", stale);
 
+    const staleSuffix = stale ? " (index out of date)" : "";
     if (ragReady && graphReady) {
-      el.setAttribute("aria-label", "Knowledge active \u2014 retrieval + graph");
+      el.setAttribute("aria-label", `Knowledge active: retrieval + graph${staleSuffix}`);
     } else if (ragReady) {
-      el.setAttribute("aria-label", "Knowledge active \u2014 retrieval");
+      el.setAttribute("aria-label", `Knowledge active: retrieval${staleSuffix}`);
     } else if (graphReady) {
-      el.setAttribute("aria-label", "Knowledge active \u2014 graph");
+      el.setAttribute("aria-label", "Knowledge active: graph");
+    } else if (stale) {
+      el.setAttribute("aria-label", "Retrieval index out of date");
     } else {
       el.setAttribute("aria-label", "No knowledge sources active");
     }

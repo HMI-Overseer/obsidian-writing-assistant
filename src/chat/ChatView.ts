@@ -147,10 +147,7 @@ export class ChatView extends ItemView {
         this.composer?.refreshToolUseIndicator(
           this.sessionStore?.getResolvedConversationModel() ?? null
         );
-        this.composer?.refreshKnowledgeIndicator(
-          this.plugin.services.ragService.isReady(),
-          this.plugin.services.graphService.isReady(),
-        );
+        this.syncKnowledgeIndicator();
         this.composer?.refreshVisionIndicator(
           this.sessionStore?.getResolvedConversationModel() ?? null
         );
@@ -256,6 +253,7 @@ export class ChatView extends ItemView {
           fileCount: this.plugin.services.ragService.getFileCount(),
           chunkCount: this.plugin.services.ragService.getChunkCount(),
           indexingState: this.plugin.services.ragService.getIndexingState(),
+          stale: this.plugin.services.ragService.isStale(),
         };
       },
       getGraphSnapshot: () => {
@@ -279,10 +277,7 @@ export class ChatView extends ItemView {
           getSelectableEmbeddingModels(this.plugin.settings),
           this.plugin.settings.providerSettings,
         );
-        this.composer?.refreshKnowledgeIndicator(
-          this.plugin.services.ragService.isReady(),
-          this.plugin.services.graphService.isReady(),
-        );
+        this.syncKnowledgeIndicator();
       },
       onGraphToggle: async (enabled) => {
         this.plugin.settings.knowledgeGraph.enabled = enabled;
@@ -293,10 +288,7 @@ export class ChatView extends ItemView {
           getSelectableEmbeddingModels(this.plugin.settings),
           this.plugin.settings.providerSettings,
         );
-        this.composer?.refreshKnowledgeIndicator(
-          this.plugin.services.ragService.isReady(),
-          this.plugin.services.graphService.isReady(),
-        );
+        this.syncKnowledgeIndicator();
       },
       onEmbeddingModelSelect: async (modelId) => {
         this.plugin.settings.rag.activeEmbeddingModelId = modelId;
@@ -342,6 +334,11 @@ export class ChatView extends ItemView {
         if (this.overflowMenu?.isOpen()) this.overflowMenu.close();
       },
     });
+
+    // Persistent chip notifier: repaints the collapsed knowledge indicator when
+    // indexing state or staleness changes, even while the popover is closed (a
+    // background edit deferred because the embedding model is not loaded).
+    this.plugin.services.ragService.onStatusChange(() => this.syncKnowledgeIndicator());
 
     this.toolUsePopover = new ToolUsePopover(this.layout, {
       getAgenticMode: () => this.plugin.settings.agenticMode,
@@ -503,6 +500,7 @@ export class ChatView extends ItemView {
     this.modelSelector?.destroy();
     this.profilePopover?.destroy();
     this.contextPickerPopover?.destroy();
+    this.plugin.services.ragService.onStatusChange(null);
     this.knowledgePopover?.destroy();
     this.toolUsePopover?.destroy();
     this.reasoningPill?.destroy();
@@ -610,10 +608,7 @@ export class ChatView extends ItemView {
       this.sessionStore.getResolvedConversationModel()
     );
     this.toolUsePopover?.refresh();
-    this.composer.refreshKnowledgeIndicator(
-      this.plugin.services.ragService.isReady(),
-      this.plugin.services.graphService.isReady(),
-    );
+    this.syncKnowledgeIndicator();
     this.composer.refreshVisionIndicator(
       this.sessionStore.getResolvedConversationModel()
     );
@@ -648,12 +643,18 @@ export class ChatView extends ItemView {
     this.composer.refreshToolUseIndicator(model);
     this.composer.refreshVisionIndicator(model);
     this.composer.refreshVisionSupport(model);
-    this.composer.refreshKnowledgeIndicator(
-      this.plugin.services.ragService.isReady(),
-      this.plugin.services.graphService.isReady(),
-    );
+    this.syncKnowledgeIndicator();
     this.reasoningPill?.refresh();
     this.overflowMenu?.refresh();
+  }
+
+  /** Repaint the composer knowledge chip from RAG readiness, graph readiness, and staleness. */
+  private syncKnowledgeIndicator(): void {
+    this.composer?.refreshKnowledgeIndicator(
+      this.plugin.services.ragService.isReady(),
+      this.plugin.services.graphService.isReady(),
+      this.plugin.services.ragService.isStale(),
+    );
   }
 
   private updateHeader(): void {

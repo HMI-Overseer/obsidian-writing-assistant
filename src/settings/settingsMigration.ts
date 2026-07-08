@@ -115,6 +115,18 @@ export function normalizeRagSettings(raw: unknown): RagSettings {
       typeof data.metadataEnrichment === "boolean"
         ? data.metadataEnrichment
         : DEFAULT_RAG_SETTINGS.metadataEnrichment,
+    reindexOnStartup:
+      typeof data.reindexOnStartup === "boolean"
+        ? data.reindexOnStartup
+        : DEFAULT_RAG_SETTINGS.reindexOnStartup,
+    watchForChanges:
+      typeof data.watchForChanges === "boolean"
+        ? data.watchForChanges
+        : DEFAULT_RAG_SETTINGS.watchForChanges,
+    autoReindexOnCloud:
+      typeof data.autoReindexOnCloud === "boolean"
+        ? data.autoReindexOnCloud
+        : DEFAULT_RAG_SETTINGS.autoReindexOnCloud,
   };
 }
 

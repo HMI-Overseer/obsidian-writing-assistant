@@ -31,8 +31,21 @@ export interface IndexerOptions {
   chunkOverlap: number;
   excludePatterns: string[];
   metadataEnrichment: boolean;
+  /** Register live vault watchers. Defaults to true (manual builds keep watching). */
+  watchForChanges?: boolean;
+  /**
+   * Gate consulted before embedding on an *automatic* path (a live watcher edit
+   * or a gated startup scan). Returns false when the model must not be
+   * force-loaded (a local model that is not currently loaded, or a cloud model
+   * the user has not opted into for auto-reindex). Absent means always allowed.
+   * A manual build calls {@link VaultIndexer.runFullScan} with `gated: false`
+   * and bypasses this entirely.
+   */
+  canAutoEmbed?: () => Promise<boolean>;
   onStateChange: (state: IndexingState) => void;
   onSave: () => void;
+  /** Notified whenever the deferred (changed-but-not-indexed) set changes. */
+  onStale?: () => void;
 }
 
 /**
@@ -50,13 +63,17 @@ export class VaultIndexer {
   private readonly chunkOverlap: number;
   private readonly excludePatterns: string[];
   private readonly metadataEnrichment: boolean;
+  private readonly watchForChanges: boolean;
+  private readonly canAutoEmbed?: () => Promise<boolean>;
   private readonly onStateChange: (state: IndexingState) => void;
   private readonly onSave: () => void;
+  private readonly onStale: () => void;
 
   private saveTimer: ReturnType<typeof setTimeout> | null = null;
   private abortController: AbortController | null = null;
   private eventRefs: Array<ReturnType<App["vault"]["on"]>> = [];
   private destroyed = false;
+  private watching = false;
 
   /** Per-file debounce timers for watcher-triggered (re-)indexing. */
   private readonly indexTimers = new Map<string, ReturnType<typeof setTimeout>>();
@@ -64,6 +81,13 @@ export class VaultIndexer {
   private readonly indexing = new Set<string>();
   /** Paths that changed again mid-flight and must be re-indexed once that run ends. */
   private readonly dirty = new Set<string>();
+  /**
+   * Paths known to have changed but left un-indexed because an automatic run was
+   * not allowed to embed (model not loaded, or cloud without opt-in). This set
+   * is the cheap "index out of date" signal the chip reads; the authoritative
+   * list of what actually needs work is always recomputed by mtime in a scan.
+   */
+  private readonly deferred = new Set<string>();
 
   constructor(options: IndexerOptions) {
     this.app = options.app;
@@ -74,14 +98,34 @@ export class VaultIndexer {
     this.chunkOverlap = options.chunkOverlap;
     this.excludePatterns = options.excludePatterns;
     this.metadataEnrichment = options.metadataEnrichment;
+    this.watchForChanges = options.watchForChanges ?? true;
+    this.canAutoEmbed = options.canAutoEmbed;
     this.onStateChange = options.onStateChange;
     this.onSave = options.onSave;
+    this.onStale = options.onStale ?? (() => {});
   }
 
-  /** Perform the initial index scan and register vault watchers. */
+  /**
+   * Convenience: begin watching (if enabled) and run a forced full scan. Kept
+   * for callers that want the old one-shot behavior; {@link RagService} drives
+   * {@link beginWatching} and {@link runFullScan} separately so it can gate the
+   * scan without loading the model.
+   */
   async start(): Promise<void> {
+    this.beginWatching();
+    await this.runFullScan({ gated: false });
+  }
+
+  /** Register live vault watchers once, if this indexer is configured to watch. */
+  beginWatching(): void {
+    if (this.watching || this.destroyed || !this.watchForChanges) return;
+    this.watching = true;
     this.registerVaultEvents();
-    await this.runFullScan();
+  }
+
+  /** Number of files known to be stale (changed but not yet indexed). */
+  getDeferredCount(): number {
+    return this.deferred.size;
   }
 
   /** Unregister vault events and cancel pending work. */
@@ -99,6 +143,7 @@ export class VaultIndexer {
     }
     this.indexTimers.clear();
     this.dirty.clear();
+    this.deferred.clear();
 
     if (this.saveTimer) {
       clearTimeout(this.saveTimer);
@@ -152,8 +197,13 @@ export class VaultIndexer {
     return this.excludePatterns.some((pattern) => matchGlob(pattern, filePath));
   }
 
-  /** Scan all markdown files and index stale/new ones. */
-  private async runFullScan(): Promise<void> {
+  /**
+   * Scan all markdown files and index stale/new ones. `gated` scans (startup
+   * catch-up, deferred drain) consult {@link canAutoEmbed} first and stop before
+   * any embed call when the model is not ready, recording the stale files rather
+   * than force-loading. A manual build passes `gated: false` and always runs.
+   */
+  async runFullScan(opts: { gated: boolean }): Promise<void> {
     this.abortController = new AbortController();
     const signal = this.abortController.signal;
 
@@ -177,7 +227,17 @@ export class VaultIndexer {
     }
 
     if (staleFiles.length === 0) {
+      this.clearDeferred();
       this.onStateChange({ status: "idle" });
+      return;
+    }
+
+    // Automatic scans must never load the embedding model. If it is not ready,
+    // remember what is stale (so the chip can flag it) and stop before embedding.
+    if (!(await this.allowedToEmbed(opts.gated))) {
+      for (const file of staleFiles) this.deferred.add(file.path);
+      this.onStateChange({ status: "idle" });
+      this.onStale();
       return;
     }
 
@@ -207,6 +267,7 @@ export class VaultIndexer {
       }
 
       this.scheduleSave();
+      this.clearDeferred();
       this.onStateChange({ status: "idle" });
     } catch (error) {
       if (!signal.aborted && !this.destroyed) {
@@ -214,6 +275,26 @@ export class VaultIndexer {
         this.onStateChange({ status: "error", message });
       }
     }
+  }
+
+  /** Whether an embed may run now: ungated always, gated only if the model is ready. */
+  private async allowedToEmbed(gated: boolean): Promise<boolean> {
+    if (!gated || !this.canAutoEmbed) return true;
+    return this.canAutoEmbed();
+  }
+
+  /** Forget the stale set (all pending files were just indexed), notifying if it changed. */
+  private clearDeferred(): void {
+    if (this.deferred.size === 0) return;
+    this.deferred.clear();
+    this.onStale();
+  }
+
+  /** Record a path as stale (deferred), notifying only when the set actually grows. */
+  private markDeferred(path: string): void {
+    const before = this.deferred.size;
+    this.deferred.add(path);
+    if (this.deferred.size !== before) this.onStale();
   }
 
   /**
@@ -242,6 +323,7 @@ export class VaultIndexer {
       this.indexTimers.delete(path);
     }
     this.dirty.delete(path);
+    if (this.deferred.delete(path)) this.onStale();
   }
 
   /**
@@ -258,15 +340,35 @@ export class VaultIndexer {
       this.dirty.add(path);
       return;
     }
+
+    // Live watching is an automatic path: if the embedding model is not ready,
+    // defer this file rather than force-load it. The chip reflects the staleness.
+    if (!(await this.allowedToEmbed(true))) {
+      this.markDeferred(path);
+      return;
+    }
+
     this.indexing.add(path);
+    let redispatched = false;
     try {
       await this.indexFile(file);
     } finally {
       this.indexing.delete(path);
       if (this.dirty.has(path) && !this.destroyed) {
         this.dirty.delete(path);
+        redispatched = true;
         void this.indexFileGuarded(file);
       }
+    }
+
+    if (redispatched || this.destroyed) return;
+
+    // The model just answered, so it is loaded now: catch up anything deferred
+    // while it was down with one gated scan (which re-defers if it went away).
+    if (this.deferred.size > 0) {
+      this.deferred.clear();
+      this.onStale();
+      void this.runFullScan({ gated: true });
     }
   }
 

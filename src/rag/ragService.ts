@@ -61,10 +61,19 @@ export function createEmbeddingClient(
 }
 
 /**
+ * Decides, without loading anything, whether an *automatic* (re)index may embed
+ * with the given model right now. Local models must already be loaded; cloud
+ * models only when the user opted into auto-reindex on cloud. Manual builds
+ * bypass this. Injected by the service container, which owns model availability.
+ */
+export type AutoEmbedGate = (model: EmbeddingModel) => Promise<boolean>;
+
+/**
  * Top-level facade for RAG functionality.
  *
  * Lifecycle:
- * - `configure()`, loads persisted index from disk. No API calls. Safe for plugin load.
+ * - `configure()`, loads the persisted index and, per settings, starts watching
+ *   the vault and/or runs a gated startup catch-up scan. No forced model load.
  * - `startIndexing()`, user-initiated full vault scan. Makes embedding API calls.
  * - `stopIndexing()`, cancels in-progress indexing.
  * - `retrieve()`, query-time retrieval against the loaded index.
@@ -78,6 +87,14 @@ export class RagService {
   private indexingState: IndexingState = { status: "idle" };
   private embeddingErrorShown = false;
   private onStateChangeCallback: ((state: IndexingState) => void) | null = null;
+  /**
+   * A persistent status notifier for the composer knowledge chip, kept separate
+   * from {@link onStateChangeCallback} (which the popover and settings tab claim
+   * and release). Fires on indexing-state and staleness changes so the collapsed
+   * chip can reflect a background deferral even while its popover is closed.
+   */
+  private onStatusChangeCallback: (() => void) | null = null;
+  private autoEmbedGate: AutoEmbedGate | null = null;
 
   /** Tracks the settings used by the currently configured pipeline. */
   private configuredModelId: string | null = null;
@@ -131,6 +148,30 @@ export class RagService {
   }
 
   /**
+   * Register the persistent chip notifier (indexing-state or staleness changes).
+   * Pass null to unregister. Survives {@link configure}/{@link shutdown} so a
+   * background deferral repaints the chip; cleared only on {@link destroy}.
+   */
+  onStatusChange(callback: (() => void) | null): void {
+    this.onStatusChangeCallback = callback;
+  }
+
+  /** Inject the gate that decides whether an automatic reindex may embed now. */
+  setAutoEmbedGate(gate: AutoEmbedGate): void {
+    this.autoEmbedGate = gate;
+  }
+
+  /** Files known to have changed since indexing but not yet re-embedded. */
+  getStaleCount(): number {
+    return this.indexer?.getDeferredCount() ?? 0;
+  }
+
+  /** Whether the index is out of date (changed files await an available model). */
+  isStale(): boolean {
+    return this.getStaleCount() > 0;
+  }
+
+  /**
    * Whether the current settings differ from what the persisted index was built with.
    * Returns true if a rebuild is recommended (model changed, chunk settings changed).
    */
@@ -153,11 +194,12 @@ export class RagService {
   }
 
   /**
-   * Configure the RAG pipeline without scanning the vault.
-   *
-   * Loads the persisted index from disk and sets up a retriever so queries
-   * work immediately against the existing index. Makes NO embedding API calls
-   * and does NOT register vault watchers. Safe for plugin load.
+   * Configure the RAG pipeline. Loads the persisted index from disk and sets up
+   * a retriever so queries work immediately against the existing index, then,
+   * per settings, registers live vault watchers ({@link RagSettings.watchForChanges}).
+   * Makes no embedding API calls itself, watcher-triggered indexing and the
+   * separate {@link runStartupCatchUp} scan are both gated so they never
+   * force-load a local embedding model. Safe for plugin load.
    */
   async configure(
     ragSettings: RagSettings,
@@ -179,18 +221,80 @@ export class RagService {
     this.embeddingClient = client;
     this.configuredModelId = model.modelId;
     this.maxContextChars = ragSettings.maxContextChars;
-    this.store = new VectorStore(model.modelId, 0, ragSettings.chunkSize, ragSettings.chunkOverlap);
+    const store = new VectorStore(model.modelId, 0, ragSettings.chunkSize, ragSettings.chunkOverlap);
+    this.store = store;
 
     // Load persisted index from disk (no API calls).
     await this.loadIndex();
 
     this.retriever = new Retriever({
-      store: this.store,
+      store,
       embeddingClient: client,
       embeddingModelId: model.modelId,
       topK: ragSettings.topK,
       maxChunksPerFile: ragSettings.maxChunksPerFile,
       minScore: ragSettings.minScore,
+    });
+
+    // Keep watching the vault so live edits reindex without a manual rebuild.
+    // The startup catch-up scan is a load-time concern, driven separately by
+    // runStartupCatchUp so a mere reconfigure (e.g. a model switch) never kicks
+    // an unexpected full rebuild.
+    this.setupAutoIndexer(ragSettings, model, store, client, model.modelId);
+  }
+
+  /**
+   * Wire the automatic indexer per settings. Registers live watchers when
+   * `watchForChanges` is on. Also created (idle) when only `reindexOnStartup`
+   * is on, so {@link runStartupCatchUp} has an indexer to scan with.
+   */
+  private setupAutoIndexer(
+    ragSettings: RagSettings,
+    model: EmbeddingModel,
+    store: VectorStore,
+    client: EmbeddingClient,
+    modelId: string,
+  ): void {
+    if (!ragSettings.watchForChanges && !ragSettings.reindexOnStartup) return;
+
+    this.indexer = this.createIndexer(ragSettings, model, store, client, modelId);
+    if (ragSettings.watchForChanges) this.indexer.beginWatching();
+  }
+
+  /**
+   * Run the load-time catch-up scan when `reindexOnStartup` is on: absorbs edits
+   * made while the plugin was off. Fire-and-forget and gated, so a not-yet-loaded
+   * local model defers (marking the index stale) instead of being force-loaded.
+   * Call once after {@link configure}, not on every reconfigure.
+   */
+  runStartupCatchUp(ragSettings: RagSettings): void {
+    if (!ragSettings.reindexOnStartup) return;
+    void this.indexer?.runFullScan({ gated: true });
+  }
+
+  /** Build a VaultIndexer bound to the given store, model, and the auto-embed gate. */
+  private createIndexer(
+    ragSettings: RagSettings,
+    model: EmbeddingModel,
+    store: VectorStore,
+    client: EmbeddingClient,
+    modelId: string,
+  ): VaultIndexer {
+    const gate = this.autoEmbedGate;
+    return new VaultIndexer({
+      app: this.app,
+      store,
+      embeddingClient: client,
+      embeddingModelId: modelId,
+      chunkSize: ragSettings.chunkSize,
+      chunkOverlap: ragSettings.chunkOverlap,
+      excludePatterns: ragSettings.excludePatterns,
+      metadataEnrichment: ragSettings.metadataEnrichment,
+      watchForChanges: ragSettings.watchForChanges,
+      canAutoEmbed: gate ? () => gate(model) : undefined,
+      onStateChange: (state) => this.setIndexingState(state),
+      onSave: () => this.saveIndex(),
+      onStale: () => this.notifyStatus(),
     });
   }
 
@@ -215,45 +319,49 @@ export class RagService {
       return;
     }
 
+    const model = embeddingModels.find((m) => m.id === ragSettings.activeEmbeddingModelId);
+    if (!model) {
+      this.setIndexingState({ status: "error", message: "Select an embedding model first." });
+      return;
+    }
+
+    // Capture the (guard-narrowed) pipeline deps before the teardown/await below,
+    // which would otherwise widen the class fields back to nullable.
+    const client = this.embeddingClient;
+    const modelId = this.configuredModelId;
+    const dimensions = this.store.getDimensions();
+
     // Tear down any existing indexer.
     this.indexer?.destroy();
 
     // Update store's chunk settings for the new build.
-    this.store = new VectorStore(
-      this.configuredModelId,
-      this.store.getDimensions(),
+    const store = new VectorStore(
+      modelId,
+      dimensions,
       ragSettings.chunkSize,
       ragSettings.chunkOverlap,
       ragSettings.metadataEnrichment,
     );
+    this.store = store;
 
     // Re-load existing index so incremental indexing can detect stale files.
     await this.loadIndex();
 
     // Update retriever to point at the new store.
     this.retriever = new Retriever({
-      store: this.store,
-      embeddingClient: this.embeddingClient,
-      embeddingModelId: this.configuredModelId,
+      store,
+      embeddingClient: client,
+      embeddingModelId: modelId,
       topK: ragSettings.topK,
       maxChunksPerFile: ragSettings.maxChunksPerFile,
       minScore: ragSettings.minScore,
     });
 
-    this.indexer = new VaultIndexer({
-      app: this.app,
-      store: this.store,
-      embeddingClient: this.embeddingClient,
-      embeddingModelId: this.configuredModelId,
-      chunkSize: ragSettings.chunkSize,
-      chunkOverlap: ragSettings.chunkOverlap,
-      excludePatterns: ragSettings.excludePatterns,
-      metadataEnrichment: ragSettings.metadataEnrichment,
-      onStateChange: (state) => this.setIndexingState(state),
-      onSave: () => this.saveIndex(),
-    });
-
-    await this.indexer.start();
+    // A manual build is user-initiated, so its scan is ungated (it may load the
+    // model). Live watchers still honor watchForChanges and stay gated after.
+    this.indexer = this.createIndexer(ragSettings, model, store, client, modelId);
+    this.indexer.beginWatching();
+    await this.indexer.runFullScan({ gated: false });
   }
 
   /** Cancel in-progress indexing. */
@@ -382,11 +490,23 @@ export class RagService {
   destroy(): void {
     this.shutdown();
     this.onStateChangeCallback = null;
+    this.onStatusChangeCallback = null;
   }
 
   private setIndexingState(state: IndexingState): void {
     this.indexingState = state;
     this.onStateChangeCallback?.(state);
+    this.onStatusChangeCallback?.();
+  }
+
+  /**
+   * Notify listeners that status changed without an indexing-state transition
+   * (a staleness change). Re-emits the current state to the state-change
+   * consumer, which re-reads the snapshot, and pings the persistent chip notifier.
+   */
+  private notifyStatus(): void {
+    this.onStateChangeCallback?.(this.indexingState);
+    this.onStatusChangeCallback?.();
   }
 
   private createEmbeddingClient(

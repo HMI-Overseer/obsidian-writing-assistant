@@ -413,3 +413,128 @@ describe("VaultIndexer modify-watcher debounce and in-flight guard", () => {
     }
   });
 });
+
+// --------------------------------------------------------------------------
+// Automatic-reindex gate: never force-load the embedding model
+// --------------------------------------------------------------------------
+
+function gatedIndexer(
+  client: EmbeddingClient,
+  app: App,
+  store: VectorStore,
+  canAutoEmbed: () => Promise<boolean>,
+  onStale: () => void = () => {},
+): VaultIndexer {
+  return new VaultIndexer({
+    app,
+    store,
+    embeddingClient: client,
+    embeddingModelId: "model-1",
+    chunkSize: 80,
+    chunkOverlap: 16,
+    excludePatterns: [],
+    metadataEnrichment: false,
+    watchForChanges: true,
+    canAutoEmbed,
+    onStateChange: () => {},
+    onSave: () => {},
+    onStale,
+  });
+}
+
+describe("VaultIndexer automatic-reindex gate", () => {
+  test("a gated scan defers (no embed) when the model is not available", async () => {
+    const file = mdFile("note.md", LONG_CONTENT);
+    const { app } = makeEventApp([file]);
+    const client = countingClient();
+    const store = new VectorStore("model-1");
+    let staleFired = 0;
+    const indexer = gatedIndexer(client, app, store, async () => false, () => staleFired++);
+
+    await indexer.runFullScan({ gated: true });
+
+    // Nothing embedded or stored, and the file is recorded as stale for the chip.
+    // (Assert before destroy(), which clears the deferred set.)
+    expect(client.calls()).toBe(0);
+    expect(store.getChunkCount()).toBe(0);
+    expect(indexer.getDeferredCount()).toBe(1);
+    expect(staleFired).toBeGreaterThan(0);
+    indexer.destroy();
+  });
+
+  test("a gated scan indexes normally when the model is available", async () => {
+    const file = mdFile("note.md", LONG_CONTENT);
+    const { app } = makeEventApp([file]);
+    const client = countingClient();
+    const store = new VectorStore("model-1");
+    const indexer = gatedIndexer(client, app, store, async () => true);
+
+    await indexer.runFullScan({ gated: true });
+
+    expect(client.calls()).toBeGreaterThan(0);
+    expect(store.getChunkCount()).toBeGreaterThan(0);
+    expect(indexer.getDeferredCount()).toBe(0);
+    indexer.destroy();
+  });
+
+  test("a manual (ungated) scan indexes even when the gate would deny", async () => {
+    const file = mdFile("note.md", LONG_CONTENT);
+    const { app } = makeEventApp([file]);
+    const client = countingClient();
+    const store = new VectorStore("model-1");
+    const indexer = gatedIndexer(client, app, store, async () => false);
+
+    // A user-initiated build is allowed to run (and load the model) regardless.
+    await indexer.runFullScan({ gated: false });
+
+    expect(store.getChunkCount()).toBeGreaterThan(0);
+    expect(indexer.getDeferredCount()).toBe(0);
+    indexer.destroy();
+  });
+
+  test("a later gated scan drains the deferred set once the model comes back", async () => {
+    const file = mdFile("note.md", LONG_CONTENT);
+    const { app } = makeEventApp([file]);
+    const client = countingClient();
+    const store = new VectorStore("model-1");
+    const gate = { ok: false };
+    const indexer = gatedIndexer(client, app, store, async () => gate.ok);
+
+    await indexer.runFullScan({ gated: true });
+    expect(indexer.getDeferredCount()).toBe(1);
+    expect(store.getChunkCount()).toBe(0);
+
+    // Model becomes available: the next automatic scan catches the backlog up.
+    gate.ok = true;
+    await indexer.runFullScan({ gated: true });
+
+    expect(indexer.getDeferredCount()).toBe(0);
+    expect(store.getChunkCount()).toBeGreaterThan(0);
+    indexer.destroy();
+  });
+
+  test("a live edit defers instead of loading the model, flagging staleness", async () => {
+    vi.useFakeTimers();
+    try {
+      const { app, handlers } = makeEventApp([]); // empty at scan time
+      const client = countingClient();
+      const store = new VectorStore("model-1");
+      let staleFired = 0;
+      const indexer = gatedIndexer(client, app, store, async () => false, () => staleFired++);
+      indexer.beginWatching();
+
+      handlers.create(mdFile("note.md", LONG_CONTENT));
+      await vi.advanceTimersByTimeAsync(MODIFY_DEBOUNCE_MS + 1);
+      await flushMicrotasks();
+
+      // The edit must not trigger an embed (which would JIT-load the model).
+      expect(client.calls()).toBe(0);
+      expect(store.getChunkCount()).toBe(0);
+      expect(indexer.getDeferredCount()).toBe(1);
+      expect(staleFired).toBeGreaterThan(0);
+      indexer.destroy();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});

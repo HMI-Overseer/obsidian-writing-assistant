@@ -400,6 +400,14 @@
     opacity: 1;
   }
 
+  /* Out-of-date index: a muted amber that overrides the active cyan (declared
+     after, same specificity) so a stale-but-active chip still reads as warning. */
+  .lmsa-chat-composer-knowledge-indicator.is-stale {
+    color: color-mix(in srgb, var(--color-orange, #d29922) 80%, var(--text-muted));
+    border-color: color-mix(in srgb, var(--color-orange, #d29922) 40%, var(--background-modifier-border));
+    opacity: 1;
+  }
+
   /* ── Vision indicator ────────────────────────────────────────────────────── */
 
   .lmsa-chat-composer-vision-indicator {

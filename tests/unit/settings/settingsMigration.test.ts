@@ -287,4 +287,23 @@ describe("normalizeRagSettings", () => {
     expect(rag.chunkSize).toBe(DEFAULT_RAG_SETTINGS.chunkSize);
     expect(rag.topK).toBe(9);
   });
+
+  it("back-fills auto-reindex flags for settings saved before they existed", () => {
+    // A pre-feature blob has none of the auto-reindex keys.
+    const rag = normalizeRagSettings({ enabled: true, chunkSize: 1200 });
+    expect(rag.reindexOnStartup).toBe(DEFAULT_RAG_SETTINGS.reindexOnStartup);
+    expect(rag.watchForChanges).toBe(DEFAULT_RAG_SETTINGS.watchForChanges);
+    expect(rag.autoReindexOnCloud).toBe(DEFAULT_RAG_SETTINGS.autoReindexOnCloud);
+  });
+
+  it("preserves explicit auto-reindex flags", () => {
+    const rag = normalizeRagSettings({
+      reindexOnStartup: false,
+      watchForChanges: false,
+      autoReindexOnCloud: true,
+    });
+    expect(rag.reindexOnStartup).toBe(false);
+    expect(rag.watchForChanges).toBe(false);
+    expect(rag.autoReindexOnCloud).toBe(true);
+  });
 });

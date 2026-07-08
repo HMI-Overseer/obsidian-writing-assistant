@@ -48,6 +48,9 @@ export const DEFAULT_RAG_SETTINGS: RagSettings = {
   excludePatterns: ["templates/**"],
   maxContextChars: 6000,
   metadataEnrichment: true,
+  reindexOnStartup: true,
+  watchForChanges: true,
+  autoReindexOnCloud: false,
 };
 
 export const DEFAULT_KNOWLEDGE_GRAPH_SETTINGS: KnowledgeGraphSettings = {

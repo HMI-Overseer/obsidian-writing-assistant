@@ -13,6 +13,8 @@ export type RagSnapshot = {
   fileCount: number;
   chunkCount: number;
   indexingState: IndexingState;
+  /** True when files changed since indexing but could not be re-embedded yet. */
+  stale: boolean;
 };
 
 export type GraphSnapshot = {
@@ -249,7 +251,13 @@ export class KnowledgePopover {
     } else if (isError) {
       refs.statusEl.textContent = "Error";
     } else if (snap.ready) {
-      refs.statusEl.textContent = `${snap.fileCount} files, ${snap.chunkCount} chunks`;
+      // The out-of-date note flags a pending reindex; the model selector's own
+      // status dot below reveals *why* (e.g. the local model is not loaded).
+      refs.statusEl.textContent = snap.stale
+        ? `${snap.fileCount} files, ${snap.chunkCount} chunks (out of date)`
+        : `${snap.fileCount} files, ${snap.chunkCount} chunks`;
+    } else if (snap.stale && snap.hasModel) {
+      refs.statusEl.textContent = "Index out of date";
     } else if (!snap.hasModel) {
       refs.statusEl.textContent = "No embedding model selected";
     } else {

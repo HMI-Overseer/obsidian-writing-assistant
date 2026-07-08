@@ -10,6 +10,7 @@ import {
 } from "../providers/selectableModels";
 import { RagService } from "../rag";
 import { GraphService } from "../rag/graph";
+import { getProviderDescriptor } from "../providers/registry";
 import { ClaudeCodeService } from "./ClaudeCodeService";
 
 /**
@@ -42,6 +43,10 @@ export class ServiceContainer {
       },
     );
     this.ragService = new RagService(app, pluginDir);
+    // Automatic reindex may only embed when the model won't be force-loaded:
+    // local models must already be loaded (probed via a non-loading listing
+    // call), cloud models only with the user's opt-in.
+    this.ragService.setAutoEmbedGate((model) => this.canAutoEmbed(model));
     this.graphService = new GraphService(app, pluginDir);
     this.claudeCode = new ClaudeCodeService(
       app,
@@ -69,6 +74,9 @@ export class ServiceContainer {
     this.modelAvailability.reportClaudeCodeEffortLevels(s.claudeCodeEffortLevels);
 
     await this.ragService.configure(s.rag, getSelectableEmbeddingModels(s), s.providerSettings);
+    // Load-time catch-up: absorb edits made while the plugin was off. Gated, so
+    // it defers rather than loading a local embedding model that is not running.
+    this.ragService.runStartupCatchUp(s.rag);
     await this.graphService.configure(
       s.knowledgeGraph,
       getSelectableCompletionModels(s),
@@ -76,6 +84,25 @@ export class ServiceContainer {
       s.providerSettings,
     );
     this.ragService.setGraphService(this.graphService);
+  }
+
+  /**
+   * Whether an automatic reindex may embed with this model right now, without
+   * loading anything. Cloud models embed only when the user opted in; local
+   * models must already be loaded, probed via `refreshLocalModels` (a listing
+   * call that never triggers a just-in-time load) and treated as unavailable if
+   * discovery fails.
+   */
+  private async canAutoEmbed(model: EmbeddingModel): Promise<boolean> {
+    if (getProviderDescriptor(model.provider).kind === "cloud") {
+      return this.getSettings().rag.autoReindexOnCloud;
+    }
+    try {
+      await this.modelAvailability.refreshLocalModels();
+    } catch {
+      return false;
+    }
+    return this.modelAvailability.getAvailability(model.modelId, model.provider).state === "loaded";
   }
 
   /** Reconfigure RAG after settings change. */

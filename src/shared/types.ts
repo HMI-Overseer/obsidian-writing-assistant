@@ -543,6 +543,16 @@ export interface RagSettings {
   maxContextChars: number;
   /** Enrich embedding text with tags, folder path, and wikilink targets for disambiguation. */
   metadataEnrichment: boolean;
+  /** Run a catch-up scan on plugin load to absorb edits made while it was off. */
+  reindexOnStartup: boolean;
+  /** Keep watching the vault and incrementally reindex edited notes while enabled. */
+  watchForChanges: boolean;
+  /**
+   * Allow automatic reindexing to embed through a metered cloud model. Off (the
+   * default) keeps automatic runs local-only, so cloud usage stays manual and
+   * never bills unexpectedly.
+   */
+  autoReindexOnCloud: boolean;
 }
 
 /** Knowledge graph settings. */

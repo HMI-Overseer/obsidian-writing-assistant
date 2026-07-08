@@ -380,4 +380,43 @@ describe("config-subtree rejection (.obsidian writes refused before the gate)", 
 
     expect(validateWriteFile({ path: ".obsidian/note.md", content: "x" }, absent, ".config").ok).toBe(true);
   });
+
+  // FINDING 2.1 (tool level): the same first-segment-only bypass, exercised through the
+  // in-loop validators the model actually hits. Each currently returns ok:true because
+  // escapesVault permits the `..` path and the config guard reads only the first segment.
+  test("validateWriteFile refuses a .obsidian write reached via internal .. traversal", () => {
+    const r = validateWriteFile({ path: "x/../.obsidian/evil.md", content: "x" }, absent);
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error).toContain("configuration folder");
+  });
+
+  test("validateCreateDirectory refuses a .obsidian folder reached via internal .. traversal", () => {
+    const r = validateCreateDirectory({ path: "x/../.obsidian/evil" }, absent);
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error).toContain("off limits");
+  });
+
+  test("validateMoveFile refuses a destination reaching .obsidian via internal .. traversal", () => {
+    const r = validateMoveFile(
+      { from: "note.md", to: "x/../.obsidian/note.md" },
+      resolveWith({ "note.md": "file" }),
+    );
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error).toContain("configuration folder");
+  });
+
+  test("validateMoveFolder refuses a destination reaching .obsidian via internal .. traversal", () => {
+    const r = validateMoveFolder(
+      { from: "Notes", to: "x/../.obsidian/Notes" },
+      resolveWith({ Notes: "dir" }),
+    );
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error).toContain("configuration folder");
+  });
+
+  // GUARDRAIL (must stay green): a legitimate internal `..` that stays in the note area
+  // must remain writable, so the traversal-aware fix does not over-reject.
+  test("still allows an internal .. write that never reaches the config dir (no over-rejection)", () => {
+    expect(validateWriteFile({ path: "Drafts/../Archive/note.md", content: "x" }, absent).ok).toBe(true);
+  });
 });

@@ -143,6 +143,13 @@ markdownIt.renderer.rules.code_block = (tokens: Token[], idx: number) => {
   return renderCodeBlock(token.content, "text");
 };
 
+markdownIt.renderer.rules.image = (tokens: Token[], idx: number) => {
+  // Security (finding 3.2): never emit an <img>. A remote / data:image source auto-loads
+  // in the Electron renderer, an out-of-band tracking-pixel / exfiltration channel for a
+  // prompt-injected model. Drop the source entirely, keep only the escaped alt text.
+  return escapeHtml(tokens[idx].content ?? "");
+};
+
 markdownIt.renderer.rules.table_open = () => '<div class="lmsa-md-table-wrap"><table>';
 markdownIt.renderer.rules.table_close = () => "</table></div>";
 

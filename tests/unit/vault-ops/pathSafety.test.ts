@@ -51,6 +51,15 @@ describe("escapesVault", () => {
     expect(escapesVault("/Note.md")).toBe(false);
   });
 
+  // FINDING 3.1: a drive letter hidden behind a leading slash currently slips the
+  // /^[a-zA-Z]:/ test (the "/" precedes the letter); normalizePath then strips the slash
+  // to a bare C:/… . It must be refused identically to the un-slashed drive-letter form.
+  test("refuses a Windows drive-letter absolute hidden behind a leading slash", () => {
+    for (const p of ["/C:/Windows/System32/test.md", "/d:/secrets/note.md", "\\C:\\Windows\\x.md"]) {
+      expect(escapesVault(p), p).toBe(true);
+    }
+  });
+
   test("an empty path is not itself an escape (rejected by the non-empty check elsewhere)", () => {
     expect(escapesVault("")).toBe(false);
   });
@@ -90,6 +99,28 @@ describe("isReservedConfigPath", () => {
       ".obsidian-archive/note.md",
       "obsidian/note.md", // no leading dot
     ]) {
+      expect(isReservedConfigPath(p, CFG), p).toBe(false);
+    }
+  });
+
+  // FINDING 2.1: the guard inspects only the FIRST segment, so a `..` that resolves into
+  // the config dir slips it (the first segment is innocuous). path.join later collapses
+  // `foo/../.obsidian/…` to `.obsidian/…` on disk, so it must be treated as reserved.
+  test("refuses a config-dir target reached via internal .. traversal", () => {
+    for (const p of [
+      "foo/../.obsidian/evil.md",
+      "a/b/../../.obsidian/plugins/x/main.js",
+      "Notes/../.obsidian",
+      "./x/../.obsidian/note.md",
+    ]) {
+      expect(isReservedConfigPath(p, CFG), p).toBe(true);
+    }
+  });
+
+  // GUARDRAIL (must stay green): an internal `..` that never resolves into the config dir
+  // must remain allowed, so the traversal-aware fix does not over-reject ordinary writes.
+  test("still allows an internal .. that never reaches the config dir (no over-rejection)", () => {
+    for (const p of ["foo/../bar.md", "Notes/../Archive/note.md"]) {
       expect(isReservedConfigPath(p, CFG), p).toBe(false);
     }
   });

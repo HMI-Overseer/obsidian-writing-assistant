@@ -12,8 +12,8 @@ import { TFile, TFolder, normalizePath } from "obsidian";
 import type { PathState, TargetFingerprint, VaultOperation } from "./types";
 import type { DiskSnapshot, InverseContext } from "./plan";
 import { inverseOf } from "./plan";
-import { targetPaths } from "./gateway";
-import { escapesVault } from "./pathSafety";
+import { targetPaths, writeTargetPaths } from "./gateway";
+import { escapesVault, isReservedConfigPath } from "./pathSafety";
 
 // ---------------------------------------------------------------------------
 // Disk probes, back the pure planners' injected data with the live vault.
@@ -115,6 +115,17 @@ export async function applyOperation(
   // `..`/drive-letter path escape via path.join.
   for (const p of targetPaths(op)) {
     if (escapesVault(p)) throw new Error(`refusing to apply "${p}": path is outside the vault.`);
+  }
+  // Same last-line treatment for the config-subtree guard: never write into the config
+  // dir (destination-only, so a move OUT of it still applies), even if the pre-flight
+  // config check was absent. A `..` that path.join collapses into the dir is caught here.
+  const configDir = app.vault.configDir;
+  if (configDir) {
+    for (const p of writeTargetPaths(op)) {
+      if (isReservedConfigPath(p, configDir)) {
+        throw new Error(`refusing to apply "${p}": path is inside the ${configDir} configuration folder.`);
+      }
+    }
   }
   switch (op.kind) {
     case "create": {

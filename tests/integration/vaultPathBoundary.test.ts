@@ -70,6 +70,7 @@ function makeRealFsApp(root: string): App {
   return {
     vault: {
       adapter: { getBasePath: () => root },
+      configDir: ".obsidian",
       getName: () => nodePath.basename(root),
       getRoot() {
         return Object.assign(new TFolder(), { path: "", children: childrenOf("") });
@@ -575,5 +576,34 @@ describe("smart-quote path resolution, real filesystem", () => {
     expect(batch.ok).toBe(true);
     expect(fs.existsSync(nodePath.join(vaultRoot, "Lore", "Renamed.md"))).toBe(true);
     expect(fs.existsSync(nodePath.join(vaultRoot, "Lore", realName))).toBe(false);
+  });
+});
+
+describe("config-subtree write backstop, real-filesystem resolution (2.1)", () => {
+  // FINDING 2.1: `escapesVault` permits `x/../.obsidian/evil.md` (depth never goes
+  // negative), and the config guard is not re-checked at the apply pre-flight or the disk
+  // executor, so a path that path.join collapses INTO the config dir currently writes
+  // there. The strongest form of the finding: assert nothing lands under .obsidian on real
+  // disk. (filesOutsideVault() cannot see this, .obsidian sits inside vaultRoot.)
+  it("never writes into the config dir via an internal '..' that resolves into .obsidian", async () => {
+    const app = makeRealFsApp(vaultRoot);
+    const op: VaultOperation = { kind: "create", path: "x/../.obsidian/evil.md", content: "pwned" };
+
+    const batch = await applyVaultOpBatch(app, [{ id: "cfg", op }]);
+
+    expect(batch.ok).toBe(false);
+    expect(fs.existsSync(nodePath.join(vaultRoot, ".obsidian", "evil.md"))).toBe(false);
+    // The disk executor must also refuse as its first act, even if reached directly.
+    await expect(applyOperation(app, op)).rejects.toThrow();
+  });
+
+  it("still applies a legitimate internal '..' that stays in the note area (positive control)", async () => {
+    const app = makeRealFsApp(vaultRoot);
+    const op: VaultOperation = { kind: "create", path: "Drafts/../Archive/Note.md", content: "ok" };
+
+    const batch = await applyVaultOpBatch(app, [{ id: "ok", op }]);
+
+    expect(batch.ok).toBe(true);
+    expect(fs.existsSync(nodePath.join(vaultRoot, "Archive", "Note.md"))).toBe(true);
   });
 });

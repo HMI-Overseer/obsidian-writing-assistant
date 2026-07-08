@@ -51,7 +51,7 @@ export async function applyVaultOpBatch(app: App, batch: BatchOp[]): Promise<Bat
   const idByOp = new Map<VaultOperation, string>(batch.map((b) => [b.op, b.id]));
   const ordered = orderOps(batch.map((b) => b.op));
 
-  const preflightResult = preflight(ordered, makeDiskSnapshot(app));
+  const preflightResult = preflight(ordered, makeDiskSnapshot(app), app.vault.configDir);
   if (!preflightResult.ok) {
     return { ok: false, conflicts: preflightResult.conflicts, applied: [] };
   }

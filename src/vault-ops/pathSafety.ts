@@ -9,9 +9,11 @@
  * model gets a self-correcting error before any review), the apply pre-flight (the
  * batch is refused), and the apply executor itself (the only code that touches disk).
  *
- * A leading slash is *not* treated as an escape: `normalizePath` strips it, so the
- * path resolves inside the vault. Internal `..` that stays within the vault
- * (e.g. `a/../b.md`) is allowed, only traversal that rises above the root is refused.
+ * A leading slash alone is *not* treated as an escape: `normalizePath` strips it, so
+ * the path resolves inside the vault, but a leading slash that merely shields a
+ * drive-letter absolute (`/C:/…`) is still refused, since `normalizePath` strips the
+ * slash to a bare `C:/…`. Internal `..` that stays within the vault (e.g. `a/../b.md`)
+ * is allowed, only traversal that rises above the root is refused.
  *
  * Pure (no Obsidian, no disk) so the guard is unit-testable and identical across
  * every layer it defends.
@@ -25,7 +27,9 @@
 export function escapesVault(path: string): boolean {
   const normalized = path.replace(/\\/g, "/");
   // A drive letter (C:, d:\) is an absolute filesystem path, never vault-relative.
-  if (/^[a-zA-Z]:/.test(normalized)) return true;
+  // Strip leading slashes first: `/C:/…` shields the drive letter from this test, yet
+  // normalizePath later strips the slash to a bare `C:/…`, so both forms must be refused.
+  if (/^[a-zA-Z]:/.test(normalized.replace(/^\/+/, ""))) return true;
   // Walk segments tracking depth below the root; rising above it (depth < 0) escapes.
   let depth = 0;
   for (const segment of normalized.split("/")) {
@@ -46,26 +50,37 @@ export function outsideVaultMessage(path: string): string {
 }
 
 /**
- * True when a path's *first* segment is the vault's configuration directory
- * (`app.vault.configDir`, conventionally `.obsidian`). Model write / overwrite /
- * move-into / create-directory ops are refused here as defense in depth: the
- * file-type allowlist already blocks `.json`/`.css` config files, but a `.md` or
- * `.canvas` written into the config subtree would otherwise pass it, and a stray
- * write there can corrupt the vault's configuration. This guard stands in front of
- * the (default "ask") gate so the model never even proposes a config-subtree write.
+ * True when a path's first segment, after collapsing any `.`/`..`, is the vault's
+ * configuration directory (`app.vault.configDir`, conventionally `.obsidian`). Model
+ * write / overwrite / move-into / create-directory ops are refused here as defense in
+ * depth: the file-type allowlist already blocks `.json`/`.css` config files, but a `.md`
+ * or `.canvas` written into the config subtree would otherwise pass it, and a stray write
+ * there can corrupt the vault's configuration. This guard stands in front of the
+ * (default "ask") gate so the model never even proposes a config-subtree write.
+ *
+ * The `..` collapse matters because `normalizePath` does *not* fold `..`, so a path like
+ * `foo/../.obsidian/x.md` reaches the guard first-segment-innocuous yet `path.join`
+ * collapses it into the config dir on disk. Only the first *resolved* segment is compared,
+ * exact-match, so a folder whose name merely starts with the config dir name
+ * (`.obsidian-archive`) is not over-rejected.
  *
  * `configDir` is the *live* value (sourced from `app.vault.configDir` at the
  * call site), so a user who renamed their config directory is still protected,
  * and a vault that legitimately holds a folder named `.obsidian` is not.
  */
 export function isReservedConfigPath(path: string, configDir: string): boolean {
-  const target = configDir.replace(/\\/g, "/").replace(/^\/+|\/+$/g, "");
-  const normalized = path.replace(/\\/g, "/");
-  for (const segment of normalized.split("/")) {
+  const target = (configDir ?? "").replace(/\\/g, "/").replace(/^\/+|\/+$/g, "");
+  if (!target) return false;
+  const resolved: string[] = [];
+  for (const segment of path.replace(/\\/g, "/").split("/")) {
     if (segment === "" || segment === ".") continue;
-    return segment === target;
+    if (segment === "..") {
+      resolved.pop();
+    } else {
+      resolved.push(segment);
+    }
   }
-  return false;
+  return resolved[0] === target;
 }
 
 /** Model-facing reason a config-subtree path was refused. */

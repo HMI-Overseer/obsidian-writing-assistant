@@ -98,6 +98,27 @@ export function targetPaths(op: VaultOperation): string[] {
   return [op.path];
 }
 
+/**
+ * The path(s) an op *writes to*, a subset of {@link targetPaths} used by the
+ * config-subtree guard. A move's SOURCE is deliberately excluded: relocating a file or
+ * folder OUT of the config dir is legitimate, only the destination is a write into it.
+ * Trash and replace targets are existing in-vault (in-index) files, never a write into
+ * the config subtree, so they contribute no guarded path.
+ */
+export function writeTargetPaths(op: VaultOperation): string[] {
+  switch (op.kind) {
+    case "create":
+    case "overwrite":
+    case "createDir":
+      return [op.path];
+    case "move":
+    case "moveFolder":
+      return [op.to];
+    default:
+      return [];
+  }
+}
+
 /** True when every path sits inside one of the scope prefixes (empty ⇒ whole vault). */
 export function inScope(paths: string[], scopes: string[]): boolean {
   if (scopes.length === 0) return true;

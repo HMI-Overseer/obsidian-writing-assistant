@@ -5,8 +5,13 @@
  */
 
 import type { PathState, TargetFingerprint, VaultOperation } from "./types";
-import { targetPaths } from "./gateway";
-import { escapesVault, outsideVaultMessage } from "./pathSafety";
+import { targetPaths, writeTargetPaths } from "./gateway";
+import {
+  escapesVault,
+  isReservedConfigPath,
+  outsideVaultMessage,
+  reservedConfigMessage,
+} from "./pathSafety";
 
 /** Live disk, injected as data. The apply executor backs this with the real vault. */
 export interface DiskSnapshot {
@@ -34,7 +39,11 @@ export function fingerprintsMatch(live: TargetFingerprint | null, expect: Target
  * Any conflict ⇒ the batch aborts and nothing is written. This is the real
  * safety guarantee; in-loop validation is only a courtesy to the model.
  */
-export function preflight(ops: VaultOperation[], disk: DiskSnapshot): PreflightResult {
+export function preflight(
+  ops: VaultOperation[],
+  disk: DiskSnapshot,
+  configDir = "",
+): PreflightResult {
   const conflicts: Conflict[] = [];
   ops.forEach((op, index) => {
     const add = (reason: string) => conflicts.push({ index, op, reason });
@@ -43,6 +52,14 @@ export function preflight(ops: VaultOperation[], disk: DiskSnapshot): PreflightR
     // the in-loop validator. A violation aborts the whole batch, nothing is written.
     const escaping = targetPaths(op).find((p) => escapesVault(p));
     if (escaping !== undefined) add(outsideVaultMessage(escaping));
+    // Config-subtree backstop (defense in depth, matching the escapesVault treatment):
+    // refuse any op that WRITES into the config dir, even via `..` traversal that
+    // path.join later collapses. Destination-only (writeTargetPaths), so relocating a
+    // file OUT of the config dir stays allowed; the executor re-checks unconditionally.
+    if (configDir) {
+      const reserved = writeTargetPaths(op).find((p) => isReservedConfigPath(p, configDir));
+      if (reserved !== undefined) add(reservedConfigMessage(reserved, configDir));
+    }
     switch (op.kind) {
       case "create":
         if (disk.state(op.path) !== "absent") add(`"${op.path}" already exists.`);

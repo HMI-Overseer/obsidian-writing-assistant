@@ -21,7 +21,7 @@ import {
 
 /** Precomputed per-file change set for a `replace_in_vault` call (see preScanReplacements). */
 export interface ReplaceScanResult {
-  targets: Array<{ path: string; content: string; expect: TargetFingerprint }>;
+  targets: Array<{ path: string; content: string; expect: TargetFingerprint; count: number }>;
   occurrences: number;
 }
 

@@ -523,7 +523,19 @@ export class LiveVaultReview implements VaultOpReviewer {
     for (const call of calls) {
       const found = opByCall.get(call.id);
       if (!found) {
-        const error = errByCall.get(call.id) ?? "could not convert operation";
+        const conversionError = errByCall.get(call.id);
+        // A `replace_in_vault` with valid arguments but no matches converts to no op AND
+        // no error (the scan ran, the result set was empty), so it fell through to the
+        // generic "could not convert operation" below, which misreads a clean zero-match
+        // as malformed arguments. Report it honestly as a no-match instead, so the model
+        // fixes the search (spelling / case / scope) rather than its (fine) arguments.
+        // Only when validation passed (no recorded conversion error); a genuinely invalid
+        // replace still reports its specific reason.
+        if (call.name === "replace_in_vault" && conversionError === undefined) {
+          entries.push({ call, kind: "error", result: replaceNoMatchResult(call) });
+          continue;
+        }
+        const error = conversionError ?? "could not convert operation";
         entries.push({
           call,
           kind: "error",
@@ -848,6 +860,28 @@ function dispoResult(
 /** A call with no result is a parked op cancelled before it decided. */
 function cancelledFallback(call: ToolCall): ToolResult {
   return { content: `${call.name} review was interrupted; still pending.`, isReadOnly: false };
+}
+
+/**
+ * A `replace_in_vault` whose search matched nothing: valid arguments, empty result set,
+ * so conversion emits no op. Reported as an honest no-match (not the generic conversion
+ * failure), so the model corrects the search rather than assuming its call was malformed.
+ * Mirrors the edit channel's no-match contract: `isError` + a self-correcting recovery,
+ * so the model self-corrects (its own errorGuidance: spelling / case / scope).
+ */
+function replaceNoMatchResult(call: ToolCall): ToolResult {
+  const args = call.arguments as Record<string, unknown>;
+  const search = typeof args.search === "string" ? args.search : "";
+  const where =
+    typeof args.path === "string" && args.path.trim() !== "" ? `"${args.path}"` : "the vault";
+  const recovery =
+    "check spelling and case, or widen the scope; the search is literal text, not a pattern";
+  return {
+    content: `No occurrences of "${search}" were found in ${where}, so there was nothing to replace. ${recovery}.`,
+    isReadOnly: false,
+    isError: true,
+    failure: { kind: "no-match", recovery },
+  };
 }
 
 /**

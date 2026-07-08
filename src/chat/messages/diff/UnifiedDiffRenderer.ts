@@ -15,7 +15,11 @@ export function renderUnifiedBody(bodyEl: HTMLElement, hunk: DiffHunk): void {
   const removedLines = resolvedEdit.editBlock.searchText.split("\n");
   const addedLines = resolvedEdit.editBlock.replaceText.split("\n");
   const hasAdded = addedLines.length > 0 && !(addedLines.length === 1 && addedLines[0] === "");
-  const pairedCount = hasAdded ? Math.min(removedLines.length, addedLines.length) : 0;
+  // Symmetric with hasAdded: an empty search is a pure insertion, so it must render no
+  // removed lines rather than a spurious blank "−" row (e.g. a create preview or an
+  // append/prepend edit, whose search text is empty).
+  const hasRemoved = removedLines.length > 0 && !(removedLines.length === 1 && removedLines[0] === "");
+  const pairedCount = hasAdded && hasRemoved ? Math.min(removedLines.length, addedLines.length) : 0;
 
   for (let i = 0; i < pairedCount; i++) {
     const segments = computeWordDiff(removedLines[i], addedLines[i]);
@@ -24,7 +28,7 @@ export function renderUnifiedBody(bodyEl: HTMLElement, hunk: DiffHunk): void {
     renderHighlightedLine(bodyEl, segments.added, "added");
   }
 
-  if (removedLines.length > pairedCount) {
+  if (hasRemoved && removedLines.length > pairedCount) {
     renderLines(bodyEl, removedLines.slice(pairedCount), "removed", resolvedEdit.startLine + pairedCount);
   }
 

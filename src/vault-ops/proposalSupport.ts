@@ -87,7 +87,12 @@ export async function preScanReplacements(
     const targets = results.map((r) => {
       occurrences += r.count;
       const fp = read.get(r.path);
-      return { path: r.path, content: r.content, expect: { mtime: fp?.mtime ?? 0, size: fp?.size ?? 0 } };
+      return {
+        path: r.path,
+        content: r.content,
+        expect: { mtime: fp?.mtime ?? 0, size: fp?.size ?? 0 },
+        count: r.count,
+      };
     });
     out.set(tc.id, { targets, occurrences });
   }

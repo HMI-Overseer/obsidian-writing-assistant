@@ -1,7 +1,7 @@
 import { setIcon } from "obsidian";
 import type { AgenticStep } from "../../shared/types";
 import type { VaultOpDisposition } from "../../vault-ops/disposition";
-import { TOOL_ICONS, TOOL_LABELS, isMutatingTool } from "../../tools/metadata";
+import { TOOL_ICONS, TOOL_LABELS, isMutatingTool, pendingToolLabel } from "../../tools/metadata";
 import { captureStepFields } from "../../tools/resultDigest";
 
 /**
@@ -71,9 +71,12 @@ export class AgenticTimeline {
     const dotEl = stepEl.createDiv({ cls: "lmsa-agentic-timeline-dot" });
     setIcon(dotEl, TOOL_ICONS[toolName] ?? "wrench");
     const bodyEl = stepEl.createDiv({ cls: "lmsa-agentic-timeline-step-body" });
+    // Present tense while pending: a mutating step (write_file, move_file, …) reads as a
+    // proposal, not a completed action, until the review overlay flips it to past tense
+    // on apply (F4). Read-only tools fall back to their normal label.
     bodyEl.createSpan({
       cls: "lmsa-agentic-timeline-step-name",
-      text: TOOL_LABELS[toolName] ?? toolName,
+      text: pendingToolLabel(toolName),
     });
     const detailEl = bodyEl.createSpan({ cls: "lmsa-agentic-timeline-step-detail", text: "…" });
 

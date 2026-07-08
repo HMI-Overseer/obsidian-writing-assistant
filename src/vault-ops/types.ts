@@ -63,9 +63,11 @@ export type VaultOperation =
       /**
        * Precomputed per-file change. Each target carries the file's full new
        * content and the conflict guard captured at proposal time (re-checked at
-       * apply, like `overwrite`).
+       * apply, like `overwrite`). `count` is that file's match count, surfaced in the
+       * review's affected-file list (F2); it is display-only and absent on the
+       * inverse (undo restores content directly, no re-scan).
        */
-      targets: Array<{ path: string; content: string; expect: TargetFingerprint }>;
+      targets: Array<{ path: string; content: string; expect: TargetFingerprint; count?: number }>;
       /** Total occurrences replaced across all targets, for the summary/disposition. */
       occurrences: number;
     };

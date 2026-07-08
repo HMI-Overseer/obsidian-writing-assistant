@@ -54,6 +54,29 @@ export function gateBadgeLabel(gate: Gate): string {
   }
 }
 
+/**
+ * The step-detail line for an op: the target path a reviewer needs to see next to the
+ * label ("Create folder" → which folder). Mirrors {@link ../tools/metadata.extractToolInput}
+ * but derives from the op, so the review can fill it in even when the timeline step still
+ * shows the streaming "…" placeholder (the Claude Code path only records the real detail
+ * once the tool returns, i.e. after approval).
+ */
+export function opDetailLine(op: VaultOperation): string {
+  switch (op.kind) {
+    case "create":
+    case "overwrite":
+    case "createDir":
+    case "trash":
+    case "trashFolder":
+      return op.path;
+    case "move":
+    case "moveFolder":
+      return `${op.from} → ${op.to}`;
+    case "replaceInVault":
+      return `"${op.search}" → "${op.replace}"`;
+  }
+}
+
 /** The single path an op acts on, for hierarchy display (move shows its destination,
  *  a replace its first target as a representative path). */
 export function opPrimaryPath(op: VaultOperation): string {

@@ -31,11 +31,15 @@ export function renderSplitBody(bodyEl: HTMLElement, hunk: DiffHunk): void {
   const removedLines = resolvedEdit.editBlock.searchText.split("\n");
   const addedLines = resolvedEdit.editBlock.replaceText.split("\n");
   const hasAdded = addedLines.length > 0 && !(addedLines.length === 1 && addedLines[0] === "");
-  const pairedCount = hasAdded ? Math.min(removedLines.length, addedLines.length) : 0;
-  const maxCount = Math.max(removedLines.length, hasAdded ? addedLines.length : 0);
+  // Symmetric with hasAdded: an empty search is a pure insertion, so the left (removed)
+  // column stays empty rather than showing a spurious blank row (e.g. a create preview
+  // or an append/prepend edit, whose search text is empty).
+  const removedPresent = removedLines.length > 0 && !(removedLines.length === 1 && removedLines[0] === "");
+  const pairedCount = hasAdded && removedPresent ? Math.min(removedLines.length, addedLines.length) : 0;
+  const maxCount = Math.max(removedPresent ? removedLines.length : 0, hasAdded ? addedLines.length : 0);
 
   for (let i = 0; i < maxCount; i++) {
-    const hasRemoved = i < removedLines.length;
+    const hasRemoved = removedPresent && i < removedLines.length;
     const hasAddedLine = hasAdded && i < addedLines.length;
 
     let leftSegments: DiffSegment[] | undefined;

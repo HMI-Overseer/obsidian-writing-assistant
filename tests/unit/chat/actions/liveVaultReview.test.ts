@@ -68,6 +68,9 @@ function makeApp(existing: { files?: string[]; folders?: string[]; content?: str
         const n = normalizePath(p);
         return contents.has(n) ? fileFor(n) : null;
       },
+      // Backs preScanReplacements: every markdown file, read via cachedRead.
+      getMarkdownFiles: () => [...contents.keys()].map((n) => fileFor(n)),
+      cachedRead: (file: TFile) => Promise.resolve(contents.get(normalizePath(file.path)) ?? ""),
       read: (file: TFile) => Promise.resolve(contents.get(normalizePath(file.path)) ?? ""),
       process: async (file: TFile, fn: (c: string) => string) => {
         const n = normalizePath(file.path);
@@ -413,6 +416,57 @@ describe("LiveVaultReview", () => {
     expect(second.result.content).toBe('Applied edit to "Notes/A.md" (auto-applied).');
     const read = await app.vault.read(app.vault.getFileByPath("Notes/A.md") as never);
     expect(read).toBe("She beamed. He waited.");
+  });
+
+  it("reports a zero-match replace_in_vault as an honest no-match, not a conversion error", async () => {
+    // The in-the-wild repro: the doc says "Velmoor", the model searched "Velomoor" (typo),
+    // so nothing matched. A zero-match replace converts to no op *and* no error, which used
+    // to fall through to "invalid replace_in_vault arguments, could not convert operation",
+    // misreading a clean empty result as malformed arguments. It must self-describe instead.
+    const review = new LiveVaultReview({
+      app: makeApp({ files: ["Lore/Vex.md"], content: "Velmoor is a distant place." }),
+      timelineEl: TIMELINE_EL,
+      policy: POLICY(),
+    });
+
+    const [{ result }] = await review.resolveRound([
+      {
+        id: "r1",
+        name: "replace_in_vault",
+        arguments: { search: "Velomoor", replace: "Karman", caseSensitive: true },
+      },
+    ]);
+
+    expect(result.isError).toBe(true);
+    expect(result.failure?.kind).toBe("no-match");
+    expect(result.content).toContain("No occurrences of \"Velomoor\" were found");
+    expect(result.content).toContain("the vault");
+    expect(result.content).toContain("check spelling and case");
+    // The misleading old wording is gone.
+    expect(result.content).not.toContain("could not convert operation");
+    expect(result.content).not.toContain("invalid replace_in_vault arguments");
+    // Nothing was queued for review or applied.
+    expect(review.getProposal()).toBeNull();
+    expect(review.getAppliedRecord()).toBeNull();
+  });
+
+  it("scopes the no-match message to the path when one was given", async () => {
+    const review = new LiveVaultReview({
+      app: makeApp({ files: ["Lore/Vex.md"], content: "Velmoor is a distant place." }),
+      timelineEl: TIMELINE_EL,
+      policy: POLICY(),
+    });
+
+    const [{ result }] = await review.resolveRound([
+      {
+        id: "r1",
+        name: "replace_in_vault",
+        arguments: { search: "Velomoor", replace: "Karman", path: "Lore" },
+      },
+    ]);
+
+    expect(result.failure?.kind).toBe("no-match");
+    expect(result.content).toContain('were found in "Lore"');
   });
 
   it("resolveOne binds the op to the supplied tool-call id (Claude Code path)", async () => {

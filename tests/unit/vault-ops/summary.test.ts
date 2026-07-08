@@ -3,6 +3,7 @@ import {
   formatBytes,
   summarizeOp,
   gateBadgeLabel,
+  opDetailLine,
   opPrimaryPath,
   commonAncestorDir,
   describeOpInHierarchy,
@@ -11,6 +12,38 @@ import {
 import type { VaultOperation } from "../../../src/vault-ops/types";
 
 const FP = { mtime: 1, size: 2 };
+
+describe("opDetailLine", () => {
+  it("returns the folder path for a createDir (the review's step detail)", () => {
+    const op: VaultOperation = { kind: "createDir", path: "Characters/Minor" };
+    expect(opDetailLine(op)).toBe("Characters/Minor");
+  });
+
+  it("returns the target path for create / overwrite / trash", () => {
+    expect(opDetailLine({ kind: "create", path: "A.md", content: "x" })).toBe("A.md");
+    expect(opDetailLine({ kind: "overwrite", path: "B.md", content: "x", expect: FP })).toBe("B.md");
+    expect(opDetailLine({ kind: "trash", path: "C.md", expect: FP, snapshot: "x" })).toBe("C.md");
+    expect(opDetailLine({ kind: "trashFolder", path: "Old" })).toBe("Old");
+  });
+
+  it("returns from → to for moves", () => {
+    expect(opDetailLine({ kind: "move", from: "A.md", to: "B.md", expect: FP })).toBe("A.md → B.md");
+    expect(opDetailLine({ kind: "moveFolder", from: "X", to: "Y" })).toBe("X → Y");
+  });
+
+  it("returns the search → replace pair for a vault-wide replace", () => {
+    const op: VaultOperation = {
+      kind: "replaceInVault",
+      search: "old",
+      replace: "new",
+      caseSensitive: false,
+      wholeWord: false,
+      targets: [],
+      occurrences: 0,
+    };
+    expect(opDetailLine(op)).toBe('"old" → "new"');
+  });
+});
 
 describe("formatBytes", () => {
   it("formats small sizes in bytes", () => {

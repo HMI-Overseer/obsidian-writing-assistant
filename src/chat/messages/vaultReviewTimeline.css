@@ -111,6 +111,87 @@
     color: var(--text-error);
   }
 
+  /* ── Content preview: write_file diff, nested under the step (F1) ── */
+
+  /* Full-width so it wraps onto its own line below the row, staying right of the
+     timeline's connecting line (parity with the edit channel's .lmsa-edit-timeline-hunk).
+     The diff body is height-capped and scrolls internally, so a large create/overwrite
+     stays a compact, reviewable window rather than pushing the transcript down. */
+  .lmsa-vault-timeline-preview {
+    flex-basis: 100%;
+    width: 100%;
+    margin-top: 6px;
+  }
+
+  .lmsa-vault-timeline-preview .lmsa-chat-window-diff-hunk-body {
+    max-height: 260px;
+    overflow-y: auto;
+  }
+
+  /* Declined / cancelled: dim the preview so it reads as inactive, like the edit diff. */
+  .lmsa-agentic-timeline-step.is-vault-rejected .lmsa-vault-timeline-preview,
+  .lmsa-agentic-timeline-step.is-vault-cancelled .lmsa-vault-timeline-preview {
+    opacity: 0.6;
+  }
+
+  /* ── Affected-file list: replace_in_vault blast radius, collapsed (F2) ── */
+
+  /* Wraps onto its own line below the step row, like the write preview. Collapsed by
+     default (a <details>); expand to see which notes the replace rewrites. */
+  .lmsa-vault-replace-files {
+    flex-basis: 100%;
+    width: 100%;
+    margin-top: 6px;
+    font-size: var(--font-ui-smaller);
+  }
+
+  .lmsa-vault-replace-files-summary {
+    @apply lmsa-cursor-pointer;
+    color: var(--text-muted);
+    list-style: none;
+    user-select: none;
+  }
+
+  .lmsa-vault-replace-files-summary:hover {
+    color: var(--text-normal);
+  }
+
+  /* Hide the default disclosure triangle marker (both engines). */
+  .lmsa-vault-replace-files-summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .lmsa-vault-replace-files-summary::marker {
+    content: "";
+  }
+
+  .lmsa-vault-replace-files-list {
+    @apply lmsa-flex lmsa-flex-col;
+    margin-top: 4px;
+    padding-left: 6px;
+    max-height: 200px;
+    overflow-y: auto;
+  }
+
+  .lmsa-vault-replace-file {
+    @apply lmsa-flex lmsa-items-baseline lmsa-justify-between lmsa-gap-2;
+    padding: 1px 0;
+  }
+
+  .lmsa-vault-replace-file-path {
+    @apply lmsa-cursor-pointer lmsa-truncate;
+    color: var(--text-accent);
+  }
+
+  .lmsa-vault-replace-file-path:hover {
+    text-decoration: underline;
+  }
+
+  .lmsa-vault-replace-file-count {
+    color: var(--text-faint);
+    white-space: nowrap;
+  }
+
   /* ── Turn-level footer (outside the collapsible list, stays visible) ── */
 
   .lmsa-vault-review-footer {

@@ -123,8 +123,8 @@ describe("toVaultOperations", () => {
   describe("replace_in_vault", () => {
     const scan = {
       targets: [
-        { path: "Lore/A.md", content: "new A", expect: { mtime: 1, size: 5 } },
-        { path: "Lore/B.md", content: "new B", expect: { mtime: 2, size: 5 } },
+        { path: "Lore/A.md", content: "new A", expect: { mtime: 1, size: 5 }, count: 2 },
+        { path: "Lore/B.md", content: "new B", expect: { mtime: 2, size: 5 }, count: 1 },
       ],
       occurrences: 3,
     };

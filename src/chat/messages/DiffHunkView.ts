@@ -41,6 +41,15 @@ export class DiffHunkView {
    * on the tool-call step itself, leaving this card as the pure diff display.
    */
   private readonly showReviewControls: boolean;
+  /**
+   * Whether the card header (location, filename link, confidence, mode toggle) renders.
+   * The vault-op write preview turns it off: its step row already names the file, its
+   * confidence tiers ("Exact match") are meaningless for a whole-file write, its target
+   * may not exist yet (a create), and the preview is built once and kept across
+   * re-paints, so a per-card mode toggle would not stay wired. Left with just the diff
+   * body, side-by-side and stateless.
+   */
+  private readonly showHeader: boolean;
 
   constructor(
     parent: HTMLElement,
@@ -48,10 +57,11 @@ export class DiffHunkView {
     private readonly callbacks: DiffHunkCallbacks,
     private readonly meta: DiffHunkMeta,
     initialMode: DiffMode = "split",
-    opts: { showReviewControls?: boolean } = {}
+    opts: { showReviewControls?: boolean; showHeader?: boolean } = {}
   ) {
     this.diffMode = initialMode;
     this.showReviewControls = opts.showReviewControls ?? true;
+    this.showHeader = opts.showHeader ?? true;
     this.containerEl = parent.createDiv({ cls: "lmsa-chat-window-diff-hunk" });
     this.containerEl.dataset.status = hunk.status;
     this.containerEl.dataset.hunkId = hunk.id;
@@ -140,6 +150,14 @@ export class DiffHunkView {
     acceptBtn: HTMLButtonElement | null;
     rejectBtn: HTMLButtonElement | null;
   } {
+    // Headerless (vault-op write preview): no chrome, just the diff body below. The
+    // status/actions fields still need a value for the (unused here) lifecycle setters,
+    // so hand back a detached placeholder rather than null.
+    if (!this.showHeader) {
+      const placeholder = this.containerEl.ownerDocument.createElement("div");
+      return { statusEl: placeholder, actionsEl: placeholder, acceptBtn: null, rejectBtn: null };
+    }
+
     const headerEl = this.containerEl.createDiv({ cls: "lmsa-chat-window-diff-hunk-header" });
 
     const metaEl = headerEl.createDiv({ cls: "lmsa-chat-window-diff-hunk-meta" });

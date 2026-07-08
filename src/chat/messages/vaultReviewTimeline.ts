@@ -1,4 +1,4 @@
-import { type App, Notice, setIcon } from "obsidian";
+import { type App, Keymap, Notice, normalizePath, setIcon } from "obsidian";
 import type {
   AppliedVaultOpRecord,
   ReviewableVaultOp,
@@ -7,7 +7,10 @@ import type {
   VaultOpStatus,
 } from "../../vault-ops/types";
 import { applyVaultOpBatch, undoVaultOpBatch } from "../../vault-ops/applyBatch";
-import { opPrimaryPath } from "../../vault-ops/summary";
+import { opDetailLine, opPrimaryPath } from "../../vault-ops/summary";
+import { buildWritePreviewHunk } from "../../vault-ops/writePreview";
+import { TOOL_LABELS, pendingToolLabel } from "../../tools/metadata";
+import { DiffHunkView } from "./DiffHunkView";
 
 /** Icon per op kind, for synthetic fallback rows (matched steps keep their own). */
 const OP_KIND_ICONS: Record<VaultOperation["kind"], string> = {
@@ -250,11 +253,191 @@ export class VaultReviewTimelineView {
     // This step is reviewed, so the overlay owns its state label, drop the base
     // "Failed" word the timeline may have added (it paints first on a history re-render).
     bodyEl.querySelector(":scope > .lmsa-agentic-timeline-step-failed")?.remove();
+    this.relabelStep(bodyEl, stepEl, op);
     const controls = bodyEl.createDiv({ cls: "lmsa-vault-step-controls" });
     // A tool-call step with args carries a row-level click-to-expand handler;
     // approving/declining must not also toggle that, so stop clicks here.
     controls.addEventListener("click", (e) => e.stopPropagation());
     this.renderControls(controls, op, historical);
+    // Content preview (write_file only): the diff of what will be written, always
+    // visible under the step, so the user reviews the change before approving (F1).
+    this.ensurePreview(bodyEl, op);
+    // Affected-file list (replace_in_vault only): which notes the vault-wide replace
+    // rewrites, so its blast radius is reviewable, not just an "N notes" count (F2).
+    this.ensureReplaceList(bodyEl, op);
+  }
+
+  /**
+   * Keep the step's name and detail correct while the review owns it. Synthetic fallback
+   * rows already show the op summary + path, so they are left alone.
+   *
+   * Name (F4): the base timeline labels a step with the past-tense {@link TOOL_LABELS}
+   * ("Wrote file"), which reads as done next to a still-pending approve/decline. Use the
+   * present-tense {@link pendingToolLabel} ("Write file") until the op is applied, then
+   * flip to past tense.
+   *
+   * Detail: the target path a reviewer needs ("Create folder" → *which* folder). The
+   * Claude Code path records the real detail only once the tool returns, i.e. after
+   * approval, so a pending step still shows the streaming "…" placeholder. Fill it from
+   * the op so the path is visible at decision time. The plugin loop already sets the
+   * same text, so this is idempotent there.
+   */
+  private relabelStep(bodyEl: HTMLElement, stepEl: HTMLElement, op: ReviewableVaultOp): void {
+    if (stepEl.closest(".lmsa-vault-review-fallback")) return;
+    const nameEl = bodyEl.querySelector<HTMLElement>(
+      ":scope > .lmsa-agentic-timeline-step-name",
+    );
+    const toolName = TOOL_NAME_BY_KIND[op.op.kind];
+    if (nameEl) {
+      nameEl.textContent =
+        op.status === "applied" ? TOOL_LABELS[toolName] ?? toolName : pendingToolLabel(toolName);
+    }
+
+    let detailEl = bodyEl.querySelector<HTMLElement>(
+      ":scope > .lmsa-agentic-timeline-step-detail",
+    );
+    if (!detailEl) {
+      detailEl = bodyEl.createSpan({ cls: "lmsa-agentic-timeline-step-detail" });
+      if (nameEl) bodyEl.insertBefore(detailEl, nameEl.nextSibling);
+    }
+    detailEl.textContent = opDetailLine(op.op);
+  }
+
+  /**
+   * Mount the write_file content preview under a `create` / `overwrite` step (F1),
+   * mirroring the edit channel's always-visible diff. Built once and kept: its content
+   * is fixed, and an overwrite's "before" is captured the first time (pre-apply), so a
+   * later re-paint (or the op applying) never re-reads the file and shows an empty diff.
+   * Non-write ops render nothing here; their whole change is the path in the step detail.
+   */
+  private ensurePreview(bodyEl: HTMLElement, op: ReviewableVaultOp): void {
+    if (op.op.kind !== "create" && op.op.kind !== "overwrite") return;
+
+    const existing = bodyEl.querySelector<HTMLElement>(
+      ":scope > .lmsa-vault-timeline-preview",
+    );
+    const container =
+      existing ?? bodyEl.createDiv({ cls: "lmsa-vault-timeline-preview" });
+    // Clicks inside the diff must not toggle the step's raw-args expand.
+    if (!existing) container.addEventListener("click", (e) => e.stopPropagation());
+    // Keep the preview last so re-created controls sit above it.
+    bodyEl.appendChild(container);
+    if (existing) return;
+
+    const writeOp = op.op;
+    if (writeOp.kind === "create") {
+      this.renderPreviewDiff(container, null, writeOp.content, op.id);
+      return;
+    }
+
+    // Overwrite: prefer the applied record's inverse (the captured pre-apply content,
+    // also correct after the op applied); otherwise read the file, which still holds the
+    // old content while the op is pending review.
+    const recorded = this.overwriteBefore(op);
+    if (recorded !== null) {
+      this.renderPreviewDiff(container, recorded, writeOp.content, op.id);
+      return;
+    }
+    const file = this.opts.app.vault.getFileByPath(normalizePath(writeOp.path));
+    if (!file) {
+      container.remove(); // nothing to diff against; the step detail still names the file
+      return;
+    }
+    void this.opts.app.vault.read(file).then(
+      (before) => {
+        if (!container.isConnected) return;
+        // If the op applied while the read was in flight, the inverse holds the true
+        // pre-apply content; otherwise the just-read disk content is the "before".
+        this.renderPreviewDiff(container, this.overwriteBefore(op) ?? before, writeOp.content, op.id);
+      },
+      () => container.remove(),
+    );
+  }
+
+  /** Render the write preview's diff into its container (idempotent). */
+  private renderPreviewDiff(
+    container: HTMLElement,
+    before: string | null,
+    next: string,
+    id: string,
+  ): void {
+    container.empty();
+    const hunk = buildWritePreviewHunk(before, next, id);
+    new DiffHunkView(
+      container,
+      hunk,
+      {
+        onAccept: () => undefined,
+        onReject: () => undefined,
+        onUndo: () => undefined,
+        onModeChange: () => undefined,
+        onOpenFile: () => undefined,
+      },
+      { fileName: "" },
+      "split",
+      { showReviewControls: false, showHeader: false },
+    );
+  }
+
+  /**
+   * The pre-apply content of an applied overwrite, from its undo record: the inverse of
+   * an `overwrite` is itself an `overwrite` carrying the old content (ADR-0005). Null
+   * when the op is not yet applied or has no such inverse.
+   */
+  private overwriteBefore(op: ReviewableVaultOp): string | null {
+    const inverse = this.appliedRecord?.applied.find((a) => a.opId === op.id)?.inverse;
+    return inverse && inverse.kind === "overwrite" ? inverse.content : null;
+  }
+
+  /**
+   * Mount the affected-file list under a `replace_in_vault` step (F2). A vault-wide
+   * replace is the broadest-blast-radius op, yet the step shows only `"X" → "Y"` and an
+   * "N notes" count. This adds the one fact that hides: *which* notes change, as a
+   * collapsed disclosure of internal links + per-file match count (per-file diffs are
+   * waived as clutter, matching how editors surface a bulk replace). Built once and kept.
+   */
+  private ensureReplaceList(bodyEl: HTMLElement, op: ReviewableVaultOp): void {
+    if (op.op.kind !== "replaceInVault") return;
+    const existing = bodyEl.querySelector<HTMLElement>(
+      ":scope > .lmsa-vault-replace-files",
+    );
+    const details = existing ?? this.buildReplaceList(bodyEl, op.op);
+    // Keep it last so re-created controls sit above it.
+    bodyEl.appendChild(details);
+  }
+
+  private buildReplaceList(
+    bodyEl: HTMLElement,
+    op: Extract<VaultOperation, { kind: "replaceInVault" }>,
+  ): HTMLElement {
+    const details = bodyEl.createEl("details", { cls: "lmsa-vault-replace-files" });
+    // Clicks (toggle, link) must not also toggle the step's raw-args expand.
+    details.addEventListener("click", (e) => e.stopPropagation());
+    const count = op.targets.length;
+    details.createEl("summary", {
+      cls: "lmsa-vault-replace-files-summary",
+      text: `${count} note${count === 1 ? "" : "s"} affected`,
+    });
+    const list = details.createDiv({ cls: "lmsa-vault-replace-files-list" });
+    for (const target of op.targets) {
+      const row = list.createDiv({ cls: "lmsa-vault-replace-file" });
+      const link = row.createEl("a", {
+        cls: "lmsa-vault-replace-file-path internal-link",
+        text: target.path,
+        attr: { href: "#", "aria-label": `Open ${target.path}` },
+      });
+      link.addEventListener("click", (evt) => {
+        evt.preventDefault();
+        void this.opts.app.workspace.openLinkText(target.path, "", Keymap.isModEvent(evt));
+      });
+      if (typeof target.count === "number") {
+        row.createSpan({
+          cls: "lmsa-vault-replace-file-count",
+          text: `${target.count} match${target.count === 1 ? "" : "es"}`,
+        });
+      }
+    }
+    return details;
   }
 
   private renderControls(

@@ -66,6 +66,8 @@ export const UPDATE_FRONTMATTER_TOOL: CanonicalToolDefinition = {
     "Add, update, or remove YAML frontmatter properties of a note. Always pass `path`, the " +
     "vault-relative path of the note to change. Put ALL changes into one call. " +
     "Each operation must use action 'set' or 'remove'. Skip properties you want to leave as-is. " +
+    "For a multi-value property such as tags or aliases, pass `value` as an array of strings; " +
+    "it is written as a real YAML list. " +
     "If the document has no frontmatter, a new block will be created.",
   strategyHint:
     "add, update, or remove YAML frontmatter properties of a specific note (`path`). Batch all changes into a single call.",
@@ -91,8 +93,16 @@ export const UPDATE_FRONTMATTER_TOOL: CanonicalToolDefinition = {
               description: "The frontmatter property name.",
             },
             value: {
-              type: "string",
-              description: "New value for the property. Required when action is 'set'.",
+              anyOf: [
+                { type: "string" },
+                { type: "array", items: { type: "string" } },
+              ],
+              description:
+                "New value for the property. Required when action is 'set'. " +
+                "Pass a string for a single-value property (e.g. status: \"complete\"). " +
+                "Pass an ARRAY of strings for a multi-value / list property such as tags " +
+                "or aliases (e.g. [\"worldbuilding\", \"lore\"]); each item becomes its own " +
+                "YAML list entry. Do not encode a list as a comma-joined string.",
             },
             action: {
               type: "string",

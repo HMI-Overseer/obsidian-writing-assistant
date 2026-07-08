@@ -65,6 +65,26 @@ describe("jsonSchemaToZodShape", () => {
     expect(shape.paths.safeParse([1]).success).toBe(false);
   });
 
+  it("accepts either alternative of an anyOf union (string or array of strings)", () => {
+    const shape = shapeFor({
+      type: "object",
+      properties: {
+        value: {
+          anyOf: [
+            { type: "string" },
+            { type: "array", items: { type: "string" } },
+          ],
+        },
+      },
+      required: ["value"],
+    });
+
+    expect(shape.value.safeParse("scalar").success).toBe(true);
+    expect(shape.value.safeParse(["a", "b"]).success).toBe(true);
+    expect(shape.value.safeParse([1, 2]).success).toBe(false);
+    expect(shape.value.safeParse(42).success).toBe(false);
+  });
+
   it("validates nested arrays of objects with their own required fields", () => {
     const shape = shapeFor({
       type: "object",

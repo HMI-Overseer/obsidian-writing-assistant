@@ -36,7 +36,8 @@ export interface ProposeEditArgs {
 
 export interface FrontmatterOperation {
   key: string;
-  value?: string;
+  /** A scalar string, or an array of strings for a multi-value / list property. */
+  value?: string | string[];
   action: "set" | "remove";
 }
 
@@ -84,6 +85,20 @@ export function validateProposeEdit(
   });
 }
 
+/**
+ * Coerce a frontmatter `value` argument to the supported shapes: a scalar string,
+ * or an array of strings (a multi-value / list property such as tags). Anything
+ * else, including an array with non-string items, becomes `undefined` so the
+ * validator can reject a `set` that carried an unusable value.
+ */
+function normalizeFrontmatterValue(value: unknown): string | string[] | undefined {
+  if (typeof value === "string") return value;
+  if (Array.isArray(value) && value.every((item) => typeof item === "string")) {
+    return value as string[];
+  }
+  return undefined;
+}
+
 export function validateUpdateFrontmatter(
   args: Record<string, unknown>,
 ): ValidationResult<UpdateFrontmatterArgs> {
@@ -112,12 +127,16 @@ export function validateUpdateFrontmatter(
     if (op.action !== "set" && op.action !== "remove") {
       return err(`operations[${i}].action must be "set" or "remove". Got: ${JSON.stringify(op.action)}`);
     }
-    if (op.action === "set" && op.value !== undefined && typeof op.value !== "string") {
-      return err(`operations[${i}].value must be a string when action is "set". Got: ${typeof op.value}`);
+    const value = normalizeFrontmatterValue(op.value);
+    if (op.action === "set" && op.value !== undefined && value === undefined) {
+      return err(
+        `operations[${i}].value must be a string or an array of strings when action is "set". ` +
+          `Got: ${Array.isArray(op.value) ? "array with non-string items" : typeof op.value}`,
+      );
     }
     validated.push({
       key: op.key,
-      value: typeof op.value === "string" ? op.value : undefined,
+      value,
       action: op.action,
     });
   }

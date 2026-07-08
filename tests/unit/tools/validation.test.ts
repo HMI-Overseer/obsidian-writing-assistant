@@ -125,4 +125,35 @@ describe("validateUpdateFrontmatter", () => {
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error).toContain("must be a string");
   });
+
+  test("accepts an array-of-strings value for a multi-value property", () => {
+    const result = validateUpdateFrontmatter({
+      operations: [{ key: "tags", value: ["worldbuilding", "lore"], action: "set" }],
+    });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.args.operations[0].value).toEqual(["worldbuilding", "lore"]);
+    }
+  });
+
+  test("rejects an array value that contains non-string items", () => {
+    const result = validateUpdateFrontmatter({
+      operations: [{ key: "tags", value: ["ok", 3], action: "set" }],
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toContain("array of strings");
+  });
+
+  test("auto-wraps a flat key/action/array-value into an operations array", () => {
+    const result = validateUpdateFrontmatter({
+      key: "aliases",
+      value: ["Alt", "Other"],
+      action: "set",
+    });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.args.operations).toHaveLength(1);
+      expect(result.args.operations[0].value).toEqual(["Alt", "Other"]);
+    }
+  });
 });

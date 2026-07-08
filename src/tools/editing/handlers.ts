@@ -379,9 +379,7 @@ async function resolveUpdateFrontmatter(
     const setOps = operations.filter((op) => op.action === "set");
     if (setOps.length === 0) return block;
 
-    const newInner = setOps.map((op) =>
-      op.value ? `${op.key}: ${yamlSafeValue(op.value)}` : `${op.key}:`
-    );
+    const newInner = setOps.flatMap((op) => renderFrontmatterEntry(op.key, op.value));
     const fmBlock = "---\n" + newInner.join("\n") + "\n---";
 
     // Anchor on the first line to insert before it.
@@ -416,6 +414,22 @@ function yamlSafeValue(value: string): string {
 }
 
 /**
+ * Render one `set` operation as YAML frontmatter line(s). A string value becomes a
+ * single `key: value` scalar line; an array value becomes a block list so a
+ * multi-value property (tags, aliases) is written as a real YAML list rather than a
+ * single quoted scalar, which Obsidian would otherwise read as one literal tag. An
+ * empty array is written as an empty flow list (`key: []`); an empty/omitted value
+ * yields a bare `key:`.
+ */
+function renderFrontmatterEntry(key: string, value: string | string[] | undefined): string[] {
+  if (Array.isArray(value)) {
+    if (value.length === 0) return [`${key}: []`];
+    return [`${key}:`, ...value.map((item) => `  - ${yamlSafeValue(item)}`)];
+  }
+  return value ? [`${key}: ${yamlSafeValue(value)}`] : [`${key}:`];
+}
+
+/**
  * Apply frontmatter operations to raw YAML lines, preserving complex
  * values (lists, nested objects, multi-line strings) for keys that
  * are not being modified.
@@ -439,8 +453,11 @@ function applyFrontmatterOperations(
   for (let i = 0; i < result.length; i++) {
     const line = result[i];
     // Top-level key: starts at column 0, has a colon not inside a quote.
+    // A column-0 block-list item ("- item" or "- a: b") is a continuation of the
+    // preceding key's value, not a key of its own, even when it contains a colon.
     const colonIdx = line.indexOf(":");
-    if (colonIdx > 0 && !line.startsWith(" ") && !line.startsWith("\t")) {
+    const isListItem = /^-(\s|$)/.test(line);
+    if (colonIdx > 0 && !line.startsWith(" ") && !line.startsWith("\t") && !isListItem) {
       const key = line.slice(0, colonIdx).trim();
       if (key) {
         keyRanges.push({ key, start: i, end: i + 1 });
@@ -470,17 +487,16 @@ function applyFrontmatterOperations(
     if (op.action === "remove") {
       result.splice(start, end - start);
     } else if (op.action === "set") {
-      // Replace the entire key block with a simple key: value line.
-      const newLine = op.value ? `${key}: ${yamlSafeValue(op.value)}` : `${key}:`;
-      result.splice(start, end - start, newLine);
+      // Replace the entire key block with the rendered entry (a scalar line, or a
+      // multi-line block list when the value is an array).
+      result.splice(start, end - start, ...renderFrontmatterEntry(key, op.value));
     }
   }
 
   // Append any "set" operations for keys not already in the frontmatter.
   for (const op of operations) {
     if (op.action === "set" && !keysProcessed.has(op.key)) {
-      const newLine = op.value ? `${op.key}: ${yamlSafeValue(op.value)}` : `${op.key}:`;
-      result.push(newLine);
+      result.push(...renderFrontmatterEntry(op.key, op.value));
     }
   }
 

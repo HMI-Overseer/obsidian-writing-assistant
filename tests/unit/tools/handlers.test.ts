@@ -158,6 +158,119 @@ describe("resolveStructuralEditBlocks", () => {
     expect(resolved[0].replaceText).toContain("title: My Note");
     expect(resolved[0].replaceText).toContain("# My Note");
   });
+
+  test("writes an array value as a real YAML block list, not a quoted scalar", async () => {
+    const content = "---\ntitle: The Fold\ntags: draft\n---\n# Content";
+    const app = mockApp({
+      fileContent: content,
+      hasFrontmatter: true,
+      frontmatterLines: [0, 3],
+    });
+
+    const blocks: EditBlock[] = [
+      {
+        id: "1",
+        searchText: "",
+        replaceText: "",
+        rawBlock: "[tc:1]",
+        toolName: "update_frontmatter",
+        toolArgs: {
+          operations: [
+            { key: "tags", value: ["worldbuilding", "lore", "fold"], action: "set" },
+          ],
+        },
+      },
+    ];
+
+    const resolved = await resolveStructuralEditBlocks(blocks, { app, filePath: CTX_PATH });
+
+    const replaced = resolved[0].replaceText ?? "";
+    // One item per line as a YAML list, never a single `tags: "a, b, c"` scalar.
+    expect(replaced).toContain("tags:\n  - worldbuilding\n  - lore\n  - fold");
+    expect(replaced).not.toContain('tags: "');
+    // Untouched keys are preserved.
+    expect(replaced).toContain("title: The Fold");
+  });
+
+  test("creates new frontmatter with an array value as a YAML list", async () => {
+    const content = "# My Note\n\nSome content.";
+    const app = mockApp({ fileContent: content });
+
+    const blocks: EditBlock[] = [
+      {
+        id: "1",
+        searchText: "",
+        replaceText: "",
+        rawBlock: "[tc:1]",
+        toolName: "update_frontmatter",
+        toolArgs: {
+          operations: [{ key: "aliases", value: ["Alt", "Other"], action: "set" }],
+        },
+      },
+    ];
+
+    const resolved = await resolveStructuralEditBlocks(blocks, { app, filePath: CTX_PATH });
+
+    expect(resolved[0].replaceText).toContain("aliases:\n  - Alt\n  - Other");
+  });
+
+  test("writes an empty array value as an empty YAML list", async () => {
+    const content = "---\ntags: draft\n---\n# Content";
+    const app = mockApp({
+      fileContent: content,
+      hasFrontmatter: true,
+      frontmatterLines: [0, 2],
+    });
+
+    const blocks: EditBlock[] = [
+      {
+        id: "1",
+        searchText: "",
+        replaceText: "",
+        rawBlock: "[tc:1]",
+        toolName: "update_frontmatter",
+        toolArgs: {
+          operations: [{ key: "tags", value: [], action: "set" }],
+        },
+      },
+    ];
+
+    const resolved = await resolveStructuralEditBlocks(blocks, { app, filePath: CTX_PATH });
+
+    expect(resolved[0].replaceText).toContain("tags: []");
+  });
+
+  test("removes a column-0 list whose items contain colons together with its key", async () => {
+    // "- note: A" at column 0 is a list item, not a top-level key, even though it
+    // contains a colon. Removing `related` must take its whole list block with it.
+    const content = "---\nrelated:\n- note: A\n- note: B\nstatus: wip\n---\n# Content";
+    const app = mockApp({
+      fileContent: content,
+      hasFrontmatter: true,
+      frontmatterLines: [0, 5],
+    });
+
+    const blocks: EditBlock[] = [
+      {
+        id: "1",
+        searchText: "",
+        replaceText: "",
+        rawBlock: "[tc:1]",
+        toolName: "update_frontmatter",
+        toolArgs: {
+          operations: [{ key: "related", action: "remove" }],
+        },
+      },
+    ];
+
+    const resolved = await resolveStructuralEditBlocks(blocks, { app, filePath: CTX_PATH });
+
+    const replaced = resolved[0].replaceText ?? "";
+    expect(replaced).not.toContain("related:");
+    expect(replaced).not.toContain("- note: A");
+    expect(replaced).not.toContain("- note: B");
+    expect(replaced).toContain("status: wip");
+  });
 });
 
 // ---------------------------------------------------------------------------

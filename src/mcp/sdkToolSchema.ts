@@ -44,6 +44,12 @@ function propertyToZod(property: JsonSchemaProperty): ZodTypeAny {
 }
 
 function baseSchema(property: JsonSchemaProperty): ZodTypeAny {
+  if (property.anyOf && property.anyOf.length > 0) {
+    const variants = property.anyOf.map((sub) => propertyToZod(sub));
+    return variants.length === 1
+      ? variants[0]
+      : z.union(variants as [ZodTypeAny, ZodTypeAny, ...ZodTypeAny[]]);
+  }
   switch (property.type) {
     case "string":
       return property.enum && property.enum.length > 0

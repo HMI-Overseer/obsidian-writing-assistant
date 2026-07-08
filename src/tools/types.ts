@@ -2,12 +2,19 @@ import type { VaultOpDisposition } from "../vault-ops/disposition";
 
 /** JSON Schema subset for tool parameter definitions. */
 export interface JsonSchemaProperty {
-  type: "string" | "number" | "boolean" | "array" | "object";
+  /** Omitted only when {@link anyOf} carries the type alternatives instead. */
+  type?: "string" | "number" | "boolean" | "array" | "object";
   description?: string;
   items?: JsonSchemaProperty;
   properties?: Record<string, JsonSchemaProperty>;
   required?: string[];
   enum?: string[];
+  /**
+   * Type alternatives for a value that may take more than one shape (e.g. a
+   * frontmatter value that is either a scalar string or an array of strings).
+   * When present, `type` is omitted and each alternative is a full sub-schema.
+   */
+  anyOf?: JsonSchemaProperty[];
 }
 
 /**

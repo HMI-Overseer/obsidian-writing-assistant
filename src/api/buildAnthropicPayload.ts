@@ -27,7 +27,7 @@ const CONVERSATION_BREAKPOINT_BLOCK_STRIDE = 15;
  * Model-id prefixes whose models still accept the `temperature` / `top_p` / `top_k`
  * sampling params. Opus 4.7+, Fable 5, and Mythos REMOVED these and return HTTP 400 if
  * any is sent; Opus 4.6 and earlier, plus the Sonnet 4.x and Haiku 4.x families, still
- * accept them. Verified against docs/reference/external/anthropic-api.md and the bundled
+ * accept them. Verified against docs/02-architecture/external/anthropic-api.md and the bundled
  * claude-api reference (the sampling-removal set is Opus 4.7+, not 4.6).
  *
  * The gate is an allowlist on purpose: emit sampling only for a model known to accept
@@ -56,7 +56,7 @@ export function anthropicModelSupportsSampling(modelId: string): boolean {
  * plus the `output_config.effort` control. Adaptive is the only on-mode on the current
  * generation; the legacy `thinking: {type:"enabled", budget_tokens:N}` 400s on Opus 4.7+/
  * Fable and is deprecated elsewhere. The effort levels this maps to (low/medium/high) are
- * valid on every model in this set. Verified against docs/reference/external/anthropic-api.md
+ * valid on every model in this set. Verified against docs/02-architecture/external/anthropic-api.md
  * and the bundled claude-api reference.
  *
  * Like the sampling gate, this is an allowlist: emit a thinking field only for a model known

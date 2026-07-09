@@ -342,7 +342,7 @@ function mapOpenAIStopReason(raw: string | undefined): StopReason {
  * Turns LM Studio's generic jinja-template render error into an actionable one
  * when the request carried tools. Empirically pinned by a live payload bisect
  * (gemma4 fine-tune, 2026-07-06, recorded in
- * docs/reference/external/lmstudio-api.md): a bare chat request renders fine,
+ * docs/02-architecture/external/lmstudio-api.md): a bare chat request renders fine,
  * adding a single `tools` entry 400s with "Cannot call something that is not a
  * function: got UndefinedValue". Some models advertise
  * `trained_for_tool_use: true` while their (often fine-tuned) chat template's

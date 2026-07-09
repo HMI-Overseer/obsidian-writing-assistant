@@ -150,7 +150,7 @@ Plugin data is stored via Obsidian's `loadData()` / `saveData()` API. `main.ts` 
 
 ## Decision records (ADRs)
 
-Architectural decisions are recorded as ADRs in `docs/reference/adr/`. When you make a decision with lasting structural impact, add a numbered ADR there and reference it as `ADR-NNNN` from code and docs. Existing records cover the second write-proposal channel, the annotation-driven approval gateway, the single write-file tool, trash-only deletion, and the unified dependency-ordered apply plan. See `docs/reference/adr/README.md` for the convention.
+Architectural decisions are recorded as ADRs in `docs/03-decisions/`. When you make a decision with lasting structural impact, add a numbered ADR there and reference it as `ADR-NNNN` from code and docs. Existing records cover the second write-proposal channel, the annotation-driven approval gateway, the single write-file tool, trash-only deletion, and the unified dependency-ordered apply plan. See `docs/03-decisions/README.md` for the convention.
 
 ---
 

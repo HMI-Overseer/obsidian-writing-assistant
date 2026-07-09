@@ -99,7 +99,7 @@ describe("buildAnthropicMessages", () => {
   });
 
   // The 1-hour extended cache TTL is applied via `ttl: "1h"` on the cache_control block
-  // (verified against the claude-api skill + docs/reference/external/anthropic-api.md).
+  // (verified against the claude-api skill + docs/02-architecture/external/anthropic-api.md).
   // Previously the block hardcoded `{ type: "ephemeral" }` with no ttl, so a user who
   // selected the 1h cache paid the 2x write premium intent but never got the longer TTL.
   test("with cache enabled + 1h TTL emits ttl on the cache_control block", () => {
@@ -329,7 +329,7 @@ describe("buildAnthropicHeaders", () => {
   });
 
   // The 1-hour extended cache TTL is GA and needs NO beta header (verified against the
-  // claude-api skill + docs/reference/external/anthropic-api.md). The legacy
+  // claude-api skill + docs/02-architecture/external/anthropic-api.md). The legacy
   // prompt-caching-2024-07-31 header must never be sent, the TTL rides on the
   // cache_control block instead (see the buildAnthropicMessages tests above), so the
   // headers no longer depend on cache settings at all.
@@ -481,7 +481,7 @@ describe("buildAnthropicPayload sampling-param gate (by model family)", () => {
 
   // Opus 4.7+, Fable 5, and Mythos REMOVED these params and return HTTP 400 if they
   // are sent. Verified: claude-api reference (Thinking & Effort / error-codes) and
-  // docs/reference/external/anthropic-api.md.
+  // docs/02-architecture/external/anthropic-api.md.
   test.each([
     "claude-opus-4-8",
     "claude-opus-4-7",

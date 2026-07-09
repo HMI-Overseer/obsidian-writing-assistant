@@ -183,7 +183,7 @@ describe("Layer 2 progressive-disclosure core (ADR-0009 / section 6.2.5)", () =>
   // Layer 2 exists to shrink. Crossing this guard should force the section 6.2.5 "does this
   // primitive earn a non-deferred slot" conversation (the get_outline / read_section
   // watch-item), not a silent bump.
-  // See docs/reference/adr/0009-layer-2-progressive-disclosure-deferred.md.
+  // See docs/03-decisions/ADR-0009-layer-2-progressive-disclosure-deferred.md.
   const NON_DEFERRED_CORE_MAX = 8;
 
   it("keeps the core read set to the six section 6.2.5 primitives", () => {

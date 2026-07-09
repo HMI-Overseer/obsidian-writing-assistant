@@ -44,7 +44,7 @@ describe("display-metadata coverage", () => {
   // MUTATING_TOOL_NAMES, the four display maps below are hand-maintained, so a new
   // tool must be added to each by hand. These drift guards fail loudly when it isn't
   // (the gap that left move_folder / trash_folder showing a raw tool name and the
-  // generic wrench icon; docs/review 2026-07-08-edit-tool-review-display F3).
+  // generic wrench icon; docs/review/reviews 2026-07-08-edit-tool-review-display F3).
   const ALL_TOOL_NAMES = [
     ...VAULT_OPS_TOOL_NAMES,
     ...EDIT_TOOL_NAMES,

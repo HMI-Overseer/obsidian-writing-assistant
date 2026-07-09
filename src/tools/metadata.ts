@@ -67,7 +67,7 @@ export const TOOL_LABELS: Record<string, string> = {
 /**
  * Present-tense label for a mutating step *while it is still awaiting approval*, so a
  * pending row reads as a proposal ("Write file") rather than asserting the action
- * already happened ("Wrote file") next to its approve/decline (docs/review
+ * already happened ("Wrote file") next to its approve/decline (docs/review/reviews
  * 2026-07-08-edit-tool-review-display F4). Only the vault-op tools need this: the base
  * timeline uses it for the pending placeholder, and {@link ../chat/messages/vaultReviewTimeline}
  * flips back to the past-tense {@link TOOL_LABELS} once the op is applied. Tools with no

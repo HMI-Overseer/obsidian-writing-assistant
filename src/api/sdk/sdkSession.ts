@@ -26,7 +26,7 @@ import type { ModelInfo, Options, Query, SDKMessage, SDKUserMessage } from "./cl
  * One long-lived SDK `query()` per conversation, driven in streaming-input mode so
  * the `claude` process stays alive between turns, retains context in memory, and
  * caches incrementally (the win one-shot processes can't give,
- * `docs/reference/architecture/claude-code-provider.md`). Session persistence to
+ * `docs/02-architecture/components/claude-code-provider.md`). Session persistence to
  * disk is on (the SDK default; the earlier zero-footprint Model B forced it off), so
  * when the live process is gone (idle eviction, Obsidian restart, plugin reload) the
  * registry can `resume` the session from `~/.claude` before falling back to a

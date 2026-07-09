@@ -1,6 +1,6 @@
 /**
  * Build the always-visible diff a write_file review nests under its timeline step
- * (docs/03-decisions, docs/review 2026-07-08-edit-tool-review-display F1). Turns a
+ * (docs/03-decisions, docs/review/reviews 2026-07-08-edit-tool-review-display F1). Turns a
  * `create` / `overwrite` op's content into a single {@link DiffHunk} the shared
  * DiffHunkView can render, so the user sees *what will be written* before approving.
  *

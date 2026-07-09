@@ -1,7 +1,7 @@
 /**
  * Core data model for the vault write surface.
  *
- * See docs/reference/architecture/vault-write-tools.md. These types are portable,
+ * See docs/02-architecture/components/vault-write-tools.md. These types are portable,
  * no Obsidian imports, so the pure planners (gateway, plan) and validators
  * can be unit-tested with no vault.
  */

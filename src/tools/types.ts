@@ -18,7 +18,7 @@ export interface JsonSchemaProperty {
 }
 
 /**
- * MCP-standard tool annotations (ADR-0003; see docs/reference/architecture/vault-write-tools.md).
+ * MCP-standard tool annotations (ADR-0003; see docs/02-architecture/components/vault-write-tools.md).
  * Declared on the definition so the approval gateway can classify a tool's risk
  * *before* a call runs. Not sent in the API body, gateway / metadata only.
  */

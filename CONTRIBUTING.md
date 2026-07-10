@@ -2,7 +2,7 @@
 
 Thanks for your interest in contributing to Writing Assistant Chat. This document covers getting the project running locally, the codebase layout, and the standards I follow.
 
-This is a creative writing tool with a local-first approach. Beyond chat, it offers plan and edit modes, vault-wide RAG retrieval, a knowledge graph, agentic tool use, note context, and reusable prompt commands. If you want to contribute, please follow the [Obsidian plugin guidelines](https://docs.obsidian.md/Plugins/Releasing/Plugin+guidelines) and keep that philosophy in mind.
+This is a creative writing tool with a local-first approach. Its unified conversation surface supports planning and ambient editing, with **Ask before edits** and **Edit automatically** approval postures, vault-wide RAG retrieval, a knowledge graph, agentic tool use, note context, and reusable prompt commands. If you want to contribute, please follow the [Obsidian plugin guidelines](https://docs.obsidian.md/Plugins/Releasing/Plugin+guidelines) and keep that philosophy in mind.
 
 ---
 

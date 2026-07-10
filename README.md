@@ -1,6 +1,6 @@
 # Writing Assistant Chat
 
-AI writing assistant for [Obsidian](https://obsidian.md) with chat, plan, and edit modes. Connects to local or cloud LLM providers. Features vault-wide RAG retrieval, knowledge graph, agentic tool use, note context, and reusable prompt commands.
+AI writing assistant for [Obsidian](https://obsidian.md) with a unified chat and editing surface. Connects to local or cloud LLM providers. Features vault-wide RAG retrieval, knowledge graph, agentic tool use, note context, and reusable prompt commands.
 
 Desktop only.
 
@@ -8,11 +8,12 @@ Desktop only.
 
 ## Features
 
-### Three operating modes
+### One conversation, two ways to work
 
-- **Conversation**, Back-and-forth chat with your chosen model in a persistent side panel.
-- **Plan**, Outline and brainstorm with tool use support for vault-aware planning.
-- **Edit**, Targeted document editing with diff preview and human review before applying changes.
+- **Ask before edits**, The default. Write operations follow the per-operation policy in settings, which
+  normally asks you to review changes before they are applied.
+- **Edit automatically**, Applies proposed changes without per-operation review. Use it for trusted
+  sessions where hands-off editing is intentional.
 
 ### Multi-provider support
 

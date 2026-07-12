@@ -1,5 +1,5 @@
 {
-  "asOf": "2026-07-06",
+  "asOf": "2026-07-12",
   "source": "https://openrouter.ai/api/v1/models",
   "providers": {
     "anthropic": [
@@ -310,6 +310,48 @@
       {
         "modelId": "gpt-5.5-pro",
         "name": "GPT-5.5 Pro",
+        "role": "completion",
+        "contextWindowSize": 1050000,
+        "vision": true
+      },
+      {
+        "modelId": "gpt-5.6-luna",
+        "name": "GPT-5.6 Luna",
+        "role": "completion",
+        "contextWindowSize": 1050000,
+        "vision": true
+      },
+      {
+        "modelId": "gpt-5.6-luna-pro",
+        "name": "GPT-5.6 Luna Pro",
+        "role": "completion",
+        "contextWindowSize": 1050000,
+        "vision": true
+      },
+      {
+        "modelId": "gpt-5.6-sol",
+        "name": "GPT-5.6 Sol",
+        "role": "completion",
+        "contextWindowSize": 1050000,
+        "vision": true
+      },
+      {
+        "modelId": "gpt-5.6-sol-pro",
+        "name": "GPT-5.6 Sol Pro",
+        "role": "completion",
+        "contextWindowSize": 1050000,
+        "vision": true
+      },
+      {
+        "modelId": "gpt-5.6-terra",
+        "name": "GPT-5.6 Terra",
+        "role": "completion",
+        "contextWindowSize": 1050000,
+        "vision": true
+      },
+      {
+        "modelId": "gpt-5.6-terra-pro",
+        "name": "GPT-5.6 Terra Pro",
         "role": "completion",
         "contextWindowSize": 1050000,
         "vision": true

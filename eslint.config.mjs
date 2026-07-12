@@ -63,6 +63,12 @@ export default tseslint.config(
     },
   },
   {
-    ignores: ["main.js", "node_modules/", "esbuild.config.mjs"],
+    ignores: [
+      "main.js",
+      "node_modules/",
+      "esbuild.config.mjs",
+      "experimental/esbuild.config.mjs",
+      "experimental/.build/",
+    ],
   }
 );

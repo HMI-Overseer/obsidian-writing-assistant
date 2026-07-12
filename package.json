@@ -7,7 +7,7 @@
     "dev": "node esbuild.config.mjs",
     "build": "node esbuild.config.mjs production",
     "build:css": "postcss src/styles/index.css -o styles.css",
-    "lint": "eslint src",
+    "lint": "eslint src experimental",
     "lint:fix": "eslint src --fix",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -15,6 +15,9 @@
     "test:unit": "vitest run tests/unit",
     "test:integration": "vitest run tests/integration",
     "test:coverage": "vitest run --coverage",
+    "lab:check": "tsc -p experimental/tsconfig.json --noEmit",
+    "lab:build": "node experimental/esbuild.config.mjs",
+    "lab:run": "npm run lab:build --silent && node experimental/.build/cli.mjs",
     "update-pricing": "node scripts/update-pricing.mjs",
     "version": "node version-bump.mjs && node scripts/update-pricing.mjs && git add manifest.json versions.json src/api/pricingData.json src/providers/catalogData.json"
   },

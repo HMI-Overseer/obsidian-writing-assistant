@@ -29,6 +29,11 @@ Thumbs.db
 # Test coverage
 coverage/
 
+# Generated model laboratory evidence
+experimental/artifacts/*
+!experimental/artifacts/.gitkeep
+experimental/.build/
+
 # AI slop
 .claude/
 AGENTS.md

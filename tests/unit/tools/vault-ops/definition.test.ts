@@ -62,7 +62,7 @@ describe("allowedVaultOpsTools", () => {
     expect(allowedVaultOpsTools(policy)).toHaveLength(0);
   });
 
-  test("returned tools carry annotations (the gateway reads them)", () => {
+  test("returned tools carry declarative MCP annotations", () => {
     for (const tool of allowedVaultOpsTools(DEFAULT_VAULT_OP_POLICY)) {
       expect(VAULT_OPS_TOOL_NAMES.has(tool.name)).toBe(true);
       expect(tool.annotations).toBeDefined();

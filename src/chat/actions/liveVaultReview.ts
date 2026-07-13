@@ -598,7 +598,7 @@ export class LiveVaultReview implements VaultOpReviewer {
     // future refactor of the conversion stage cannot open an auto-apply hole. A
     // single escaping op fails the *whole* auto batch, nothing reaches
     // applyVaultOpBatch or disk, the conservative all-or-nothing stance for a
-    // safety violation. See docs/work/issues/RESOLVED-vault-path-boundary-out-of-vault-escape.md section 6.2.
+    // safety violation. See ADR-0020.
     if (this.refuseEscapingAuto(autoEntries, results)) return;
 
     const batch = autoEntries.map((e) => ({ id: e.reviewable.id, op: e.reviewable.op }));
@@ -852,7 +852,7 @@ function dispoResult(
     failure: disposition === "failed" ? { kind: "failed", recovery: reason } : undefined,
     // Carry the real outcome to the tool-result choke points so a step persists it,
     // a decline resolves isError:false and is otherwise indistinguishable from an
-    // applied op (cold-rebuild-fidelity section 6 question 6).
+    // applied op (ADR-0016).
     disposition,
   };
 }

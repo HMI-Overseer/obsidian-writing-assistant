@@ -14,7 +14,7 @@ import type { AgenticStep } from "../../../src/shared/types";
 
 /**
  * Phase-2 capture contract for the claudecode cold rebuild
- * (docs/work/issues/claude-code-cold-rebuild-fidelity.md section A.1, question 9).
+ * (ADR-0016).
  * The digest is pointers only, never scores or chunk content; the record is a bounded
  * copy of the full result.
  */

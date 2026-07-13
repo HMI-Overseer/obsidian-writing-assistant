@@ -33,8 +33,7 @@ const CONVERSATION_BREAKPOINT_BLOCK_STRIDE = 15;
  * The gate is an allowlist on purpose: emit sampling only for a model known to accept
  * it, and omit for anything current-gen OR unrecognized. An unknown / future id (e.g.
  * the next Opus generation) therefore fails safe, it never 400s on a stale sampling
- * param. This is the tactical fix; the model-aware capability layer that subsumes it is
- * tracked in docs/work/issues/anthropic-native-payload-api-drift.md (P0-1).
+ * param. This is the tactical fix within ADR-0017's model-aware capability boundary.
  */
 const SAMPLING_CAPABLE_PREFIXES = [
   "claude-3", // Claude 3.x (opus / sonnet / haiku)
@@ -63,8 +62,7 @@ export function anthropicModelSupportsSampling(modelId: string): boolean {
  * to accept adaptive thinking, and omit for older families (Haiku 4.5, Sonnet 4.5, legacy
  * 3.x / 4.0 / 4.1 / 4.5, these use the legacy budget_tokens path, intentionally out of scope
  * here) OR any unrecognized id. An unknown / future id therefore fails safe: no thinking
- * field, never a 400 on a stale reasoning setting. The model-aware capability layer that
- * subsumes this is tracked in docs/work/issues/anthropic-native-payload-api-drift.md (P1-6).
+ * field, never a 400 on a stale reasoning setting. See ADR-0017.
  */
 const ADAPTIVE_THINKING_CAPABLE_PREFIXES = [
   "claude-opus-4-6", // Opus 4.6

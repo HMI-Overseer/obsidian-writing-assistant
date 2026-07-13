@@ -454,8 +454,7 @@ describe("runToolLoop step results", () => {
 });
 
 /**
- * Phase-2 replay capture at the plugin tool-loop choke point (cold-rebuild-fidelity
- * section A.1 / question 6 / question 9). The read channel records the digest + bounded
+ * Replay capture at the plugin tool-loop choke point (ADR-0016). The read channel records the digest + bounded
  * record with the result in hand; the vault-op / edit channel threads the reviewed
  * disposition through onStepResult. Pre-phase neither field existed.
  */

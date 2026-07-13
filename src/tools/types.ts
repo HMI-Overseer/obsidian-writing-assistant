@@ -18,9 +18,10 @@ export interface JsonSchemaProperty {
 }
 
 /**
- * MCP-standard tool annotations (ADR-0003; see docs/02-architecture/components/vault-write-tools.md).
- * Declared on the definition so the approval gateway can classify a tool's risk
- * *before* a call runs. Not sent in the API body, gateway / metadata only.
+ * MCP-standard tool annotations (ADR-0023; see docs/02-architecture/components/vault-write-tools.md).
+ * Declarative risk metadata for definitions and future wire formatters. The plugin's
+ * authorization gateway uses explicit converted operation classes, not these hints.
+ * Not sent in direct-provider API bodies.
  */
 export interface ToolAnnotations {
   /** Executes immediately, no gate (all vault read tools). */
@@ -58,8 +59,8 @@ export interface CanonicalToolDefinition {
    */
   errorGuidance?: string;
   /**
-   * MCP-standard risk annotations. Drive the vault-op approval gateway;
-   * not sent to the API.
+   * MCP-standard risk annotations. Descriptive metadata, not the plugin's
+   * authorization source; not sent to direct-provider APIs.
    */
   annotations?: ToolAnnotations;
 }

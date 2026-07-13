@@ -1,6 +1,5 @@
 /**
- * Replay-capture helpers for the claudecode cold rebuild (issue
- * docs/work/issues/claude-code-cold-rebuild-fidelity.md, phase 2).
+ * Replay-capture helpers for the claudecode cold rebuild (ADR-0016).
  *
  * At the two tool-result choke points (Claude Code's `callTool` end event and the
  * plugin tool loop) we now record, per {@link ../shared/types.AgenticStep}, what a

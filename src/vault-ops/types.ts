@@ -72,7 +72,7 @@ export type VaultOperation =
       occurrences: number;
     };
 
-/** The class an op is gated by, identical to its `kind` (ADR-0003). */
+/** The class an op is gated by, identical to its `kind` (ADR-0023). */
 export type VaultOpClass = VaultOperation["kind"];
 
 export type VaultOpStatus =

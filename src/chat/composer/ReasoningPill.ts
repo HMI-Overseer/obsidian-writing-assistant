@@ -72,7 +72,7 @@ export function buildReasoningItemSpecs(
 /**
  * The composer footer's reasoning pill: reads the active model's current level
  * at a glance, one click opens a compact menu of the model's resolved level set
- * (composer-reasoning-effort-selector section 3.3). Same visual language as the
+ * (ADR-0017). Same visual language as the
  * posture toggle; hidden entirely for models with an empty resolved set. Writes
  * the same per-model entry as the profile popover's reasoning control.
  */

@@ -204,7 +204,7 @@ export type SessionRebuildReason =
  * never permission" holds across a restart: the same linearity/config gates the
  * live-reuse path runs are re-checked against this cursor (our own transcript hash,
  * never Claude Code's file) before a resume is attempted
- * (docs/work/issues/claude-code-cold-rebuild-fidelity.md section 6.3 / section 6.5 item 1). Static
+ * (ADR-0016). Static
  * per conversation: the CLI does not rotate the session id across a resume (section 6.7.1).
  */
 export interface ClaudeCodeResumeCursor {
@@ -292,7 +292,7 @@ export interface MessageVersion {
  * replay-capture fields ({@link disposition}, {@link resultDigest},
  * {@link resultRecord}) that the claudecode cold rebuild reads at replay time
  * (phase 3), where it derives a compact digest from them (see
- * docs/work/issues/claude-code-cold-rebuild-fidelity.md section 4.A / section A.1). All three are
+ * ADR-0016). All three are
  * optional forever: conversations written before phase 2 lack them and replay must
  * degrade to today's behavior when they are absent.
  */

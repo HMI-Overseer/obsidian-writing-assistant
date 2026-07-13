@@ -12,7 +12,7 @@
  * Naming the boundary instead points it at the real next step (use a vault-relative
  * path). The index lookup stays in place behind this as the security backstop.
  *
- * See docs/work/issues/read-tools-mask-out-of-vault-as-not-found.md.
+ * See ADR-0020.
  */
 
 import { escapesVault, outsideVaultMessage } from "../vault-ops/pathSafety";

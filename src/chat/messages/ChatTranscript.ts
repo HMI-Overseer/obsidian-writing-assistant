@@ -136,7 +136,7 @@ export class ChatTranscript {
   /**
    * Renders a persisted message's timeline and body into its bubble. A persisted
    * empty assistant turn is a stopped (aborted) claudecode generation
-   * (`GENERATION_STOPPED_LABEL` persist-always, cold-rebuild-fidelity section 6.1): render
+   * (`GENERATION_STOPPED_LABEL` persist-always, ADR-0016): render
    * the same muted face `finalizeAbortedResponse` shows live, not a blank bubble.
    */
   private async renderMessageBody(bubble: BubbleRefs, message: ConversationMessage): Promise<void> {

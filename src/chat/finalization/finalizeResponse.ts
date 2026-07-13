@@ -118,7 +118,7 @@ export async function finalizeAbortedResponse(
     // A claudecode turn ALWAYS persists its aborted assistant message, even with
     // zero text: the live session banked an empty assistant turn in its watermark,
     // so the transcript must carry a matching empty turn or the next turn cold-
-    // rebuilds with a mislabeled `turn-count` reason (cold-rebuild-fidelity section 6.1 /
+    // rebuilds with a mislabeled `turn-count` reason (ADR-0016,
     // question 7). Partial steps ride it for replay fidelity. Other providers keep
     // today's behavior (no empty turn appended, so their histories don't grow one).
     if (provider === "claudecode") {

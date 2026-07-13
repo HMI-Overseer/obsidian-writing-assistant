@@ -26,7 +26,7 @@ import { toolFailure } from "./toolFailure";
  * Writes are no longer gated by an edit "mode" (the plan/chat/edit selector is gone,
  * section 6.3); they are offered whenever the {@link ApprovalPosture} + per-class
  * {@link VaultOpPolicy} permit. Under the default `ask` posture a `deny`-classed
- * write is excluded (the hard read-only guarantee, ADR-0003); under the `auto`
+ * write is excluded (the hard read-only guarantee, ADR-0023); under the `auto`
  * posture ("Edit automatically") the policy is overruled and every write is offered
  * so it can auto-apply at the gate. Reads are never gated on the cloud paths, and the
  * local read tier is now the full read suite too (the per-mode read-narrowing went
@@ -195,7 +195,7 @@ export function anthropicNonDeferredToolNames(): Set<string> {
  * the `ask` posture is absent from this catalogue entirely. It is therefore never
  * discoverable via tool search, closing the open seam at the discovery layer rather than
  * only refusing it at execution (ADR-0009 open seam / {@link toolNotAllowedFailure},
- * ADR-0003). The runtime allow-list ({@link cloudAllowedToolNames}) still guards execution
+ * ADR-0023). The runtime allow-list ({@link cloudAllowedToolNames}) still guards execution
  * as defense in depth.
  */
 export function anthropicLayer2ToolSet(opts: ToolSurfaceOptions): CanonicalToolDefinition[] {

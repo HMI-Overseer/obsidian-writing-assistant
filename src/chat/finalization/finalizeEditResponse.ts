@@ -73,7 +73,7 @@ export interface FinalizeEditOptions {
   prebuiltVaultOpRecord?: AppliedVaultOpRecord;
   /**
    * Edit proposals already built and (partly) resolved in-loop by {@link LiveVaultReview}
-   * (propose-edit-in-loop-blocking-review), one per edited file (ADR-0010). When present,
+   * (ADR-0018), one per edited file (ADR-0010). When present,
    * finalization persists them as-is instead of re-resolving the edit blocks, the hunks
    * already carry their accepted/rejected status and applied content.
    */

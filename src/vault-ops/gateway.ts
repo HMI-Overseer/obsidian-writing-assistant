@@ -1,5 +1,5 @@
 /**
- * The approval gateway, the whole authorization argument (ADR-0003).
+ * The approval gateway, the whole authorization argument (ADR-0023).
  *
  * `resolveGate` is a total predicate with no "probably fine" branch, pure with
  * no Obsidian and no disk. This is the single most important seam to get right.
@@ -34,7 +34,7 @@ export interface VaultOpPolicy {
    * In-document edits (`propose_edit` and `update_frontmatter`). Edits are vault
    * ops too (a file mutation), gated like the rest: `deny` removes the edit tools,
    * `ask` blocks on review (today's behaviour), `auto` applies the hunk in-loop,
-   * including on a non-active file. See docs/work/issues/propose-edit-in-loop-blocking-review.md.
+   * including on a non-active file. See ADR-0018.
    */
   edit: Gate;
   /** Folder prefixes eligible for "auto"; empty ⇒ whole vault. */
@@ -78,8 +78,8 @@ export type GatedVaultOpClass = Exclude<
 >;
 
 /**
- * Annotation-derived gate class of an op. Identical to its kind except for the ops
- * that deliberately reuse another class's policy knob (ADR-0003):
+ * Policy gate class of a converted op. Identical to its kind except for the ops
+ * that deliberately reuse another class's policy knob (ADR-0023):
  *   - `replaceInVault` gates as `overwrite` (a multi-file content rewrite);
  *   - `moveFolder` gates as `move` (a relocation, just folder-level);
  *   - `trashFolder` gates as `trash` (a removal, empty-folder-only).

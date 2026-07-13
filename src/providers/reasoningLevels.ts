@@ -21,7 +21,7 @@ export interface ReasoningDiscovery {
  * the profile popover's reasoning control, and request-time validation all
  * read, so the offered set can never disagree between surfaces.
  *
- * Resolution is layered (composer-reasoning-effort-selector section 3.1), discovered
+ * Resolution is layered (ADR-0017), discovered
  * beats declared: a per-model discovered capability (LM Studio's
  * `capabilities.reasoning.allowed_options`) wins outright; the provider
  * descriptor's `reasoningLevels` is the fallback. LM Studio's fallback is
@@ -42,7 +42,7 @@ export function resolveReasoningLevels(
 }
 
 /**
- * The catalog layer for Anthropic (section 3.1 layer 2 equivalent, keyed off the same
+ * The provider-specific per-model layer for Anthropic (section 3.1 layer 2 equivalent, keyed off the same
  * capability gates the payload builder enforces, so the offered set and the
  * emitted request can never disagree): adaptive-capable models take effort
  * tiers up to `max`, with `xhigh` only where the API honors it (Opus 4.7+;

@@ -140,7 +140,7 @@ The Claude Code provider is different: it runs its own agent harness, so it does
 
 ### Vault writes and the approval gateway
 
-Any tool that mutates the vault (create, overwrite, move, trash, mkdir, and in-document edits) is routed through the approval gateway in `src/vault-ops/`. `resolveGate` is a pure, total predicate: every operation resolves to `deny`, `ask`, or `auto`, with scope and budget limits as defense-in-depth behind any `auto` choice. Path-boundary safety (operations must never escape the vault) is enforced here. This design is recorded in ADR-0003; see the ADR convention below.
+Any tool that mutates the vault (create, overwrite, move, trash, mkdir, and in-document edits) is routed through the approval gateway in `src/vault-ops/`. `resolveGate` is a pure, total predicate: every converted operation class resolves to `deny`, `ask`, or `auto`, with scope and budget limits as defense-in-depth behind any `auto` choice. Path-boundary safety (operations must never escape the vault) is enforced here. This design is recorded in ADR-0023; see the ADR convention below.
 
 ### Settings persistence
 
@@ -150,7 +150,7 @@ Plugin data is stored via Obsidian's `loadData()` / `saveData()` API. `main.ts` 
 
 ## Decision records (ADRs)
 
-Architectural decisions are recorded as ADRs in `docs/03-decisions/`. When you make a decision with lasting structural impact, add a numbered ADR there and reference it as `ADR-NNNN` from code and docs. Existing records cover the second write-proposal channel, the annotation-driven approval gateway, the single write-file tool, trash-only deletion, and the unified dependency-ordered apply plan. See `docs/03-decisions/README.md` for the convention.
+Architectural decisions are recorded as ADRs in `docs/03-decisions/`. When you make a decision with lasting structural impact, add a numbered ADR there and reference it as `ADR-NNNN` from code and docs. Existing records cover the second write-proposal channel, the operation-class approval gateway, the single write-file tool, trash-only deletion, and the unified in-loop mutation reviewer. See `docs/03-decisions/README.md` for the convention.
 
 ---
 

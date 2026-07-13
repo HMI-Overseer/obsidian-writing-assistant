@@ -487,7 +487,7 @@ describe("LiveVaultReview", () => {
 });
 
 /**
- * Phase-2 disposition capture (cold-rebuild-fidelity section 6 question 6). The tool result
+ * Disposition capture for faithful synthetic replay (ADR-0016). The tool result
  * must carry the real {@link VaultOpDisposition} the review resolved, so a choke point
  * can persist it onto the step. Pre-phase this was collapsed to `isError` alone, which
  * cannot tell a decline (`isError: false`) from an applied op.

@@ -4,7 +4,7 @@ import type { VaultOpPolicy, GatedVaultOpClass } from "../../vault-ops/gateway";
 // ---------------------------------------------------------------------------
 // Vault-operation tools, produce a VaultOperationProposal for review.
 //
-// Each tool carries MCP `annotations` (the gateway reads them, ADR-0003) plus
+// Each tool carries MCP `annotations` as descriptive risk metadata (ADR-0023) plus
 // strategyHint / errorGuidance for the system prompt. They never touch disk in
 // the loop: a call appends an intent to a per-turn proposal, applied only once
 // gated and pre-flighted.
@@ -266,9 +266,9 @@ const TOOL_POLICY_CLASSES: Record<string, GatedVaultOpClass[]> = {
 
 /**
  * The vault-op tools a policy leaves usable: a `deny`-classed tool is
- * detached from the active set so the model is never offered a capability it
- * can't use, the same mechanism that drops `semantic_search` when its index is
- * cold. A tool is dropped only when *every* class it can resolve to is denied, so
+ * detached from lean and deferred tool sets so the model cannot discover a
+ * capability it cannot use. A cache-stable schema superset is separately guarded
+ * at runtime. A tool is dropped only when *every* class it can resolve to is denied, so
  * `write_file` survives whenever either `create` or `overwrite` is allowed.
  */
 export function allowedVaultOpsTools(policy: VaultOpPolicy): CanonicalToolDefinition[] {

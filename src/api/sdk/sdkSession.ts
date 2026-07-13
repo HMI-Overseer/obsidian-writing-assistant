@@ -39,8 +39,7 @@ import type { ModelInfo, Options, Query, SDKMessage, SDKUserMessage } from "./cl
  * transcript cleanly extends what was banked (linearity + config gates, identical to
  * live reuse, our own hash never Claude Code's file). On any doubt (abort, SDK error,
  * unexpected end, config drift, a resume that can't start) it degrades one rung, and
- * a synthetic rebuild is always the floor. See
- * `docs/work/issues/claude-code-cold-rebuild-fidelity.md` section 6.3.
+ * a synthetic rebuild is always the floor. See ADR-0016.
  */
 
 /** Idle sessions are disposed after this long unused (kills the `claude` process). */
@@ -440,7 +439,7 @@ export class SdkSessionRegistry {
    * eviction and compaction *delete* the registry entry, so the next turn would
    * otherwise decide `no-session` and the badge would read a misleading "session
    * started". The tombstone lets {@link decideRecovery} attribute a rebuild to its
-   * real cause instead (cold-rebuild-fidelity section 6.2) when there is no resume cursor to
+   * real cause instead (ADR-0016) when there is no resume cursor to
    * check. One-shot: cleared the moment a session is minted or resumed, so a
    * tombstone present always implies no live session.
    */

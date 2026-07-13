@@ -452,7 +452,7 @@ export class ClaudeCodeService {
         // call shows its error. Defaults cover a thrown executor (no result object).
         let content = "The tool threw an unexpected error.";
         // The reviewed op's real disposition, when present, so the persisted step
-        // records the outcome for the cold-rebuild replay digest (section 6 question 6).
+        // records the outcome for the cold-rebuild replay digest (ADR-0016).
         let disposition: VaultOpDisposition | undefined;
         try {
           const result = await this.executeTool(call, toolCallId);

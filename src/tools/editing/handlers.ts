@@ -70,7 +70,7 @@ type TargetResolution =
 
 /**
  * Resolve the edit target from the tool call's `path`
- * (propose-edit-in-loop-blocking-review). Invariant: an explicit `path` must land on
+ * (ADR-0018). Invariant: an explicit `path` must land on
  * exactly that file, so if it is supplied but does not resolve we report not-found
  * rather than falling through to the open file. Only an omitted `path` falls back to
  * the document context / active file.

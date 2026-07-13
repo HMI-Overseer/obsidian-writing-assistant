@@ -407,7 +407,7 @@ export type SemanticSearchUnavailableReason =
  * to fix it (with the literal Settings path), and (4) what to do right now instead.
  * No hedging ("may", "might"): a failure to run is reported as a failure, never as an
  * empty vault. Kept here so the handler and any future UI surface read one source.
- * See docs/work/issues/semantic-search-silent-embedding-failure.md section 6.
+ * See ADR-0022.
  */
 export const SEMANTIC_SEARCH_UNAVAILABLE_MESSAGE: Record<
   SemanticSearchUnavailableReason,
@@ -439,7 +439,7 @@ export const SEMANTIC_SEARCH_UNAVAILABLE_MESSAGE: Record<
  * ({@link ../../chat/finalization/prepareApiMessages}) and the Claude Code MCP bridge
  * ({@link ../../services/ClaudeCodeService}), so they cannot gate it differently and
  * drift apart, which is the defect that produced the silent-failure symptom.
- * See docs/work/issues/semantic-search-silent-embedding-failure.md section 3-A/B, section 4.
+ * See ADR-0022.
  */
 export function filterSemanticSearchByAvailability(
   tools: CanonicalToolDefinition[],

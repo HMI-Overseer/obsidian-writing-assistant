@@ -9,7 +9,7 @@ import { PRICING_AS_OF } from "../../api/pricing";
  * the prompt-cache work targets; a first-turn mint ("no-session") reads as
  * expected and is handled separately. Idle eviction ("expired") and compaction
  * ("compacted") reach here via the registry's disposal tombstone
- * (cold-rebuild-fidelity section 6.2).
+ * (ADR-0016).
  */
 const SESSION_REBUILD_LABELS: Record<SessionRebuildReason, string> = {
   "no-session": "new",
@@ -214,7 +214,7 @@ export function describeSession(
   // Only a genuinely reason-less rebuild (a hand-built / older persisted record)
   // shows the bare label; every real cause, including an idle-evicted
   // `session-disposed` ("expired") and a `compacted` session, names itself now that
-  // the disposal tombstone makes those reachable (cold-rebuild-fidelity section 6.2).
+  // the disposal tombstone makes those reachable (ADR-0016).
   if (reason === undefined) {
     return { text: "synthetic rebuild", state: "rebuilt" };
   }

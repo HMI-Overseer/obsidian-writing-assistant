@@ -225,7 +225,7 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
   // review on the streaming timeline, applies auto ops, and suspends the loop on
   // ask-gated ops until the user decides (in-loop-tool-approval-blocking-flow). In
   // when editing is active it also owns the edit channel, folding the live diff onto
-  // the timeline step like vault ops (propose-edit-in-loop-blocking-review).
+  // the timeline step like vault ops (ADR-0018).
   const liveReview = new LiveVaultReview({
     app: plugin.app,
     timelineEl: assistantBubble.timelineEl,

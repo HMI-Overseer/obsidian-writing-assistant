@@ -1,10 +1,6 @@
 /** @type {import('tailwindcss').Config} */
 module.exports = {
   content: ["./src/**/*.{ts,css}"],
-  prefix: "lmsa-",
-  corePlugins: {
-    preflight: false,
-  },
   theme: {
     extend: {
       colors: {

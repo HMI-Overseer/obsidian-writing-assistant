@@ -6,62 +6,60 @@
  * replacement is a block widget on its own line(s) beneath it.
  * ----------------------------------------------------------------------- */
 
-@layer components {
-  /* Matched text awaiting review, struck through in place. */
-  .lmsa-inline-diff-removed {
-    background: color-mix(in srgb, var(--text-error) 10%, var(--background-primary));
-    color: var(--text-muted);
-    text-decoration: line-through;
-    text-decoration-color: var(--text-error);
-  }
+/* Matched text awaiting review, struck through in place. */
+.lmsa-inline-diff-removed {
+  background: color-mix(in srgb, var(--text-error) 10%, var(--background-primary));
+  color: var(--text-muted);
+  text-decoration: line-through;
+  text-decoration-color: var(--text-error);
+}
 
-  /* The proposed replacement, as a block beneath the struck range. */
-  .lmsa-inline-diff-block {
-    margin: 2px 0 6px;
-    padding: 6px 10px;
-    border-radius: 6px;
-    border-left: 3px solid var(--text-success, var(--color-green, var(--interactive-accent)));
-    background: color-mix(in srgb, var(--text-success, var(--color-green, var(--interactive-accent))) 8%, var(--background-primary));
-  }
+/* The proposed replacement, as a block beneath the struck range. */
+.lmsa-inline-diff-block {
+  margin: 2px 0 6px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  border-left: 3px solid var(--text-success, var(--color-green, var(--interactive-accent)));
+  background: color-mix(in srgb, var(--text-success, var(--color-green, var(--interactive-accent))) 8%, var(--background-primary));
+}
 
-  .lmsa-inline-diff-added {
-    white-space: pre-wrap;
-    word-break: break-word;
-    color: var(--text-normal);
-    font-family: var(--font-text);
-  }
+.lmsa-inline-diff-added {
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--text-normal);
+  font-family: var(--font-text);
+}
 
-  /* Accept / reject controls beneath the replacement. */
-  .lmsa-inline-diff-actions {
-    display: flex;
-    gap: 6px;
-    margin-top: 6px;
-  }
+/* Accept / reject controls beneath the replacement. */
+.lmsa-inline-diff-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+}
 
-  .lmsa-inline-diff-btn {
-    cursor: pointer;
-    border: 1px solid var(--background-modifier-border);
-    background: var(--background-primary);
-    color: var(--text-muted);
-    border-radius: 6px;
-    padding: 1px 10px;
-    font-size: var(--font-ui-smaller);
-    line-height: 1.6;
-    transition: all 0.1s ease;
-  }
+.lmsa-inline-diff-btn {
+  cursor: pointer;
+  border: 1px solid var(--background-modifier-border);
+  background: var(--background-primary);
+  color: var(--text-muted);
+  border-radius: 6px;
+  padding: 1px 10px;
+  font-size: var(--font-ui-smaller);
+  line-height: 1.6;
+  transition: all 0.1s ease;
+}
 
-  .lmsa-inline-diff-btn:hover {
-    background: var(--background-modifier-hover);
-    color: var(--text-normal);
-  }
+.lmsa-inline-diff-btn:hover {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
 
-  .lmsa-inline-diff-btn--accept:hover {
-    border-color: var(--text-success, var(--color-green, var(--interactive-accent)));
-    color: var(--text-success, var(--color-green, var(--interactive-accent)));
-  }
+.lmsa-inline-diff-btn--accept:hover {
+  border-color: var(--text-success, var(--color-green, var(--interactive-accent)));
+  color: var(--text-success, var(--color-green, var(--interactive-accent)));
+}
 
-  .lmsa-inline-diff-btn--reject:hover {
-    border-color: var(--text-error);
-    color: var(--text-error);
-  }
+.lmsa-inline-diff-btn--reject:hover {
+  border-color: var(--text-error);
+  color: var(--text-error);
 }

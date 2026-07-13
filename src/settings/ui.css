@@ -1,570 +1,568 @@
-@layer components {
-  /* ── Panel ─────────────────────────────────────────────────────────────── */
+/* ── Panel ─────────────────────────────────────────────────────────────── */
 
-  .lmsa-settings-panel {
-    @apply lmsa-relative lmsa-overflow-hidden;
-    background:
-      radial-gradient(circle at top left, var(--lmsa-tint-5), transparent 42%),
-      linear-gradient(180deg, var(--lmsa-surface-overlay), var(--lmsa-surface-raised));
-    backdrop-filter: blur(18px);
-    -webkit-backdrop-filter: blur(18px);
-    box-shadow:
-      0 24px 56px var(--lmsa-shadow-medium),
-      inset 0 1px 0 var(--lmsa-inset-highlight);
-  }
+.lmsa-settings-panel {
+  @apply lmsa:relative lmsa:overflow-hidden;
+  background:
+    radial-gradient(circle at top left, var(--lmsa-tint-5), transparent 42%),
+    linear-gradient(180deg, var(--lmsa-surface-overlay), var(--lmsa-surface-raised));
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  box-shadow:
+    0 24px 56px var(--lmsa-shadow-medium),
+    inset 0 1px 0 var(--lmsa-inset-highlight);
+}
 
-  .lmsa-settings-panel::before {
-    content: "";
-    @apply lmsa-pointer-events-none lmsa-absolute lmsa-inset-x-5 lmsa-top-0 lmsa-h-px;
-    background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--lmsa-section-accent) 55%, white), transparent);
-    opacity: var(--lmsa-shimmer-opacity);
-  }
+.lmsa-settings-panel::before {
+  content: "";
+  @apply lmsa:pointer-events-none lmsa:absolute lmsa:inset-x-5 lmsa:top-0 lmsa:h-px;
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--lmsa-section-accent) 55%, white), transparent);
+  opacity: var(--lmsa-shimmer-opacity);
+}
 
-  /* ── Panel header ──────────────────────────────────────────────────────── */
+/* ── Panel header ──────────────────────────────────────────────────────── */
 
+.lmsa-settings-panel-header {
+  @apply lmsa:flex lmsa:flex-col lmsa:gap-2 lmsa:px-6 lmsa:pb-5 lmsa:pt-6;
+  border-bottom: 1px solid color-mix(in srgb, var(--lmsa-border-default) 82%, transparent);
+}
+
+/* panel description is now handled by .setting-item-description
+   in SettingsTab.css via Setting.setHeading().setDesc() */
+
+/* ── Content area ──────────────────────────────────────────────────────── */
+
+.lmsa-settings-content {
+  @apply lmsa:flex lmsa:flex-col lmsa:gap-5 lmsa:p-5;
+}
+
+/* Conditional wrappers inside content inherit the same flex gap layout
+   so that section cards inside them don't collapse together. */
+.lmsa-settings-content > .lmsa-rag-conditional,
+.lmsa-settings-content > .lmsa-kg-conditional {
+  @apply lmsa:flex lmsa:flex-col lmsa:gap-5;
+}
+
+/* ── Section (card) ────────────────────────────────────────────────────── */
+
+.lmsa-settings-section {
+  @apply lmsa:relative;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--lmsa-surface-base) 88%, transparent), var(--lmsa-surface-raised));
+  box-shadow:
+    0 14px 34px var(--lmsa-shadow-subtle),
+    inset 0 1px 0 var(--lmsa-inset-highlight);
+  border-color: var(--lmsa-border-subtle);
+  transition: border-color 200ms ease, box-shadow 200ms ease;
+}
+
+.lmsa-settings-section:hover {
+  border-color: var(--lmsa-border-emphasis);
+  box-shadow:
+    0 14px 34px var(--lmsa-shadow-subtle),
+    inset 0 1px 0 var(--lmsa-inset-highlight),
+    0 0 0 1px var(--lmsa-tint-20);
+}
+
+/* Card glow, soft accent-colored aura behind each section */
+.lmsa-settings-section::after {
+  content: "";
+  @apply lmsa:pointer-events-none lmsa:absolute;
+  inset: -2px;
+  border-radius: inherit;
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--lmsa-section-accent) 12%, transparent),
+    transparent 60%,
+    color-mix(in srgb, var(--lmsa-section-accent-secondary) 8%, transparent)
+  );
+  z-index: -1;
+  filter: blur(20px);
+  opacity: 0.5;
+  transition: opacity 300ms ease;
+}
+
+.lmsa-settings-section:hover::after {
+  opacity: 0.85;
+}
+
+/* ── Warning section, animated border shimmer ─────────────────────────── */
+
+.lmsa-kg-warning {
+  border-color: transparent;
+}
+
+.lmsa-kg-warning:hover {
+  border-color: transparent;
+  box-shadow:
+    0 14px 34px var(--lmsa-shadow-subtle),
+    inset 0 1px 0 var(--lmsa-inset-highlight);
+}
+
+.lmsa-kg-warning::before {
+  content: "";
+  @apply lmsa:pointer-events-none lmsa:absolute;
+  inset: -1px;
+  border-radius: inherit;
+  padding: 1.5px;
+  background: conic-gradient(
+    from var(--lmsa-border-angle),
+    transparent 0deg,
+    color-mix(in srgb, var(--lmsa-section-accent) 90%, white) 40deg,
+    transparent 80deg,
+    transparent 180deg,
+    color-mix(in srgb, var(--lmsa-section-accent) 90%, white) 220deg,
+    transparent 260deg,
+    transparent 360deg
+  );
+  -webkit-mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  animation: lmsa-border-spin 5s linear infinite;
+  opacity: 0.55;
+  z-index: 0;
+}
+
+/* ── Section header ────────────────────────────────────────────────────── */
+
+.lmsa-settings-section-header {
+  @apply lmsa:flex lmsa:items-start lmsa:justify-between lmsa:gap-4 lmsa:px-5 lmsa:pb-0 lmsa:pt-5;
+}
+
+.lmsa-settings-section-heading {
+  @apply lmsa:flex lmsa:min-w-0 lmsa:flex-1 lmsa:flex-row lmsa:items-center lmsa:gap-3;
+}
+
+.lmsa-settings-section-actions {
+  @apply lmsa:flex lmsa:flex-wrap lmsa:justify-end lmsa:gap-2;
+}
+
+.lmsa-settings-section-title {
+  @apply lmsa:m-0 lmsa:font-semibold;
+  color: var(--lmsa-text-primary);
+  font-size: 1rem;
+}
+
+.lmsa-settings-section-desc {
+  @apply lmsa:m-0;
+  color: var(--lmsa-text-secondary);
+  font-weight: 500;
+  line-height: 1.6;
+  padding-bottom: 15px;
+}
+
+/* ── Section icon badge ────────────────────────────────────────────────── */
+
+.lmsa-settings-section-icon {
+  @apply lmsa:inline-flex lmsa:flex-none lmsa:items-center lmsa:justify-center;
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--lmsa-section-accent) 20%, var(--background-secondary)),
+    color-mix(in srgb, var(--lmsa-section-accent-secondary) 15%, var(--background-secondary))
+  );
+  color: var(--lmsa-section-accent);
+}
+
+.lmsa-settings-section-icon svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* ── Section body ──────────────────────────────────────────────────────── */
+
+.lmsa-settings-section-body {
+  @apply lmsa:px-5 lmsa:pb-4 lmsa:pt-4;
+}
+
+.lmsa-settings-section-footer {
+  @apply lmsa:flex lmsa:flex-wrap lmsa:justify-end lmsa:gap-2 lmsa:px-5 lmsa:pb-5 lmsa:pt-0;
+}
+
+.lmsa-settings-section-footer:empty {
+  display: none;
+}
+
+/* ── Setting item ──────────────────────────────────────────────────────── */
+
+.lmsa-setting-item {
+  @apply lmsa:relative lmsa:m-0 lmsa:flex lmsa:flex-wrap lmsa:items-center lmsa:gap-4 lmsa:px-0 lmsa:py-4;
+}
+
+/* Gradient separator line between setting items */
+.lmsa-setting-item:not(:first-child)::before {
+  content: "";
+  @apply lmsa:pointer-events-none lmsa:absolute lmsa:inset-x-0 lmsa:top-0 lmsa:h-px;
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--lmsa-section-accent) 20%, transparent),
+    var(--lmsa-border-subtle),
+    color-mix(in srgb, var(--lmsa-section-accent-secondary) 20%, transparent)
+  );
+}
+
+.lmsa-setting-item:first-child {
+  padding-top: 0;
+}
+
+.lmsa-setting-item:last-child {
+  padding-bottom: 0;
+}
+
+.lmsa-setting-item-info {
+  @apply lmsa:flex-1 lmsa:pr-3;
+}
+
+.lmsa-setting-item-name {
+  @apply lmsa:font-semibold;
+  color: var(--lmsa-text-primary);
+}
+
+.lmsa-setting-item-desc {
+  color: var(--lmsa-text-secondary);
+  line-height: 1.55;
+}
+
+.lmsa-setting-item-control {
+  @apply lmsa:flex lmsa:shrink-0 lmsa:items-center lmsa:gap-2;
+}
+
+.lmsa-setting-item > .lmsa-settings-model-selector-wrap {
+  flex-basis: 100%;
+}
+
+.lmsa-modal .lmsa-setting-item {
+  @apply lmsa:px-0;
+}
+
+/* ── Disclaimer modal ──────────────────────────────────────────────── */
+
+.lmsa-disclaimer-modal .modal-content {
+  max-width: 540px;
+}
+
+.lmsa-disclaimer-modal p {
+  color: var(--lmsa-text-secondary);
+  line-height: 1.65;
+  margin: 0.75em 0;
+}
+
+.lmsa-disclaimer-modal p:first-of-type {
+  margin-top: 0.25em;
+}
+
+.lmsa-disclaimer-buttons {
+  @apply lmsa:flex lmsa:justify-end lmsa:gap-2;
+  margin-top: 1.25em;
+  padding-top: 1em;
+  border-top: 1px solid var(--lmsa-border-default);
+}
+
+/* ── Toggle ──────────────────────────────────────────────────────────── */
+
+.lmsa-toggle {
+  @apply lmsa:relative lmsa:inline-block lmsa:shrink-0 lmsa:cursor-pointer;
+  width: 40px;
+  height: 22px;
+  border-radius: 11px;
+  background: var(--lmsa-border-default);
+  transition: background 150ms ease;
+  outline: none;
+}
+
+.lmsa-toggle::after {
+  content: "";
+  @apply lmsa:absolute;
+  top: 3px;
+  left: 3px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--lmsa-text-primary);
+  transition: transform 150ms ease;
+}
+
+.lmsa-toggle.is-enabled {
+  background: var(--lmsa-section-accent);
+}
+
+.lmsa-toggle.is-enabled::after {
+  transform: translateX(18px);
+  background: var(--lmsa-surface-contrast);
+}
+
+.lmsa-toggle:focus-visible {
+  box-shadow: 0 0 0 2px var(--lmsa-accent-glow);
+}
+
+
+/* ── Form inputs ───────────────────────────────────────────────────────── */
+
+.lmsa-settings-root input[type="text"],
+.lmsa-settings-root input[type="number"],
+.lmsa-settings-root textarea,
+.lmsa-settings-root select,
+.lmsa-settings-root .dropdown {
+  border-radius: 12px;
+  border: 1px solid var(--lmsa-border-default);
+  background: var(--lmsa-surface-inset);
+  padding: 8px 12px;
+  color: var(--lmsa-text-primary);
+  box-shadow: inset 0 1px 0 var(--lmsa-inset-highlight-subtle);
+  transition: border-color 140ms ease, box-shadow 140ms ease;
+}
+
+/* A native <select> paints its own disclosure arrow inside the right padding
+   box. The shared rule above uses the same 12px right padding as a text input
+   (which has no arrow), so the chevron overlaps short labels like "Ask" /
+   "Auto" and they read as clipped. Reserve room for the arrow and keep a floor
+   width so short-label boxes don't collapse under it. Inputs/textareas keep
+   the tighter padding.
+
+   Obsidian also pins selects to a fixed --input-height; combined with the 8px
+   vertical padding from the shared rule above, that leaves too little room for
+   the text line and the label clips top-and-bottom. height:auto + a min-height
+   lets the box grow to fit its content instead. Fixes every settings dropdown
+   at once. */
+.lmsa-settings-root select {
+  padding-right: 28px;
+  min-width: 6ch;
+  height: auto;
+  min-height: 36px;
+  overflow: visible;
+}
+
+.lmsa-settings-root input[type="text"]:focus,
+.lmsa-settings-root input[type="number"]:focus,
+.lmsa-settings-root textarea:focus,
+.lmsa-settings-root select:focus,
+.lmsa-settings-root .dropdown:focus {
+  border-color: var(--lmsa-border-emphasis);
+  box-shadow: 0 0 0 2px var(--lmsa-accent-glow);
+  outline: none;
+}
+
+.lmsa-monospace {
+  font-family: var(--font-monospace);
+}
+
+/* ── Range inputs ──────────────────────────────────────────────────────── */
+
+.lmsa-settings-root input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 6px;
+  border-radius: 9999px;
+  background: var(--lmsa-border-default);
+  outline: none;
+}
+
+.lmsa-settings-root input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--lmsa-section-accent), var(--lmsa-section-accent-secondary));
+  border: 2px solid var(--lmsa-surface-base);
+  box-shadow: 0 2px 6px var(--lmsa-shadow-strong);
+  cursor: pointer;
+  transition: box-shadow 0.15s ease, transform 0.15s ease;
+}
+
+.lmsa-settings-root input[type="range"]::-webkit-slider-thumb:hover {
+  box-shadow: 0 0 0 4px var(--lmsa-tint-25);
+  transform: scale(1.1);
+}
+
+.lmsa-settings-root input[type="range"]::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--lmsa-section-accent), var(--lmsa-section-accent-secondary));
+  border: 2px solid var(--lmsa-surface-base);
+  box-shadow: 0 2px 6px var(--lmsa-shadow-strong);
+  cursor: pointer;
+  transition: box-shadow 0.15s ease, transform 0.15s ease;
+}
+
+.lmsa-settings-root input[type="range"]::-moz-range-thumb:hover {
+  box-shadow: 0 0 0 4px var(--lmsa-tint-25);
+  transform: scale(1.1);
+}
+
+/* ── Info boxes ────────────────────────────────────────────────────────── */
+
+.lmsa-empty-state,
+.lmsa-settings-note,
+.lmsa-advanced-note {
+  @apply lmsa:m-0 lmsa:rounded-[16px] lmsa:border lmsa:p-4;
+  color: var(--lmsa-text-secondary);
+  border-color: var(--lmsa-border-emphasis);
+  background: var(--lmsa-surface-raised);
+  line-height: 1.6;
+}
+
+.lmsa-empty-state {
+  border-style: dashed;
+  border-color: color-mix(in srgb, var(--lmsa-section-accent) 40%, var(--lmsa-border-emphasis));
+  color: color-mix(in srgb, var(--lmsa-section-accent) 50%, var(--lmsa-text-secondary));
+}
+
+.lmsa-settings-note-title {
+  @apply lmsa:mb-2 lmsa:font-semibold;
+  color: var(--lmsa-text-primary);
+}
+
+.lmsa-hint-list {
+  @apply lmsa:m-0 lmsa:pl-5;
+  color: var(--lmsa-text-secondary);
+}
+
+.lmsa-hint-list li + li {
+  margin-top: 6px;
+}
+
+/* ── Full-width inputs ─────────────────────────────────────────────────── */
+
+.lmsa-input-full {
+  width: 100%;
+}
+
+/* ── Settings model selector ────────────────────────────────────────────── */
+
+.lmsa-settings-model-selector-wrap {
+  @apply lmsa:relative;
+}
+
+.lmsa-settings-model-selector {
+  @apply lmsa:inline-flex lmsa:min-w-0 lmsa:cursor-pointer lmsa:items-center lmsa:gap-1.5 lmsa:text-obsidian-muted;
+  font-size: var(--font-ui-small);
+  line-height: 1.45;
+  padding: 2px 6px;
+  margin: -2px -6px;
+  border-radius: 6px;
+  transition: background-color 140ms ease, color 140ms ease;
+}
+
+.lmsa-settings-model-selector:hover {
+  background: color-mix(in srgb, var(--background-modifier-hover) 60%, transparent);
+  color: var(--text-normal);
+}
+
+.lmsa-settings-model-selector.is-active {
+  color: var(--text-normal);
+}
+
+.lmsa-settings-model-selector-label {
+  @apply lmsa:min-w-0 lmsa:truncate lmsa:whitespace-nowrap;
+}
+
+.lmsa-settings-model-selector-chevron {
+  @apply lmsa:inline-flex lmsa:flex-none lmsa:items-center;
+  opacity: 0.4;
+  transition: opacity 140ms ease;
+}
+
+.lmsa-settings-model-selector:hover .lmsa-settings-model-selector-chevron,
+.lmsa-settings-model-selector.is-active .lmsa-settings-model-selector-chevron {
+  opacity: 0.75;
+}
+
+.lmsa-settings-model-selector-chevron svg {
+  width: 12px;
+  height: 12px;
+}
+
+.lmsa-settings-model-selector.is-attention {
+  animation: lmsa-settings-model-selector-attention 0.7s ease;
+}
+
+/* ── Support cards ─────────────────────────────────────────────────────── */
+
+.lmsa-support-grid {
+  @apply lmsa:grid lmsa:gap-3;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+}
+
+.lmsa-support-card {
+  @apply lmsa:relative lmsa:flex lmsa:cursor-pointer lmsa:items-center lmsa:gap-3 lmsa:rounded-xl lmsa:border lmsa:px-4 lmsa:py-3;
+  border-color: var(--lmsa-border-subtle);
+  background: var(--lmsa-surface-inset);
+  transition: border-color 200ms ease, box-shadow 200ms ease, background 200ms ease;
+}
+
+.lmsa-support-card:hover {
+  border-color: var(--lmsa-border-emphasis);
+  background: var(--lmsa-tint-5);
+  box-shadow: 0 4px 16px var(--lmsa-shadow-subtle);
+}
+
+.lmsa-support-card-icon {
+  @apply lmsa:inline-flex lmsa:flex-none lmsa:items-center lmsa:justify-center;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--lmsa-section-accent) 20%, var(--background-secondary)),
+    color-mix(in srgb, var(--lmsa-section-accent-secondary) 15%, var(--background-secondary))
+  );
+  color: var(--lmsa-section-accent);
+}
+
+.lmsa-support-card-icon svg {
+  width: 18px;
+  height: 18px;
+}
+
+.lmsa-support-card-text {
+  @apply lmsa:flex lmsa:min-w-0 lmsa:flex-col;
+}
+
+.lmsa-support-card-name {
+  @apply lmsa:font-semibold;
+  color: var(--lmsa-text-primary);
+  font-size: var(--font-ui-small);
+}
+
+.lmsa-support-card-desc {
+  color: var(--lmsa-text-faint);
+  font-size: var(--font-ui-smaller);
+}
+
+/* ── Responsive ────────────────────────────────────────────────────────── */
+
+@media (max-width: 700px) {
   .lmsa-settings-panel-header {
-    @apply lmsa-flex lmsa-flex-col lmsa-gap-2 lmsa-px-6 lmsa-pb-5 lmsa-pt-6;
-    border-bottom: 1px solid color-mix(in srgb, var(--lmsa-border-default) 82%, transparent);
+    @apply lmsa:px-4 lmsa:pt-5;
   }
-
-  /* panel description is now handled by .setting-item-description
-     in SettingsTab.css via Setting.setHeading().setDesc() */
-
-  /* ── Content area ──────────────────────────────────────────────────────── */
 
   .lmsa-settings-content {
-    @apply lmsa-flex lmsa-flex-col lmsa-gap-5 lmsa-p-5;
+    @apply lmsa:px-4 lmsa:py-4;
   }
-
-  /* Conditional wrappers inside content inherit the same flex gap layout
-     so that section cards inside them don't collapse together. */
-  .lmsa-settings-content > .lmsa-rag-conditional,
-  .lmsa-settings-content > .lmsa-kg-conditional {
-    @apply lmsa-flex lmsa-flex-col lmsa-gap-5;
-  }
-
-  /* ── Section (card) ────────────────────────────────────────────────────── */
-
-  .lmsa-settings-section {
-    @apply lmsa-relative;
-    background:
-      linear-gradient(180deg, color-mix(in srgb, var(--lmsa-surface-base) 88%, transparent), var(--lmsa-surface-raised));
-    box-shadow:
-      0 14px 34px var(--lmsa-shadow-subtle),
-      inset 0 1px 0 var(--lmsa-inset-highlight);
-    border-color: var(--lmsa-border-subtle);
-    transition: border-color 200ms ease, box-shadow 200ms ease;
-  }
-
-  .lmsa-settings-section:hover {
-    border-color: var(--lmsa-border-emphasis);
-    box-shadow:
-      0 14px 34px var(--lmsa-shadow-subtle),
-      inset 0 1px 0 var(--lmsa-inset-highlight),
-      0 0 0 1px var(--lmsa-tint-20);
-  }
-
-  /* Card glow, soft accent-colored aura behind each section */
-  .lmsa-settings-section::after {
-    content: "";
-    @apply lmsa-pointer-events-none lmsa-absolute;
-    inset: -2px;
-    border-radius: inherit;
-    background: linear-gradient(
-      135deg,
-      color-mix(in srgb, var(--lmsa-section-accent) 12%, transparent),
-      transparent 60%,
-      color-mix(in srgb, var(--lmsa-section-accent-secondary) 8%, transparent)
-    );
-    z-index: -1;
-    filter: blur(20px);
-    opacity: 0.5;
-    transition: opacity 300ms ease;
-  }
-
-  .lmsa-settings-section:hover::after {
-    opacity: 0.85;
-  }
-
-  /* ── Warning section, animated border shimmer ─────────────────────────── */
-
-  .lmsa-kg-warning {
-    border-color: transparent;
-  }
-
-  .lmsa-kg-warning:hover {
-    border-color: transparent;
-    box-shadow:
-      0 14px 34px var(--lmsa-shadow-subtle),
-      inset 0 1px 0 var(--lmsa-inset-highlight);
-  }
-
-  .lmsa-kg-warning::before {
-    content: "";
-    @apply lmsa-pointer-events-none lmsa-absolute;
-    inset: -1px;
-    border-radius: inherit;
-    padding: 1.5px;
-    background: conic-gradient(
-      from var(--lmsa-border-angle),
-      transparent 0deg,
-      color-mix(in srgb, var(--lmsa-section-accent) 90%, white) 40deg,
-      transparent 80deg,
-      transparent 180deg,
-      color-mix(in srgb, var(--lmsa-section-accent) 90%, white) 220deg,
-      transparent 260deg,
-      transparent 360deg
-    );
-    -webkit-mask:
-      linear-gradient(#fff 0 0) content-box,
-      linear-gradient(#fff 0 0);
-    -webkit-mask-composite: xor;
-    mask-composite: exclude;
-    animation: lmsa-border-spin 5s linear infinite;
-    opacity: 0.55;
-    z-index: 0;
-  }
-
-  /* ── Section header ────────────────────────────────────────────────────── */
 
   .lmsa-settings-section-header {
-    @apply lmsa-flex lmsa-items-start lmsa-justify-between lmsa-gap-4 lmsa-px-5 lmsa-pb-0 lmsa-pt-5;
+    @apply lmsa:px-4 lmsa:pt-4 lmsa:flex-col;
   }
-
-  .lmsa-settings-section-heading {
-    @apply lmsa-flex lmsa-min-w-0 lmsa-flex-1 lmsa-flex-row lmsa-items-center lmsa-gap-3;
-  }
-
-  .lmsa-settings-section-actions {
-    @apply lmsa-flex lmsa-flex-wrap lmsa-justify-end lmsa-gap-2;
-  }
-
-  .lmsa-settings-section-title {
-    @apply lmsa-m-0 lmsa-font-semibold;
-    color: var(--lmsa-text-primary);
-    font-size: 1rem;
-  }
-
-  .lmsa-settings-section-desc {
-    @apply lmsa-m-0;
-    color: var(--lmsa-text-secondary);
-    font-weight: 500;
-    line-height: 1.6;
-    padding-bottom: 15px;
-  }
-
-  /* ── Section icon badge ────────────────────────────────────────────────── */
-
-  .lmsa-settings-section-icon {
-    @apply lmsa-inline-flex lmsa-flex-none lmsa-items-center lmsa-justify-center;
-    width: 32px;
-    height: 32px;
-    border-radius: 10px;
-    background: linear-gradient(
-      135deg,
-      color-mix(in srgb, var(--lmsa-section-accent) 20%, var(--background-secondary)),
-      color-mix(in srgb, var(--lmsa-section-accent-secondary) 15%, var(--background-secondary))
-    );
-    color: var(--lmsa-section-accent);
-  }
-
-  .lmsa-settings-section-icon svg {
-    width: 16px;
-    height: 16px;
-  }
-
-  /* ── Section body ──────────────────────────────────────────────────────── */
 
   .lmsa-settings-section-body {
-    @apply lmsa-px-5 lmsa-pb-4 lmsa-pt-4;
+    @apply lmsa:px-4 lmsa:py-3;
   }
 
   .lmsa-settings-section-footer {
-    @apply lmsa-flex lmsa-flex-wrap lmsa-justify-end lmsa-gap-2 lmsa-px-5 lmsa-pb-5 lmsa-pt-0;
+    @apply lmsa:px-4 lmsa:pb-4 lmsa:justify-start;
   }
 
-  .lmsa-settings-section-footer:empty {
-    display: none;
+  .lmsa-settings-section-actions {
+    @apply lmsa:justify-start;
   }
-
-  /* ── Setting item ──────────────────────────────────────────────────────── */
 
   .lmsa-setting-item {
-    @apply lmsa-relative lmsa-m-0 lmsa-flex lmsa-flex-wrap lmsa-items-center lmsa-gap-4 lmsa-px-0 lmsa-py-4;
-  }
-
-  /* Gradient separator line between setting items */
-  .lmsa-setting-item:not(:first-child)::before {
-    content: "";
-    @apply lmsa-pointer-events-none lmsa-absolute lmsa-inset-x-0 lmsa-top-0 lmsa-h-px;
-    background: linear-gradient(
-      90deg,
-      color-mix(in srgb, var(--lmsa-section-accent) 20%, transparent),
-      var(--lmsa-border-subtle),
-      color-mix(in srgb, var(--lmsa-section-accent-secondary) 20%, transparent)
-    );
-  }
-
-  .lmsa-setting-item:first-child {
-    padding-top: 0;
-  }
-
-  .lmsa-setting-item:last-child {
-    padding-bottom: 0;
-  }
-
-  .lmsa-setting-item-info {
-    @apply lmsa-flex-1 lmsa-pr-3;
-  }
-
-  .lmsa-setting-item-name {
-    @apply lmsa-font-semibold;
-    color: var(--lmsa-text-primary);
-  }
-
-  .lmsa-setting-item-desc {
-    color: var(--lmsa-text-secondary);
-    line-height: 1.55;
-  }
-
-  .lmsa-setting-item-control {
-    @apply lmsa-flex lmsa-flex-shrink-0 lmsa-items-center lmsa-gap-2;
-  }
-
-  .lmsa-setting-item > .lmsa-settings-model-selector-wrap {
-    flex-basis: 100%;
-  }
-
-  .lmsa-modal .lmsa-setting-item {
-    @apply lmsa-px-0;
-  }
-
-  /* ── Disclaimer modal ──────────────────────────────────────────────── */
-
-  .lmsa-disclaimer-modal .modal-content {
-    max-width: 540px;
-  }
-
-  .lmsa-disclaimer-modal p {
-    color: var(--lmsa-text-secondary);
-    line-height: 1.65;
-    margin: 0.75em 0;
-  }
-
-  .lmsa-disclaimer-modal p:first-of-type {
-    margin-top: 0.25em;
-  }
-
-  .lmsa-disclaimer-buttons {
-    @apply lmsa-flex lmsa-justify-end lmsa-gap-2;
-    margin-top: 1.25em;
-    padding-top: 1em;
-    border-top: 1px solid var(--lmsa-border-default);
-  }
-
-  /* ── Toggle ──────────────────────────────────────────────────────────── */
-
-  .lmsa-toggle {
-    @apply lmsa-relative lmsa-inline-block lmsa-flex-shrink-0 lmsa-cursor-pointer;
-    width: 40px;
-    height: 22px;
-    border-radius: 11px;
-    background: var(--lmsa-border-default);
-    transition: background 150ms ease;
-    outline: none;
-  }
-
-  .lmsa-toggle::after {
-    content: "";
-    @apply lmsa-absolute;
-    top: 3px;
-    left: 3px;
-    width: 16px;
-    height: 16px;
-    border-radius: 50%;
-    background: var(--lmsa-text-primary);
-    transition: transform 150ms ease;
-  }
-
-  .lmsa-toggle.is-enabled {
-    background: var(--lmsa-section-accent);
-  }
-
-  .lmsa-toggle.is-enabled::after {
-    transform: translateX(18px);
-    background: var(--lmsa-surface-contrast);
-  }
-
-  .lmsa-toggle:focus-visible {
-    box-shadow: 0 0 0 2px var(--lmsa-accent-glow);
-  }
-
-
-  /* ── Form inputs ───────────────────────────────────────────────────────── */
-
-  .lmsa-settings-root input[type="text"],
-  .lmsa-settings-root input[type="number"],
-  .lmsa-settings-root textarea,
-  .lmsa-settings-root select,
-  .lmsa-settings-root .dropdown {
-    border-radius: 12px;
-    border: 1px solid var(--lmsa-border-default);
-    background: var(--lmsa-surface-inset);
-    padding: 8px 12px;
-    color: var(--lmsa-text-primary);
-    box-shadow: inset 0 1px 0 var(--lmsa-inset-highlight-subtle);
-    transition: border-color 140ms ease, box-shadow 140ms ease;
-  }
-
-  /* A native <select> paints its own disclosure arrow inside the right padding
-     box. The shared rule above uses the same 12px right padding as a text input
-     (which has no arrow), so the chevron overlaps short labels like "Ask" /
-     "Auto" and they read as clipped. Reserve room for the arrow and keep a floor
-     width so short-label boxes don't collapse under it. Inputs/textareas keep
-     the tighter padding.
-
-     Obsidian also pins selects to a fixed --input-height; combined with the 8px
-     vertical padding from the shared rule above, that leaves too little room for
-     the text line and the label clips top-and-bottom. height:auto + a min-height
-     lets the box grow to fit its content instead. Fixes every settings dropdown
-     at once. */
-  .lmsa-settings-root select {
-    padding-right: 28px;
-    min-width: 6ch;
-    height: auto;
-    min-height: 36px;
-    overflow: visible;
-  }
-
-  .lmsa-settings-root input[type="text"]:focus,
-  .lmsa-settings-root input[type="number"]:focus,
-  .lmsa-settings-root textarea:focus,
-  .lmsa-settings-root select:focus,
-  .lmsa-settings-root .dropdown:focus {
-    border-color: var(--lmsa-border-emphasis);
-    box-shadow: 0 0 0 2px var(--lmsa-accent-glow);
-    outline: none;
-  }
-
-  .lmsa-monospace {
-    font-family: var(--font-monospace);
-  }
-
-  /* ── Range inputs ──────────────────────────────────────────────────────── */
-
-  .lmsa-settings-root input[type="range"] {
-    -webkit-appearance: none;
-    appearance: none;
-    width: 100%;
-    height: 6px;
-    border-radius: 9999px;
-    background: var(--lmsa-border-default);
-    outline: none;
-  }
-
-  .lmsa-settings-root input[type="range"]::-webkit-slider-thumb {
-    -webkit-appearance: none;
-    width: 18px;
-    height: 18px;
-    border-radius: 50%;
-    background: linear-gradient(135deg, var(--lmsa-section-accent), var(--lmsa-section-accent-secondary));
-    border: 2px solid var(--lmsa-surface-base);
-    box-shadow: 0 2px 6px var(--lmsa-shadow-strong);
-    cursor: pointer;
-    transition: box-shadow 0.15s ease, transform 0.15s ease;
-  }
-
-  .lmsa-settings-root input[type="range"]::-webkit-slider-thumb:hover {
-    box-shadow: 0 0 0 4px var(--lmsa-tint-25);
-    transform: scale(1.1);
-  }
-
-  .lmsa-settings-root input[type="range"]::-moz-range-thumb {
-    width: 18px;
-    height: 18px;
-    border-radius: 50%;
-    background: linear-gradient(135deg, var(--lmsa-section-accent), var(--lmsa-section-accent-secondary));
-    border: 2px solid var(--lmsa-surface-base);
-    box-shadow: 0 2px 6px var(--lmsa-shadow-strong);
-    cursor: pointer;
-    transition: box-shadow 0.15s ease, transform 0.15s ease;
-  }
-
-  .lmsa-settings-root input[type="range"]::-moz-range-thumb:hover {
-    box-shadow: 0 0 0 4px var(--lmsa-tint-25);
-    transform: scale(1.1);
-  }
-
-  /* ── Info boxes ────────────────────────────────────────────────────────── */
-
-  .lmsa-empty-state,
-  .lmsa-settings-note,
-  .lmsa-advanced-note {
-    @apply lmsa-m-0 lmsa-rounded-[16px] lmsa-border lmsa-p-4;
-    color: var(--lmsa-text-secondary);
-    border-color: var(--lmsa-border-emphasis);
-    background: var(--lmsa-surface-raised);
-    line-height: 1.6;
-  }
-
-  .lmsa-empty-state {
-    border-style: dashed;
-    border-color: color-mix(in srgb, var(--lmsa-section-accent) 40%, var(--lmsa-border-emphasis));
-    color: color-mix(in srgb, var(--lmsa-section-accent) 50%, var(--lmsa-text-secondary));
-  }
-
-  .lmsa-settings-note-title {
-    @apply lmsa-mb-2 lmsa-font-semibold;
-    color: var(--lmsa-text-primary);
-  }
-
-  .lmsa-hint-list {
-    @apply lmsa-m-0 lmsa-pl-5;
-    color: var(--lmsa-text-secondary);
-  }
-
-  .lmsa-hint-list li + li {
-    margin-top: 6px;
-  }
-
-  /* ── Full-width inputs ─────────────────────────────────────────────────── */
-
-  .lmsa-input-full {
-    width: 100%;
-  }
-
-  /* ── Settings model selector ────────────────────────────────────────────── */
-
-  .lmsa-settings-model-selector-wrap {
-    @apply lmsa-relative;
-  }
-
-  .lmsa-settings-model-selector {
-    @apply lmsa-inline-flex lmsa-min-w-0 lmsa-cursor-pointer lmsa-items-center lmsa-gap-1.5 lmsa-text-obsidian-muted;
-    font-size: var(--font-ui-small);
-    line-height: 1.45;
-    padding: 2px 6px;
-    margin: -2px -6px;
-    border-radius: 6px;
-    transition: background-color 140ms ease, color 140ms ease;
-  }
-
-  .lmsa-settings-model-selector:hover {
-    background: color-mix(in srgb, var(--background-modifier-hover) 60%, transparent);
-    color: var(--text-normal);
-  }
-
-  .lmsa-settings-model-selector.is-active {
-    color: var(--text-normal);
-  }
-
-  .lmsa-settings-model-selector-label {
-    @apply lmsa-min-w-0 lmsa-truncate lmsa-whitespace-nowrap;
-  }
-
-  .lmsa-settings-model-selector-chevron {
-    @apply lmsa-inline-flex lmsa-flex-none lmsa-items-center;
-    opacity: 0.4;
-    transition: opacity 140ms ease;
-  }
-
-  .lmsa-settings-model-selector:hover .lmsa-settings-model-selector-chevron,
-  .lmsa-settings-model-selector.is-active .lmsa-settings-model-selector-chevron {
-    opacity: 0.75;
-  }
-
-  .lmsa-settings-model-selector-chevron svg {
-    width: 12px;
-    height: 12px;
-  }
-
-  .lmsa-settings-model-selector.is-attention {
-    animation: lmsa-settings-model-selector-attention 0.7s ease;
-  }
-
-  /* ── Support cards ─────────────────────────────────────────────────────── */
-
-  .lmsa-support-grid {
-    @apply lmsa-grid lmsa-gap-3;
-    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  }
-
-  .lmsa-support-card {
-    @apply lmsa-relative lmsa-flex lmsa-cursor-pointer lmsa-items-center lmsa-gap-3 lmsa-rounded-xl lmsa-border lmsa-px-4 lmsa-py-3;
-    border-color: var(--lmsa-border-subtle);
-    background: var(--lmsa-surface-inset);
-    transition: border-color 200ms ease, box-shadow 200ms ease, background 200ms ease;
-  }
-
-  .lmsa-support-card:hover {
-    border-color: var(--lmsa-border-emphasis);
-    background: var(--lmsa-tint-5);
-    box-shadow: 0 4px 16px var(--lmsa-shadow-subtle);
-  }
-
-  .lmsa-support-card-icon {
-    @apply lmsa-inline-flex lmsa-flex-none lmsa-items-center lmsa-justify-center;
-    width: 36px;
-    height: 36px;
-    border-radius: 10px;
-    background: linear-gradient(
-      135deg,
-      color-mix(in srgb, var(--lmsa-section-accent) 20%, var(--background-secondary)),
-      color-mix(in srgb, var(--lmsa-section-accent-secondary) 15%, var(--background-secondary))
-    );
-    color: var(--lmsa-section-accent);
-  }
-
-  .lmsa-support-card-icon svg {
-    width: 18px;
-    height: 18px;
-  }
-
-  .lmsa-support-card-text {
-    @apply lmsa-flex lmsa-min-w-0 lmsa-flex-col;
-  }
-
-  .lmsa-support-card-name {
-    @apply lmsa-font-semibold;
-    color: var(--lmsa-text-primary);
-    font-size: var(--font-ui-small);
-  }
-
-  .lmsa-support-card-desc {
-    color: var(--lmsa-text-faint);
-    font-size: var(--font-ui-smaller);
-  }
-
-  /* ── Responsive ────────────────────────────────────────────────────────── */
-
-  @media (max-width: 700px) {
-    .lmsa-settings-panel-header {
-      @apply lmsa-px-4 lmsa-pt-5;
-    }
-
-    .lmsa-settings-content {
-      @apply lmsa-px-4 lmsa-py-4;
-    }
-
-    .lmsa-settings-section-header {
-      @apply lmsa-px-4 lmsa-pt-4 lmsa-flex-col;
-    }
-
-    .lmsa-settings-section-body {
-      @apply lmsa-px-4 lmsa-py-3;
-    }
-
-    .lmsa-settings-section-footer {
-      @apply lmsa-px-4 lmsa-pb-4 lmsa-justify-start;
-    }
-
-    .lmsa-settings-section-actions {
-      @apply lmsa-justify-start;
-    }
-
-    .lmsa-setting-item {
-      @apply lmsa-flex-col lmsa-items-stretch;
-    }
+    @apply lmsa:flex-col lmsa:items-stretch;
   }
 }
 

@@ -1,234 +1,232 @@
-@layer components {
-  /* Hide the container when empty (no timeline rendered inside). */
-  .lmsa-chat-window-message-timeline:empty {
-    display: none;
-  }
+/* Hide the container when empty (no timeline rendered inside). */
+.lmsa-chat-window-message-timeline:empty {
+  display: none;
+}
 
-  .lmsa-agentic-timeline {
-    width: 100%;
-    font-size: var(--font-ui-small);
-    color: var(--text-muted);
-  }
+.lmsa-agentic-timeline {
+  width: 100%;
+  font-size: var(--font-ui-small);
+  color: var(--text-muted);
+}
 
-  .lmsa-agentic-timeline-summary {
-    @apply lmsa-inline-flex lmsa-cursor-pointer lmsa-select-none lmsa-items-center lmsa-gap-1.5;
-    list-style: none;
-    opacity: 0.65;
-    transition: opacity 120ms ease;
-  }
+.lmsa-agentic-timeline-summary {
+  @apply lmsa:inline-flex lmsa:cursor-pointer lmsa:select-none lmsa:items-center lmsa:gap-1.5;
+  list-style: none;
+  opacity: 0.65;
+  transition: opacity 120ms ease;
+}
 
-  .lmsa-agentic-timeline-summary::-webkit-details-marker {
-    display: none;
-  }
+.lmsa-agentic-timeline-summary::-webkit-details-marker {
+  display: none;
+}
 
-  .lmsa-agentic-timeline-summary:hover {
-    opacity: 1;
-  }
+.lmsa-agentic-timeline-summary:hover {
+  opacity: 1;
+}
 
-  .lmsa-agentic-timeline-summary-icon {
-    @apply lmsa-inline-flex lmsa-h-3.5 lmsa-w-3.5 lmsa-items-center lmsa-justify-center;
-    color: var(--lmsa-mode-accent);
-  }
+.lmsa-agentic-timeline-summary-icon {
+  @apply lmsa:inline-flex lmsa:h-3.5 lmsa:w-3.5 lmsa:items-center lmsa:justify-center;
+  color: var(--lmsa-mode-accent);
+}
 
-  .lmsa-agentic-timeline-summary-icon svg {
-    width: 14px;
-    height: 14px;
-  }
+.lmsa-agentic-timeline-summary-icon svg {
+  width: 14px;
+  height: 14px;
+}
 
-  .lmsa-agentic-timeline-summary-label {
-    color: var(--text-muted);
-  }
+.lmsa-agentic-timeline-summary-label {
+  color: var(--text-muted);
+}
 
-  /* ── Step list ──────────────────────────────────────────────────── */
+/* ── Step list ──────────────────────────────────────────────────── */
 
-  .lmsa-agentic-timeline-list {
-    position: relative;
-    padding: 6px 0 2px 26px;
-    margin-top: 4px;
-  }
+.lmsa-agentic-timeline-list {
+  position: relative;
+  padding: 6px 0 2px 26px;
+  margin-top: 4px;
+}
 
-  /* Vertical connecting line */
-  .lmsa-agentic-timeline-list::before {
-    content: "";
-    position: absolute;
-    left: 8px;
-    top: 16px;
-    bottom: 10px;
-    width: 2px;
-    background: var(--background-modifier-border);
-    border-radius: 1px;
-  }
+/* Vertical connecting line */
+.lmsa-agentic-timeline-list::before {
+  content: "";
+  position: absolute;
+  left: 8px;
+  top: 16px;
+  bottom: 10px;
+  width: 2px;
+  background: var(--background-modifier-border);
+  border-radius: 1px;
+}
 
-  .lmsa-agentic-timeline-step {
-    @apply lmsa-flex lmsa-items-start lmsa-gap-2;
-    position: relative;
-    padding: 3px 0;
-    min-height: 22px;
-  }
+.lmsa-agentic-timeline-step {
+  @apply lmsa:flex lmsa:items-start lmsa:gap-2;
+  position: relative;
+  padding: 3px 0;
+  min-height: 22px;
+}
 
-  /* ── Dot on the line ─────────────────────────────────────────────── */
+/* ── Dot on the line ─────────────────────────────────────────────── */
 
-  .lmsa-agentic-timeline-dot {
-    @apply lmsa-inline-flex lmsa-flex-shrink-0 lmsa-items-center lmsa-justify-center lmsa-rounded-full;
-    position: absolute;
-    left: -26px;
-    top: 3px;
-    width: 18px;
-    height: 18px;
-    background: var(--background-primary);
-    border: 2px solid var(--background-modifier-border);
-    box-sizing: border-box;
-  }
+.lmsa-agentic-timeline-dot {
+  @apply lmsa:inline-flex lmsa:shrink-0 lmsa:items-center lmsa:justify-center lmsa:rounded-full;
+  position: absolute;
+  left: -26px;
+  top: 3px;
+  width: 18px;
+  height: 18px;
+  background: var(--background-primary);
+  border: 2px solid var(--background-modifier-border);
+  box-sizing: border-box;
+}
 
-  .lmsa-agentic-timeline-dot svg {
-    width: 10px;
-    height: 10px;
-  }
+.lmsa-agentic-timeline-dot svg {
+  width: 10px;
+  height: 10px;
+}
 
-  .lmsa-agentic-timeline-step--tool_call .lmsa-agentic-timeline-dot {
-    color: var(--color-cyan, var(--lmsa-mode-accent));
-    border-color: color-mix(in srgb, var(--color-cyan, var(--lmsa-mode-accent)) 55%, var(--background-modifier-border));
-    background: color-mix(in srgb, var(--color-cyan, var(--lmsa-mode-accent)) 10%, var(--background-primary));
-  }
+.lmsa-agentic-timeline-step--tool_call .lmsa-agentic-timeline-dot {
+  color: var(--color-cyan, var(--lmsa-mode-accent));
+  border-color: color-mix(in srgb, var(--color-cyan, var(--lmsa-mode-accent)) 55%, var(--background-modifier-border));
+  background: color-mix(in srgb, var(--color-cyan, var(--lmsa-mode-accent)) 10%, var(--background-primary));
+}
 
-  /* Mutating tools (vault ops + edits): orange category tint, the same accent as the
-     "pending approval" label. Defined after --tool_call so it overrides the cyan on the
-     equal-specificity descendant rule; the review overlays' applied/failed states (a
-     later import) override this in turn once an op resolves. */
-  .lmsa-agentic-timeline-step--mutating .lmsa-agentic-timeline-dot {
-    color: var(--lmsa-mode-accent);
-    border-color: color-mix(in srgb, var(--lmsa-mode-accent) 55%, var(--background-modifier-border));
-    background: color-mix(in srgb, var(--lmsa-mode-accent) 10%, var(--background-primary));
-  }
+/* Mutating tools (vault ops + edits): orange category tint, the same accent as the
+   "pending approval" label. Defined after --tool_call so it overrides the cyan on the
+   equal-specificity descendant rule; the review overlays' applied/failed states (a
+   later import) override this in turn once an op resolves. */
+.lmsa-agentic-timeline-step--mutating .lmsa-agentic-timeline-dot {
+  color: var(--lmsa-mode-accent);
+  border-color: color-mix(in srgb, var(--lmsa-mode-accent) 55%, var(--background-modifier-border));
+  background: color-mix(in srgb, var(--lmsa-mode-accent) 10%, var(--background-primary));
+}
 
-  /* Error: the tool failed or was policy-denied, red, overriding the category and
-     read-only tints. Must stay last of the three so it wins by source order. (The
-     review overlays paint their own red for failed / declined / no-match ops.) */
-  .lmsa-agentic-timeline-step--error .lmsa-agentic-timeline-dot {
-    color: var(--text-error);
-    border-color: color-mix(in srgb, var(--text-error) 55%, var(--background-modifier-border));
-    background: color-mix(in srgb, var(--text-error) 12%, var(--background-primary));
-  }
+/* Error: the tool failed or was policy-denied, red, overriding the category and
+   read-only tints. Must stay last of the three so it wins by source order. (The
+   review overlays paint their own red for failed / declined / no-match ops.) */
+.lmsa-agentic-timeline-step--error .lmsa-agentic-timeline-dot {
+  color: var(--text-error);
+  border-color: color-mix(in srgb, var(--text-error) 55%, var(--background-modifier-border));
+  background: color-mix(in srgb, var(--text-error) 12%, var(--background-primary));
+}
 
-  .lmsa-agentic-timeline-step--reasoning .lmsa-agentic-timeline-dot {
-    color: var(--text-faint);
-    border-color: var(--background-modifier-border);
-  }
+.lmsa-agentic-timeline-step--reasoning .lmsa-agentic-timeline-dot {
+  color: var(--text-faint);
+  border-color: var(--background-modifier-border);
+}
 
-  /* ── Step body ───────────────────────────────────────────────────── */
+/* ── Step body ───────────────────────────────────────────────────── */
 
-  .lmsa-agentic-timeline-step-body {
-    @apply lmsa-flex lmsa-min-w-0 lmsa-flex-wrap lmsa-items-baseline lmsa-gap-x-1.5;
-    line-height: 1.5;
-  }
+.lmsa-agentic-timeline-step-body {
+  @apply lmsa:flex lmsa:min-w-0 lmsa:flex-wrap lmsa:items-baseline lmsa:gap-x-1.5;
+  line-height: 1.5;
+}
 
-  .lmsa-agentic-timeline-step-name {
-    color: var(--text-normal);
-    font-weight: 500;
-  }
+.lmsa-agentic-timeline-step-name {
+  color: var(--text-normal);
+  font-weight: 500;
+}
 
-  .lmsa-agentic-timeline-step--reasoning .lmsa-agentic-timeline-step-name {
-    font-weight: 400;
-    color: var(--text-muted);
-    font-style: italic;
-  }
+.lmsa-agentic-timeline-step--reasoning .lmsa-agentic-timeline-step-name {
+  font-weight: 400;
+  color: var(--text-muted);
+  font-style: italic;
+}
 
-  .lmsa-agentic-timeline-step-detail {
-    color: var(--text-muted);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    max-width: 280px;
-  }
+.lmsa-agentic-timeline-step-detail {
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 280px;
+}
 
-  /* Inline "Failed" marker for an errored read-only tool, the unmissable signal when
-     the step is collapsed (mutating ops show their state via the review controls). */
-  .lmsa-agentic-timeline-step-failed {
-    color: var(--text-error);
-    font-size: var(--font-ui-smaller);
-    font-weight: 500;
-  }
+/* Inline "Failed" marker for an errored read-only tool, the unmissable signal when
+   the step is collapsed (mutating ops show their state via the review controls). */
+.lmsa-agentic-timeline-step-failed {
+  color: var(--text-error);
+  font-size: var(--font-ui-smaller);
+  font-weight: 500;
+}
 
-  /* Pending state: dot pulses while tool arguments are streaming in. */
-  .lmsa-agentic-timeline-step--pending .lmsa-agentic-timeline-dot {
-    animation: lmsa-timeline-dot-pulse 1.2s ease-in-out infinite;
-  }
+/* Pending state: dot pulses while tool arguments are streaming in. */
+.lmsa-agentic-timeline-step--pending .lmsa-agentic-timeline-dot {
+  animation: lmsa-timeline-dot-pulse 1.2s ease-in-out infinite;
+}
 
-  @keyframes lmsa-timeline-dot-pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.35; }
-  }
+@keyframes lmsa-timeline-dot-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
 
-  /* ── Expandable tool args ──────────────────────────────────────── */
+/* ── Expandable tool args ──────────────────────────────────────── */
 
-  .lmsa-agentic-timeline-step--expandable {
-    cursor: pointer;
-  }
+.lmsa-agentic-timeline-step--expandable {
+  cursor: pointer;
+}
 
-  .lmsa-agentic-timeline-step--expandable:hover .lmsa-agentic-timeline-step-name {
-    text-decoration: underline;
-    text-decoration-style: dotted;
-  }
+.lmsa-agentic-timeline-step--expandable:hover .lmsa-agentic-timeline-step-name {
+  text-decoration: underline;
+  text-decoration-style: dotted;
+}
 
-  /* No card: a quiet left rule marks the detail as nested under the step, so it
-     sits on the timeline background seamlessly instead of in a boxed panel.
-     `order: 1` keeps it last in the body's flex-wrap, so expanding drops it
-     *below* any inline controls (e.g. vault approve/decline) rather than shoving
-     them down. */
-  .lmsa-agentic-timeline-step-expand {
-    display: none;
-    order: 1;
-    width: 100%;
-    margin-top: 4px;
-    padding: 2px 0 2px 10px;
-    border-left: 2px solid var(--background-modifier-border);
-    font-size: var(--font-ui-smaller);
-  }
+/* No card: a quiet left rule marks the detail as nested under the step, so it
+   sits on the timeline background seamlessly instead of in a boxed panel.
+   `order: 1` keeps it last in the body's flex-wrap, so expanding drops it
+   *below* any inline controls (e.g. vault approve/decline) rather than shoving
+   them down. */
+.lmsa-agentic-timeline-step-expand {
+  display: none;
+  order: 1;
+  width: 100%;
+  margin-top: 4px;
+  padding: 2px 0 2px 10px;
+  border-left: 2px solid var(--background-modifier-border);
+  font-size: var(--font-ui-smaller);
+}
 
-  .lmsa-agentic-timeline-step.is-expanded .lmsa-agentic-timeline-step-expand {
-    display: block;
-  }
+.lmsa-agentic-timeline-step.is-expanded .lmsa-agentic-timeline-step-expand {
+  display: block;
+}
 
-  /* The exact tool result returned to the model on failure, sits at the top of the
-     expand block, marked with a red left rule (echoing the neutral one on the expand
-     itself) so it reads as the error nested under the failed step. */
-  .lmsa-agentic-timeline-error {
-    margin-bottom: 6px;
-    padding: 2px 0 2px 8px;
-    border-left: 2px solid var(--text-error);
-  }
+/* The exact tool result returned to the model on failure, sits at the top of the
+   expand block, marked with a red left rule (echoing the neutral one on the expand
+   itself) so it reads as the error nested under the failed step. */
+.lmsa-agentic-timeline-error {
+  margin-bottom: 6px;
+  padding: 2px 0 2px 8px;
+  border-left: 2px solid var(--text-error);
+}
 
-  .lmsa-agentic-timeline-error-label {
-    display: block;
-    margin-bottom: 2px;
-    color: var(--text-error);
-    font-weight: 600;
-  }
+.lmsa-agentic-timeline-error-label {
+  display: block;
+  margin-bottom: 2px;
+  color: var(--text-error);
+  font-weight: 600;
+}
 
-  .lmsa-agentic-timeline-arg-entry {
-    @apply lmsa-flex lmsa-flex-col lmsa-gap-0.5;
-    padding: 2px 0;
-  }
+.lmsa-agentic-timeline-arg-entry {
+  @apply lmsa:flex lmsa:flex-col lmsa:gap-0.5;
+  padding: 2px 0;
+}
 
-  .lmsa-agentic-timeline-arg-entry + .lmsa-agentic-timeline-arg-entry {
-    margin-top: 4px;
-    padding-top: 4px;
-    border-top: 1px solid var(--background-modifier-border);
-  }
+.lmsa-agentic-timeline-arg-entry + .lmsa-agentic-timeline-arg-entry {
+  margin-top: 4px;
+  padding-top: 4px;
+  border-top: 1px solid var(--background-modifier-border);
+}
 
-  .lmsa-agentic-timeline-arg-key {
-    color: var(--text-accent);
-    font-weight: 600;
-  }
+.lmsa-agentic-timeline-arg-key {
+  color: var(--text-accent);
+  font-weight: 600;
+}
 
-  .lmsa-agentic-timeline-arg-value {
-    margin: 0;
-    padding: 0;
-    background: transparent;
-    color: var(--text-normal);
-    white-space: pre-wrap;
-    word-break: break-word;
-    max-height: 300px;
-    overflow-y: auto;
-  }
+.lmsa-agentic-timeline-arg-value {
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--text-normal);
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 300px;
+  overflow-y: auto;
 }

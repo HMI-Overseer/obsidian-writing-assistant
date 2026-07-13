@@ -1,88 +1,86 @@
-@layer components {
-  .lmsa-chat-composer-tool-indicator {
-    cursor: pointer;
-    anchor-name: --lmsa-tool-chip;
-  }
+.lmsa-chat-composer-tool-indicator {
+  cursor: pointer;
+  anchor-name: --lmsa-tool-chip;
+}
 
-  /* ── Popover shell ────────────────────────────────────────────────── */
+/* ── Popover shell ────────────────────────────────────────────────── */
 
-  .lmsa-tool-popover {
-    @apply lmsa-absolute lmsa-z-[120] lmsa-flex-col lmsa-rounded-2xl lmsa-border lmsa-border-obsidian-border lmsa-p-4;
-    --lmsa-tool-popover-width: min(280px, calc(100% - 28px));
-    bottom: calc(100% + 8px);
-    /* The popover lives outside the footer row (its overflow clip would chop it),
-       so it can't sit next to its chip in the DOM. CSS anchor positioning tracks
-       the chip across pane widths and container-query reshuffles: right edges
-       align, clamped so the popover never leaves the footer. The first, static
-       `right` is the fallback for pre-anchor-positioning engines. */
-    right: 50px;
-    position-anchor: --lmsa-tool-chip;
-    right: clamp(14px, anchor(right), calc(100% - 14px - var(--lmsa-tool-popover-width)));
-    width: var(--lmsa-tool-popover-width);
-    background:
-      linear-gradient(
-        180deg,
-        color-mix(in srgb, var(--background-primary) 97%, transparent),
-        color-mix(in srgb, var(--background-secondary) 94%, transparent)
-      );
-    backdrop-filter: blur(22px);
-    -webkit-backdrop-filter: blur(22px);
-    box-shadow:
-      0 -12px 48px rgba(0, 0, 0, 0.18),
-      inset 0 -1px 0 var(--lmsa-inset-highlight-subtle);
-    transform-origin: bottom right;
-  }
+.lmsa-tool-popover {
+  @apply lmsa:absolute lmsa:z-[120] lmsa:flex-col lmsa:rounded-2xl lmsa:border lmsa:border-obsidian-border lmsa:p-4;
+  --lmsa-tool-popover-width: min(280px, calc(100% - 28px));
+  bottom: calc(100% + 8px);
+  /* The popover lives outside the footer row (its overflow clip would chop it),
+     so it can't sit next to its chip in the DOM. CSS anchor positioning tracks
+     the chip across pane widths and container-query reshuffles: right edges
+     align, clamped so the popover never leaves the footer. The first, static
+     `right` is the fallback for pre-anchor-positioning engines. */
+  right: 50px;
+  position-anchor: --lmsa-tool-chip;
+  right: clamp(14px, anchor(right), calc(100% - 14px - var(--lmsa-tool-popover-width)));
+  width: var(--lmsa-tool-popover-width);
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--background-primary) 97%, transparent),
+      color-mix(in srgb, var(--background-secondary) 94%, transparent)
+    );
+  backdrop-filter: blur(22px);
+  -webkit-backdrop-filter: blur(22px);
+  box-shadow:
+    0 -12px 48px rgba(0, 0, 0, 0.18),
+    inset 0 -1px 0 var(--lmsa-inset-highlight-subtle);
+  transform-origin: bottom right;
+}
 
-  .lmsa-tool-popover-title {
-    @apply lmsa-font-bold lmsa-text-obsidian-text;
-    font-size: var(--font-ui-small);
-    margin-bottom: 0.75rem;
-  }
+.lmsa-tool-popover-title {
+  @apply lmsa:font-bold lmsa:text-obsidian-text;
+  font-size: var(--font-ui-small);
+  margin-bottom: 0.75rem;
+}
 
-  .lmsa-tool-popover-body {
-    @apply lmsa-flex lmsa-flex-col lmsa-gap-4;
-  }
+.lmsa-tool-popover-body {
+  @apply lmsa:flex lmsa:flex-col lmsa:gap-4;
+}
 
-  /* ── Section ──────────────────────────────────────────────────────── */
+/* ── Section ──────────────────────────────────────────────────────── */
 
-  .lmsa-tool-popover-section {
-    @apply lmsa-flex lmsa-flex-col lmsa-gap-2;
-  }
+.lmsa-tool-popover-section {
+  @apply lmsa:flex lmsa:flex-col lmsa:gap-2;
+}
 
-  /* Header row: label + toggle */
-  .lmsa-tool-popover-row {
-    @apply lmsa-flex lmsa-items-center lmsa-justify-between lmsa-gap-3;
-  }
+/* Header row: label + toggle */
+.lmsa-tool-popover-row {
+  @apply lmsa:flex lmsa:items-center lmsa:justify-between lmsa:gap-3;
+}
 
-  .lmsa-tool-popover-label {
-    font-weight: 600;
-    font-size: var(--font-ui-small);
-    color: var(--text-normal);
-  }
+.lmsa-tool-popover-label {
+  font-weight: 600;
+  font-size: var(--font-ui-small);
+  color: var(--text-normal);
+}
 
-  .lmsa-tool-popover-control {
-    @apply lmsa-flex;
-  }
+.lmsa-tool-popover-control {
+  @apply lmsa:flex;
+}
 
-  /* Provide token values the settings Toggle expects (normally scoped to .lmsa-settings-root) */
-  .lmsa-tool-popover .lmsa-toggle {
-    --lmsa-border-default: var(--background-modifier-border);
-    --lmsa-text-primary: var(--text-normal);
-    --lmsa-section-accent: var(--color-orange, #e8a84b);
-    --lmsa-surface-contrast: #fff;
-    --lmsa-accent-glow: color-mix(in srgb, var(--color-orange, #e8a84b) 30%, transparent);
-  }
+/* Provide token values the settings Toggle expects (normally scoped to .lmsa-settings-root) */
+.lmsa-tool-popover .lmsa-toggle {
+  --lmsa-border-default: var(--background-modifier-border);
+  --lmsa-text-primary: var(--text-normal);
+  --lmsa-section-accent: var(--color-orange, #e8a84b);
+  --lmsa-surface-contrast: #fff;
+  --lmsa-accent-glow: color-mix(in srgb, var(--color-orange, #e8a84b) 30%, transparent);
+}
 
-  /* Status text */
-  .lmsa-tool-popover-status {
-    font-size: var(--font-ui-smaller);
-    color: var(--text-muted);
-    line-height: 1.4;
-  }
+/* Status text */
+.lmsa-tool-popover-status {
+  font-size: var(--font-ui-smaller);
+  color: var(--text-muted);
+  line-height: 1.4;
+}
 
-  .lmsa-tool-popover-status.is-warning {
-    color: var(--text-warning, #e6a700);
-  }
+.lmsa-tool-popover-status.is-warning {
+  color: var(--text-warning, #e6a700);
 }
 
 /* Once the tool chip has left the footer row (399px and below) the popover is
@@ -90,7 +88,7 @@
    footer instead of relying on the anchored clamp. */
 @container lmsa-composer-footer (max-width: 399px) {
   .lmsa-tool-popover {
-    @apply lmsa-left-0 lmsa-right-0;
+    @apply lmsa:left-0 lmsa:right-0;
     width: auto;
   }
 }

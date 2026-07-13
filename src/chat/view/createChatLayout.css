@@ -1,281 +1,279 @@
-@layer components {
-  /* ── Root ────────────────────────────────────────────────────────────────── */
+/* ── Root ────────────────────────────────────────────────────────────────── */
 
+.lmsa-root {
+  @apply lmsa:relative;
+  height: 100%;
+  font-size: var(--font-ui-small);
+
+  /* The plugin root is also Obsidian's .view-content, whose core rule sets
+     `overflow: auto` and wins the cascade over a plain/layered `overflow: hidden`.
+     Left unbeaten, the root itself scrolls: a few px of horizontal overflow at narrow
+     widths pops a scrollbar that steals height and shoves the composer up (a jitter).
+     !important is required here, matching the padding overrides just below that beat
+     the same .view-content rule. The chat scrolls internally (the messages list), so
+     the root must never scroll. */
+  overflow: hidden !important;
+
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+  padding-top: 0 !important;
+
+  /* Mode accent, overridden per data-posture */
+  --lmsa-mode-accent: var(--interactive-accent);
+
+  /* Chat hover tokens, derived from mode accent */
+  --lmsa-chat-accent: var(--lmsa-mode-accent);
+  --lmsa-chat-border-emphasis: color-mix(in srgb, var(--lmsa-mode-accent) 30%, var(--background-modifier-border));
+  --lmsa-chat-glow-ring: color-mix(in srgb, var(--lmsa-mode-accent) 22%, transparent);
+
+  /* Raised-surface top-edge bevel. Derived from the theme border so it exists in both
+     light and dark themes, unlike the raw white it replaces (which vanished on light). */
+  --lmsa-inset-highlight: color-mix(in srgb, var(--background-modifier-border) 55%, transparent);
+  --lmsa-inset-highlight-subtle: color-mix(in srgb, var(--background-modifier-border) 35%, transparent);
+
+  background:
+    radial-gradient(circle at top, color-mix(in srgb, var(--lmsa-mode-accent) 9%, transparent), transparent 42%),
+    linear-gradient(180deg, var(--background-primary), var(--background-secondary-alt, var(--background-secondary)) 120%);
+  transition: background 400ms ease;
+}
+
+/* "ask" posture keeps the base --interactive-accent (no override needed). */
+.lmsa-root[data-posture="auto"] {
+  --lmsa-mode-accent: var(--color-orange, #e8a84b);
+}
+
+/* OS-level appearance handling. Obsidian's own theme variables (resolved above via
+   color-mix) are the primary, authoritative signal, so the surfaces already adapt to a
+   light Obsidian theme. This reinforces the bevel for an explicit light OS preference,
+   where a near-transparent edge is least visible against a bright backdrop. */
+@media (prefers-color-scheme: light) {
   .lmsa-root {
-    @apply lmsa-relative;
-    height: 100%;
-    font-size: var(--font-ui-small);
-
-    /* The plugin root is also Obsidian's .view-content, whose core rule sets
-       `overflow: auto` and wins the cascade over a plain/layered `overflow: hidden`.
-       Left unbeaten, the root itself scrolls: a few px of horizontal overflow at narrow
-       widths pops a scrollbar that steals height and shoves the composer up (a jitter).
-       !important is required here, matching the padding overrides just below that beat
-       the same .view-content rule. The chat scrolls internally (the messages list), so
-       the root must never scroll. */
-    overflow: hidden !important;
-
-    padding-left: 0 !important;
-    padding-right: 0 !important;
-    padding-top: 0 !important;
-
-    /* Mode accent, overridden per data-posture */
-    --lmsa-mode-accent: var(--interactive-accent);
-
-    /* Chat hover tokens, derived from mode accent */
-    --lmsa-chat-accent: var(--lmsa-mode-accent);
-    --lmsa-chat-border-emphasis: color-mix(in srgb, var(--lmsa-mode-accent) 30%, var(--background-modifier-border));
-    --lmsa-chat-glow-ring: color-mix(in srgb, var(--lmsa-mode-accent) 22%, transparent);
-
-    /* Raised-surface top-edge bevel. Derived from the theme border so it exists in both
-       light and dark themes, unlike the raw white it replaces (which vanished on light). */
-    --lmsa-inset-highlight: color-mix(in srgb, var(--background-modifier-border) 55%, transparent);
-    --lmsa-inset-highlight-subtle: color-mix(in srgb, var(--background-modifier-border) 35%, transparent);
-
-    background:
-      radial-gradient(circle at top, color-mix(in srgb, var(--lmsa-mode-accent) 9%, transparent), transparent 42%),
-      linear-gradient(180deg, var(--background-primary), var(--background-secondary-alt, var(--background-secondary)) 120%);
-    transition: background 400ms ease;
+    --lmsa-inset-highlight: color-mix(in srgb, var(--background-modifier-border) 70%, transparent);
+    --lmsa-inset-highlight-subtle: color-mix(in srgb, var(--background-modifier-border) 45%, transparent);
   }
+}
 
-  /* "ask" posture keeps the base --interactive-accent (no override needed). */
-  .lmsa-root[data-posture="auto"] {
-    --lmsa-mode-accent: var(--color-orange, #e8a84b);
-  }
+/* ── Shell ───────────────────────────────────────────────────────────────── */
 
-  /* OS-level appearance handling. Obsidian's own theme variables (resolved above via
-     color-mix) are the primary, authoritative signal, so the surfaces already adapt to a
-     light Obsidian theme. This reinforces the bevel for an explicit light OS preference,
-     where a near-transparent edge is least visible against a bright backdrop. */
-  @media (prefers-color-scheme: light) {
-    .lmsa-root {
-      --lmsa-inset-highlight: color-mix(in srgb, var(--background-modifier-border) 70%, transparent);
-      --lmsa-inset-highlight-subtle: color-mix(in srgb, var(--background-modifier-border) 45%, transparent);
-    }
-  }
+.lmsa-shell {
+  @apply lmsa:mx-auto lmsa:flex lmsa:h-full lmsa:max-w-[980px] lmsa:flex-col;
+}
 
-  /* ── Shell ───────────────────────────────────────────────────────────────── */
+/* ── Header ──────────────────────────────────────────────────────────────── */
 
-  .lmsa-shell {
-    @apply lmsa-mx-auto lmsa-flex lmsa-h-full lmsa-max-w-[980px] lmsa-flex-col;
-  }
+.lmsa-chat-header {
+  @apply lmsa:flex lmsa:items-center lmsa:justify-between lmsa:gap-4 lmsa:px-[18px] lmsa:pb-3 lmsa:pt-[18px];
+}
 
-  /* ── Header ──────────────────────────────────────────────────────────────── */
+.lmsa-chat-header-copy {
+  @apply lmsa:flex lmsa:min-w-0 lmsa:flex-col lmsa:gap-1;
+}
 
+.lmsa-chat-header-title {
+  @apply lmsa:font-bold lmsa:text-obsidian-text;
+  font-size: 1.05rem;
+}
+
+.lmsa-chat-header-meta-wrap {
+  @apply lmsa:relative;
+}
+
+.lmsa-chat-header-meta {
+  @apply lmsa:inline-flex lmsa:min-w-0 lmsa:cursor-pointer lmsa:items-center lmsa:gap-1.5 lmsa:text-obsidian-muted;
+  font-size: var(--font-ui-small);
+  line-height: 1.45;
+  padding: 2px 6px;
+  margin: -2px -6px;
+  border-radius: 6px;
+  transition: background-color 140ms ease, color 140ms ease;
+}
+
+.lmsa-chat-header-meta:hover {
+  background: color-mix(in srgb, var(--background-modifier-hover) 60%, transparent);
+  color: var(--text-normal);
+}
+
+.lmsa-chat-header-meta.is-active {
+  color: var(--text-normal);
+}
+
+.lmsa-chat-header-meta.is-attention {
+  animation: lmsa-chat-header-meta-attention 0.7s ease;
+}
+
+.lmsa-chat-header-meta-label {
+  @apply lmsa:min-w-0 lmsa:truncate lmsa:whitespace-nowrap;
+}
+
+.lmsa-chat-header-meta-chevron {
+  @apply lmsa:inline-flex lmsa:flex-none lmsa:items-center;
+  opacity: 0.4;
+  transition: opacity 140ms ease;
+}
+
+.lmsa-chat-header-meta:hover .lmsa-chat-header-meta-chevron,
+.lmsa-chat-header-meta.is-active .lmsa-chat-header-meta-chevron {
+  opacity: 0.75;
+}
+
+.lmsa-chat-header-meta-chevron svg {
+  width: 12px;
+  height: 12px;
+}
+
+.lmsa-chat-header-actions {
+  @apply lmsa:flex lmsa:items-center lmsa:gap-2.5;
+}
+
+.lmsa-chat-header-actions .lmsa-ui-icon-btn {
+  @apply lmsa:h-auto lmsa:w-auto lmsa:rounded-md lmsa:border-none lmsa:p-1.5;
+  background: transparent !important;
+  box-shadow: none;
+  outline: none;
+  appearance: none;
+  min-height: unset;
+  transition: background 120ms ease, color 120ms ease;
+}
+
+.lmsa-chat-header-actions .lmsa-ui-icon-btn:hover,
+.lmsa-chat-header-btn:hover {
+  background: color-mix(in srgb, var(--background-modifier-hover) 60%, transparent) !important;
+  color: var(--text-normal);
+  box-shadow: none;
+}
+
+.lmsa-chat-header-actions .lmsa-ui-icon-btn:focus-visible {
+  box-shadow: 0 0 0 2px var(--lmsa-mode-accent);
+}
+
+.lmsa-chat-header-btn svg {
+  width: 20px;
+  height: 20px;
+}
+
+/* ── Messages pane ───────────────────────────────────────────────────────── */
+
+.lmsa-messages-pane {
+  @apply lmsa:relative lmsa:min-h-0 lmsa:flex-1 lmsa:overflow-visible;
+}
+
+.lmsa-chat-window-messages {
+  @apply lmsa:flex lmsa:h-full lmsa:flex-col lmsa:gap-[18px] lmsa:overflow-y-auto lmsa:px-[18px] lmsa:pb-6 lmsa:pt-2.5;
+  /* No horizontal scrollbar, wide content scrolls inside its own wrapper
+     (code blocks, tables); everything else wraps or clips. */
+  overflow-x: hidden;
+  scrollbar-gutter: stable;
+  transition: opacity 180ms ease;
+}
+
+.lmsa-history-backdrop {
+  @apply lmsa:pointer-events-none lmsa:absolute lmsa:inset-0 lmsa:z-[8] lmsa:opacity-0;
+  background: transparent;
+  transition: opacity 180ms ease;
+}
+
+.lmsa-history-backdrop.is-open {
+  @apply lmsa:pointer-events-auto lmsa:opacity-100;
+}
+
+.lmsa-messages-pane.is-history-open .lmsa-chat-window-messages,
+.lmsa-messages-pane.is-history-open .lmsa-empty-view {
+  opacity: 0;
+}
+
+/* ── Empty state ─────────────────────────────────────────────────────────── */
+
+.lmsa-empty-view {
+  @apply lmsa:pointer-events-none lmsa:absolute lmsa:inset-0 lmsa:flex lmsa:flex-col lmsa:items-center lmsa:justify-center lmsa:gap-2.5 lmsa:p-8 lmsa:text-center lmsa:text-obsidian-muted;
+  transition: opacity 180ms ease;
+}
+
+.lmsa-empty-view--hidden {
+  @apply lmsa:hidden;
+}
+
+.lmsa-empty-title {
+  @apply lmsa:font-bold lmsa:text-obsidian-text;
+  font-size: 1.1rem;
+}
+
+.lmsa-empty-copy {
+  @apply lmsa:max-w-[42ch];
+  line-height: 1.6;
+}
+
+/* ── Generate response button ────────────────────────────────────────────── */
+
+.lmsa-chat-composer-generate-btn {
+  @apply lmsa:absolute lmsa:z-10 lmsa:inline-flex lmsa:cursor-pointer lmsa:items-center lmsa:gap-1.5 lmsa:whitespace-nowrap lmsa:rounded-full lmsa:px-3 lmsa:py-[7px] lmsa:text-obsidian-text;
+  font-size: var(--font-ui-small);
+  left: 50%;
+  top: 0;
+  transform: translate(-50%, calc(-100% - 10px));
+  /* Theme-aware fill + border so the control reads on light themes too (was hardcoded
+     white glass that ghosted out). The SVG url(#lmsa-glass) backdrop-filter is dropped:
+     a fragile Chromium effect that can render as nothing; the solid tinted fill stands in. */
+  border: 1px solid color-mix(in srgb, var(--lmsa-mode-accent) 38%, var(--background-modifier-border));
+  background-color: transparent !important;
+  background-image: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--lmsa-mode-accent) 14%, var(--background-secondary)) 0%,
+    color-mix(in srgb, var(--background-secondary) 90%, transparent) 100%
+  );
+  box-shadow: none !important;
+  transition: all 0.8s cubic-bezier(0.175, 0.885, 0.32, 2.2);
+}
+
+.lmsa-chat-composer-generate-btn:hover {
+  transform: translate(-50%, calc(-100% - 10px)) scale(1.05);
+}
+
+.lmsa-chat-composer-generate-icon {
+  @apply lmsa:inline-flex lmsa:items-center;
+  color: var(--lmsa-mode-accent);
+}
+
+.lmsa-chat-composer-generate-icon svg {
+  width: 14px;
+  height: 14px;
+}
+
+
+/* ── Composer wrapper ────────────────────────────────────────────────────── */
+
+.lmsa-chat-composer {
+  @apply lmsa:relative lmsa:flex lmsa:flex-col lmsa:gap-2.5;
+  padding: 0 12px;
+}
+
+/* ── Collapsed overlay ───────────────────────────────────────────────────── */
+
+.lmsa-collapsed-overlay {
+  @apply lmsa:hidden lmsa:items-center lmsa:justify-center lmsa:p-8 lmsa:text-center lmsa:text-obsidian-muted;
+  height: 100%;
+}
+
+.lmsa-collapsed-text {
+  font-size: var(--font-ui-small);
+  line-height: 1.6;
+}
+
+.lmsa-root.is-collapsed .lmsa-shell > *:not(.lmsa-collapsed-overlay) {
+  @apply lmsa:hidden;
+}
+
+.lmsa-root.is-collapsed .lmsa-collapsed-overlay {
+  @apply lmsa:flex;
+}
+
+/* ── Responsive ──────────────────────────────────────────────────────────── */
+
+@media (max-width: 700px) {
   .lmsa-chat-header {
-    @apply lmsa-flex lmsa-items-center lmsa-justify-between lmsa-gap-4 lmsa-px-[18px] lmsa-pb-3 lmsa-pt-[18px];
-  }
-
-  .lmsa-chat-header-copy {
-    @apply lmsa-flex lmsa-min-w-0 lmsa-flex-col lmsa-gap-1;
-  }
-
-  .lmsa-chat-header-title {
-    @apply lmsa-font-bold lmsa-text-obsidian-text;
-    font-size: 1.05rem;
-  }
-
-  .lmsa-chat-header-meta-wrap {
-    @apply lmsa-relative;
-  }
-
-  .lmsa-chat-header-meta {
-    @apply lmsa-inline-flex lmsa-min-w-0 lmsa-cursor-pointer lmsa-items-center lmsa-gap-1.5 lmsa-text-obsidian-muted;
-    font-size: var(--font-ui-small);
-    line-height: 1.45;
-    padding: 2px 6px;
-    margin: -2px -6px;
-    border-radius: 6px;
-    transition: background-color 140ms ease, color 140ms ease;
-  }
-
-  .lmsa-chat-header-meta:hover {
-    background: color-mix(in srgb, var(--background-modifier-hover) 60%, transparent);
-    color: var(--text-normal);
-  }
-
-  .lmsa-chat-header-meta.is-active {
-    color: var(--text-normal);
-  }
-
-  .lmsa-chat-header-meta.is-attention {
-    animation: lmsa-chat-header-meta-attention 0.7s ease;
-  }
-
-  .lmsa-chat-header-meta-label {
-    @apply lmsa-min-w-0 lmsa-truncate lmsa-whitespace-nowrap;
-  }
-
-  .lmsa-chat-header-meta-chevron {
-    @apply lmsa-inline-flex lmsa-flex-none lmsa-items-center;
-    opacity: 0.4;
-    transition: opacity 140ms ease;
-  }
-
-  .lmsa-chat-header-meta:hover .lmsa-chat-header-meta-chevron,
-  .lmsa-chat-header-meta.is-active .lmsa-chat-header-meta-chevron {
-    opacity: 0.75;
-  }
-
-  .lmsa-chat-header-meta-chevron svg {
-    width: 12px;
-    height: 12px;
+    @apply lmsa:flex-col lmsa:items-stretch;
   }
 
   .lmsa-chat-header-actions {
-    @apply lmsa-flex lmsa-items-center lmsa-gap-2.5;
-  }
-
-  .lmsa-chat-header-actions .lmsa-ui-icon-btn {
-    @apply lmsa-h-auto lmsa-w-auto lmsa-rounded-md lmsa-border-none lmsa-p-1.5;
-    background: transparent !important;
-    box-shadow: none;
-    outline: none;
-    appearance: none;
-    min-height: unset;
-    transition: background 120ms ease, color 120ms ease;
-  }
-
-  .lmsa-chat-header-actions .lmsa-ui-icon-btn:hover,
-  .lmsa-chat-header-btn:hover {
-    background: color-mix(in srgb, var(--background-modifier-hover) 60%, transparent) !important;
-    color: var(--text-normal);
-    box-shadow: none;
-  }
-
-  .lmsa-chat-header-actions .lmsa-ui-icon-btn:focus-visible {
-    box-shadow: 0 0 0 2px var(--lmsa-mode-accent);
-  }
-
-  .lmsa-chat-header-btn svg {
-    width: 20px;
-    height: 20px;
-  }
-
-  /* ── Messages pane ───────────────────────────────────────────────────────── */
-
-  .lmsa-messages-pane {
-    @apply lmsa-relative lmsa-min-h-0 lmsa-flex-1 lmsa-overflow-visible;
-  }
-
-  .lmsa-chat-window-messages {
-    @apply lmsa-flex lmsa-h-full lmsa-flex-col lmsa-gap-[18px] lmsa-overflow-y-auto lmsa-px-[18px] lmsa-pb-6 lmsa-pt-2.5;
-    /* No horizontal scrollbar, wide content scrolls inside its own wrapper
-       (code blocks, tables); everything else wraps or clips. */
-    overflow-x: hidden;
-    scrollbar-gutter: stable;
-    transition: opacity 180ms ease;
-  }
-
-  .lmsa-history-backdrop {
-    @apply lmsa-pointer-events-none lmsa-absolute lmsa-inset-0 lmsa-z-[8] lmsa-opacity-0;
-    background: transparent;
-    transition: opacity 180ms ease;
-  }
-
-  .lmsa-history-backdrop.is-open {
-    @apply lmsa-pointer-events-auto lmsa-opacity-100;
-  }
-
-  .lmsa-messages-pane.is-history-open .lmsa-chat-window-messages,
-  .lmsa-messages-pane.is-history-open .lmsa-empty-view {
-    opacity: 0;
-  }
-
-  /* ── Empty state ─────────────────────────────────────────────────────────── */
-
-  .lmsa-empty-view {
-    @apply lmsa-pointer-events-none lmsa-absolute lmsa-inset-0 lmsa-flex lmsa-flex-col lmsa-items-center lmsa-justify-center lmsa-gap-2.5 lmsa-p-8 lmsa-text-center lmsa-text-obsidian-muted;
-    transition: opacity 180ms ease;
-  }
-
-  .lmsa-empty-view--hidden {
-    @apply lmsa-hidden;
-  }
-
-  .lmsa-empty-title {
-    @apply lmsa-font-bold lmsa-text-obsidian-text;
-    font-size: 1.1rem;
-  }
-
-  .lmsa-empty-copy {
-    @apply lmsa-max-w-[42ch];
-    line-height: 1.6;
-  }
-
-  /* ── Generate response button ────────────────────────────────────────────── */
-
-  .lmsa-chat-composer-generate-btn {
-    @apply lmsa-absolute lmsa-z-10 lmsa-inline-flex lmsa-cursor-pointer lmsa-items-center lmsa-gap-1.5 lmsa-whitespace-nowrap lmsa-rounded-full lmsa-px-3 lmsa-py-[7px] lmsa-text-obsidian-text;
-    font-size: var(--font-ui-small);
-    left: 50%;
-    top: 0;
-    transform: translate(-50%, calc(-100% - 10px));
-    /* Theme-aware fill + border so the control reads on light themes too (was hardcoded
-       white glass that ghosted out). The SVG url(#lmsa-glass) backdrop-filter is dropped:
-       a fragile Chromium effect that can render as nothing; the solid tinted fill stands in. */
-    border: 1px solid color-mix(in srgb, var(--lmsa-mode-accent) 38%, var(--background-modifier-border));
-    background-color: transparent !important;
-    background-image: linear-gradient(
-      135deg,
-      color-mix(in srgb, var(--lmsa-mode-accent) 14%, var(--background-secondary)) 0%,
-      color-mix(in srgb, var(--background-secondary) 90%, transparent) 100%
-    );
-    box-shadow: none !important;
-    transition: all 0.8s cubic-bezier(0.175, 0.885, 0.32, 2.2);
-  }
-
-  .lmsa-chat-composer-generate-btn:hover {
-    transform: translate(-50%, calc(-100% - 10px)) scale(1.05);
-  }
-
-  .lmsa-chat-composer-generate-icon {
-    @apply lmsa-inline-flex lmsa-items-center;
-    color: var(--lmsa-mode-accent);
-  }
-
-  .lmsa-chat-composer-generate-icon svg {
-    width: 14px;
-    height: 14px;
-  }
-
-
-  /* ── Composer wrapper ────────────────────────────────────────────────────── */
-
-  .lmsa-chat-composer {
-    @apply lmsa-relative lmsa-flex lmsa-flex-col lmsa-gap-2.5;
-    padding: 0 12px;
-  }
-
-  /* ── Collapsed overlay ───────────────────────────────────────────────────── */
-
-  .lmsa-collapsed-overlay {
-    @apply lmsa-hidden lmsa-items-center lmsa-justify-center lmsa-p-8 lmsa-text-center lmsa-text-obsidian-muted;
-    height: 100%;
-  }
-
-  .lmsa-collapsed-text {
-    font-size: var(--font-ui-small);
-    line-height: 1.6;
-  }
-
-  .lmsa-root.is-collapsed .lmsa-shell > *:not(.lmsa-collapsed-overlay) {
-    @apply lmsa-hidden;
-  }
-
-  .lmsa-root.is-collapsed .lmsa-collapsed-overlay {
-    @apply lmsa-flex;
-  }
-
-  /* ── Responsive ──────────────────────────────────────────────────────────── */
-
-  @media (max-width: 700px) {
-    .lmsa-chat-header {
-      @apply lmsa-flex-col lmsa-items-stretch;
-    }
-
-    .lmsa-chat-header-actions {
-      @apply lmsa-w-full lmsa-justify-start;
-    }
+    @apply lmsa:w-full lmsa:justify-start;
   }
 }

@@ -1,163 +1,161 @@
-@layer components {
-  /* ── Overflow ("...") button ─────────────────────────────────────────────
-     Appears only once the footer is narrow enough that a control has left
-     the row (521px and below, the reasoning pill's exit); wider footers show
-     every control in place and no overflow button. Same 28px square family
-     as the tool/knowledge/vision indicators, but with interactive chrome,
-     since it is a control rather than a status light. */
+/* ── Overflow ("...") button ─────────────────────────────────────────────
+   Appears only once the footer is narrow enough that a control has left
+   the row (521px and below, the reasoning pill's exit); wider footers show
+   every control in place and no overflow button. Same 28px square family
+   as the tool/knowledge/vision indicators, but with interactive chrome,
+   since it is a control rather than a status light. */
 
+.lmsa-chat-composer-overflow-btn {
+  display: none;
+  anchor-name: --lmsa-overflow-btn;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border-radius: 7px;
+  border: 1px solid var(--background-modifier-border) !important;
+  color: var(--text-muted);
+  background: transparent !important;
+  box-shadow: none !important;
+  outline: none;
+  appearance: none;
+  min-height: unset;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.lmsa-chat-composer-overflow-btn:hover {
+  color: var(--text-normal);
+}
+
+.lmsa-chat-composer-overflow-btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--lmsa-mode-accent) 20%, transparent) !important;
+}
+
+.lmsa-chat-composer-overflow-btn svg {
+  width: 14px;
+  height: 14px;
+}
+
+@container lmsa-composer-footer (max-width: 521px) {
   .lmsa-chat-composer-overflow-btn {
-    display: none;
-    anchor-name: --lmsa-overflow-btn;
-    width: 28px;
-    height: 28px;
-    padding: 0;
-    flex: none;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    border-radius: 7px;
-    border: 1px solid var(--background-modifier-border) !important;
-    color: var(--text-muted);
-    background: transparent !important;
-    box-shadow: none !important;
-    outline: none;
-    appearance: none;
-    min-height: unset;
-    transition: color 0.15s ease, border-color 0.15s ease;
+    display: inline-flex;
   }
+}
 
-  .lmsa-chat-composer-overflow-btn:hover {
-    color: var(--text-normal);
-  }
+/* ── Overflow menu ───────────────────────────────────────────────────────
+   Same chrome as the posture/reasoning menus; right-anchored to the button
+   like the posture menu (the clamp reserve covers the menu's min-width). */
 
-  .lmsa-chat-composer-overflow-btn:focus-visible {
-    outline: none;
-    box-shadow: 0 0 0 3px color-mix(in srgb, var(--lmsa-mode-accent) 20%, transparent) !important;
-  }
+.lmsa-overflow-menu {
+  @apply lmsa:absolute lmsa:z-[120] lmsa:flex-col lmsa:rounded-xl lmsa:border lmsa:border-obsidian-border lmsa:p-1;
+  display: flex;
+  bottom: calc(100% + 8px);
+  right: 8px;
+  position-anchor: --lmsa-overflow-btn;
+  right: clamp(8px, anchor(right), calc(100% - 196px));
+  min-width: 180px;
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--background-primary) 97%, transparent),
+      color-mix(in srgb, var(--background-secondary) 94%, transparent)
+    );
+  backdrop-filter: blur(22px);
+  -webkit-backdrop-filter: blur(22px);
+  box-shadow:
+    0 -12px 48px rgba(0, 0, 0, 0.18),
+    inset 0 -1px 0 var(--lmsa-inset-highlight-subtle);
+  transform-origin: bottom right;
+}
 
-  .lmsa-chat-composer-overflow-btn svg {
-    width: 14px;
-    height: 14px;
-  }
+.lmsa-overflow-menu.lmsa-hidden {
+  display: none;
+}
 
-  @container lmsa-composer-footer (max-width: 521px) {
-    .lmsa-chat-composer-overflow-btn {
-      display: inline-flex;
-    }
-  }
-
-  /* ── Overflow menu ───────────────────────────────────────────────────────
-     Same chrome as the posture/reasoning menus; right-anchored to the button
-     like the posture menu (the clamp reserve covers the menu's min-width). */
-
+/* The menu exists only while its button does; if the panel is widened while
+   the menu is open this hides the orphan until the next outside click
+   resets the JS state. Placed after the base block so the display tie
+   resolves by source order. */
+@container lmsa-composer-footer (min-width: 522px) {
   .lmsa-overflow-menu {
-    @apply lmsa-absolute lmsa-z-[120] lmsa-flex-col lmsa-rounded-xl lmsa-border lmsa-border-obsidian-border lmsa-p-1;
-    display: flex;
-    bottom: calc(100% + 8px);
-    right: 8px;
-    position-anchor: --lmsa-overflow-btn;
-    right: clamp(8px, anchor(right), calc(100% - 196px));
-    min-width: 180px;
-    background:
-      linear-gradient(
-        180deg,
-        color-mix(in srgb, var(--background-primary) 97%, transparent),
-        color-mix(in srgb, var(--background-secondary) 94%, transparent)
-      );
-    backdrop-filter: blur(22px);
-    -webkit-backdrop-filter: blur(22px);
-    box-shadow:
-      0 -12px 48px rgba(0, 0, 0, 0.18),
-      inset 0 -1px 0 var(--lmsa-inset-highlight-subtle);
-    transform-origin: bottom right;
-  }
-
-  .lmsa-overflow-menu.lmsa-hidden {
     display: none;
   }
+}
 
-  /* The menu exists only while its button does; if the panel is widened while
-     the menu is open this hides the orphan until the next outside click
-     resets the JS state. Placed after the base block so the display tie
-     resolves by source order. */
-  @container lmsa-composer-footer (min-width: 522px) {
-    .lmsa-overflow-menu {
-      display: none;
-    }
+/* ── Sections ──────────────────────────────────────────────────────────── */
+
+.lmsa-overflow-menu-section {
+  @apply lmsa:flex lmsa:flex-col;
+}
+
+/* Subtle divider between adjacent sections. Sections render in descending
+   breakpoint order (ComposerOverflowMenu.ts), so the width-gated ones are
+   always a trailing run and no divider is ever stranded above the first
+   visible section. */
+.lmsa-overflow-menu-section + .lmsa-overflow-menu-section {
+  margin-top: 4px;
+  padding-top: 4px;
+  border-top: 1px solid color-mix(in srgb, var(--background-modifier-border) 70%, transparent);
+}
+
+.lmsa-overflow-menu-heading {
+  @apply lmsa:px-2.5 lmsa:pb-0.5 lmsa:pt-1;
+  font-size: var(--font-ui-smaller);
+  color: var(--text-faint);
+}
+
+/* ── Vision status row (informational, not interactive) ───────────────── */
+
+.lmsa-overflow-menu-status {
+  @apply lmsa:flex lmsa:items-center lmsa:gap-2 lmsa:px-2.5 lmsa:py-1.5;
+  font-size: var(--font-ui-smaller);
+  color: var(--text-faint);
+  cursor: default;
+}
+
+.lmsa-overflow-menu-status-icon {
+  @apply lmsa:inline-flex lmsa:flex-none lmsa:items-center;
+}
+
+.lmsa-overflow-menu-status-icon svg {
+  width: 12px;
+  height: 12px;
+}
+
+.lmsa-overflow-menu-status.is-active .lmsa-overflow-menu-status-icon {
+  color: var(--color-purple, #a78bfa);
+}
+
+/* ── Section gates ───────────────────────────────────────────────────────
+   Each section shows only while its footer counterpart is hidden: the
+   min-width here is that control's max-width breakpoint plus one. The
+   reasoning section needs no gate, its 521px threshold is the same one
+   that reveals the menu itself. */
+
+@container lmsa-composer-footer (min-width: 480px) {
+  .lmsa-overflow-section-vision {
+    display: none;
   }
+}
 
-  /* ── Sections ──────────────────────────────────────────────────────────── */
-
-  .lmsa-overflow-menu-section {
-    @apply lmsa-flex lmsa-flex-col;
+@container lmsa-composer-footer (min-width: 440px) {
+  .lmsa-overflow-section-knowledge {
+    display: none;
   }
+}
 
-  /* Subtle divider between adjacent sections. Sections render in descending
-     breakpoint order (ComposerOverflowMenu.ts), so the width-gated ones are
-     always a trailing run and no divider is ever stranded above the first
-     visible section. */
-  .lmsa-overflow-menu-section + .lmsa-overflow-menu-section {
-    margin-top: 4px;
-    padding-top: 4px;
-    border-top: 1px solid color-mix(in srgb, var(--background-modifier-border) 70%, transparent);
+@container lmsa-composer-footer (min-width: 400px) {
+  .lmsa-overflow-section-tools {
+    display: none;
   }
+}
 
-  .lmsa-overflow-menu-heading {
-    @apply lmsa-px-2.5 lmsa-pb-0.5 lmsa-pt-1;
-    font-size: var(--font-ui-smaller);
-    color: var(--text-faint);
-  }
-
-  /* ── Vision status row (informational, not interactive) ───────────────── */
-
-  .lmsa-overflow-menu-status {
-    @apply lmsa-flex lmsa-items-center lmsa-gap-2 lmsa-px-2.5 lmsa-py-1.5;
-    font-size: var(--font-ui-smaller);
-    color: var(--text-faint);
-    cursor: default;
-  }
-
-  .lmsa-overflow-menu-status-icon {
-    @apply lmsa-inline-flex lmsa-flex-none lmsa-items-center;
-  }
-
-  .lmsa-overflow-menu-status-icon svg {
-    width: 12px;
-    height: 12px;
-  }
-
-  .lmsa-overflow-menu-status.is-active .lmsa-overflow-menu-status-icon {
-    color: var(--color-purple, #a78bfa);
-  }
-
-  /* ── Section gates ───────────────────────────────────────────────────────
-     Each section shows only while its footer counterpart is hidden: the
-     min-width here is that control's max-width breakpoint plus one. The
-     reasoning section needs no gate, its 521px threshold is the same one
-     that reveals the menu itself. */
-
-  @container lmsa-composer-footer (min-width: 480px) {
-    .lmsa-overflow-section-vision {
-      display: none;
-    }
-  }
-
-  @container lmsa-composer-footer (min-width: 440px) {
-    .lmsa-overflow-section-knowledge {
-      display: none;
-    }
-  }
-
-  @container lmsa-composer-footer (min-width: 400px) {
-    .lmsa-overflow-section-tools {
-      display: none;
-    }
-  }
-
-  @container lmsa-composer-footer (min-width: 360px) {
-    .lmsa-overflow-section-posture {
-      display: none;
-    }
+@container lmsa-composer-footer (min-width: 360px) {
+  .lmsa-overflow-section-posture {
+    display: none;
   }
 }

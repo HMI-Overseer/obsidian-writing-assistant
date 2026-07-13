@@ -1,334 +1,332 @@
-@layer components {
-  .lmsa-model-state-badge {
-    @apply lmsa-inline-flex lmsa-flex-none lmsa-items-center lmsa-rounded-full lmsa-px-2.5 lmsa-py-1 lmsa-text-xs lmsa-font-semibold;
-    background: color-mix(in srgb, var(--background-modifier-hover) 84%, transparent);
-    color: var(--lmsa-text-primary);
-  }
+.lmsa-model-state-badge {
+  @apply lmsa:inline-flex lmsa:flex-none lmsa:items-center lmsa:rounded-full lmsa:px-2.5 lmsa:py-1 lmsa:text-xs lmsa:font-semibold;
+  background: color-mix(in srgb, var(--background-modifier-hover) 84%, transparent);
+  color: var(--lmsa-text-primary);
+}
 
-  .lmsa-model-state-badge.is-loaded {
-    background: color-mix(in srgb, var(--lmsa-status-success) 18%, transparent);
-    color: color-mix(in srgb, var(--lmsa-status-success) 74%, var(--lmsa-text-primary));
-  }
+.lmsa-model-state-badge.is-loaded {
+  background: color-mix(in srgb, var(--lmsa-status-success) 18%, transparent);
+  color: color-mix(in srgb, var(--lmsa-status-success) 74%, var(--lmsa-text-primary));
+}
 
-  .lmsa-model-state-badge.is-unloaded {
-    background: color-mix(in srgb, var(--lmsa-status-error-bg) 18%, transparent);
-    color: color-mix(in srgb, var(--lmsa-status-error-bg) 88%, var(--lmsa-text-primary));
-  }
+.lmsa-model-state-badge.is-unloaded {
+  background: color-mix(in srgb, var(--lmsa-status-error-bg) 18%, transparent);
+  color: color-mix(in srgb, var(--lmsa-status-error-bg) 88%, var(--lmsa-text-primary));
+}
 
-  .lmsa-item-list {
-    @apply lmsa-flex lmsa-flex-col;
-  }
+.lmsa-item-list {
+  @apply lmsa:flex lmsa:flex-col;
+}
 
+.lmsa-item-row {
+  @apply lmsa:relative lmsa:flex lmsa:items-start lmsa:justify-between lmsa:gap-4 lmsa:py-3;
+}
+
+.lmsa-item-row:not(:first-child)::before {
+  content: "";
+  @apply lmsa:pointer-events-none lmsa:absolute lmsa:inset-x-0 lmsa:top-0 lmsa:h-px;
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--lmsa-section-accent) 20%, transparent),
+    var(--lmsa-border-subtle),
+    color-mix(in srgb, var(--lmsa-section-accent-secondary) 20%, transparent)
+  );
+}
+
+.lmsa-item-info {
+  @apply lmsa:flex lmsa:min-w-0 lmsa:flex-1 lmsa:flex-col lmsa:gap-1.5;
+}
+
+.lmsa-live-model-row {
+  @apply lmsa:gap-3;
+}
+
+.lmsa-live-model-header {
+  @apply lmsa:flex lmsa:flex-wrap lmsa:items-center lmsa:gap-2;
+}
+
+.lmsa-item-name {
+  @apply lmsa:font-semibold;
+  color: var(--lmsa-text-primary);
+}
+
+.lmsa-item-sub,
+.lmsa-item-meta {
+  color: var(--lmsa-text-secondary);
+  line-height: 1.55;
+  word-break: break-word;
+}
+
+.lmsa-item-sub {
+  white-space: pre-wrap;
+}
+
+.lmsa-item-actions {
+  @apply lmsa:flex lmsa:flex-wrap lmsa:justify-end lmsa:gap-2;
+}
+
+.lmsa-btn-secondary,
+.lmsa-btn-danger,
+.lmsa-btn-add {
+  @apply lmsa:whitespace-nowrap;
+}
+
+.lmsa-btn-danger {
+  @apply lmsa:border;
+  border-color: color-mix(in srgb, var(--lmsa-status-error-bg) 72%, var(--lmsa-border-default));
+  background: color-mix(in srgb, var(--lmsa-surface-base) 92%, transparent);
+  color: var(--lmsa-status-error);
+}
+
+.lmsa-btn-danger:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--lmsa-status-error-bg) 14%, var(--lmsa-surface-base));
+}
+
+/* ── Settings model selector ────────────────────────────────────────── */
+
+.lmsa-settings-model-selector-wrap {
+  @apply lmsa:flex lmsa:items-center lmsa:gap-2;
+}
+
+.lmsa-settings-model-selector-wrap .lmsa-model-dropdown {
+  left: 0;
+  right: auto;
+}
+
+/* ── Provider selector ────────────────────────────────────────────── */
+
+.lmsa-provider-selector-row {
+  @apply lmsa:flex lmsa:items-center lmsa:gap-3 lmsa:py-3;
+  margin-bottom: 8px;
+}
+
+.lmsa-provider-selector-label {
+  @apply lmsa:font-semibold lmsa:shrink-0;
+  color: var(--lmsa-text-primary);
+}
+
+.lmsa-settings-root select.lmsa-provider-selector-select {
+  @apply lmsa:flex-1;
+  font-family: var(--font-text);
+  font-size: var(--font-ui-small);
+  color: var(--text-normal);
+  background: var(--background-secondary);
+  border: 1px solid color-mix(in srgb, var(--lmsa-section-accent) 40%, var(--lmsa-border-default));
+  border-radius: 0.5rem;
+  outline: none;
+  cursor: pointer;
+  height: auto;
+  min-height: 36px;
+  padding: 8px 12px;
+  overflow: visible;
+  text-overflow: ellipsis;
+  transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+
+.lmsa-settings-root select.lmsa-provider-selector-select:focus {
+  border-color: var(--lmsa-section-accent);
+  box-shadow: 0 0 0 2px var(--lmsa-tint-25);
+}
+
+.lmsa-provider-content {
+  @apply lmsa:flex lmsa:flex-col;
+}
+
+.lmsa-provider-placeholder {
+  @apply lmsa:py-3;
+}
+
+.lmsa-provider-connection {
+  @apply lmsa:flex lmsa:flex-col;
+}
+
+.lmsa-discovery-header {
+  @apply lmsa:flex lmsa:justify-end;
+  margin-bottom: 12px;
+}
+
+/* ── Inline add-model discovery (modal standalone mode) ──────────────── */
+
+.lmsa-modal-discovery {
+  @apply lmsa:flex lmsa:flex-col lmsa:gap-2;
+  margin-top: 4px;
+}
+
+.lmsa-modal-discovery-header {
+  @apply lmsa:flex lmsa:items-center lmsa:justify-between lmsa:gap-3;
+}
+
+.lmsa-modal-discovery-title {
+  @apply lmsa:font-semibold;
+  color: var(--lmsa-text-primary);
+}
+
+.lmsa-modal-discovery-list {
+  @apply lmsa:flex lmsa:flex-col lmsa:gap-1 lmsa:overflow-y-auto;
+  max-height: 220px;
+}
+
+.lmsa-modal-discovery-row {
+  @apply lmsa:flex lmsa:cursor-pointer lmsa:flex-col lmsa:gap-1 lmsa:rounded-lg;
+  padding: 8px 10px;
+  border: 1px solid transparent;
+  transition: background 120ms ease, border-color 120ms ease;
+}
+
+.lmsa-modal-discovery-row:hover {
+  background: color-mix(in srgb, var(--background-modifier-hover) 60%, transparent);
+  border-color: color-mix(in srgb, var(--lmsa-section-accent) 36%, var(--lmsa-border-default));
+}
+
+.lmsa-modal-discovery-row-header {
+  @apply lmsa:flex lmsa:flex-wrap lmsa:items-center lmsa:gap-2;
+}
+
+@media (max-width: 700px) {
   .lmsa-item-row {
-    @apply lmsa-relative lmsa-flex lmsa-items-start lmsa-justify-between lmsa-gap-4 lmsa-py-3;
-  }
-
-  .lmsa-item-row:not(:first-child)::before {
-    content: "";
-    @apply lmsa-pointer-events-none lmsa-absolute lmsa-inset-x-0 lmsa-top-0 lmsa-h-px;
-    background: linear-gradient(
-      90deg,
-      color-mix(in srgb, var(--lmsa-section-accent) 20%, transparent),
-      var(--lmsa-border-subtle),
-      color-mix(in srgb, var(--lmsa-section-accent-secondary) 20%, transparent)
-    );
-  }
-
-  .lmsa-item-info {
-    @apply lmsa-flex lmsa-min-w-0 lmsa-flex-1 lmsa-flex-col lmsa-gap-1.5;
-  }
-
-  .lmsa-live-model-row {
-    @apply lmsa-gap-3;
-  }
-
-  .lmsa-live-model-header {
-    @apply lmsa-flex lmsa-flex-wrap lmsa-items-center lmsa-gap-2;
-  }
-
-  .lmsa-item-name {
-    @apply lmsa-font-semibold;
-    color: var(--lmsa-text-primary);
-  }
-
-  .lmsa-item-sub,
-  .lmsa-item-meta {
-    color: var(--lmsa-text-secondary);
-    line-height: 1.55;
-    word-break: break-word;
-  }
-
-  .lmsa-item-sub {
-    white-space: pre-wrap;
+    @apply lmsa:flex-col lmsa:items-stretch;
   }
 
   .lmsa-item-actions {
-    @apply lmsa-flex lmsa-flex-wrap lmsa-justify-end lmsa-gap-2;
+    @apply lmsa:justify-start;
   }
-
-  .lmsa-btn-secondary,
-  .lmsa-btn-danger,
-  .lmsa-btn-add {
-    @apply lmsa-whitespace-nowrap;
-  }
-
-  .lmsa-btn-danger {
-    @apply lmsa-border;
-    border-color: color-mix(in srgb, var(--lmsa-status-error-bg) 72%, var(--lmsa-border-default));
-    background: color-mix(in srgb, var(--lmsa-surface-base) 92%, transparent);
-    color: var(--lmsa-status-error);
-  }
-
-  .lmsa-btn-danger:hover:not(:disabled) {
-    background: color-mix(in srgb, var(--lmsa-status-error-bg) 14%, var(--lmsa-surface-base));
-  }
-
-  /* ── Settings model selector ────────────────────────────────────────── */
-
-  .lmsa-settings-model-selector-wrap {
-    @apply lmsa-flex lmsa-items-center lmsa-gap-2;
-  }
-
-  .lmsa-settings-model-selector-wrap .lmsa-model-dropdown {
-    left: 0;
-    right: auto;
-  }
-
-  /* ── Provider selector ────────────────────────────────────────────── */
 
   .lmsa-provider-selector-row {
-    @apply lmsa-flex lmsa-items-center lmsa-gap-3 lmsa-py-3;
-    margin-bottom: 8px;
+    @apply lmsa:flex-col lmsa:items-stretch;
   }
+}
 
-  .lmsa-provider-selector-label {
-    @apply lmsa-font-semibold lmsa-flex-shrink-0;
-    color: var(--lmsa-text-primary);
-  }
+/* ── Command icon badge ──────────────────────────────────────────────── */
 
-  .lmsa-settings-root select.lmsa-provider-selector-select {
-    @apply lmsa-flex-1;
-    font-family: var(--font-text);
-    font-size: var(--font-ui-small);
-    color: var(--text-normal);
-    background: var(--background-secondary);
-    border: 1px solid color-mix(in srgb, var(--lmsa-section-accent) 40%, var(--lmsa-border-default));
-    border-radius: 0.5rem;
-    outline: none;
-    cursor: pointer;
-    height: auto;
-    min-height: 36px;
-    padding: 8px 12px;
-    overflow: visible;
-    text-overflow: ellipsis;
-    transition: border-color 120ms ease, box-shadow 120ms ease;
-  }
+.lmsa-command-icon {
+  @apply lmsa:inline-flex lmsa:flex-none lmsa:items-center lmsa:justify-center;
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--lmsa-section-accent) 12%, var(--background-secondary));
+  color: var(--lmsa-section-accent);
+}
 
-  .lmsa-settings-root select.lmsa-provider-selector-select:focus {
-    border-color: var(--lmsa-section-accent);
-    box-shadow: 0 0 0 2px var(--lmsa-tint-25);
-  }
+.lmsa-command-icon svg {
+  width: 16px;
+  height: 16px;
+}
 
-  .lmsa-provider-content {
-    @apply lmsa-flex lmsa-flex-col;
-  }
+/* ── Built-in command rows ───────────────────────────────────────────── */
 
-  .lmsa-provider-placeholder {
-    @apply lmsa-py-3;
-  }
+.lmsa-item-row.is-builtin {
+  opacity: 0.85;
+}
 
-  .lmsa-provider-connection {
-    @apply lmsa-flex lmsa-flex-col;
-  }
+.lmsa-command-header {
+  @apply lmsa:flex lmsa:flex-wrap lmsa:items-center lmsa:gap-2;
+}
 
-  .lmsa-discovery-header {
-    @apply lmsa-flex lmsa-justify-end;
-    margin-bottom: 12px;
-  }
+.lmsa-command-badge {
+  @apply lmsa:inline-flex lmsa:flex-none lmsa:items-center lmsa:rounded-full lmsa:px-2.5 lmsa:py-1 lmsa:text-xs lmsa:font-semibold;
+  background: color-mix(in srgb, var(--background-modifier-hover) 84%, transparent);
+  color: var(--lmsa-text-primary);
+}
 
-  /* ── Inline add-model discovery (modal standalone mode) ──────────────── */
+.lmsa-command-badge.is-builtin {
+  background: color-mix(in srgb, var(--lmsa-section-accent) 14%, transparent);
+  color: color-mix(in srgb, var(--lmsa-section-accent) 74%, var(--lmsa-text-primary));
+}
 
-  .lmsa-modal-discovery {
-    @apply lmsa-flex lmsa-flex-col lmsa-gap-2;
-    margin-top: 4px;
-  }
+.lmsa-command-badge.is-user-created {
+  background: color-mix(in srgb, var(--lmsa-section-accent-secondary) 14%, transparent);
+  color: color-mix(in srgb, var(--lmsa-section-accent-secondary) 68%, var(--lmsa-text-primary));
+}
 
-  .lmsa-modal-discovery-header {
-    @apply lmsa-flex lmsa-items-center lmsa-justify-between lmsa-gap-3;
-  }
+.lmsa-command-category-label {
+  @apply lmsa:flex lmsa:items-center lmsa:gap-3 lmsa:text-xs lmsa:font-semibold lmsa:uppercase lmsa:tracking-wide;
+  color: color-mix(in srgb, var(--lmsa-section-accent) 34%, var(--lmsa-text-primary));
+  letter-spacing: 0.14em;
+  margin: 14px 0 6px;
+  text-shadow: 0 0 10px color-mix(in srgb, var(--lmsa-section-accent) 12%, transparent);
+}
 
-  .lmsa-modal-discovery-title {
-    @apply lmsa-font-semibold;
-    color: var(--lmsa-text-primary);
-  }
+.lmsa-command-category-label::before {
+  content: "";
+  width: 18px;
+  height: 2px;
+  border-radius: 999px;
+  background: linear-gradient(
+    90deg,
+    var(--lmsa-section-accent),
+    color-mix(in srgb, var(--lmsa-section-accent-secondary) 72%, var(--lmsa-section-accent))
+  );
+  box-shadow: 0 0 12px color-mix(in srgb, var(--lmsa-section-accent) 22%, transparent);
+}
 
-  .lmsa-modal-discovery-list {
-    @apply lmsa-flex lmsa-flex-col lmsa-gap-1 lmsa-overflow-y-auto;
-    max-height: 220px;
-  }
+.lmsa-command-category-label::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  min-width: 48px;
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--lmsa-section-accent) 30%, transparent),
+    color-mix(in srgb, var(--lmsa-section-accent-secondary) 16%, transparent),
+    transparent
+  );
+}
 
-  .lmsa-modal-discovery-row {
-    @apply lmsa-flex lmsa-cursor-pointer lmsa-flex-col lmsa-gap-1 lmsa-rounded-lg;
-    padding: 8px 10px;
-    border: 1px solid transparent;
-    transition: background 120ms ease, border-color 120ms ease;
-  }
+.lmsa-command-category-label:first-child {
+  margin-top: 4px;
+}
 
-  .lmsa-modal-discovery-row:hover {
-    background: color-mix(in srgb, var(--background-modifier-hover) 60%, transparent);
-    border-color: color-mix(in srgb, var(--lmsa-section-accent) 36%, var(--lmsa-border-default));
-  }
+.lmsa-command-category-label + .lmsa-item-row::before {
+  display: none;
+}
 
-  .lmsa-modal-discovery-row-header {
-    @apply lmsa-flex lmsa-flex-wrap lmsa-items-center lmsa-gap-2;
-  }
+/* ── Icon picker section (stacked layout so grid spans full width) ───── */
 
-  @media (max-width: 700px) {
-    .lmsa-item-row {
-      @apply lmsa-flex-col lmsa-items-stretch;
-    }
+.lmsa-icon-picker-section {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+}
 
-    .lmsa-item-actions {
-      @apply lmsa-justify-start;
-    }
+.lmsa-icon-picker-section .lmsa-setting-item-info {
+  flex: 0 0 auto;
+  padding-right: 0;
+}
 
-    .lmsa-provider-selector-row {
-      @apply lmsa-flex-col lmsa-items-stretch;
-    }
-  }
+.lmsa-icon-picker-section .lmsa-setting-item-control:empty {
+  display: none;
+}
 
-  /* ── Command icon badge ──────────────────────────────────────────────── */
+/* ── Icon picker grid ────────────────────────────────────────────────── */
 
-  .lmsa-command-icon {
-    @apply lmsa-inline-flex lmsa-flex-none lmsa-items-center lmsa-justify-center;
-    width: 32px;
-    height: 32px;
-    border-radius: 10px;
-    background: color-mix(in srgb, var(--lmsa-section-accent) 12%, var(--background-secondary));
-    color: var(--lmsa-section-accent);
-  }
+.lmsa-icon-picker-grid {
+  display: flex;
+  flex-wrap: wrap;
+  align-content: flex-start;
+  gap: 8px;
+}
 
-  .lmsa-command-icon svg {
-    width: 16px;
-    height: 16px;
-  }
+.lmsa-icon-picker-cell {
+  @apply lmsa:inline-flex lmsa:cursor-pointer lmsa:items-center lmsa:justify-center lmsa:rounded-lg;
+  width: 36px;
+  height: 36px;
+  border: 1px solid transparent;
+  color: var(--lmsa-text-secondary);
+  transition: background 120ms ease, border-color 120ms ease, color 120ms ease;
+}
 
-  /* ── Built-in command rows ───────────────────────────────────────────── */
+.lmsa-icon-picker-cell:hover {
+  background: color-mix(in srgb, var(--background-modifier-hover) 60%, transparent);
+  color: var(--lmsa-text-primary);
+}
 
-  .lmsa-item-row.is-builtin {
-    opacity: 0.85;
-  }
+.lmsa-icon-picker-cell.is-selected {
+  border-color: var(--lmsa-section-accent);
+  background: color-mix(in srgb, var(--lmsa-section-accent) 14%, transparent);
+  color: var(--lmsa-section-accent);
+}
 
-  .lmsa-command-header {
-    @apply lmsa-flex lmsa-flex-wrap lmsa-items-center lmsa-gap-2;
-  }
-
-  .lmsa-command-badge {
-    @apply lmsa-inline-flex lmsa-flex-none lmsa-items-center lmsa-rounded-full lmsa-px-2.5 lmsa-py-1 lmsa-text-xs lmsa-font-semibold;
-    background: color-mix(in srgb, var(--background-modifier-hover) 84%, transparent);
-    color: var(--lmsa-text-primary);
-  }
-
-  .lmsa-command-badge.is-builtin {
-    background: color-mix(in srgb, var(--lmsa-section-accent) 14%, transparent);
-    color: color-mix(in srgb, var(--lmsa-section-accent) 74%, var(--lmsa-text-primary));
-  }
-
-  .lmsa-command-badge.is-user-created {
-    background: color-mix(in srgb, var(--lmsa-section-accent-secondary) 14%, transparent);
-    color: color-mix(in srgb, var(--lmsa-section-accent-secondary) 68%, var(--lmsa-text-primary));
-  }
-
-  .lmsa-command-category-label {
-    @apply lmsa-flex lmsa-items-center lmsa-gap-3 lmsa-text-xs lmsa-font-semibold lmsa-uppercase lmsa-tracking-wide;
-    color: color-mix(in srgb, var(--lmsa-section-accent) 34%, var(--lmsa-text-primary));
-    letter-spacing: 0.14em;
-    margin: 14px 0 6px;
-    text-shadow: 0 0 10px color-mix(in srgb, var(--lmsa-section-accent) 12%, transparent);
-  }
-
-  .lmsa-command-category-label::before {
-    content: "";
-    width: 18px;
-    height: 2px;
-    border-radius: 999px;
-    background: linear-gradient(
-      90deg,
-      var(--lmsa-section-accent),
-      color-mix(in srgb, var(--lmsa-section-accent-secondary) 72%, var(--lmsa-section-accent))
-    );
-    box-shadow: 0 0 12px color-mix(in srgb, var(--lmsa-section-accent) 22%, transparent);
-  }
-
-  .lmsa-command-category-label::after {
-    content: "";
-    flex: 1;
-    height: 1px;
-    min-width: 48px;
-    background: linear-gradient(
-      90deg,
-      color-mix(in srgb, var(--lmsa-section-accent) 30%, transparent),
-      color-mix(in srgb, var(--lmsa-section-accent-secondary) 16%, transparent),
-      transparent
-    );
-  }
-
-  .lmsa-command-category-label:first-child {
-    margin-top: 4px;
-  }
-  
-  .lmsa-command-category-label + .lmsa-item-row::before {
-    display: none;
-  }
-
-  /* ── Icon picker section (stacked layout so grid spans full width) ───── */
-
-  .lmsa-icon-picker-section {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 8px;
-  }
-
-  .lmsa-icon-picker-section .lmsa-setting-item-info {
-    flex: 0 0 auto;
-    padding-right: 0;
-  }
-
-  .lmsa-icon-picker-section .lmsa-setting-item-control:empty {
-    display: none;
-  }
-
-  /* ── Icon picker grid ────────────────────────────────────────────────── */
-
-  .lmsa-icon-picker-grid {
-    display: flex;
-    flex-wrap: wrap;
-    align-content: flex-start;
-    gap: 8px;
-  }
-
-  .lmsa-icon-picker-cell {
-    @apply lmsa-inline-flex lmsa-cursor-pointer lmsa-items-center lmsa-justify-center lmsa-rounded-lg;
-    width: 36px;
-    height: 36px;
-    border: 1px solid transparent;
-    color: var(--lmsa-text-secondary);
-    transition: background 120ms ease, border-color 120ms ease, color 120ms ease;
-  }
-
-  .lmsa-icon-picker-cell:hover {
-    background: color-mix(in srgb, var(--background-modifier-hover) 60%, transparent);
-    color: var(--lmsa-text-primary);
-  }
-
-  .lmsa-icon-picker-cell.is-selected {
-    border-color: var(--lmsa-section-accent);
-    background: color-mix(in srgb, var(--lmsa-section-accent) 14%, transparent);
-    color: var(--lmsa-section-accent);
-  }
-
-  .lmsa-icon-picker-cell svg {
-    width: 16px;
-    height: 16px;
-  }
+.lmsa-icon-picker-cell svg {
+  width: 16px;
+  height: 16px;
 }

@@ -5,503 +5,501 @@
   inherits: false;
 }
 
-@layer components {
-  @keyframes lmsa-border-spin {
-    to {
-      --lmsa-border-angle: 360deg;
-    }
+@keyframes lmsa-border-spin {
+  to {
+    --lmsa-border-angle: 360deg;
   }
+}
 
-  /* ── Context chips ───────────────────────────────────────────────────────── */
+/* ── Context chips ───────────────────────────────────────────────────────── */
 
-  /* This row sits at the TOP of the bottom-anchored composer panel, so anything that grows
-     it pushes the panel's top edge, and the whole row, upward. A chip pill is taller than
-     the bare + button, so we hold a constant min-height of one chip row: attaching or
-     removing the first chip then never reflows the row, and the composer never jolts upward.
-     No bottom padding, that was only cosmetic breathing room and just made the row taller.
-     30px ≈ one chip (~28px); border-box so min-height is the outer box. */
-  .lmsa-chat-composer-chips {
-    @apply lmsa-flex lmsa-flex-wrap lmsa-items-center lmsa-gap-1.5 lmsa-px-1;
-    box-sizing: border-box;
-    min-height: 30px;
-  }
+/* This row sits at the TOP of the bottom-anchored composer panel, so anything that grows
+   it pushes the panel's top edge, and the whole row, upward. A chip pill is taller than
+   the bare + button, so we hold a constant min-height of one chip row: attaching or
+   removing the first chip then never reflows the row, and the composer never jolts upward.
+   No bottom padding, that was only cosmetic breathing room and just made the row taller.
+   30px ≈ one chip (~28px); border-box so min-height is the outer box. */
+.lmsa-chat-composer-chips {
+  @apply lmsa:flex lmsa:flex-wrap lmsa:items-center lmsa:gap-1.5 lmsa:px-1;
+  box-sizing: border-box;
+  min-height: 30px;
+}
 
-  .lmsa-chat-composer-chip {
-    @apply lmsa-inline-flex lmsa-max-w-[220px] lmsa-items-center lmsa-gap-[5px] lmsa-rounded-full lmsa-pb-1 lmsa-pl-2 lmsa-pr-1.5 lmsa-pt-1 lmsa-text-obsidian-muted;
-    font-size: var(--font-ui-smaller);
-    border: 1px solid color-mix(in srgb, var(--lmsa-mode-accent) 40%, var(--background-modifier-border));
-    background: color-mix(in srgb, var(--lmsa-mode-accent) 10%, var(--background-secondary));
-  }
+.lmsa-chat-composer-chip {
+  @apply lmsa:inline-flex lmsa:max-w-[220px] lmsa:items-center lmsa:gap-[5px] lmsa:rounded-full lmsa:pb-1 lmsa:pl-2 lmsa:pr-1.5 lmsa:pt-1 lmsa:text-obsidian-muted;
+  font-size: var(--font-ui-smaller);
+  border: 1px solid color-mix(in srgb, var(--lmsa-mode-accent) 40%, var(--background-modifier-border));
+  background: color-mix(in srgb, var(--lmsa-mode-accent) 10%, var(--background-secondary));
+}
 
-  .lmsa-chat-composer-chip-icon {
-    @apply lmsa-inline-flex lmsa-flex-none lmsa-items-center;
-    color: var(--lmsa-mode-accent);
-  }
+.lmsa-chat-composer-chip-icon {
+  @apply lmsa:inline-flex lmsa:flex-none lmsa:items-center;
+  color: var(--lmsa-mode-accent);
+}
 
-  .lmsa-chat-composer-chip-icon svg {
-    width: 11px;
-    height: 11px;
-  }
+.lmsa-chat-composer-chip-icon svg {
+  width: 11px;
+  height: 11px;
+}
 
-  .lmsa-chat-composer-chip-label {
-    @apply lmsa-min-w-0 lmsa-flex-1 lmsa-truncate lmsa-whitespace-nowrap;
-  }
+.lmsa-chat-composer-chip-label {
+  @apply lmsa:min-w-0 lmsa:flex-1 lmsa:truncate lmsa:whitespace-nowrap;
+}
 
-  .lmsa-chat-composer-chip-remove {
-    @apply lmsa-inline-flex lmsa-h-4 lmsa-w-4 lmsa-flex-none lmsa-cursor-pointer lmsa-items-center lmsa-justify-center lmsa-rounded-full lmsa-border-none lmsa-p-0 lmsa-text-obsidian-muted;
-    background: transparent;
-    box-shadow: none;
-    outline: none;
-    appearance: none;
-    min-height: unset;
-    font: inherit;
-    line-height: 1;
-    transition: color 120ms ease;
-  }
+.lmsa-chat-composer-chip-remove {
+  @apply lmsa:inline-flex lmsa:h-4 lmsa:w-4 lmsa:flex-none lmsa:cursor-pointer lmsa:items-center lmsa:justify-center lmsa:rounded-full lmsa:border-none lmsa:p-0 lmsa:text-obsidian-muted;
+  background: transparent;
+  box-shadow: none;
+  outline: none;
+  appearance: none;
+  min-height: unset;
+  font: inherit;
+  line-height: 1;
+  transition: color 120ms ease;
+}
 
-  .lmsa-chat-composer-chip-remove:hover {
-    @apply lmsa-text-obsidian-text;
-    background: var(--background-modifier-hover);
-  }
+.lmsa-chat-composer-chip-remove:hover {
+  @apply lmsa:text-obsidian-text;
+  background: var(--background-modifier-hover);
+}
 
-  .lmsa-chat-composer-chip-remove svg {
-    width: 10px;
-    height: 10px;
-  }
+.lmsa-chat-composer-chip-remove svg {
+  width: 10px;
+  height: 10px;
+}
 
-  /* ── Composer panel ──────────────────────────────────────────────────────── */
+/* ── Composer panel ──────────────────────────────────────────────────────── */
 
-  .lmsa-chat-composer-panel {
-    @apply lmsa-relative lmsa-z-[1] lmsa-overflow-visible lmsa-rounded-[10px] lmsa-border lmsa-border-obsidian-border lmsa-px-[14px] lmsa-pb-1.5 lmsa-pt-[14px];
-    background: linear-gradient(
-      180deg,
-      color-mix(in srgb, var(--background-primary) 92%, transparent),
-      color-mix(in srgb, var(--background-secondary) 86%, transparent)
-    );
-    backdrop-filter: blur(18px);
-    -webkit-backdrop-filter: blur(18px);
-    box-shadow:
-      0 18px 48px rgba(0, 0, 0, 0.12),
-      inset 0 1px 0 var(--lmsa-inset-highlight);
-    transition: border-color 200ms ease, box-shadow 200ms ease;
-  }
+.lmsa-chat-composer-panel {
+  @apply lmsa:relative lmsa:z-[1] lmsa:overflow-visible lmsa:rounded-[10px] lmsa:border lmsa:border-obsidian-border lmsa:px-[14px] lmsa:pb-1.5 lmsa:pt-[14px];
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--background-primary) 92%, transparent),
+    color-mix(in srgb, var(--background-secondary) 86%, transparent)
+  );
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  box-shadow:
+    0 18px 48px rgba(0, 0, 0, 0.12),
+    inset 0 1px 0 var(--lmsa-inset-highlight);
+  transition: border-color 200ms ease, box-shadow 200ms ease;
+}
 
-  .lmsa-chat-composer-panel:hover,
-  .lmsa-chat-composer-panel:focus-within {
-    border-color: color-mix(in srgb, var(--lmsa-mode-accent) 45%, var(--background-modifier-border));
-    box-shadow:
-      0 24px 60px rgba(0, 0, 0, 0.14),
-      0 0 0 1px color-mix(in srgb, var(--lmsa-mode-accent) 24%, transparent),
-      inset 0 1px 0 var(--lmsa-inset-highlight);
-  }
+.lmsa-chat-composer-panel:hover,
+.lmsa-chat-composer-panel:focus-within {
+  border-color: color-mix(in srgb, var(--lmsa-mode-accent) 45%, var(--background-modifier-border));
+  box-shadow:
+    0 24px 60px rgba(0, 0, 0, 0.14),
+    0 0 0 1px color-mix(in srgb, var(--lmsa-mode-accent) 24%, transparent),
+    inset 0 1px 0 var(--lmsa-inset-highlight);
+}
 
-  /* Idle ring, wide shimmer sweep, fades out on interaction */
-  .lmsa-root .lmsa-chat-composer-panel::before {
-    content: "";
-    @apply lmsa-pointer-events-none lmsa-absolute;
-    inset: -1px;
-    border-radius: inherit;
-    padding: 1.5px;
-    background: conic-gradient(
-      from var(--lmsa-border-angle),
-      color-mix(in srgb, var(--lmsa-mode-accent) 30%, transparent) 0deg,
-      color-mix(in srgb, var(--lmsa-mode-accent) 85%, white) 115deg,
-      color-mix(in srgb, var(--lmsa-mode-accent) 30%, transparent) 230deg,
-      color-mix(in srgb, var(--lmsa-mode-accent) 30%, transparent) 360deg
-    );
-    -webkit-mask:
-      linear-gradient(#fff 0 0) content-box,
-      linear-gradient(#fff 0 0);
-    -webkit-mask-composite: xor;
-    mask-composite: exclude;
-    animation: lmsa-border-spin 15s linear infinite;
-    opacity: 0.55;
-    transition: opacity 900ms ease;
-    z-index: 0;
-  }
+/* Idle ring, wide shimmer sweep, fades out on interaction */
+.lmsa-root .lmsa-chat-composer-panel::before {
+  content: "";
+  @apply lmsa:pointer-events-none lmsa:absolute;
+  inset: -1px;
+  border-radius: inherit;
+  padding: 1.5px;
+  background: conic-gradient(
+    from var(--lmsa-border-angle),
+    color-mix(in srgb, var(--lmsa-mode-accent) 30%, transparent) 0deg,
+    color-mix(in srgb, var(--lmsa-mode-accent) 85%, white) 115deg,
+    color-mix(in srgb, var(--lmsa-mode-accent) 30%, transparent) 230deg,
+    color-mix(in srgb, var(--lmsa-mode-accent) 30%, transparent) 360deg
+  );
+  -webkit-mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  animation: lmsa-border-spin 15s linear infinite;
+  opacity: 0.55;
+  transition: opacity 900ms ease;
+  z-index: 0;
+}
 
-  .lmsa-root .lmsa-chat-composer-panel:hover::before,
-  .lmsa-root .lmsa-chat-composer-panel:focus-within::before {
-    opacity: 0;
-  }
+.lmsa-root .lmsa-chat-composer-panel:hover::before,
+.lmsa-root .lmsa-chat-composer-panel:focus-within::before {
+  opacity: 0;
+}
 
-  /* Spinning neutron-star beam, always running, invisible at idle */
-  .lmsa-root .lmsa-chat-composer-panel::after {
-    content: "";
-    @apply lmsa-pointer-events-none lmsa-absolute;
-    inset: -1px;
-    border-radius: inherit;
-    padding: 1.5px;
-    background: conic-gradient(
-      from var(--lmsa-border-angle),
-      transparent 0deg,
-      color-mix(in srgb, var(--lmsa-mode-accent) 90%, white) 40deg,
-      transparent 80deg,
-      transparent 180deg,
-      color-mix(in srgb, var(--lmsa-mode-accent) 90%, white) 220deg,
-      transparent 260deg,
-      transparent 360deg
-    );
-    -webkit-mask:
-      linear-gradient(#fff 0 0) content-box,
-      linear-gradient(#fff 0 0);
-    -webkit-mask-composite: xor;
-    mask-composite: exclude;
-    animation: lmsa-border-spin 5s linear infinite;
-    opacity: 0;
-    transition: opacity 900ms ease;
-    z-index: 0;
-  }
+/* Spinning neutron-star beam, always running, invisible at idle */
+.lmsa-root .lmsa-chat-composer-panel::after {
+  content: "";
+  @apply lmsa:pointer-events-none lmsa:absolute;
+  inset: -1px;
+  border-radius: inherit;
+  padding: 1.5px;
+  background: conic-gradient(
+    from var(--lmsa-border-angle),
+    transparent 0deg,
+    color-mix(in srgb, var(--lmsa-mode-accent) 90%, white) 40deg,
+    transparent 80deg,
+    transparent 180deg,
+    color-mix(in srgb, var(--lmsa-mode-accent) 90%, white) 220deg,
+    transparent 260deg,
+    transparent 360deg
+  );
+  -webkit-mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  animation: lmsa-border-spin 5s linear infinite;
+  opacity: 0;
+  transition: opacity 900ms ease;
+  z-index: 0;
+}
 
-  .lmsa-root .lmsa-chat-composer-panel:hover::after,
-  .lmsa-root .lmsa-chat-composer-panel:focus-within::after {
-    opacity: 1;
-  }
+.lmsa-root .lmsa-chat-composer-panel:hover::after,
+.lmsa-root .lmsa-chat-composer-panel:focus-within::after {
+  opacity: 1;
+}
 
-  /* ── Staged attachments ──────────────────────────────────────────────────── */
+/* ── Staged attachments ──────────────────────────────────────────────────── */
 
-  .lmsa-chat-composer-attachments:empty {
-    display: none;
-  }
+.lmsa-chat-composer-attachments:empty {
+  display: none;
+}
 
-  .lmsa-chat-composer-attachments {
-    @apply lmsa-flex lmsa-flex-wrap lmsa-items-center lmsa-gap-2 lmsa-px-1 lmsa-pb-2;
-  }
+.lmsa-chat-composer-attachments {
+  @apply lmsa:flex lmsa:flex-wrap lmsa:items-center lmsa:gap-2 lmsa:px-1 lmsa:pb-2;
+}
 
-  .lmsa-chat-composer-attachment {
-    @apply lmsa-relative lmsa-flex-none lmsa-overflow-hidden lmsa-rounded-lg;
-    width: 64px;
-    height: 64px;
-    border: 1px solid var(--background-modifier-border);
-  }
+.lmsa-chat-composer-attachment {
+  @apply lmsa:relative lmsa:flex-none lmsa:overflow-hidden lmsa:rounded-lg;
+  width: 64px;
+  height: 64px;
+  border: 1px solid var(--background-modifier-border);
+}
 
-  .lmsa-chat-composer-attachment-img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    display: block;
-  }
+.lmsa-chat-composer-attachment-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
 
-  .lmsa-chat-composer-attachment-remove {
-    @apply lmsa-absolute lmsa-right-0.5 lmsa-top-0.5 lmsa-flex lmsa-h-4 lmsa-w-4 lmsa-cursor-pointer lmsa-items-center lmsa-justify-center lmsa-rounded-full lmsa-border-none lmsa-p-0;
-    background: color-mix(in srgb, var(--background-primary) 85%, transparent);
-    color: var(--text-muted);
-    box-shadow: none;
-    outline: none;
-    appearance: none;
-    min-height: unset;
-    backdrop-filter: blur(4px);
-    transition: color 120ms ease, background 120ms ease;
-  }
+.lmsa-chat-composer-attachment-remove {
+  @apply lmsa:absolute lmsa:right-0.5 lmsa:top-0.5 lmsa:flex lmsa:h-4 lmsa:w-4 lmsa:cursor-pointer lmsa:items-center lmsa:justify-center lmsa:rounded-full lmsa:border-none lmsa:p-0;
+  background: color-mix(in srgb, var(--background-primary) 85%, transparent);
+  color: var(--text-muted);
+  box-shadow: none;
+  outline: none;
+  appearance: none;
+  min-height: unset;
+  backdrop-filter: blur(4px);
+  transition: color 120ms ease, background 120ms ease;
+}
 
-  .lmsa-chat-composer-attachment-remove:hover {
-    color: var(--text-error);
-    background: color-mix(in srgb, var(--background-primary) 95%, transparent);
-  }
+.lmsa-chat-composer-attachment-remove:hover {
+  color: var(--text-error);
+  background: color-mix(in srgb, var(--background-primary) 95%, transparent);
+}
 
-  .lmsa-chat-composer-attachment-remove svg {
-    width: 10px;
-    height: 10px;
-  }
+.lmsa-chat-composer-attachment-remove svg {
+  width: 10px;
+  height: 10px;
+}
 
-  /* ── Drag-drop feedback ─────────────────────────────────────────────────── */
+/* ── Drag-drop feedback ─────────────────────────────────────────────────── */
 
-  /* Draw the drag ring as an OUTLINE, not by mutating the border. The panel's 1px border has
-     no border-style in the normal state (Tailwind preflight is off, so it defaults to `none`,
-     which collapses the reserved width to 0). Forcing `border-style: dashed` would activate
-     that 1px on all sides and shove the content inward by 1px. An outline is painted outside
-     the box and never affects layout, so the dashed ring appears with zero shift. */
-  .lmsa-chat-composer-panel.is-dragover {
-    outline: 1px dashed var(--lmsa-mode-accent);
-    outline-offset: -1px;
-    background: color-mix(in srgb, var(--lmsa-mode-accent) 6%, var(--background-primary)) !important;
-  }
+/* Draw the drag ring as an OUTLINE, not by mutating the border. The panel's 1px border has
+   no border-style in the normal state (Tailwind preflight is off, so it defaults to `none`,
+   which collapses the reserved width to 0). Forcing `border-style: dashed` would activate
+   that 1px on all sides and shove the content inward by 1px. An outline is painted outside
+   the box and never affects layout, so the dashed ring appears with zero shift. */
+.lmsa-chat-composer-panel.is-dragover {
+  outline: 1px dashed var(--lmsa-mode-accent);
+  outline-offset: -1px;
+  background: color-mix(in srgb, var(--lmsa-mode-accent) 6%, var(--background-primary)) !important;
+}
 
-  /* ── Textarea ────────────────────────────────────────────────────────────── */
+/* ── Textarea ────────────────────────────────────────────────────────────── */
 
-  .lmsa-chat-composer-textarea {
-    @apply lmsa-box-border lmsa-w-full lmsa-resize-none lmsa-border-none lmsa-bg-transparent lmsa-px-2 lmsa-pb-2 lmsa-pt-2 lmsa-text-obsidian-text;
-    font-family: var(--font-interface);
-    font-size: 1rem;
-    line-height: 1.7;
-    min-height: calc(1.7em + 16px); /* one line + padding, never collapse */
-    max-height: 260px;
-    overflow-y: auto;
-  }
+.lmsa-chat-composer-textarea {
+  @apply lmsa:box-border lmsa:w-full lmsa:resize-none lmsa:border-none lmsa:bg-transparent lmsa:px-2 lmsa:pb-2 lmsa:pt-2 lmsa:text-obsidian-text;
+  font-family: var(--font-interface);
+  font-size: 1rem;
+  line-height: 1.7;
+  min-height: calc(1.7em + 16px); /* one line + padding, never collapse */
+  max-height: 260px;
+  overflow-y: auto;
+}
 
-  .lmsa-chat-composer-textarea::placeholder {
-    color: color-mix(in srgb, var(--text-muted) 82%, transparent);
-  }
+.lmsa-chat-composer-textarea::placeholder {
+  color: color-mix(in srgb, var(--text-muted) 82%, transparent);
+}
 
-  .lmsa-chat-composer-textarea:hover,
-  .lmsa-chat-composer-textarea:focus,
-  .lmsa-chat-composer-textarea:focus-visible {
-    outline: none;
-    border: none;
-    box-shadow: none;
-    background: transparent;
-  }
+.lmsa-chat-composer-textarea:hover,
+.lmsa-chat-composer-textarea:focus,
+.lmsa-chat-composer-textarea:focus-visible {
+  outline: none;
+  border: none;
+  box-shadow: none;
+  background: transparent;
+}
 
-  /* ── Footer ──────────────────────────────────────────────────────────────── */
+/* ── Footer ──────────────────────────────────────────────────────────────── */
 
-  .lmsa-chat-composer-footer {
-    @apply lmsa-relative lmsa-mt-1 lmsa-pt-1.5;
-    border-top: 1px solid color-mix(in srgb, var(--background-modifier-border) 78%, transparent);
-    container-type: inline-size;
-    container-name: lmsa-composer-footer;
-  }
+.lmsa-chat-composer-footer {
+  @apply lmsa:relative lmsa:mt-1 lmsa:pt-1.5;
+  border-top: 1px solid color-mix(in srgb, var(--background-modifier-border) 78%, transparent);
+  container-type: inline-size;
+  container-name: lmsa-composer-footer;
+}
 
-  /* The in-flow footer line. `overflow: clip` guarantees no horizontal scrollbar can ever
-     appear if content briefly exceeds the width between breakpoints; the tool/knowledge
-     popovers are children of the footer (not this row), so they are never clipped. The
-     clip margin keeps focus rings from being shaved. */
-  .lmsa-chat-composer-footer-row {
-    @apply lmsa-flex lmsa-items-center lmsa-justify-between lmsa-gap-3;
-    overflow: clip;
-    overflow-clip-margin: 6px;
-  }
+/* The in-flow footer line. `overflow: clip` guarantees no horizontal scrollbar can ever
+   appear if content briefly exceeds the width between breakpoints; the tool/knowledge
+   popovers are children of the footer (not this row), so they are never clipped. The
+   clip margin keeps focus rings from being shaved. */
+.lmsa-chat-composer-footer-row {
+  @apply lmsa:flex lmsa:items-center lmsa:justify-between lmsa:gap-3;
+  overflow: clip;
+  overflow-clip-margin: 6px;
+}
 
-  /* Left cluster: capacity ring + reasoning pill, left-aligned. Keeping the pill
-     out of the actions row preserves the measured degradation thresholds below,
-     which were calculated from the right-side items' exact footprints. */
-  .lmsa-chat-composer-footer-left {
-    @apply lmsa-flex lmsa-min-w-0 lmsa-items-center lmsa-gap-2;
-  }
+/* Left cluster: capacity ring + reasoning pill, left-aligned. Keeping the pill
+   out of the actions row preserves the measured degradation thresholds below,
+   which were calculated from the right-side items' exact footprints. */
+.lmsa-chat-composer-footer-left {
+  @apply lmsa:flex lmsa:min-w-0 lmsa:items-center lmsa:gap-2;
+}
 
-  .lmsa-chat-composer-footer-actions {
-    @apply lmsa-ml-auto lmsa-flex lmsa-items-center lmsa-gap-3;
-  }
+.lmsa-chat-composer-footer-actions {
+  @apply lmsa:ml-auto lmsa:flex lmsa:items-center lmsa:gap-3;
+}
 
-  /* Tool/knowledge indicator wrappers. Must stay above the container queries
-     that hide them, the display tie resolves by source order. */
-  .lmsa-chat-composer-tool-wrap,
-  .lmsa-chat-composer-knowledge-wrap {
-    @apply lmsa-flex;
-  }
+/* Tool/knowledge indicator wrappers. Must stay above the container queries
+   that hide them, the display tie resolves by source order. */
+.lmsa-chat-composer-tool-wrap,
+.lmsa-chat-composer-knowledge-wrap {
+  @apply lmsa:flex;
+}
 
-  /* ── Context capacity ring ────────────────────────────────────────────────── */
+/* ── Context capacity ring ────────────────────────────────────────────────── */
 
-  .lmsa-chat-composer-context-capacity {
-    @apply lmsa-relative lmsa-inline-flex lmsa-flex-none lmsa-items-center lmsa-justify-center lmsa-gap-1.5;
-    cursor: default;
-  }
+.lmsa-chat-composer-context-capacity {
+  @apply lmsa:relative lmsa:inline-flex lmsa:flex-none lmsa:items-center lmsa:justify-center lmsa:gap-1.5;
+  cursor: default;
+}
 
+.lmsa-context-ring-label {
+  font-size: var(--font-ui-smaller);
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
+  /* Fixed lane wide enough for "100%" so the digit count changing (8% -> 100%) never
+     reflows the footer; flex-none so it can't be squeezed before it is dropped.
+     Left-aligned so the digits hug the ring instead of drifting to the far edge of the
+     lane; the unused width trails off into the ml-auto gap before the footer actions. */
+  flex: none;
+  min-width: 2.6em;
+  text-align: left;
+}
+
+.lmsa-chat-composer-context-capacity.is-warning .lmsa-context-ring-label {
+  color: var(--text-warning, #e6a700);
+}
+
+.lmsa-chat-composer-context-capacity.is-danger .lmsa-context-ring-label {
+  color: var(--text-error, #e93147);
+}
+
+.lmsa-context-ring-svg {
+  width: 28px;
+  height: 28px;
+}
+
+.lmsa-context-ring-track {
+  stroke: var(--background-modifier-border);
+}
+
+.lmsa-context-ring-fill {
+  stroke: var(--lmsa-mode-accent);
+  transition: stroke-dashoffset 0.4s ease, stroke 0.2s ease;
+}
+
+.lmsa-chat-composer-context-capacity.is-warning .lmsa-context-ring-fill {
+  stroke: var(--text-warning, #e6a700);
+}
+
+.lmsa-chat-composer-context-capacity.is-danger .lmsa-context-ring-fill {
+  stroke: var(--text-error, #e93147);
+}
+
+/* Tooltip, fixed positioning to escape overflow:hidden ancestors */
+.lmsa-context-ring-tooltip {
+  display: none;
+  position: fixed;
+  flex-direction: column;
+  gap: 2px;
+  transform: translate(-50%, -100%);
+  padding: 6px 10px;
+  border-radius: 6px;
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  white-space: nowrap;
+  font-size: var(--font-ui-smaller);
+  color: var(--text-muted);
+  pointer-events: none;
+  z-index: 1000;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+}
+
+.lmsa-context-ring-tooltip.is-visible {
+  display: flex;
+}
+
+/* ── Tool indicator ──────────────────────────────────────────────────────── */
+
+.lmsa-chat-composer-tool-indicator {
+  @apply lmsa:inline-flex lmsa:items-center lmsa:justify-center;
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+  border: 1px solid var(--background-modifier-border);
+  color: var(--text-faint);
+  opacity: 0.4;
+  transition: color 0.15s ease, opacity 0.15s ease, border-color 0.15s ease;
+}
+
+.lmsa-chat-composer-tool-indicator svg {
+  width: 14px;
+  height: 14px;
+}
+
+.lmsa-chat-composer-tool-indicator.is-active {
+  color: var(--color-orange, #e8a84b);
+  border-color: color-mix(in srgb, var(--color-orange, #e8a84b) 45%, var(--background-modifier-border));
+  opacity: 1;
+}
+
+/* ── Knowledge indicator ─────────────────────────────────────────────────── */
+
+.lmsa-chat-composer-knowledge-indicator {
+  @apply lmsa:inline-flex lmsa:items-center lmsa:justify-center;
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+  border: 1px solid var(--background-modifier-border);
+  color: var(--text-faint);
+  opacity: 0.4;
+  transition: color 0.15s ease, opacity 0.15s ease, border-color 0.15s ease;
+}
+
+.lmsa-chat-composer-knowledge-indicator svg {
+  width: 14px;
+  height: 14px;
+}
+
+.lmsa-chat-composer-knowledge-indicator.is-active {
+  color: var(--color-cyan, #58a6ff);
+  border-color: color-mix(in srgb, var(--color-cyan, #58a6ff) 45%, var(--background-modifier-border));
+  opacity: 1;
+}
+
+/* Out-of-date index: a muted amber that overrides the active cyan (declared
+   after, same specificity) so a stale-but-active chip still reads as warning. */
+.lmsa-chat-composer-knowledge-indicator.is-stale {
+  color: color-mix(in srgb, var(--color-orange, #d29922) 80%, var(--text-muted));
+  border-color: color-mix(in srgb, var(--color-orange, #d29922) 40%, var(--background-modifier-border));
+  opacity: 1;
+}
+
+/* ── Vision indicator ────────────────────────────────────────────────────── */
+
+.lmsa-chat-composer-vision-indicator {
+  @apply lmsa:inline-flex lmsa:items-center lmsa:justify-center;
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+  border: 1px solid var(--background-modifier-border);
+  color: var(--text-faint);
+  opacity: 0.4;
+  transition: color 0.15s ease, opacity 0.15s ease, border-color 0.15s ease;
+}
+
+.lmsa-chat-composer-vision-indicator svg {
+  width: 14px;
+  height: 14px;
+}
+
+.lmsa-chat-composer-vision-indicator.is-active {
+  color: var(--color-purple, #a78bfa);
+  border-color: color-mix(in srgb, var(--color-purple, #a78bfa) 45%, var(--background-modifier-border));
+  opacity: 1;
+}
+
+/* ── Send button ─────────────────────────────────────────────────────────── */
+
+.lmsa-chat-composer-send-btn {
+  @apply lmsa:flex lmsa:flex-none lmsa:cursor-pointer lmsa:items-center lmsa:justify-center lmsa:border-none;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border-radius: 10px;
+  background: transparent !important;
+  color: var(--text-muted);
+  box-shadow: none !important;
+  outline: none;
+  appearance: none;
+  min-height: unset;
+  transition: background 120ms ease, color 120ms ease;
+}
+
+.lmsa-chat-composer-send-btn:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--background-modifier-hover) 60%, transparent) !important;
+  color: var(--text-normal);
+  box-shadow: none !important;
+}
+
+.lmsa-chat-composer-send-btn svg {
+  width: 18px;
+  height: 18px;
+}
+
+.lmsa-chat-composer-send-btn.is-stop {
+  color: var(--text-error);
+}
+
+.lmsa-chat-composer-send-btn.is-stop:hover {
+  background: color-mix(in srgb, var(--text-error) 12%, transparent);
+}
+
+/* ── Responsive (container query, reacts to panel width, not viewport) ──
+   Degradation order as the footer narrows: at 521px the reasoning pill leaves
+   the left cluster and the overflow ("...") button appears in the actions row
+   (ReasoningPill.css / ComposerOverflowMenu.css); then the context % label
+   drops (516), then the vision indicator (479), the knowledge chip (439), the
+   tool chip (399), and finally the posture pill (359, PosturePill.css). Every
+   control that leaves the row resurfaces as a section of the overflow menu,
+   gated at the same breakpoint, so nothing becomes unreachable and nothing
+   shows twice. The drop thresholds predate the overflow button and still
+   hold: the button adds ~40px to the right cluster, but the departing
+   reasoning pill frees ~46px on the left at the same width, so each item
+   still leaves just before the row would run out of room. */
+
+@container lmsa-composer-footer (max-width: 516px) {
   .lmsa-context-ring-label {
-    font-size: var(--font-ui-smaller);
-    color: var(--text-faint);
-    font-variant-numeric: tabular-nums;
-    /* Fixed lane wide enough for "100%" so the digit count changing (8% -> 100%) never
-       reflows the footer; flex-none so it can't be squeezed before it is dropped.
-       Left-aligned so the digits hug the ring instead of drifting to the far edge of the
-       lane; the unused width trails off into the ml-auto gap before the footer actions. */
-    flex: none;
-    min-width: 2.6em;
-    text-align: left;
-  }
-
-  .lmsa-chat-composer-context-capacity.is-warning .lmsa-context-ring-label {
-    color: var(--text-warning, #e6a700);
-  }
-
-  .lmsa-chat-composer-context-capacity.is-danger .lmsa-context-ring-label {
-    color: var(--text-error, #e93147);
-  }
-
-  .lmsa-context-ring-svg {
-    width: 28px;
-    height: 28px;
-  }
-
-  .lmsa-context-ring-track {
-    stroke: var(--background-modifier-border);
-  }
-
-  .lmsa-context-ring-fill {
-    stroke: var(--lmsa-mode-accent);
-    transition: stroke-dashoffset 0.4s ease, stroke 0.2s ease;
-  }
-
-  .lmsa-chat-composer-context-capacity.is-warning .lmsa-context-ring-fill {
-    stroke: var(--text-warning, #e6a700);
-  }
-
-  .lmsa-chat-composer-context-capacity.is-danger .lmsa-context-ring-fill {
-    stroke: var(--text-error, #e93147);
-  }
-
-  /* Tooltip, fixed positioning to escape overflow:hidden ancestors */
-  .lmsa-context-ring-tooltip {
     display: none;
-    position: fixed;
-    flex-direction: column;
-    gap: 2px;
-    transform: translate(-50%, -100%);
-    padding: 6px 10px;
-    border-radius: 6px;
-    background: var(--background-secondary);
-    border: 1px solid var(--background-modifier-border);
-    white-space: nowrap;
-    font-size: var(--font-ui-smaller);
-    color: var(--text-muted);
-    pointer-events: none;
-    z-index: 1000;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
   }
+}
 
-  .lmsa-context-ring-tooltip.is-visible {
-    display: flex;
-  }
-
-  /* ── Tool indicator ──────────────────────────────────────────────────────── */
-
-  .lmsa-chat-composer-tool-indicator {
-    @apply lmsa-inline-flex lmsa-items-center lmsa-justify-center;
-    width: 28px;
-    height: 28px;
-    border-radius: 7px;
-    border: 1px solid var(--background-modifier-border);
-    color: var(--text-faint);
-    opacity: 0.4;
-    transition: color 0.15s ease, opacity 0.15s ease, border-color 0.15s ease;
-  }
-
-  .lmsa-chat-composer-tool-indicator svg {
-    width: 14px;
-    height: 14px;
-  }
-
-  .lmsa-chat-composer-tool-indicator.is-active {
-    color: var(--color-orange, #e8a84b);
-    border-color: color-mix(in srgb, var(--color-orange, #e8a84b) 45%, var(--background-modifier-border));
-    opacity: 1;
-  }
-
-  /* ── Knowledge indicator ─────────────────────────────────────────────────── */
-
-  .lmsa-chat-composer-knowledge-indicator {
-    @apply lmsa-inline-flex lmsa-items-center lmsa-justify-center;
-    width: 28px;
-    height: 28px;
-    border-radius: 7px;
-    border: 1px solid var(--background-modifier-border);
-    color: var(--text-faint);
-    opacity: 0.4;
-    transition: color 0.15s ease, opacity 0.15s ease, border-color 0.15s ease;
-  }
-
-  .lmsa-chat-composer-knowledge-indicator svg {
-    width: 14px;
-    height: 14px;
-  }
-
-  .lmsa-chat-composer-knowledge-indicator.is-active {
-    color: var(--color-cyan, #58a6ff);
-    border-color: color-mix(in srgb, var(--color-cyan, #58a6ff) 45%, var(--background-modifier-border));
-    opacity: 1;
-  }
-
-  /* Out-of-date index: a muted amber that overrides the active cyan (declared
-     after, same specificity) so a stale-but-active chip still reads as warning. */
-  .lmsa-chat-composer-knowledge-indicator.is-stale {
-    color: color-mix(in srgb, var(--color-orange, #d29922) 80%, var(--text-muted));
-    border-color: color-mix(in srgb, var(--color-orange, #d29922) 40%, var(--background-modifier-border));
-    opacity: 1;
-  }
-
-  /* ── Vision indicator ────────────────────────────────────────────────────── */
-
+@container lmsa-composer-footer (max-width: 479px) {
   .lmsa-chat-composer-vision-indicator {
-    @apply lmsa-inline-flex lmsa-items-center lmsa-justify-center;
-    width: 28px;
-    height: 28px;
-    border-radius: 7px;
-    border: 1px solid var(--background-modifier-border);
-    color: var(--text-faint);
-    opacity: 0.4;
-    transition: color 0.15s ease, opacity 0.15s ease, border-color 0.15s ease;
+    display: none;
   }
+}
 
-  .lmsa-chat-composer-vision-indicator svg {
-    width: 14px;
-    height: 14px;
+@container lmsa-composer-footer (max-width: 439px) {
+  .lmsa-chat-composer-knowledge-wrap {
+    display: none;
   }
+}
 
-  .lmsa-chat-composer-vision-indicator.is-active {
-    color: var(--color-purple, #a78bfa);
-    border-color: color-mix(in srgb, var(--color-purple, #a78bfa) 45%, var(--background-modifier-border));
-    opacity: 1;
-  }
-
-  /* ── Send button ─────────────────────────────────────────────────────────── */
-
-  .lmsa-chat-composer-send-btn {
-    @apply lmsa-flex lmsa-flex-none lmsa-cursor-pointer lmsa-items-center lmsa-justify-center lmsa-border-none;
-    width: 34px;
-    height: 34px;
-    padding: 0;
-    border-radius: 10px;
-    background: transparent !important;
-    color: var(--text-muted);
-    box-shadow: none !important;
-    outline: none;
-    appearance: none;
-    min-height: unset;
-    transition: background 120ms ease, color 120ms ease;
-  }
-
-  .lmsa-chat-composer-send-btn:hover:not(:disabled) {
-    background: color-mix(in srgb, var(--background-modifier-hover) 60%, transparent) !important;
-    color: var(--text-normal);
-    box-shadow: none !important;
-  }
-
-  .lmsa-chat-composer-send-btn svg {
-    width: 18px;
-    height: 18px;
-  }
-
-  .lmsa-chat-composer-send-btn.is-stop {
-    color: var(--text-error);
-  }
-
-  .lmsa-chat-composer-send-btn.is-stop:hover {
-    background: color-mix(in srgb, var(--text-error) 12%, transparent);
-  }
-
-  /* ── Responsive (container query, reacts to panel width, not viewport) ──
-     Degradation order as the footer narrows: at 521px the reasoning pill leaves
-     the left cluster and the overflow ("...") button appears in the actions row
-     (ReasoningPill.css / ComposerOverflowMenu.css); then the context % label
-     drops (516), then the vision indicator (479), the knowledge chip (439), the
-     tool chip (399), and finally the posture pill (359, PosturePill.css). Every
-     control that leaves the row resurfaces as a section of the overflow menu,
-     gated at the same breakpoint, so nothing becomes unreachable and nothing
-     shows twice. The drop thresholds predate the overflow button and still
-     hold: the button adds ~40px to the right cluster, but the departing
-     reasoning pill frees ~46px on the left at the same width, so each item
-     still leaves just before the row would run out of room. */
-
-  @container lmsa-composer-footer (max-width: 516px) {
-    .lmsa-context-ring-label {
-      display: none;
-    }
-  }
-
-  @container lmsa-composer-footer (max-width: 479px) {
-    .lmsa-chat-composer-vision-indicator {
-      display: none;
-    }
-  }
-
-  @container lmsa-composer-footer (max-width: 439px) {
-    .lmsa-chat-composer-knowledge-wrap {
-      display: none;
-    }
-  }
-
-  @container lmsa-composer-footer (max-width: 399px) {
-    .lmsa-chat-composer-tool-wrap {
-      display: none;
-    }
+@container lmsa-composer-footer (max-width: 399px) {
+  .lmsa-chat-composer-tool-wrap {
+    display: none;
   }
 }

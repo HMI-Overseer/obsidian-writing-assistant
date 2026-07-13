@@ -1,187 +1,185 @@
-@layer components {
-  /* ── Index status block ───────────────────────────────────────────────────
-   * Shared layout for RAG index and Knowledge Graph build status.
-   * Structure: status header row (text + buttons) → progress bar.
-   * ─────────────────────────────────────────────────────────────────────── */
+/* ── Index status block ───────────────────────────────────────────────────
+ * Shared layout for RAG index and Knowledge Graph build status.
+ * Structure: status header row (text + buttons) → progress bar.
+ * ─────────────────────────────────────────────────────────────────────── */
 
-  .lmsa-index-status {
-    @apply lmsa-flex lmsa-flex-col lmsa-gap-3;
-  }
+.lmsa-index-status {
+  @apply lmsa:flex lmsa:flex-col lmsa:gap-3;
+}
 
-  /* ── Header: status text left, action buttons right ───────────────────── */
+/* ── Header: status text left, action buttons right ───────────────────── */
 
+.lmsa-index-status-header {
+  @apply lmsa:flex lmsa:items-center lmsa:justify-between lmsa:gap-4;
+}
+
+.lmsa-index-status-info {
+  @apply lmsa:flex lmsa:min-w-0 lmsa:flex-1 lmsa:flex-col lmsa:gap-1;
+}
+
+.lmsa-index-status-text {
+  @apply lmsa:m-0;
+  color: var(--lmsa-text-secondary);
+  line-height: 1.5;
+}
+
+.lmsa-index-status-text.mod-error {
+  color: var(--lmsa-status-error);
+}
+
+.lmsa-index-drift-notice {
+  @apply lmsa:m-0;
+  display: none;
+  color: var(--lmsa-status-warning);
+  font-size: var(--font-ui-smaller);
+  line-height: 1.5;
+}
+
+.lmsa-index-drift-notice.is-visible {
+  display: block;
+}
+
+/* ── Action button group ──────────────────────────────────────────────── */
+
+.lmsa-index-actions {
+  @apply lmsa:flex lmsa:shrink-0 lmsa:items-center lmsa:gap-2;
+}
+
+.lmsa-index-actions > .lmsa-ui-btn {
+  display: none;
+}
+
+.lmsa-index-actions > .lmsa-ui-btn.is-visible {
+  @apply lmsa:inline-flex;
+}
+
+/* ── Progress bar ─────────────────────────────────────────────────────── */
+
+.lmsa-index-progress {
+  display: none;
+}
+
+.lmsa-index-progress.is-visible {
+  @apply lmsa:flex lmsa:flex-col lmsa:gap-1.5;
+}
+
+.lmsa-index-progress-bar {
+  @apply lmsa:relative lmsa:overflow-hidden;
+  height: 6px;
+  border-radius: 9999px;
+  background: var(--lmsa-border-default);
+}
+
+.lmsa-index-progress-fill {
+  @apply lmsa:absolute lmsa:inset-y-0 lmsa:left-0;
+  border-radius: 9999px;
+  background: linear-gradient(
+    90deg,
+    var(--lmsa-section-accent, var(--interactive-accent)),
+    var(--lmsa-section-accent-secondary, var(--interactive-accent))
+  );
+  transition: width 300ms ease;
+}
+
+.lmsa-index-progress-text {
+  color: var(--lmsa-text-secondary);
+  font-size: var(--font-ui-smaller);
+  line-height: 1.4;
+}
+
+/* ── Responsive ───────────────────────────────────────────────────────── */
+
+@media (max-width: 700px) {
   .lmsa-index-status-header {
-    @apply lmsa-flex lmsa-items-center lmsa-justify-between lmsa-gap-4;
+    @apply lmsa:flex-col lmsa:items-stretch;
   }
-
-  .lmsa-index-status-info {
-    @apply lmsa-flex lmsa-min-w-0 lmsa-flex-1 lmsa-flex-col lmsa-gap-1;
-  }
-
-  .lmsa-index-status-text {
-    @apply lmsa-m-0;
-    color: var(--lmsa-text-secondary);
-    line-height: 1.5;
-  }
-
-  .lmsa-index-status-text.mod-error {
-    color: var(--lmsa-status-error);
-  }
-
-  .lmsa-index-drift-notice {
-    @apply lmsa-m-0;
-    display: none;
-    color: var(--lmsa-status-warning);
-    font-size: var(--font-ui-smaller);
-    line-height: 1.5;
-  }
-
-  .lmsa-index-drift-notice.is-visible {
-    display: block;
-  }
-
-  /* ── Action button group ──────────────────────────────────────────────── */
 
   .lmsa-index-actions {
-    @apply lmsa-flex lmsa-flex-shrink-0 lmsa-items-center lmsa-gap-2;
+    @apply lmsa:justify-start;
   }
+}
 
-  .lmsa-index-actions > .lmsa-ui-btn {
-    display: none;
-  }
+/* ── Per-folder graph coverage section ──────────────────────────────────── */
 
-  .lmsa-index-actions > .lmsa-ui-btn.is-visible {
-    @apply lmsa-inline-flex;
-  }
+.lmsa-kg-folder-section {
+  @apply lmsa:flex lmsa:flex-col lmsa:gap-1.5;
+  margin-top: 4px;
+}
 
-  /* ── Progress bar ─────────────────────────────────────────────────────── */
+.lmsa-kg-folder-row {
+  @apply lmsa:flex lmsa:items-center lmsa:gap-2;
+  min-height: 24px;
+}
 
-  .lmsa-index-progress {
-    display: none;
-  }
+.lmsa-kg-folder-name {
+  @apply lmsa:truncate;
+  flex: 0 0 140px;
+  font-size: var(--font-ui-smaller);
+  color: var(--lmsa-text-primary);
+}
 
-  .lmsa-index-progress.is-visible {
-    @apply lmsa-flex lmsa-flex-col lmsa-gap-1.5;
-  }
+.lmsa-kg-folder-name.is-root {
+  color: var(--lmsa-text-secondary);
+  font-style: italic;
+}
 
-  .lmsa-index-progress-bar {
-    @apply lmsa-relative lmsa-overflow-hidden;
-    height: 6px;
-    border-radius: 9999px;
-    background: var(--lmsa-border-default);
-  }
+.lmsa-kg-folder-bar {
+  @apply lmsa:relative lmsa:flex-1 lmsa:overflow-hidden;
+  height: 4px;
+  border-radius: 9999px;
+  background: var(--lmsa-border-default);
+  min-width: 40px;
+}
 
-  .lmsa-index-progress-fill {
-    @apply lmsa-absolute lmsa-inset-y-0 lmsa-left-0;
-    border-radius: 9999px;
-    background: linear-gradient(
-      90deg,
-      var(--lmsa-section-accent, var(--interactive-accent)),
-      var(--lmsa-section-accent-secondary, var(--interactive-accent))
-    );
-    transition: width 300ms ease;
-  }
+.lmsa-kg-folder-bar-fill {
+  @apply lmsa:absolute lmsa:inset-y-0 lmsa:left-0;
+  border-radius: 9999px;
+  background: var(--lmsa-section-accent, var(--interactive-accent));
+  transition: width 300ms ease;
+  opacity: 0.5;
+}
 
-  .lmsa-index-progress-text {
-    color: var(--lmsa-text-secondary);
-    font-size: var(--font-ui-smaller);
-    line-height: 1.4;
-  }
+.lmsa-kg-folder-bar-fill.is-complete {
+  opacity: 1;
+}
 
-  /* ── Responsive ───────────────────────────────────────────────────────── */
+.lmsa-kg-folder-bar-fill.is-active {
+  opacity: 0.85;
+  background: linear-gradient(
+    90deg,
+    var(--lmsa-section-accent, var(--interactive-accent)),
+    var(--lmsa-section-accent-secondary, var(--interactive-accent))
+  );
+}
 
-  @media (max-width: 700px) {
-    .lmsa-index-status-header {
-      @apply lmsa-flex-col lmsa-items-stretch;
-    }
+.lmsa-kg-folder-count {
+  flex: 0 0 52px;
+  text-align: right;
+  font-size: var(--font-ui-smaller);
+  color: var(--lmsa-text-secondary);
+  font-variant-numeric: tabular-nums;
+}
 
-    .lmsa-index-actions {
-      @apply lmsa-justify-start;
-    }
-  }
+.lmsa-kg-folder-action {
+  flex: 0 0 72px;
+  display: flex;
+  justify-content: flex-end;
+}
 
-  /* ── Per-folder graph coverage section ──────────────────────────────────── */
+.lmsa-kg-folder-btn {
+  font-size: var(--font-ui-smaller) !important;
+  padding: 2px 8px !important;
+  height: auto !important;
+  min-height: 0 !important;
+  line-height: 1.4 !important;
+}
 
-  .lmsa-kg-folder-section {
-    @apply lmsa-flex lmsa-flex-col lmsa-gap-1.5;
-    margin-top: 4px;
-  }
+.lmsa-kg-folder-stop-btn {
+  border-color: var(--lmsa-status-error, var(--color-red)) !important;
+  color: var(--lmsa-status-error, var(--color-red)) !important;
+}
 
-  .lmsa-kg-folder-row {
-    @apply lmsa-flex lmsa-items-center lmsa-gap-2;
-    min-height: 24px;
-  }
-
-  .lmsa-kg-folder-name {
-    @apply lmsa-truncate;
-    flex: 0 0 140px;
-    font-size: var(--font-ui-smaller);
-    color: var(--lmsa-text-primary);
-  }
-
-  .lmsa-kg-folder-name.is-root {
-    color: var(--lmsa-text-secondary);
-    font-style: italic;
-  }
-
-  .lmsa-kg-folder-bar {
-    @apply lmsa-relative lmsa-flex-1 lmsa-overflow-hidden;
-    height: 4px;
-    border-radius: 9999px;
-    background: var(--lmsa-border-default);
-    min-width: 40px;
-  }
-
-  .lmsa-kg-folder-bar-fill {
-    @apply lmsa-absolute lmsa-inset-y-0 lmsa-left-0;
-    border-radius: 9999px;
-    background: var(--lmsa-section-accent, var(--interactive-accent));
-    transition: width 300ms ease;
-    opacity: 0.5;
-  }
-
-  .lmsa-kg-folder-bar-fill.is-complete {
-    opacity: 1;
-  }
-
-  .lmsa-kg-folder-bar-fill.is-active {
-    opacity: 0.85;
-    background: linear-gradient(
-      90deg,
-      var(--lmsa-section-accent, var(--interactive-accent)),
-      var(--lmsa-section-accent-secondary, var(--interactive-accent))
-    );
-  }
-
-  .lmsa-kg-folder-count {
-    flex: 0 0 52px;
-    text-align: right;
-    font-size: var(--font-ui-smaller);
-    color: var(--lmsa-text-secondary);
-    font-variant-numeric: tabular-nums;
-  }
-
-  .lmsa-kg-folder-action {
-    flex: 0 0 72px;
-    display: flex;
-    justify-content: flex-end;
-  }
-
-  .lmsa-kg-folder-btn {
-    font-size: var(--font-ui-smaller) !important;
-    padding: 2px 8px !important;
-    height: auto !important;
-    min-height: 0 !important;
-    line-height: 1.4 !important;
-  }
-
-  .lmsa-kg-folder-stop-btn {
-    border-color: var(--lmsa-status-error, var(--color-red)) !important;
-    color: var(--lmsa-status-error, var(--color-red)) !important;
-  }
-
-  .lmsa-kg-folder-stop-btn:hover {
-    background: var(--lmsa-status-error, var(--color-red)) !important;
-    color: var(--text-on-accent) !important;
-  }
+.lmsa-kg-folder-stop-btn:hover {
+  background: var(--lmsa-status-error, var(--color-red)) !important;
+  color: var(--text-on-accent) !important;
 }

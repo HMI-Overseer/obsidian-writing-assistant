@@ -1,255 +1,253 @@
-@layer components {
-  .lmsa-model-selector-status {
-    @apply lmsa-inline-block lmsa-flex-none lmsa-rounded-full;
-    width: 10px;
-    height: 10px;
-  }
-
-  .lmsa-model-selector-status.is-hidden {
-    @apply lmsa-hidden;
-  }
-
-  .lmsa-model-selector-status.is-loaded {
-    background: var(--color-green, #29a36a);
-    box-shadow:
-      0 0 3px 1px color-mix(in srgb, var(--color-green, #29a36a) 30%, transparent),
-      0 0 8px 2px color-mix(in srgb, var(--color-green, #29a36a) 14%, transparent);
-  }
-
-  .lmsa-model-selector-status.is-unloaded {
-    background: var(--text-error);
-    box-shadow:
-      0 0 3px 1px color-mix(in srgb, var(--text-error) 30%, transparent),
-      0 0 8px 2px color-mix(in srgb, var(--text-error) 14%, transparent);
-  }
-
-  .lmsa-model-selector-status.is-unknown {
-    background: var(--text-faint);
-    box-shadow:
-      0 0 3px 1px color-mix(in srgb, var(--text-faint) 25%, transparent),
-      0 0 8px 2px color-mix(in srgb, var(--text-faint) 10%, transparent);
-  }
-
-  .lmsa-model-selector-status.is-cloud {
-    background: var(--color-blue, #4a90d9);
-    box-shadow:
-      0 0 3px 1px color-mix(in srgb, var(--color-blue, #4a90d9) 30%, transparent),
-      0 0 8px 2px color-mix(in srgb, var(--color-blue, #4a90d9) 14%, transparent);
-  }
-
-  .lmsa-model-dropdown {
-    @apply lmsa-absolute lmsa-left-0 lmsa-z-[120] lmsa-flex lmsa-max-h-[360px] lmsa-flex-col lmsa-overflow-hidden lmsa-rounded-[16px] lmsa-border lmsa-border-obsidian-border lmsa-p-2;
-    top: calc(100% + 6px);
-    width: min(372px, calc(100vw - 48px));
-    background:
-      linear-gradient(180deg, color-mix(in srgb, var(--background-primary) 97%, transparent), color-mix(in srgb, var(--background-secondary) 94%, transparent));
-    backdrop-filter: blur(22px);
-    -webkit-backdrop-filter: blur(22px);
-    box-shadow:
-      0 22px 56px rgba(0, 0, 0, 0.22),
-      inset 0 1px 0 var(--lmsa-inset-highlight-subtle);
-    transform-origin: top left;
-  }
-
-  .lmsa-model-dropdown-search {
-    @apply lmsa-flex lmsa-flex-none lmsa-items-center lmsa-gap-2;
-    padding: 4px 8px 8px;
-    margin-bottom: 6px;
-    border-bottom: 1px solid var(--background-modifier-border);
-  }
-
-  .lmsa-model-dropdown-search-icon {
-    @apply lmsa-inline-flex lmsa-flex-none lmsa-items-center;
-    color: var(--text-faint);
-  }
-
-  .lmsa-model-dropdown-search-icon svg {
-    width: 14px;
-    height: 14px;
-  }
-
-  /* Two-class descendant selector to beat Obsidian's input chrome. */
-  .lmsa-model-dropdown-search input.lmsa-model-dropdown-search-input {
-    @apply lmsa-min-w-0 lmsa-flex-1;
-    background: transparent;
-    border: none;
-    box-shadow: none;
-    padding: 0;
-    height: auto;
-    font-size: var(--font-ui-small);
-    color: var(--text-normal);
-  }
-
-  .lmsa-model-dropdown-search input.lmsa-model-dropdown-search-input:focus,
-  .lmsa-model-dropdown-search input.lmsa-model-dropdown-search-input:focus-visible {
-    background: transparent;
-    border: none;
-    box-shadow: none;
-    outline: none;
-  }
-
-  /* Two-class descendant selector to beat Obsidian's base button chrome. */
-  .lmsa-model-dropdown-search button.lmsa-model-dropdown-refresh {
-    @apply lmsa-inline-flex lmsa-flex-none lmsa-cursor-pointer lmsa-items-center lmsa-justify-center lmsa-rounded-md lmsa-border-none lmsa-p-1;
-    color: var(--text-muted);
-    min-height: unset;
-    background: transparent !important;
-    box-shadow: none !important;
-    outline: none;
-    appearance: none;
-    transition: background 120ms ease, color 120ms ease;
-  }
-
-  .lmsa-model-dropdown-search button.lmsa-model-dropdown-refresh:hover {
-    background: color-mix(in srgb, var(--background-modifier-hover) 60%, transparent) !important;
-    color: var(--text-normal);
-  }
-
-  .lmsa-model-dropdown-refresh svg {
-    width: 14px;
-    height: 14px;
-  }
-
-  .lmsa-model-dropdown-refresh.is-refreshing svg {
-    animation: lmsa-model-refresh-spin 900ms linear infinite;
-  }
-
-  @keyframes lmsa-model-refresh-spin {
-    to {
-      transform: rotate(360deg);
-    }
-  }
-
-  .lmsa-model-dropdown-body {
-    @apply lmsa-flex lmsa-min-h-0 lmsa-flex-1 lmsa-items-stretch lmsa-gap-1.5;
-  }
-
-  /* Rail styles live in ProviderRail.css (shared with the profile popover). */
-
-  .lmsa-model-dropdown-list {
-    @apply lmsa-flex lmsa-min-w-0 lmsa-flex-1 lmsa-flex-col lmsa-gap-0.5 lmsa-overflow-y-auto;
-  }
-
-  .lmsa-model-dropdown-item {
-    @apply lmsa-flex lmsa-w-full lmsa-cursor-pointer lmsa-items-center lmsa-gap-2 lmsa-text-obsidian-muted;
-    font-size: var(--font-ui-small);
-    padding: 6px 8px;
-    border-radius: 6px;
-    transition: background-color 140ms ease, color 140ms ease;
-  }
-
-  .lmsa-model-dropdown-item:hover {
-    background: color-mix(in srgb, var(--background-modifier-hover) 60%, transparent);
-    color: var(--text-normal);
-  }
-
-  .lmsa-model-dropdown-item.is-active {
-    /* Fallback: settings surfaces don't define the chat root's mode accent. */
-    color: var(--lmsa-mode-accent, var(--interactive-accent));
-  }
-
-  .lmsa-model-dropdown-item.is-active:hover {
-    background: color-mix(in srgb, var(--background-modifier-hover) 60%, transparent);
-  }
-
-  .lmsa-model-dropdown-copy {
-    @apply lmsa-flex lmsa-min-w-0 lmsa-flex-1 lmsa-flex-col lmsa-items-start;
-  }
-
-  .lmsa-model-dropdown-check {
-    @apply lmsa-inline-flex lmsa-h-4 lmsa-w-4 lmsa-flex-none lmsa-items-center lmsa-justify-center;
-    color: transparent;
-  }
-
-  .lmsa-model-dropdown-item.is-active .lmsa-model-dropdown-check {
-    color: var(--lmsa-mode-accent, var(--interactive-accent));
-  }
-
-  .lmsa-model-dropdown-check svg {
-    width: 13px;
-    height: 13px;
-  }
-
-  .lmsa-model-dropdown-name {
-    @apply lmsa-w-full lmsa-truncate lmsa-whitespace-nowrap;
-    letter-spacing: 0.01em;
-  }
-
-  .lmsa-model-dropdown-provider {
-    @apply lmsa-w-full lmsa-truncate lmsa-whitespace-nowrap;
-    font-size: var(--font-ui-smaller);
-    color: var(--text-faint);
-  }
-
-  .lmsa-model-dropdown-state {
-    @apply lmsa-inline-block lmsa-flex-none lmsa-rounded-full;
-    width: 8px;
-    height: 8px;
-  }
-
-  .lmsa-model-dropdown-state.is-loaded {
-    background: var(--color-green, #29a36a);
-    box-shadow:
-      0 0 3px 1px color-mix(in srgb, var(--color-green, #29a36a) 30%, transparent),
-      0 0 8px 2px color-mix(in srgb, var(--color-green, #29a36a) 14%, transparent);
-  }
-
-  .lmsa-model-dropdown-state.is-unloaded {
-    background: var(--text-error);
-    box-shadow:
-      0 0 3px 1px color-mix(in srgb, var(--text-error) 30%, transparent),
-      0 0 8px 2px color-mix(in srgb, var(--text-error) 14%, transparent);
-  }
-
-  .lmsa-model-dropdown-state.is-unknown {
-    background: var(--text-faint);
-    box-shadow:
-      0 0 3px 1px color-mix(in srgb, var(--text-faint) 25%, transparent),
-      0 0 8px 2px color-mix(in srgb, var(--text-faint) 10%, transparent);
-  }
-
-  .lmsa-model-dropdown-state.is-cloud {
-    background: var(--color-blue, #4a90d9);
-    box-shadow:
-      0 0 3px 1px color-mix(in srgb, var(--color-blue, #4a90d9) 30%, transparent),
-      0 0 8px 2px color-mix(in srgb, var(--color-blue, #4a90d9) 14%, transparent);
-  }
-
-  .lmsa-model-dropdown-star {
-    @apply lmsa-inline-flex lmsa-h-5 lmsa-w-5 lmsa-flex-none lmsa-cursor-pointer lmsa-items-center lmsa-justify-center lmsa-rounded;
-    color: var(--text-faint);
-    transition: color 140ms ease;
-  }
-
-  .lmsa-model-dropdown-star svg {
-    width: 13px;
-    height: 13px;
-  }
-
-  .lmsa-model-dropdown-star:hover {
-    color: var(--text-normal);
-  }
-
-  .lmsa-model-dropdown-star.is-faved {
-    color: var(--color-yellow, #e0ac00);
-  }
-
-  .lmsa-model-dropdown-star.is-faved svg {
-    fill: currentColor;
-  }
-
-  .lmsa-model-dropdown-empty {
-    @apply lmsa-px-4 lmsa-py-5 lmsa-text-center lmsa-text-obsidian-muted;
-    font-size: var(--font-ui-smaller);
-    /* Center vertically against the rail's height when the list is empty. */
-    margin-block: auto;
-  }
-
+.lmsa-model-selector-status {
+  @apply lmsa:inline-block lmsa:flex-none lmsa:rounded-full;
+  width: 10px;
+  height: 10px;
 }
+
+.lmsa-model-selector-status.is-hidden {
+  @apply lmsa:hidden;
+}
+
+.lmsa-model-selector-status.is-loaded {
+  background: var(--color-green, #29a36a);
+  box-shadow:
+    0 0 3px 1px color-mix(in srgb, var(--color-green, #29a36a) 30%, transparent),
+    0 0 8px 2px color-mix(in srgb, var(--color-green, #29a36a) 14%, transparent);
+}
+
+.lmsa-model-selector-status.is-unloaded {
+  background: var(--text-error);
+  box-shadow:
+    0 0 3px 1px color-mix(in srgb, var(--text-error) 30%, transparent),
+    0 0 8px 2px color-mix(in srgb, var(--text-error) 14%, transparent);
+}
+
+.lmsa-model-selector-status.is-unknown {
+  background: var(--text-faint);
+  box-shadow:
+    0 0 3px 1px color-mix(in srgb, var(--text-faint) 25%, transparent),
+    0 0 8px 2px color-mix(in srgb, var(--text-faint) 10%, transparent);
+}
+
+.lmsa-model-selector-status.is-cloud {
+  background: var(--color-blue, #4a90d9);
+  box-shadow:
+    0 0 3px 1px color-mix(in srgb, var(--color-blue, #4a90d9) 30%, transparent),
+    0 0 8px 2px color-mix(in srgb, var(--color-blue, #4a90d9) 14%, transparent);
+}
+
+.lmsa-model-dropdown {
+  @apply lmsa:absolute lmsa:left-0 lmsa:z-[120] lmsa:flex lmsa:max-h-[360px] lmsa:flex-col lmsa:overflow-hidden lmsa:rounded-[16px] lmsa:border lmsa:border-obsidian-border lmsa:p-2;
+  top: calc(100% + 6px);
+  width: min(372px, calc(100vw - 48px));
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--background-primary) 97%, transparent), color-mix(in srgb, var(--background-secondary) 94%, transparent));
+  backdrop-filter: blur(22px);
+  -webkit-backdrop-filter: blur(22px);
+  box-shadow:
+    0 22px 56px rgba(0, 0, 0, 0.22),
+    inset 0 1px 0 var(--lmsa-inset-highlight-subtle);
+  transform-origin: top left;
+}
+
+.lmsa-model-dropdown-search {
+  @apply lmsa:flex lmsa:flex-none lmsa:items-center lmsa:gap-2;
+  padding: 4px 8px 8px;
+  margin-bottom: 6px;
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.lmsa-model-dropdown-search-icon {
+  @apply lmsa:inline-flex lmsa:flex-none lmsa:items-center;
+  color: var(--text-faint);
+}
+
+.lmsa-model-dropdown-search-icon svg {
+  width: 14px;
+  height: 14px;
+}
+
+/* Two-class descendant selector to beat Obsidian's input chrome. */
+.lmsa-model-dropdown-search input.lmsa-model-dropdown-search-input {
+  @apply lmsa:min-w-0 lmsa:flex-1;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  padding: 0;
+  height: auto;
+  font-size: var(--font-ui-small);
+  color: var(--text-normal);
+}
+
+.lmsa-model-dropdown-search input.lmsa-model-dropdown-search-input:focus,
+.lmsa-model-dropdown-search input.lmsa-model-dropdown-search-input:focus-visible {
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  outline: none;
+}
+
+/* Two-class descendant selector to beat Obsidian's base button chrome. */
+.lmsa-model-dropdown-search button.lmsa-model-dropdown-refresh {
+  @apply lmsa:inline-flex lmsa:flex-none lmsa:cursor-pointer lmsa:items-center lmsa:justify-center lmsa:rounded-md lmsa:border-none lmsa:p-1;
+  color: var(--text-muted);
+  min-height: unset;
+  background: transparent !important;
+  box-shadow: none !important;
+  outline: none;
+  appearance: none;
+  transition: background 120ms ease, color 120ms ease;
+}
+
+.lmsa-model-dropdown-search button.lmsa-model-dropdown-refresh:hover {
+  background: color-mix(in srgb, var(--background-modifier-hover) 60%, transparent) !important;
+  color: var(--text-normal);
+}
+
+.lmsa-model-dropdown-refresh svg {
+  width: 14px;
+  height: 14px;
+}
+
+.lmsa-model-dropdown-refresh.is-refreshing svg {
+  animation: lmsa-model-refresh-spin 900ms linear infinite;
+}
+
+@keyframes lmsa-model-refresh-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.lmsa-model-dropdown-body {
+  @apply lmsa:flex lmsa:min-h-0 lmsa:flex-1 lmsa:items-stretch lmsa:gap-1.5;
+}
+
+/* Rail styles live in ProviderRail.css (shared with the profile popover). */
+
+.lmsa-model-dropdown-list {
+  @apply lmsa:flex lmsa:min-w-0 lmsa:flex-1 lmsa:flex-col lmsa:gap-0.5 lmsa:overflow-y-auto;
+}
+
+.lmsa-model-dropdown-item {
+  @apply lmsa:flex lmsa:w-full lmsa:cursor-pointer lmsa:items-center lmsa:gap-2 lmsa:text-obsidian-muted;
+  font-size: var(--font-ui-small);
+  padding: 6px 8px;
+  border-radius: 6px;
+  transition: background-color 140ms ease, color 140ms ease;
+}
+
+.lmsa-model-dropdown-item:hover {
+  background: color-mix(in srgb, var(--background-modifier-hover) 60%, transparent);
+  color: var(--text-normal);
+}
+
+.lmsa-model-dropdown-item.is-active {
+  /* Fallback: settings surfaces don't define the chat root's mode accent. */
+  color: var(--lmsa-mode-accent, var(--interactive-accent));
+}
+
+.lmsa-model-dropdown-item.is-active:hover {
+  background: color-mix(in srgb, var(--background-modifier-hover) 60%, transparent);
+}
+
+.lmsa-model-dropdown-copy {
+  @apply lmsa:flex lmsa:min-w-0 lmsa:flex-1 lmsa:flex-col lmsa:items-start;
+}
+
+.lmsa-model-dropdown-check {
+  @apply lmsa:inline-flex lmsa:h-4 lmsa:w-4 lmsa:flex-none lmsa:items-center lmsa:justify-center;
+  color: transparent;
+}
+
+.lmsa-model-dropdown-item.is-active .lmsa-model-dropdown-check {
+  color: var(--lmsa-mode-accent, var(--interactive-accent));
+}
+
+.lmsa-model-dropdown-check svg {
+  width: 13px;
+  height: 13px;
+}
+
+.lmsa-model-dropdown-name {
+  @apply lmsa:w-full lmsa:truncate lmsa:whitespace-nowrap;
+  letter-spacing: 0.01em;
+}
+
+.lmsa-model-dropdown-provider {
+  @apply lmsa:w-full lmsa:truncate lmsa:whitespace-nowrap;
+  font-size: var(--font-ui-smaller);
+  color: var(--text-faint);
+}
+
+.lmsa-model-dropdown-state {
+  @apply lmsa:inline-block lmsa:flex-none lmsa:rounded-full;
+  width: 8px;
+  height: 8px;
+}
+
+.lmsa-model-dropdown-state.is-loaded {
+  background: var(--color-green, #29a36a);
+  box-shadow:
+    0 0 3px 1px color-mix(in srgb, var(--color-green, #29a36a) 30%, transparent),
+    0 0 8px 2px color-mix(in srgb, var(--color-green, #29a36a) 14%, transparent);
+}
+
+.lmsa-model-dropdown-state.is-unloaded {
+  background: var(--text-error);
+  box-shadow:
+    0 0 3px 1px color-mix(in srgb, var(--text-error) 30%, transparent),
+    0 0 8px 2px color-mix(in srgb, var(--text-error) 14%, transparent);
+}
+
+.lmsa-model-dropdown-state.is-unknown {
+  background: var(--text-faint);
+  box-shadow:
+    0 0 3px 1px color-mix(in srgb, var(--text-faint) 25%, transparent),
+    0 0 8px 2px color-mix(in srgb, var(--text-faint) 10%, transparent);
+}
+
+.lmsa-model-dropdown-state.is-cloud {
+  background: var(--color-blue, #4a90d9);
+  box-shadow:
+    0 0 3px 1px color-mix(in srgb, var(--color-blue, #4a90d9) 30%, transparent),
+    0 0 8px 2px color-mix(in srgb, var(--color-blue, #4a90d9) 14%, transparent);
+}
+
+.lmsa-model-dropdown-star {
+  @apply lmsa:inline-flex lmsa:h-5 lmsa:w-5 lmsa:flex-none lmsa:cursor-pointer lmsa:items-center lmsa:justify-center lmsa:rounded-sm;
+  color: var(--text-faint);
+  transition: color 140ms ease;
+}
+
+.lmsa-model-dropdown-star svg {
+  width: 13px;
+  height: 13px;
+}
+
+.lmsa-model-dropdown-star:hover {
+  color: var(--text-normal);
+}
+
+.lmsa-model-dropdown-star.is-faved {
+  color: var(--color-yellow, #e0ac00);
+}
+
+.lmsa-model-dropdown-star.is-faved svg {
+  fill: currentColor;
+}
+
+.lmsa-model-dropdown-empty {
+  @apply lmsa:px-4 lmsa:py-5 lmsa:text-center lmsa:text-obsidian-muted;
+  font-size: var(--font-ui-smaller);
+  /* Center vertically against the rail's height when the list is empty. */
+  margin-block: auto;
+}
+
 
 @media (max-width: 700px) {
   .lmsa-model-dropdown {
-    @apply lmsa-left-0 lmsa-right-0;
+    @apply lmsa:left-0 lmsa:right-0;
     width: auto;
   }
 }

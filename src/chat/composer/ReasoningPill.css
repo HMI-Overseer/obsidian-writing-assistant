@@ -1,110 +1,108 @@
-@layer components {
-  /* ── Reasoning pill ──────────────────────────────────────────────────────
-     Footer control reading the active model's reasoning level, sitting in the
-     LEFT cluster next to the capacity ring (so the right-side indicators keep
-     their measured degradation thresholds). Same visual language as the
-     posture toggle: low-chrome rounded pill, muted until it carries an
-     explicit (non-default) level. */
+/* ── Reasoning pill ──────────────────────────────────────────────────────
+   Footer control reading the active model's reasoning level, sitting in the
+   LEFT cluster next to the capacity ring (so the right-side indicators keep
+   their measured degradation thresholds). Same visual language as the
+   posture toggle: low-chrome rounded pill, muted until it carries an
+   explicit (non-default) level. */
 
+.lmsa-chat-composer-reasoning-pill {
+  @apply lmsa:relative lmsa:inline-flex lmsa:flex-none lmsa:cursor-pointer lmsa:items-center lmsa:gap-1.5 lmsa:px-3 lmsa:py-1.5;
+  anchor-name: --lmsa-reasoning-pill;
+  border-radius: 999px;
+  border: 1px solid var(--background-modifier-border) !important;
+  font-size: var(--font-ui-smaller);
+  font-weight: 500;
+  line-height: 1.25;
+  color: var(--text-muted);
+  background: transparent !important;
+  box-shadow: none !important;
+  outline: none;
+  appearance: none;
+  min-height: unset;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.lmsa-chat-composer-reasoning-pill:hover {
+  color: var(--text-normal);
+}
+
+.lmsa-chat-composer-reasoning-pill:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--lmsa-mode-accent) 20%, transparent) !important;
+}
+
+/* An explicit level reads as "set": accent tint, like the active posture. */
+.lmsa-chat-composer-reasoning-pill:not(.is-default) {
+  color: var(--lmsa-mode-accent);
+  border-color: color-mix(in srgb, var(--lmsa-mode-accent) 45%, var(--background-modifier-border)) !important;
+}
+
+.lmsa-chat-composer-reasoning-pill-icon {
+  @apply lmsa:inline-flex lmsa:items-center;
+}
+
+.lmsa-chat-composer-reasoning-pill-icon svg {
+  width: 12px;
+  height: 12px;
+}
+
+/* Expandability affordance, same treatment as the header model selector's
+   chevron: faded until the control is hovered. Points up because the level
+   menu opens above the pill. */
+.lmsa-chat-composer-reasoning-pill-chevron {
+  @apply lmsa:inline-flex lmsa:flex-none lmsa:items-center;
+  opacity: 0.4;
+  transition: opacity 140ms ease;
+}
+
+.lmsa-chat-composer-reasoning-pill:hover .lmsa-chat-composer-reasoning-pill-chevron {
+  opacity: 0.75;
+}
+
+.lmsa-chat-composer-reasoning-pill-chevron svg {
+  width: 12px;
+  height: 12px;
+}
+
+/* ── Level menu ───────────────────────────────────────────────────────── */
+
+.lmsa-reasoning-menu {
+  @apply lmsa:absolute lmsa:z-[120] lmsa:flex-col lmsa:rounded-xl lmsa:border lmsa:border-obsidian-border lmsa:p-1;
+  display: flex;
+  bottom: calc(100% + 8px);
+  /* Anchored to the pill (see the tool popover for the rationale): left edges
+     align, clamped so the menu never leaves the footer (148px covers the menu's
+     132px min-width). The first, static `left` is the pre-anchor fallback. */
+  left: 8px;
+  position-anchor: --lmsa-reasoning-pill;
+  left: clamp(8px, anchor(left), calc(100% - 148px));
+  min-width: 132px;
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--background-primary) 97%, transparent),
+      color-mix(in srgb, var(--background-secondary) 94%, transparent)
+    );
+  backdrop-filter: blur(22px);
+  -webkit-backdrop-filter: blur(22px);
+  box-shadow:
+    0 -12px 48px rgba(0, 0, 0, 0.18),
+    inset 0 -1px 0 var(--lmsa-inset-highlight-subtle);
+  transform-origin: bottom left;
+}
+
+.lmsa-reasoning-menu.lmsa-hidden {
+  display: none;
+}
+
+/* Rows are the shared .lmsa-footer-menu-item (menuItem.css). */
+
+/* Narrow footer: at the 521px threshold the pill leaves the left cluster
+   entirely (formerly it collapsed to a bare icon) and its level list
+   resurfaces as the overflow menu's reasoning section; the overflow button
+   appears at this same width (ComposerOverflowMenu.css). */
+@container lmsa-composer-footer (max-width: 521px) {
   .lmsa-chat-composer-reasoning-pill {
-    @apply lmsa-relative lmsa-inline-flex lmsa-flex-none lmsa-cursor-pointer lmsa-items-center lmsa-gap-1.5 lmsa-px-3 lmsa-py-1.5;
-    anchor-name: --lmsa-reasoning-pill;
-    border-radius: 999px;
-    border: 1px solid var(--background-modifier-border) !important;
-    font-size: var(--font-ui-smaller);
-    font-weight: 500;
-    line-height: 1.25;
-    color: var(--text-muted);
-    background: transparent !important;
-    box-shadow: none !important;
-    outline: none;
-    appearance: none;
-    min-height: unset;
-    transition: color 0.15s ease, border-color 0.15s ease;
-  }
-
-  .lmsa-chat-composer-reasoning-pill:hover {
-    color: var(--text-normal);
-  }
-
-  .lmsa-chat-composer-reasoning-pill:focus-visible {
-    outline: none;
-    box-shadow: 0 0 0 3px color-mix(in srgb, var(--lmsa-mode-accent) 20%, transparent) !important;
-  }
-
-  /* An explicit level reads as "set": accent tint, like the active posture. */
-  .lmsa-chat-composer-reasoning-pill:not(.is-default) {
-    color: var(--lmsa-mode-accent);
-    border-color: color-mix(in srgb, var(--lmsa-mode-accent) 45%, var(--background-modifier-border)) !important;
-  }
-
-  .lmsa-chat-composer-reasoning-pill-icon {
-    @apply lmsa-inline-flex lmsa-items-center;
-  }
-
-  .lmsa-chat-composer-reasoning-pill-icon svg {
-    width: 12px;
-    height: 12px;
-  }
-
-  /* Expandability affordance, same treatment as the header model selector's
-     chevron: faded until the control is hovered. Points up because the level
-     menu opens above the pill. */
-  .lmsa-chat-composer-reasoning-pill-chevron {
-    @apply lmsa-inline-flex lmsa-flex-none lmsa-items-center;
-    opacity: 0.4;
-    transition: opacity 140ms ease;
-  }
-
-  .lmsa-chat-composer-reasoning-pill:hover .lmsa-chat-composer-reasoning-pill-chevron {
-    opacity: 0.75;
-  }
-
-  .lmsa-chat-composer-reasoning-pill-chevron svg {
-    width: 12px;
-    height: 12px;
-  }
-
-  /* ── Level menu ───────────────────────────────────────────────────────── */
-
-  .lmsa-reasoning-menu {
-    @apply lmsa-absolute lmsa-z-[120] lmsa-flex-col lmsa-rounded-xl lmsa-border lmsa-border-obsidian-border lmsa-p-1;
-    display: flex;
-    bottom: calc(100% + 8px);
-    /* Anchored to the pill (see the tool popover for the rationale): left edges
-       align, clamped so the menu never leaves the footer (148px covers the menu's
-       132px min-width). The first, static `left` is the pre-anchor fallback. */
-    left: 8px;
-    position-anchor: --lmsa-reasoning-pill;
-    left: clamp(8px, anchor(left), calc(100% - 148px));
-    min-width: 132px;
-    background:
-      linear-gradient(
-        180deg,
-        color-mix(in srgb, var(--background-primary) 97%, transparent),
-        color-mix(in srgb, var(--background-secondary) 94%, transparent)
-      );
-    backdrop-filter: blur(22px);
-    -webkit-backdrop-filter: blur(22px);
-    box-shadow:
-      0 -12px 48px rgba(0, 0, 0, 0.18),
-      inset 0 -1px 0 var(--lmsa-inset-highlight-subtle);
-    transform-origin: bottom left;
-  }
-
-  .lmsa-reasoning-menu.lmsa-hidden {
     display: none;
-  }
-
-  /* Rows are the shared .lmsa-footer-menu-item (menuItem.css). */
-
-  /* Narrow footer: at the 521px threshold the pill leaves the left cluster
-     entirely (formerly it collapsed to a bare icon) and its level list
-     resurfaces as the overflow menu's reasoning section; the overflow button
-     appears at this same width (ComposerOverflowMenu.css). */
-  @container lmsa-composer-footer (max-width: 521px) {
-    .lmsa-chat-composer-reasoning-pill {
-      display: none;
-    }
   }
 }

@@ -1,197 +1,195 @@
-@layer components {
-  /* ── Drawer shell ──────────────────────────────────────────────────────────
-     A full-pane overlay over the messages area. Styled to match the model
-     dropdown (ChatModelSelector.css): a soft frosted panel, not the heavy
-     accent-gradient card with a glowing top edge it used to be. */
-  .lmsa-history-drawer {
-    @apply lmsa-absolute lmsa-z-10 lmsa-hidden lmsa-flex-col lmsa-overflow-hidden lmsa-rounded-2xl lmsa-border lmsa-border-obsidian-border;
-    inset: 12px 12px 10px;
-    background: linear-gradient(
-      180deg,
-      color-mix(in srgb, var(--background-primary) 97%, transparent),
-      color-mix(in srgb, var(--background-secondary) 94%, transparent)
-    );
-    backdrop-filter: blur(22px);
-    -webkit-backdrop-filter: blur(22px);
-    box-shadow:
-      0 22px 56px rgba(0, 0, 0, 0.22),
-      inset 0 1px 0 var(--lmsa-inset-highlight-subtle);
-  }
+/* ── Drawer shell ──────────────────────────────────────────────────────────
+   A full-pane overlay over the messages area. Styled to match the model
+   dropdown (ChatModelSelector.css): a soft frosted panel, not the heavy
+   accent-gradient card with a glowing top edge it used to be. */
+.lmsa-history-drawer {
+  @apply lmsa:absolute lmsa:z-10 lmsa:hidden lmsa:flex-col lmsa:overflow-hidden lmsa:rounded-2xl lmsa:border lmsa:border-obsidian-border;
+  inset: 12px 12px 10px;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--background-primary) 97%, transparent),
+    color-mix(in srgb, var(--background-secondary) 94%, transparent)
+  );
+  backdrop-filter: blur(22px);
+  -webkit-backdrop-filter: blur(22px);
+  box-shadow:
+    0 22px 56px rgba(0, 0, 0, 0.22),
+    inset 0 1px 0 var(--lmsa-inset-highlight-subtle);
+}
 
-  .lmsa-history-drawer.is-open {
-    @apply lmsa-flex;
-    animation: lmsa-drawer-fade 180ms ease forwards;
-  }
+.lmsa-history-drawer.is-open {
+  @apply lmsa:flex;
+  animation: lmsa-drawer-fade 180ms ease forwards;
+}
 
-  /* ── Header ────────────────────────────────────────────────────────────────
-     A quiet title row with a hairline divider, matching the chat header. */
-  .lmsa-history-header {
-    @apply lmsa-flex lmsa-flex-shrink-0 lmsa-items-center lmsa-justify-between lmsa-gap-2.5 lmsa-px-4 lmsa-pb-3 lmsa-pt-4;
-    border-bottom: 1px solid color-mix(in srgb, var(--background-modifier-border) 55%, transparent);
-  }
+/* ── Header ────────────────────────────────────────────────────────────────
+   A quiet title row with a hairline divider, matching the chat header. */
+.lmsa-history-header {
+  @apply lmsa:flex lmsa:shrink-0 lmsa:items-center lmsa:justify-between lmsa:gap-2.5 lmsa:px-4 lmsa:pb-3 lmsa:pt-4;
+  border-bottom: 1px solid color-mix(in srgb, var(--background-modifier-border) 55%, transparent);
+}
 
-  .lmsa-history-title-group {
-    @apply lmsa-flex lmsa-min-w-0 lmsa-items-baseline lmsa-gap-2;
-  }
+.lmsa-history-title-group {
+  @apply lmsa:flex lmsa:min-w-0 lmsa:items-baseline lmsa:gap-2;
+}
 
-  .lmsa-history-title {
-    @apply lmsa-font-semibold lmsa-text-obsidian-text;
-    font-size: var(--font-ui-medium);
-  }
+.lmsa-history-title {
+  @apply lmsa:font-semibold lmsa:text-obsidian-text;
+  font-size: var(--font-ui-medium);
+}
 
-  .lmsa-history-count {
-    color: var(--text-faint);
-    font-size: var(--font-ui-smaller);
-  }
+.lmsa-history-count {
+  color: var(--text-faint);
+  font-size: var(--font-ui-smaller);
+}
 
-  .lmsa-history-header-actions {
-    @apply lmsa-flex lmsa-flex-shrink-0 lmsa-gap-1.5;
-  }
+.lmsa-history-header-actions {
+  @apply lmsa:flex lmsa:shrink-0 lmsa:gap-1.5;
+}
 
-  .lmsa-history-header-actions .lmsa-ui-icon-btn {
-    @apply lmsa-h-auto lmsa-w-auto lmsa-rounded-md lmsa-border-none lmsa-p-1.5;
-    background: transparent !important;
-    box-shadow: none !important;
-  }
+.lmsa-history-header-actions .lmsa-ui-icon-btn {
+  @apply lmsa:h-auto lmsa:w-auto lmsa:rounded-md lmsa:border-none lmsa:p-1.5;
+  background: transparent !important;
+  box-shadow: none !important;
+}
 
-  .lmsa-history-header-actions .lmsa-ui-icon-btn:hover {
-    background: color-mix(in srgb, var(--background-modifier-hover) 60%, transparent) !important;
-    color: var(--text-normal);
-  }
+.lmsa-history-header-actions .lmsa-ui-icon-btn:hover {
+  background: color-mix(in srgb, var(--background-modifier-hover) 60%, transparent) !important;
+  color: var(--text-normal);
+}
 
-  .lmsa-history-header-actions .lmsa-history-btn svg {
-    width: 18px;
-    height: 18px;
-  }
+.lmsa-history-header-actions .lmsa-history-btn svg {
+  width: 18px;
+  height: 18px;
+}
 
-  /* ── Search ────────────────────────────────────────────────────────────── */
-  .lmsa-history-search {
-    @apply lmsa-flex-shrink-0 lmsa-px-3 lmsa-pt-3;
-  }
+/* ── Search ────────────────────────────────────────────────────────────── */
+.lmsa-history-search {
+  @apply lmsa:shrink-0 lmsa:px-3 lmsa:pt-3;
+}
 
-  .lmsa-history-search.lmsa-hidden {
-    display: none;
-  }
+.lmsa-history-search.lmsa-hidden {
+  display: none;
+}
 
-  .lmsa-history-search-input {
-    @apply lmsa-w-full lmsa-rounded-lg lmsa-border lmsa-border-obsidian-border lmsa-px-3 lmsa-py-1.5;
-    font-family: var(--font-text);
-    font-size: var(--font-ui-small);
-    color: var(--text-normal);
-    background: color-mix(in srgb, var(--background-secondary) 50%, transparent);
-    outline: none;
-    transition: border-color 120ms ease, background-color 120ms ease;
-  }
+.lmsa-history-search-input {
+  @apply lmsa:w-full lmsa:rounded-lg lmsa:border lmsa:border-obsidian-border lmsa:px-3 lmsa:py-1.5;
+  font-family: var(--font-text);
+  font-size: var(--font-ui-small);
+  color: var(--text-normal);
+  background: color-mix(in srgb, var(--background-secondary) 50%, transparent);
+  outline: none;
+  transition: border-color 120ms ease, background-color 120ms ease;
+}
 
-  .lmsa-history-search-input:focus {
-    border-color: color-mix(in srgb, var(--lmsa-mode-accent) 55%, var(--background-modifier-border));
-    background: var(--background-primary);
-  }
+.lmsa-history-search-input:focus {
+  border-color: color-mix(in srgb, var(--lmsa-mode-accent) 55%, var(--background-modifier-border));
+  background: var(--background-primary);
+}
 
-  /* ── List ──────────────────────────────────────────────────────────────── */
-  .lmsa-history-list {
-    @apply lmsa-flex lmsa-flex-1 lmsa-flex-col lmsa-gap-0.5 lmsa-overflow-y-auto lmsa-p-2;
-  }
+/* ── List ──────────────────────────────────────────────────────────────── */
+.lmsa-history-list {
+  @apply lmsa:flex lmsa:flex-1 lmsa:flex-col lmsa:gap-0.5 lmsa:overflow-y-auto lmsa:p-2;
+}
 
-  .lmsa-history-empty {
-    @apply lmsa-px-4 lmsa-py-8 lmsa-text-center lmsa-text-obsidian-muted;
-    font-size: var(--font-ui-smaller);
-  }
+.lmsa-history-empty {
+  @apply lmsa:px-4 lmsa:py-8 lmsa:text-center lmsa:text-obsidian-muted;
+  font-size: var(--font-ui-smaller);
+}
 
-  /* ── Conversation row ──────────────────────────────────────────────────────
-     Flat list rows in the model-dropdown idiom: transparent by default, a
-     subtle hover tint, and an active row marked by an accent-tinted wash plus
-     an accent title (see .is-active .lmsa-history-item-title below). No cards,
-     borders, glow rings, or drop shadows. Overrides the .lmsa-ui-list-item base
-     (border + full-strength hover), which wins by later source order. */
-  .lmsa-history-item {
-    @apply lmsa-rounded-lg lmsa-px-3 lmsa-py-2;
-    border-color: transparent;
-    background: transparent;
-    box-shadow: none;
-    transition: background-color 120ms ease;
-  }
+/* ── Conversation row ──────────────────────────────────────────────────────
+   Flat list rows in the model-dropdown idiom: transparent by default, a
+   subtle hover tint, and an active row marked by an accent-tinted wash plus
+   an accent title (see .is-active .lmsa-history-item-title below). No cards,
+   borders, glow rings, or drop shadows. Overrides the .lmsa-ui-list-item base
+   (border + full-strength hover), which wins by later source order. */
+.lmsa-history-item {
+  @apply lmsa:rounded-lg lmsa:px-3 lmsa:py-2;
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+  transition: background-color 120ms ease;
+}
 
-  .lmsa-history-item:hover {
-    border-color: transparent;
-    background: color-mix(in srgb, var(--background-modifier-hover) 60%, transparent);
-    box-shadow: none;
-  }
+.lmsa-history-item:hover {
+  border-color: transparent;
+  background: color-mix(in srgb, var(--background-modifier-hover) 60%, transparent);
+  box-shadow: none;
+}
 
-  .lmsa-history-item.is-active {
-    border-color: transparent;
-    background: color-mix(in srgb, var(--lmsa-mode-accent) 12%, transparent);
-    box-shadow: none;
-  }
+.lmsa-history-item.is-active {
+  border-color: transparent;
+  background: color-mix(in srgb, var(--lmsa-mode-accent) 12%, transparent);
+  box-shadow: none;
+}
 
-  .lmsa-history-item.is-active:hover {
-    background: color-mix(in srgb, var(--lmsa-mode-accent) 16%, transparent);
-  }
+.lmsa-history-item.is-active:hover {
+  background: color-mix(in srgb, var(--lmsa-mode-accent) 16%, transparent);
+}
 
-  .lmsa-history-item-body {
-    @apply lmsa-flex lmsa-min-w-0 lmsa-flex-1 lmsa-cursor-pointer lmsa-flex-col lmsa-gap-0.5;
-  }
+.lmsa-history-item-body {
+  @apply lmsa:flex lmsa:min-w-0 lmsa:flex-1 lmsa:cursor-pointer lmsa:flex-col lmsa:gap-0.5;
+}
 
-  .lmsa-history-item-title {
-    @apply lmsa-truncate lmsa-whitespace-nowrap lmsa-font-medium lmsa-text-obsidian-text;
-    font-size: var(--font-ui-small);
-  }
+.lmsa-history-item-title {
+  @apply lmsa:truncate lmsa:whitespace-nowrap lmsa:font-medium lmsa:text-obsidian-text;
+  font-size: var(--font-ui-small);
+}
 
-  .lmsa-history-item-title.is-renaming {
-    @apply lmsa-overflow-visible;
-  }
+.lmsa-history-item-title.is-renaming {
+  @apply lmsa:overflow-visible;
+}
 
-  .lmsa-history-rename-input {
-    @apply lmsa-w-full lmsa-rounded-md lmsa-border lmsa-px-1.5 lmsa-py-0.5;
-    border-color: var(--lmsa-mode-accent);
-    font-family: var(--font-text);
-    font-size: var(--font-ui-small);
-    color: var(--text-normal);
-    background: var(--background-primary);
-    outline: none;
-  }
+.lmsa-history-rename-input {
+  @apply lmsa:w-full lmsa:rounded-md lmsa:border lmsa:px-1.5 lmsa:py-0.5;
+  border-color: var(--lmsa-mode-accent);
+  font-family: var(--font-text);
+  font-size: var(--font-ui-small);
+  color: var(--text-normal);
+  background: var(--background-primary);
+  outline: none;
+}
 
-  .lmsa-history-item.is-active .lmsa-history-item-title {
-    color: var(--lmsa-mode-accent);
-  }
+.lmsa-history-item.is-active .lmsa-history-item-title {
+  color: var(--lmsa-mode-accent);
+}
 
-  .lmsa-history-item-meta {
-    @apply lmsa-truncate lmsa-whitespace-nowrap;
-    color: var(--text-faint);
-    font-size: var(--font-ui-smaller);
-  }
+.lmsa-history-item-meta {
+  @apply lmsa:truncate lmsa:whitespace-nowrap;
+  color: var(--text-faint);
+  font-size: var(--font-ui-smaller);
+}
 
-  .lmsa-history-item-delete-area {
-    @apply lmsa-flex lmsa-flex-shrink-0 lmsa-items-center lmsa-gap-1;
-  }
+.lmsa-history-item-delete-area {
+  @apply lmsa:flex lmsa:shrink-0 lmsa:items-center lmsa:gap-1;
+}
 
-  /* Row actions stay out of sight until the row is hovered or active, so a
-     resting list reads as plain titles. A quiet opacity fade, no scale pop. */
-  .lmsa-history-trash-btn,
-  .lmsa-history-rename-btn {
-    @apply lmsa-opacity-0 lmsa-transition-opacity lmsa-duration-100;
-    background: transparent !important;
-    box-shadow: none !important;
-  }
+/* Row actions stay out of sight until the row is hovered or active, so a
+   resting list reads as plain titles. A quiet opacity fade, no scale pop. */
+.lmsa-history-trash-btn,
+.lmsa-history-rename-btn {
+  @apply lmsa:opacity-0 lmsa:transition-opacity lmsa:duration-100;
+  background: transparent !important;
+  box-shadow: none !important;
+}
 
-  .lmsa-history-item:hover .lmsa-history-trash-btn,
-  .lmsa-history-item:hover .lmsa-history-rename-btn,
-  .lmsa-history-item.is-active .lmsa-history-trash-btn,
-  .lmsa-history-item.is-active .lmsa-history-rename-btn {
-    @apply lmsa-opacity-100;
-  }
+.lmsa-history-item:hover .lmsa-history-trash-btn,
+.lmsa-history-item:hover .lmsa-history-rename-btn,
+.lmsa-history-item.is-active .lmsa-history-trash-btn,
+.lmsa-history-item.is-active .lmsa-history-rename-btn {
+  @apply lmsa:opacity-100;
+}
 
-  .lmsa-history-trash-btn:hover,
-  .lmsa-history-rename-btn:hover {
-    background: var(--background-modifier-hover) !important;
-    box-shadow: none !important;
-  }
+.lmsa-history-trash-btn:hover,
+.lmsa-history-rename-btn:hover {
+  background: var(--background-modifier-hover) !important;
+  box-shadow: none !important;
+}
 
-  .lmsa-history-rename-btn svg,
-  .lmsa-history-trash-btn svg {
-    width: 15px;
-    height: 15px;
-  }
+.lmsa-history-rename-btn svg,
+.lmsa-history-trash-btn svg {
+  width: 15px;
+  height: 15px;
 }
 
 @media (max-width: 700px) {
@@ -200,6 +198,6 @@
   }
 
   .lmsa-history-header {
-    @apply lmsa-px-3;
+    @apply lmsa:px-3;
   }
 }

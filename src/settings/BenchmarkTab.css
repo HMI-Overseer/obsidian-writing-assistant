@@ -2,559 +2,557 @@
  * BenchmarkTab, test card layout and result display
  * ----------------------------------------------------------------------- */
 
-@layer components {
-  .lmsa-benchmark-empty {
-    color: var(--lmsa-text-secondary);
-    font-style: italic;
-  }
-
-  .lmsa-benchmark-model-wrap {
-    @apply lmsa-flex lmsa-justify-start;
-  }
-
-  .lmsa-benchmark-model-selector {
-    margin: 0;
-    padding: 6px 10px;
-    font-size: var(--font-ui-small);
-  }
-
-  .lmsa-benchmark-model-wrap .lmsa-model-dropdown {
-    left: 0;
-    right: auto;
-    transform-origin: top left;
-  }
-
-  /* ------- Setting row ------- */
-
-  .lmsa-benchmark-setting-row {
-    @apply lmsa-flex lmsa-items-center lmsa-gap-4 lmsa-py-4;
-  }
-
-  .lmsa-benchmark-setting-info {
-    @apply lmsa-flex lmsa-min-w-0 lmsa-flex-1 lmsa-flex-col lmsa-gap-1;
-  }
-
-  .lmsa-benchmark-setting-name {
-    @apply lmsa-font-semibold;
-    color: var(--lmsa-text-primary);
-    font-size: var(--font-ui-small);
-  }
-
-  .lmsa-benchmark-setting-desc {
-    color: var(--lmsa-text-secondary);
-    font-size: var(--font-ui-smaller);
-    line-height: 1.55;
-  }
-
-  .lmsa-benchmark-setting-input {
-    @apply lmsa-flex-none;
-    width: 64px;
-    border-radius: 12px;
-    border: 1px solid var(--lmsa-border-default);
-    background: var(--lmsa-surface-inset);
-    padding: 8px 12px;
-    color: var(--lmsa-text-primary);
-    box-shadow: inset 0 1px 0 var(--lmsa-inset-highlight-subtle);
-    transition: border-color 140ms ease, box-shadow 140ms ease;
-    text-align: center;
-  }
-
-  .lmsa-benchmark-setting-input:focus {
-    border-color: var(--lmsa-border-emphasis);
-    box-shadow: 0 0 0 2px var(--lmsa-accent-glow);
-    outline: none;
-  }
-
-  .lmsa-benchmark-setting-input--wide {
-    width: 200px;
-    text-align: left;
-  }
-
-  .lmsa-benchmark-summary-scope {
-    color: var(--lmsa-text-secondary);
-    font-weight: 600;
-  }
-
-  .lmsa-benchmark-warning {
-    @apply lmsa-flex lmsa-items-center lmsa-gap-2;
-    border-radius: 8px;
-    border: 1px solid var(--lmsa-status-warning);
-    background: color-mix(in srgb, var(--lmsa-status-warning) 8%, var(--lmsa-surface-base));
-    padding: 8px 12px;
-    margin-bottom: 12px;
-    font-size: var(--font-ui-smaller);
-    color: var(--lmsa-text-primary);
-  }
-
-  .lmsa-benchmark-warning-icon {
-    @apply lmsa-inline-flex lmsa-flex-none lmsa-items-center;
-    color: var(--lmsa-status-warning);
-  }
-
-  .lmsa-benchmark-warning-icon svg {
-    width: 14px;
-    height: 14px;
-  }
-
-  .lmsa-benchmark-error {
-    border-radius: 8px;
-    border: 1px solid var(--lmsa-status-error);
-    background: color-mix(in srgb, var(--lmsa-status-error) 8%, var(--lmsa-surface-base));
-    padding: 8px 12px;
-    margin-bottom: 8px;
-    font-size: var(--font-ui-smaller);
-    color: var(--lmsa-text-primary);
-  }
-
-  /* ------- Buttons ------- */
-
-  .lmsa-benchmark-btn {
-    @apply lmsa-inline-flex lmsa-cursor-pointer lmsa-items-center lmsa-gap-1 lmsa-rounded-lg lmsa-border lmsa-px-3 lmsa-py-1.5;
-    border-color: var(--lmsa-border-default);
-    background: transparent;
-    font-size: var(--font-ui-smaller);
-    color: var(--lmsa-text-secondary);
-    transition: all 0.15s ease;
-  }
-
-  .lmsa-benchmark-btn:hover {
-    background: var(--background-modifier-hover);
-    color: var(--lmsa-text-primary);
-  }
-
-  .lmsa-benchmark-btn.is-disabled {
-    opacity: 0.5;
-    pointer-events: none;
-  }
-
-  .lmsa-benchmark-btn--run-all {
-    color: var(--lmsa-section-accent);
-    border-color: var(--lmsa-section-accent);
-  }
-
-  .lmsa-benchmark-btn--run-all:hover {
-    background: color-mix(in srgb, var(--lmsa-section-accent) 12%, var(--lmsa-surface-base));
-  }
-
-  .lmsa-benchmark-btn--abort {
-    color: var(--lmsa-status-error);
-    border-color: var(--lmsa-status-error);
-  }
-
-  .lmsa-benchmark-btn--abort:hover {
-    background: color-mix(in srgb, var(--lmsa-status-error) 12%, var(--lmsa-surface-base));
-  }
-
-  .lmsa-benchmark-btn-icon {
-    @apply lmsa-inline-flex lmsa-items-center;
-  }
-
-  .lmsa-benchmark-btn-icon svg {
-    width: 12px;
-    height: 12px;
-  }
-
-  /* ------- Tab bar ------- */
-
-  .lmsa-benchmark-tab-bar {
-    @apply lmsa-flex lmsa-items-end lmsa-gap-1;
-    margin-bottom: 12px;
-  }
-
-  .lmsa-benchmark-tab {
-    @apply lmsa-relative lmsa-inline-flex lmsa-cursor-pointer lmsa-items-center lmsa-gap-1.5 lmsa-border-0 lmsa-px-3 lmsa-py-1.5;
-    border-radius: 8px 8px 0 0;
-    background: transparent;
-    font-size: var(--font-ui-small);
-    font-weight: 500;
-    color: var(--lmsa-text-faint);
-    transition: background-color 140ms ease, color 140ms ease, box-shadow 140ms ease;
-  }
-
-  .lmsa-benchmark-tab:hover {
-    color: var(--lmsa-text-primary);
-    background: color-mix(in srgb, var(--background-modifier-hover) 60%, transparent);
-  }
-
-  .lmsa-benchmark-tab.is-active {
-    color: var(--lmsa-section-accent);
-    background: color-mix(in srgb, var(--lmsa-section-accent) 10%, var(--lmsa-surface-raised));
-    box-shadow: inset 0 2px 0 var(--lmsa-section-accent);
-  }
-
-
-  .lmsa-benchmark-tab-icon {
-    @apply lmsa-inline-flex lmsa-items-center;
-  }
-
-  .lmsa-benchmark-tab-icon svg {
-    width: 14px;
-    height: 14px;
-  }
-
-  /* ------- Tab content ------- */
-
-  .lmsa-benchmark-tab-content {
-    @apply lmsa-flex lmsa-flex-col lmsa-gap-3;
-  }
-
-  /* ------- Suite actions ------- */
-
-  .lmsa-benchmark-suite-actions {
-    @apply lmsa-flex lmsa-items-center lmsa-gap-2;
-  }
-
-  .lmsa-benchmark-btn--run-suite {
-    color: var(--lmsa-section-accent);
-    border-color: var(--lmsa-section-accent);
-  }
-
-  .lmsa-benchmark-btn--run-suite:hover {
-    background: color-mix(in srgb, var(--lmsa-section-accent) 12%, var(--lmsa-surface-base));
-  }
-  .lmsa-benchmark-cards {
-    @apply lmsa-mt-0;
-  }
-
-  /* ------- Test cards ------- */
-
-  .lmsa-benchmark-cards {
-    @apply lmsa-flex lmsa-flex-col lmsa-gap-3;
-  }
-
-  .lmsa-benchmark-card {
-    @apply lmsa-overflow-hidden lmsa-rounded-xl lmsa-border;
-    border-color: var(--lmsa-border-default);
-    background: var(--lmsa-surface-base);
-  }
-
-  .lmsa-benchmark-card-header {
-    @apply lmsa-flex lmsa-flex-col lmsa-gap-1.5 lmsa-px-4 lmsa-py-3;
-  }
-
-  .lmsa-benchmark-card-title-row {
-    @apply lmsa-flex lmsa-items-center lmsa-justify-between lmsa-gap-2;
-  }
-
-  .lmsa-benchmark-card-name {
-    @apply lmsa-flex lmsa-items-center lmsa-gap-2;
-    font-weight: 600;
-    font-size: var(--font-ui-small);
-    color: var(--lmsa-text-primary);
-  }
-
-  .lmsa-benchmark-badge {
-    @apply lmsa-rounded-md lmsa-px-1.5 lmsa-py-0.5;
-    font-size: 10px;
-    font-weight: 500;
-    text-transform: uppercase;
-    letter-spacing: 0.03em;
-  }
-
-  .lmsa-benchmark-badge--control {
-    background: color-mix(in srgb, var(--lmsa-text-faint) 15%, var(--lmsa-surface-base));
-    color: var(--lmsa-text-faint);
-  }
-
-  .lmsa-benchmark-card-status {
-    font-size: var(--font-ui-smaller);
-    color: var(--lmsa-text-faint);
-    font-weight: 500;
-    white-space: nowrap;
-  }
-
-  .lmsa-benchmark-card-status.is-passed {
-    color: var(--lmsa-status-success);
-  }
-
-  .lmsa-benchmark-card-status.is-failed {
-    color: var(--lmsa-status-error);
-  }
-
-  .lmsa-benchmark-card-status.is-mixed {
-    color: var(--lmsa-status-warning);
-  }
-
-  .lmsa-benchmark-card-status.is-running {
-    color: var(--lmsa-section-accent);
-  }
-
-  .lmsa-benchmark-card-desc {
-    font-size: var(--font-ui-smaller);
-    color: var(--lmsa-text-secondary);
-    line-height: 1.5;
-    margin: 0;
-  }
-
-  .lmsa-benchmark-progress {
-    font-size: var(--font-ui-smaller);
-    color: var(--lmsa-section-accent);
-    font-weight: 500;
-  }
-
-  .lmsa-benchmark-card-actions {
-    @apply lmsa-flex lmsa-items-center lmsa-gap-2;
-    margin-top: 4px;
-  }
-
-  /* ------- Collapsible details ------- */
-
-  .lmsa-benchmark-card-details {
-    @apply lmsa-flex lmsa-flex-col lmsa-gap-3 lmsa-px-4 lmsa-py-3;
-    border-top: 1px solid var(--lmsa-border-default);
-    background: var(--lmsa-surface-raised);
-  }
-
-  /* ------- Inline toggle button (Show full / Show less) ------- */
-
-  .lmsa-benchmark-btn--inline {
-    @apply lmsa-border-0 lmsa-p-0;
-    background: none;
-    color: var(--lmsa-section-accent);
-    font-size: var(--font-ui-smaller);
-    cursor: pointer;
-    text-decoration: underline;
-  }
-
-  .lmsa-benchmark-btn--inline:hover {
-    color: var(--lmsa-text-primary);
-  }
-
-  /* ------- Section headers within details ------- */
-
-  .lmsa-benchmark-section-header {
-    font-size: var(--font-ui-smaller);
-    color: var(--lmsa-text-primary);
-    margin-bottom: 6px;
-    padding-bottom: 4px;
-    border-bottom: 1px solid var(--lmsa-border-default);
-  }
-
-  /* ------- Evaluation criteria ------- */
-
-  .lmsa-benchmark-criteria {
-    @apply lmsa-flex lmsa-flex-col lmsa-gap-1;
-  }
-
-  .lmsa-benchmark-criteria-row {
-    font-size: var(--font-ui-smaller);
-    color: var(--lmsa-text-secondary);
-    line-height: 1.5;
-  }
-
-  .lmsa-benchmark-criteria-notes {
-    color: var(--lmsa-text-faint);
-  }
-
-  /* ------- Conversation preview ------- */
-
-  .lmsa-benchmark-conversation {
-    @apply lmsa-flex lmsa-flex-col lmsa-gap-2;
-  }
-
-  .lmsa-benchmark-msg {
-    @apply lmsa-flex lmsa-flex-col lmsa-gap-1 lmsa-rounded-lg lmsa-p-2;
-    background: var(--lmsa-surface-inset);
-    font-size: var(--font-ui-smaller);
-  }
-
-  .lmsa-benchmark-msg-role {
-    @apply lmsa-rounded-md lmsa-px-1.5 lmsa-py-0.5;
-    font-size: 10px;
-    font-weight: 600;
-    text-transform: uppercase;
-    width: fit-content;
-  }
-
-  .lmsa-benchmark-msg-role--user {
-    background: color-mix(in srgb, var(--lmsa-section-accent) 15%, var(--lmsa-surface-base));
-    color: var(--lmsa-section-accent);
-  }
-
-  .lmsa-benchmark-msg-role--assistant {
-    background: color-mix(in srgb, var(--lmsa-status-success) 15%, var(--lmsa-surface-base));
-    color: var(--lmsa-status-success);
-  }
-
-  .lmsa-benchmark-msg-content {
-    color: var(--lmsa-text-secondary);
-    line-height: 1.5;
-    word-break: break-word;
-  }
-
-  .lmsa-benchmark-msg-full {
-    margin-top: 4px;
-  }
-
-  /* ------- Results container ------- */
-
-  .lmsa-benchmark-results-container:not(:empty) {
-    margin-top: 12px;
-    padding-top: 12px;
-    border-top: 1px solid var(--lmsa-border-default);
-  }
-
-  /* ------- Per-iteration blocks ------- */
-
-  .lmsa-benchmark-iteration {
-    @apply lmsa-flex lmsa-flex-col lmsa-gap-2 lmsa-rounded-lg lmsa-border lmsa-p-3;
-    border-color: var(--lmsa-border-default);
-    background: var(--lmsa-surface-base);
-  }
-
-  .lmsa-benchmark-iteration-header {
-    @apply lmsa-flex lmsa-items-center lmsa-justify-between lmsa-gap-2;
-  }
-
-  .lmsa-benchmark-iteration-label {
-    font-size: var(--font-ui-smaller);
-    font-weight: 600;
-    color: var(--lmsa-text-primary);
-  }
-
-  .lmsa-benchmark-iteration-status {
-    font-size: var(--font-ui-smaller);
-    font-weight: 500;
-  }
-
-  .lmsa-benchmark-iteration-status.is-passed {
-    color: var(--lmsa-status-success);
-  }
-
-  .lmsa-benchmark-iteration-status.is-failed {
-    color: var(--lmsa-status-error);
-  }
-
-  .lmsa-benchmark-detail-section {
-    font-size: var(--font-ui-smaller);
-    color: var(--lmsa-text-secondary);
-    line-height: 1.5;
-  }
-
-  .lmsa-benchmark-detail-section strong {
-    color: var(--lmsa-text-primary);
-  }
-
-  .lmsa-benchmark-evidence-list {
-    margin: 4px 0 0 16px;
-    padding: 0;
-  }
-
-  .lmsa-benchmark-evidence-list li {
-    margin-bottom: 2px;
-  }
-
-  /* ------- Evaluator check list ------- */
-
-  .lmsa-benchmark-check-list {
-    margin: 4px 0 0 0;
-    padding: 0;
-    list-style: none;
-  }
-
-  .lmsa-benchmark-check {
-    @apply lmsa-flex lmsa-items-start lmsa-gap-2;
-    margin-bottom: 2px;
-  }
-
-  .lmsa-benchmark-check-icon {
-    @apply lmsa-flex lmsa-shrink-0 lmsa-items-center;
-    margin-top: 2px;
-  }
-
-  .lmsa-benchmark-check-icon svg {
-    width: 12px;
-    height: 12px;
-  }
-
-  .lmsa-benchmark-check.is-passed .lmsa-benchmark-check-icon {
-    color: var(--lmsa-status-success);
-  }
-
-  .lmsa-benchmark-check.is-failed .lmsa-benchmark-check-icon {
-    color: var(--lmsa-status-error);
-  }
-
-  .lmsa-benchmark-check.is-warning .lmsa-benchmark-check-icon {
-    color: var(--lmsa-status-warning);
-  }
-
-  .lmsa-benchmark-check-label {
-    color: var(--lmsa-text-primary);
-    font-weight: 500;
-  }
-
-  .lmsa-benchmark-check.is-failed .lmsa-benchmark-check-label {
-    color: var(--lmsa-status-error);
-  }
-
-  .lmsa-benchmark-check-detail {
-    color: var(--lmsa-text-secondary);
-  }
-
-  .lmsa-benchmark-check-optional {
-    color: var(--lmsa-text-faint);
-    font-style: italic;
-  }
-
-  .lmsa-benchmark-response-block {
-    @apply lmsa-mt-2 lmsa-overflow-x-auto lmsa-rounded-lg lmsa-p-3;
-    background: var(--lmsa-surface-raised);
-    border: 1px solid var(--lmsa-border-default);
-    font-family: var(--font-monospace);
-    font-size: var(--font-ui-smaller);
-    line-height: 1.5;
-    white-space: pre-wrap;
-    word-break: break-word;
-    max-height: 300px;
-    overflow-y: auto;
-  }
-
-  /* ------- Summary (inside test suite section) ------- */
-
-  .lmsa-benchmark-summary {
-    @apply lmsa-mt-2 lmsa-rounded-xl lmsa-border lmsa-px-4 lmsa-py-3;
-    border-color: var(--lmsa-border-default);
-    background: var(--lmsa-surface-base);
-    font-size: var(--font-ui-small);
-    color: var(--lmsa-text-secondary);
-  }
-
-  .lmsa-benchmark-summary-headline {
-    font-size: var(--font-ui-small);
-  }
-
-  .lmsa-benchmark-summary--pass {
-    color: var(--lmsa-status-success);
-    font-weight: 600;
-  }
-
-  .lmsa-benchmark-summary--mixed {
-    color: var(--lmsa-status-warning);
-    font-weight: 600;
-  }
-
-  .lmsa-benchmark-summary-detail {
-    color: var(--lmsa-text-faint);
-    font-weight: 400;
-  }
-
-  .lmsa-benchmark-summary-control {
-    margin-top: 4px;
-    font-size: var(--font-ui-smaller);
-    color: var(--lmsa-text-faint);
-  }
-
-  .lmsa-benchmark-summary-progress-bar {
-    @apply lmsa-mt-2 lmsa-overflow-hidden lmsa-rounded-full;
-    height: 6px;
-    background: var(--lmsa-border-default);
-  }
-
-  .lmsa-benchmark-summary-progress-fill {
-    height: 100%;
-    @apply lmsa-rounded-full;
-    background: var(--lmsa-section-accent);
-    transition: width 0.2s ease;
-  }
+.lmsa-benchmark-empty {
+  color: var(--lmsa-text-secondary);
+  font-style: italic;
+}
+
+.lmsa-benchmark-model-wrap {
+  @apply lmsa:flex lmsa:justify-start;
+}
+
+.lmsa-benchmark-model-selector {
+  margin: 0;
+  padding: 6px 10px;
+  font-size: var(--font-ui-small);
+}
+
+.lmsa-benchmark-model-wrap .lmsa-model-dropdown {
+  left: 0;
+  right: auto;
+  transform-origin: top left;
+}
+
+/* ------- Setting row ------- */
+
+.lmsa-benchmark-setting-row {
+  @apply lmsa:flex lmsa:items-center lmsa:gap-4 lmsa:py-4;
+}
+
+.lmsa-benchmark-setting-info {
+  @apply lmsa:flex lmsa:min-w-0 lmsa:flex-1 lmsa:flex-col lmsa:gap-1;
+}
+
+.lmsa-benchmark-setting-name {
+  @apply lmsa:font-semibold;
+  color: var(--lmsa-text-primary);
+  font-size: var(--font-ui-small);
+}
+
+.lmsa-benchmark-setting-desc {
+  color: var(--lmsa-text-secondary);
+  font-size: var(--font-ui-smaller);
+  line-height: 1.55;
+}
+
+.lmsa-benchmark-setting-input {
+  @apply lmsa:flex-none;
+  width: 64px;
+  border-radius: 12px;
+  border: 1px solid var(--lmsa-border-default);
+  background: var(--lmsa-surface-inset);
+  padding: 8px 12px;
+  color: var(--lmsa-text-primary);
+  box-shadow: inset 0 1px 0 var(--lmsa-inset-highlight-subtle);
+  transition: border-color 140ms ease, box-shadow 140ms ease;
+  text-align: center;
+}
+
+.lmsa-benchmark-setting-input:focus {
+  border-color: var(--lmsa-border-emphasis);
+  box-shadow: 0 0 0 2px var(--lmsa-accent-glow);
+  outline: none;
+}
+
+.lmsa-benchmark-setting-input--wide {
+  width: 200px;
+  text-align: left;
+}
+
+.lmsa-benchmark-summary-scope {
+  color: var(--lmsa-text-secondary);
+  font-weight: 600;
+}
+
+.lmsa-benchmark-warning {
+  @apply lmsa:flex lmsa:items-center lmsa:gap-2;
+  border-radius: 8px;
+  border: 1px solid var(--lmsa-status-warning);
+  background: color-mix(in srgb, var(--lmsa-status-warning) 8%, var(--lmsa-surface-base));
+  padding: 8px 12px;
+  margin-bottom: 12px;
+  font-size: var(--font-ui-smaller);
+  color: var(--lmsa-text-primary);
+}
+
+.lmsa-benchmark-warning-icon {
+  @apply lmsa:inline-flex lmsa:flex-none lmsa:items-center;
+  color: var(--lmsa-status-warning);
+}
+
+.lmsa-benchmark-warning-icon svg {
+  width: 14px;
+  height: 14px;
+}
+
+.lmsa-benchmark-error {
+  border-radius: 8px;
+  border: 1px solid var(--lmsa-status-error);
+  background: color-mix(in srgb, var(--lmsa-status-error) 8%, var(--lmsa-surface-base));
+  padding: 8px 12px;
+  margin-bottom: 8px;
+  font-size: var(--font-ui-smaller);
+  color: var(--lmsa-text-primary);
+}
+
+/* ------- Buttons ------- */
+
+.lmsa-benchmark-btn {
+  @apply lmsa:inline-flex lmsa:cursor-pointer lmsa:items-center lmsa:gap-1 lmsa:rounded-lg lmsa:border lmsa:px-3 lmsa:py-1.5;
+  border-color: var(--lmsa-border-default);
+  background: transparent;
+  font-size: var(--font-ui-smaller);
+  color: var(--lmsa-text-secondary);
+  transition: all 0.15s ease;
+}
+
+.lmsa-benchmark-btn:hover {
+  background: var(--background-modifier-hover);
+  color: var(--lmsa-text-primary);
+}
+
+.lmsa-benchmark-btn.is-disabled {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+.lmsa-benchmark-btn--run-all {
+  color: var(--lmsa-section-accent);
+  border-color: var(--lmsa-section-accent);
+}
+
+.lmsa-benchmark-btn--run-all:hover {
+  background: color-mix(in srgb, var(--lmsa-section-accent) 12%, var(--lmsa-surface-base));
+}
+
+.lmsa-benchmark-btn--abort {
+  color: var(--lmsa-status-error);
+  border-color: var(--lmsa-status-error);
+}
+
+.lmsa-benchmark-btn--abort:hover {
+  background: color-mix(in srgb, var(--lmsa-status-error) 12%, var(--lmsa-surface-base));
+}
+
+.lmsa-benchmark-btn-icon {
+  @apply lmsa:inline-flex lmsa:items-center;
+}
+
+.lmsa-benchmark-btn-icon svg {
+  width: 12px;
+  height: 12px;
+}
+
+/* ------- Tab bar ------- */
+
+.lmsa-benchmark-tab-bar {
+  @apply lmsa:flex lmsa:items-end lmsa:gap-1;
+  margin-bottom: 12px;
+}
+
+.lmsa-benchmark-tab {
+  @apply lmsa:relative lmsa:inline-flex lmsa:cursor-pointer lmsa:items-center lmsa:gap-1.5 lmsa:border-0 lmsa:px-3 lmsa:py-1.5;
+  border-radius: 8px 8px 0 0;
+  background: transparent;
+  font-size: var(--font-ui-small);
+  font-weight: 500;
+  color: var(--lmsa-text-faint);
+  transition: background-color 140ms ease, color 140ms ease, box-shadow 140ms ease;
+}
+
+.lmsa-benchmark-tab:hover {
+  color: var(--lmsa-text-primary);
+  background: color-mix(in srgb, var(--background-modifier-hover) 60%, transparent);
+}
+
+.lmsa-benchmark-tab.is-active {
+  color: var(--lmsa-section-accent);
+  background: color-mix(in srgb, var(--lmsa-section-accent) 10%, var(--lmsa-surface-raised));
+  box-shadow: inset 0 2px 0 var(--lmsa-section-accent);
+}
+
+
+.lmsa-benchmark-tab-icon {
+  @apply lmsa:inline-flex lmsa:items-center;
+}
+
+.lmsa-benchmark-tab-icon svg {
+  width: 14px;
+  height: 14px;
+}
+
+/* ------- Tab content ------- */
+
+.lmsa-benchmark-tab-content {
+  @apply lmsa:flex lmsa:flex-col lmsa:gap-3;
+}
+
+/* ------- Suite actions ------- */
+
+.lmsa-benchmark-suite-actions {
+  @apply lmsa:flex lmsa:items-center lmsa:gap-2;
+}
+
+.lmsa-benchmark-btn--run-suite {
+  color: var(--lmsa-section-accent);
+  border-color: var(--lmsa-section-accent);
+}
+
+.lmsa-benchmark-btn--run-suite:hover {
+  background: color-mix(in srgb, var(--lmsa-section-accent) 12%, var(--lmsa-surface-base));
+}
+.lmsa-benchmark-cards {
+  @apply lmsa:mt-0;
+}
+
+/* ------- Test cards ------- */
+
+.lmsa-benchmark-cards {
+  @apply lmsa:flex lmsa:flex-col lmsa:gap-3;
+}
+
+.lmsa-benchmark-card {
+  @apply lmsa:overflow-hidden lmsa:rounded-xl lmsa:border;
+  border-color: var(--lmsa-border-default);
+  background: var(--lmsa-surface-base);
+}
+
+.lmsa-benchmark-card-header {
+  @apply lmsa:flex lmsa:flex-col lmsa:gap-1.5 lmsa:px-4 lmsa:py-3;
+}
+
+.lmsa-benchmark-card-title-row {
+  @apply lmsa:flex lmsa:items-center lmsa:justify-between lmsa:gap-2;
+}
+
+.lmsa-benchmark-card-name {
+  @apply lmsa:flex lmsa:items-center lmsa:gap-2;
+  font-weight: 600;
+  font-size: var(--font-ui-small);
+  color: var(--lmsa-text-primary);
+}
+
+.lmsa-benchmark-badge {
+  @apply lmsa:rounded-md lmsa:px-1.5 lmsa:py-0.5;
+  font-size: 10px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.lmsa-benchmark-badge--control {
+  background: color-mix(in srgb, var(--lmsa-text-faint) 15%, var(--lmsa-surface-base));
+  color: var(--lmsa-text-faint);
+}
+
+.lmsa-benchmark-card-status {
+  font-size: var(--font-ui-smaller);
+  color: var(--lmsa-text-faint);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.lmsa-benchmark-card-status.is-passed {
+  color: var(--lmsa-status-success);
+}
+
+.lmsa-benchmark-card-status.is-failed {
+  color: var(--lmsa-status-error);
+}
+
+.lmsa-benchmark-card-status.is-mixed {
+  color: var(--lmsa-status-warning);
+}
+
+.lmsa-benchmark-card-status.is-running {
+  color: var(--lmsa-section-accent);
+}
+
+.lmsa-benchmark-card-desc {
+  font-size: var(--font-ui-smaller);
+  color: var(--lmsa-text-secondary);
+  line-height: 1.5;
+  margin: 0;
+}
+
+.lmsa-benchmark-progress {
+  font-size: var(--font-ui-smaller);
+  color: var(--lmsa-section-accent);
+  font-weight: 500;
+}
+
+.lmsa-benchmark-card-actions {
+  @apply lmsa:flex lmsa:items-center lmsa:gap-2;
+  margin-top: 4px;
+}
+
+/* ------- Collapsible details ------- */
+
+.lmsa-benchmark-card-details {
+  @apply lmsa:flex lmsa:flex-col lmsa:gap-3 lmsa:px-4 lmsa:py-3;
+  border-top: 1px solid var(--lmsa-border-default);
+  background: var(--lmsa-surface-raised);
+}
+
+/* ------- Inline toggle button (Show full / Show less) ------- */
+
+.lmsa-benchmark-btn--inline {
+  @apply lmsa:border-0 lmsa:p-0;
+  background: none;
+  color: var(--lmsa-section-accent);
+  font-size: var(--font-ui-smaller);
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.lmsa-benchmark-btn--inline:hover {
+  color: var(--lmsa-text-primary);
+}
+
+/* ------- Section headers within details ------- */
+
+.lmsa-benchmark-section-header {
+  font-size: var(--font-ui-smaller);
+  color: var(--lmsa-text-primary);
+  margin-bottom: 6px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--lmsa-border-default);
+}
+
+/* ------- Evaluation criteria ------- */
+
+.lmsa-benchmark-criteria {
+  @apply lmsa:flex lmsa:flex-col lmsa:gap-1;
+}
+
+.lmsa-benchmark-criteria-row {
+  font-size: var(--font-ui-smaller);
+  color: var(--lmsa-text-secondary);
+  line-height: 1.5;
+}
+
+.lmsa-benchmark-criteria-notes {
+  color: var(--lmsa-text-faint);
+}
+
+/* ------- Conversation preview ------- */
+
+.lmsa-benchmark-conversation {
+  @apply lmsa:flex lmsa:flex-col lmsa:gap-2;
+}
+
+.lmsa-benchmark-msg {
+  @apply lmsa:flex lmsa:flex-col lmsa:gap-1 lmsa:rounded-lg lmsa:p-2;
+  background: var(--lmsa-surface-inset);
+  font-size: var(--font-ui-smaller);
+}
+
+.lmsa-benchmark-msg-role {
+  @apply lmsa:rounded-md lmsa:px-1.5 lmsa:py-0.5;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  width: fit-content;
+}
+
+.lmsa-benchmark-msg-role--user {
+  background: color-mix(in srgb, var(--lmsa-section-accent) 15%, var(--lmsa-surface-base));
+  color: var(--lmsa-section-accent);
+}
+
+.lmsa-benchmark-msg-role--assistant {
+  background: color-mix(in srgb, var(--lmsa-status-success) 15%, var(--lmsa-surface-base));
+  color: var(--lmsa-status-success);
+}
+
+.lmsa-benchmark-msg-content {
+  color: var(--lmsa-text-secondary);
+  line-height: 1.5;
+  word-break: break-word;
+}
+
+.lmsa-benchmark-msg-full {
+  margin-top: 4px;
+}
+
+/* ------- Results container ------- */
+
+.lmsa-benchmark-results-container:not(:empty) {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--lmsa-border-default);
+}
+
+/* ------- Per-iteration blocks ------- */
+
+.lmsa-benchmark-iteration {
+  @apply lmsa:flex lmsa:flex-col lmsa:gap-2 lmsa:rounded-lg lmsa:border lmsa:p-3;
+  border-color: var(--lmsa-border-default);
+  background: var(--lmsa-surface-base);
+}
+
+.lmsa-benchmark-iteration-header {
+  @apply lmsa:flex lmsa:items-center lmsa:justify-between lmsa:gap-2;
+}
+
+.lmsa-benchmark-iteration-label {
+  font-size: var(--font-ui-smaller);
+  font-weight: 600;
+  color: var(--lmsa-text-primary);
+}
+
+.lmsa-benchmark-iteration-status {
+  font-size: var(--font-ui-smaller);
+  font-weight: 500;
+}
+
+.lmsa-benchmark-iteration-status.is-passed {
+  color: var(--lmsa-status-success);
+}
+
+.lmsa-benchmark-iteration-status.is-failed {
+  color: var(--lmsa-status-error);
+}
+
+.lmsa-benchmark-detail-section {
+  font-size: var(--font-ui-smaller);
+  color: var(--lmsa-text-secondary);
+  line-height: 1.5;
+}
+
+.lmsa-benchmark-detail-section strong {
+  color: var(--lmsa-text-primary);
+}
+
+.lmsa-benchmark-evidence-list {
+  margin: 4px 0 0 16px;
+  padding: 0;
+}
+
+.lmsa-benchmark-evidence-list li {
+  margin-bottom: 2px;
+}
+
+/* ------- Evaluator check list ------- */
+
+.lmsa-benchmark-check-list {
+  margin: 4px 0 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.lmsa-benchmark-check {
+  @apply lmsa:flex lmsa:items-start lmsa:gap-2;
+  margin-bottom: 2px;
+}
+
+.lmsa-benchmark-check-icon {
+  @apply lmsa:flex lmsa:shrink-0 lmsa:items-center;
+  margin-top: 2px;
+}
+
+.lmsa-benchmark-check-icon svg {
+  width: 12px;
+  height: 12px;
+}
+
+.lmsa-benchmark-check.is-passed .lmsa-benchmark-check-icon {
+  color: var(--lmsa-status-success);
+}
+
+.lmsa-benchmark-check.is-failed .lmsa-benchmark-check-icon {
+  color: var(--lmsa-status-error);
+}
+
+.lmsa-benchmark-check.is-warning .lmsa-benchmark-check-icon {
+  color: var(--lmsa-status-warning);
+}
+
+.lmsa-benchmark-check-label {
+  color: var(--lmsa-text-primary);
+  font-weight: 500;
+}
+
+.lmsa-benchmark-check.is-failed .lmsa-benchmark-check-label {
+  color: var(--lmsa-status-error);
+}
+
+.lmsa-benchmark-check-detail {
+  color: var(--lmsa-text-secondary);
+}
+
+.lmsa-benchmark-check-optional {
+  color: var(--lmsa-text-faint);
+  font-style: italic;
+}
+
+.lmsa-benchmark-response-block {
+  @apply lmsa:mt-2 lmsa:overflow-x-auto lmsa:rounded-lg lmsa:p-3;
+  background: var(--lmsa-surface-raised);
+  border: 1px solid var(--lmsa-border-default);
+  font-family: var(--font-monospace);
+  font-size: var(--font-ui-smaller);
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+/* ------- Summary (inside test suite section) ------- */
+
+.lmsa-benchmark-summary {
+  @apply lmsa:mt-2 lmsa:rounded-xl lmsa:border lmsa:px-4 lmsa:py-3;
+  border-color: var(--lmsa-border-default);
+  background: var(--lmsa-surface-base);
+  font-size: var(--font-ui-small);
+  color: var(--lmsa-text-secondary);
+}
+
+.lmsa-benchmark-summary-headline {
+  font-size: var(--font-ui-small);
+}
+
+.lmsa-benchmark-summary--pass {
+  color: var(--lmsa-status-success);
+  font-weight: 600;
+}
+
+.lmsa-benchmark-summary--mixed {
+  color: var(--lmsa-status-warning);
+  font-weight: 600;
+}
+
+.lmsa-benchmark-summary-detail {
+  color: var(--lmsa-text-faint);
+  font-weight: 400;
+}
+
+.lmsa-benchmark-summary-control {
+  margin-top: 4px;
+  font-size: var(--font-ui-smaller);
+  color: var(--lmsa-text-faint);
+}
+
+.lmsa-benchmark-summary-progress-bar {
+  @apply lmsa:mt-2 lmsa:overflow-hidden lmsa:rounded-full;
+  height: 6px;
+  background: var(--lmsa-border-default);
+}
+
+.lmsa-benchmark-summary-progress-fill {
+  height: 100%;
+  @apply lmsa:rounded-full;
+  background: var(--lmsa-section-accent);
+  transition: width 0.2s ease;
 }

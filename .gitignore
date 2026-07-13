@@ -29,6 +29,10 @@ Thumbs.db
 # Test coverage
 coverage/
 
+# Visual harness (extracted Obsidian CSS + rendered output; app.css is Obsidian's, do not commit)
+dev/visual/.cache/
+dev/visual/out/
+
 # AI slop
 .claude/
 AGENTS.md

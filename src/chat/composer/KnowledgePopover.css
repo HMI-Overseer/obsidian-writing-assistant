@@ -106,7 +106,10 @@
 }
 
 .lmsa-knowledge-popover-model-wrap .lmsa-settings-model-selector {
-  @apply lmsa:flex lmsa:w-full lmsa:items-center lmsa:gap-2 lmsa:rounded-lg lmsa:border lmsa:border-obsidian-border lmsa:px-3 lmsa:py-2;
+  /* This trigger is a filled, rounded box (unlike the inline settings trigger), so it wants a visible
+     edge. `lmsa:border-solid` opts it back into a drawn border, overriding the global v3 border parity
+     default (base.css `--tw-border-style: none`) for this element only. */
+  @apply lmsa:flex lmsa:w-full lmsa:items-center lmsa:gap-2 lmsa:rounded-lg lmsa:border lmsa:border-obsidian-border lmsa:border-solid lmsa:px-3 lmsa:py-2;
   font-size: var(--font-ui-smaller);
   color: var(--text-normal);
   background: var(--background-secondary);

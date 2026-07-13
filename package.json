@@ -20,7 +20,7 @@
     "version": "node version-bump.mjs && node scripts/update-pricing.mjs && git add manifest.json versions.json src/api/pricingData.json src/providers/catalogData.json"
   },
   "keywords": [],
-  "author": "Harbingers",
+  "author": "Resolve-public",
   "license": "MIT",
   "devDependencies": {
     "@eslint/js": "^9.30.0",

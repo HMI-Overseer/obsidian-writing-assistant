@@ -3,7 +3,7 @@
 	"name": "Writing Assistant Chat",
 	"version": "1.4.0",
 	"minAppVersion": "1.12.5",
-	"description": "AI writing assistant with chat, plan, and edit modes. Connects to local or cloud providers. Features vault-wide RAG retrieval, knowledge graph, agentic tool use, note context, and reusable prompt commands.",
+	"description": "AI writing assistant with unified chat, planning, and ambient editing. Connects to local or cloud providers. Features vault-wide RAG retrieval, knowledge graph, agentic tool use, note context, and reusable prompt commands.",
 	"author": "Resolve-public",
 	"authorUrl": "https://github.com/Resolve-public",
 	"isDesktopOnly": true,

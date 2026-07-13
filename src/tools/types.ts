@@ -18,7 +18,8 @@ export interface JsonSchemaProperty {
 }
 
 /**
- * MCP-standard tool annotations (ADR-0023; see docs/02-architecture/components/vault-write-tools.md).
+ * MCP-standard tool annotations (ADR-0023; see
+ * docs/02-architecture/components/tools/vault-write-surface.md).
  * Declarative risk metadata for definitions and future wire formatters. The plugin's
  * authorization gateway uses explicit converted operation classes, not these hints.
  * Not sent in direct-provider API bodies.

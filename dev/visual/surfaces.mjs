@@ -307,7 +307,7 @@ export const SURFACES = {
               <span class="lmsa-knowledge-popover-label">Vault retrieval</span>${toggle}
             </div>
             <div class="lmsa-knowledge-popover-model-wrap"><div class="lmsa-settings-model-selector-wrap">
-              <div class="lmsa-settings-model-selector">
+              <div class="lmsa-settings-model-selector is-active">
                 <span class="lmsa-model-selector-status is-cloud"></span>
                 <span class="lmsa-settings-model-selector-label">text-embedding-3-large</span>
                 <span class="lmsa-settings-model-selector-chevron">${I.chevronDown}</span>

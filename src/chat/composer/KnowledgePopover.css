@@ -101,25 +101,28 @@
   @apply lmsa:relative;
 }
 
+/*
+ * The trigger is the shared inline `.lmsa-settings-model-selector` control (status dot + label +
+ * chevron, subtle hover tint, no box), so the chat header, settings, and knowledge model selectors
+ * read as one family. Here it is stretched to fill its row with the chevron pushed to the trailing
+ * edge, mirroring the profile / sampling popover's `.lmsa-profile-trigger`: a flex wrap plus a flex-1
+ * trigger. An earlier revision boxed this one (filled, bordered); the box was removed to unify the
+ * family, and it fills its row rather than shrinking to content. Only the dropdown panel below is
+ * repositioned for the popover.
+ */
 .lmsa-knowledge-popover-model-wrap .lmsa-settings-model-selector-wrap {
-  @apply lmsa:relative;
+  @apply lmsa:relative lmsa:flex;
 }
 
 .lmsa-knowledge-popover-model-wrap .lmsa-settings-model-selector {
-  /* This trigger is a filled, rounded box (unlike the inline settings trigger), so it wants a visible
-     edge. `lmsa:border-solid` opts it back into a drawn border, overriding the global v3 border parity
-     default (base.css `--tw-border-style: none`) for this element only. */
-  @apply lmsa:flex lmsa:w-full lmsa:items-center lmsa:gap-2 lmsa:rounded-lg lmsa:border lmsa:border-obsidian-border lmsa:border-solid lmsa:px-3 lmsa:py-2;
-  font-size: var(--font-ui-smaller);
-  color: var(--text-normal);
-  background: var(--background-secondary);
-  margin: 0;
-  padding: 8px 12px;
-  transition: border-color 120ms ease, color 120ms ease;
+  @apply lmsa:flex-1;
+  /* Base sets margin: -2px -6px; drop the trailing side so the stretched right edge (and the chevron)
+     lands flush with the row instead of poking 6px past it. */
+  margin-right: 0;
 }
 
-.lmsa-knowledge-popover-model-wrap .lmsa-settings-model-selector:hover {
-  border-color: color-mix(in srgb, var(--interactive-accent) 40%, var(--background-modifier-border));
+.lmsa-knowledge-popover-model-wrap .lmsa-settings-model-selector-chevron {
+  margin-left: auto;
 }
 
 .lmsa-knowledge-popover-model-wrap .lmsa-model-dropdown {

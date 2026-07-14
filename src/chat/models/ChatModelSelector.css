@@ -67,13 +67,20 @@
   height: 14px;
 }
 
-/* Two-class descendant selector to beat Obsidian's input chrome. */
+/*
+ * Two-class descendant selector to beat Obsidian's input chrome. In a chat leaf the selector alone
+ * wins, but inside the settings modal Obsidian's form-field input styling out-specifies it and draws a
+ * rounded, filled capsule (the shared dropdown is reused there, so the same element picks up the modal
+ * chrome). `!important` on the visual reset forces the borderless field in every context, matching the
+ * refresh button below, which escalates the same way to beat Obsidian's base button chrome.
+ */
 .lmsa-model-dropdown-search input.lmsa-model-dropdown-search-input {
   @apply lmsa:min-w-0 lmsa:flex-1;
-  background: transparent;
-  border: none;
-  box-shadow: none;
-  padding: 0;
+  background: transparent !important;
+  border: none !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  padding: 0 !important;
   height: auto;
   font-size: var(--font-ui-small);
   color: var(--text-normal);
@@ -81,9 +88,9 @@
 
 .lmsa-model-dropdown-search input.lmsa-model-dropdown-search-input:focus,
 .lmsa-model-dropdown-search input.lmsa-model-dropdown-search-input:focus-visible {
-  background: transparent;
-  border: none;
-  box-shadow: none;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
   outline: none;
 }
 

@@ -176,6 +176,8 @@
   box-shadow:
     0 16px 40px rgba(0, 0, 0, 0.22),
     inset 0 1px 0 var(--lmsa-inset-highlight-subtle);
+  /* Opens below-left of the trigger; scales in from that corner (see the overlay-motion group). */
+  transform-origin: top left;
 }
 
 .lmsa-profile-menu-item {

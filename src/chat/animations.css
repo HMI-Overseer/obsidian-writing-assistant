@@ -38,3 +38,77 @@
     color: var(--text-error);
   }
 }
+
+/*
+ * Overlay entrance + exit motion (2026-07-14, post-migration polish). Every popover / dropdown / menu
+ * below already declared a `transform-origin`, a scale-in was intended but never wired. These rules
+ * animate each overlay in from that origin and back out on close, giving one motion language across all
+ * overlays (previously only the history drawer animated, via lmsa-drawer-fade above).
+ *
+ * The overlays are shown/hidden by toggling the global `.lmsa-hidden` shim (display: none !important).
+ * `transition-behavior: allow-discrete` holds the element displayed through the fade before display flips
+ * to none. That was verified to survive the !important shim with a headless computed-style probe: after
+ * hiding, display stays `block` while opacity falls 1 -> 0 over the transition, then flips to `none`.
+ * `@starting-style` supplies the entry from-values (applied each time the element goes from display:none
+ * to shown). Each overlay keeps its own `transform-origin`, so it scales from the corner nearest its
+ * trigger. Runtime is desktop Electron / Chromium, above the floor for `@starting-style` +
+ * `transition-behavior`, so no fallback is needed.
+ */
+.lmsa-model-dropdown,
+.lmsa-knowledge-popover,
+.lmsa-profile-popover,
+.lmsa-overflow-menu,
+.lmsa-context-picker-popover,
+.lmsa-posture-menu,
+.lmsa-reasoning-menu,
+.lmsa-tool-popover,
+.lmsa-profile-menu {
+  transition:
+    opacity 160ms ease,
+    scale 160ms ease,
+    display 160ms allow-discrete;
+  transition-behavior: allow-discrete;
+}
+
+@starting-style {
+  .lmsa-model-dropdown,
+  .lmsa-knowledge-popover,
+  .lmsa-profile-popover,
+  .lmsa-overflow-menu,
+  .lmsa-context-picker-popover,
+  .lmsa-posture-menu,
+  .lmsa-reasoning-menu,
+  .lmsa-tool-popover,
+  .lmsa-profile-menu {
+    opacity: 0;
+    scale: 0.97;
+  }
+}
+
+.lmsa-model-dropdown.lmsa-hidden,
+.lmsa-knowledge-popover.lmsa-hidden,
+.lmsa-profile-popover.lmsa-hidden,
+.lmsa-overflow-menu.lmsa-hidden,
+.lmsa-context-picker-popover.lmsa-hidden,
+.lmsa-posture-menu.lmsa-hidden,
+.lmsa-reasoning-menu.lmsa-hidden,
+.lmsa-tool-popover.lmsa-hidden,
+.lmsa-profile-menu.lmsa-hidden {
+  opacity: 0;
+  scale: 0.97;
+}
+
+/* Respect the OS reduced-motion setting: instant show/hide, no fade or scale. */
+@media (prefers-reduced-motion: reduce) {
+  .lmsa-model-dropdown,
+  .lmsa-knowledge-popover,
+  .lmsa-profile-popover,
+  .lmsa-overflow-menu,
+  .lmsa-context-picker-popover,
+  .lmsa-posture-menu,
+  .lmsa-reasoning-menu,
+  .lmsa-tool-popover,
+  .lmsa-profile-menu {
+    transition: none;
+  }
+}

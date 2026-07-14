@@ -29,6 +29,15 @@ export function makeMessage(role: "user" | "assistant", content: string): Conver
   return { id: generateId(), role, content };
 }
 
+/**
+ * The label shown for a conversation in the history drawer: its title, or a
+ * placeholder when untitled ("New conversation" while empty, "Untitled" once it has
+ * messages). Shared so the drawer and history search agree on what a row reads as.
+ */
+export function conversationDisplayTitle(meta: Pick<ConversationMeta, "title" | "messageCount">): string {
+  return meta.title || (meta.messageCount === 0 ? "New conversation" : "Untitled");
+}
+
 export function toConversationMeta(conversation: Conversation): ConversationMeta {
   return {
     id: conversation.id,

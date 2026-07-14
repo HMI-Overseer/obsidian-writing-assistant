@@ -439,6 +439,8 @@ export class ChatView extends ItemView {
       onDelete: (id) => void this.conversation.deleteConversation(id),
       onRename: (id, title) => void this.conversation.renameConversation(id, title),
       onClose: () => this.historyDrawer?.close(),
+      onSearch: (query) => this.sessionStore?.searchConversations(query) ?? Promise.resolve([]),
+      onAfterClose: () => this.sessionStore?.clearSearchCache(),
     });
 
     this.registerDomEvent(this.layout.newChatBtn, "click", (event) => {

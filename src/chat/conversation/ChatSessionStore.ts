@@ -17,6 +17,7 @@ import {
 import type { ConversationStorage } from "./ConversationStorage";
 import type { ChatSessionSnapshot } from "../types";
 import { ChatSessionMemory } from "./ChatSessionMemory";
+import { ConversationSearch, type ConversationSearchHit } from "./ConversationSearch";
 
 const CHAT_DRAFT_SAVE_DELAY_MS = 300;
 
@@ -30,11 +31,35 @@ const CHAT_DRAFT_SAVE_DELAY_MS = 300;
 export class ChatSessionStore {
   private readonly memory = new ChatSessionMemory();
   private draftSaveTimer: number | null = null;
+  private readonly search: ConversationSearch;
 
   constructor(
     private readonly plugin: WritingAssistantChat,
     private readonly storage: ConversationStorage,
-  ) {}
+  ) {
+    this.search = new ConversationSearch({
+      getActiveId: () => this.memory.getActiveConversationId(),
+      getActiveMessages: () => this.memory.getSnapshot().messageHistory,
+      loadConversation: (id) => this.storage.load(id),
+    });
+  }
+
+  // ── History search ──────────────────────────────────────────────
+
+  /**
+   * Find conversations whose title, model, or message body matches `query`.
+   * Body text is scanned on demand (index-free) and cached per conversation; the
+   * cache is invalidated on save/delete and released via {@link clearSearchCache}
+   * when the drawer closes.
+   */
+  searchConversations(query: string): Promise<ConversationSearchHit[]> {
+    return this.search.search(query, this.getConversations());
+  }
+
+  /** Release cached conversation bodies (called when the history drawer closes). */
+  clearSearchCache(): void {
+    this.search.clear();
+  }
 
   // ── Read-through to memory ──────────────────────────────────────
 
@@ -267,6 +292,7 @@ export class ChatSessionStore {
 
     history.conversations = history.conversations.filter((meta) => meta.id !== id);
     await this.storage.delete(id);
+    this.search.invalidate(id);
 
     if (isActiveConversation) {
       if (history.conversations.length > 0) {
@@ -301,6 +327,7 @@ export class ChatSessionStore {
     if (isEmptyConversation && !meta.title) {
       history.conversations.splice(metaIndex, 1);
       await this.storage.delete(id);
+      this.search.invalidate(id);
       if (history.activeConversationId === id) {
         history.activeConversationId = history.conversations[0]?.id ?? null;
       }
@@ -320,6 +347,9 @@ export class ChatSessionStore {
       approvalPosture: meta.approvalPosture ?? "ask",
     };
     await this.storage.save(conversation);
+    // The active thread is served live during search, but once it is switched away
+    // its stored body changed, so drop any cache entry from before it was active.
+    this.search.invalidate(id);
 
     history.conversations[metaIndex] = toConversationMeta(conversation);
     await this.plugin.saveSettings();

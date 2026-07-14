@@ -160,6 +160,20 @@
   font-size: var(--font-ui-smaller);
 }
 
+/* Body-match excerpt: one clamped line of muted context under the meta row, with
+   the matched span tinted in the mode accent so the hit is obvious. */
+.lmsa-history-item-snippet {
+  @apply lmsa:truncate lmsa:whitespace-nowrap;
+  margin-top: 1px;
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+}
+
+.lmsa-history-item-snippet-mark {
+  @apply lmsa:font-semibold;
+  color: var(--lmsa-mode-accent);
+}
+
 .lmsa-history-item-delete-area {
   @apply lmsa:flex lmsa:shrink-0 lmsa:items-center lmsa:gap-1;
 }

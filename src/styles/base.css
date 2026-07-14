@@ -1,7 +1,35 @@
 @layer theme, base, components, utilities;
 @import "tailwindcss/theme.css" layer(theme) prefix(lmsa);
 @import "tailwindcss/utilities.css" layer(utilities) prefix(lmsa);
-@config "../../tailwind.config.cjs";
+
+/*
+ * Theme tokens, ported from the former tailwind.config.cjs `theme.extend` (Appendix B of
+ * the Tailwind 3 to 4 migration plan). v4's native `@theme` block replaces the JS `@config`
+ * bridge, so this is the whole theme surface now. Per the v4 prefix convention, declare the
+ * variables without the prefix.
+ *
+ * `inline` is required, not cosmetic. Every obsidian-* token aliases an Obsidian CSS variable
+ * (`--background-modifier-border`, `--text-muted`, ...) that Obsidian can redefine on a
+ * container below `:root` (theme scopes, sub-regions). A plain `@theme` would emit a
+ * `:root`-scoped indirection var (`--lmsa-color-obsidian-border: var(--background-modifier-border)`)
+ * whose inner var() is substituted at the `:root` declaration, freezing it to the root value and
+ * ignoring any lower override. `inline` drops the indirection so utilities reference the Obsidian
+ * variable directly (`var(--background-modifier-border)`), resolved lazily at the element, exactly
+ * as the former @config bridge did. This reproduces the pre-port compiled output byte-for-byte
+ * (verified by A/B: identical `styles.css` and identical rendered surfaces). `--shadow-panel` backs
+ * `lmsa:shadow-panel`; `--font-interface` backs `lmsa:font-interface`.
+ */
+@theme inline {
+  --color-obsidian-accent: var(--interactive-accent);
+  --color-obsidian-accent-hover: var(--interactive-accent-hover);
+  --color-obsidian-border: var(--background-modifier-border);
+  --color-obsidian-surface-primary: var(--background-primary);
+  --color-obsidian-surface-secondary: var(--background-secondary);
+  --color-obsidian-text: var(--text-normal);
+  --color-obsidian-muted: var(--text-muted);
+  --font-interface: var(--font-interface);
+  --shadow-panel: 0 14px 40px rgba(0, 0, 0, 0.05);
+}
 
 /*
  * v3 border parity. With Preflight off, Tailwind v3's `border` utility set only

@@ -159,9 +159,89 @@
   font-size: 1.1rem;
 }
 
+/*
+ * Writing-prompt carousel (EmptyStateCarousel). Prompts slide horizontally; the track offset is driven by
+ * the --lmsa-carousel-index custom property the controller sets (no inline style rule). Prev/next controls
+ * sit in the side gutters and fade in on hover. The empty view is pointer-events-none, so the carousel
+ * opts interaction back in for its own hover + navigation.
+ */
 .lmsa-empty-copy {
-  @apply lmsa:max-w-[42ch];
+  @apply lmsa:w-full lmsa:max-w-[42ch];
+}
+
+.lmsa-empty-carousel {
+  @apply lmsa:relative;
+  pointer-events: auto;
+}
+
+.lmsa-empty-carousel-viewport {
+  @apply lmsa:overflow-hidden;
+  margin-inline: 22px;
+}
+
+.lmsa-empty-carousel-track {
+  @apply lmsa:flex;
+  transform: translateX(calc(var(--lmsa-carousel-index, 0) * -100%));
+  transition: transform 440ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+.lmsa-empty-carousel-slide {
+  /* Exactly one viewport wide so the slide offset (index * -100%) lands with no drift. Preflight is off,
+     so box-sizing is content-box; keep this element padding-free (the viewport gutters already inset the
+     text) so w-full is the true slide width. */
+  @apply lmsa:flex lmsa:w-full lmsa:flex-none lmsa:items-center lmsa:justify-center;
+  min-height: 3.6em;
   line-height: 1.6;
+}
+
+.lmsa-empty-carousel-nav {
+  @apply lmsa:absolute lmsa:inline-flex lmsa:cursor-pointer lmsa:items-center lmsa:justify-center;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 22px;
+  height: 22px;
+  border: none;
+  border-radius: 50%;
+  color: var(--text-faint);
+  opacity: 0;
+  background: transparent !important;
+  box-shadow: none !important;
+  outline: none;
+  appearance: none;
+  min-height: unset;
+  padding: 0;
+  transition: opacity 140ms ease, color 140ms ease, background 140ms ease;
+}
+
+.lmsa-empty-carousel-nav--prev {
+  left: 0;
+}
+
+.lmsa-empty-carousel-nav--next {
+  right: 0;
+}
+
+.lmsa-empty-carousel:hover .lmsa-empty-carousel-nav {
+  opacity: 0.5;
+}
+
+.lmsa-empty-carousel-nav:hover {
+  opacity: 1;
+  color: var(--text-normal);
+  background: color-mix(in srgb, var(--background-modifier-hover) 60%, transparent) !important;
+}
+
+.lmsa-empty-carousel-nav svg {
+  width: 15px;
+  height: 15px;
+}
+
+/* Reduced motion: the controller already skips auto-advance; drop the slide transition so manual
+   navigation jumps instantly. */
+@media (prefers-reduced-motion: reduce) {
+  .lmsa-empty-carousel-track {
+    transition: none;
+  }
 }
 
 /* ── Generate response button ────────────────────────────────────────────── */

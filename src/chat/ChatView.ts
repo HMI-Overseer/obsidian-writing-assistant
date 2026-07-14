@@ -34,6 +34,7 @@ import { ProfileSettingsPopover } from "./models/ProfileSettingsPopover";
 import type { ChatLayoutRefs } from "./types";
 import { ChatHistoryDrawer } from "./view/ChatHistoryDrawer";
 import { createChatLayout } from "./view/createChatLayout";
+import { EmptyStateCarousel } from "./view/EmptyStateCarousel";
 
 const NO_MODEL_SELECTED_LABEL = "No model selected";
 /** Below this width the "widen the panel" overlay replaces the chat. */
@@ -45,6 +46,7 @@ export class ChatView extends ItemView {
   private layout: ChatLayoutRefs | null = null;
   private sessionStore: ChatSessionStore | null = null;
   private transcript: ChatTranscript | null = null;
+  private emptyStateCarousel: EmptyStateCarousel | null = null;
   private composer: ChatComposer | null = null;
   private modelSelector: ChatModelSelector | null = null;
   private profilePopover: ProfileSettingsPopover | null = null;
@@ -84,6 +86,7 @@ export class ChatView extends ItemView {
     this.layout = createChatLayout(this.contentEl);
     this.sessionStore = new ChatSessionStore(this.plugin, this.plugin.services.conversationStorage);
     this.transcript = new ChatTranscript(this, this.app, this.layout);
+    this.emptyStateCarousel = new EmptyStateCarousel(this.layout.emptyCopyEl);
 
     this.orchestrator = new ChatGenerationOrchestrator({
       plugin: this.plugin,
@@ -497,6 +500,7 @@ export class ChatView extends ItemView {
     await this.sessionStore?.persistActiveConversation();
     this.contextUpdater?.destroy();
     this.transcript?.destroy();
+    this.emptyStateCarousel?.destroy();
     this.modelSelector?.destroy();
     this.profilePopover?.destroy();
     this.contextPickerPopover?.destroy();

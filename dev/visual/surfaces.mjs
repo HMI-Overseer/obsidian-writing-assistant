@@ -226,6 +226,36 @@ export const SURFACES = {
     html: view(composerHtml(), 600),
   },
 
+  // Empty state (createChatLayout.ts + EmptyStateCarousel.ts): the writing-prompt carousel. The controller
+  // slides the track via --lmsa-carousel-index and reveals the nav on hover; the harness renders a static
+  // frame at index 0 with the nav forced visible (lmsa-harness-show) so its placement can be checked.
+  emptyState: {
+    w: 460,
+    shot: ".lmsa-messages-pane",
+    html: view(
+      `<div class="lmsa-messages-pane" style="position:relative;width:412px;height:540px;flex:none">
+        <div class="lmsa-empty-view">
+          <div class="lmsa-empty-title">Start a conversation</div>
+          <div class="lmsa-empty-copy">
+            <div class="lmsa-empty-carousel">
+              <div class="lmsa-empty-carousel-viewport">
+                <div class="lmsa-empty-carousel-track">
+                  <div class="lmsa-empty-carousel-slide">Ask a question, paste a passage, or run a quick command on your draft.</div>
+                  <div class="lmsa-empty-carousel-slide">Select a line in your note and ask for a few ways to phrase it.</div>
+                  <div class="lmsa-empty-carousel-slide">Paste a paragraph and I'll tighten it without losing your voice.</div>
+                  <div class="lmsa-empty-carousel-slide">Describe where a scene is headed and we'll find the next line together.</div>
+                </div>
+              </div>
+              <button class="lmsa-empty-carousel-nav lmsa-empty-carousel-nav--prev lmsa-harness-show" aria-label="Previous prompt">${I.chevronLeft}</button>
+              <button class="lmsa-empty-carousel-nav lmsa-empty-carousel-nav--next lmsa-harness-show" aria-label="Next prompt">${I.chevronRight}</button>
+            </div>
+          </div>
+        </div>
+      </div>`,
+      460,
+    ),
+  },
+
   // S4: composer while a vault note is dragged over it. Exercises the drag-outline trick that depends
   // on the reserved invisible border (compensation #3). The dashed ring must appear with no 1px shift.
   composerDragOver: {

@@ -94,10 +94,9 @@ export function createChatLayout(contentEl: HTMLElement): ChatLayoutRefs {
   const messagesPaneEl = shell.createDiv({ cls: "lmsa-messages-pane" });
   const emptyStateEl = messagesPaneEl.createDiv({ cls: "lmsa-empty-view" });
   emptyStateEl.createEl("div", { cls: "lmsa-empty-title", text: "Start a conversation" });
-  emptyStateEl.createEl("div", {
-    cls: "lmsa-empty-copy",
-    text: "Ask a question, paste a passage, or use a quick command to rewrite, expand, or tighten your draft.",
-  });
+  // Host for the writing-prompt carousel; EmptyStateCarousel builds the track / slides / nav inside it
+  // and owns the slide + auto-advance behaviour (mirrors how ChatHistoryDrawer fills the messages pane).
+  const emptyCopyEl = emptyStateEl.createDiv({ cls: "lmsa-empty-copy" });
   const messagesEl = messagesPaneEl.createDiv({ cls: "lmsa-chat-window-messages" });
 
   const composer = shell.createDiv({ cls: "lmsa-chat-composer" });
@@ -245,6 +244,7 @@ export function createChatLayout(contentEl: HTMLElement): ChatLayoutRefs {
     shellEl: shell,
     messagesEl,
     emptyStateEl,
+    emptyCopyEl,
     contextChipsEl,
     textareaEl,
     posturePillEl,

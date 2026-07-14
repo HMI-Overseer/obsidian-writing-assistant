@@ -125,6 +125,16 @@ When using **Local providers** exclusively, **no data leaves your machine**.
 - **Conversations**, **RAG embeddings**, and **knowledge graph data** are stored locally on your device.
 - **No telemetry, analytics, or tracking.** The plugin makes no network requests beyond what is required to communicate with your chosen provider.
 - **No account required.** LM Studio needs no account; Anthropic and OpenAI require their own API accounts.
+- **Cloud usage is billed to you.** The plugin is free. When you use a cloud provider, Anthropic and OpenAI charge metered usage against your own API key (this includes OpenAI embeddings if you select an OpenAI embedding model for RAG), and Claude Code draws on your existing Claude subscription. Local providers such as LM Studio are free to run.
+
+### External tools and files outside your vault
+
+The **Claude Code** provider is the only part of the plugin that reaches outside your vault:
+
+- **It launches an external program.** When you use this provider, the plugin runs the `claude` command-line tool as a subprocess, with its working directory set to your vault. To find the executable it searches the directories on your system `PATH`, and on Windows it reads the npm shim files (`claude.cmd` / `claude.bat`) to resolve the real program. It only ever runs a `claude` binary that you have already installed; it never downloads, installs, or updates one.
+- **The CLI keeps its own files outside the vault.** The `claude` tool stores its login, configuration, and per-conversation session files in its own home-directory folder (`~/.claude`), outside your Obsidian vault. The plugin relies on these to resume a conversation after a restart. These files are created and managed by the Claude Code CLI itself.
+
+Every other tool the plugin offers the model (read, edit, create, move, trash) is path-restricted to your vault.
 
 ---
 
@@ -147,3 +157,8 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for setup instructions, project structure
 ## License
 
 MIT, see [LICENSE](LICENSE) for details.
+
+The distributed build bundles third-party components under their own licenses,
+including one proprietary Anthropic component that is not covered by this
+plugin's MIT license. See [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md) for
+the full list and terms.

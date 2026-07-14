@@ -616,8 +616,27 @@ export function renderBenchmarkTab(
   // Run handlers
   // -----------------------------------------------------------------------
 
+  /**
+   * Refuses to start a run against a local model that isn't already loaded,
+   * mirroring the chat send guard (ChatGenerationOrchestrator.generateResponse).
+   * A benchmark request would otherwise make LM Studio just-in-time load the
+   * model, an action the user never took themselves. `refreshAvailability`
+   * probes via a non-loading listing call; cloud models report "loaded"-equivalent
+   * "cloud" and always pass.
+   */
+  async function ensureModelLoaded(): Promise<boolean> {
+    const state = await selector.refreshAvailability();
+    if (state === "loaded" || state === "cloud") return true;
+    selector.retriggerAttention();
+    new Notice(
+      "The selected model isn't loaded. Load it in LM Studio before running benchmarks, the plugin won't load it for you."
+    );
+    return false;
+  }
+
   async function runSingleTest(tc: BenchmarkTestCase): Promise<void> {
     if (!selectedModel) return;
+    if (!(await ensureModelLoaded())) return;
     setRunningState(true);
     abortController = new AbortController();
     errorNoticedThisRun = false;
@@ -665,6 +684,7 @@ export function renderBenchmarkTab(
 
   async function runSuite(suite: BenchmarkTestSuite): Promise<void> {
     if (!selectedModel) return;
+    if (!(await ensureModelLoaded())) return;
     setRunningState(true);
     abortController = new AbortController();
     errorNoticedThisRun = false;
@@ -733,6 +753,7 @@ export function renderBenchmarkTab(
   // Run All handler
   runAllBtn.addEventListener("click", async () => {
     if (isRunning || !selectedModel) return;
+    if (!(await ensureModelLoaded())) return;
     setRunningState(true);
     abortController = new AbortController();
     errorNoticedThisRun = false;

@@ -117,46 +117,18 @@
   @apply lmsa:flex lmsa:flex-none lmsa:items-center lmsa:gap-2;
 }
 
-/* Trigger mirrors the chat header's model selector (lmsa-chat-header-meta),
-   stretched so the hit area runs edge to edge up to the row actions. */
+/*
+ * The profile trigger is the shared model-selector control (base.css) stretched to fill its row: flex-1
+ * plus a chevron pushed to the trailing edge. The left-only margin resets the shared rule's `-2px -6px`
+ * so the stretched right edge stays flush with the row actions (see the shared group's comment).
+ */
 .lmsa-profile-trigger {
-  @apply lmsa:inline-flex lmsa:min-w-0 lmsa:flex-1 lmsa:cursor-pointer lmsa:items-center lmsa:gap-1.5 lmsa:text-obsidian-muted;
-  font-size: var(--font-ui-small);
-  line-height: 1.45;
-  padding: 2px 6px;
-  margin-left: -6px;
-  border-radius: 6px;
-  transition: background-color 140ms ease, color 140ms ease;
-}
-
-.lmsa-profile-trigger:hover {
-  background: color-mix(in srgb, var(--background-modifier-hover) 60%, transparent);
-  color: var(--text-normal);
-}
-
-.lmsa-profile-trigger.is-open {
-  color: var(--text-normal);
-}
-
-.lmsa-profile-trigger-label {
-  @apply lmsa:min-w-0 lmsa:truncate lmsa:whitespace-nowrap;
+  @apply lmsa:flex-1;
+  margin: 0 0 0 -6px;
 }
 
 .lmsa-profile-trigger-chevron {
-  @apply lmsa:inline-flex lmsa:flex-none lmsa:items-center;
   margin-left: auto;
-  opacity: 0.4;
-  transition: opacity 140ms ease;
-}
-
-.lmsa-profile-trigger:hover .lmsa-profile-trigger-chevron,
-.lmsa-profile-trigger.is-open .lmsa-profile-trigger-chevron {
-  opacity: 0.75;
-}
-
-.lmsa-profile-trigger-chevron svg {
-  width: 12px;
-  height: 12px;
 }
 
 /* Profile dropdown, a pocket edition of the model dropdown's list. */

@@ -98,7 +98,14 @@
   scale: 0.97;
 }
 
-/* Respect the OS reduced-motion setting: instant show/hide, no fade or scale. */
+/*
+ * Reduced-motion: honor the OS setting across the whole plugin. The overlay motion above is a
+ * transition, so those elements get it disabled directly (instant show/hide, no fade or scale). Every
+ * keyframe animation, the typing dots, drawer fade, both attention pulses, the streaming border, the
+ * timeline-dot pulse, the refresh spin, and anything added later, is collapsed to run once and instantly
+ * (reaching its end state) via the standard duration reset, scoped to the plugin's `lmsa-` namespace so
+ * Obsidian's own motion is untouched.
+ */
 @media (prefers-reduced-motion: reduce) {
   .lmsa-model-dropdown,
   .lmsa-knowledge-popover,
@@ -110,5 +117,20 @@
   .lmsa-tool-popover,
   .lmsa-profile-menu {
     transition: none;
+  }
+
+  /*
+   * Scoped to lmsa subtrees (the element, its pseudo-elements, and any descendant + their pseudos) so
+   * animations on unclassed children, e.g. the refresh-spin `<svg>`, or on ::before/::after are caught
+   * too, without disabling Obsidian's own animations outside the plugin's DOM.
+   */
+  [class*="lmsa-"],
+  [class*="lmsa-"]::before,
+  [class*="lmsa-"]::after,
+  [class*="lmsa-"] *,
+  [class*="lmsa-"] *::before,
+  [class*="lmsa-"] *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
   }
 }

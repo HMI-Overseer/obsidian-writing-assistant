@@ -231,3 +231,68 @@
 .lmsa-ui-muted {
   color: var(--text-muted);
 }
+
+/*
+ * Shared model-selector trigger. The chat header (.lmsa-chat-header-meta), the settings / benchmark /
+ * knowledge trigger (.lmsa-settings-model-selector), and the profile / sampling trigger
+ * (.lmsa-profile-trigger) are one control: a status dot + truncated label + chevron, muted text with a
+ * subtle hover tint. The common styling lives here so the three cannot drift; each component's own file
+ * keeps only its delta (the profile trigger's row-fill via flex-1 + chevron margin-left:auto and its
+ * left-only margin; the chat/settings attention pulses). base.css is imported first, so those later,
+ * equal-specificity deltas win. Both open-state class names are matched here: .is-active (chat/settings)
+ * and .is-open (profile).
+ */
+.lmsa-chat-header-meta,
+.lmsa-settings-model-selector,
+.lmsa-profile-trigger {
+  @apply lmsa:inline-flex lmsa:min-w-0 lmsa:cursor-pointer lmsa:items-center lmsa:gap-1.5 lmsa:text-obsidian-muted;
+  font-size: var(--font-ui-small);
+  line-height: 1.45;
+  padding: 2px 6px;
+  margin: -2px -6px;
+  border-radius: 6px;
+  transition: background-color 140ms ease, color 140ms ease;
+}
+
+.lmsa-chat-header-meta:hover,
+.lmsa-settings-model-selector:hover,
+.lmsa-profile-trigger:hover {
+  background: color-mix(in srgb, var(--background-modifier-hover) 60%, transparent);
+  color: var(--text-normal);
+}
+
+.lmsa-chat-header-meta.is-active,
+.lmsa-settings-model-selector.is-active,
+.lmsa-profile-trigger.is-open {
+  color: var(--text-normal);
+}
+
+.lmsa-chat-header-meta-label,
+.lmsa-settings-model-selector-label,
+.lmsa-profile-trigger-label {
+  @apply lmsa:min-w-0 lmsa:truncate lmsa:whitespace-nowrap;
+}
+
+.lmsa-chat-header-meta-chevron,
+.lmsa-settings-model-selector-chevron,
+.lmsa-profile-trigger-chevron {
+  @apply lmsa:inline-flex lmsa:flex-none lmsa:items-center;
+  opacity: 0.4;
+  transition: opacity 140ms ease;
+}
+
+.lmsa-chat-header-meta:hover .lmsa-chat-header-meta-chevron,
+.lmsa-chat-header-meta.is-active .lmsa-chat-header-meta-chevron,
+.lmsa-settings-model-selector:hover .lmsa-settings-model-selector-chevron,
+.lmsa-settings-model-selector.is-active .lmsa-settings-model-selector-chevron,
+.lmsa-profile-trigger:hover .lmsa-profile-trigger-chevron,
+.lmsa-profile-trigger.is-open .lmsa-profile-trigger-chevron {
+  opacity: 0.75;
+}
+
+.lmsa-chat-header-meta-chevron svg,
+.lmsa-settings-model-selector-chevron svg,
+.lmsa-profile-trigger-chevron svg {
+  width: 12px;
+  height: 12px;
+}

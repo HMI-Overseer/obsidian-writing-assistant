@@ -78,47 +78,9 @@
   @apply lmsa:relative;
 }
 
-.lmsa-chat-header-meta {
-  @apply lmsa:inline-flex lmsa:min-w-0 lmsa:cursor-pointer lmsa:items-center lmsa:gap-1.5 lmsa:text-obsidian-muted;
-  font-size: var(--font-ui-small);
-  line-height: 1.45;
-  padding: 2px 6px;
-  margin: -2px -6px;
-  border-radius: 6px;
-  transition: background-color 140ms ease, color 140ms ease;
-}
-
-.lmsa-chat-header-meta:hover {
-  background: color-mix(in srgb, var(--background-modifier-hover) 60%, transparent);
-  color: var(--text-normal);
-}
-
-.lmsa-chat-header-meta.is-active {
-  color: var(--text-normal);
-}
-
+/* Base styling is the shared model-selector trigger group in base.css; only the attention pulse is local. */
 .lmsa-chat-header-meta.is-attention {
   animation: lmsa-chat-header-meta-attention 0.7s ease;
-}
-
-.lmsa-chat-header-meta-label {
-  @apply lmsa:min-w-0 lmsa:truncate lmsa:whitespace-nowrap;
-}
-
-.lmsa-chat-header-meta-chevron {
-  @apply lmsa:inline-flex lmsa:flex-none lmsa:items-center;
-  opacity: 0.4;
-  transition: opacity 140ms ease;
-}
-
-.lmsa-chat-header-meta:hover .lmsa-chat-header-meta-chevron,
-.lmsa-chat-header-meta.is-active .lmsa-chat-header-meta-chevron {
-  opacity: 0.75;
-}
-
-.lmsa-chat-header-meta-chevron svg {
-  width: 12px;
-  height: 12px;
 }
 
 .lmsa-chat-header-actions {

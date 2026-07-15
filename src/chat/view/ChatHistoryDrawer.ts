@@ -114,7 +114,7 @@ export class ChatHistoryDrawer {
     this.searchInputEl = this.searchRowEl.createEl("input", {
       cls: "lmsa-history-search-input",
       attr: { type: "text", placeholder: "Search conversations..." },
-    }) as HTMLInputElement;
+    });
     this.searchInputEl.addEventListener("input", () => {
       this.filterQuery = this.searchInputEl.value.trim();
       this.scheduleFilter();
@@ -257,7 +257,7 @@ export class ChatHistoryDrawer {
     const input = titleEl.createEl("input", {
       cls: "lmsa-history-rename-input",
       attr: { type: "text" },
-    }) as HTMLInputElement;
+    });
     input.value = conversation.title || currentLabel;
     input.focus();
     input.select();

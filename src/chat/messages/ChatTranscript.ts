@@ -235,9 +235,9 @@ export class ChatTranscript {
     const isLastAssistant = messageIndex === lastAssistantIndex;
 
     // Scroll anchor: capture toolbar position before content swap
-    const oldToolbarEl = bubble.rowEl.querySelector(
+    const oldToolbarEl = bubble.rowEl.querySelector<HTMLElement>(
       ".lmsa-chat-window-bubble-toolbar"
-    ) as HTMLElement | null;
+    );
     const anchorY = oldToolbarEl?.getBoundingClientRect().top ?? null;
 
     // In-place content swap
@@ -251,9 +251,9 @@ export class ChatTranscript {
 
     // Restore scroll anchor so version nav stays at the same screen position
     if (anchorY !== null) {
-      const newToolbarEl = bubble.rowEl.querySelector(
+      const newToolbarEl = bubble.rowEl.querySelector<HTMLElement>(
         ".lmsa-chat-window-bubble-toolbar"
-      ) as HTMLElement | null;
+      );
       if (newToolbarEl) {
         const delta = newToolbarEl.getBoundingClientRect().top - anchorY;
         this.refs.messagesEl.scrollTop += delta;

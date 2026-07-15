@@ -168,8 +168,7 @@ export class AgenticTimeline {
   /** Remove any error decoration (red class, "Failed" label, error block) from a step. */
   private clearError(stepEl: HTMLElement): void {
     stepEl.classList.remove("lmsa-agentic-timeline-step--error");
-    const bodyEl =
-      (stepEl.querySelector(".lmsa-agentic-timeline-step-body") as HTMLElement | null) ?? stepEl;
+    const bodyEl = stepEl.querySelector<HTMLElement>(".lmsa-agentic-timeline-step-body") ?? stepEl;
     bodyEl.querySelector(":scope > .lmsa-agentic-timeline-step-failed")?.remove();
     bodyEl
       .querySelector(":scope > .lmsa-agentic-timeline-step-expand > .lmsa-agentic-timeline-error")
@@ -349,8 +348,7 @@ export class AgenticTimeline {
    * handler is wired once. Shared by the raw-args view and the error block.
    */
   private ensureExpandBlock(stepEl: HTMLElement): HTMLElement {
-    const bodyEl =
-      (stepEl.querySelector(".lmsa-agentic-timeline-step-body") as HTMLElement | null) ?? stepEl;
+    const bodyEl = stepEl.querySelector<HTMLElement>(".lmsa-agentic-timeline-step-body") ?? stepEl;
     let expandEl = bodyEl.querySelector<HTMLElement>(
       ":scope > .lmsa-agentic-timeline-step-expand",
     );
@@ -377,8 +375,7 @@ export class AgenticTimeline {
    */
   private decorateError(stepEl: HTMLElement, content: string): void {
     stepEl.classList.add("lmsa-agentic-timeline-step--error");
-    const bodyEl =
-      (stepEl.querySelector(".lmsa-agentic-timeline-step-body") as HTMLElement | null) ?? stepEl;
+    const bodyEl = stepEl.querySelector<HTMLElement>(".lmsa-agentic-timeline-step-body") ?? stepEl;
     const reviewed = !!bodyEl.querySelector(
       ":scope > .lmsa-vault-step-controls, :scope > .lmsa-edit-step-controls",
     );

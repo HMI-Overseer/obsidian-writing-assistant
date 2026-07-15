@@ -214,7 +214,7 @@ export function buildAnthropicMessages(
       };
       const prev = messages[messages.length - 1];
       if (prev?.role === "user" && Array.isArray(prev.content)) {
-        (prev.content as AnthropicContentBlock[]).push(block);
+        prev.content.push(block);
       } else {
         messages.push({ role: "user", content: [block] });
       }
@@ -246,7 +246,7 @@ export function buildAnthropicMessages(
       }
       messages.push({ role: "user", content: blocks });
     } else {
-      messages.push({ role: turn.role as "user" | "assistant", content: turn.content ?? "" });
+      messages.push({ role: turn.role, content: turn.content ?? "" });
     }
   }
 
@@ -426,7 +426,7 @@ function appendTextToUserMessage(message: AnthropicMessage, text: string): void 
   if (typeof message.content === "string") {
     message.content = message.content + "\n\n" + text;
   } else if (Array.isArray(message.content)) {
-    (message.content as AnthropicContentBlock[]).push({ type: "text", text });
+    message.content.push({ type: "text", text });
   }
 }
 
@@ -449,7 +449,7 @@ function appendNoteImageContextToUserMessage(
 
 function ensureAnthropicUserBlocks(message: AnthropicMessage): AnthropicContentBlock[] {
   if (Array.isArray(message.content)) {
-    return message.content as AnthropicContentBlock[];
+    return message.content;
   }
   const blocks: AnthropicContentBlock[] = [];
   if (typeof message.content === "string" && message.content) {

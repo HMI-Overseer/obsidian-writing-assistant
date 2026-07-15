@@ -71,9 +71,9 @@ export function normalizeBenchmarkSettings(raw: unknown): BenchmarkSettings {
         .filter(
           (e): e is BenchmarkHistoryEntry =>
             typeof e === "object" && e !== null &&
-            typeof (e as BenchmarkHistoryEntry).id === "string" &&
-            typeof (e as BenchmarkHistoryEntry).conditions === "object" &&
-            Array.isArray((e as BenchmarkHistoryEntry).results)
+            typeof e.id === "string" &&
+            typeof e.conditions === "object" &&
+            Array.isArray(e.results)
         )
         .slice(0, MAX_BENCHMARK_HISTORY)
     : [];

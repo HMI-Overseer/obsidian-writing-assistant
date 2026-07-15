@@ -37,7 +37,7 @@ export class CacheSettingsControl {
     this.toggleEl = toggleWrapper.createEl("input", {
       attr: { type: "checkbox" },
       cls: "lmsa-profile-toggle",
-    }) as HTMLInputElement;
+    });
     this.toggleEl.checked = this.opts.settings.enabled;
 
     // TTL row
@@ -50,7 +50,7 @@ export class CacheSettingsControl {
     const ttlWrapper = ttlRow.createDiv({ cls: "lmsa-profile-popover-control" });
     this.ttlSelectEl = ttlWrapper.createEl("select", {
       cls: "lmsa-profile-ttl-select",
-    }) as HTMLSelectElement;
+    });
     this.ttlSelectEl.createEl("option", { text: "5 min (default)", attr: { value: "default" } });
     this.ttlSelectEl.createEl("option", { text: "1 hour (2x write cost)", attr: { value: "1h" } });
     this.ttlSelectEl.value = this.opts.settings.ttl;

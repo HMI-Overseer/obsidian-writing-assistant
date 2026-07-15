@@ -3,7 +3,6 @@ import type {
   GraphRelation,
   GraphFileMeta,
   SerializedKnowledgeGraph,
-  EntityType,
   ExtractionResult,
 } from "./types";
 import { cosineSimilarity } from "../vectorMath";
@@ -223,7 +222,7 @@ export class KnowledgeGraph {
       } else {
         this.entities.set(key, {
           name: raw.name,
-          type: raw.type as EntityType,
+          type: raw.type,
           description: raw.description,
           sourceFiles: [filePath],
           aliases: [],

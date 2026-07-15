@@ -35,7 +35,6 @@ export default tseslint.config(
 
       // Staged. Options are written out only where a severity-only override would inherit an
       // unwanted one; see the doc's Gotchas.
-      "@typescript-eslint/no-unnecessary-type-assertion": "warn",
       "@typescript-eslint/no-deprecated": "warn",
       "@typescript-eslint/no-floating-promises": "warn",
       "@typescript-eslint/no-misused-promises": "warn",

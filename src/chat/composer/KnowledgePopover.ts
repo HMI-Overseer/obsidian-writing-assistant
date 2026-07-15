@@ -160,7 +160,7 @@ export class KnowledgePopover {
     const statusEl = statusRowEl.createEl("span", { cls: "lmsa-knowledge-popover-status" });
     const actionBtn = statusRowEl.createEl("button", {
       cls: "lmsa-knowledge-popover-action-btn",
-    }) as HTMLButtonElement;
+    });
 
     actionBtn.addEventListener("click", async () => {
       const snap = this.callbacks.getRagSnapshot();

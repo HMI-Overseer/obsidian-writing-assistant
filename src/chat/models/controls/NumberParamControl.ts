@@ -35,7 +35,7 @@ export class NumberParamControl {
     const toggle = labelRow.createEl("input", {
       cls: "lmsa-params-toggle",
       attr: { type: "checkbox" },
-    }) as HTMLInputElement;
+    });
     labelRow.createEl("label", { cls: "lmsa-params-label", text: this.opts.label });
 
     const inputRow = section.createDiv({ cls: "lmsa-params-input-row" });
@@ -48,7 +48,7 @@ export class NumberParamControl {
         step: String(this.opts.step),
         placeholder: this.opts.placeholder,
       },
-    }) as HTMLInputElement;
+    });
 
     // Initialize from value
     const enabled = this.opts.value !== null;

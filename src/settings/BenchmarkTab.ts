@@ -91,7 +91,7 @@ export function renderBenchmarkTab(
   const profileSettingsBtn = selector.wrapEl.createEl("button", {
     cls: "lmsa-profile-settings-btn",
     attr: { "aria-label": "Profile settings" },
-  }) as HTMLButtonElement;
+  });
   setIcon(profileSettingsBtn, "settings");
 
   const profileSettingsPopoverEl = selector.wrapEl.createDiv({
@@ -197,7 +197,7 @@ export function renderBenchmarkTab(
   const iterInput = iterRow.createEl("input", {
     cls: "lmsa-benchmark-setting-input",
     attr: { type: "number", min: "1", max: "20", placeholder: "3", value: String(iterationCount) },
-  }) as HTMLInputElement;
+  });
   iterInput.addEventListener("input", () => {
     const parsed = parseInt(iterInput.value, 10);
     if (!Number.isNaN(parsed) && parsed >= 1 && parsed <= 20) {
@@ -216,7 +216,7 @@ export function renderBenchmarkTab(
   const folderInput = folderRow.createEl("input", {
     cls: "lmsa-benchmark-setting-input lmsa-benchmark-setting-input--wide",
     attr: { type: "text", placeholder: "Benchmarks", value: plugin.settings.benchmark.reportFolder },
-  }) as HTMLInputElement;
+  });
   folderInput.addEventListener("change", () => {
     void (async () => {
       plugin.settings.benchmark.reportFolder = folderInput.value.trim() || "Benchmarks";

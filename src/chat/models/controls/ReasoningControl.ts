@@ -33,13 +33,13 @@ export class ReasoningControl {
     this.toggleEl = labelRow.createEl("input", {
       cls: "lmsa-params-toggle",
       attr: { type: "checkbox" },
-    }) as HTMLInputElement;
+    });
     labelRow.createEl("label", { cls: "lmsa-params-label", text: "Reasoning" });
 
     this.row = section.createDiv({ cls: "lmsa-params-input-row" });
     this.selectEl = this.row.createEl("select", {
       cls: "lmsa-params-select",
-    }) as HTMLSelectElement;
+    });
 
     for (const level of this.opts.levels) {
       this.selectEl.createEl("option", {

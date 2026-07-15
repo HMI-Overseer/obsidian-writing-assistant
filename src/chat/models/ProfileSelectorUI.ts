@@ -50,7 +50,7 @@ export class ProfileSelectorUI {
     const createBtn = actions.createEl("button", {
       cls: "lmsa-profile-action-btn",
       attr: { "aria-label": "Create profile" },
-    }) as HTMLButtonElement;
+    });
     setIcon(createBtn, "plus");
 
     createBtn.addEventListener("click", (e) => {
@@ -61,7 +61,7 @@ export class ProfileSelectorUI {
     this.deleteBtn = actions.createEl("button", {
       cls: "lmsa-profile-action-btn lmsa-profile-action-btn--danger",
       attr: { "aria-label": "Delete profile" },
-    }) as HTMLButtonElement;
+    });
     setIcon(this.deleteBtn, "trash-2");
     this.deleteBtn.disabled = activeProfile.isDefault;
     if (activeProfile.isDefault) {
@@ -122,12 +122,12 @@ export class ProfileSelectorUI {
     const confirmBtn = inline.createEl("button", {
       cls: "lmsa-ui-compact-btn lmsa-ui-compact-btn-danger",
       text: "Delete",
-    }) as HTMLButtonElement;
+    });
 
     const cancelBtn = inline.createEl("button", {
       cls: "lmsa-ui-compact-btn lmsa-ui-compact-btn-secondary",
       text: "Cancel",
-    }) as HTMLButtonElement;
+    });
 
     confirmBtn.addEventListener("click", (e) => {
       e.stopPropagation();
@@ -156,18 +156,18 @@ export class ProfileSelectorUI {
     const input = inline.createEl("input", {
       cls: "lmsa-profile-create-input",
       attr: { type: "text", placeholder: "Profile name..." },
-    }) as HTMLInputElement;
+    });
 
     const confirmBtn = inline.createEl("button", {
       cls: "lmsa-profile-action-btn",
       attr: { "aria-label": "Confirm" },
-    }) as HTMLButtonElement;
+    });
     setIcon(confirmBtn, "check");
 
     const cancelBtn = inline.createEl("button", {
       cls: "lmsa-profile-action-btn",
       attr: { "aria-label": "Cancel" },
-    }) as HTMLButtonElement;
+    });
     setIcon(cancelBtn, "x");
 
     input.focus();

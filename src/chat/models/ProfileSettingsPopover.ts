@@ -353,7 +353,7 @@ export class ProfileSettingsPopover {
     this.promptTextareaEl = section.createEl("textarea", {
       cls: "lmsa-params-textarea",
       attr: { placeholder: "Enter a system prompt...", rows: "6" },
-    }) as HTMLTextAreaElement;
+    });
 
     this.promptTextareaEl.value = profile.systemPrompt;
 
@@ -377,7 +377,7 @@ export class ProfileSettingsPopover {
     const toggle = toggleRow.createEl("input", {
       cls: "lmsa-params-toggle",
       attr: { type: "checkbox" },
-    }) as HTMLInputElement;
+    });
     toggle.checked = profile.disableBuiltinSystemPrompts;
     toggleRow.createEl("label", {
       cls: "lmsa-params-label",

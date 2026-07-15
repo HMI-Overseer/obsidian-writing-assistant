@@ -43,7 +43,7 @@ export class SliderParamControl {
     const toggle = labelRow.createEl("input", {
       cls: "lmsa-params-toggle",
       attr: { type: "checkbox" },
-    }) as HTMLInputElement;
+    });
     labelRow.createEl("label", { cls: "lmsa-params-label", text: this.opts.label });
 
     const sliderRow = section.createDiv({ cls: "lmsa-params-slider-row" });
@@ -55,7 +55,7 @@ export class SliderParamControl {
         max: String(this.opts.max),
         step: String(this.opts.step),
       },
-    }) as HTMLInputElement;
+    });
 
     const valueDisplay = sliderRow.createEl("span", {
       cls: "lmsa-params-slider-value",

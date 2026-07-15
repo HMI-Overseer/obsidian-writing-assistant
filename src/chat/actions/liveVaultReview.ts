@@ -870,7 +870,7 @@ function cancelledFallback(call: ToolCall): ToolResult {
  * so the model self-corrects (its own errorGuidance: spelling / case / scope).
  */
 function replaceNoMatchResult(call: ToolCall): ToolResult {
-  const args = call.arguments as Record<string, unknown>;
+  const args = call.arguments;
   const search = typeof args.search === "string" ? args.search : "";
   const where =
     typeof args.path === "string" && args.path.trim() !== "" ? `"${args.path}"` : "the vault";
@@ -912,7 +912,7 @@ function editCancelled(kind: EditOpKind, path: string): ToolResult {
 
 /** The vault path an edit call names, for the defensive cancelled fallback message. */
 function pathArg(call: ToolCall): string {
-  const p = (call.arguments as Record<string, unknown>).path;
+  const p = call.arguments.path;
   return typeof p === "string" ? p : "";
 }
 

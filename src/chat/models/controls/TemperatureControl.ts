@@ -25,7 +25,7 @@ export class TemperatureControl {
     this.sliderEl = sliderRow.createEl("input", {
       cls: "lmsa-params-slider",
       attr: { type: "range", min: "0", max: "1", step: "0.05" },
-    }) as HTMLInputElement;
+    });
 
     this.valueEl = sliderRow.createEl("span", {
       cls: "lmsa-params-slider-value",

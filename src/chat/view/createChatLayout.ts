@@ -74,7 +74,7 @@ export function createChatLayout(contentEl: HTMLElement): ChatLayoutRefs {
   const profileSettingsBtn = headerMetaWrap.createEl("button", {
     cls: "lmsa-profile-settings-btn",
     attr: { "aria-label": "Profile settings" },
-  }) as HTMLButtonElement;
+  });
   setIcon(profileSettingsBtn, "settings");
 
   const profileSettingsPopoverEl = headerMetaWrap.createDiv({ cls: "lmsa-profile-popover lmsa-hidden" });
@@ -83,12 +83,12 @@ export function createChatLayout(contentEl: HTMLElement): ChatLayoutRefs {
   const newChatBtn = headerActions.createEl("button", {
     cls: "lmsa-chat-header-btn lmsa-ui-icon-btn",
     attr: { "aria-label": "New chat" },
-  }) as HTMLButtonElement;
+  });
   setIcon(newChatBtn, "file-pen");
   const historyBtn = headerActions.createEl("button", {
     cls: "lmsa-chat-header-btn lmsa-ui-icon-btn",
     attr: { "aria-label": "Chat history" },
-  }) as HTMLButtonElement;
+  });
   setIcon(historyBtn, "clock");
 
   const messagesPaneEl = shell.createDiv({ cls: "lmsa-messages-pane" });
@@ -104,7 +104,7 @@ export function createChatLayout(contentEl: HTMLElement): ChatLayoutRefs {
   const generateResponseBtn = composer.createEl("button", {
     cls: "lmsa-chat-composer-generate-btn lmsa-hidden",
     attr: { "aria-label": "Generate response" },
-  }) as HTMLButtonElement;
+  });
   const genBtnIcon = generateResponseBtn.createEl("span", { cls: "lmsa-chat-composer-generate-icon" });
   setIcon(genBtnIcon, "sparkles");
   generateResponseBtn.createEl("span", { text: "Generate response" });
@@ -115,7 +115,7 @@ export function createChatLayout(contentEl: HTMLElement): ChatLayoutRefs {
   const contextAddBtnEl = contextChipsEl.createEl("button", {
     cls: "lmsa-chat-composer-add-context-btn",
     attr: { "aria-label": "Add context" },
-  }) as HTMLButtonElement;
+  });
   setIcon(contextAddBtnEl, "plus");
 
   const attachmentsEl = composerPanel.createDiv({ cls: "lmsa-chat-composer-attachments" });
@@ -123,7 +123,7 @@ export function createChatLayout(contentEl: HTMLElement): ChatLayoutRefs {
   const textareaEl = composerPanel.createEl("textarea", {
     cls: "lmsa-chat-composer-textarea",
     attr: { placeholder: "Ask anything about your writing...", rows: "1" },
-  }) as HTMLTextAreaElement;
+  });
 
   const composerFooter = composerPanel.createDiv({ cls: "lmsa-chat-composer-footer" });
 
@@ -176,7 +176,7 @@ export function createChatLayout(contentEl: HTMLElement): ChatLayoutRefs {
   const reasoningPillEl = composerFooterLeft.createEl("button", {
     cls: "lmsa-chat-composer-reasoning-pill lmsa-hidden",
     attr: { "aria-label": "Reasoning effort" },
-  }) as HTMLButtonElement;
+  });
   const reasoningPillIcon = reasoningPillEl.createEl("span", {
     cls: "lmsa-chat-composer-reasoning-pill-icon",
   });
@@ -198,7 +198,7 @@ export function createChatLayout(contentEl: HTMLElement): ChatLayoutRefs {
   const overflowBtnEl = composerFooterActions.createEl("button", {
     cls: "lmsa-chat-composer-overflow-btn",
     attr: { "aria-label": "More options" },
-  }) as HTMLButtonElement;
+  });
   setIcon(overflowBtnEl, "more-horizontal");
 
   const toolWrap = composerFooterActions.createDiv({ cls: "lmsa-chat-composer-tool-wrap" });
@@ -212,7 +212,7 @@ export function createChatLayout(contentEl: HTMLElement): ChatLayoutRefs {
   const posturePillEl = composerFooterActions.createEl("button", {
     cls: "lmsa-chat-composer-posture-pill",
     attr: { "aria-label": "Edit approval" },
-  }) as HTMLButtonElement;
+  });
   posturePillEl.createEl("span", { cls: "lmsa-chat-composer-posture-pill-icon" });
   posturePillEl.createEl("span", { cls: "lmsa-chat-composer-posture-pill-label" });
   // Chevron points up because the posture menu opens above the pill.
@@ -223,7 +223,7 @@ export function createChatLayout(contentEl: HTMLElement): ChatLayoutRefs {
 
   const actionBtn = composerFooterActions.createEl("button", {
     cls: "lmsa-chat-composer-send-btn",
-  }) as HTMLButtonElement;
+  });
   setIcon(actionBtn, "arrow-up");
 
   // Popovers are children of the footer (not the small wrap divs) so the footer

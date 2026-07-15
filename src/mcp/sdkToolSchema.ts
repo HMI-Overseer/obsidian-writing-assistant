@@ -1,5 +1,4 @@
 import { z } from "zod";
-import type { ZodTypeAny } from "zod";
 import type { CanonicalToolDefinition, JsonSchemaProperty } from "../tools/types";
 
 /**
@@ -7,7 +6,7 @@ import type { CanonicalToolDefinition, JsonSchemaProperty } from "../tools/types
  * `tool()` helper expects as its input schema. The SDK converts it back to JSON
  * Schema for the model and validates tool arguments against it.
  */
-export type ZodRawShape = Record<string, ZodTypeAny>;
+export type ZodRawShape = Record<string, z.ZodType>;
 
 /**
  * Converts a provider-agnostic {@link CanonicalToolDefinition} parameter block
@@ -37,18 +36,16 @@ function propertiesToShape(
   return shape;
 }
 
-function propertyToZod(property: JsonSchemaProperty): ZodTypeAny {
+function propertyToZod(property: JsonSchemaProperty): z.ZodType {
   let schema = baseSchema(property);
   if (property.description) schema = schema.describe(property.description);
   return schema;
 }
 
-function baseSchema(property: JsonSchemaProperty): ZodTypeAny {
+function baseSchema(property: JsonSchemaProperty): z.ZodType {
   if (property.anyOf && property.anyOf.length > 0) {
     const variants = property.anyOf.map((sub) => propertyToZod(sub));
-    return variants.length === 1
-      ? variants[0]
-      : z.union(variants as [ZodTypeAny, ZodTypeAny, ...ZodTypeAny[]]);
+    return variants.length === 1 ? variants[0] : z.union(variants);
   }
   switch (property.type) {
     case "string":

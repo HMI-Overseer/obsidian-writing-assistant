@@ -14,7 +14,7 @@ export function appendTextToOpenAIMessage(message: Message, text: string): void 
   if (typeof message.content === "string") {
     message.content = message.content + "\n\n" + text;
   } else if (Array.isArray(message.content)) {
-    (message.content as OpenAIContentPart[]).push({ type: "text", text });
+    message.content.push({ type: "text", text });
   }
 }
 
@@ -42,7 +42,7 @@ export function appendNoteImageContextToOpenAIMessage(
 /** Converts a plain-string message to multipart form and returns its parts. */
 function ensureOpenAIUserParts(message: Message): OpenAIContentPart[] {
   if (Array.isArray(message.content)) {
-    return message.content as OpenAIContentPart[];
+    return message.content;
   }
   const parts: OpenAIContentPart[] = [];
   if (typeof message.content === "string" && message.content) {

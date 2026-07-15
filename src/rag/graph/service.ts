@@ -39,7 +39,7 @@ export class GraphService {
 
   /** Live vault watchers that keep the graph structurally consistent (no LLM). */
   private eventRefs: Array<ReturnType<App["vault"]["on"]>> = [];
-  private saveTimer: ReturnType<typeof setTimeout> | null = null;
+  private saveTimer: number | null = null;
 
   constructor(
     app: App,
@@ -202,8 +202,8 @@ export class GraphService {
 
   /** Persist the graph after a debounce, coalescing bursts (e.g. a folder rename). */
   private scheduleSave(): void {
-    if (this.saveTimer) clearTimeout(this.saveTimer);
-    this.saveTimer = setTimeout(() => {
+    if (this.saveTimer) window.clearTimeout(this.saveTimer);
+    this.saveTimer = window.setTimeout(() => {
       this.saveTimer = null;
       void this.saveGraph();
     }, SAVE_DEBOUNCE_MS);
@@ -341,7 +341,7 @@ export class GraphService {
     this.eventRefs = [];
 
     if (this.saveTimer) {
-      clearTimeout(this.saveTimer);
+      window.clearTimeout(this.saveTimer);
       this.saveTimer = null;
     }
 

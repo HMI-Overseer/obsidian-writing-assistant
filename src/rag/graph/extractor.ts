@@ -84,7 +84,7 @@ export class GraphExtractor {
   private readonly embeddingModelId: string | undefined;
   private readonly folderFilter: string | undefined;
 
-  private saveTimer: ReturnType<typeof setTimeout> | null = null;
+  private saveTimer: number | null = null;
   private abortController: AbortController | null = null;
   private destroyed = false;
 
@@ -112,7 +112,7 @@ export class GraphExtractor {
     this.abortController?.abort();
 
     if (this.saveTimer) {
-      clearTimeout(this.saveTimer);
+      window.clearTimeout(this.saveTimer);
       this.saveTimer = null;
     }
   }
@@ -299,8 +299,8 @@ export class GraphExtractor {
   }
 
   private scheduleSave(): void {
-    if (this.saveTimer) clearTimeout(this.saveTimer);
-    this.saveTimer = setTimeout(() => {
+    if (this.saveTimer) window.clearTimeout(this.saveTimer);
+    this.saveTimer = window.setTimeout(() => {
       this.saveTimer = null;
       this.onSave();
     }, SAVE_DEBOUNCE_MS);
@@ -359,7 +359,7 @@ export function parseExtractionResponse(text: string): ExtractionResult | null {
 
 /** Yield to the main thread to keep the UI responsive. */
 function yieldToMain(): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, 0));
+  return new Promise((resolve) => window.setTimeout(resolve, 0));
 }
 
 /** Simple glob matching supporting `*` and `**` patterns. */

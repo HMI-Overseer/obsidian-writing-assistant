@@ -44,7 +44,7 @@ export class InlineMessageEditor {
       attr: { type: "button" },
     });
 
-    requestAnimationFrame(() => {
+    window.requestAnimationFrame(() => {
       this.autoResize();
       this.textareaEl?.focus();
     });

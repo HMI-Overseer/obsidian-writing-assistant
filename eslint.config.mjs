@@ -32,6 +32,7 @@ export default tseslint.config(
       "@typescript-eslint/explicit-function-return-type": "off",
       "no-console": ["warn", { allow: ["error", "warn"] }],
       "import/no-extraneous-dependencies": "error",
+      "obsidianmd/prefer-window-timers": "error",
 
       // Staged. Options are written out only where a severity-only override would inherit an
       // unwanted one; see the doc's Gotchas.

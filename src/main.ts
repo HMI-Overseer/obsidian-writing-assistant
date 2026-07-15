@@ -59,7 +59,7 @@ export default class WritingAssistantChat extends Plugin {
         }
 
         this.activateChatView().then(() => {
-          setTimeout(() => {
+          window.setTimeout(() => {
             const leaves = this.app.workspace.getLeavesOfType(VIEW_TYPE_CHAT);
             if (leaves.length > 0) {
               const view = leaves[0].view as ChatView;
@@ -102,7 +102,7 @@ export default class WritingAssistantChat extends Plugin {
                 const expanded = expandCommandTemplate(command.prompt, { selection, noteText });
 
                 await this.activateChatView();
-                setTimeout(async () => {
+                window.setTimeout(async () => {
                   const leaves = this.app.workspace.getLeavesOfType(VIEW_TYPE_CHAT);
                   if (leaves.length > 0) {
                     await (leaves[0].view as ChatView).sendCommand(expanded);

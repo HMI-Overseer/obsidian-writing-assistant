@@ -444,7 +444,7 @@ export class SdkSessionRegistry {
    * tombstone present always implies no live session.
    */
   private readonly tombstones = new Map<string, SessionRebuildReason>();
-  private sweepTimer: ReturnType<typeof setInterval> | null = null;
+  private sweepTimer: number | null = null;
 
   constructor(private readonly idleMs: number = DEFAULT_IDLE_MS) {}
 
@@ -691,14 +691,12 @@ export class SdkSessionRegistry {
 
   private ensureSweeping(): void {
     if (this.sweepTimer) return;
-    this.sweepTimer = setInterval(() => this.evictIdle(), SWEEP_INTERVAL_MS);
-    // Don't let the sweep timer hold the process open (no-op in the browser).
-    (this.sweepTimer as { unref?: () => void }).unref?.();
+    this.sweepTimer = window.setInterval(() => this.evictIdle(), SWEEP_INTERVAL_MS);
   }
 
   private stopSweeping(): void {
     if (this.sweepTimer) {
-      clearInterval(this.sweepTimer);
+      window.clearInterval(this.sweepTimer);
       this.sweepTimer = null;
     }
   }

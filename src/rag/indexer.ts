@@ -69,14 +69,14 @@ export class VaultIndexer {
   private readonly onSave: () => void;
   private readonly onStale: () => void;
 
-  private saveTimer: ReturnType<typeof setTimeout> | null = null;
+  private saveTimer: number | null = null;
   private abortController: AbortController | null = null;
   private eventRefs: Array<ReturnType<App["vault"]["on"]>> = [];
   private destroyed = false;
   private watching = false;
 
   /** Per-file debounce timers for watcher-triggered (re-)indexing. */
-  private readonly indexTimers = new Map<string, ReturnType<typeof setTimeout>>();
+  private readonly indexTimers = new Map<string, number>();
   /** Paths with an index run currently in flight (read → embed → store). */
   private readonly indexing = new Set<string>();
   /** Paths that changed again mid-flight and must be re-indexed once that run ends. */
@@ -139,14 +139,14 @@ export class VaultIndexer {
     this.eventRefs = [];
 
     for (const timer of this.indexTimers.values()) {
-      clearTimeout(timer);
+      window.clearTimeout(timer);
     }
     this.indexTimers.clear();
     this.dirty.clear();
     this.deferred.clear();
 
     if (this.saveTimer) {
-      clearTimeout(this.saveTimer);
+      window.clearTimeout(this.saveTimer);
       this.saveTimer = null;
     }
   }
@@ -305,10 +305,10 @@ export class VaultIndexer {
     if (this.destroyed) return;
     const path = file.path;
     const existing = this.indexTimers.get(path);
-    if (existing) clearTimeout(existing);
+    if (existing) window.clearTimeout(existing);
     this.indexTimers.set(
       path,
-      setTimeout(() => {
+      window.setTimeout(() => {
         this.indexTimers.delete(path);
         void this.indexFileGuarded(file);
       }, MODIFY_DEBOUNCE_MS),
@@ -319,7 +319,7 @@ export class VaultIndexer {
   private clearPendingIndex(path: string): void {
     const timer = this.indexTimers.get(path);
     if (timer) {
-      clearTimeout(timer);
+      window.clearTimeout(timer);
       this.indexTimers.delete(path);
     }
     this.dirty.delete(path);
@@ -461,8 +461,8 @@ export class VaultIndexer {
   }
 
   private scheduleSave(): void {
-    if (this.saveTimer) clearTimeout(this.saveTimer);
-    this.saveTimer = setTimeout(() => {
+    if (this.saveTimer) window.clearTimeout(this.saveTimer);
+    this.saveTimer = window.setTimeout(() => {
       this.saveTimer = null;
       this.onSave();
     }, SAVE_DEBOUNCE_MS);
@@ -471,7 +471,7 @@ export class VaultIndexer {
 
 /** Yield to the main thread to keep the UI responsive. */
 function yieldToMain(): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, 0));
+  return new Promise((resolve) => window.setTimeout(resolve, 0));
 }
 
 /** Simple glob matching supporting `*` and `**` patterns. */

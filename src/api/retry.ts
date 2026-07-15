@@ -64,10 +64,10 @@ function delay(ms: number, signal?: AbortSignal): Promise<void> {
       return;
     }
 
-    const timer = setTimeout(resolve, ms);
+    const timer = window.setTimeout(resolve, ms);
 
     signal?.addEventListener("abort", () => {
-      clearTimeout(timer);
+      window.clearTimeout(timer);
       reject(signal.reason ?? new Error("Aborted"));
     }, { once: true });
   });

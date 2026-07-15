@@ -47,7 +47,7 @@ export class ProfileSettingsPopover {
    * can be edited (or copied from) without switching models.
    */
   private viewedProvider: ProviderOption | null = null;
-  private saveTimer: ReturnType<typeof setTimeout> | null = null;
+  private saveTimer: number | null = null;
   private readonly onBtnClick: (event: MouseEvent) => void;
   private readonly onPopoverClick: (event: MouseEvent) => void;
 
@@ -423,9 +423,9 @@ export class ProfileSettingsPopover {
 
   private debounceSave(fn: () => void): void {
     if (this.saveTimer !== null) {
-      clearTimeout(this.saveTimer);
+      window.clearTimeout(this.saveTimer);
     }
-    this.saveTimer = setTimeout(() => {
+    this.saveTimer = window.setTimeout(() => {
       this.saveTimer = null;
       fn();
     }, 500);
@@ -433,7 +433,7 @@ export class ProfileSettingsPopover {
 
   private flushPendingSave(): void {
     if (this.saveTimer !== null) {
-      clearTimeout(this.saveTimer);
+      window.clearTimeout(this.saveTimer);
       this.saveTimer = null;
       if (this.promptTextareaEl) {
         this.emitProfileUpdate({ systemPrompt: this.promptTextareaEl.value });

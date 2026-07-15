@@ -22,7 +22,7 @@ const SEARCH_DEBOUNCE_MS = 100;
 export class ContextPickerPopover {
   private popoverOpen = false;
   private searchMode = false;
-  private searchDebounce: ReturnType<typeof setTimeout> | null = null;
+  private searchDebounce: number | null = null;
   private readonly onBtnClick: (event: MouseEvent) => void;
   private readonly onPopoverClick: (event: MouseEvent) => void;
 
@@ -60,7 +60,7 @@ export class ContextPickerPopover {
 
   close(): void {
     if (this.searchDebounce !== null) {
-      clearTimeout(this.searchDebounce);
+      window.clearTimeout(this.searchDebounce);
       this.searchDebounce = null;
     }
     this.searchMode = false;
@@ -77,7 +77,7 @@ export class ContextPickerPopover {
 
   destroy(): void {
     if (this.searchDebounce !== null) {
-      clearTimeout(this.searchDebounce);
+      window.clearTimeout(this.searchDebounce);
     }
     this.close();
     this.refs.contextAddBtnEl.removeEventListener("click", this.onBtnClick);
@@ -228,7 +228,7 @@ export class ContextPickerPopover {
     this.renderResults("", resultsEl);
 
     // Focus after the element lands in the DOM
-    setTimeout(() => input.focus(), 0);
+    window.setTimeout(() => input.focus(), 0);
 
     // Escape → close the popover entirely
     input.addEventListener("keydown", (e: KeyboardEvent) => {
@@ -240,8 +240,8 @@ export class ContextPickerPopover {
 
     // Live search with debounce
     input.addEventListener("input", () => {
-      if (this.searchDebounce !== null) clearTimeout(this.searchDebounce);
-      this.searchDebounce = setTimeout(() => {
+      if (this.searchDebounce !== null) window.clearTimeout(this.searchDebounce);
+      this.searchDebounce = window.setTimeout(() => {
         resultsEl.empty();
         this.renderResults(input.value, resultsEl);
         this.searchDebounce = null;

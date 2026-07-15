@@ -31,6 +31,7 @@ export default tseslint.config(
       "@typescript-eslint/no-non-null-assertion": "warn",
       "@typescript-eslint/explicit-function-return-type": "off",
       "no-console": ["warn", { allow: ["error", "warn"] }],
+      "import/no-extraneous-dependencies": "error",
 
       // Staged. Options are written out only where a severity-only override would inherit an
       // unwanted one; see the doc's Gotchas.
@@ -57,7 +58,7 @@ export default tseslint.config(
   {
     files: ["package.json"],
     rules: {
-      "depend/ban-dependencies": "warn",
+      "depend/ban-dependencies": "error",
     },
   },
   {

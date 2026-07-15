@@ -56,12 +56,6 @@ export default tseslint.config(
     },
   },
   {
-    files: ["package.json"],
-    rules: {
-      "depend/ban-dependencies": "error",
-    },
-  },
-  {
     ignores: ["main.js", "node_modules/", "esbuild.config.mjs"],
   }
 );

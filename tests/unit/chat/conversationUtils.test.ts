@@ -252,10 +252,13 @@ describe("normalizeConversation, editProposal / appliedEdit validation", () => {
       id: "msg-1",
       role: "assistant",
       content: "Edit response",
-      editProposal: makeEditProposal() as ConversationMessage["editProposal"],
     };
 
     const raw = jsonRoundTrip(makeConversation([msg])) as Record<string, unknown>;
+    // The pre-ADR-0010 singular field exists only in the on-disk shape now (retired from
+    // the live type, ADR-0027); inject it onto the raw persisted record to test migration.
+    (raw.messages as Array<Record<string, unknown>>)[0].editProposal = makeEditProposal();
+
     const result = normalizeConversation(raw);
     const normalized = result!.messages[0];
 
@@ -326,11 +329,14 @@ describe("normalizeConversation, editProposal / appliedEdit validation", () => {
       id: "msg-1",
       role: "assistant",
       content: "Edit response",
-      editProposal: makeEditProposal() as ConversationMessage["editProposal"],
-      appliedEdit: makeAppliedEditRecord() as ConversationMessage["appliedEdit"],
     };
 
     const raw = jsonRoundTrip(makeConversation([msg])) as Record<string, unknown>;
+    // Legacy singular fields live only in the on-disk shape (retired, ADR-0027).
+    const rawMessages = raw.messages as Array<Record<string, unknown>>;
+    rawMessages[0].editProposal = makeEditProposal();
+    rawMessages[0].appliedEdit = makeAppliedEditRecord();
+
     const result = normalizeConversation(raw);
     const normalized = result!.messages[0];
 

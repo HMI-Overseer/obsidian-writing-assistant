@@ -365,19 +365,15 @@ export interface ConversationMessage {
    * Present when this assistant message contains document edit proposals, one per
    * edited file (ADR-0010: a turn may edit N files). Each file stays a self-contained
    * single-file {@link EditProposal}; the array is the turn's collection of them.
+   *
+   * Legacy pre-ADR-0010 conversations stored a single `editProposal` on disk; that
+   * on-disk shape is folded into this array at load time (see `migrateEditProposals`),
+   * so an in-memory message is always plural. The legacy field was retired from this
+   * type once the migration was proven the single load funnel (ADR-0027).
    */
   editProposals?: EditProposal[];
   /** Present after edits from this message have been applied, one record per edited file. */
   appliedEdits?: AppliedEditRecord[];
-  /**
-   * @deprecated Legacy single-file fields (pre-ADR-0010). Read only by the load-time
-   * migration ({@link ../chat/conversation/conversationUtils}), which folds them into
-   * {@link editProposals} / {@link appliedEdits}. Never written by new code; use the
-   * arrays (via `editProposalsOf` / `appliedEditsOf`) everywhere else.
-   */
-  editProposal?: EditProposal;
-  /** @deprecated Legacy single-file field (pre-ADR-0010); migrated into {@link appliedEdits}. */
-  appliedEdit?: AppliedEditRecord;
   /** Present when this assistant message contains vault-operation proposals (ADR-0002). */
   vaultOpProposal?: VaultOperationProposal;
   /** Present after vault ops from this message have been applied (undo = inverses in reverse). */

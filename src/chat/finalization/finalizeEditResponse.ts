@@ -415,21 +415,18 @@ function makeEditCallbacks(store: ChatSessionStore, proposal: EditProposal): Edi
       const msg = find(updated.id);
       if (!msg) return;
       msg.editProposals = editProposalsOf(msg).map((p) => (p.id === updated.id ? updated : p));
-      msg.editProposal = undefined; // migrate off the legacy singular once we rewrite.
       void store.persistActiveConversation();
     },
     onApplied: (record) => {
       const msg = find(proposal.id);
       if (!msg) return;
       msg.appliedEdits = upsertAppliedEdit(appliedEditsOf(msg), record);
-      msg.appliedEdit = undefined;
       void store.persistActiveConversation();
     },
     onUndone: () => {
       const msg = find(proposal.id);
       if (!msg) return;
       msg.appliedEdits = appliedEditsOf(msg).filter((r) => r.proposalId !== proposal.id);
-      msg.appliedEdit = undefined;
       void store.persistActiveConversation();
     },
   };

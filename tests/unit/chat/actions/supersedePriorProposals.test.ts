@@ -13,7 +13,7 @@ function editMsg(...statuses: EditStatus[]): ConversationMessage {
     prose: "",
     hunks: statuses.map((status, i) => ({ id: `h${i}`, status })),
   } as unknown as EditProposal;
-  return { id: "m1", role: "assistant", content: "", editProposal: proposal };
+  return { id: "m1", role: "assistant", content: "", editProposals: [proposal] };
 }
 
 function vaultMsg(
@@ -44,7 +44,7 @@ describe("supersedePriorProposals", () => {
     const changed = supersedePriorProposals([msg]);
 
     expect(changed).toBe(true);
-    expect(msg.editProposal?.hunks.map((h) => h.status)).toEqual([
+    expect(msg.editProposals?.[0].hunks.map((h) => h.status)).toEqual([
       "rejected",
       "accepted",
       "rejected",
@@ -102,7 +102,7 @@ describe("supersedePriorProposals", () => {
     const changed = supersedePriorProposals(history);
 
     expect(changed).toBe(true);
-    expect(history[0].editProposal?.hunks[0].status).toBe("rejected");
+    expect(history[0].editProposals?.[0].hunks[0].status).toBe("rejected");
     expect(history[1].vaultOpProposal?.ops[0].status).toBe("rejected");
     expect(history[1].vaultOpProposal?.historical).toBe(true);
   });

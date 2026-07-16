@@ -37,10 +37,10 @@ export default tseslint.config(
       "obsidianmd/prefer-active-doc": "error",
       "no-restricted-globals": "error",
       "obsidianmd/prefer-create-el": "error",
+      "@typescript-eslint/no-deprecated": "error",
 
       // Staged. Options are written out only where a severity-only override would inherit an
       // unwanted one; see the doc's Gotchas.
-      "@typescript-eslint/no-deprecated": "warn",
       "@typescript-eslint/no-explicit-any": ["warn", { fixToUnknown: false }],
     },
   },

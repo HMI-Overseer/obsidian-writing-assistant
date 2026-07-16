@@ -307,20 +307,19 @@ function migrateAppliedEdits(message: Record<string, unknown>): AppliedEditRecor
 }
 
 /**
- * All edit proposals on an in-memory message (ADR-0010), folding the legacy singular
- * field so read sites need one accessor regardless of a message's provenance
- * (migrated on load, or freshly built as an array). Prefer this over touching the
- * fields directly.
+ * All edit proposals on an in-memory message (ADR-0010). An in-memory message is
+ * always plural: the load-time migration ({@link migrateEditProposals}) folds any
+ * legacy pre-ADR-0010 singular field into the array at the persistence boundary, and
+ * new code only ever writes the array (the singular field was retired from the type,
+ * ADR-0027). Kept as the canonical accessor so read sites need not repeat the guard.
  */
 export function editProposalsOf(message: ConversationMessage): EditProposal[] {
-  if (message.editProposals?.length) return message.editProposals;
-  return message.editProposal ? [message.editProposal] : [];
+  return message.editProposals ?? [];
 }
 
 /** The applied-edit-record sibling of {@link editProposalsOf}. */
 export function appliedEditsOf(message: ConversationMessage): AppliedEditRecord[] {
-  if (message.appliedEdits?.length) return message.appliedEdits;
-  return message.appliedEdit ? [message.appliedEdit] : [];
+  return message.appliedEdits ?? [];
 }
 
 function isValidVaultOpProposal(value: unknown): boolean {

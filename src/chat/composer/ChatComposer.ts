@@ -180,7 +180,9 @@ export class ChatComposer {
       new Notice("The active model does not support image input.");
       return;
     }
-    const input = document.createElement("input");
+    // Create the throwaway file input in the view's own document so a popped-out
+    // view opens the native picker against its own window (ADR-0024, Phase 7).
+    const input = this.refs.textareaEl.ownerDocument.createElement("input");
     input.type = "file";
     input.accept = "image/jpeg,image/png,image/gif,image/webp";
     input.multiple = true;

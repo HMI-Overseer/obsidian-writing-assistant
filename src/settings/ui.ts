@@ -309,11 +309,19 @@ export function createModelSelector(
   // (added in open, removed in close) so the listener never outlives the
   // dropdown: this settings helper has no Component to hang registerDomEvent on,
   // and a never-removed document listener accumulates across settings re-renders.
+  //
+  // Bind to the container's own document, not the bare global: this selector is
+  // reused inside the chat composer (KnowledgePopover), whose leaf can be popped
+  // into a separate window (ADR-0024, Phase 7). Capturing it once also guarantees
+  // the add and the two removes target the identical Document reference, so the
+  // click-away listener can never be stranded on a different document than it was
+  // added to.
+  const doc = containerEl.ownerDocument;
   const onDocClick = (): void => { if (isOpen) close(); };
 
   function close(): void {
     if (closeOpenModelSelector === close) closeOpenModelSelector = null;
-    document.removeEventListener("click", onDocClick);
+    doc.removeEventListener("click", onDocClick);
     dropdownEl.addClass("lmsa-hidden");
     isOpen = false;
     btn.removeClass("is-active");
@@ -324,7 +332,7 @@ export function createModelSelector(
   function open(): void {
     closeOpenModelSelector?.();
     closeOpenModelSelector = close;
-    document.addEventListener("click", onDocClick);
+    doc.addEventListener("click", onDocClick);
     dropdownEl.empty();
     dropdownEl.removeClass("lmsa-hidden");
     isOpen = true;
@@ -400,7 +408,7 @@ export function createModelSelector(
     destroy() {
       clearAttention();
       if (closeOpenModelSelector === close) closeOpenModelSelector = null;
-      document.removeEventListener("click", onDocClick);
+      doc.removeEventListener("click", onDocClick);
     },
   };
 }

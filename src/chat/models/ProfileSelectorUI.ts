@@ -110,7 +110,7 @@ export class ProfileSelectorUI {
 
     const inline = row.insertAdjacentElement(
       "afterend",
-      document.createElement("div"),
+      row.ownerDocument.createElement("div"),
     ) as HTMLElement;
     inline.className = "lmsa-profile-delete-inline";
 
@@ -149,7 +149,7 @@ export class ProfileSelectorUI {
 
     const inline = row.insertAdjacentElement(
       "afterend",
-      document.createElement("div"),
+      row.ownerDocument.createElement("div"),
     ) as HTMLElement;
     inline.className = "lmsa-profile-create-inline";
 

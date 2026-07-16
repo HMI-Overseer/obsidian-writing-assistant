@@ -34,14 +34,27 @@ export default tseslint.config(
       "import/no-extraneous-dependencies": "error",
       "obsidianmd/prefer-window-timers": "error",
       "@typescript-eslint/require-await": "error",
+      "obsidianmd/prefer-active-doc": "error",
 
       // Staged. Options are written out only where a severity-only override would inherit an
       // unwanted one; see the doc's Gotchas.
       "@typescript-eslint/no-deprecated": "warn",
       "@typescript-eslint/no-explicit-any": ["warn", { fixToUnknown: false }],
-      "obsidianmd/prefer-active-doc": "warn",
       "obsidianmd/prefer-create-el": "warn",
       "no-restricted-globals": "warn",
+    },
+  },
+  {
+    // ADR-0024 class 5 (the finding is false). prefer-active-doc flags the `document`
+    // key of the `BenchmarkTestCase.document: string` interface field: the rule skips
+    // object-literal Property keys but not TS TSPropertySignature keys, so it mistakes a
+    // type-level field name for a global-`document` reference. There is no DOM access here
+    // to redirect; obeying it would rename a correctly-named data field. Kept as a scoped
+    // override rather than suppressed inline (ADR-0024 mechanism; inline disable is itself
+    // an error under eslint-comments/no-restricted-disable). See lint-configuration.md.
+    files: ["src/settings/benchmark/types.ts"],
+    rules: {
+      "obsidianmd/prefer-active-doc": "off",
     },
   },
   {

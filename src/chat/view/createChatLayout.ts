@@ -7,11 +7,16 @@ const GLASS_FILTER_ID = "lmsa-glass";
 function ensureGlassFilter(root: HTMLElement): void {
   if (root.querySelector(`#${GLASS_FILTER_ID}`)) return;
 
-  const svg = document.createElementNS(SVG_NS, "svg");
+  // Build against the view's own document (root.ownerDocument), not the bare global
+  // `document`: if the leaf is dragged into a popout window the filter must be created
+  // in that window's document, not the main window's. See ADR-0024 and Phase 7.
+  const doc = root.ownerDocument;
+
+  const svg = doc.createElementNS(SVG_NS, "svg");
   svg.setAttribute("role", "presentation");
   svg.classList.add("lmsa-hidden");
 
-  const filter = document.createElementNS(SVG_NS, "filter");
+  const filter = doc.createElementNS(SVG_NS, "filter");
   filter.setAttribute("id", GLASS_FILTER_ID);
   filter.setAttribute("x", "-50%");
   filter.setAttribute("y", "-50%");
@@ -19,19 +24,19 @@ function ensureGlassFilter(root: HTMLElement): void {
   filter.setAttribute("height", "200%");
   filter.setAttribute("primitiveUnits", "objectBoundingBox");
 
-  const turbulence = document.createElementNS(SVG_NS, "feTurbulence");
+  const turbulence = doc.createElementNS(SVG_NS, "feTurbulence");
   turbulence.setAttribute("type", "fractalNoise");
   turbulence.setAttribute("baseFrequency", "0.50 0.99");
   turbulence.setAttribute("numOctaves", "2");
   turbulence.setAttribute("seed", "5");
   turbulence.setAttribute("result", "map");
 
-  const blur = document.createElementNS(SVG_NS, "feGaussianBlur");
+  const blur = doc.createElementNS(SVG_NS, "feGaussianBlur");
   blur.setAttribute("in", "SourceGraphic");
   blur.setAttribute("stdDeviation", "0.1");
   blur.setAttribute("result", "blur");
 
-  const displacement = document.createElementNS(SVG_NS, "feDisplacementMap");
+  const displacement = doc.createElementNS(SVG_NS, "feDisplacementMap");
   displacement.setAttribute("in", "blur");
   displacement.setAttribute("in2", "map");
   displacement.setAttribute("scale", "0.1");
@@ -140,12 +145,16 @@ export function createChatLayout(contentEl: HTMLElement): ChatLayoutRefs {
 
   const contextCapacityEl = composerFooterLeft.createDiv({ cls: "lmsa-chat-composer-context-capacity lmsa-hidden" });
 
-  const ringSvg = document.createElementNS(SVG_NS, "svg");
+  // Same reasoning as the glass filter above: reach the view's own document so the
+  // ring's SVG nodes are built in the window the leaf actually lives in.
+  const doc = contentEl.ownerDocument;
+
+  const ringSvg = doc.createElementNS(SVG_NS, "svg");
   ringSvg.classList.add("lmsa-context-ring-svg");
   ringSvg.setAttribute("viewBox", "0 0 32 32");
   ringSvg.setAttribute("role", "presentation");
 
-  const trackCircle = document.createElementNS(SVG_NS, "circle");
+  const trackCircle = doc.createElementNS(SVG_NS, "circle");
   trackCircle.classList.add("lmsa-context-ring-track");
   trackCircle.setAttribute("cx", "16");
   trackCircle.setAttribute("cy", "16");
@@ -153,7 +162,7 @@ export function createChatLayout(contentEl: HTMLElement): ChatLayoutRefs {
   trackCircle.setAttribute("fill", "none");
   trackCircle.setAttribute("stroke-width", "3");
 
-  const fillCircle = document.createElementNS(SVG_NS, "circle");
+  const fillCircle = doc.createElementNS(SVG_NS, "circle");
   fillCircle.classList.add("lmsa-context-ring-fill");
   fillCircle.setAttribute("cx", "16");
   fillCircle.setAttribute("cy", "16");

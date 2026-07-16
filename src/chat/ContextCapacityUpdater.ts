@@ -79,7 +79,10 @@ export class ContextCapacityUpdater {
     this.fillCircle = capacityEl.querySelector(".lmsa-context-ring-fill");
     this.ringLabelEl = capacityEl.querySelector(".lmsa-context-ring-label");
 
-    this.tooltipEl = document.body.createDiv({ cls: "lmsa-context-ring-tooltip" });
+    // Mount on <body> deliberately, to escape the composer footer's clipping context,
+    // but on the view's own document body so a popped-out view puts the tooltip in its
+    // own window rather than the main one (ADR-0024, Phase 7).
+    this.tooltipEl = capacityEl.ownerDocument.body.createDiv({ cls: "lmsa-context-ring-tooltip" });
     this.tooltipContextEl = this.tooltipEl.createEl("span", { cls: "lmsa-context-ring-tooltip-context" });
     this.tooltipUsageEl = this.tooltipEl.createEl("span", { cls: "lmsa-context-ring-tooltip-usage lmsa-hidden" });
 

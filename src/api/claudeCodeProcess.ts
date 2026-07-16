@@ -2,7 +2,7 @@ import { spawn } from "child_process";
 import type { ChildProcess } from "child_process";
 import { existsSync, readFileSync } from "fs";
 import * as path from "path";
-import { createAbortError } from "./httpTransport";
+import { createAbortError, throwIfError } from "./httpTransport";
 
 let cachedBinary: string | null = null;
 
@@ -386,5 +386,5 @@ export async function* streamClaudeCode(
     if (child && child.exitCode === null) child.kill();
   }
 
-  if (error) throw error;
+  throwIfError(error);
 }

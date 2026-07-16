@@ -13,6 +13,18 @@ export function formatError(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
+/**
+ * Throws `error` when it is non-null, otherwise returns. The streaming transports
+ * accumulate a possible failure into a closure-assigned `let error: Error | null`, which
+ * defeats control-flow narrowing at the throw site: TypeScript reads the `= null`
+ * initializer, so a direct `if (error) throw error` trips `only-throw-error` (the
+ * constrained type still includes `null`). Passing the value through a parameter rebinds
+ * it to a fresh `Error | null` that narrows cleanly, with no runtime change.
+ */
+export function throwIfError(error: Error | null): void {
+  if (error) throw error;
+}
+
 export function createModelListError(nativeError: unknown, openAIError: unknown): Error {
   return new Error(
     `Failed to fetch models from LM Studio. Native /api/v1/models error: ${formatError(

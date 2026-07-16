@@ -39,9 +39,6 @@ export default tseslint.config(
       // unwanted one; see the doc's Gotchas.
       "@typescript-eslint/no-deprecated": "warn",
       "@typescript-eslint/no-explicit-any": ["warn", { fixToUnknown: false }],
-      "@typescript-eslint/only-throw-error": "warn",
-      "@typescript-eslint/prefer-promise-reject-errors": "warn",
-      "@typescript-eslint/no-redundant-type-constituents": "warn",
       "obsidianmd/prefer-active-doc": "warn",
       "obsidianmd/prefer-create-el": "warn",
       "no-restricted-globals": "warn",

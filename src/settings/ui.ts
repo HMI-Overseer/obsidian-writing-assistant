@@ -131,7 +131,7 @@ export class Button {
     return this;
   }
 
-  onClick(cb: (evt: MouseEvent) => unknown | Promise<unknown>): this {
+  onClick(cb: (evt: MouseEvent) => unknown): this {
     this.buttonEl.addEventListener("click", cb);
     return this;
   }

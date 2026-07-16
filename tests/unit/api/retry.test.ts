@@ -124,6 +124,44 @@ describe("withRetry", () => {
     expect(fn).toHaveBeenCalledTimes(1);
   });
 
+  it("rejects with an Error even when the abort reason is not an Error", async () => {
+    // `AbortSignal.reason` is typed `any`, so a caller that aborts with a non-Error
+    // value would otherwise reject the backoff delay with that raw value. Downstream
+    // abort detection is `error instanceof Error && error.name === "AbortError"`, so a
+    // string reason must not leak out as the rejection.
+    const controller = new AbortController();
+    const fn = vi.fn().mockRejectedValue(new Error("HTTP 500"));
+
+    const promise = withRetry(fn, {
+      maxAttempts: 5,
+      initialDelayMs: 10000,
+      signal: controller.signal,
+    });
+
+    setTimeout(() => controller.abort("stopped by the user"), 10);
+
+    await expect(promise).rejects.toBeInstanceOf(Error);
+    expect(fn).toHaveBeenCalledTimes(1);
+  });
+
+  it("preserves the AbortError reason when the signal is aborted without a value", async () => {
+    // Default abort (no argument) yields a DOMException named "AbortError", which is an
+    // Error. The rejection must pass it through unchanged so isRetryable/isAbortError see it.
+    const controller = new AbortController();
+    const fn = vi.fn().mockRejectedValue(new Error("HTTP 500"));
+
+    const promise = withRetry(fn, {
+      maxAttempts: 5,
+      initialDelayMs: 10000,
+      signal: controller.signal,
+    });
+
+    setTimeout(() => controller.abort(), 10);
+
+    await expect(promise).rejects.toMatchObject({ name: "AbortError" });
+    expect(fn).toHaveBeenCalledTimes(1);
+  });
+
   it("uses exponential backoff", async () => {
     const delays: number[] = [];
     const realSetTimeout = globalThis.setTimeout;

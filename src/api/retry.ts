@@ -60,7 +60,7 @@ export function isRetryable(error: unknown): boolean {
 function delay(ms: number, signal?: AbortSignal): Promise<void> {
   return new Promise((resolve, reject) => {
     if (signal?.aborted) {
-      reject(signal.reason ?? new Error("Aborted"));
+      reject(signal.reason instanceof Error ? signal.reason : new Error("Aborted"));
       return;
     }
 
@@ -68,7 +68,7 @@ function delay(ms: number, signal?: AbortSignal): Promise<void> {
 
     signal?.addEventListener("abort", () => {
       window.clearTimeout(timer);
-      reject(signal.reason ?? new Error("Aborted"));
+      reject(signal.reason instanceof Error ? signal.reason : new Error("Aborted"));
     }, { once: true });
   });
 }

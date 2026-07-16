@@ -1,6 +1,6 @@
 import * as http from "http";
 import * as https from "https";
-import { createAbortError } from "./httpTransport";
+import { createAbortError, throwIfError } from "./httpTransport";
 
 /** Extracts a text delta from a parsed SSE JSON payload. Returns null if the event is not a text delta. */
 export type DeltaExtractor = (json: unknown) => string | null;
@@ -171,7 +171,7 @@ export async function* streamNode(
     signal?.removeEventListener("abort", abortHandler);
   }
 
-  if (error) throw error;
+  throwIfError(error);
 }
 
 export async function* streamFetch(

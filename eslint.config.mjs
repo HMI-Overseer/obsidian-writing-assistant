@@ -35,13 +35,26 @@ export default tseslint.config(
       "obsidianmd/prefer-window-timers": "error",
       "@typescript-eslint/require-await": "error",
       "obsidianmd/prefer-active-doc": "error",
+      "no-restricted-globals": "error",
 
       // Staged. Options are written out only where a severity-only override would inherit an
       // unwanted one; see the doc's Gotchas.
       "@typescript-eslint/no-deprecated": "warn",
       "@typescript-eslint/no-explicit-any": ["warn", { fixToUnknown: false }],
       "obsidianmd/prefer-create-el": "warn",
-      "no-restricted-globals": "warn",
+    },
+  },
+  {
+    // ADR-0025 (won't-fix): the two provider network paths, fetchRequest (non-streaming)
+    // and streamFetch (streaming), must forward an AbortSignal that the composer Stop
+    // control depends on. RequestUrlParam cannot express it (no signal, no cancellation),
+    // and requestUrl buffers the whole body, which breaks SSE. CORS is already handled by
+    // the separate bypassCors -> nodeRequest path, not requestUrl. Kept as a files-scoped
+    // override (ADR-0024 mechanism; inline disable is itself an error under
+    // eslint-comments/no-restricted-disable). See lint-configuration.md.
+    files: ["src/api/httpTransport.ts", "src/api/streamingTransport.ts"],
+    rules: {
+      "no-restricted-globals": "off",
     },
   },
   {

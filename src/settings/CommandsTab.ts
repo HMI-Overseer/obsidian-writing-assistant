@@ -21,7 +21,7 @@ export function renderCommandsTab(
   );
 
   const note = library.bodyEl.createDiv({ cls: "lmsa-settings-note" });
-  note.createEl("div", {
+  note.createDiv({
     cls: "lmsa-settings-note-title",
     text: "Prompt variables",
   });

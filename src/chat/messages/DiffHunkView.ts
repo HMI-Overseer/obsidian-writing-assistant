@@ -152,7 +152,9 @@ export class DiffHunkView {
   } {
     // Headerless (vault-op write preview): no chrome, just the diff body below. The
     // status/actions fields still need a value for the (unused here) lifecycle setters,
-    // so hand back a detached placeholder rather than null.
+    // so hand back a detached placeholder rather than null. Raw createElement on the
+    // view's own document: createEl cannot build a detached element on a non-main
+    // document (ADR-0024 / Phase 7 for the document target, ADR-0026 for the helper).
     if (!this.showHeader) {
       const placeholder = this.containerEl.ownerDocument.createElement("div");
       return { statusEl: placeholder, actionsEl: placeholder, acceptBtn: null, rejectBtn: null };

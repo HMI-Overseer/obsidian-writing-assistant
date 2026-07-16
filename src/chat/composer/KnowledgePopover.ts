@@ -136,7 +136,7 @@ export class KnowledgePopover {
 
     // Toggle row
     const headerRow = section.createDiv({ cls: "lmsa-knowledge-popover-row" });
-    headerRow.createEl("span", { cls: "lmsa-knowledge-popover-label", text: "Vault retrieval" });
+    headerRow.createSpan({ cls: "lmsa-knowledge-popover-label", text: "Vault retrieval" });
     const toggleWrap = headerRow.createDiv({ cls: "lmsa-knowledge-popover-control" });
     const toggle = new Toggle(toggleWrap);
     toggle.onChange((value) => void this.callbacks.onRagToggle(value));
@@ -158,7 +158,7 @@ export class KnowledgePopover {
 
     // Status + action row
     const statusRowEl = section.createDiv({ cls: "lmsa-knowledge-popover-status-row" });
-    const statusEl = statusRowEl.createEl("span", { cls: "lmsa-knowledge-popover-status" });
+    const statusEl = statusRowEl.createSpan({ cls: "lmsa-knowledge-popover-status" });
     const actionBtn = statusRowEl.createEl("button", {
       cls: "lmsa-knowledge-popover-action-btn",
     });
@@ -185,16 +185,16 @@ export class KnowledgePopover {
 
     // Toggle row
     const headerRow = section.createDiv({ cls: "lmsa-knowledge-popover-row" });
-    headerRow.createEl("span", { cls: "lmsa-knowledge-popover-label", text: "Knowledge graph" });
+    headerRow.createSpan({ cls: "lmsa-knowledge-popover-label", text: "Knowledge graph" });
     const toggleWrap = headerRow.createDiv({ cls: "lmsa-knowledge-popover-control" });
     const toggle = new Toggle(toggleWrap);
     toggle.onChange((value) => void this.callbacks.onGraphToggle(value));
 
     // Status
-    const statusEl = section.createEl("span", { cls: "lmsa-knowledge-popover-status" });
+    const statusEl = section.createSpan({ cls: "lmsa-knowledge-popover-status" });
 
     // Hint
-    section.createEl("span", {
+    section.createSpan({
       cls: "lmsa-knowledge-popover-hint",
       text: "Configure graph extraction in plugin settings.",
     });

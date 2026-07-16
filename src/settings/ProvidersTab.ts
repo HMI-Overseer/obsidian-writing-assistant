@@ -121,17 +121,17 @@ function renderProviderCard(
   const iconEl = iconWrap.createDiv({ cls: "lmsa-provider-card-icon" });
   iconEl.addClass(`lmsa-brand-tint-${provider}`);
   setIcon(iconEl, PROVIDER_ICONS[provider]);
-  const dotEl = iconWrap.createEl("span", { cls: "lmsa-provider-status-dot is-unknown" });
+  const dotEl = iconWrap.createSpan({ cls: "lmsa-provider-status-dot is-unknown" });
 
   const infoEl = header.createDiv({ cls: "lmsa-provider-card-info" });
   const nameRow = infoEl.createDiv({ cls: "lmsa-provider-card-name-row" });
-  nameRow.createEl("span", { cls: "lmsa-provider-card-name", text: descriptor.label });
-  const versionEl = nameRow.createEl("span", {
+  nameRow.createSpan({ cls: "lmsa-provider-card-name", text: descriptor.label });
+  const versionEl = nameRow.createSpan({
     cls: "lmsa-provider-card-version lmsa-hidden",
   });
   const statusEl = infoEl.createDiv({ cls: "lmsa-provider-card-status" });
 
-  const chevronEl = header.createEl("span", { cls: "lmsa-provider-card-chevron" });
+  const chevronEl = header.createSpan({ cls: "lmsa-provider-card-chevron" });
   setIcon(chevronEl, "chevron-down");
 
   // The toggle lives in the header but must not toggle expansion.
@@ -373,10 +373,10 @@ function renderLmStudioBody(
   // ── Discovered models ──
   const section = body.createDiv({ cls: "lmsa-provider-models" });
   const headerRow = section.createDiv({ cls: "lmsa-provider-models-header" });
-  headerRow.createEl("span", { cls: "lmsa-provider-models-title", text: "Models" });
+  headerRow.createSpan({ cls: "lmsa-provider-models-title", text: "Models" });
 
   const cache = plugin.settings.lmStudioModelCache;
-  headerRow.createEl("span", { cls: "lmsa-provider-models-meta" });
+  headerRow.createSpan({ cls: "lmsa-provider-models-meta" });
 
   new Button(headerRow).setButtonText("Refresh").onClick(async () => {
     try {
@@ -409,10 +409,10 @@ function renderLmStudioBody(
     info.createDiv({ cls: "lmsa-provider-model-id", text: row.modelId });
 
     const badges = rowEl.createDiv({ cls: "lmsa-provider-model-badges" });
-    badges.createEl("span", { cls: "lmsa-provider-role-chip", text: row.role });
+    badges.createSpan({ cls: "lmsa-provider-role-chip", text: row.role });
     const { state } = plugin.services.modelAvailability.getAvailability(row.modelId, "lmstudio");
     if (state === "loaded" || state === "unloaded") {
-      badges.createEl("span", {
+      badges.createSpan({
         cls: `lmsa-model-state-badge is-${state}`,
         text: state === "loaded" ? "loaded" : "unloaded",
       });
@@ -438,7 +438,7 @@ function renderClaudeCodeBody(
         "conversation and tool-read vault content into ~/.claude under Claude Code's " +
         "own retention policy.",
     );
-  const statusEl = detectionItem.controlEl.createEl("span", {
+  const statusEl = detectionItem.controlEl.createSpan({
     cls: "lmsa-provider-detection",
     text: "Checking…",
   });
@@ -491,8 +491,8 @@ function renderCatalogList(
 
   const section = body.createDiv({ cls: "lmsa-provider-models" });
   const headerRow = section.createDiv({ cls: "lmsa-provider-models-header" });
-  headerRow.createEl("span", { cls: "lmsa-provider-models-title", text: "Models" });
-  headerRow.createEl("span", {
+  headerRow.createSpan({ cls: "lmsa-provider-models-title", text: "Models" });
+  headerRow.createSpan({
     cls: "lmsa-provider-models-meta",
     text: "Built-in catalog",
   });
@@ -505,10 +505,10 @@ function renderCatalogList(
     info.createDiv({ cls: "lmsa-provider-model-id", text: entry.modelId });
 
     const badges = rowEl.createDiv({ cls: "lmsa-provider-model-badges" });
-    badges.createEl("span", { cls: "lmsa-provider-role-chip", text: entry.role });
+    badges.createSpan({ cls: "lmsa-provider-role-chip", text: entry.role });
     const context = formatContextSize(entry.contextWindowSize);
     if (context) {
-      badges.createEl("span", { cls: "lmsa-provider-context-chip", text: context });
+      badges.createSpan({ cls: "lmsa-provider-context-chip", text: context });
     }
   }
 }
@@ -521,8 +521,8 @@ function renderCustomModels(
 ): void {
   const section = body.createDiv({ cls: "lmsa-provider-models" });
   const headerRow = section.createDiv({ cls: "lmsa-provider-models-header" });
-  headerRow.createEl("span", { cls: "lmsa-provider-models-title", text: "Custom models" });
-  headerRow.createEl("span", {
+  headerRow.createSpan({ cls: "lmsa-provider-models-title", text: "Custom models" });
+  headerRow.createSpan({
     cls: "lmsa-provider-models-meta",
     text: "For fine-tunes and ids the catalog does not carry.",
   });
@@ -537,7 +537,7 @@ function renderCustomModels(
       info.createDiv({ cls: "lmsa-provider-model-id", text: entry.modelId });
 
       const badges = rowEl.createDiv({ cls: "lmsa-provider-model-badges" });
-      badges.createEl("span", { cls: "lmsa-provider-role-chip", text: entry.role });
+      badges.createSpan({ cls: "lmsa-provider-role-chip", text: entry.role });
 
       const removeBtn = rowEl.createEl("button", {
         cls: "lmsa-ui-btn lmsa-ui-btn-secondary lmsa-provider-remove-btn",

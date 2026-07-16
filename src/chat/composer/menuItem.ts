@@ -20,12 +20,12 @@ export function renderMenuItem(el: HTMLElement, spec: MenuItemSpec): void {
   const item = el.createDiv({ cls: "lmsa-footer-menu-item" });
   item.toggleClass("is-selected", spec.selected);
   if (spec.icon !== undefined) {
-    const iconEl = item.createEl("span", { cls: "lmsa-footer-menu-item-icon" });
+    const iconEl = item.createSpan({ cls: "lmsa-footer-menu-item-icon" });
     setIcon(iconEl, spec.icon);
   }
-  item.createEl("span", { cls: "lmsa-footer-menu-item-label", text: spec.label });
+  item.createSpan({ cls: "lmsa-footer-menu-item-label", text: spec.label });
   if (spec.selected) {
-    const check = item.createEl("span", { cls: "lmsa-footer-menu-item-check" });
+    const check = item.createSpan({ cls: "lmsa-footer-menu-item-check" });
     setIcon(check, "check");
   }
   item.addEventListener("click", spec.onSelect);

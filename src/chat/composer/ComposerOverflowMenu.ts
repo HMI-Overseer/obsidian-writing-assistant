@@ -157,9 +157,9 @@ export class ComposerOverflowMenu {
     const section = this.createSection(el, "vision");
     const row = section.createDiv({ cls: "lmsa-overflow-menu-status" });
     row.toggleClass("is-active", supported === true);
-    const iconEl = row.createEl("span", { cls: "lmsa-overflow-menu-status-icon" });
+    const iconEl = row.createSpan({ cls: "lmsa-overflow-menu-status-icon" });
     setIcon(iconEl, "eye");
-    row.createEl("span", {
+    row.createSpan({
       cls: "lmsa-overflow-menu-status-label",
       text:
         supported === null

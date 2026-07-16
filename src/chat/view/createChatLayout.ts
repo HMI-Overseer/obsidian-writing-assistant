@@ -56,22 +56,22 @@ export function createChatLayout(contentEl: HTMLElement): ChatLayoutRefs {
   const shell = contentEl.createDiv({ cls: "lmsa-shell" });
 
   const collapsedOverlay = shell.createDiv({ cls: "lmsa-collapsed-overlay" });
-  collapsedOverlay.createEl("div", {
+  collapsedOverlay.createDiv({
     cls: "lmsa-collapsed-text",
     text: "Widen the panel to use the chat",
   });
 
   const header = shell.createDiv({ cls: "lmsa-chat-header" });
   const titleGroup = header.createDiv({ cls: "lmsa-chat-header-copy" });
-  titleGroup.createEl("div", { cls: "lmsa-chat-header-title", text: "Writing assistant chat" });
+  titleGroup.createDiv({ cls: "lmsa-chat-header-title", text: "Writing assistant chat" });
 
   const headerMetaWrap = titleGroup.createDiv({ cls: "lmsa-chat-header-meta-wrap" });
   const headerMetaBtn = headerMetaWrap.createDiv({ cls: "lmsa-chat-header-meta" });
-  const headerMetaLabel = headerMetaBtn.createEl("span", { cls: "lmsa-chat-header-meta-label" });
-  const modelSelectorStatusEl = headerMetaBtn.createEl("span", {
+  const headerMetaLabel = headerMetaBtn.createSpan({ cls: "lmsa-chat-header-meta-label" });
+  const modelSelectorStatusEl = headerMetaBtn.createSpan({
     cls: "lmsa-model-selector-status is-hidden",
   });
-  const headerMetaChevron = headerMetaBtn.createEl("span", { cls: "lmsa-chat-header-meta-chevron" });
+  const headerMetaChevron = headerMetaBtn.createSpan({ cls: "lmsa-chat-header-meta-chevron" });
   setIcon(headerMetaChevron, "chevron-down");
 
   const modelDropdownEl = headerMetaWrap.createDiv({ cls: "lmsa-model-dropdown lmsa-hidden" });
@@ -98,7 +98,7 @@ export function createChatLayout(contentEl: HTMLElement): ChatLayoutRefs {
 
   const messagesPaneEl = shell.createDiv({ cls: "lmsa-messages-pane" });
   const emptyStateEl = messagesPaneEl.createDiv({ cls: "lmsa-empty-view" });
-  emptyStateEl.createEl("div", { cls: "lmsa-empty-title", text: "Start a conversation" });
+  emptyStateEl.createDiv({ cls: "lmsa-empty-title", text: "Start a conversation" });
   // Host for the writing-prompt carousel; EmptyStateCarousel builds the track / slides / nav inside it
   // and owns the slide + auto-advance behaviour (mirrors how ChatHistoryDrawer fills the messages pane).
   const emptyCopyEl = emptyStateEl.createDiv({ cls: "lmsa-empty-copy" });
@@ -110,9 +110,9 @@ export function createChatLayout(contentEl: HTMLElement): ChatLayoutRefs {
     cls: "lmsa-chat-composer-generate-btn lmsa-hidden",
     attr: { "aria-label": "Generate response" },
   });
-  const genBtnIcon = generateResponseBtn.createEl("span", { cls: "lmsa-chat-composer-generate-icon" });
+  const genBtnIcon = generateResponseBtn.createSpan({ cls: "lmsa-chat-composer-generate-icon" });
   setIcon(genBtnIcon, "sparkles");
-  generateResponseBtn.createEl("span", { text: "Generate response" });
+  generateResponseBtn.createSpan({ text: "Generate response" });
 
   const composerPanel = composer.createDiv({ cls: "lmsa-chat-composer-panel" });
   const contextPickerPopoverEl = composerPanel.createDiv({ cls: "lmsa-context-picker-popover lmsa-hidden" });
@@ -186,13 +186,13 @@ export function createChatLayout(contentEl: HTMLElement): ChatLayoutRefs {
     cls: "lmsa-chat-composer-reasoning-pill lmsa-hidden",
     attr: { "aria-label": "Reasoning effort" },
   });
-  const reasoningPillIcon = reasoningPillEl.createEl("span", {
+  const reasoningPillIcon = reasoningPillEl.createSpan({
     cls: "lmsa-chat-composer-reasoning-pill-icon",
   });
   setIcon(reasoningPillIcon, "brain");
-  reasoningPillEl.createEl("span", { cls: "lmsa-chat-composer-reasoning-pill-label" });
+  reasoningPillEl.createSpan({ cls: "lmsa-chat-composer-reasoning-pill-label" });
   // Chevron points up because the level menu opens above the pill.
-  const reasoningPillChevron = reasoningPillEl.createEl("span", {
+  const reasoningPillChevron = reasoningPillEl.createSpan({
     cls: "lmsa-chat-composer-reasoning-pill-chevron",
   });
   setIcon(reasoningPillChevron, "chevron-up");
@@ -222,10 +222,10 @@ export function createChatLayout(contentEl: HTMLElement): ChatLayoutRefs {
     cls: "lmsa-chat-composer-posture-pill",
     attr: { "aria-label": "Edit approval" },
   });
-  posturePillEl.createEl("span", { cls: "lmsa-chat-composer-posture-pill-icon" });
-  posturePillEl.createEl("span", { cls: "lmsa-chat-composer-posture-pill-label" });
+  posturePillEl.createSpan({ cls: "lmsa-chat-composer-posture-pill-icon" });
+  posturePillEl.createSpan({ cls: "lmsa-chat-composer-posture-pill-label" });
   // Chevron points up because the posture menu opens above the pill.
-  const posturePillChevron = posturePillEl.createEl("span", {
+  const posturePillChevron = posturePillEl.createSpan({
     cls: "lmsa-chat-composer-posture-pill-chevron",
   });
   setIcon(posturePillChevron, "chevron-up");

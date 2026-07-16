@@ -83,8 +83,8 @@ export class ContextCapacityUpdater {
     // but on the view's own document body so a popped-out view puts the tooltip in its
     // own window rather than the main one (ADR-0024, Phase 7).
     this.tooltipEl = capacityEl.ownerDocument.body.createDiv({ cls: "lmsa-context-ring-tooltip" });
-    this.tooltipContextEl = this.tooltipEl.createEl("span", { cls: "lmsa-context-ring-tooltip-context" });
-    this.tooltipUsageEl = this.tooltipEl.createEl("span", { cls: "lmsa-context-ring-tooltip-usage lmsa-hidden" });
+    this.tooltipContextEl = this.tooltipEl.createSpan({ cls: "lmsa-context-ring-tooltip-context" });
+    this.tooltipUsageEl = this.tooltipEl.createSpan({ cls: "lmsa-context-ring-tooltip-usage lmsa-hidden" });
 
     capacityEl.addEventListener("mouseenter", this.onEnter);
     capacityEl.addEventListener("mouseleave", this.onLeave);

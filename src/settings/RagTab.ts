@@ -134,7 +134,7 @@ export function renderRagTab(
     const progressRow = statusBlock.createDiv({ cls: "lmsa-index-progress" });
     const progressBarEl = progressRow.createDiv({ cls: "lmsa-index-progress-bar" });
     const progressFillEl = progressBarEl.createDiv({ cls: "lmsa-index-progress-fill" });
-    const progressTextEl = progressRow.createEl("span", { cls: "lmsa-index-progress-text" });
+    const progressTextEl = progressRow.createSpan({ cls: "lmsa-index-progress-text" });
 
     // ── State rendering function ──
     function updateDisplay(state: IndexingState): void {

@@ -191,7 +191,7 @@ export function renderKnowledgeGraphTab(
     const progressRow = statusBlock.createDiv({ cls: "lmsa-index-progress" });
     const progressBarEl = progressRow.createDiv({ cls: "lmsa-index-progress-bar" });
     const progressFillEl = progressBarEl.createDiv({ cls: "lmsa-index-progress-fill" });
-    const progressTextEl = progressRow.createEl("span", { cls: "lmsa-index-progress-text" });
+    const progressTextEl = progressRow.createSpan({ cls: "lmsa-index-progress-text" });
 
     const folderSectionEl = statusBlock.createDiv({ cls: "lmsa-kg-folder-section" });
 
@@ -284,7 +284,7 @@ export function renderKnowledgeGraphTab(
 
         const row = folderSectionEl.createDiv({ cls: "lmsa-kg-folder-row" });
 
-        row.createEl("span", {
+        row.createSpan({
           cls: `lmsa-kg-folder-name${folder === "(root)" ? " is-root" : ""}`,
           text: folder,
         });
@@ -295,7 +295,7 @@ export function renderKnowledgeGraphTab(
         if (isComplete) barFill.addClass("is-complete");
         if (isBuildingThisFolder) barFill.addClass("is-active");
 
-        row.createEl("span", { cls: "lmsa-kg-folder-count", text: `${processed} / ${total}` });
+        row.createSpan({ cls: "lmsa-kg-folder-count", text: `${processed} / ${total}` });
 
         const actionEl = row.createDiv({ cls: "lmsa-kg-folder-action" });
 

@@ -239,28 +239,28 @@ export class ModelDropdownView<T extends SelectableModelLike> {
     favoriteKeys: readonly string[]
   ): void {
     const item = listEl.createDiv({ cls: "lmsa-model-dropdown-item" });
-    const checkSpan = item.createEl("span", { cls: "lmsa-model-dropdown-check" });
+    const checkSpan = item.createSpan({ cls: "lmsa-model-dropdown-check" });
     if (model.id === selectedId) {
       item.addClass("is-active");
       setIcon(checkSpan, "check");
     }
 
     const copy = item.createDiv({ cls: "lmsa-model-dropdown-copy" });
-    copy.createEl("span", {
+    copy.createSpan({
       cls: "lmsa-model-dropdown-name",
       text: model.name,
     });
-    copy.createEl("span", {
+    copy.createSpan({
       cls: "lmsa-model-dropdown-provider",
       text: PROVIDER_DESCRIPTORS[model.provider].label,
     });
 
     const itemState = this.deps.getAvailability(model.modelId, model.provider);
-    item.createEl("span", {
+    item.createSpan({
       cls: `lmsa-model-dropdown-state is-${itemState}`,
     });
 
-    const starEl = item.createEl("span", { cls: "lmsa-model-dropdown-star" });
+    const starEl = item.createSpan({ cls: "lmsa-model-dropdown-star" });
     setIcon(starEl, "star");
     if (isFavoriteModel(model, favoriteKeys)) starEl.addClass("is-faved");
     starEl.addEventListener("click", (event) => {

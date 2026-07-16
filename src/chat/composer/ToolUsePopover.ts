@@ -124,7 +124,7 @@ export class ToolUsePopover {
     const agenticSection = container.createDiv({ cls: "lmsa-tool-popover-section" });
 
     const agenticRow = agenticSection.createDiv({ cls: "lmsa-tool-popover-row" });
-    agenticRow.createEl("span", { cls: "lmsa-tool-popover-label", text: "Agentic mode" });
+    agenticRow.createSpan({ cls: "lmsa-tool-popover-label", text: "Agentic mode" });
     const agenticToggleWrap = agenticRow.createDiv({ cls: "lmsa-tool-popover-control" });
     const agenticToggle = new Toggle(agenticToggleWrap);
     agenticToggle.onChange((value) => {
@@ -132,7 +132,7 @@ export class ToolUsePopover {
       if (this.sectionRefs) this.syncContent(this.sectionRefs);
     });
 
-    const agenticStatusEl = agenticSection.createEl("span", { cls: "lmsa-tool-popover-status" });
+    const agenticStatusEl = agenticSection.createSpan({ cls: "lmsa-tool-popover-status" });
 
     return { agenticToggle, agenticStatusEl };
   }

@@ -108,6 +108,10 @@ export class ProfileSelectorUI {
     const existing = row.parentElement?.querySelector(".lmsa-profile-delete-inline");
     if (existing) return;
 
+    // Inserted immediately after `row` and owned by `row`'s document (popout-safe).
+    // Raw createElement, not createEl: the helper can only append as a parent's first
+    // or last child, not after a specific sibling, and cannot name a non-main document
+    // (ADR-0026).
     const inline = row.insertAdjacentElement(
       "afterend",
       row.ownerDocument.createElement("div"),
@@ -147,6 +151,9 @@ export class ProfileSelectorUI {
     const existing = row.parentElement?.querySelector(".lmsa-profile-create-inline");
     if (existing) return;
 
+    // Inserted immediately after `row` and owned by `row`'s document (popout-safe).
+    // Raw createElement, not createEl, for the same reason as showDeleteConfirmInline
+    // (ADR-0026).
     const inline = row.insertAdjacentElement(
       "afterend",
       row.ownerDocument.createElement("div"),

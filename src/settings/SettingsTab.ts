@@ -131,7 +131,7 @@ export class WritingAssistantSettingTab extends PluginSettingTab {
       const groupActive = group.items.some((i) => i.tab === this.activeTab);
       const groupEl = rail.createDiv({ cls: "lmsa-settings-rail-group" });
       if (groupActive) groupEl.addClass("is-active");
-      groupEl.createEl("span", { cls: "lmsa-settings-rail-group-label", text: group.label });
+      groupEl.createSpan({ cls: "lmsa-settings-rail-group-label", text: group.label });
       for (const item of group.items) {
         const button = groupEl.createEl("button", {
           cls: "lmsa-settings-rail-item",
@@ -139,7 +139,7 @@ export class WritingAssistantSettingTab extends PluginSettingTab {
         });
         const iconEl = button.createSpan({ cls: "lmsa-settings-rail-icon" });
         setIcon(iconEl, item.icon);
-        button.createEl("span", { cls: "lmsa-settings-rail-label", text: item.rail });
+        button.createSpan({ cls: "lmsa-settings-rail-label", text: item.rail });
         if (item.tab === this.activeTab) {
           button.addClass("is-active");
         }

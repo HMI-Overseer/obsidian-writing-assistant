@@ -182,6 +182,8 @@ export class ChatComposer {
     }
     // Create the throwaway file input in the view's own document so a popped-out
     // view opens the native picker against its own window (ADR-0024, Phase 7).
+    // Raw createElement, not createEl: the helper cannot build a detached element
+    // on a non-main document (ADR-0026).
     const input = this.refs.textareaEl.ownerDocument.createElement("input");
     input.type = "file";
     input.accept = "image/jpeg,image/png,image/gif,image/webp";
@@ -450,14 +452,14 @@ export class ChatComposer {
 
   private renderChip(icon: string, label: string, onRemove: () => void): void {
     const chip = this.refs.contextChipsEl.createDiv({ cls: "lmsa-chat-composer-chip" });
-    const fileIcon = chip.createEl("span", { cls: "lmsa-chat-composer-chip-icon" });
+    const fileIcon = chip.createSpan({ cls: "lmsa-chat-composer-chip-icon" });
     setIcon(fileIcon, icon);
-    chip.createEl("span", { cls: "lmsa-chat-composer-chip-label", text: label });
+    chip.createSpan({ cls: "lmsa-chat-composer-chip-label", text: label });
     const removeBtn = chip.createEl("button", {
       cls: "lmsa-chat-composer-chip-remove",
       attr: { "aria-label": "Remove context" },
     });
-    setIcon(removeBtn.createEl("span"), "x");
+    setIcon(removeBtn.createSpan(), "x");
     removeBtn.addEventListener("click", (event) => {
       event.stopPropagation();
       onRemove();

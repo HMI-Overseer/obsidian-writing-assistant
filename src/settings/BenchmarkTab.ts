@@ -190,8 +190,8 @@ export function renderBenchmarkTab(
   // Iterations setting
   const iterRow = suitesSection.bodyEl.createDiv({ cls: "lmsa-benchmark-setting-row" });
   const iterInfo = iterRow.createDiv({ cls: "lmsa-benchmark-setting-info" });
-  iterInfo.createEl("span", { cls: "lmsa-benchmark-setting-name", text: "Iterations per test" });
-  iterInfo.createEl("span", {
+  iterInfo.createSpan({ cls: "lmsa-benchmark-setting-name", text: "Iterations per test" });
+  iterInfo.createSpan({
     cls: "lmsa-benchmark-setting-desc",
     text: "Run each test multiple times to measure consistency. Higher values give more reliable results but take longer.",
   });
@@ -209,8 +209,8 @@ export function renderBenchmarkTab(
   // Report folder setting
   const folderRow = suitesSection.bodyEl.createDiv({ cls: "lmsa-benchmark-setting-row" });
   const folderInfo = folderRow.createDiv({ cls: "lmsa-benchmark-setting-info" });
-  folderInfo.createEl("span", { cls: "lmsa-benchmark-setting-name", text: "Report folder" });
-  folderInfo.createEl("span", {
+  folderInfo.createSpan({ cls: "lmsa-benchmark-setting-name", text: "Report folder" });
+  folderInfo.createSpan({
     cls: "lmsa-benchmark-setting-desc",
     text: "Vault folder where exported benchmark reports are created.",
   });

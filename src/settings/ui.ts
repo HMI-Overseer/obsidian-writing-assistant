@@ -273,12 +273,12 @@ export function createModelSelector(
 
   const wrapEl = containerEl.createDiv({ cls: "lmsa-settings-model-selector-wrap" });
   const btn = wrapEl.createDiv({ cls: "lmsa-settings-model-selector" });
-  const statusEl = btn.createEl("span", { cls: "lmsa-model-selector-status is-unknown" });
-  const labelEl = btn.createEl("span", {
+  const statusEl = btn.createSpan({ cls: "lmsa-model-selector-status is-unknown" });
+  const labelEl = btn.createSpan({
     cls: "lmsa-settings-model-selector-label",
     text: selected?.name ?? (opts.placeholder ?? "Select model..."),
   });
-  const chevronEl = btn.createEl("span", { cls: "lmsa-settings-model-selector-chevron" });
+  const chevronEl = btn.createSpan({ cls: "lmsa-settings-model-selector-chevron" });
   setIcon(chevronEl, "chevron-down");
 
   const dropdownEl = wrapEl.createDiv({ cls: "lmsa-model-dropdown lmsa-hidden" });

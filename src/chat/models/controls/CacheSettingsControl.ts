@@ -21,14 +21,14 @@ export class CacheSettingsControl {
 
   private render(): void {
     const section = this.container.createDiv({ cls: "lmsa-profile-popover-section" });
-    section.createEl("div", {
+    section.createDiv({
       cls: "lmsa-profile-popover-section-title",
       text: "Prompt caching",
     });
 
     // Toggle row
     const toggleRow = section.createDiv({ cls: "lmsa-profile-popover-row" });
-    toggleRow.createEl("span", {
+    toggleRow.createSpan({
       cls: "lmsa-profile-popover-label",
       text: "Enable caching",
     });
@@ -42,7 +42,7 @@ export class CacheSettingsControl {
 
     // TTL row
     const ttlRow = section.createDiv({ cls: "lmsa-profile-popover-row" });
-    ttlRow.createEl("span", {
+    ttlRow.createSpan({
       cls: "lmsa-profile-popover-label",
       text: "Cache TTL",
     });

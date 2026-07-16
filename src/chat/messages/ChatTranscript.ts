@@ -61,9 +61,9 @@ export class ChatTranscript {
       cls: "lmsa-scroll-to-bottom lmsa-hidden",
       attr: { "aria-label": "Jump to latest" },
     });
-    const icon = btn.createEl("span", { cls: "lmsa-scroll-to-bottom-icon" });
+    const icon = btn.createSpan({ cls: "lmsa-scroll-to-bottom-icon" });
     setIcon(icon, "chevron-down");
-    btn.createEl("span", { text: "Jump to latest" });
+    btn.createSpan({ text: "Jump to latest" });
     this.owner.registerDomEvent(btn, "click", () => this.scrollToBottom(true));
     return btn;
   }
@@ -391,8 +391,8 @@ export class ChatTranscript {
         });
       } else if (attachment.type === "note") {
         const chipEl = galleryEl.createDiv({ cls: "lmsa-chat-window-attachment-note" });
-        setIcon(chipEl.createEl("span", { cls: "lmsa-chat-window-attachment-note-icon" }), "file-text");
-        chipEl.createEl("span", {
+        setIcon(chipEl.createSpan({ cls: "lmsa-chat-window-attachment-note-icon" }), "file-text");
+        chipEl.createSpan({
           cls: "lmsa-chat-window-attachment-note-label",
           text: attachment.truncated ? `${attachment.fileName} · truncated` : attachment.fileName,
         });

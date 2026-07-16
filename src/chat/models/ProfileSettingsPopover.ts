@@ -142,7 +142,7 @@ export class ProfileSettingsPopover {
       cls: "lmsa-profile-popover-title",
       text: "Model parameters",
     });
-    title.createEl("span", {
+    title.createSpan({
       cls: "lmsa-profile-popover-subtitle",
       text:
         provider === model.provider
@@ -233,7 +233,7 @@ export class ProfileSettingsPopover {
     profile: ProviderProfile,
   ): void {
     const section = body.createDiv({ cls: "lmsa-profile-popover-section" });
-    section.createEl("div", {
+    section.createDiv({
       cls: "lmsa-profile-popover-section-title",
       text: "Sampling",
     });
@@ -327,7 +327,7 @@ export class ProfileSettingsPopover {
     const section = body.createDiv({
       cls: "lmsa-profile-popover-section lmsa-model-reasoning-section",
     });
-    section.createEl("div", {
+    section.createDiv({
       cls: "lmsa-profile-popover-section-title",
       text: "Reasoning",
     });
@@ -337,7 +337,7 @@ export class ProfileSettingsPopover {
       levels,
       onChange: (v) => void this.callbacks.onModelReasoningChange(v),
     });
-    section.createEl("span", {
+    section.createSpan({
       cls: "lmsa-profile-popover-hint",
       text: "Remembered per model, off means the model default.",
     });
@@ -384,7 +384,7 @@ export class ProfileSettingsPopover {
       text: "Disable built-in system prompts",
     });
 
-    section.createEl("span", {
+    section.createSpan({
       cls: "lmsa-disable-prompts-warning",
       text: "Edit, agentic, and tool features may not work correctly.",
     });

@@ -27,7 +27,7 @@ export class TemperatureControl {
       attr: { type: "range", min: "0", max: "1", step: "0.05" },
     });
 
-    this.valueEl = sliderRow.createEl("span", {
+    this.valueEl = sliderRow.createSpan({
       cls: "lmsa-params-slider-value",
       text: this.opts.value.toFixed(2),
     });

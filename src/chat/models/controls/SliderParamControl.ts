@@ -57,7 +57,7 @@ export class SliderParamControl {
       },
     });
 
-    const valueDisplay = sliderRow.createEl("span", {
+    const valueDisplay = sliderRow.createSpan({
       cls: "lmsa-params-slider-value",
       text: UNSET_VALUE_LABEL,
     });

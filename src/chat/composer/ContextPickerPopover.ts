@@ -113,18 +113,18 @@ export class ContextPickerPopover {
     // trailing pin so the persistent default stays reachable while this is dimmed.
     const noteMain = noteRow.createDiv({ cls: "lmsa-context-picker-row-main" });
 
-    const noteIcon = noteMain.createEl("span", { cls: "lmsa-context-picker-row-icon" });
+    const noteIcon = noteMain.createSpan({ cls: "lmsa-context-picker-row-icon" });
     setIcon(noteIcon, "file-text");
 
-    const noteLabel = noteMain.createEl("span", { cls: "lmsa-context-picker-row-label" });
-    noteLabel.createEl("span", { cls: "lmsa-context-picker-row-title", text: "Add current note" });
-    noteLabel.createEl("span", {
+    const noteLabel = noteMain.createSpan({ cls: "lmsa-context-picker-row-label" });
+    noteLabel.createSpan({ cls: "lmsa-context-picker-row-title", text: "Add current note" });
+    noteLabel.createSpan({
       cls: "lmsa-context-picker-row-hint",
       text: activeFileName ?? "No note open",
     });
 
     if (isAttached) {
-      const checkIcon = noteMain.createEl("span", { cls: "lmsa-context-picker-row-check" });
+      const checkIcon = noteMain.createSpan({ cls: "lmsa-context-picker-row-check" });
       setIcon(checkIcon, "check");
     }
 
@@ -142,11 +142,11 @@ export class ContextPickerPopover {
     // ── "Add note from vault" row ────────────────────────────────────────────
     const vaultRow = el.createDiv({ cls: "lmsa-context-picker-row" });
 
-    const vaultIcon = vaultRow.createEl("span", { cls: "lmsa-context-picker-row-icon" });
+    const vaultIcon = vaultRow.createSpan({ cls: "lmsa-context-picker-row-icon" });
     setIcon(vaultIcon, "search");
 
-    const vaultLabel = vaultRow.createEl("span", { cls: "lmsa-context-picker-row-label" });
-    vaultLabel.createEl("span", { cls: "lmsa-context-picker-row-title", text: "Add note from vault" });
+    const vaultLabel = vaultRow.createSpan({ cls: "lmsa-context-picker-row-label" });
+    vaultLabel.createSpan({ cls: "lmsa-context-picker-row-title", text: "Add note from vault" });
 
     vaultRow.addEventListener("click", () => {
       this.enterSearchMode();
@@ -156,11 +156,11 @@ export class ContextPickerPopover {
     if (this.callbacks.canAttachImages()) {
       const imageRow = el.createDiv({ cls: "lmsa-context-picker-row" });
 
-      const imageIcon = imageRow.createEl("span", { cls: "lmsa-context-picker-row-icon" });
+      const imageIcon = imageRow.createSpan({ cls: "lmsa-context-picker-row-icon" });
       setIcon(imageIcon, "image");
 
-      const imageLabel = imageRow.createEl("span", { cls: "lmsa-context-picker-row-label" });
-      imageLabel.createEl("span", { cls: "lmsa-context-picker-row-title", text: "Attach image" });
+      const imageLabel = imageRow.createSpan({ cls: "lmsa-context-picker-row-label" });
+      imageLabel.createSpan({ cls: "lmsa-context-picker-row-title", text: "Attach image" });
 
       imageRow.addEventListener("click", () => {
         this.close();
@@ -213,7 +213,7 @@ export class ContextPickerPopover {
     // ── Search input row ─────────────────────────────────────────────────────
     const searchWrap = el.createDiv({ cls: "lmsa-context-picker-search-wrap" });
 
-    const searchIconEl = searchWrap.createEl("span", { cls: "lmsa-context-picker-search-icon" });
+    const searchIconEl = searchWrap.createSpan({ cls: "lmsa-context-picker-search-icon" });
     setIcon(searchIconEl, "search");
 
     const input = searchWrap.createEl("input", {
@@ -264,10 +264,10 @@ export class ContextPickerPopover {
     for (const file of files) {
       const item = container.createDiv({ cls: "lmsa-context-picker-result-item" });
 
-      item.createEl("span", { cls: "lmsa-context-picker-result-name", text: file.basename });
+      item.createSpan({ cls: "lmsa-context-picker-result-name", text: file.basename });
 
       if (file.parent && file.parent.path !== "/") {
-        item.createEl("span", { cls: "lmsa-context-picker-result-path", text: file.parent.path });
+        item.createSpan({ cls: "lmsa-context-picker-result-path", text: file.parent.path });
       }
 
       item.addEventListener("click", () => {

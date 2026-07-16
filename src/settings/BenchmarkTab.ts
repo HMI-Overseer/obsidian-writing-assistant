@@ -12,6 +12,7 @@ import { PROVIDER_DESCRIPTORS } from "../providers/descriptors";
 import { getSelectableCompletionModels } from "../providers/selectableModels";
 import { createSettingsSection, createModelSelector, pluginModelDropdownDeps, SettingItem } from "./ui";
 import { getTestSuites } from "./benchmark/testSuites";
+import { reportIfRejected, voidAsync } from "../asyncCallbacks";
 import { runBenchmarkTest, runAllBenchmarks } from "./benchmark/benchmarkRunner";
 import type { BenchmarkTestCase, BenchmarkTestSuite, BenchmarkRunResult } from "./benchmark/types";
 import { computeSummaryStats, computeSuiteSummary } from "./benchmark/BenchmarkSummary";
@@ -353,7 +354,7 @@ export function renderBenchmarkTab(
 
       runBtn.addEventListener("click", () => {
         if (isRunning || !selectedModel) return;
-        runSingleTest(tc);
+        reportIfRejected(runSingleTest(tc), "Failed to run the benchmark test.");
       });
 
       cardEls.set(tc.id, { statusEl, progressEl, detailsEl, resultsContainerEl, runBtn, toggleBtn });
@@ -375,7 +376,7 @@ export function renderBenchmarkTab(
 
     runSuiteBtn.addEventListener("click", () => {
       if (isRunning || !selectedModel) return;
-      runSuite(suite);
+      reportIfRejected(runSuite(suite), "Failed to run the benchmark suite.");
     });
   }
 
@@ -751,7 +752,7 @@ export function renderBenchmarkTab(
   }
 
   // Run All handler
-  runAllBtn.addEventListener("click", async () => {
+  runAllBtn.addEventListener("click", voidAsync(async () => {
     if (isRunning || !selectedModel) return;
     if (!(await ensureModelLoaded())) return;
     setRunningState(true);
@@ -820,7 +821,7 @@ export function renderBenchmarkTab(
       for (const suite of suites) refreshSuiteSummary(suite);
       refreshGlobalSummary();
     }
-  });
+  }, "Failed to run the benchmarks."));
 
   // Abort handler
   abortBtn.addEventListener("click", () => {

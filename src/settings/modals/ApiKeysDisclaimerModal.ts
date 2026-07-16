@@ -1,6 +1,7 @@
 import type { App } from "obsidian";
 import { Component, MarkdownRenderer, Modal } from "obsidian";
 import type WritingAssistantChat from "../../main";
+import { voidAsync } from "../../asyncCallbacks";
 
 const DISCLAIMER_MD = `\
 Hello,
@@ -65,12 +66,12 @@ export class ApiKeysDisclaimerModal extends Modal {
       text: "I understand, continue",
       cls: "mod-cta",
     });
-    acceptBtn.addEventListener("click", async () => {
+    acceptBtn.addEventListener("click", voidAsync(async () => {
       this.plugin.settings.apiKeysDisclaimerAccepted = true;
       await this.plugin.saveSettings();
       this.close();
       this.onAccept();
-    });
+    }, "Failed to save your preference."));
   }
 
   onClose(): void {

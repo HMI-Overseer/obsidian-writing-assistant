@@ -433,10 +433,14 @@ export async function runToolLoop(
           return { tc, result: await executeVaultTool(tc, vaultToolContext) };
         }),
         // think is a no-op: returns empty content so the model continues reasoning.
-        ...liveThinkCalls.map((tc) => ({
-          tc,
-          result: { content: "", isReadOnly: true as const } as ToolResult,
-        })),
+        // Promise.resolve so every element handed to Promise.all is a thenable
+        // (await-thenable) without an async function that would have no await to make.
+        ...liveThinkCalls.map((tc) =>
+          Promise.resolve({
+            tc,
+            result: { content: "", isReadOnly: true as const } as ToolResult,
+          }),
+        ),
       ]),
       resolveVaultOps({
         vaultOpCalls: liveVaultOpCalls,

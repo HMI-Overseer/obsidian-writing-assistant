@@ -5,6 +5,7 @@ import type { EmbeddingModel } from "../../shared/types";
 import { Toggle, createModelSelector } from "../../settings/ui";
 import type { ModelDropdownDeps, ModelSelectorRefs } from "../../settings/ui";
 import type { ChatLayoutRefs } from "../types";
+import { voidAsync } from "../../asyncCallbacks";
 
 export type RagSnapshot = {
   enabled: boolean;
@@ -162,7 +163,7 @@ export class KnowledgePopover {
       cls: "lmsa-knowledge-popover-action-btn",
     });
 
-    actionBtn.addEventListener("click", async () => {
+    actionBtn.addEventListener("click", voidAsync(async () => {
       const snap = this.callbacks.getRagSnapshot();
       if (snap.indexingState.status === "indexing") {
         this.callbacks.onRagStop();
@@ -174,7 +175,7 @@ export class KnowledgePopover {
           await this.callbacks.onRagBuild();
         }
       }
-    });
+    }, "Failed to update the knowledge index."));
 
     return { toggle, statusEl, actionBtn, modelSelector, statusRowEl };
   }

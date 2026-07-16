@@ -1,8 +1,10 @@
 import { setIcon } from "obsidian";
 import type WritingAssistantChat from "../main";
+import type { CustomCommand } from "../shared/types";
 import { BUILTIN_COMMAND_CATEGORIES } from "../commands";
 import { CommandModal } from "./modals";
 import { createSettingsSection } from "./ui";
+import { voidAsync } from "../asyncCallbacks";
 
 export function renderCommandsTab(
   container: HTMLElement,
@@ -101,21 +103,21 @@ export function renderCommandsTab(
           text: "Edit",
         })
         .addEventListener("click", () => {
-          new CommandModal(plugin.app, command, async (updated) => {
+          new CommandModal(plugin.app, command, voidAsync(async (updated: CustomCommand) => {
             const index = settings.commands.findIndex((item) => item.id === updated.id);
             if (index >= 0) settings.commands[index] = updated;
             await plugin.saveSettings();
             renderList();
-          }).open();
+          }, "Failed to save the command.")).open();
         });
 
       actions
         .createEl("button", { cls: "lmsa-btn-danger lmsa-ui-btn", text: "Delete" })
-        .addEventListener("click", async () => {
+        .addEventListener("click", voidAsync(async () => {
           settings.commands = settings.commands.filter((item) => item.id !== command.id);
           await plugin.saveSettings();
           refresh();
-        });
+        }, "Failed to delete the command."));
     }
   };
 
@@ -127,10 +129,10 @@ export function renderCommandsTab(
       text: "Add command",
     })
     .addEventListener("click", () => {
-      new CommandModal(plugin.app, null, async (command) => {
+      new CommandModal(plugin.app, null, voidAsync(async (command: CustomCommand) => {
         settings.commands.push(command);
         await plugin.saveSettings();
         refresh();
-      }).open();
+      }, "Failed to add the command.")).open();
     });
 }

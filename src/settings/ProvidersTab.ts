@@ -2,6 +2,7 @@ import { setIcon } from "obsidian";
 import type WritingAssistantChat from "../main";
 import type { CustomModelEntry, ModelRole, ProviderOption } from "../shared/types";
 import { normalizeLMStudioBaseUrl } from "../api";
+import { voidAsync } from "../asyncCallbacks";
 import { PROVIDER_DESCRIPTORS, PROVIDER_ICONS } from "../providers/descriptors";
 import { getCatalogEntries } from "../providers/catalog";
 import {
@@ -543,14 +544,14 @@ function renderCustomModels(
         attr: { "aria-label": "Remove custom model" },
       });
       setIcon(removeBtn, "trash-2");
-      removeBtn.addEventListener("click", async () => {
+      removeBtn.addEventListener("click", voidAsync(async () => {
         const entries = plugin.settings.customModels[provider] ?? [];
         entries.splice(index, 1);
         if (entries.length === 0) delete plugin.settings.customModels[provider];
         await plugin.saveSettings();
         await reconfigureKnowledgeServices(plugin);
         refresh();
-      });
+      }, "Failed to remove the custom model."));
     });
   }
 

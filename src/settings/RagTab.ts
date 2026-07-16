@@ -3,6 +3,8 @@ import type { IndexingState } from "../rag/types";
 import type { ModelAvailabilityState } from "../shared/types";
 import { getSelectableEmbeddingModels } from "../providers/selectableModels";
 import { createSettingsSection, createModelSelector, pluginModelDropdownDeps, Button, SettingItem } from "./ui";
+import type { ModelSelectorItem } from "./ui";
+import { voidAsync } from "../asyncCallbacks";
 import { DEFAULT_RAG_SETTINGS } from "../constants";
 
 /**
@@ -53,7 +55,7 @@ export function renderRagTab(
   const modelSelector = createModelSelector(embeddingItem.settingEl, models, pluginModelDropdownDeps(plugin), {
     initial: currentModel,
     placeholder: "None selected",
-    onSelect: async (model) => {
+    onSelect: voidAsync(async (model: ModelSelectorItem | null) => {
       rag.activeEmbeddingModelId = model?.id ?? null;
       await plugin.saveSettings();
       await plugin.services.ragService.configure(
@@ -61,7 +63,7 @@ export function renderRagTab(
         getSelectableEmbeddingModels(plugin.settings),
         plugin.settings.providerSettings,
       );
-    },
+    }, "Failed to update the embedding model."),
   });
 
   // Move the conditional wrapper after the general section in the DOM.

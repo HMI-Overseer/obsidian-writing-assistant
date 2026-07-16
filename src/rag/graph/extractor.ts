@@ -57,7 +57,9 @@ export interface GraphExtractorOptions {
   modelId: string;
   excludePatterns: string[];
   onStateChange: (state: GraphBuildState) => void;
-  onSave: () => void;
+  // The debounced save may be async; the extractor fires it and does not await it (see
+  // scheduleSave). The callee is expected to handle its own errors.
+  onSave: () => void | Promise<void>;
   /** Optional embedding client for generating entity vectors at build time. */
   embeddingClient?: EmbeddingClient;
   /** The modelId to pass to the embedding client. */
@@ -79,7 +81,7 @@ export class GraphExtractor {
   private readonly modelId: string;
   private readonly excludePatterns: string[];
   private readonly onStateChange: (state: GraphBuildState) => void;
-  private readonly onSave: () => void;
+  private readonly onSave: () => void | Promise<void>;
   private readonly embeddingClient: EmbeddingClient | undefined;
   private readonly embeddingModelId: string | undefined;
   private readonly folderFilter: string | undefined;
@@ -302,7 +304,8 @@ export class GraphExtractor {
     if (this.saveTimer) window.clearTimeout(this.saveTimer);
     this.saveTimer = window.setTimeout(() => {
       this.saveTimer = null;
-      this.onSave();
+      // Fire-and-forget: a debounced background persist that handles its own errors.
+      void this.onSave();
     }, SAVE_DEBOUNCE_MS);
   }
 }

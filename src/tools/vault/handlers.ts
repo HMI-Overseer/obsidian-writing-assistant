@@ -279,10 +279,10 @@ async function executeReadSection(
   };
 }
 
-async function executeListDirectory(
+function executeListDirectory(
   args: Record<string, unknown>,
   ctx: VaultToolContext,
-): Promise<ToolResult> {
+): ToolResult {
   const rawPath = typeof args.path === "string" ? args.path.trim() : "";
 
   // An out-of-vault folder path is named at the boundary; an omitted path still
@@ -321,10 +321,10 @@ async function executeListDirectory(
   return { content: `${header}:\n${items.join("\n")}`, isReadOnly: true };
 }
 
-async function executeDirectoryTree(
+function executeDirectoryTree(
   args: Record<string, unknown>,
   ctx: VaultToolContext,
-): Promise<ToolResult> {
+): ToolResult {
   const rawPath = typeof args.path === "string" ? args.path.trim() : "";
 
   // Boundary first; an omitted path still walks the whole vault tree.
@@ -380,10 +380,10 @@ function buildDirectoryTree(folder: TFolder): TreeNode {
   };
 }
 
-async function executeSearchFiles(
+function executeSearchFiles(
   args: Record<string, unknown>,
   ctx: VaultToolContext,
-): Promise<ToolResult> {
+): ToolResult {
   const rawPattern = typeof args.pattern === "string" ? args.pattern.trim() : "";
   if (!rawPattern) {
     return toolFailure({ kind: "invalid-args", what: "pattern is required" });
@@ -639,10 +639,10 @@ function clipLine(line: string): string {
   return trimmed.length <= max ? trimmed : `${trimmed.slice(0, max)}…`;
 }
 
-async function executeGetBacklinks(
+function executeGetBacklinks(
   args: Record<string, unknown>,
   ctx: VaultToolContext,
-): Promise<ToolResult> {
+): ToolResult {
   const rawPath = typeof args.path === "string" ? args.path.trim() : "";
   if (!rawPath) {
     return toolFailure({ kind: "invalid-args", what: "path is required" });
@@ -677,10 +677,10 @@ async function executeGetBacklinks(
   };
 }
 
-async function executeGetOutgoingLinks(
+function executeGetOutgoingLinks(
   args: Record<string, unknown>,
   ctx: VaultToolContext,
-): Promise<ToolResult> {
+): ToolResult {
   const rawPath = typeof args.path === "string" ? args.path.trim() : "";
   if (!rawPath) {
     return toolFailure({ kind: "invalid-args", what: "path is required" });
@@ -718,10 +718,10 @@ async function executeGetOutgoingLinks(
   };
 }
 
-async function executeFindNotesByTag(
+function executeFindNotesByTag(
   args: Record<string, unknown>,
   ctx: VaultToolContext,
-): Promise<ToolResult> {
+): ToolResult {
   const rawTag = typeof args.tag === "string" ? args.tag.trim() : "";
   if (!rawTag) {
     return toolFailure({ kind: "invalid-args", what: "tag is required" });
@@ -776,10 +776,10 @@ async function executeFindNotesByTag(
   };
 }
 
-async function executeGetFrontmatter(
+function executeGetFrontmatter(
   args: Record<string, unknown>,
   ctx: VaultToolContext,
-): Promise<ToolResult> {
+): ToolResult {
   const paths = Array.isArray(args.paths) ? args.paths : [];
   if (paths.length === 0) {
     return toolFailure({

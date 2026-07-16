@@ -6,6 +6,8 @@ import {
   getSelectableEmbeddingModels,
 } from "../providers/selectableModels";
 import { createSettingsSection, createModelSelector, pluginModelDropdownDeps, Button, SettingItem } from "./ui";
+import type { ModelSelectorItem } from "./ui";
+import { voidAsync } from "../asyncCallbacks";
 
 /**
  * Renders the Knowledge Graph settings tab.
@@ -80,7 +82,7 @@ export function renderKnowledgeGraphTab(
   const modelSelector = createModelSelector(completionItem.settingEl, models, pluginModelDropdownDeps(plugin), {
     initial: currentModel,
     placeholder: "None selected",
-    onSelect: async (model) => {
+    onSelect: voidAsync(async (model: ModelSelectorItem | null) => {
       kg.activeCompletionModelId = model?.id ?? null;
       await plugin.saveSettings();
       await plugin.services.graphService.configure(
@@ -89,7 +91,7 @@ export function renderKnowledgeGraphTab(
         getSelectableEmbeddingModels(plugin.settings),
         plugin.settings.providerSettings,
       );
-    },
+    }, "Failed to update the knowledge graph completion model."),
   });
 
   // ── Embedding model ───────────────────────────────────────────────
@@ -103,7 +105,7 @@ export function renderKnowledgeGraphTab(
   const embModelSelector = createModelSelector(embeddingItem.settingEl, embModels, pluginModelDropdownDeps(plugin), {
     initial: currentEmbModel,
     placeholder: "None selected",
-    onSelect: async (model) => {
+    onSelect: voidAsync(async (model: ModelSelectorItem | null) => {
       kg.activeEmbeddingModelId = model?.id ?? null;
       await plugin.saveSettings();
       await plugin.services.graphService.configure(
@@ -112,7 +114,7 @@ export function renderKnowledgeGraphTab(
         getSelectableEmbeddingModels(plugin.settings),
         plugin.settings.providerSettings,
       );
-    },
+    }, "Failed to update the knowledge graph embedding model."),
   });
 
   // Move the conditional wrapper after the general section in the DOM.
@@ -302,15 +304,15 @@ export function renderKnowledgeGraphTab(
             cls: "lmsa-ui-btn lmsa-kg-folder-btn lmsa-kg-folder-stop-btn",
             text: "Stop",
           });
-          stopFolderBtn.addEventListener("click", async () => {
+          stopFolderBtn.addEventListener("click", voidAsync(async () => {
             await plugin.services.graphService.stopBuild();
-          });
+          }, "Failed to stop the knowledge graph build."));
         } else if (!isComplete && canAct && !isExtracting) {
           const btn = actionEl.createEl("button", {
             cls: "lmsa-ui-btn lmsa-ui-btn-secondary lmsa-kg-folder-btn",
             text: processed > 0 ? "Resume" : "Build",
           });
-          btn.addEventListener("click", async () => {
+          btn.addEventListener("click", voidAsync(async () => {
             if (!await validateModelsReady()) return;
             await plugin.services.graphService.startBuildFolder(
               folder,
@@ -319,7 +321,7 @@ export function renderKnowledgeGraphTab(
               getSelectableEmbeddingModels(plugin.settings),
               plugin.settings.providerSettings,
             );
-          });
+          }, "Failed to build the knowledge graph folder."));
         }
         // isComplete → no button needed
         // isExtracting + not this folder → no button (prevents concurrent builds)

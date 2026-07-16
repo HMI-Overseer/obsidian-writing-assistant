@@ -7,7 +7,10 @@ const EXTERNAL_HREF_RE = /^(?:[a-z][a-z0-9+.-]*:|\/\/)/i;
 export class MarkdownItBubbleRenderer implements MarkdownBubbleRenderer {
   constructor(private readonly app: App) {}
 
-  async render(contentEl: HTMLElement, text: string): Promise<void> {
+  // Synchronous, but returns Promise<void> to satisfy the MarkdownBubbleRenderer contract
+  // (the Obsidian-backed sibling implementation genuinely awaits). No `async`, so require-await
+  // is satisfied without an empty await.
+  render(contentEl: HTMLElement, text: string): Promise<void> {
     // markdown-it runs with html disabled and all token content escaped, but the
     // string is still adopted through an inert DOMParser document rather than
     // assigned via innerHTML so no markup is ever parsed in the live document.
@@ -19,6 +22,7 @@ export class MarkdownItBubbleRenderer implements MarkdownBubbleRenderer {
     contentEl.append(...Array.from(doc.body.childNodes));
     this.attachCopyHandlers(contentEl);
     this.attachLinkHandlers(contentEl);
+    return Promise.resolve();
   }
 
   clear(_containerEl: HTMLElement): void {}

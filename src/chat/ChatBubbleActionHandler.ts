@@ -1,4 +1,5 @@
 import { Notice } from "obsidian";
+import { reportIfRejected, voidAsync } from "../asyncCallbacks";
 import type { ChatGenerationOrchestrator } from "./ChatGenerationOrchestrator";
 import type { ContextCapacityUpdater } from "./ContextCapacityUpdater";
 import type { ContextInputs } from "./ContextCapacityUpdater";
@@ -40,10 +41,20 @@ export class ChatBubbleActionHandler {
     return {
       onCopy: (messageId) => this.handleCopy(messageId),
       onEdit: (messageId) => this.handleEdit(messageId),
-      onDelete: (messageId) => this.handleDelete(messageId),
-      onBranch: (messageId) => void this.handleBranch(messageId),
-      onRegenerate: (messageId) => void this.deps.getOrchestrator().regenerate(messageId),
-      onVersionChange: (messageId, newIndex) => void this.handleVersionChange(messageId, newIndex),
+      onDelete: (messageId) =>
+        reportIfRejected(this.handleDelete(messageId), "Failed to delete the message."),
+      onBranch: (messageId) =>
+        reportIfRejected(this.handleBranch(messageId), "Failed to branch the conversation."),
+      onRegenerate: (messageId) =>
+        reportIfRejected(
+          this.deps.getOrchestrator().regenerate(messageId),
+          "Failed to regenerate the response.",
+        ),
+      onVersionChange: (messageId, newIndex) =>
+        reportIfRejected(
+          this.handleVersionChange(messageId, newIndex),
+          "Failed to switch the message version.",
+        ),
     };
   }
 
@@ -70,7 +81,7 @@ export class ChatBubbleActionHandler {
     if (!bubble || !message) return;
 
     const editor = new InlineMessageEditor(bubble, message.content, {
-      onSave: async (newContent) => {
+      onSave: voidAsync(async (newContent: string) => {
         // Re-check at commit time: the editor can outlive the start of a new
         // generation, and committing then would race the in-flight persist.
         if (this.blockedDuringGeneration()) return;
@@ -79,7 +90,7 @@ export class ChatBubbleActionHandler {
         currentStore.updateMessageContent(messageId, newContent);
         await currentStore.persistActiveConversation();
         await this.deps.syncConversationUi();
-      },
+      }, "Failed to save your edit."),
       onCancel: () => {},
     });
     editor.activate();

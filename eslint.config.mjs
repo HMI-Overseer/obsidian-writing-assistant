@@ -33,14 +33,11 @@ export default tseslint.config(
       "no-console": ["warn", { allow: ["error", "warn"] }],
       "import/no-extraneous-dependencies": "error",
       "obsidianmd/prefer-window-timers": "error",
+      "@typescript-eslint/require-await": "error",
 
       // Staged. Options are written out only where a severity-only override would inherit an
       // unwanted one; see the doc's Gotchas.
       "@typescript-eslint/no-deprecated": "warn",
-      "@typescript-eslint/no-floating-promises": "warn",
-      "@typescript-eslint/no-misused-promises": "warn",
-      "@typescript-eslint/await-thenable": "warn",
-      "@typescript-eslint/require-await": "warn",
       "@typescript-eslint/no-unsafe-argument": "warn",
       "@typescript-eslint/no-unsafe-assignment": "warn",
       "@typescript-eslint/no-unsafe-call": "warn",

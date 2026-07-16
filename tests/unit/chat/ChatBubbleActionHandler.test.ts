@@ -12,10 +12,10 @@ vi.mock("obsidian", async (importOriginal) => {
   return { ...actual, Notice: vi.fn() };
 });
 
-function makeHandler(opts: { isGenerating: boolean }) {
+function makeHandler(opts: { isGenerating: boolean; persist?: () => Promise<void> }) {
   const removeMessage = vi.fn();
   const switchMessageVersion = vi.fn();
-  const persistActiveConversation = vi.fn().mockResolvedValue(undefined);
+  const persistActiveConversation = vi.fn(opts.persist ?? (() => Promise.resolve()));
   const getBubbleForMessage = vi.fn().mockReturnValue(null);
   const updateBubbleVersion = vi.fn().mockResolvedValue(undefined);
   const immediateUpdate = vi.fn();
@@ -87,6 +87,30 @@ describe("ChatBubbleActionHandler, generation gate (P1-12)", () => {
       const { handler, switchMessageVersion } = makeHandler({ isGenerating: false });
       await handler.handleVersionChange("m2", 1);
       expect(switchMessageVersion).toHaveBeenCalledWith("m2", 1);
+      expect(vi.mocked(Notice)).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("rejection surfacing via createCallbacks (Phase 6a)", () => {
+    const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
+
+    it("surfaces a Notice when a delete rejects, rather than leaving it unhandled", async () => {
+      const { handler } = makeHandler({
+        isGenerating: false,
+        persist: () => Promise.reject(new Error("disk full")),
+      });
+      const callbacks = handler.createCallbacks();
+      // The callback slot is void-returning; a rejecting delete must reach the
+      // user as a Notice, not float away as an unhandled rejection.
+      callbacks.onDelete("m1");
+      await flush();
+      expect(vi.mocked(Notice)).toHaveBeenCalled();
+    });
+
+    it("shows no Notice when a delete resolves normally", async () => {
+      const { handler } = makeHandler({ isGenerating: false });
+      handler.createCallbacks().onDelete("m1");
+      await flush();
       expect(vi.mocked(Notice)).not.toHaveBeenCalled();
     });
   });

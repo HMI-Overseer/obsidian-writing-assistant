@@ -11,6 +11,7 @@ import { registerBrandIcons, unregisterBrandIcons } from "./providers/brandIcons
 import { normalizePluginSettings } from "./settings/settingsMigration";
 import { WritingAssistantSettingTab } from "./settings/SettingsTab";
 import { ServiceContainer } from "./services/ServiceContainer";
+import { reportIfRejected } from "./asyncCallbacks";
 
 export default class WritingAssistantChat extends Plugin {
   settings!: PluginSettings;
@@ -39,13 +40,18 @@ export default class WritingAssistantChat extends Plugin {
     this.registerView(VIEW_TYPE_CHAT, (leaf: WorkspaceLeaf) => new ChatView(leaf, this));
 
     this.addRibbonIcon("message-square", "Writing assistant chat", () => {
-      this.activateChatView();
+      // Fire-and-forget: a ribbon click should not block, and Obsidian ignores the
+      // callback's return, so an unhandled rejection is surfaced here as a Notice.
+      // There is no chat timeline in scope yet (we are opening the view), so Notice
+      // is the user-facing surface, not decorateError.
+      reportIfRejected(this.activateChatView(), "Failed to open the writing assistant chat.");
     });
 
     this.addCommand({
       id: "open-chat",
       name: "Open chat",
-      callback: () => this.activateChatView(),
+      callback: () =>
+        reportIfRejected(this.activateChatView(), "Failed to open the writing assistant chat."),
     });
 
     this.addCommand({
@@ -58,15 +64,21 @@ export default class WritingAssistantChat extends Plugin {
           return;
         }
 
-        this.activateChatView().then(() => {
-          window.setTimeout(() => {
-            const leaves = this.app.workspace.getLeavesOfType(VIEW_TYPE_CHAT);
-            if (leaves.length > 0) {
-              const view = leaves[0].view as ChatView;
-              view.seedPrompt(selection);
-            }
-          }, 100);
-        });
+        // Fire-and-forget from a void editorCallback: open the view, then seed the
+        // prompt once it exists. Any failure surfaces as a Notice; the timeline that
+        // would carry a decorateError does not exist until the view is open.
+        reportIfRejected(
+          this.activateChatView().then(() => {
+            window.setTimeout(() => {
+              const leaves = this.app.workspace.getLeavesOfType(VIEW_TYPE_CHAT);
+              if (leaves.length > 0) {
+                const view = leaves[0].view as ChatView;
+                view.seedPrompt(selection);
+              }
+            }, 100);
+          }),
+          "Failed to open the writing assistant chat.",
+        );
       },
     });
 
@@ -102,10 +114,13 @@ export default class WritingAssistantChat extends Plugin {
                 const expanded = expandCommandTemplate(command.prompt, { selection, noteText });
 
                 await this.activateChatView();
-                window.setTimeout(async () => {
+                window.setTimeout(() => {
                   const leaves = this.app.workspace.getLeavesOfType(VIEW_TYPE_CHAT);
                   if (leaves.length > 0) {
-                    await (leaves[0].view as ChatView).sendCommand(expanded);
+                    reportIfRejected(
+                      (leaves[0].view as ChatView).sendCommand(expanded),
+                      "Failed to run the command.",
+                    );
                   }
                 }, 100);
               });
@@ -159,19 +174,27 @@ export default class WritingAssistantChat extends Plugin {
   private initLeafIfNeeded(): void {
     const existing = this.app.workspace.getLeavesOfType(VIEW_TYPE_CHAT);
     if (existing.length === 0) return;
-    this.app.workspace.revealLeaf(existing[0]);
+    // Startup reveal of a restored leaf, fire-and-forget: this method is a sync void
+    // callback for onLayoutReady, so a failed reveal surfaces as a Notice.
+    reportIfRejected(
+      this.app.workspace.revealLeaf(existing[0]),
+      "Failed to reveal the writing assistant chat.",
+    );
   }
 
   async activateChatView(): Promise<void> {
     const existing = this.app.workspace.getLeavesOfType(VIEW_TYPE_CHAT);
     if (existing.length > 0) {
-      this.app.workspace.revealLeaf(existing[0]);
+      // Awaited: revealing the view is the whole job of this method, and callers await
+      // it (or route it through reportIfRejected), so a failed reveal propagates rather
+      // than floating.
+      await this.app.workspace.revealLeaf(existing[0]);
       return;
     }
 
     const leaf = this.app.workspace.getRightLeaf(false);
     if (!leaf) return;
     await leaf.setViewState({ type: VIEW_TYPE_CHAT, active: true });
-    this.app.workspace.revealLeaf(leaf);
+    await this.app.workspace.revealLeaf(leaf);
   }
 }

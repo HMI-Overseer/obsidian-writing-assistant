@@ -74,7 +74,8 @@ export class ConversationStorage {
     try {
       if (!(await this.exists(path))) return null;
       const raw = await this.app.vault.adapter.read(path);
-      return normalizeConversation(JSON.parse(raw));
+      const parsed: unknown = JSON.parse(raw);
+      return normalizeConversation(parsed);
     } catch {
       return null;
     }

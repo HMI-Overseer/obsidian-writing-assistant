@@ -44,6 +44,32 @@ function makeConversation(messages: ConversationMessage[]): Conversation {
   };
 }
 
+describe("normalizeConversation, malformed persisted data (disk boundary)", () => {
+  // data.json is user-editable and can be corrupted or predate the current shape.
+  // JSON.parse yields any of null / a primitive / an array here, none of which is a
+  // conversation. Each must be rejected, not crash and not silently become a junk
+  // conversation with a fresh id.
+  test("null is rejected, not dereferenced", () => {
+    expect(normalizeConversation(null)).toBeNull();
+  });
+
+  test("a bare primitive is rejected", () => {
+    expect(normalizeConversation(42)).toBeNull();
+    expect(normalizeConversation("not a conversation")).toBeNull();
+  });
+
+  test("an array is rejected", () => {
+    expect(normalizeConversation([])).toBeNull();
+    expect(normalizeConversation([{ id: "x" }])).toBeNull();
+  });
+
+  test("a well-formed object still normalizes (guard is not over-broad)", () => {
+    const result = normalizeConversation(makeConversation([]));
+    expect(result).not.toBeNull();
+    expect(result!.id).toBe("conv-1");
+  });
+});
+
 describe("normalizeConversation, usage field preservation", () => {
   test("preserves modelId, provider, and usage on assistant messages", () => {
     const msg: ConversationMessage = {

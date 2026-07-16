@@ -15,7 +15,7 @@ function sandwichOrder<T>(items: T[]): T[] {
   // Place the best item first and the second-best last.
   // Weaker items go in the middle where LLM attention is lowest.
   // For [1,2,3,4,5] → [1, 4, 5, 3, 2]
-  const result: T[] = new Array(items.length);
+  const result: T[] = new Array<T>(items.length);
   let left = 0;
   let right = items.length - 1;
 

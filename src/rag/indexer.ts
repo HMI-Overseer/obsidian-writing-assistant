@@ -412,7 +412,8 @@ export class VaultIndexer {
         const cache = this.app.metadataCache.getFileCache(file);
         const tags: string[] = [];
         if (cache?.frontmatter?.tags) {
-          const raw = cache.frontmatter.tags;
+          // Frontmatter values are untyped (any) user YAML; treat as unknown and narrow.
+          const raw: unknown = cache.frontmatter.tags;
           if (Array.isArray(raw)) {
             tags.push(...raw.map(String));
           } else if (typeof raw === "string") {

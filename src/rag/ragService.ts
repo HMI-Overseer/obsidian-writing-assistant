@@ -3,7 +3,7 @@ import { Notice } from "obsidian";
 import type { RagSettings, IndexingState } from "./types";
 import type { EmbeddingModel, ProviderSettingsMap } from "../shared/types";
 import type { RagContextBlock } from "../shared/chatRequest";
-import { VectorStore } from "./vectorStore";
+import { VectorStore, isSerializedVectorIndex } from "./vectorStore";
 import { VaultIndexer } from "./indexer";
 import { Retriever } from "./retriever";
 import { LMStudioEmbeddingClient } from "./lmStudioEmbedding";
@@ -529,10 +529,10 @@ export class RagService {
       if (!exists) return;
 
       const raw = await this.app.vault.adapter.read(path);
-      const data = JSON.parse(raw);
+      const data: unknown = JSON.parse(raw);
 
-      if (!this.store.deserialize(data)) {
-        // Model mismatch, index was built with a different model.
+      if (!isSerializedVectorIndex(data) || !this.store.deserialize(data)) {
+        // Malformed index, or a model mismatch: discard and rebuild.
         this.store.clear();
       }
     } catch {

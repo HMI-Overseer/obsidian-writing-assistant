@@ -59,6 +59,15 @@ That's all I found.`;
     expect(parseExtractionResponse("[1, 2, 3]")).toBeNull();
   });
 
+  test("treats non-array entities/relationships as empty (model-output boundary)", () => {
+    // The model can emit a syntactically valid object whose collections are the wrong
+    // shape. Each is read as unknown and only iterated when it is actually an array.
+    const result = parseExtractionResponse(
+      'noise {"entities": "not-an-array", "relationships": 5} trailing',
+    );
+    expect(result).toEqual({ entities: [], relationships: [] });
+  });
+
   test("filters out malformed entities", () => {
     const input = JSON.stringify({
       entities: [

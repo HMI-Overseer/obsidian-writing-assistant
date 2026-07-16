@@ -329,10 +329,15 @@ export function parseExtractionResponse(text: string): ExtractionResult | null {
   }
 
   try {
-    const parsed = JSON.parse(cleaned.slice(firstBrace, lastBrace + 1));
+    // JSON.parse of model output is untrusted: narrow to a record once, then read
+    // each collection through a local so downstream stays type-safe.
+    const parsed: unknown = JSON.parse(cleaned.slice(firstBrace, lastBrace + 1));
+    if (typeof parsed !== "object" || parsed === null) return null;
+    const record = parsed as Record<string, unknown>;
 
-    const entities = Array.isArray(parsed.entities)
-      ? parsed.entities.filter(
+    const rawEntities = record.entities;
+    const entities = Array.isArray(rawEntities)
+      ? rawEntities.filter(
           (e: unknown): e is ExtractionResult["entities"][number] =>
             typeof e === "object" &&
             e !== null &&
@@ -342,8 +347,9 @@ export function parseExtractionResponse(text: string): ExtractionResult | null {
         )
       : [];
 
-    const relationships = Array.isArray(parsed.relationships)
-      ? parsed.relationships.filter(
+    const rawRelationships = record.relationships;
+    const relationships = Array.isArray(rawRelationships)
+      ? rawRelationships.filter(
           (r: unknown): r is ExtractionResult["relationships"][number] =>
             typeof r === "object" &&
             r !== null &&

@@ -403,3 +403,20 @@ export class KnowledgeGraph {
     this.builtAt = Date.now();
   }
 }
+
+/**
+ * Boundary guard for a persisted graph read off disk (JSON.parse yields `any`).
+ * Validates the top-level shape only: the required arrays must be present so
+ * `deserialize`'s spreads and iteration cannot throw on a non-array. Element-level
+ * corruption stays backstopped by the caller's try/catch, which discards and
+ * rebuilds, exactly as before this guard existed.
+ */
+export function isSerializedKnowledgeGraph(data: unknown): data is SerializedKnowledgeGraph {
+  if (typeof data !== "object" || data === null) return false;
+  const obj = data as Record<string, unknown>;
+  return (
+    Array.isArray(obj.files) &&
+    Array.isArray(obj.entities) &&
+    Array.isArray(obj.relations)
+  );
+}

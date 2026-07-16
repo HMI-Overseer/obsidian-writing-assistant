@@ -736,8 +736,9 @@ function executeFindNotesByTag(
     const cache = ctx.app.metadataCache.getFileCache(file);
     if (!cache) continue;
 
-    // Frontmatter tags array (e.g. tags: [character, location]).
-    const fmTags = cache.frontmatter?.tags;
+    // Frontmatter tags array (e.g. tags: [character, location]). Frontmatter is
+    // untyped (any) user YAML, so treat it as unknown and narrow.
+    const fmTags: unknown = cache.frontmatter?.tags;
     if (fmTags) {
       const tagList = Array.isArray(fmTags) ? fmTags : [fmTags];
       if (tagList.some((t) => `#${String(t)}`.toLowerCase() === tagLower)) {

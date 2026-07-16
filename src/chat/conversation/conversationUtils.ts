@@ -104,24 +104,30 @@ function normalizeConversationMeta(raw: Record<string, unknown>): ConversationMe
   };
 }
 
-export function normalizeConversation(raw: Record<string, unknown>): Conversation | null {
-  const id = typeof raw.id === "string" && raw.id ? raw.id : generateId();
-  const title = typeof raw.title === "string" ? raw.title : "";
-  const now = Date.now();
-  const createdAt = typeof raw.createdAt === "number" ? raw.createdAt : now;
-  const updatedAt = typeof raw.updatedAt === "number" ? raw.updatedAt : now;
-  const modelId = typeof raw.modelId === "string" ? raw.modelId : "";
-  const modelName = typeof raw.modelName === "string" ? raw.modelName : "Unknown";
-  const draft = typeof raw.draft === "string" ? raw.draft : "";
+export function normalizeConversation(raw: unknown): Conversation | null {
+  // data.json is user-editable and may be corrupt or predate this shape; a non-object
+  // (null, a primitive, an array) is not a conversation and is rejected rather than
+  // dereferenced into a crash or a junk record.
+  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) return null;
+  const record = raw as Record<string, unknown>;
 
-  const messages: ConversationMessage[] = Array.isArray(raw.messages)
-    ? raw.messages
-        .filter((message): message is Record<string, unknown> => {
+  const id = typeof record.id === "string" && record.id ? record.id : generateId();
+  const title = typeof record.title === "string" ? record.title : "";
+  const now = Date.now();
+  const createdAt = typeof record.createdAt === "number" ? record.createdAt : now;
+  const updatedAt = typeof record.updatedAt === "number" ? record.updatedAt : now;
+  const modelId = typeof record.modelId === "string" ? record.modelId : "";
+  const modelName = typeof record.modelName === "string" ? record.modelName : "Unknown";
+  const draft = typeof record.draft === "string" ? record.draft : "";
+
+  const messages: ConversationMessage[] = Array.isArray(record.messages)
+    ? record.messages
+        .filter((message: unknown): message is Record<string, unknown> => {
+          if (typeof message !== "object" || message === null) return false;
+          const m = message as Record<string, unknown>;
           return (
-            !!message &&
-            typeof message === "object" &&
-            (message.role === "user" || message.role === "assistant") &&
-            typeof message.content === "string"
+            (m.role === "user" || m.role === "assistant") &&
+            typeof m.content === "string"
           );
         })
         .map((message) => {
@@ -203,7 +209,7 @@ export function normalizeConversation(raw: Record<string, unknown>): Conversatio
     modelName,
     messages,
     draft,
-    approvalPosture: normalizePosture(raw.approvalPosture),
+    approvalPosture: normalizePosture(record.approvalPosture),
   };
 }
 

@@ -200,7 +200,7 @@ export function normalizeVaultToolCall(app: App, call: ToolCall): ToolCall {
     const value = args[key];
     if (!Array.isArray(value)) continue;
     let arrayChanged = false;
-    const rewritten = value.map((entry) => {
+    const rewritten = value.map((entry: unknown) => {
       if (typeof entry !== "string") return entry;
       const next = rewrite(entry, key);
       if (next !== entry) arrayChanged = true;

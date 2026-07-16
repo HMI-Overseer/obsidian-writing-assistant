@@ -2,7 +2,7 @@ import type { App } from "obsidian";
 import { Notice } from "obsidian";
 import type { KnowledgeGraphSettings, GraphBuildState } from "./types";
 import type { CompletionModel, EmbeddingModel, ProviderSettingsMap } from "../../shared/types";
-import { KnowledgeGraph } from "./knowledgeGraph";
+import { KnowledgeGraph, isSerializedKnowledgeGraph } from "./knowledgeGraph";
 import { GraphExtractor, matchGlob, getTopLevelFolder } from "./extractor";
 import { createChatClient } from "../../providers/registry";
 import type { ChatClient } from "../../api/chatClient";
@@ -379,10 +379,13 @@ export class GraphService {
       if (!exists) return;
 
       const raw = await this.app.vault.adapter.read(path);
-      const data = JSON.parse(raw);
+      const data: unknown = JSON.parse(raw);
 
-      if (!this.graph.deserialize(data, this.configuredModelId, this.configuredEmbeddingModelId ?? undefined)) {
-        // Model mismatch, graph was built with a different model.
+      if (
+        !isSerializedKnowledgeGraph(data) ||
+        !this.graph.deserialize(data, this.configuredModelId, this.configuredEmbeddingModelId ?? undefined)
+      ) {
+        // Malformed graph, or a model mismatch: discard and rebuild.
         this.graph.clear();
       }
     } catch {

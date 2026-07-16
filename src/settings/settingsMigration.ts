@@ -255,15 +255,17 @@ const VALID_PROVIDERS = new Set<string>(Object.keys(PROVIDER_DESCRIPTORS));
 export function normalizeProviderProfiles(raw: unknown): ProviderProfile[] {
   if (!Array.isArray(raw)) return [];
   return raw
-    .filter(
-      (p): p is ProviderProfile =>
-        typeof p === "object" &&
-        p !== null &&
-        typeof p.id === "string" &&
-        typeof p.name === "string" &&
-        VALID_PROVIDERS.has(p.provider) &&
-        !p.isDefault,
-    )
+    .filter((p: unknown): p is ProviderProfile => {
+      if (typeof p !== "object" || p === null) return false;
+      const candidate = p as Record<string, unknown>;
+      return (
+        typeof candidate.id === "string" &&
+        typeof candidate.name === "string" &&
+        typeof candidate.provider === "string" &&
+        VALID_PROVIDERS.has(candidate.provider) &&
+        !candidate.isDefault
+      );
+    })
     .map((profile) => {
       // One-way migration: reasoning moved from the profile to the per-model
       // `reasoningByModelKey` map. Provider-wide values are deliberately not

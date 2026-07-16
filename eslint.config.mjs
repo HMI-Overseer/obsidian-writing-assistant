@@ -38,11 +38,6 @@ export default tseslint.config(
       // Staged. Options are written out only where a severity-only override would inherit an
       // unwanted one; see the doc's Gotchas.
       "@typescript-eslint/no-deprecated": "warn",
-      "@typescript-eslint/no-unsafe-argument": "warn",
-      "@typescript-eslint/no-unsafe-assignment": "warn",
-      "@typescript-eslint/no-unsafe-call": "warn",
-      "@typescript-eslint/no-unsafe-member-access": "warn",
-      "@typescript-eslint/no-unsafe-return": "warn",
       "@typescript-eslint/no-explicit-any": ["warn", { fixToUnknown: false }],
       "@typescript-eslint/only-throw-error": "warn",
       "@typescript-eslint/prefer-promise-reject-errors": "warn",

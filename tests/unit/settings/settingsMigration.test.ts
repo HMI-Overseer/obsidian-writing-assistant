@@ -189,6 +189,21 @@ describe("normalizeProviderProfiles", () => {
     expect(normalizeProviderProfiles(null)).toEqual([]);
   });
 
+  it("drops non-object and malformed entries without dereferencing them (disk boundary)", () => {
+    // data.json is user-editable; an array can hold junk. Each entry is narrowed
+    // from unknown before any property is read, so these are filtered, not crashed on.
+    const profiles = normalizeProviderProfiles([
+      null,
+      42,
+      "not-an-object",
+      [],
+      { id: "a", name: "A", provider: 123, isDefault: false }, // non-string provider
+      { id: "ok", name: "OK", provider: "anthropic", isDefault: false },
+    ]);
+    expect(profiles).toHaveLength(1);
+    expect(profiles[0].id).toBe("ok");
+  });
+
   it("accepts a profile for every registered provider (VALID_PROVIDERS derives from descriptors)", () => {
     const keys = Object.keys(PROVIDER_DESCRIPTORS);
     const profiles = keys.map((provider, i) => ({

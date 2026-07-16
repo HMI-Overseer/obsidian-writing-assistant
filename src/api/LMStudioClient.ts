@@ -290,7 +290,7 @@ export class LMStudioClient implements ChatClient {
         }
         messages.push({ role: "user", content: parts });
       } else {
-        messages.push({ role: turn.role as "system" | "user" | "assistant", content: turn.content ?? "" });
+        messages.push({ role: turn.role, content: turn.content ?? "" });
       }
     }
 

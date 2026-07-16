@@ -37,7 +37,7 @@ export function buildVaultSdkTools(
         const result = await provider.callTool({
           id: generateId(),
           name: definition.name,
-          arguments: (args ?? {}) as Record<string, unknown>,
+          arguments: (args ?? {}),
         });
         return {
           content: [{ type: "text", text: result.content }],

@@ -319,7 +319,7 @@ export function normalizeActiveProfileIds(raw: unknown): Record<ProviderOption, 
   const obj = raw as Record<string, unknown>;
   for (const key of Object.keys(defaults) as ProviderOption[]) {
     if (typeof obj[key] === "string") {
-      defaults[key] = obj[key] as string;
+      defaults[key] = obj[key];
     }
   }
   return defaults;
@@ -342,11 +342,31 @@ interface LegacyModelRow {
   provider: ProviderOption;
 }
 
+/**
+ * The persisted-settings shape a migration may encounter on disk: the current
+ * {@link PluginSettings} (optional, since a saved blob can be partial) plus fields
+ * retired from older versions. Retired fields are typed `unknown` because their stored
+ * value is untrusted and is validated at read time; typing the input as the live model
+ * and casting to `Record<string, unknown>` to reach them would be the anti-pattern. The
+ * live model never carries these fields. See ADR-0027 for the retire-then-migrate stance.
+ */
+type LegacyPersistedSettings = Partial<PluginSettings> & {
+  /** Pre-rework flat model arrays, folded into lmStudioModelCache / customModels. */
+  completionModels?: unknown;
+  embeddingModels?: unknown;
+  /** Pre-unification per-mode prompt prefixes, folded into systemPromptPrefix. */
+  chatSystemPromptPrefix?: unknown;
+  planSystemPromptPrefix?: unknown;
+  /** Pre-unification per-mode round budgets, folded into maxToolRounds. */
+  maxToolRoundsChat?: unknown;
+  maxToolRoundsEdit?: unknown;
+};
+
 function readLegacyModelRows(
-  data: Partial<PluginSettings> | null,
+  data: LegacyPersistedSettings | null,
   field: "completionModels" | "embeddingModels",
 ): LegacyModelRow[] {
-  const raw = (data as Record<string, unknown> | null)?.[field];
+  const raw = data?.[field];
   if (!Array.isArray(raw)) return [];
   const rows: LegacyModelRow[] = [];
   for (const entry of raw) {
@@ -391,11 +411,11 @@ function normalizeCacheRows<T extends CompletionModel | EmbeddingModel>(raw: unk
 }
 
 function normalizeLmStudioModelCache(
-  data: Partial<PluginSettings> | null,
+  data: LegacyPersistedSettings | null,
   legacyCompletion: LegacyModelRow[],
   legacyEmbedding: LegacyModelRow[],
 ): LmStudioModelCache {
-  const raw = (data as Record<string, unknown> | null)?.lmStudioModelCache;
+  const raw: unknown = data?.lmStudioModelCache;
   if (typeof raw === "object" && raw !== null) {
     const cache = raw as Record<string, unknown>;
     return {
@@ -420,11 +440,11 @@ function normalizeLmStudioModelCache(
 const VALID_MODEL_ROLES = new Set<ModelRole>(["completion", "embedding"]);
 
 function normalizeCustomModels(
-  data: Partial<PluginSettings> | null,
+  data: LegacyPersistedSettings | null,
   legacyCompletion: LegacyModelRow[],
   legacyEmbedding: LegacyModelRow[],
 ): Partial<Record<ProviderOption, CustomModelEntry[]>> {
-  const raw = (data as Record<string, unknown> | null)?.customModels;
+  const raw: unknown = data?.customModels;
   if (typeof raw === "object" && raw !== null) {
     const result: Partial<Record<ProviderOption, CustomModelEntry[]>> = {};
     for (const [provider, entries] of Object.entries(raw)) {
@@ -466,12 +486,12 @@ function normalizeCustomModels(
 }
 
 function normalizeModelIdAliases(
-  data: Partial<PluginSettings> | null,
+  data: LegacyPersistedSettings | null,
   legacyCompletion: LegacyModelRow[],
   legacyEmbedding: LegacyModelRow[],
 ): Record<string, string> {
   const aliases: Record<string, string> = {};
-  const raw = (data as Record<string, unknown> | null)?.modelIdAliases;
+  const raw = data?.modelIdAliases;
   if (typeof raw === "object" && raw !== null) {
     for (const [key, value] of Object.entries(raw)) {
       if (typeof value === "string" && value.length > 0) aliases[key] = value;
@@ -496,22 +516,20 @@ function normalizeModelIdAliases(
  * a customized legacy chat (then plan) prefix is carried forward, so a user's prior
  * wording survives. The edit-format prompts are dropped (their guidance is now dynamic).
  */
-function migrateSystemPromptPrefix(data: Partial<PluginSettings> | null): string {
+function migrateSystemPromptPrefix(data: LegacyPersistedSettings | null): string {
   if (typeof data?.systemPromptPrefix === "string") return data.systemPromptPrefix;
-  const legacy = data as Record<string, unknown> | null;
-  if (typeof legacy?.chatSystemPromptPrefix === "string") return legacy.chatSystemPromptPrefix;
-  if (typeof legacy?.planSystemPromptPrefix === "string") return legacy.planSystemPromptPrefix;
+  if (typeof data?.chatSystemPromptPrefix === "string") return data.chatSystemPromptPrefix;
+  if (typeof data?.planSystemPromptPrefix === "string") return data.planSystemPromptPrefix;
   return DEFAULT_SETTINGS.systemPromptPrefix;
 }
 
 // The old per-mode round budgets (`maxToolRoundsEdit` / `maxToolRoundsChat`) collapsed
 // into one `maxToolRounds` once the modes were gone; carry a customized legacy value
 // forward, the live chat budget preferred over the dead edit one.
-function migrateMaxToolRounds(data: Partial<PluginSettings> | null): number {
+function migrateMaxToolRounds(data: LegacyPersistedSettings | null): number {
   if (typeof data?.maxToolRounds === "number") return data.maxToolRounds;
-  const legacy = data as Record<string, unknown> | null;
-  if (typeof legacy?.maxToolRoundsChat === "number") return legacy.maxToolRoundsChat;
-  if (typeof legacy?.maxToolRoundsEdit === "number") return legacy.maxToolRoundsEdit;
+  if (typeof data?.maxToolRoundsChat === "number") return data.maxToolRoundsChat;
+  if (typeof data?.maxToolRoundsEdit === "number") return data.maxToolRoundsEdit;
   return DEFAULT_SETTINGS.maxToolRounds;
 }
 

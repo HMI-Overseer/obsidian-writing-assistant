@@ -82,7 +82,7 @@ export function renderBenchmarkTab(
   const selector = createModelSelector(modelItem.settingEl, models, pluginModelDropdownDeps(plugin), {
     initial: selectedModel,
     onSelect: (model) => {
-      selectedModel = model as CompletionModel | null;
+      selectedModel = model;
       profilePopover.syncVisibility();
     },
   });

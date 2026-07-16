@@ -94,7 +94,7 @@ export function validateProposeEdit(
 function normalizeFrontmatterValue(value: unknown): string | string[] | undefined {
   if (typeof value === "string") return value;
   if (Array.isArray(value) && value.every((item) => typeof item === "string")) {
-    return value as string[];
+    return value;
   }
   return undefined;
 }

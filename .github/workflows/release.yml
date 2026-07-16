@@ -8,6 +8,14 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    # An explicit permissions block replaces the default token scope entirely, so every
+    # permission the job needs must be listed. contents: write is required by gh release
+    # create (drop it and the release step 403s); id-token + attestations: write exist for
+    # the build-provenance attestation (ADR-0028).
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
 
     steps:
       - uses: actions/checkout@v4
@@ -23,6 +31,17 @@ jobs:
           npm ci
           npm run build
           npm run build:css
+
+      # This stage exists because release assets must ship a verifiable build-provenance
+      # attestation. Why it runs before "Create release", and why it attests only the built
+      # outputs, is ADR-0028:
+      # docs/03-decisions/ADR-0028-release-assets-carry-build-provenance-attestations.md
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@v4
+        with:
+          subject-path: |
+            main.js
+            styles.css
 
       - name: Create release
         env:

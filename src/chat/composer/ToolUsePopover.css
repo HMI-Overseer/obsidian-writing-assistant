@@ -12,11 +12,10 @@
   /* The popover lives outside the footer row (its overflow clip would chop it),
      so it can't sit next to its chip in the DOM. CSS anchor positioning tracks
      the chip across pane widths and container-query reshuffles: right edges
-     align, clamped so the popover never leaves the footer. The first, static
-     `right` is the fallback for pre-anchor-positioning engines. */
+     align, clamped so the popover never leaves the footer. The static `right`
+     is the fallback for pre-anchor-positioning engines, the enhancement is in
+     the @supports below. */
   right: 50px;
-  position-anchor: --lmsa-tool-chip;
-  right: clamp(14px, anchor(right), calc(100% - 14px - var(--lmsa-tool-popover-width)));
   width: var(--lmsa-tool-popover-width);
   background:
     linear-gradient(
@@ -30,6 +29,13 @@
     0 -12px 48px rgba(0, 0, 0, 0.18),
     inset 0 -1px 0 var(--lmsa-inset-highlight-subtle);
   transform-origin: bottom right;
+}
+
+@supports (position-anchor: --lmsa-probe) and (right: anchor(right)) {
+  .lmsa-tool-popover {
+    position-anchor: --lmsa-tool-chip;
+    right: clamp(14px, anchor(right), calc(100% - 14px - var(--lmsa-tool-popover-width)));
+  }
 }
 
 .lmsa-tool-popover-title {

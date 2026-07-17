@@ -63,10 +63,9 @@
   /* Anchored to the pill (see the tool popover for the rationale): right
      edges align since the pill sits in the right cluster, clamped so the
      menu never leaves the footer (184px covers the menu's min-width). The
-     first, static `right` is the pre-anchor fallback. */
+     static `right` is the pre-anchor fallback, the enhancement is in the
+     @supports below. */
   right: 8px;
-  position-anchor: --lmsa-posture-pill;
-  right: clamp(8px, anchor(right), calc(100% - 184px));
   min-width: 168px;
   background:
     linear-gradient(
@@ -80,6 +79,13 @@
     0 -12px 48px rgba(0, 0, 0, 0.18),
     inset 0 -1px 0 var(--lmsa-inset-highlight-subtle);
   transform-origin: bottom right;
+}
+
+@supports (position-anchor: --lmsa-probe) and (right: anchor(right)) {
+  .lmsa-posture-menu {
+    position-anchor: --lmsa-posture-pill;
+    right: clamp(8px, anchor(right), calc(100% - 184px));
+  }
 }
 
 .lmsa-posture-menu.lmsa-hidden {

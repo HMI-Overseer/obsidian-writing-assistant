@@ -54,9 +54,9 @@
   @apply lmsa:absolute lmsa:z-[120] lmsa:flex-col lmsa:rounded-xl lmsa:border lmsa:border-obsidian-border lmsa:p-1;
   display: flex;
   bottom: calc(100% + 8px);
+  /* Right-anchored to --lmsa-overflow-btn; the static value is the
+     pre-anchor-positioning fallback, the enhancement is in the @supports below. */
   right: 8px;
-  position-anchor: --lmsa-overflow-btn;
-  right: clamp(8px, anchor(right), calc(100% - 196px));
   min-width: 180px;
   background:
     linear-gradient(
@@ -70,6 +70,13 @@
     0 -12px 48px rgba(0, 0, 0, 0.18),
     inset 0 -1px 0 var(--lmsa-inset-highlight-subtle);
   transform-origin: bottom right;
+}
+
+@supports (position-anchor: --lmsa-probe) and (right: anchor(right)) {
+  .lmsa-overflow-menu {
+    position-anchor: --lmsa-overflow-btn;
+    right: clamp(8px, anchor(right), calc(100% - 196px));
+  }
 }
 
 .lmsa-overflow-menu.lmsa-hidden {

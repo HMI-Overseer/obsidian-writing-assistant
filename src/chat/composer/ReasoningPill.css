@@ -72,10 +72,9 @@
   bottom: calc(100% + 8px);
   /* Anchored to the pill (see the tool popover for the rationale): left edges
      align, clamped so the menu never leaves the footer (148px covers the menu's
-     132px min-width). The first, static `left` is the pre-anchor fallback. */
+     132px min-width). The static `left` is the pre-anchor fallback, the
+     enhancement is in the @supports below. */
   left: 8px;
-  position-anchor: --lmsa-reasoning-pill;
-  left: clamp(8px, anchor(left), calc(100% - 148px));
   min-width: 132px;
   background:
     linear-gradient(
@@ -89,6 +88,13 @@
     0 -12px 48px rgba(0, 0, 0, 0.18),
     inset 0 -1px 0 var(--lmsa-inset-highlight-subtle);
   transform-origin: bottom left;
+}
+
+@supports (position-anchor: --lmsa-probe) and (left: anchor(left)) {
+  .lmsa-reasoning-menu {
+    position-anchor: --lmsa-reasoning-pill;
+    left: clamp(8px, anchor(left), calc(100% - 148px));
+  }
 }
 
 .lmsa-reasoning-menu.lmsa-hidden {

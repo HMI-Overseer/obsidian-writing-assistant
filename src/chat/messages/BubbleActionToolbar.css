@@ -12,8 +12,7 @@
   opacity: 1;
 }
 
-.lmsa-chat-window-message.is-editing .lmsa-chat-window-bubble-toolbar,
-.lmsa-chat-window-message:has(.lmsa-chat-window-message-body.is-streaming) > .lmsa-chat-window-bubble-toolbar {
+.lmsa-chat-window-message.is-editing .lmsa-chat-window-bubble-toolbar {
   display: none;
 }
 

@@ -10,8 +10,7 @@
 .lmsa-inline-diff-removed {
   background: color-mix(in srgb, var(--text-error) 10%, var(--background-primary));
   color: var(--text-muted);
-  text-decoration: line-through;
-  text-decoration-color: var(--text-error);
+  text-decoration: line-through var(--text-error);
 }
 
 /* The proposed replacement, as a block beneath the struck range. */

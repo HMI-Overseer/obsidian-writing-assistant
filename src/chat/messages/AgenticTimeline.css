@@ -165,8 +165,7 @@
 }
 
 .lmsa-agentic-timeline-step--expandable:hover .lmsa-agentic-timeline-step-name {
-  text-decoration: underline;
-  text-decoration-style: dotted;
+  text-decoration: underline dotted;
 }
 
 /* No card: a quiet left rule marks the detail as nested under the step, so it

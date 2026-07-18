@@ -1024,6 +1024,12 @@ export const SURFACES = {
                 <span class="lmsa-kg-folder-count">4 / 10</span>
                 <div class="lmsa-kg-folder-action"><button class="lmsa-ui-btn lmsa-ui-btn-secondary lmsa-kg-folder-btn">Resume</button></div>
               </div>
+              <div class="lmsa-kg-folder-row">
+                <span class="lmsa-kg-folder-name">Locations</span>
+                <div class="lmsa-kg-folder-bar"><div class="lmsa-kg-folder-bar-fill" style="width:60%"></div></div>
+                <span class="lmsa-kg-folder-count">6 / 10</span>
+                <div class="lmsa-kg-folder-action"><button class="lmsa-ui-btn lmsa-kg-folder-btn lmsa-kg-folder-stop-btn">Stop</button></div>
+              </div>
             </div>
           </div>`,
         )}</div>`,
@@ -1193,6 +1199,91 @@ export const SURFACES = {
         <div class="cm-line">The rain began to fall.</div>
       </div></div></div>`,
       560,
+    ),
+  },
+
+  // S26: settings navigation rail (SettingsTab.ts renderRail). The rail is the sibling of the stage
+  // inside .lmsa-settings-shell and is absent from settingsView(), so the rail-item button-reset overrides
+  // (SettingsTab.css base block + is-active block) had no harness coverage. One item is-active so the
+  // is-active background/box-shadow overrides render; the group is-active so the label accent renders.
+  // Hover (rail-item:hover, group-label hover) stays live-app: the harness is static.
+  settingsRail: {
+    w: 200,
+    shot: ".lmsa-settings-rail",
+    html: `<div class="lmsa-harness-stage" style="width:180px">
+      <div class="lmsa-settings-root"><div class="lmsa-settings-shell">
+        <div class="lmsa-settings-rail">
+          <div class="lmsa-settings-rail-group is-active">
+            <span class="lmsa-settings-rail-group-label">Chat</span>
+            <button class="lmsa-settings-rail-item is-active" type="button">
+              <span class="lmsa-settings-rail-icon">${I.gear}</span>
+              <span class="lmsa-settings-rail-label">General</span>
+            </button>
+            <button class="lmsa-settings-rail-item" type="button">
+              <span class="lmsa-settings-rail-icon">${I.database}</span>
+              <span class="lmsa-settings-rail-label">Providers</span>
+            </button>
+          </div>
+          <div class="lmsa-settings-rail-group">
+            <span class="lmsa-settings-rail-group-label">Retrieval</span>
+            <button class="lmsa-settings-rail-item" type="button">
+              <span class="lmsa-settings-rail-icon">${I.brain}</span>
+              <span class="lmsa-settings-rail-label">Knowledge</span>
+            </button>
+          </div>
+        </div>
+      </div></div>
+    </div>`,
+  },
+
+  // S27: chat header row (createChatLayout.ts): model-selector trigger + the two header icon buttons.
+  // The composer/transcript surfaces omit the header, so .lmsa-chat-header-actions .lmsa-ui-icon-btn
+  // (view-scoped background override) and .lmsa-profile-settings-btn in the chat context had no coverage.
+  // Hover stays live-app.
+  chatHeader: {
+    w: 520,
+    shot: ".lmsa-chat-header",
+    html: view(
+      `<div class="lmsa-chat-header">
+        <div class="lmsa-chat-header-copy">
+          <div class="lmsa-chat-header-title">Writing assistant chat</div>
+          <div class="lmsa-chat-header-meta-wrap">
+            <div class="lmsa-chat-header-meta is-active">
+              <span class="lmsa-chat-header-meta-label">Claude Sonnet 4.5</span>
+              <span class="lmsa-model-selector-status is-cloud"></span>
+              <span class="lmsa-chat-header-meta-chevron">${I.chevronDown}</span>
+            </div>
+            <button class="lmsa-profile-settings-btn" aria-label="Profile settings">${I.gear}</button>
+          </div>
+        </div>
+        <div class="lmsa-chat-header-actions">
+          <button class="lmsa-chat-header-btn lmsa-ui-icon-btn" aria-label="New chat">${I.file}</button>
+          <button class="lmsa-chat-header-btn lmsa-ui-icon-btn" aria-label="Chat history">${I.gear}</button>
+        </div>
+      </div>`,
+      520,
+    ),
+  },
+
+  // S28: floating overlay affordances rendered in flow. The jump-to-latest pill (.lmsa-scroll-to-bottom,
+  // a span) and the generate-response button (.lmsa-chat-composer-generate-btn, a button normally carrying
+  // lmsa-hidden) are absolutely positioned and absent from the at-rest composer/transcript surfaces, so
+  // their transparent-background / no-shadow overrides had no coverage. Rendered here (generate button
+  // without lmsa-hidden); their anchored top/left offsets and translate are position-dependent, neutralized
+  // inline like SCAFFOLD does for popovers, so the anchored placement is a live-app check, the chrome is not.
+  floatingButtons: {
+    w: 360,
+    shot: ".lmsa-floating-probe",
+    html: view(
+      `<div class="lmsa-floating-probe" style="position:relative;width:320px;height:120px;display:flex;align-items:center;justify-content:center;gap:14px">
+        <span class="lmsa-scroll-to-bottom" style="position:static;transform:none">
+          <span>Jump to latest</span>${I.chevronDown}
+        </span>
+        <button class="lmsa-chat-composer-generate-btn" style="position:static;transform:none" aria-label="Generate response">
+          <span class="lmsa-chat-composer-generate-icon">${I.arrowUp}</span>Generate response
+        </button>
+      </div>`,
+      360,
     ),
   },
 };

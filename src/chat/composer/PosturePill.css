@@ -10,7 +10,7 @@
   @apply lmsa:relative lmsa:inline-flex lmsa:flex-none lmsa:cursor-pointer lmsa:items-center lmsa:gap-1.5 lmsa:px-3 lmsa:py-1.5;
   anchor-name: --lmsa-posture-pill;
   border-radius: 999px;
-  border: 1px solid color-mix(in srgb, var(--lmsa-mode-accent) 45%, var(--background-modifier-border)) !important;
+  border: 1px solid color-mix(in srgb, var(--lmsa-mode-accent) 45%, var(--background-modifier-border));
   font-size: var(--font-ui-smaller);
   font-weight: 500;
   line-height: 1.25;

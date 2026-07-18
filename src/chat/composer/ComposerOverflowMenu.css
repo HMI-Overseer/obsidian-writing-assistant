@@ -16,7 +16,7 @@
   justify-content: center;
   cursor: pointer;
   border-radius: 7px;
-  border: 1px solid var(--background-modifier-border) !important;
+  border: 1px solid var(--background-modifier-border);
   color: var(--text-muted);
   background: transparent !important;
   box-shadow: none !important;

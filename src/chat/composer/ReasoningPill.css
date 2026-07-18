@@ -9,7 +9,7 @@
   @apply lmsa:relative lmsa:inline-flex lmsa:flex-none lmsa:cursor-pointer lmsa:items-center lmsa:gap-1.5 lmsa:px-3 lmsa:py-1.5;
   anchor-name: --lmsa-reasoning-pill;
   border-radius: 999px;
-  border: 1px solid var(--background-modifier-border) !important;
+  border: 1px solid var(--background-modifier-border);
   font-size: var(--font-ui-smaller);
   font-weight: 500;
   line-height: 1.25;
@@ -34,7 +34,7 @@
 /* An explicit level reads as "set": accent tint, like the active posture. */
 .lmsa-chat-composer-reasoning-pill:not(.is-default) {
   color: var(--lmsa-mode-accent);
-  border-color: color-mix(in srgb, var(--lmsa-mode-accent) 45%, var(--background-modifier-border)) !important;
+  border-color: color-mix(in srgb, var(--lmsa-mode-accent) 45%, var(--background-modifier-border));
 }
 
 .lmsa-chat-composer-reasoning-pill-icon {

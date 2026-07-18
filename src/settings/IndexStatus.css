@@ -167,19 +167,19 @@
 }
 
 .lmsa-kg-folder-btn {
-  font-size: var(--font-ui-smaller) !important;
-  padding: 2px 8px !important;
-  height: auto !important;
-  min-height: 0 !important;
-  line-height: 1.4 !important;
+  font-size: var(--font-ui-smaller);
+  padding: 2px 8px;
+  height: auto;
+  min-height: 0;
+  line-height: 1.4;
 }
 
 .lmsa-kg-folder-stop-btn {
-  border-color: var(--lmsa-status-error, var(--color-red)) !important;
+  border-color: var(--lmsa-status-error, var(--color-red));
   color: var(--lmsa-status-error, var(--color-red)) !important;
 }
 
 .lmsa-kg-folder-stop-btn:hover {
-  background: var(--lmsa-status-error, var(--color-red)) !important;
+  background: var(--lmsa-status-error, var(--color-red));
   color: var(--text-on-accent) !important;
 }

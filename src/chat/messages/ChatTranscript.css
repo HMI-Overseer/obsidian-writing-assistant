@@ -94,7 +94,7 @@
   border: 1px solid transparent;
   border-radius: 0;
   background: transparent;
-  box-shadow: none !important;
+  box-shadow: none;
   user-select: text;
   -webkit-user-select: text;
   cursor: text;
@@ -430,26 +430,26 @@
    selector to clear Obsidian's core .modal / button styling. */
 
 .modal.lmsa-chat-image-modal-shell {
-  width: auto !important;
-  min-width: 0 !important;
-  max-width: 94vw !important;
-  max-height: none !important;
-  overflow: visible !important;
-  padding: 0 !important;
-  background: transparent !important;
-  border: none !important;
-  box-shadow: none !important;
+  width: auto;
+  min-width: 0;
+  max-width: 94vw;
+  max-height: none;
+  overflow: visible;
+  padding: 0;
+  background: transparent;
+  border: none;
+  box-shadow: none;
 }
 
 .lmsa-chat-image-modal-shell .modal-close-button,
 .lmsa-chat-image-modal-shell .modal-title {
-  display: none !important;
+  display: none;
 }
 
 .lmsa-chat-image-modal-shell .lmsa-chat-image-lightbox {
-  padding: 0 !important;
-  max-height: none !important;
-  overflow: visible !important;
+  padding: 0;
+  max-height: none;
+  overflow: visible;
 }
 
 .lmsa-chat-image-lightbox-frame {

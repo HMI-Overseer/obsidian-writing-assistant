@@ -213,7 +213,7 @@
 .lmsa-chat-composer-panel.is-dragover {
   outline: 1px dashed var(--lmsa-mode-accent);
   outline-offset: -1px;
-  background: color-mix(in srgb, var(--lmsa-mode-accent) 6%, var(--background-primary)) !important;
+  background: color-mix(in srgb, var(--lmsa-mode-accent) 6%, var(--background-primary));
 }
 
 /* ── Textarea ────────────────────────────────────────────────────────────── */

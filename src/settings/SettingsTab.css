@@ -187,14 +187,14 @@
 .lmsa-settings-rail-item {
   background: transparent !important;
   box-shadow: none !important;
-  border: none !important;
-  padding: 10px 6px 8px !important;
-  height: auto !important;
-  min-height: 0 !important;
-  line-height: 1 !important;
-  font: inherit !important;
-  -webkit-appearance: none !important;
-  appearance: none !important;
+  border: none;
+  padding: 10px 6px 8px;
+  height: auto;
+  min-height: 0;
+  line-height: 1;
+  font: inherit;
+  -webkit-appearance: none;
+  appearance: none;
 }
 
 .lmsa-settings-rail-item.is-active {
@@ -212,5 +212,5 @@
 
 /* Group label accent, must live outside @layer to beat Obsidian's cascade */
 .lmsa-settings-rail-group.is-active .lmsa-settings-rail-group-label {
-  color: var(--lmsa-section-accent) !important;
+  color: var(--lmsa-section-accent);
 }

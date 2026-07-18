@@ -1266,7 +1266,7 @@ export const SURFACES = {
   },
 
   // S28: floating overlay affordances rendered in flow. The jump-to-latest pill (.lmsa-scroll-to-bottom,
-  // a span) and the generate-response button (.lmsa-chat-composer-generate-btn, a button normally carrying
+  // a button per ChatTranscript.ts) and the generate-response button (.lmsa-chat-composer-generate-btn, a button normally carrying
   // lmsa-hidden) are absolutely positioned and absent from the at-rest composer/transcript surfaces, so
   // their transparent-background / no-shadow overrides had no coverage. Rendered here (generate button
   // without lmsa-hidden); their anchored top/left offsets and translate are position-dependent, neutralized
@@ -1276,9 +1276,9 @@ export const SURFACES = {
     shot: ".lmsa-floating-probe",
     html: view(
       `<div class="lmsa-floating-probe" style="position:relative;width:320px;height:120px;display:flex;align-items:center;justify-content:center;gap:14px">
-        <span class="lmsa-scroll-to-bottom" style="position:static;transform:none">
+        <button class="lmsa-scroll-to-bottom" style="position:static;transform:none">
           <span>Jump to latest</span>${I.chevronDown}
-        </span>
+        </button>
         <button class="lmsa-chat-composer-generate-btn" style="position:static;transform:none" aria-label="Generate response">
           <span class="lmsa-chat-composer-generate-icon">${I.arrowUp}</span>Generate response
         </button>

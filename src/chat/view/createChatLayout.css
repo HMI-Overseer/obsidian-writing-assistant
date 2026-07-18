@@ -5,19 +5,6 @@
   height: 100%;
   font-size: var(--font-ui-small);
 
-  /* The plugin root is also Obsidian's .view-content, whose core rule sets
-     `overflow: auto` and wins the cascade over a plain/layered `overflow: hidden`.
-     Left unbeaten, the root itself scrolls: a few px of horizontal overflow at narrow
-     widths pops a scrollbar that steals height and shoves the composer up (a jitter).
-     !important is required here, matching the padding overrides just below that beat
-     the same .view-content rule. The chat scrolls internally (the messages list), so
-     the root must never scroll. */
-  overflow: hidden !important;
-
-  padding-left: 0 !important;
-  padding-right: 0 !important;
-  padding-top: 0 !important;
-
   /* Mode accent, overridden per data-posture */
   --lmsa-mode-accent: var(--interactive-accent);
 
@@ -35,6 +22,22 @@
     radial-gradient(circle at top, color-mix(in srgb, var(--lmsa-mode-accent) 9%, transparent), transparent 42%),
     linear-gradient(180deg, var(--background-primary), var(--background-secondary-alt, var(--background-secondary)) 120%);
   transition: background 400ms ease;
+}
+
+/*
+ * The plugin root is also Obsidian's .view-content, whose core rule
+ * `.workspace-leaf-content .view-content` (0,2,0) sets `overflow: auto` and horizontal/top
+ * padding and wins over a plain/layered `.lmsa-root` (0,1,0). Left unbeaten, the root itself
+ * scrolls: a few px of horizontal overflow at narrow widths pops a scrollbar that steals height
+ * and shoves the composer up (a jitter). Qualifying with the same ancestor plus the compound
+ * `.view-content.lmsa-root` (0,3,0) out-specifies the core rule without `!important`. The chat
+ * scrolls internally (the messages list), so the root must never scroll.
+ */
+.workspace-leaf-content .view-content.lmsa-root {
+  overflow: hidden;
+  padding-left: 0;
+  padding-right: 0;
+  padding-top: 0;
 }
 
 /* "ask" posture keeps the base --interactive-accent (no override needed). */
@@ -89,7 +92,7 @@
 
 .lmsa-chat-header-actions .lmsa-ui-icon-btn {
   @apply lmsa:h-auto lmsa:w-auto lmsa:rounded-md lmsa:border-none lmsa:p-1.5;
-  background: transparent !important;
+  background: transparent;
   box-shadow: none;
   outline: none;
   appearance: none;
@@ -99,7 +102,7 @@
 
 .lmsa-chat-header-actions .lmsa-ui-icon-btn:hover,
 .lmsa-chat-header-btn:hover {
-  background: color-mix(in srgb, var(--background-modifier-hover) 60%, transparent) !important;
+  background: color-mix(in srgb, var(--background-modifier-hover) 60%, transparent);
   color: var(--text-normal);
   box-shadow: none;
 }
@@ -204,13 +207,18 @@
   border-radius: 50%;
   color: var(--text-faint);
   opacity: 0;
-  background: transparent !important;
-  box-shadow: none !important;
   outline: none;
   appearance: none;
   min-height: unset;
   padding: 0;
   transition: opacity 140ms ease, color 140ms ease, background 140ms ease;
+}
+
+/* Element-qualified so the fill/shadow reset beats `button:not(.clickable-icon)` (0,1,1) by
+   source order without `!important`; color stays on the single-class rule above. */
+button.lmsa-empty-carousel-nav {
+  background: transparent;
+  box-shadow: none;
 }
 
 .lmsa-empty-carousel-nav--prev {
@@ -228,7 +236,7 @@
 .lmsa-empty-carousel-nav:hover {
   opacity: 1;
   color: var(--text-normal);
-  background: color-mix(in srgb, var(--background-modifier-hover) 60%, transparent) !important;
+  background: color-mix(in srgb, var(--background-modifier-hover) 60%, transparent);
 }
 
 .lmsa-empty-carousel-nav svg {
@@ -256,14 +264,20 @@
      white glass that ghosted out). The SVG url(#lmsa-glass) backdrop-filter is dropped:
      a fragile Chromium effect that can render as nothing; the solid tinted fill stands in. */
   border: 1px solid color-mix(in srgb, var(--lmsa-mode-accent) 38%, var(--background-modifier-border));
-  background-color: transparent !important;
   background-image: linear-gradient(
     135deg,
     color-mix(in srgb, var(--lmsa-mode-accent) 14%, var(--background-secondary)) 0%,
     color-mix(in srgb, var(--background-secondary) 90%, transparent) 100%
   );
-  box-shadow: none !important;
   transition: all 0.8s cubic-bezier(0.175, 0.885, 0.32, 2.2);
+}
+
+/* Element-qualified so the transparent base fill + shadow reset beat `button:not(.clickable-icon)`
+   (0,1,1) by source order without `!important`; the gradient background-image (no Obsidian
+   competitor) stays on the single-class rule above. */
+button.lmsa-chat-composer-generate-btn {
+  background-color: transparent;
+  box-shadow: none;
 }
 
 .lmsa-chat-composer-generate-btn:hover {

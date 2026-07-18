@@ -1,7 +1,11 @@
 .lmsa-settings-root {
   @apply lmsa:pb-8;
   scrollbar-gutter: stable;
-  padding-left: 0 !important;
+  /* .lmsa-settings-root is Obsidian's own .vertical-tab-content element, which sets
+     `padding-inline-start: var(--size-4-12)` (0,1,0). This physical `padding-left` is equal
+     specificity but later in source, and physical wins over logical for the same used value,
+     so it zeroes the left inset without `!important`. */
+  padding-left: 0;
 }
 
 .lmsa-settings-shell {
@@ -183,10 +187,12 @@
   }
 }
 
-/* Override Obsidian's button resets (background, shadow, border, sizing) */
-.lmsa-settings-rail-item {
-  background: transparent !important;
-  box-shadow: none !important;
+/* Override Obsidian's button resets (background, shadow, border, sizing). Settings-root scoped
+   (0,2,0) so it beats Obsidian's `button:not(.clickable-icon)` (0,1,1) without `!important`; the
+   rail always lives inside .lmsa-settings-root. */
+.lmsa-settings-root .lmsa-settings-rail-item {
+  background: transparent;
+  box-shadow: none;
   border: none;
   padding: 10px 6px 8px;
   height: auto;
@@ -197,17 +203,18 @@
   appearance: none;
 }
 
-.lmsa-settings-rail-item.is-active {
+/* Scoped one class deeper (0,3,0) so the active tint/ring beats the reset block above. */
+.lmsa-settings-root .lmsa-settings-rail-item.is-active {
   background:
     radial-gradient(ellipse at 50% 30%, var(--lmsa-tint-10), transparent 70%),
-    color-mix(in srgb, var(--lmsa-section-accent) 8%, var(--lmsa-surface-raised)) !important;
+    color-mix(in srgb, var(--lmsa-section-accent) 8%, var(--lmsa-surface-raised));
   box-shadow:
     inset 0 0 0 1px var(--lmsa-tint-15),
-    0 0 12px var(--lmsa-tint-5) !important;
+    0 0 12px var(--lmsa-tint-5);
 }
 
-.lmsa-settings-rail-item:hover:not(.is-active) {
-  background: color-mix(in srgb, var(--lmsa-surface-overlay) 80%, transparent) !important;
+.lmsa-settings-root .lmsa-settings-rail-item:hover:not(.is-active) {
+  background: color-mix(in srgb, var(--lmsa-surface-overlay) 80%, transparent);
 }
 
 /* Group label accent, must live outside @layer to beat Obsidian's cascade */

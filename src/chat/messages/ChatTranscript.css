@@ -9,7 +9,6 @@
      "Generate response" affordance (was a muted grey icon and easy to miss). */
   color: var(--lmsa-mode-accent);
   border: 1px solid color-mix(in srgb, var(--lmsa-mode-accent) 38%, var(--background-modifier-border));
-  background-color: transparent !important;
   background-image: linear-gradient(
     135deg,
     color-mix(in srgb, var(--lmsa-mode-accent) 14%, var(--background-secondary)) 0%,
@@ -18,6 +17,13 @@
   box-shadow: 0 4px 12px color-mix(in srgb, var(--lmsa-mode-accent) 22%, transparent);
   transition: transform 0.8s cubic-bezier(0.175, 0.885, 0.32, 2.2),
     color 120ms ease, box-shadow 120ms ease;
+}
+
+/* Element-qualified so the transparent base fill beats `button:not(.clickable-icon)`
+   (0,1,1) by source order without `!important`; the gradient background-image (no Obsidian
+   competitor) stays on the single-class rule above. */
+button.lmsa-scroll-to-bottom {
+  background-color: transparent;
 }
 
 .lmsa-scroll-to-bottom:hover {

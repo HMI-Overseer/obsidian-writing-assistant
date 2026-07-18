@@ -49,12 +49,12 @@
 
 .lmsa-history-header-actions .lmsa-ui-icon-btn {
   @apply lmsa:h-auto lmsa:w-auto lmsa:rounded-md lmsa:border-none lmsa:p-1.5;
-  background: transparent !important;
-  box-shadow: none !important;
+  background: transparent;
+  box-shadow: none;
 }
 
 .lmsa-history-header-actions .lmsa-ui-icon-btn:hover {
-  background: color-mix(in srgb, var(--background-modifier-hover) 60%, transparent) !important;
+  background: color-mix(in srgb, var(--background-modifier-hover) 60%, transparent);
   color: var(--text-normal);
 }
 
@@ -180,11 +180,13 @@
 
 /* Row actions stay out of sight until the row is hovered or active, so a
    resting list reads as plain titles. A quiet opacity fade, no scale pop. */
-.lmsa-history-trash-btn,
-.lmsa-history-rename-btn {
+/* Element-qualified (0,1,1) so these keep beating the shared `button.lmsa-ui-icon-btn` fill
+   (also 0,1,1) by source order, now that neither carries `!important`. */
+button.lmsa-history-trash-btn,
+button.lmsa-history-rename-btn {
   @apply lmsa:opacity-0 lmsa:transition-opacity lmsa:duration-100;
-  background: transparent !important;
-  box-shadow: none !important;
+  background: transparent;
+  box-shadow: none;
 }
 
 .lmsa-history-item:hover .lmsa-history-trash-btn,
@@ -196,8 +198,8 @@
 
 .lmsa-history-trash-btn:hover,
 .lmsa-history-rename-btn:hover {
-  background: var(--background-modifier-hover) !important;
-  box-shadow: none !important;
+  background: var(--background-modifier-hover);
+  box-shadow: none;
 }
 
 .lmsa-history-rename-btn svg,

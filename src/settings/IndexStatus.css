@@ -176,10 +176,15 @@
 
 .lmsa-kg-folder-stop-btn {
   border-color: var(--lmsa-status-error, var(--color-red));
-  color: var(--lmsa-status-error, var(--color-red)) !important;
+}
+
+/* Element-qualified so the red text beats `button:not(.clickable-icon)` color (0,1,1) by source
+   order without `!important`; the hover selector below (0,2,0) then out-specifies this base. */
+button.lmsa-kg-folder-stop-btn {
+  color: var(--lmsa-status-error, var(--color-red));
 }
 
 .lmsa-kg-folder-stop-btn:hover {
   background: var(--lmsa-status-error, var(--color-red));
-  color: var(--text-on-accent) !important;
+  color: var(--text-on-accent);
 }

@@ -120,7 +120,12 @@
 
 .lmsa-ui-icon-btn {
   @apply lmsa:inline-flex lmsa:h-[34px] lmsa:w-[34px] lmsa:cursor-pointer lmsa:items-center lmsa:justify-center lmsa:rounded-[10px] lmsa:border lmsa:border-obsidian-border lmsa:text-obsidian-muted;
-  background: var(--background-primary) !important;
+  /*
+   * Irreducible keep. This `none` is what suppresses the chat-header icon button's
+   * `:focus-visible` accent ring (createChatLayout.css `.lmsa-chat-header-actions
+   * .lmsa-ui-icon-btn:focus-visible`, a normal 0,3,0 box-shadow). Dropping `!important`
+   * un-masks that ring, a rendered change on keyboard focus, so it stays.
+   */
   box-shadow: none !important;
   outline: none;
   appearance: none;
@@ -130,10 +135,19 @@
   transition: background 120ms ease, color 120ms ease;
 }
 
+/*
+ * Fill reset on an element-qualified selector so it beats Obsidian's
+ * `button:not(.clickable-icon)` (0,1,1) by source order without `!important`. The color
+ * stays on the single-class rule above (0,1,0) so its cascade against Obsidian is unchanged.
+ */
+button.lmsa-ui-icon-btn {
+  background: var(--background-primary);
+}
+
 .lmsa-ui-icon-btn:hover {
   @apply lmsa:text-obsidian-text;
-  background: var(--background-modifier-hover) !important;
-  box-shadow: none !important;
+  background: var(--background-modifier-hover);
+  box-shadow: none;
 }
 
 .lmsa-ui-btn {
@@ -204,8 +218,6 @@
 
 .lmsa-ui-chip-dismiss {
   @apply lmsa:inline-flex lmsa:h-4 lmsa:w-4 lmsa:flex-none lmsa:cursor-pointer lmsa:items-center lmsa:justify-center lmsa:rounded-full lmsa:border-none lmsa:p-0 lmsa:text-obsidian-muted;
-  background: transparent !important;
-  box-shadow: none !important;
   outline: none;
   appearance: none;
   min-height: unset;
@@ -214,10 +226,17 @@
   transition: color 120ms ease;
 }
 
+/* Element-qualified so the fill/shadow reset beats `button:not(.clickable-icon)` (0,1,1) by
+   source order without `!important`; color stays on the single-class rule above. */
+button.lmsa-ui-chip-dismiss {
+  background: transparent;
+  box-shadow: none;
+}
+
 .lmsa-ui-chip-dismiss:hover {
   @apply lmsa:text-obsidian-text;
-  background: var(--background-modifier-hover) !important;
-  box-shadow: none !important;
+  background: var(--background-modifier-hover);
+  box-shadow: none;
 }
 
 .lmsa-ui-list-item {

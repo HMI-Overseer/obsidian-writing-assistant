@@ -18,12 +18,17 @@
   border-radius: 7px;
   border: 1px solid var(--background-modifier-border);
   color: var(--text-muted);
-  background: transparent !important;
-  box-shadow: none !important;
   outline: none;
   appearance: none;
   min-height: unset;
   transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+/* Element-qualified so the fill/shadow reset beats `button:not(.clickable-icon)` (0,1,1) by
+   source order without `!important`; color/border stay on the single-class rule above. */
+button.lmsa-chat-composer-overflow-btn {
+  background: transparent;
+  box-shadow: none;
 }
 
 .lmsa-chat-composer-overflow-btn:hover {
@@ -32,7 +37,7 @@
 
 .lmsa-chat-composer-overflow-btn:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--lmsa-mode-accent) 20%, transparent) !important;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--lmsa-mode-accent) 20%, transparent);
 }
 
 .lmsa-chat-composer-overflow-btn svg {

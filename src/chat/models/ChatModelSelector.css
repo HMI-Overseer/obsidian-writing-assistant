@@ -67,30 +67,33 @@
   height: 14px;
 }
 
-/*
- * Two-class descendant selector to beat Obsidian's input chrome. In a chat leaf the selector alone
- * wins, but inside the settings modal Obsidian's form-field input styling out-specifies it and draws a
- * rounded, filled capsule (the shared dropdown is reused there, so the same element picks up the modal
- * chrome). `!important` on the visual reset forces the borderless field in every context, matching the
- * refresh button below, which escalates the same way to beat Obsidian's base button chrome.
- */
 .lmsa-model-dropdown-search input.lmsa-model-dropdown-search-input {
   @apply lmsa:min-w-0 lmsa:flex-1;
-  background: transparent !important;
-  border: none !important;
-  border-radius: 0 !important;
-  box-shadow: none !important;
-  padding: 0 !important;
   height: auto;
   font-size: var(--font-ui-small);
   color: var(--text-normal);
 }
 
-.lmsa-model-dropdown-search input.lmsa-model-dropdown-search-input:focus,
-.lmsa-model-dropdown-search input.lmsa-model-dropdown-search-input:focus-visible {
-  background: transparent !important;
-  border: none !important;
-  box-shadow: none !important;
+/*
+ * The visual reset must beat Obsidian's input chrome in a chat leaf AND the settings-input styling
+ * (`.lmsa-settings-root input[type="text"]`, 0,2,1) inside the settings modal, where the shared
+ * dropdown is reused. Prepending `.lmsa-model-dropdown` (its always-present container) lifts this to
+ * 0,3,1, out-specifying the settings rule in every context without `!important`. The color/sizing stay
+ * on the 0,2,1 rule above so their cascade against the settings rule is unchanged.
+ */
+.lmsa-model-dropdown .lmsa-model-dropdown-search input.lmsa-model-dropdown-search-input {
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  padding: 0;
+}
+
+.lmsa-model-dropdown .lmsa-model-dropdown-search input.lmsa-model-dropdown-search-input:focus,
+.lmsa-model-dropdown .lmsa-model-dropdown-search input.lmsa-model-dropdown-search-input:focus-visible {
+  background: transparent;
+  border: none;
+  box-shadow: none;
   outline: none;
 }
 

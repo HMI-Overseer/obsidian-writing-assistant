@@ -19,6 +19,12 @@ export function renderKnowledgeGraphTab(
 ): () => void {
   const { knowledgeGraph: kg } = plugin.settings;
 
+  // Set while the conditional sections are live. Lets a model-selection change refresh
+  // the graph status text and action buttons in place, instead of leaving the stale
+  // "no model selected" message until the tab is reopened. Null when the graph is
+  // disabled (no status block rendered).
+  let refreshStatusDisplay: (() => void) | null = null;
+
   // ── Resource warning ───────────────────────────────────────────────
   const warning = createSettingsSection(
     container,
@@ -91,6 +97,7 @@ export function renderKnowledgeGraphTab(
         getSelectableEmbeddingModels(plugin.settings),
         plugin.settings.providerSettings,
       );
+      refreshStatusDisplay?.();
     }, "Failed to update the knowledge graph completion model."),
   });
 
@@ -114,6 +121,7 @@ export function renderKnowledgeGraphTab(
         getSelectableEmbeddingModels(plugin.settings),
         plugin.settings.providerSettings,
       );
+      refreshStatusDisplay?.();
     }, "Failed to update the knowledge graph embedding model."),
   });
 
@@ -146,6 +154,9 @@ export function renderKnowledgeGraphTab(
   /** Renders or clears the conditional sections based on kg.enabled. */
   function renderConditionalSections(): void {
     conditionalWrapper.empty();
+    // The old status block (and its closures) are gone; a stale selection made now
+    // must not target detached DOM. Reassigned below once the new block is built.
+    refreshStatusDisplay = null;
 
     if (!kg.enabled) return;
 
@@ -331,6 +342,10 @@ export function renderKnowledgeGraphTab(
     // Initial render.
     updateDisplay(plugin.services.graphService.getBuildState());
 
+    // Let a model-selection change re-run the status/button render against the
+    // current build state, without rebuilding the whole conditional block.
+    refreshStatusDisplay = () => updateDisplay(plugin.services.graphService.getBuildState());
+
     // Subscribe to live state updates.
     plugin.services.graphService.onBuildStateChange((state) => updateDisplay(state));
 
@@ -363,6 +378,7 @@ export function renderKnowledgeGraphTab(
 
   // Return cleanup function.
   return () => {
+    refreshStatusDisplay = null;
     modelSelector.destroy();
     embModelSelector.destroy();
     plugin.services.graphService.onBuildStateChange(null);

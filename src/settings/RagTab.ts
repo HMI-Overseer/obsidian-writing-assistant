@@ -17,6 +17,12 @@ export function renderRagTab(
 ): () => void {
   const { rag } = plugin.settings;
 
+  // Set while the conditional sections are live. Lets a model-selection change refresh
+  // the index status text and action buttons in place, instead of leaving the stale
+  // "no embedding model selected" message until the tab is reopened. Null when
+  // retrieval is disabled (no status block rendered).
+  let refreshStatusDisplay: (() => void) | null = null;
+
   // Wrapper for conditional sections so we can show/hide them.
   const conditionalWrapper = container.createDiv({ cls: "lmsa-rag-conditional" });
 
@@ -63,6 +69,7 @@ export function renderRagTab(
         getSelectableEmbeddingModels(plugin.settings),
         plugin.settings.providerSettings,
       );
+      refreshStatusDisplay?.();
     }, "Failed to update the embedding model."),
   });
 
@@ -91,6 +98,9 @@ export function renderRagTab(
   /** Renders or clears the conditional sections based on rag.enabled. */
   function renderConditionalSections(): void {
     conditionalWrapper.empty();
+    // The old status block (and its closures) are gone; a stale selection made now
+    // must not target detached DOM. Reassigned below once the new block is built.
+    refreshStatusDisplay = null;
 
     if (!rag.enabled) return;
 
@@ -190,6 +200,10 @@ export function renderRagTab(
 
     // Initial render.
     updateDisplay(plugin.services.ragService.getIndexingState());
+
+    // Let a model-selection change re-run the status/button render against the
+    // current indexing state, without rebuilding the whole conditional block.
+    refreshStatusDisplay = () => updateDisplay(plugin.services.ragService.getIndexingState());
 
     // Subscribe to live state updates.
     plugin.services.ragService.onIndexingStateChange((state) => updateDisplay(state));
@@ -360,6 +374,7 @@ export function renderRagTab(
 
   // Return cleanup function.
   return () => {
+    refreshStatusDisplay = null;
     modelSelector.destroy();
     plugin.services.ragService.onIndexingStateChange(null);
   };

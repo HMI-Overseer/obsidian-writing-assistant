@@ -12,7 +12,18 @@
   opacity: 1;
 }
 
+/* While editing, keep the action bar in place and just swap its contents: the
+   normal icons and any version nav hide, and InlineMessageEditor drops a Save
+   button (marked .is-edit-control) into the same row. The toolbar already holds
+   its slot in the layout, so nothing reflows. */
 .lmsa-chat-window-message.is-editing .lmsa-chat-window-bubble-toolbar {
+  opacity: 1;
+}
+
+.lmsa-chat-window-message.is-editing .lmsa-chat-window-version-nav,
+.lmsa-chat-window-message.is-editing
+  .lmsa-chat-window-message-actions
+  .lmsa-chat-window-action-btn:not(.is-edit-control) {
   display: none;
 }
 

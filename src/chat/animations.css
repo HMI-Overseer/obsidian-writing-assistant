@@ -123,6 +123,13 @@
    * Scoped to lmsa subtrees (the element, its pseudo-elements, and any descendant + their pseudos) so
    * animations on unclassed children, e.g. the refresh-spin `<svg>`, or on ::before/::after are caught
    * too, without disabling Obsidian's own animations outside the plugin's DOM.
+   *
+   * Irreducible keep (`!important` load-bearing): this generic override at `[class*="lmsa-"]` (0,1,0)
+   * must defeat EVERY animation on any lmsa element, including ones on more-specific selectors (the
+   * `.is-attention` pulses at 0,2,0, the `.is-refreshing svg` spin at 0,2,1) and any added later. A
+   * normal declaration cannot out-specify an arbitrary future/existing animation rule; a Phase 6 probe
+   * confirmed 4 animations keep running under `prefers-reduced-motion` if the `!important` is dropped
+   * (two of them infinite). `!important` is the standard reduced-motion pattern for exactly this reason.
    */
   [class*="lmsa-"],
   [class*="lmsa-"]::before,

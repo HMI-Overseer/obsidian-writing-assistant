@@ -41,10 +41,14 @@ export function isRetryable(error: unknown): boolean {
     return false;
   }
 
-  // Network-level errors are retryable (ECONNRESET, ECONNREFUSED, ETIMEDOUT, etc.)
+  // Transient mid-connection faults are worth retrying. ECONNREFUSED is deliberately
+  // excluded: it means nothing is listening on the port (LM Studio not running or a
+  // wrong base URL), a definitive negative rather than a transient blip. Retrying it
+  // just burns the exponential backoff on a liveness check that will keep failing,
+  // which is exactly what made the pre-send "checking model status" gate feel slow.
   if ("code" in error) {
     const code = (error as { code?: string }).code;
-    if (code === "ECONNRESET" || code === "ECONNREFUSED" || code === "ETIMEDOUT" || code === "EPIPE") {
+    if (code === "ECONNRESET" || code === "ETIMEDOUT" || code === "EPIPE") {
       return true;
     }
   }

@@ -48,10 +48,13 @@ describe("isRetryable", () => {
     expect(isRetryable(err)).toBe(true);
   });
 
-  it("returns true for ECONNREFUSED", () => {
+  it("returns false for ECONNREFUSED", () => {
+    // A refused connection is a definitive "nothing is listening", not a transient
+    // fault, so it must not be retried. Retrying it is what made the pre-send model
+    // status check hang on the retry backoff when LM Studio was not running.
     const err = new Error("Connection refused");
     (err as unknown as { code: string }).code = "ECONNREFUSED";
-    expect(isRetryable(err)).toBe(true);
+    expect(isRetryable(err)).toBe(false);
   });
 
   it("returns true for ETIMEDOUT", () => {
@@ -87,6 +90,18 @@ describe("withRetry", () => {
     const fn = vi.fn().mockRejectedValue(new Error("HTTP 400: Bad Request"));
 
     await expect(withRetry(fn, { initialDelayMs: 1 })).rejects.toThrow("HTTP 400");
+    expect(fn).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not retry a refused connection", async () => {
+    // Regression guard: an unreachable LM Studio server surfaces ECONNREFUSED. The
+    // pre-send status probe must fail on the first attempt instead of spending the
+    // exponential backoff across three tries plus the native->OpenAI fallback.
+    const err = new Error("connect ECONNREFUSED 127.0.0.1:1234");
+    (err as unknown as { code: string }).code = "ECONNREFUSED";
+    const fn = vi.fn().mockRejectedValue(err);
+
+    await expect(withRetry(fn, { initialDelayMs: 1 })).rejects.toThrow("ECONNREFUSED");
     expect(fn).toHaveBeenCalledTimes(1);
   });
 

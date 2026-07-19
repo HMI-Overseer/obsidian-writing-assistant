@@ -9,6 +9,42 @@ export function createAbortError(): Error {
   return error;
 }
 
+/**
+ * Derives a signal that aborts when either `parent` aborts or `ms` elapses, whichever
+ * comes first. Used to give the LM Studio model-list probe a fast-fail connection budget:
+ * `nodeRequest` sets no socket timeout, so an unreachable host that silently drops the SYN
+ * (firewall, wrong non-localhost IP, sleeping remote box) would otherwise hang for the full
+ * OS connect timeout. Timing out aborts, and an AbortError is non-retryable, so the probe
+ * fails once instead of amplifying the wait across the retry backoff. Call `cleanup()` when
+ * the request settles so the timer never outlives it.
+ */
+export function createTimeoutSignal(
+  ms: number,
+  parent?: AbortSignal
+): { signal: AbortSignal; cleanup: () => void } {
+  const controller = new AbortController();
+  const timer = window.setTimeout(() => controller.abort(createAbortError()), ms);
+
+  const onParentAbort = () => {
+    window.clearTimeout(timer);
+    controller.abort(parent?.reason instanceof Error ? parent.reason : createAbortError());
+  };
+
+  if (parent?.aborted) {
+    onParentAbort();
+  } else {
+    parent?.addEventListener("abort", onParentAbort, { once: true });
+  }
+
+  return {
+    signal: controller.signal,
+    cleanup: () => {
+      window.clearTimeout(timer);
+      parent?.removeEventListener("abort", onParentAbort);
+    },
+  };
+}
+
 export function formatError(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }

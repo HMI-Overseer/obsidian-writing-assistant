@@ -14,7 +14,7 @@ import type { LMStudioModel, LMStudioModelListResult } from "./types";
 import { formatOpenAITools } from "../tools/formatters/openai";
 import { resolveLMStudioBaseUrls } from "./urlResolution";
 import { normalizeModelList } from "./modelNormalization";
-import { requestJson, createModelListError } from "./httpTransport";
+import { requestJson, createModelListError, createTimeoutSignal } from "./httpTransport";
 import { isRecord, parseToolArguments } from "./parsing";
 import { streamNode, streamFetch } from "./streamingTransport";
 import { buildCompletionPayload } from "./buildPayload";
@@ -24,6 +24,13 @@ import { generateId } from "../utils";
 // Re-export for consumers that import from this file
 export { normalizeLMStudioBaseUrl } from "./urlResolution";
 export type { LMStudioModelListSource, LMStudioModelListResult } from "./types";
+
+/**
+ * Connection budget for the model-list probe (native attempt plus the OpenAI-compatible
+ * fallback share it). Caps how long a send blocks on "checking model status" when the
+ * server is unreachable but not actively refusing the connection.
+ */
+const MODEL_LIST_TIMEOUT_MS = 3000;
 
 export class LMStudioClient implements ChatClient {
   private readonly openAIBaseUrl: string;
@@ -45,9 +52,13 @@ export class LMStudioClient implements ChatClient {
 
   async listModelsWithSource(signal?: AbortSignal): Promise<LMStudioModelListResult> {
     const nativeEndpoint = `${this.nativeApiBaseUrl}/models`;
+    // One connection budget spans both the native attempt and the OpenAI fallback: once it
+    // expires, the fallback sees an already-aborted signal and fails instantly, so an
+    // unreachable host caps the whole probe near MODEL_LIST_TIMEOUT_MS rather than doubling it.
+    const { signal: probeSignal, cleanup } = createTimeoutSignal(MODEL_LIST_TIMEOUT_MS, signal);
 
     try {
-      const payload = await requestJson("GET", this.nativeApiBaseUrl, "/models", this.bypassCors, undefined, signal);
+      const payload = await requestJson("GET", this.nativeApiBaseUrl, "/models", this.bypassCors, undefined, probeSignal);
       const models = normalizeModelList(payload, "native");
       if (!models) {
         throw new Error("LM Studio returned an unexpected native model list response.");
@@ -62,7 +73,7 @@ export class LMStudioClient implements ChatClient {
       const openAIEndpoint = `${this.openAIBaseUrl}/models`;
 
       try {
-        const payload = await requestJson("GET", this.openAIBaseUrl, "/models", this.bypassCors, undefined, signal);
+        const payload = await requestJson("GET", this.openAIBaseUrl, "/models", this.bypassCors, undefined, probeSignal);
         const models = normalizeModelList(payload, "openai");
         if (!models) {
           throw new Error("LM Studio returned an unexpected OpenAI-compatible model list response.");
@@ -76,6 +87,8 @@ export class LMStudioClient implements ChatClient {
       } catch (openAIError) {
         throw createModelListError(nativeError, openAIError);
       }
+    } finally {
+      cleanup();
     }
   }
 

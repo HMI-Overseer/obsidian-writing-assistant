@@ -254,7 +254,7 @@ const askOther = (
     <div class="lmsa-ask-form-other-text"${checked ? "" : " hidden"}>
       <label class="lmsa-ask-form-other-label" for="${id}-text">Your answer</label>
       <textarea class="lmsa-ask-form-other-textarea" id="${id}-text" rows="3"
-        placeholder="Type your answer">${text}</textarea>
+        maxlength="500" placeholder="Type your answer">${text}</textarea>
     </div>
   </div>`;
 
@@ -416,6 +416,45 @@ const mixedReadyQuestions = [
   }),
 ];
 
+const fillToCodePoints = (prefix, limit, glyph) =>
+  prefix + glyph.repeat(limit - [...prefix].length);
+
+const maximumContractQuestions = Array.from({ length: 4 }, (_, questionIndex) => {
+  const questionNumber = questionIndex + 1;
+  return askQuestion({
+    id: `ask-maximum-q${questionIndex}`,
+    index: questionNumber,
+    total: 4,
+    header: fillToCodePoints(`Q${questionNumber} boundary!`, 12, "!"),
+    question: fillToCodePoints(
+      `Question ${questionNumber}: maximum valid model copy `,
+      300,
+      "q",
+    ),
+    multi: questionIndex % 2 === 1,
+    options: Array.from({ length: 4 }, (_, optionIndex) => ({
+      label: fillToCodePoints(
+        `Q${questionNumber} option ${optionIndex + 1} `,
+        40,
+        "L",
+      ),
+      description: fillToCodePoints(
+        `Question ${questionNumber}, option ${optionIndex + 1}: `,
+        200,
+        "d",
+      ),
+      checked: optionIndex === 0,
+    })),
+    other: questionIndex === 0
+      ? {
+          checked: true,
+          text: fillToCodePoints("Maximum custom answer: ", 500, "a"),
+        }
+      : {},
+    complete: true,
+  });
+});
+
 const memoryRow = (name, type, desc, on = true, confirming = false) =>
   `<tr class="${on ? "" : "is-off"}${confirming ? " is-confirming-delete" : ""}">
     <td class="lmsa-memory-col-switch">${sw(on ? "is-enabled" : "")}</td>
@@ -499,13 +538,34 @@ export const SURFACES = {
     ),
   },
 
-  // The same maximum mixed form at narrow sidebar width. Its question stack must
+  // The same four-question mixed form at narrow sidebar width. Its question stack must
   // remain inside the bounded scroll region while the Stop action stays reachable.
   askMixedNarrow: {
     w: 320,
     shot: ".lmsa-chat-composer",
     html: view(
       askComposerHtml(mixedReadyQuestions, { ready: true }),
+      320,
+    ),
+  },
+
+  // Exact contract maximum: four questions, four options each, maximum model copy,
+  // and one 500-code-point Other answer.
+  askMaximumContract: {
+    w: 600,
+    shot: ".lmsa-chat-composer",
+    html: view(
+      askComposerHtml(maximumContractQuestions, { ready: true }),
+      600,
+    ),
+  },
+
+  // Exact contract maximum at the narrow sidebar width.
+  askMaximumContractNarrow: {
+    w: 320,
+    shot: ".lmsa-chat-composer",
+    html: view(
+      askComposerHtml(maximumContractQuestions, { ready: true }),
       320,
     ),
   },

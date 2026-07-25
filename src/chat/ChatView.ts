@@ -516,7 +516,7 @@ export class ChatView extends ItemView {
     this.resizeObserver?.disconnect();
     this.resizeObserver = null;
     this.sessionStore?.clearDraftSaveTimer();
-    this.orchestrator.stopGeneration();
+    this.prepareForPluginUnload();
     await this.sessionStore?.persistActiveConversation();
     this.contextUpdater?.destroy();
     this.transcript?.destroy();
@@ -530,8 +530,16 @@ export class ChatView extends ItemView {
     this.reasoningPill?.destroy();
     this.posturePill?.destroy();
     this.overflowMenu?.destroy();
-    this.interactionHost?.destroy();
     this.composer?.destroy();
+  }
+
+  /**
+   * Stop generation and synchronously remove any interaction form before view or
+   * plugin services are torn down. This does not detach the leaf.
+   */
+  prepareForPluginUnload(): void {
+    this.orchestrator?.stopGeneration();
+    this.interactionHost?.destroy();
   }
 
   seedPrompt(text: string): void {

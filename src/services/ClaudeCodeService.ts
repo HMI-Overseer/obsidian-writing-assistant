@@ -3,6 +3,7 @@ import { FileSystemAdapter } from "obsidian";
 import { execFile } from "child_process";
 import type {
   ApprovalPosture,
+  AgenticStep,
   ClaudeCodeResumeCursor,
   PluginSettings,
   ProviderOption,
@@ -99,6 +100,8 @@ export type ClaudeCodeToolEvent =
        * (a decline resolves `isError: false`; section 6 question 6). Absent on read tools.
        */
       disposition?: VaultOpDisposition;
+      /** Structured terminal ask state for transcript persistence and reload. */
+      askStatus?: AgenticStep["askStatus"];
     };
 
 /** Options for a single Claude Code run, set just before the subprocess is spawned. */
@@ -533,6 +536,7 @@ export class ClaudeCodeService {
             content,
             toolCallId,
             disposition,
+            ...(isAsk && { askStatus: askStatusFromResult(isError, content) }),
           });
         }
       },
@@ -642,6 +646,9 @@ export class ClaudeCodeService {
   destroy(): void {
     this.askUserResponder?.cancelPending("destroyed");
     this.setAskUserResponder(null);
+    this.toolListener = null;
+    this.liveReview = null;
+    this.runAllowedTools.clear();
     // Kill every live SDK process, the "don't leak processes" rule.
     this.sessionRegistry.disposeAll();
     this.mcpServer?.stop();
@@ -659,6 +666,14 @@ export class ClaudeCodeService {
 
 function isAbortError(error: unknown): boolean {
   return error instanceof Error && error.name === "AbortError";
+}
+
+function askStatusFromResult(
+  isError: boolean,
+  content: string,
+): NonNullable<AgenticStep["askStatus"]> {
+  if (!isError) return "completed";
+  return content.includes("ask_cancelled") ? "cancelled" : "skipped";
 }
 
 /** Builds the `--mcp-config` JSON describing the loopback HTTP MCP server. */

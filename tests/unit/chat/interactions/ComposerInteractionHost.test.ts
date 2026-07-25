@@ -35,6 +35,7 @@ import {
 class FakeElement {
   hidden = false;
   isConnected = true;
+  value = "Draft text stays mounted.";
   readonly classes = new Set<string>();
   readonly attributes = new Map<string, string>();
   emptyCalls = 0;
@@ -70,12 +71,16 @@ const REQUEST: ValidatedAskRequest = {
   }],
 };
 
-function interaction(id: string): ComposerInteraction {
+function interaction(
+  id: string,
+  onCancel: () => void = () => undefined,
+): ComposerInteraction {
   return {
     kind: "ask",
     interactionId: id,
     request: REQUEST,
     onSubmit: (_answers: AskAnswers) => undefined,
+    onCancel,
   };
 }
 
@@ -129,16 +134,20 @@ describe("ComposerInteractionHost", () => {
     expect(refs.composerInteractionEl.hidden).toBe(true);
     expect(refs.composerInteractionEl.emptyCalls).toBe(1);
     expect(refs.actionBtn.focusCalls).toBe(1);
+    expect(refs.textareaEl.value).toBe("Draft text stays mounted.");
   });
 
   it("destroys idempotently and refuses later mounts", () => {
     const { host } = createHost();
-    host.mount(interaction("ask-1"));
+    const onCancel = vi.fn();
+    host.mount(interaction("ask-1", onCancel));
 
     host.destroy();
     host.destroy();
 
     expect(formCapture.instances[0]).toMatchObject({ disabled: 1, destroyed: 1 });
+    expect(onCancel).toHaveBeenCalledTimes(1);
+    expect(host.isActive()).toBe(false);
     expect(host.mount(interaction("ask-2"))).toBe(false);
   });
 });

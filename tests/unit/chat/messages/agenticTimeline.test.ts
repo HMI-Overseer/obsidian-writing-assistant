@@ -122,4 +122,24 @@ describe("ask_user timeline presentation", () => {
       },
     ]);
   });
+
+  test("preserves HTML-looking and Markdown-looking guidance as plain row text", () => {
+    expect(askGuidanceDetailRows({
+      type: "tool_call",
+      round: 0,
+      toolName: "ask_user",
+      askStatus: "completed",
+      askGuidance: {
+        questions: [{
+          question: "<img src=x onerror=alert(1)> **Choose** [link](https://example.com)",
+          header: "<b>UI</b>",
+          answer: "<script>alert(1)</script>\n# Not a heading",
+        }],
+      },
+    })).toEqual([{
+      header: "<b>UI</b>",
+      question: "<img src=x onerror=alert(1)> **Choose** [link](https://example.com)",
+      answers: ["<script>alert(1)</script>\n# Not a heading"],
+    }]);
+  });
 });

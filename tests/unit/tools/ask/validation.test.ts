@@ -189,6 +189,46 @@ describe("validateAskRequest", () => {
       questions: [rawQuestion({ multiSelect: "false" })],
     }, "multi_select_invalid");
   });
+
+  it("accepts the complete four-by-four request at every maximum text bound", () => {
+    const glyph = "🧭";
+    const result = validateAskRequest({
+      questions: Array.from({ length: ASK_USER_LIMITS.questions }, (_, questionIndex) => ({
+        question:
+          `${questionIndex + 1}` +
+          glyph.repeat(ASK_USER_LIMITS.question - 1),
+        header:
+          `${questionIndex + 1}` +
+          glyph.repeat(ASK_USER_LIMITS.header - 1),
+        options: Array.from({ length: ASK_USER_LIMITS.options }, (_, optionIndex) => ({
+          label:
+            `${questionIndex + 1}${optionIndex + 1}` +
+            glyph.repeat(ASK_USER_LIMITS.optionLabel - 2),
+          description:
+            `${questionIndex + 1}${optionIndex + 1}` +
+            glyph.repeat(ASK_USER_LIMITS.optionDescription - 2),
+        })),
+        multiSelect: questionIndex % 2 === 1,
+      })),
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.questions).toHaveLength(4);
+    expect(result.value.questions.every((question) => question.options.length === 4)).toBe(
+      true,
+    );
+    for (const question of result.value.questions) {
+      expect([...question.question]).toHaveLength(ASK_USER_LIMITS.question);
+      expect([...question.header]).toHaveLength(ASK_USER_LIMITS.header);
+      for (const option of question.options) {
+        expect([...option.label]).toHaveLength(ASK_USER_LIMITS.optionLabel);
+        expect([...option.description]).toHaveLength(
+          ASK_USER_LIMITS.optionDescription,
+        );
+      }
+    }
+  });
 });
 
 describe("validateAskAnswers", () => {
@@ -264,6 +304,13 @@ describe("validateAskAnswers", () => {
         "😀".repeat(ASK_USER_LIMITS.otherText),
       ]),
     );
-    expect(validateAskAnswers(manyResult.value, answers).ok).toBe(true);
+    const maximum = validateAskAnswers(manyResult.value, answers);
+    expect(maximum.ok).toBe(true);
+    expect(
+      Object.values(answers).reduce(
+        (total, answer) => total + [...answer].length,
+        0,
+      ),
+    ).toBe(ASK_USER_LIMITS.customTextTotal);
   });
 });

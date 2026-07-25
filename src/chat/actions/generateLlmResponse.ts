@@ -4,6 +4,7 @@ import { buildSamplingParams } from "../finalization/buildSamplingParams";
 import { resolveModelReasoning } from "../../providers/reasoningLevels";
 import type WritingAssistantChat from "../../main";
 import type { ChatClient } from "../../api/chatClient";
+import { createAbortError } from "../../api/httpTransport";
 import type { ChatSessionStore } from "../conversation/ChatSessionStore";
 import type { ChatTranscript } from "../messages/ChatTranscript";
 import type { ApprovalPosture, CompletionModel, ConversationMessage } from "../../shared/types";
@@ -325,6 +326,7 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
             // Same id the vault op carries (minted in ClaudeCodeService.callTool),
             // so the review binds approve/decline to this step.
             toolCallId: event.toolCallId,
+            ...(event.askStatus && { askStatus: event.askStatus }),
             // A failed call (e.g. an edit no-match, which never reaches the review
             // overlay) flags its step red and reveals the error returned to the model.
             ...(event.isError && { isError: true, errorContent: event.content }),
@@ -402,6 +404,7 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
       memoryToolContext,
       askCoordinator,
     );
+    if (abortController.signal.aborted) throw createAbortError();
 
     await renderer.flush();
     assistantBubble.bodyEl.removeClass("is-streaming");
@@ -493,7 +496,7 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
     assistantBubble.bodyEl.removeClass("is-streaming");
     timeline?.finalize();
 
-    if (isAbortError(error)) {
+    if (isAbortError(error) || abortController.signal.aborted) {
       const partialSteps = timeline?.getSteps();
       if (editsActive && renderer instanceof EditStreamingRenderer) {
         liveReview.detachEditPanel();

@@ -101,6 +101,12 @@ export class AskInteractionCoordinator implements AskUserResponder {
         onSubmit: (answers) => {
           this.submit(context.interactionId, answers);
         },
+        onCancel: () => {
+          this.settle(context.interactionId, {
+            kind: "rejected",
+            error: createAbortError(),
+          });
+        },
       });
       if (!mounted) {
         this.settle(context.interactionId, {

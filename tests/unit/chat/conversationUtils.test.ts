@@ -556,6 +556,43 @@ describe("approval posture, per conversation", () => {
     expect(branch.parentConversationId).toBe("conv-1");
   });
 
+  test("a branch preserves completed ask guidance as an independent audit record", () => {
+    const source: ConversationMeta = {
+      id: "conv-1",
+      title: "Original",
+      createdAt: 1000,
+      updatedAt: 2000,
+      modelId: "p1",
+      modelName: "Model",
+      messageCount: 1,
+      approvalPosture: "ask",
+    };
+    const message: ConversationMessage = {
+      id: "assistant-1",
+      role: "assistant",
+      content: "Done.",
+      agenticSteps: [{
+        type: "tool_call",
+        round: 0,
+        toolName: "ask_user",
+        askStatus: "completed",
+        askGuidance: {
+          questions: [{
+            question: "Format?",
+            header: "Output",
+            answer: "<table> **Detailed**",
+          }],
+        },
+      }],
+    };
+
+    const branch = createBranchConversation(source, [message], message.id);
+    const branchedGuidance = branch.messages[0].agenticSteps?.[0].askGuidance;
+
+    expect(branchedGuidance).toEqual(message.agenticSteps?.[0].askGuidance);
+    expect(branchedGuidance).not.toBe(message.agenticSteps?.[0].askGuidance);
+  });
+
   test("toConversationMeta carries the posture onto the meta", () => {
     const conv = makeConversation([]);
     conv.approvalPosture = "auto";

@@ -54,7 +54,9 @@ class FakeHost implements ComposerInteractionHostPort {
   }
 
   destroy(): void {
+    const active = this.active;
     this.active = null;
+    active?.onCancel();
   }
 }
 
@@ -163,6 +165,7 @@ describe("AskInteractionCoordinator", () => {
     const lateSubmit = host.active?.onSubmit;
 
     controller.abort();
+    controller.abort();
     lateSubmit?.(ANSWERS);
 
     await expect(pending).rejects.toMatchObject({
@@ -170,6 +173,24 @@ describe("AskInteractionCoordinator", () => {
       message: "The request was aborted.",
     });
     expect(host.clears).toEqual(["ask-1"]);
+  });
+
+  it("settles and removes its abort listener when the host is destroyed", async () => {
+    const controller = new AbortController();
+    const removeSpy = vi.spyOn(controller.signal, "removeEventListener");
+    const host = new FakeHost();
+    const coordinator = new AskInteractionCoordinator(host, controller.signal);
+    const pending = coordinator.ask(REQUEST, context("ask-1", controller.signal));
+
+    host.destroy();
+    host.destroy();
+
+    await expect(pending).rejects.toMatchObject({
+      name: "AbortError",
+      message: "The request was aborted.",
+    });
+    expect(coordinator.hasPending()).toBe(false);
+    expect(removeSpy).toHaveBeenCalledTimes(1);
   });
 
   it("settles only once across double submit and double cancellation", async () => {

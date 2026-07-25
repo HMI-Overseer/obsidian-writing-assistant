@@ -4,6 +4,8 @@ import { prepareApiMessages } from "../../../../src/chat/finalization/prepareApi
 import type { ChatSessionStore } from "../../../../src/chat/conversation/ChatSessionStore";
 import { DEFAULT_SETTINGS } from "../../../../src/constants";
 import { MemoryService } from "../../../../src/memory/MemoryService";
+import type { RagService } from "../../../../src/rag";
+import type { RagAvailability } from "../../../../src/rag/ragService";
 import type {
   ApprovalPosture,
   PluginSettings,
@@ -58,13 +60,21 @@ async function prepare(options: {
   trainedForToolUse?: boolean;
   disableBuiltinSystemPrompts?: boolean;
   anthropicCacheEnabled?: boolean;
+  memoriesEnabled?: boolean;
+  ragAvailability?: RagAvailability;
 }) {
   const currentSettings = settings(options.agenticMode, options.policy);
+  currentSettings.memoriesEnabled = options.memoriesEnabled ?? false;
+  const ragAvailability = options.ragAvailability ?? "no-backend";
   return prepareApiMessages({
     app: app(),
     store: store(),
     settings: currentSettings,
     posture: options.posture ?? "ask",
+    ragService: {
+      availability: () => ragAvailability,
+      isReady: () => ragAvailability === "ready",
+    } as RagService,
     memoryService: new MemoryService(() => currentSettings.memories),
     activeProvider: options.provider,
     modelCapabilities:
@@ -107,15 +117,22 @@ describe("ask_user direct request preparation", () => {
     },
   );
 
-  it("keeps ask_user in Anthropic Layer 2 and marks it non-deferred", async () => {
+  it.each([
+    { label: "Layer 1", anthropicCacheEnabled: false },
+    { label: "Layer 2", anthropicCacheEnabled: true },
+  ])("keeps ask_user in Anthropic $label", async ({ anthropicCacheEnabled }) => {
     const request = await prepare({
       provider: "anthropic",
       agenticMode: true,
-      anthropicCacheEnabled: true,
+      anthropicCacheEnabled,
     });
 
     expect(request.tools?.map((tool) => tool.name)).toContain("ask_user");
-    expect(request.toolSearch?.nonDeferredToolNames).toContain("ask_user");
+    if (anthropicCacheEnabled) {
+      expect(request.toolSearch?.nonDeferredToolNames).toContain("ask_user");
+    } else {
+      expect(request.toolSearch).toBeUndefined();
+    }
   });
 
   it("keeps ask_user available under every posture and vault policy", async () => {
@@ -143,5 +160,33 @@ describe("ask_user direct request preparation", () => {
     expect(enabled.systemPrompt).toContain(ASK_USER_SYSTEM_GUIDANCE);
     expect(disabled.systemPrompt).not.toContain(ASK_USER_SYSTEM_GUIDANCE);
     expect(disabled.tools?.find((tool) => tool.name === "ask_user")?.description).toBeTruthy();
+  });
+
+  it("keeps ask_user across the direct provider, posture, memory, RAG, and layer matrix", async () => {
+    const surfaces = [
+      { provider: "anthropic" as const, anthropicCacheEnabled: false },
+      { provider: "anthropic" as const, anthropicCacheEnabled: true },
+      { provider: "openai" as const },
+      { provider: "lmstudio" as const, trainedForToolUse: true },
+    ];
+
+    for (const surface of surfaces) {
+      for (const posture of ["ask", "auto"] as const) {
+        for (const memoriesEnabled of [false, true]) {
+          for (const ragAvailability of ["ready", "no-backend"] as const) {
+            const request = await prepare({
+              ...surface,
+              agenticMode: true,
+              posture,
+              memoriesEnabled,
+              ragAvailability,
+            });
+            expect(
+              request.tools?.filter((tool) => tool.name === "ask_user"),
+            ).toHaveLength(1);
+          }
+        }
+      }
+    }
   });
 });

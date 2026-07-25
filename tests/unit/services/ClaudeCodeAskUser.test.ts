@@ -10,7 +10,10 @@ import { AskInteractionCoordinator } from "../../../src/chat/interactions/AskInt
 import { DEFAULT_SETTINGS } from "../../../src/constants";
 import { MemoryService } from "../../../src/memory/MemoryService";
 import { VaultMcpServer, type McpToolProvider } from "../../../src/mcp/VaultMcpServer";
-import { ClaudeCodeService } from "../../../src/services/ClaudeCodeService";
+import {
+  ClaudeCodeService,
+  type ClaudeCodeToolEvent,
+} from "../../../src/services/ClaudeCodeService";
 import type { PluginSettings } from "../../../src/shared/types";
 import type { AskAnswers, AskUserResponder } from "../../../src/tools/ask/types";
 import type { ToolCall, ToolResult, VaultOpReviewer } from "../../../src/tools/types";
@@ -57,6 +60,7 @@ interface ClaudeCodeAskTestSeam {
   createToolProvider(): McpToolProvider;
   runAllowedTools: Set<string>;
   liveReview: VaultOpReviewer | null;
+  toolListener: ((event: ClaudeCodeToolEvent) => void) | null;
   askUserResponder: AskUserResponder | null;
   askPending: boolean;
   sdkUsable: Promise<boolean> | null;
@@ -300,6 +304,8 @@ describe("ClaudeCodeService ask_user", () => {
     const host = new FakeInteractionHost();
     const abortController = new AbortController();
     const coordinator = new AskInteractionCoordinator(host, abortController.signal);
+    const events: ClaudeCodeToolEvent[] = [];
+    service.setToolListener((event) => events.push(event));
     seam.runAllowedTools = new Set(["ask_user"]);
     service.setAskUserResponder(coordinator, abortController.signal);
 
@@ -315,6 +321,45 @@ describe("ClaudeCodeService ask_user", () => {
     expect(coordinator.hasPending()).toBe(false);
     expect(seam.askUserResponder).toBeNull();
     expect(seam.askPending).toBe(false);
+    expect(events.at(-1)).toMatchObject({
+      phase: "end",
+      toolName: "ask_user",
+      askStatus: "cancelled",
+    });
+  });
+
+  it("aborts a pending legacy callback without leaving a form, promise, or latch", async () => {
+    const { service, seam, provider } = harness();
+    const host = new FakeInteractionHost();
+    const abortController = new AbortController();
+    const coordinator = new AskInteractionCoordinator(host, abortController.signal);
+    seam.runAllowedTools = new Set(["ask_user"]);
+    service.setAskUserResponder(coordinator, abortController.signal);
+    const server = new VaultMcpServer("writing_assistant", provider);
+    const handle = await server.start();
+
+    try {
+      const pending = postToolCall(handle, "ask_user", askArguments);
+      await host.waitForMount();
+
+      abortController.abort();
+      abortController.abort();
+      const response = await pending;
+
+      expect(response).toMatchObject({
+        result: {
+          isError: true,
+        },
+      });
+      expect(JSON.stringify(response)).toContain("ask_cancelled");
+      expect(host.interaction).toBeNull();
+      expect(coordinator.hasPending()).toBe(false);
+      expect(seam.askPending).toBe(false);
+    } finally {
+      server.stop();
+      service.setAskUserResponder(null);
+      coordinator.destroy();
+    }
   });
 
   it("routes SDK and legacy loopback calls through the same responder", async () => {
@@ -382,6 +427,40 @@ describe("ClaudeCodeService ask_user", () => {
     expect(responder.cancelPending).toHaveBeenCalledWith("destroyed");
     expect(seam.askUserResponder).toBeNull();
     expect(seam.askPending).toBe(false);
+    expect(disposeAll).toHaveBeenCalledTimes(1);
+    expect(stop).toHaveBeenCalledTimes(1);
+    expect(seam.mcpServer).toBeNull();
+  });
+
+  it("destroy settles a real pending ask before disposing every transport resource", async () => {
+    const { service, seam, provider } = harness();
+    const host = new FakeInteractionHost();
+    const abortController = new AbortController();
+    const coordinator = new AskInteractionCoordinator(host, abortController.signal);
+    const disposeAll = vi.spyOn(seam.sessionRegistry, "disposeAll");
+    const stop = vi.fn();
+    service.setToolListener(vi.fn());
+    service.setLiveReview({
+      resolveOne: vi.fn(),
+      resolveEditOne: vi.fn(),
+      resolveMemoryOne: vi.fn(),
+    });
+    seam.mcpServer = { stop };
+    seam.runAllowedTools = new Set(["ask_user"]);
+    service.setAskUserResponder(coordinator, abortController.signal);
+    const pending = provider.callTool(call("ask_user", askArguments, "destroy-ask"));
+    await host.waitForMount();
+
+    service.destroy();
+    const result = await pending;
+
+    expect(result.content).toContain("ask_cancelled");
+    expect(host.interaction).toBeNull();
+    expect(coordinator.hasPending()).toBe(false);
+    expect(seam.askUserResponder).toBeNull();
+    expect(seam.askPending).toBe(false);
+    expect(seam.toolListener).toBeNull();
+    expect(seam.liveReview).toBeNull();
     expect(disposeAll).toHaveBeenCalledTimes(1);
     expect(stop).toHaveBeenCalledTimes(1);
     expect(seam.mcpServer).toBeNull();

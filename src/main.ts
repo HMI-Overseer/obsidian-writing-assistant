@@ -155,6 +155,11 @@ export default class WritingAssistantChat extends Plugin {
   }
 
   onunload(): void {
+    for (const leaf of this.app.workspace.getLeavesOfType(VIEW_TYPE_CHAT)) {
+      if (leaf.view instanceof ChatView) {
+        leaf.view.prepareForPluginUnload();
+      }
+    }
     unregisterBrandIcons();
     this.inlineDiff.destroy();
     this.services.destroy();

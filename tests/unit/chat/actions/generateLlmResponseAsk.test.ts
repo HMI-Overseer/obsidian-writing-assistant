@@ -50,7 +50,23 @@ vi.mock("../../../../src/chat/streaming/StreamingRenderer", () => ({
 }));
 
 vi.mock("../../../../src/chat/streaming/EditStreamingRenderer", () => ({
-  EditStreamingRenderer: class {},
+  EditStreamingRenderer: class {
+    private response = "";
+
+    appendDelta(delta: string): void {
+      this.response += delta;
+    }
+
+    showToolStatus(): void {}
+    beginNewRound(): void {}
+    flush(): Promise<void> {
+      return Promise.resolve();
+    }
+    getFullResponse(): string {
+      return this.response;
+    }
+    destroy(): void {}
+  },
 }));
 
 vi.mock("../../../../src/chat/messages/AgenticTimeline", () => ({
@@ -112,7 +128,10 @@ import type {
   ConversationMessage,
 } from "../../../../src/shared/types";
 import { ASK_USER_TOOL } from "../../../../src/tools/ask/definition";
-import { buildAskUserResult } from "../../../../src/tools/ask/result";
+import {
+  askCancellationFailure,
+  buildAskUserResult,
+} from "../../../../src/tools/ask/result";
 import type { AskAnswers, AskUserResponder } from "../../../../src/tools/ask/types";
 import { formatAgenticReplayLines } from "../../../../src/tools/resultDigest";
 import type { ToolCall } from "../../../../src/tools/types";
@@ -296,6 +315,7 @@ function makeClaudeCodeClient(
               isError,
               content,
               toolCallId: askCall.id,
+              askStatus: isError ? "skipped" : "completed",
             });
           }
 
@@ -315,7 +335,108 @@ function makeClaudeCodeClient(
   } as ChatClient;
 }
 
-function harness(finalization: "append" | "replace" = "append") {
+function makeCleanInterruptClaudeCodeClient(
+  bridge: FakeClaudeCodeBridge,
+): ChatClient {
+  return {
+    complete: vi.fn(),
+    stream: vi.fn(
+      (
+        _request: ChatRequest,
+        _model: string,
+        _params: unknown,
+        signal?: AbortSignal,
+      ): StreamResult => {
+        const deltas = (async function* () {
+          const responder = bridge.getAskUserResponder();
+          if (!responder || !signal) {
+            throw new Error("Claude Code ask responder was not installed before streaming.");
+          }
+
+          bridge.emitToolEvent({
+            phase: "start",
+            toolName: "ask_user",
+            toolCallId: askCall.id,
+          });
+          try {
+            await responder.ask(askCall.arguments, {
+              interactionId: "claude-code-clean-interrupt",
+              toolCallId: askCall.id,
+              signal,
+            });
+          } catch (error) {
+            if (!(error instanceof Error) || error.name !== "AbortError") throw error;
+            bridge.emitToolEvent({
+              phase: "end",
+              toolName: "ask_user",
+              args: askCall.arguments,
+              isError: true,
+              content: askCancellationFailure("stopped").content,
+              toolCallId: askCall.id,
+              askStatus: "cancelled",
+            });
+          }
+        })();
+        return {
+          deltas,
+          usage: Promise.resolve(null),
+          toolCalls: Promise.resolve(null),
+          stopReason: Promise.resolve("end_turn"),
+        };
+      },
+    ),
+  } as ChatClient;
+}
+
+function makeEarlySettlingClaudeCodeClient(
+  bridge: FakeClaudeCodeBridge,
+  onCallbackSettled: (error: Error) => void,
+): ChatClient {
+  return {
+    complete: vi.fn(),
+    stream: vi.fn(
+      (
+        _request: ChatRequest,
+        _model: string,
+        _params: unknown,
+        signal?: AbortSignal,
+      ): StreamResult => {
+        const deltas = (async function* () {
+          const responder = bridge.getAskUserResponder();
+          if (!responder || !signal) {
+            throw new Error("Claude Code ask responder was not installed before streaming.");
+          }
+
+          bridge.emitToolEvent({
+            phase: "start",
+            toolName: "ask_user",
+            toolCallId: askCall.id,
+          });
+          void responder.ask(askCall.arguments, {
+            interactionId: "legacy-early-settlement",
+            toolCallId: askCall.id,
+            signal,
+          }).catch((error: unknown) => {
+            onCallbackSettled(
+              error instanceof Error ? error : new Error(String(error)),
+            );
+          });
+        })();
+        return {
+          deltas,
+          usage: Promise.resolve(null),
+          toolCalls: Promise.resolve(null),
+          stopReason: Promise.resolve("end_turn"),
+        };
+      },
+    ),
+  } as ChatClient;
+}
+
+function harness(
+  finalization: "append" | "replace" = "append",
+  posture: "ask" | "auto" = "ask",
+) {
   const messages: ConversationMessage[] = [];
   const store = {
     persistActiveConversation: vi.fn(() => Promise.resolve()),
@@ -422,7 +543,7 @@ function harness(finalization: "append" | "replace" = "append") {
         modelId: "gpt-test",
         name: "Test",
       } as CompletionModel,
-      posture: "ask" as const,
+      posture,
       interactionHost,
       finalization:
         finalization === "append"
@@ -452,37 +573,40 @@ describe("generateLlmResponse ask_user integration", () => {
     });
   });
 
-  it("keeps the model suspended until submit and persists completed guidance", async () => {
-    const state = harness();
-    const client = makeClient([
-      { toolCalls: [askCall] },
-      { deltas: ["Done."] },
-    ]);
+  it.each(["ask", "auto"] as const)(
+    "keeps the model suspended under %s posture until submit",
+    async (posture) => {
+      const state = harness("append", posture);
+      const client = makeClient([
+        { toolCalls: [askCall] },
+        { deltas: ["Done."] },
+      ]);
 
-    const pending = generateLlmResponse({ ...state.options, client });
-    await state.interactionHost.mounted;
+      const pending = generateLlmResponse({ ...state.options, client });
+      await state.interactionHost.mounted;
 
-    expect(client.stream).toHaveBeenCalledTimes(1);
-    state.interactionHost.submit({ [question]: "Detailed" });
-    await pending;
+      expect(client.stream).toHaveBeenCalledTimes(1);
+      state.interactionHost.submit({ [question]: "Detailed" });
+      await pending;
 
-    expect(client.stream).toHaveBeenCalledTimes(2);
-    expect(state.messages).toHaveLength(1);
-    expect(completedAskStep(state.messages[0])).toMatchObject({
-      askStatus: "completed",
-      askGuidance: {
-        questions: [
-          {
-            question,
-            header: "Output",
-            answer: "Detailed",
-          },
-        ],
-      },
-    });
-    expect(state.interactionHost.clearIfOwner).toHaveBeenCalledTimes(1);
-    expect(state.activeControllers.at(-1)).toBeNull();
-  });
+      expect(client.stream).toHaveBeenCalledTimes(2);
+      expect(state.messages).toHaveLength(1);
+      expect(completedAskStep(state.messages[0])).toMatchObject({
+        askStatus: "completed",
+        askGuidance: {
+          questions: [
+            {
+              question,
+              header: "Output",
+              answer: "Detailed",
+            },
+          ],
+        },
+      });
+      expect(state.interactionHost.clearIfOwner).toHaveBeenCalledTimes(1);
+      expect(state.activeControllers.at(-1)).toBeNull();
+    },
+  );
 
   it("persists zero-text completion after submitted guidance", async () => {
     const state = harness();
@@ -518,6 +642,9 @@ describe("generateLlmResponse ask_user integration", () => {
     expect(state.messages).toHaveLength(1);
     expect(state.messages[0].isError).toBe(true);
     expect(completedAskStep(state.messages[0])?.askGuidance).toBeDefined();
+    expect(state.interactionHost.interaction).toBeNull();
+    expect(state.interactionHost.clearIfOwner).toHaveBeenCalledTimes(1);
+    expect(state.activeControllers.at(-1)).toBeNull();
   });
 
   it("persists submitted guidance when Stop wins during the next provider round", async () => {
@@ -575,6 +702,7 @@ describe("generateLlmResponse ask_user integration", () => {
     await state.interactionHost.mounted;
 
     state.activeControllers[0]?.abort();
+    state.activeControllers[0]?.abort();
     state.interactionHost.submit({ [question]: "Detailed" });
     await pending;
 
@@ -606,6 +734,70 @@ describe("generateLlmResponse ask_user integration", () => {
     expect(state.interactionHost.interaction).toBeNull();
     expect(state.claudeCode.getAskUserResponder()).toBeNull();
     expect(state.claudeCode.setAskUserResponder).toHaveBeenLastCalledWith(null);
+    expect(state.activeControllers.at(-1)).toBeNull();
+  });
+
+  it("classifies a clean SDK Stop as an interrupted generation", async () => {
+    const state = harness();
+    state.options.activeModel = {
+      provider: "claudecode",
+      modelId: "claude-sonnet-test",
+      name: "Claude test",
+    };
+    const pending = generateLlmResponse({
+      ...state.options,
+      client: makeCleanInterruptClaudeCodeClient(state.claudeCode),
+    });
+    await state.interactionHost.mounted;
+
+    state.activeControllers[0]?.abort();
+    state.activeControllers[0]?.abort();
+    await pending;
+
+    expect(state.messages).toHaveLength(1);
+    expect(state.messages[0]).toMatchObject({
+      content: "",
+      interrupted: true,
+      agenticSteps: expect.arrayContaining([
+        expect.objectContaining({
+          toolName: "ask_user",
+          askStatus: "cancelled",
+        }),
+      ]),
+    });
+    expect(state.interactionHost.interaction).toBeNull();
+    expect(state.claudeCode.getAskUserResponder()).toBeNull();
+    expect(state.activeControllers.at(-1)).toBeNull();
+  });
+
+  it("cleans up safely when a legacy query settles before its ask callback", async () => {
+    const state = harness();
+    state.options.activeModel = {
+      provider: "claudecode",
+      modelId: "claude-sonnet-test",
+      name: "Claude test",
+    };
+    let settleCallback!: (error: Error) => void;
+    const callbackSettled = new Promise<Error>((resolve) => {
+      settleCallback = resolve;
+    });
+
+    await generateLlmResponse({
+      ...state.options,
+      client: makeEarlySettlingClaudeCodeClient(
+        state.claudeCode,
+        settleCallback,
+      ),
+    });
+    const callbackError = await callbackSettled;
+
+    expect(callbackError).toMatchObject({
+      name: "AbortError",
+      message: "The request was aborted.",
+    });
+    expect(state.interactionHost.interaction).toBeNull();
+    expect(state.interactionHost.clearIfOwner).toHaveBeenCalledTimes(1);
+    expect(state.claudeCode.getAskUserResponder()).toBeNull();
     expect(state.activeControllers.at(-1)).toBeNull();
   });
 

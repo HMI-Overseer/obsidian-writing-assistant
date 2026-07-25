@@ -10,6 +10,7 @@ export type ComposerInteraction = {
   interactionId: string;
   request: ValidatedAskRequest;
   onSubmit: (answers: AskAnswers) => void;
+  onCancel: () => void;
 };
 
 export interface ComposerInteractionHostPort {
@@ -84,7 +85,9 @@ export class ComposerInteractionHost implements ComposerInteractionHostPort {
   destroy(): void {
     if (this.destroyed) return;
     this.destroyed = true;
+    const active = this.active;
     this.clearActive();
+    active?.interaction.onCancel();
   }
 
   private clearActive(): void {

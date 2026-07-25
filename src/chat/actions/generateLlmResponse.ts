@@ -20,7 +20,12 @@ import { estimateCost } from "../../api/pricing";
 import type { UsageResult } from "../../api/usageTypes";
 import type { MessageUsage } from "../../shared/types";
 import { runToolLoop } from "./toolLoop";
-import type { VaultToolContext, ToolExecutionContext, VaultOpToolContext } from "./toolLoop";
+import type {
+  MemoryToolContext,
+  ToolExecutionContext,
+  VaultOpToolContext,
+  VaultToolContext,
+} from "./toolLoop";
 import { LiveVaultReview } from "./liveVaultReview";
 import { AgenticTimeline } from "../messages/AgenticTimeline";
 import { extractToolInput } from "../../tools/metadata";
@@ -221,6 +226,14 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
     editsActive
       ? { app: plugin.app, filePath: activeFilePath ?? "" }
       : undefined;
+  const memoryToolContext: MemoryToolContext | undefined =
+    plugin.settings.memoriesEnabled
+      ? {
+          memoryService: plugin.services.memoryService,
+          getMemories: () => plugin.settings.memories,
+          saveSettings: () => plugin.saveSettings(),
+        }
+      : undefined;
 
   // The in-loop review coordinator: owns the live vault-op proposal, mounts the
   // review on the streaming timeline, applies auto ops, and suspends the loop on
@@ -242,6 +255,7 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
         ...(onEnterAutoApply && { onEnterAutoApply }),
       },
     }),
+    ...(memoryToolContext && { memory: memoryToolContext }),
   });
 
   // Vault ops operate on arbitrary paths, so they need only the app + the live
@@ -361,6 +375,7 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
       vaultToolContext,
       editToolContext,
       vaultOpToolContext,
+      memoryToolContext,
     );
 
     await renderer.flush();

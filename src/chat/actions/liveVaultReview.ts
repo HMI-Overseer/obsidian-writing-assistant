@@ -45,6 +45,18 @@ import { EditReviewTimelineView } from "../messages/editReviewTimeline";
 import { convertToolCallToEditBlock } from "../../tools/editing/conversion";
 import { resolveStructuralEditBlocks } from "../../tools/editing/handlers";
 import { defaultRecovery, trimDot } from "../../tools/toolFailure";
+import { toolFailure } from "../../tools/toolFailure";
+import {
+  applyApprovedMemoryMutation,
+  prepareMemoryMutation,
+  type MemoryToolContext,
+} from "../../tools/memory/handlers";
+import { resolveMemoryGate } from "../../tools/memory/definition";
+import { memoryDispositionMessage } from "../../tools/memory/disposition";
+import {
+  MemoryReviewTimelineView,
+  type ReviewableMemoryProposal,
+} from "../messages/memoryReviewTimeline";
 import { generateId } from "../../utils";
 
 /** A converted op classified by how it must resolve. */
@@ -58,6 +70,11 @@ type Entry =
 interface PendingResolution {
   resolve: (outcome: { disposition: VaultOpDisposition; reason?: string }) => void;
   promise: Promise<{ disposition: VaultOpDisposition; reason?: string }>;
+}
+
+interface PendingMemoryResolution {
+  resolve: (result: ToolResult) => void;
+  promise: Promise<ToolResult>;
 }
 
 /**
@@ -85,6 +102,8 @@ export interface LiveVaultReviewOptions {
   posture: ApprovalPosture;
   /** Edit-channel dependencies. Absent when no writes are permitted (read-only). */
   edit?: LiveEditReviewDeps;
+  /** Dedicated memory mutation dependencies, absent while the feature is off. */
+  memory?: MemoryToolContext;
 }
 
 /**
@@ -149,6 +168,9 @@ export class LiveVaultReview implements VaultOpReviewer {
   private editBaselineEpoch = 0;
   /** The one live timeline review, re-rendered (destroy + recreate) per round over every controller. */
   private editTimelineView: EditReviewTimelineView | null = null;
+  private readonly memoryDeps?: MemoryToolContext;
+  private readonly memoryProposals: ReviewableMemoryProposal[] = [];
+  private readonly pendingMemories = new Map<string, PendingMemoryResolution>();
 
   constructor(opts: LiveVaultReviewOptions) {
     this.app = opts.app;
@@ -156,6 +178,7 @@ export class LiveVaultReview implements VaultOpReviewer {
     this.policy = opts.policy;
     this.posture = opts.posture;
     this.editDeps = opts.edit;
+    this.memoryDeps = opts.memory;
     this.proposal = { id: generateId(), ops: [], createdAt: Date.now() };
   }
 
@@ -225,6 +248,31 @@ export class LiveVaultReview implements VaultOpReviewer {
   async resolveEditOne(call: ToolCall, toolCallId: string): Promise<ToolResult> {
     const [resolved] = await this.resolveEdits([{ ...call, id: toolCallId }]);
     return resolved.result;
+  }
+
+  /** Resolve one Claude Code memory mutation on the same review channel. */
+  async resolveMemoryOne(
+    call: ToolCall,
+    toolCallId: string,
+  ): Promise<ToolResult> {
+    const [resolved] = await this.resolveMemories([
+      { ...call, id: toolCallId },
+    ]);
+    return resolved.result;
+  }
+
+  /**
+   * Resolve memory proposals sequentially. The memory gate reads only
+   * policy.memory, never the vault editing posture.
+   */
+  async resolveMemories(
+    calls: ToolCall[],
+  ): Promise<Array<{ tc: ToolCall; result: ToolResult }>> {
+    const results: Array<{ tc: ToolCall; result: ToolResult }> = [];
+    for (const call of calls) {
+      results.push({ tc: call, result: await this.resolveMemoryCall(call) });
+    }
+    return results;
   }
 
   /**
@@ -487,9 +535,140 @@ export class LiveVaultReview implements VaultOpReviewer {
       parked.resolve({ disposition: "cancelled" });
     }
     this.pending.clear();
+
+    const cancelledIds = new Set(this.pendingMemories.keys());
+    for (const [proposalId, parked] of this.pendingMemories) {
+      const proposal = this.memoryProposals.find(
+        (candidate) => candidate.id === proposalId,
+      );
+      if (!proposal) continue;
+      parked.resolve({
+        content: memoryDispositionMessage(
+          proposal.mutation,
+          "cancelled",
+        ),
+        isReadOnly: false,
+        disposition: "cancelled",
+      });
+    }
+    this.pendingMemories.clear();
+    for (let index = this.memoryProposals.length - 1; index >= 0; index--) {
+      if (cancelledIds.has(this.memoryProposals[index].id)) {
+        this.memoryProposals.splice(index, 1);
+      }
+    }
+    this.remountMemories();
   }
 
   // -----------------------------------------------------------------------
+
+  private async resolveMemoryCall(call: ToolCall): Promise<ToolResult> {
+    const deps = this.memoryDeps;
+    if (!deps) {
+      return toolFailure({
+        kind: "unavailable",
+        what: "memory review context unavailable",
+        recovery: "retry the memory proposal in a new message",
+        isReadOnly: false,
+      });
+    }
+
+    const prepared = prepareMemoryMutation(call, deps.getMemories());
+    if (!prepared.ok) return prepared.result;
+    const gate = resolveMemoryGate(this.policy);
+    if (gate === "deny") {
+      return toolFailure({
+        kind: "denied",
+        what: `${call.name} is denied by the memory permission`,
+        recovery: "do not retry it unless the user changes the memory permission",
+        isReadOnly: false,
+      });
+    }
+
+    const proposal: ReviewableMemoryProposal = {
+      id: generateId(),
+      sourceToolCallId: call.id,
+      call,
+      mutation: prepared.mutation,
+      status: "pending",
+    };
+    this.memoryProposals.push(proposal);
+
+    if (gate === "auto") {
+      const result = await applyApprovedMemoryMutation(
+        call,
+        deps,
+        "auto-applied",
+      );
+      proposal.status = result.isError ? "failed" : "applied";
+      if (result.isError) proposal.error = result.content;
+      this.remountMemories();
+      return result;
+    }
+
+    const parked = this.parkMemory(proposal.id);
+    this.remountMemories();
+    return parked.promise;
+  }
+
+  private parkMemory(proposalId: string): PendingMemoryResolution {
+    let resolve!: PendingMemoryResolution["resolve"];
+    const promise = new Promise<ToolResult>((resolver) => {
+      resolve = resolver;
+    });
+    const parked = { resolve, promise };
+    this.pendingMemories.set(proposalId, parked);
+    return parked;
+  }
+
+  private async approveMemory(proposalId: string): Promise<void> {
+    const deps = this.memoryDeps;
+    const proposal = this.memoryProposals.find(
+      (candidate) => candidate.id === proposalId,
+    );
+    const parked = this.pendingMemories.get(proposalId);
+    if (!deps || !proposal || !parked || proposal.status !== "pending") return;
+
+    this.pendingMemories.delete(proposalId);
+    const result = await applyApprovedMemoryMutation(
+      proposal.call,
+      deps,
+      "applied",
+    );
+    proposal.status = result.isError ? "failed" : "applied";
+    if (result.isError) proposal.error = result.content;
+    parked.resolve(result);
+    this.remountMemories();
+  }
+
+  private declineMemory(proposalId: string): void {
+    const proposal = this.memoryProposals.find(
+      (candidate) => candidate.id === proposalId,
+    );
+    const parked = this.pendingMemories.get(proposalId);
+    if (!proposal || !parked || proposal.status !== "pending") return;
+
+    this.pendingMemories.delete(proposalId);
+    proposal.status = "declined";
+    parked.resolve({
+      content: memoryDispositionMessage(proposal.mutation, "declined"),
+      isReadOnly: false,
+      disposition: "declined",
+    });
+    this.remountMemories();
+  }
+
+  private remountMemories(): void {
+    if (!this.memoryDeps) return;
+    new MemoryReviewTimelineView({
+      timelineEl: this.timelineEl,
+      proposals: this.memoryProposals,
+      callbacks: {
+        onApprove: (proposalId) => this.approveMemory(proposalId),
+        onDecline: (proposalId) => this.declineMemory(proposalId),
+      },
+    });
+  }
 
   /** Convert + gate a batch, append reviewable ops, and park `ask` resolutions. */
   private async register(calls: ToolCall[], stoppedForMaxTokens: boolean): Promise<Entry[]> {

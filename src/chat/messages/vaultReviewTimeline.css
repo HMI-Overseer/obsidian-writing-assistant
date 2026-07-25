@@ -48,7 +48,8 @@
 
 /* ── Inline per-step controls (sit after the step's name + path) ── */
 
-.lmsa-vault-step-controls {
+.lmsa-vault-step-controls,
+.lmsa-memory-step-controls {
   @apply lmsa:inline-flex lmsa:items-center lmsa:gap-1;
   align-self: center;
 }
@@ -64,7 +65,8 @@
    established subtle recipe (cf. BubbleActionToolbar), transparent, no chrome,
    muted, with only a hover wash. Obsidian's base button styling is reset so it
    can't reintroduce the chunky look. */
-.lmsa-vault-step-controls .lmsa-vault-step-btn {
+.lmsa-vault-step-controls .lmsa-vault-step-btn,
+.lmsa-memory-step-controls .lmsa-vault-step-btn {
   @apply lmsa:inline-flex lmsa:cursor-pointer lmsa:items-center lmsa:justify-center lmsa:rounded-md lmsa:border-none lmsa:bg-transparent lmsa:p-0;
   box-shadow: none;
   outline: none;
@@ -78,25 +80,30 @@
   transition: background 120ms ease, color 120ms ease;
 }
 
-.lmsa-vault-step-controls .lmsa-vault-step-btn:focus-visible {
+.lmsa-vault-step-controls .lmsa-vault-step-btn:focus-visible,
+.lmsa-memory-step-controls .lmsa-vault-step-btn:focus-visible {
   box-shadow: 0 0 0 2px var(--lmsa-mode-accent);
 }
 
-.lmsa-vault-step-controls .lmsa-vault-step-btn:disabled {
+.lmsa-vault-step-controls .lmsa-vault-step-btn:disabled,
+.lmsa-memory-step-controls .lmsa-vault-step-btn:disabled {
   opacity: 0.5;
   cursor: default;
 }
 
-.lmsa-vault-step-controls .lmsa-vault-step-btn svg {
+.lmsa-vault-step-controls .lmsa-vault-step-btn svg,
+.lmsa-memory-step-controls .lmsa-vault-step-btn svg {
   width: 14px;
   height: 14px;
 }
 
-.lmsa-vault-step-controls .lmsa-vault-step-btn--approve:hover:not(:disabled) {
+.lmsa-vault-step-controls .lmsa-vault-step-btn--approve:hover:not(:disabled),
+.lmsa-memory-step-controls .lmsa-vault-step-btn--approve:hover:not(:disabled) {
   color: var(--lmsa-mode-accent);
 }
 
-.lmsa-vault-step-controls .lmsa-vault-step-btn--decline:hover:not(:disabled) {
+.lmsa-vault-step-controls .lmsa-vault-step-btn--decline:hover:not(:disabled),
+.lmsa-memory-step-controls .lmsa-vault-step-btn--decline:hover:not(:disabled) {
   color: var(--text-error);
 }
 

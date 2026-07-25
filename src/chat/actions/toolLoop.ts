@@ -17,12 +17,22 @@ import type { ToolExecutionContext } from "../../tools/editing/handlers";
 import { VAULT_OPS_TOOL_NAMES } from "../../tools/vault-ops/definition";
 import { executeVaultOpTool, buildPendingOverlay } from "../../tools/vault-ops/handlers";
 import { THINK_TOOL_NAME } from "../../tools/think/definition";
+import {
+  MEMORY_MUTATION_TOOL_NAMES,
+  MEMORY_TOOL_NAMES,
+  RECALL_MEMORY_TOOL,
+} from "../../tools/memory/definition";
+import {
+  executeMemoryTool,
+  type MemoryToolContext,
+} from "../../tools/memory/handlers";
 import { extractToolInput } from "../../tools/metadata";
 import { normalizeVaultToolCall } from "../../tools/paths";
 import { streamWithRetry } from "../../api/retry";
 import type { LiveVaultReview } from "./liveVaultReview";
 
 export type { VaultToolContext, ToolExecutionContext };
+export type { MemoryToolContext };
 
 /**
  * Context for in-loop vault-op execution. When `liveReview` is present, `ask`-gated
@@ -40,6 +50,7 @@ const ALL_LOOP_TOOL_NAMES = new Set([
   ...VAULT_TOOL_NAMES,
   ...EDIT_TOOL_NAMES,
   ...VAULT_OPS_TOOL_NAMES,
+  ...MEMORY_TOOL_NAMES,
   THINK_TOOL_NAME,
 ]);
 
@@ -127,6 +138,7 @@ export async function runToolLoop(
   vaultToolContext?: VaultToolContext,
   editToolContext?: ToolExecutionContext,
   vaultOpToolContext?: VaultOpToolContext,
+  memoryToolContext?: MemoryToolContext,
 ): Promise<ToolLoopResult> {
   const toolLoopTurns: ChatTurn[] = [];
   let allWriteToolCalls: ToolCall[] = [];
@@ -309,8 +321,16 @@ export async function runToolLoop(
     // differently: known loop tools execute inline; unknown tools accumulate as
     // write calls for finalization; edit/vault-op/vault/think are split among
     // the loop tools.
-    const { loopCalls, unknownCalls, editCalls, vaultOpCalls, vaultCalls, thinkCalls } =
-      classifyToolCalls(toolCalls);
+    const {
+      loopCalls,
+      unknownCalls,
+      editCalls,
+      vaultOpCalls,
+      vaultCalls,
+      thinkCalls,
+      memoryReadCalls,
+      memoryMutationCalls,
+    } = classifyToolCalls(toolCalls);
 
     // Two pre-execution guards, both BEFORE a call executes or accumulates as a
     // write (so a refused mutating call is never applied). Blocked calls stay in
@@ -336,6 +356,8 @@ export async function runToolLoop(
     const liveVaultOpCalls = vaultOpCalls.filter(isLive);
     const liveVaultCalls = vaultCalls.filter(isLive);
     const liveThinkCalls = thinkCalls.filter(isLive);
+    const liveMemoryReadCalls = memoryReadCalls.filter(isLive);
+    const liveMemoryMutationCalls = memoryMutationCalls.filter(isLive);
 
     // Unknown and edit calls accumulate as write calls for the finalization
     // pipeline (edits also execute in the loop so the diff panel can render them).
@@ -363,7 +385,10 @@ export async function runToolLoop(
     // reasoning. Accumulate it toward the bubble; prose before a read-only tool
     // stays in the timeline as reasoning (committed below).
     const roundIsMutating =
-      unknownCalls.length > 0 || liveEditCalls.length > 0 || liveVaultOpCalls.length > 0;
+      unknownCalls.length > 0 ||
+      liveEditCalls.length > 0 ||
+      liveVaultOpCalls.length > 0 ||
+      liveMemoryMutationCalls.length > 0;
 
     // Cap reached: push terminal error results to keep history valid, then let
     // the model produce one synthesis response. If it calls tools again after
@@ -420,7 +445,7 @@ export async function runToolLoop(
     // concurrently. Vault-op and edit steps are recorded BEFORE resolving so their
     // timeline rows exist while the review blocks this round until the user decides;
     // both channels return the *real* disposition as the tool result.
-    const [otherResults, vaultOpResults, editResults] = await Promise.all([
+    const [otherResults, vaultOpResults, editResults, memoryResults] = await Promise.all([
       Promise.all([
         ...liveVaultCalls.map(async (tc) => {
           callbacks.onToolStatus?.(tc.name);
@@ -439,6 +464,22 @@ export async function runToolLoop(
           const result: ToolResult = { content: "", isReadOnly: true };
           return Promise.resolve({ tc, result });
         }),
+        ...liveMemoryReadCalls.map((tc) => {
+          callbacks.onToolStatus?.(tc.name);
+          if (!memoryToolContext) {
+            return Promise.resolve({
+              tc,
+              result: toolFailure({
+                kind: "unavailable",
+                what: "memory tool context unavailable",
+              }),
+            });
+          }
+          return Promise.resolve({
+            tc,
+            result: executeMemoryTool(tc, memoryToolContext),
+          });
+        }),
       ]),
       resolveVaultOps({
         vaultOpCalls: liveVaultOpCalls,
@@ -452,6 +493,13 @@ export async function runToolLoop(
         editCalls: liveEditCalls,
         vaultOpContext: vaultOpToolContext,
         editContext: editToolContext,
+        round,
+        callbacks,
+      }),
+      resolveMemories({
+        memoryCalls: liveMemoryMutationCalls,
+        context: memoryToolContext,
+        liveReview: vaultOpToolContext?.liveReview,
         round,
         callbacks,
       }),
@@ -479,7 +527,11 @@ export async function runToolLoop(
     // Vault-op and edit steps were already recorded before resolution, push results,
     // and report the outcome so the timeline can flag failures / declines / denials
     // and capture the disposition + bounded record for replay (phase 2).
-    for (const { tc, result } of [...vaultOpResults, ...editResults]) {
+    for (const { tc, result } of [
+      ...vaultOpResults,
+      ...editResults,
+      ...memoryResults,
+    ]) {
       toolLoopTurns.push({ role: "tool", content: result.content, toolCallId: tc.id });
       callbacks.onStepResult?.(tc.id, {
         isError: result.isError,
@@ -517,6 +569,8 @@ export interface ClassifiedCalls {
   vaultOpCalls: ToolCall[];
   vaultCalls: ToolCall[];
   thinkCalls: ToolCall[];
+  memoryReadCalls: ToolCall[];
+  memoryMutationCalls: ToolCall[];
 }
 
 /**
@@ -545,6 +599,7 @@ export function capRoundToMutation(toolCalls: ToolCall[]): ToolCall[] {
   const isMutating = (tc: ToolCall): boolean =>
     EDIT_TOOL_NAMES.has(tc.name) ||
     VAULT_OPS_TOOL_NAMES.has(tc.name) ||
+    MEMORY_MUTATION_TOOL_NAMES.has(tc.name) ||
     // Unknown tools accumulate as write calls for finalization, so treat them as
     // mutating too (conservative: never batch an unrecognized call behind another).
     !ALL_LOOP_TOOL_NAMES.has(tc.name);
@@ -566,6 +621,12 @@ export function classifyToolCalls(toolCalls: ToolCall[]): ClassifiedCalls {
     vaultOpCalls: loopCalls.filter((tc) => VAULT_OPS_TOOL_NAMES.has(tc.name)),
     vaultCalls: loopCalls.filter((tc) => VAULT_TOOL_NAMES.has(tc.name)),
     thinkCalls: loopCalls.filter((tc) => tc.name === THINK_TOOL_NAME),
+    memoryReadCalls: loopCalls.filter(
+      (tc) => tc.name === RECALL_MEMORY_TOOL.name,
+    ),
+    memoryMutationCalls: loopCalls.filter((tc) =>
+      MEMORY_MUTATION_TOOL_NAMES.has(tc.name),
+    ),
   };
 }
 
@@ -597,7 +658,10 @@ function canonicalToolKey(tc: ToolCall): string {
 
 /** The recovery-shaped refusal returned when a call repeats past the threshold. */
 function identicalCallRefusal(tc: ToolCall): ToolResult {
-  const isReadOnly = VAULT_TOOL_NAMES.has(tc.name) || tc.name === THINK_TOOL_NAME;
+  const isReadOnly =
+    VAULT_TOOL_NAMES.has(tc.name) ||
+    tc.name === THINK_TOOL_NAME ||
+    tc.name === RECALL_MEMORY_TOOL.name;
   return toolFailure({
     kind: "precondition",
     what: `${tc.name} was already called with these exact arguments ${IDENTICAL_CALL_THRESHOLD} times this turn and its result has not changed`,
@@ -775,6 +839,57 @@ export async function resolveEdits(
         };
       }
       return { tc, result: await executeEditTool(tc, editContext) };
+    }),
+  );
+}
+
+export interface ResolveMemoriesDeps {
+  memoryCalls: ToolCall[];
+  context: MemoryToolContext | undefined;
+  liveReview?: LiveVaultReview;
+  round: number;
+  callbacks: ToolLoopCallbacks;
+}
+
+/**
+ * Resolve memory mutations through their dedicated review channel. The fallback
+ * validates and acknowledges only, it never persists without a reviewer.
+ */
+export function resolveMemories(
+  deps: ResolveMemoriesDeps,
+): Promise<Array<{ tc: ToolCall; result: ToolResult }>> {
+  const { memoryCalls, context, liveReview, round, callbacks } = deps;
+  if (memoryCalls.length === 0) return Promise.resolve([]);
+  for (const tc of memoryCalls) {
+    callbacks.onToolStatus?.(tc.name);
+    callbacks.onStepRecorded?.({
+      type: "tool_call",
+      round,
+      toolName: tc.name,
+      toolCallId: tc.id,
+      toolInput: extractToolInput(tc),
+      toolArgs: tc.arguments,
+    });
+  }
+  if (liveReview) {
+    return liveReview.resolveMemories(memoryCalls);
+  }
+  return Promise.resolve(
+    memoryCalls.map((tc) => {
+      if (!context) {
+        return {
+          tc,
+          result: toolFailure({
+            kind: "unavailable",
+            what: "memory tool context unavailable",
+            isReadOnly: false,
+          }),
+        };
+      }
+      return {
+        tc,
+        result: executeMemoryTool(tc, context),
+      };
     }),
   );
 }

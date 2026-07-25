@@ -157,4 +157,6 @@ export interface VaultOpReviewer {
   resolveOne(call: ToolCall, toolCallId: string): Promise<ToolResult>;
   /** Resolve a single edit call (the edit-channel sibling of {@link resolveOne}). */
   resolveEditOne(call: ToolCall, toolCallId: string): Promise<ToolResult>;
+  /** Resolve one memory mutation through its posture-independent review channel. */
+  resolveMemoryOne(call: ToolCall, toolCallId: string): Promise<ToolResult>;
 }

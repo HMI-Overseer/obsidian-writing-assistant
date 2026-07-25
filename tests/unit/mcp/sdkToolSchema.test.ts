@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { jsonSchemaToZodShape } from "../../../src/mcp/sdkToolSchema";
 import type { CanonicalToolDefinition } from "../../../src/tools/types";
+import { RECALL_MEMORY_TOOL } from "../../../src/tools/memory/definition";
 
 function shapeFor(parameters: CanonicalToolDefinition["parameters"]) {
   return jsonSchemaToZodShape(parameters);
@@ -63,6 +64,13 @@ describe("jsonSchemaToZodShape", () => {
 
     expect(shape.paths.safeParse(["a", "b"]).success).toBe(true);
     expect(shape.paths.safeParse([1]).success).toBe(false);
+  });
+
+  it("converts the recall_memory names array without losing its item schema", () => {
+    const shape = shapeFor(RECALL_MEMORY_TOOL.parameters);
+    expect(shape.names.safeParse(["vault-tone", "project-state"]).success).toBe(true);
+    expect(shape.names.safeParse("vault-tone").success).toBe(false);
+    expect(shape.names.safeParse(["vault-tone", 2]).success).toBe(false);
   });
 
   it("accepts either alternative of an anyOf union (string or array of strings)", () => {

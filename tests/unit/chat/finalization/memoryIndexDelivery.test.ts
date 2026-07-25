@@ -150,6 +150,37 @@ describe("memory index delivery", () => {
     expect(request.modeTail).toBeUndefined();
   });
 
+  it("offers the memory family and guidance to a tool-trained local model", async () => {
+    const currentSettings = settings({
+      memoriesEnabled: true,
+      agenticMode: true,
+      vaultOpPolicy: {
+        ...DENY_WRITES_POLICY,
+        memory: "ask",
+      },
+    });
+    const memoryService = new MemoryService(() => currentSettings.memories);
+
+    const request = await prepareApiMessages({
+      app: app(),
+      store: store(),
+      settings: currentSettings,
+      posture: "auto",
+      memoryService,
+      activeProvider: "lmstudio",
+      modelCapabilities: { trainedForToolUse: true },
+      profileSystemPrompt: "Profile prompt.",
+    });
+
+    expect(request.tools?.map((tool) => tool.name)).toEqual(
+      expect.arrayContaining(["recall_memory", "add_memory", "forget_memory"]),
+    );
+    expect(request.systemPrompt).toContain("## Memory tools");
+    expect(request.systemPrompt).toContain("recall_memory");
+    expect(request.systemPrompt).toContain("add_memory");
+    expect(request.systemPrompt).toContain("forget_memory");
+  });
+
   it("omits the memory block cleanly when no record is enabled", async () => {
     const currentSettings = settings({
       memoriesEnabled: true,

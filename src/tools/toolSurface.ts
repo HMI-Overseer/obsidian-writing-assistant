@@ -11,6 +11,12 @@ import {
 import { ALL_EDIT_TOOLS } from "./editing/definition";
 import { ALL_VAULT_OPS_TOOLS, allowedVaultOpsTools } from "./vault-ops/definition";
 import { THINK_TOOL, THINK_TOOL_NAME } from "./think/definition";
+import {
+  ALL_MEMORY_TOOLS,
+  MEMORY_MUTATION_TOOL_NAMES,
+  RECALL_MEMORY_TOOL,
+  allowedMemoryTools,
+} from "./memory/definition";
 import { toolFailure } from "./toolFailure";
 
 /**
@@ -41,6 +47,8 @@ export interface ToolSurfaceOptions {
   policy: VaultOpPolicy;
   /** Whether the `think` meta tool is offered (false for LM Studio and Claude Code). */
   useThinkTool: boolean;
+  /** Whether the memory family exists on this request's tool surface. */
+  memoriesEnabled: boolean;
 }
 
 /**
@@ -70,6 +78,7 @@ export function resolveWriteTools(opts: ToolSurfaceOptions): CanonicalToolDefini
 function permittedTools(opts: ToolSurfaceOptions): CanonicalToolDefinition[] {
   return [
     ...ALL_VAULT_TOOLS,
+    ...(opts.memoriesEnabled ? allowedMemoryTools(opts.policy) : []),
     ...resolveWriteTools(opts),
     ...(opts.useThinkTool ? [THINK_TOOL] : []),
   ];
@@ -126,6 +135,25 @@ export const CLAUDE_CODE_STABLE_TOOL_SET: CanonicalToolDefinition[] = [
   ...ALL_VAULT_OPS_TOOLS,
 ];
 
+/** Feature-conditional Layer 1 superset. The flag is its only varying input. */
+export function claudeCodeStableToolSet(
+  memoriesEnabled: boolean,
+): CanonicalToolDefinition[] {
+  return memoriesEnabled
+    ? [...CLAUDE_CODE_STABLE_TOOL_SET, ...ALL_MEMORY_TOOLS]
+    : CLAUDE_CODE_STABLE_TOOL_SET;
+}
+
+/** Feature-conditional Anthropic Layer 1 superset. The flag is its only varying input. */
+export function cloudStableToolSet(
+  memoriesEnabled: boolean,
+): CanonicalToolDefinition[] {
+  return [
+    ...claudeCodeStableToolSet(memoriesEnabled),
+    THINK_TOOL,
+  ];
+}
+
 /*
  * Layer 2, progressive disclosure (the bloat fix). Settled in ADR-0009 and the
  * prompt-cache design section 6.2.5: under tool-search deferral the always-loaded surface
@@ -154,6 +182,7 @@ export const CORE_READ_TOOLS: CanonicalToolDefinition[] = [
   ...CORE_VAULT_TOOLS,
   GET_OUTLINE_TOOL,
   READ_SECTION_TOOL,
+  RECALL_MEMORY_TOOL,
 ];
 
 /** Names of {@link CORE_READ_TOOLS}, for the wire-layer defer / `alwaysLoad` split. */
@@ -178,8 +207,17 @@ export function isCoreReadTool(name: string): boolean {
  * wire layer and is not a {@link CanonicalToolDefinition}, so it is not listed here.
  * Every emitted tool whose name is absent from this set carries `defer_loading: true`.
  */
-export function anthropicNonDeferredToolNames(): Set<string> {
-  return new Set([...CORE_READ_TOOL_NAMES, THINK_TOOL_NAME]);
+export function anthropicNonDeferredToolNames(
+  memoriesEnabled = false,
+): Set<string> {
+  const names = memoriesEnabled
+    ? CORE_READ_TOOL_NAMES
+    : new Set(
+        [...CORE_READ_TOOL_NAMES].filter(
+          (name) => name !== RECALL_MEMORY_TOOL.name,
+        ),
+      );
+  return new Set([...names, THINK_TOOL_NAME]);
 }
 
 /**
@@ -199,12 +237,21 @@ export function anthropicNonDeferredToolNames(): Set<string> {
  * as defense in depth.
  */
 export function anthropicLayer2ToolSet(opts: ToolSurfaceOptions): CanonicalToolDefinition[] {
+  const coreReads = opts.memoriesEnabled
+    ? CORE_READ_TOOLS
+    : CORE_READ_TOOLS.filter((tool) => tool.name !== RECALL_MEMORY_TOOL.name);
   const tailReads = ALL_VAULT_TOOLS.filter((tool) => !isCoreReadTool(tool.name));
+  const memoryMutations = opts.memoriesEnabled
+    ? allowedMemoryTools(opts.policy).filter((tool) =>
+        MEMORY_MUTATION_TOOL_NAMES.has(tool.name),
+      )
+    : [];
   return [
-    ...CORE_READ_TOOLS,
+    ...coreReads,
     ...(opts.useThinkTool ? [THINK_TOOL] : []),
     ...tailReads,
     ...resolveWriteTools(opts),
+    ...memoryMutations,
   ];
 }
 
@@ -217,7 +264,10 @@ export function anthropicLayer2ToolSet(opts: ToolSurfaceOptions): CanonicalToolD
  * the call rather than re-issue it.
  */
 export function toolNotAllowedFailure(name: string): ToolResult {
-  const isReadOnly = VAULT_TOOL_NAMES.has(name) || name === THINK_TOOL_NAME;
+  const isReadOnly =
+    VAULT_TOOL_NAMES.has(name) ||
+    name === THINK_TOOL_NAME ||
+    name === RECALL_MEMORY_TOOL.name;
   return toolFailure({
     kind: "precondition",
     what: `${name} is not permitted in this session`,

@@ -6,6 +6,8 @@ import {
   cloudAllowedToolNames,
   CLOUD_STABLE_TOOL_SET,
   CLAUDE_CODE_STABLE_TOOL_SET,
+  cloudStableToolSet,
+  claudeCodeStableToolSet,
   CORE_READ_TOOLS,
   CORE_READ_TOOL_NAMES,
   isCoreReadTool,
@@ -18,6 +20,10 @@ import { DEFAULT_VAULT_OP_POLICY, type VaultOpPolicy } from "../../../src/vault-
 import { VAULT_TOOL_NAMES } from "../../../src/tools/vault/definition";
 import { EDIT_TOOL_NAMES } from "../../../src/tools/editing/definition";
 import { VAULT_OPS_TOOL_NAMES } from "../../../src/tools/vault-ops/definition";
+import {
+  MEMORY_MUTATION_TOOL_NAMES,
+  MEMORY_TOOL_NAMES,
+} from "../../../src/tools/memory/definition";
 
 const EDIT_NAMES = ["propose_edit", "insert_into_note", "update_frontmatter"];
 const VAULT_OP_NAMES = [
@@ -45,6 +51,7 @@ function opts(overrides: Partial<ToolSurfaceOptions> = {}): ToolSurfaceOptions {
     posture: "ask",
     policy: DEFAULT_VAULT_OP_POLICY,
     useThinkTool: true,
+    memoriesEnabled: false,
     ...overrides,
   };
 }
@@ -160,6 +167,26 @@ describe("stable cloud surfaces (Layer 1 superset)", () => {
       "think",
     ]);
   });
+
+  it("keeps both stable catalogs byte-identical to baseline while memories are off", () => {
+    expect(JSON.stringify(cloudStableToolSet(false))).toBe(
+      JSON.stringify(CLOUD_STABLE_TOOL_SET),
+    );
+    expect(JSON.stringify(claudeCodeStableToolSet(false))).toBe(
+      JSON.stringify(CLAUDE_CODE_STABLE_TOOL_SET),
+    );
+  });
+
+  it("adds the complete memory family based only on memoriesEnabled", () => {
+    const cloud = names(cloudStableToolSet(true));
+    const claudeCode = names(claudeCodeStableToolSet(true));
+    for (const memoryName of MEMORY_TOOL_NAMES) {
+      expect(cloud).toContain(memoryName);
+      expect(claudeCode).toContain(memoryName);
+    }
+    expect(cloud[cloud.length - 1]).toBe("think");
+    expect(claudeCode).not.toContain("think");
+  });
 });
 
 describe("toolNotAllowedFailure", () => {
@@ -169,6 +196,12 @@ describe("toolNotAllowedFailure", () => {
     expect(result.failure?.kind).toBe("precondition");
     expect(result.content).toContain("write_file");
     expect(result.isReadOnly).toBe(false);
+  });
+
+  it("classifies denied memory mutations as writes and recall as a read", () => {
+    expect(toolNotAllowedFailure("add_memory").isReadOnly).toBe(false);
+    expect(toolNotAllowedFailure("forget_memory").isReadOnly).toBe(false);
+    expect(toolNotAllowedFailure("recall_memory").isReadOnly).toBe(true);
   });
 });
 
@@ -186,7 +219,7 @@ describe("Layer 2 progressive-disclosure core (ADR-0009 / section 6.2.5)", () =>
   // See docs/03-decisions/ADR-0009-layer-2-progressive-disclosure-deferred.md.
   const NON_DEFERRED_CORE_MAX = 8;
 
-  it("keeps the core read set to the six section 6.2.5 primitives", () => {
+  it("gives recall_memory the seventh core read slot", () => {
     expect(names(CORE_READ_TOOLS)).toEqual([
       "list_directory",
       "semantic_search",
@@ -194,22 +227,27 @@ describe("Layer 2 progressive-disclosure core (ADR-0009 / section 6.2.5)", () =>
       "read_file",
       "get_outline",
       "read_section",
+      "recall_memory",
     ]);
-    expect(CORE_READ_TOOL_NAMES.size).toBe(6);
+    expect(CORE_READ_TOOL_NAMES.size).toBe(7);
   });
 
-  it("holds the anthropic non-deferred core (core reads + think) small", () => {
-    // 6 core reads + think. The native tool-search entry is non-deferred at the wire
+  it("holds the enabled anthropic non-deferred core at the deliberate eight-slot cap", () => {
+    // 7 core reads + think. The native tool-search entry is non-deferred at the wire
     // layer but is not a canonical tool, so it is not counted here.
-    const nonDeferred = anthropicNonDeferredToolNames();
+    const nonDeferred = anthropicNonDeferredToolNames(true);
     expect(nonDeferred.size).toBeLessThanOrEqual(NON_DEFERRED_CORE_MAX);
-    expect(nonDeferred.size).toBe(7);
+    expect(nonDeferred.size).toBe(8);
+    expect(nonDeferred.has("recall_memory")).toBe(true);
     expect(nonDeferred.has("think")).toBe(true);
   });
 
-  it("classifies only the six core reads as non-deferred, never writes or tail reads", () => {
+  it("classifies recall as core, never its memory mutation siblings", () => {
     expect(isCoreReadTool("read_file")).toBe(true);
     expect(isCoreReadTool("semantic_search")).toBe(true);
+    expect(isCoreReadTool("recall_memory")).toBe(true);
+    expect(isCoreReadTool("add_memory")).toBe(false);
+    expect(isCoreReadTool("forget_memory")).toBe(false);
     // Tail reads defer.
     expect(isCoreReadTool("directory_tree")).toBe(false);
     expect(isCoreReadTool("get_frontmatter")).toBe(false);
@@ -218,6 +256,58 @@ describe("Layer 2 progressive-disclosure core (ADR-0009 / section 6.2.5)", () =>
     expect(isCoreReadTool("write_file")).toBe(false);
     // think is core only on the native path, added separately, not a "read".
     expect(isCoreReadTool("think")).toBe(false);
+  });
+});
+
+describe("memory catalog and runtime denial semantics", () => {
+  it("keeps every resolver byte-identical to baseline while memories are off", () => {
+    const baseline = opts({ memoriesEnabled: false });
+    expect(JSON.stringify(resolveLocalToolSet(baseline))).toBe(
+      JSON.stringify(resolveLocalToolSet(opts())),
+    );
+    expect(JSON.stringify(cloudAllowedToolSet(baseline))).toBe(
+      JSON.stringify(cloudAllowedToolSet(opts())),
+    );
+    expect(JSON.stringify(anthropicLayer2ToolSet(baseline))).toBe(
+      JSON.stringify(anthropicLayer2ToolSet(opts())),
+    );
+    expect([...anthropicNonDeferredToolNames(false)]).toEqual(
+      [...anthropicNonDeferredToolNames()],
+    );
+  });
+
+  it("keeps recall and drops mutations from Layer 2 and local under deny", () => {
+    const policy = { ...DEFAULT_VAULT_OP_POLICY, memory: "deny" as const };
+    for (const resolver of [resolveLocalToolSet, anthropicLayer2ToolSet]) {
+      const got = names(resolver(opts({ memoriesEnabled: true, policy })));
+      expect(got).toContain("recall_memory");
+      for (const mutationName of MEMORY_MUTATION_TOOL_NAMES) {
+        expect(got).not.toContain(mutationName);
+      }
+    }
+  });
+
+  it("refuses denied mutations in the cloud runtime allow-list but permits recall", () => {
+    const policy = { ...DEFAULT_VAULT_OP_POLICY, memory: "deny" as const };
+    const got = cloudAllowedToolNames(
+      opts({ memoriesEnabled: true, policy, posture: "auto" }),
+    );
+    expect(got).toContain("recall_memory");
+    expect(got).not.toContain("add_memory");
+    expect(got).not.toContain("forget_memory");
+  });
+
+  it("keeps the enabled Layer 1 and Claude Code catalog bytes policy-invariant", () => {
+    const stableCloud = JSON.stringify(cloudStableToolSet(true));
+    const stableClaudeCode = JSON.stringify(claudeCodeStableToolSet(true));
+    for (const memory of ["ask", "auto", "deny"] as const) {
+      const policy = { ...DEFAULT_VAULT_OP_POLICY, memory };
+      const surface = opts({ policy, memoriesEnabled: true });
+      expect(JSON.stringify(cloudStableToolSet(surface.memoriesEnabled))).toBe(stableCloud);
+      expect(JSON.stringify(claudeCodeStableToolSet(surface.memoriesEnabled))).toBe(
+        stableClaudeCode,
+      );
+    }
   });
 });
 
@@ -245,6 +335,13 @@ describe("anthropicLayer2ToolSet (the direct-API L2 emission)", () => {
       ...EDIT_NAMES,
       ...VAULT_OP_NAMES,
     ]);
+  });
+
+  it("places enabled recall in the core and memory mutations in the deferred tail", () => {
+    const got = names(anthropicLayer2ToolSet(opts({ memoriesEnabled: true })));
+    expect(got.indexOf("recall_memory")).toBe(6);
+    expect(got.indexOf("add_memory")).toBeGreaterThan(got.indexOf("get_frontmatter"));
+    expect(got.indexOf("forget_memory")).toBeGreaterThan(got.indexOf("add_memory"));
   });
 
   it("includes every read tool exactly once (core + tail = the full read suite)", () => {

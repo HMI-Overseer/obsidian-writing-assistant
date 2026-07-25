@@ -10,10 +10,18 @@ import {
 import { VAULT_TOOL_NAMES } from "../../../src/tools/vault/definition";
 import { EDIT_TOOL_NAMES } from "../../../src/tools/editing/definition";
 import { VAULT_OPS_TOOL_NAMES } from "../../../src/tools/vault-ops/definition";
+import {
+  MEMORY_MUTATION_TOOL_NAMES,
+  MEMORY_TOOL_NAMES,
+} from "../../../src/tools/memory/definition";
 
 describe("isMutatingTool", () => {
-  test("every vault-op and edit tool is classified as mutating", () => {
-    for (const name of [...VAULT_OPS_TOOL_NAMES, ...EDIT_TOOL_NAMES]) {
+  test("every vault-op, edit, and memory mutation tool is classified as mutating", () => {
+    for (const name of [
+      ...VAULT_OPS_TOOL_NAMES,
+      ...EDIT_TOOL_NAMES,
+      ...MEMORY_MUTATION_TOOL_NAMES,
+    ]) {
       expect(isMutatingTool(name)).toBe(true);
     }
   });
@@ -22,13 +30,18 @@ describe("isMutatingTool", () => {
     for (const name of VAULT_TOOL_NAMES) {
       expect(isMutatingTool(name)).toBe(false);
     }
+    expect(isMutatingTool("recall_memory")).toBe(false);
   });
 
   // Drift guard: if a new vault-op / edit tool is added, it must be classified here
   // too, or its timeline step would render as a read-only (cyan) call.
-  test("the mutating set is exactly the vault-op + edit tools", () => {
+  test("the mutating set is exactly the vault-op, edit, and memory mutation tools", () => {
     expect([...MUTATING_TOOL_NAMES].sort()).toEqual(
-      [...VAULT_OPS_TOOL_NAMES, ...EDIT_TOOL_NAMES].sort(),
+      [
+        ...VAULT_OPS_TOOL_NAMES,
+        ...EDIT_TOOL_NAMES,
+        ...MEMORY_MUTATION_TOOL_NAMES,
+      ].sort(),
     );
   });
 
@@ -49,6 +62,7 @@ describe("display-metadata coverage", () => {
     ...VAULT_OPS_TOOL_NAMES,
     ...EDIT_TOOL_NAMES,
     ...VAULT_TOOL_NAMES,
+    ...MEMORY_TOOL_NAMES,
   ];
 
   // A single args object carrying every key any tool reads, so extractToolInput
@@ -69,6 +83,10 @@ describe("display-metadata coverage", () => {
     where: "append",
     anchor: "line",
     thought: "hmm",
+    name: "vault-tone",
+    names: ["vault-tone"],
+    description: "Tone guide",
+    content: "Restrained and uncanny",
   };
 
   test("TOOL_ICONS covers every tool", () => {

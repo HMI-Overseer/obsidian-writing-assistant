@@ -377,7 +377,7 @@ export class AgenticTimeline {
     stepEl.classList.add("lmsa-agentic-timeline-step--error");
     const bodyEl = stepEl.querySelector<HTMLElement>(".lmsa-agentic-timeline-step-body") ?? stepEl;
     const reviewed = !!bodyEl.querySelector(
-      ":scope > .lmsa-vault-step-controls, :scope > .lmsa-edit-step-controls",
+      ":scope > .lmsa-vault-step-controls, :scope > .lmsa-edit-step-controls, :scope > .lmsa-memory-step-controls",
     );
     if (!reviewed && !bodyEl.querySelector(":scope > .lmsa-agentic-timeline-step-failed")) {
       bodyEl.createSpan({ cls: "lmsa-agentic-timeline-step-failed", text: "Failed" });

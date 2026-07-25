@@ -19,6 +19,7 @@ import { SdkSessionRegistry } from "../api/sdk/sdkSession";
 import type { SessionConfig } from "../api/harnessSession";
 import { isCliVersionCompatible } from "../api/sdkVersionGuard";
 import type { RagService } from "../rag/ragService";
+import type { MemoryService } from "../memory/MemoryService";
 import type { CanonicalToolDefinition, ToolCall, ToolResult } from "../tools/types";
 import type { VaultOpDisposition } from "../vault-ops/disposition";
 import { VAULT_TOOL_NAMES } from "../tools/vault/definition";
@@ -29,7 +30,7 @@ import { executeEditTool } from "../tools/editing/handlers";
 import { VAULT_OPS_TOOL_NAMES } from "../tools/vault-ops/definition";
 import { executeVaultOpTool, buildPendingOverlay } from "../tools/vault-ops/handlers";
 import {
-  CLAUDE_CODE_STABLE_TOOL_SET,
+  claudeCodeStableToolSet,
   cloudAllowedToolSet,
   toolNotAllowedFailure,
 } from "../tools/toolSurface";
@@ -37,6 +38,11 @@ import { normalizeVaultToolCall } from "../tools/paths";
 import { VaultMcpServer, type McpServerHandle, type McpToolProvider } from "../mcp/VaultMcpServer";
 import type { VaultOpReviewer } from "../tools/types";
 import { generateId } from "../utils";
+import { MEMORY_TOOL_NAMES } from "../tools/memory/definition";
+import {
+  executeMemoryTool,
+  type MemoryToolContext,
+} from "../tools/memory/handlers";
 
 /** Result of probing the local `claude` binary for the settings panel. */
 export interface ClaudeCodeDetection {
@@ -160,6 +166,8 @@ export class ClaudeCodeService {
     private readonly app: App,
     private readonly getSettings: () => PluginSettings,
     private readonly getRagService: () => RagService,
+    private readonly getMemoryService: () => MemoryService,
+    private readonly persistSettings: () => Promise<void>,
     /**
      * Receives the normalized effort-level harvest whenever a fresh SDK session
      * mints (section 3.1 layer 2). The container merges it into the availability
@@ -212,6 +220,7 @@ export class ClaudeCodeService {
             posture: options.posture ?? "ask",
             policy: settings.vaultOpPolicy,
             useThinkTool: false,
+            memoriesEnabled: settings.memoriesEnabled,
           }).map((tool) => tool.name),
         )
       : new Set();
@@ -430,7 +439,8 @@ export class ClaudeCodeService {
       // semantic_search stays advertised and reports unavailability at call time (the
       // handler's curated message); the runtime allow-list (runAllowedTools, enforced
       // in executeTool) restricts writes per mode, not this catalogue.
-      listTools: (): CanonicalToolDefinition[] => CLAUDE_CODE_STABLE_TOOL_SET,
+      listTools: (): CanonicalToolDefinition[] =>
+        claudeCodeStableToolSet(this.getSettings().memoriesEnabled),
       callTool: async (rawCall: ToolCall): Promise<ToolResult> => {
         // Surface tool activity to the chat UI's timeline (Claude Code runs its
         // loop internally, so this MCP hook is the only place we see its calls).
@@ -494,6 +504,12 @@ export class ClaudeCodeService {
         activeFilePath: this.app.workspace.getActiveFile()?.path,
       });
     }
+    if (MEMORY_TOOL_NAMES.has(call.name)) {
+      if (call.name !== "recall_memory" && this.liveReview) {
+        return this.liveReview.resolveMemoryOne(call, toolCallId);
+      }
+      return executeMemoryTool(call, this.memoryToolContext());
+    }
     if (EDIT_TOOL_NAMES.has(call.name)) {
       // Live in-loop review: suspend on the edit until the user accepts/declines and
       // return the real disposition, mirroring vault ops (resolveEditOne). The diff
@@ -543,6 +559,14 @@ export class ClaudeCodeService {
     this.sessionRegistry.disposeAll();
     this.mcpServer?.stop();
     this.mcpServer = null;
+  }
+
+  private memoryToolContext(): MemoryToolContext {
+    return {
+      memoryService: this.getMemoryService(),
+      getMemories: () => this.getSettings().memories,
+      saveSettings: this.persistSettings,
+    };
   }
 }
 

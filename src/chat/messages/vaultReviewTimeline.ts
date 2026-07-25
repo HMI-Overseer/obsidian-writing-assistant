@@ -151,10 +151,12 @@ export class VaultReviewTimelineView {
     t.querySelectorAll(".lmsa-vault-review-footer, .lmsa-vault-review-fallback").forEach((e) =>
       e.remove(),
     );
-    t.querySelectorAll(".lmsa-vault-step-controls").forEach((e) => e.remove());
-    t.querySelectorAll(".lmsa-agentic-timeline-step").forEach((e) =>
-      e.classList.remove(...ALL_STATE_CLASSES),
-    );
+    t.querySelectorAll(".lmsa-vault-step-controls").forEach((element) => {
+      element
+        .closest(".lmsa-agentic-timeline-step")
+        ?.classList.remove(...ALL_STATE_CLASSES);
+      element.remove();
+    });
   }
 
   private paint(): void {

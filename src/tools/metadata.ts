@@ -9,6 +9,7 @@
 
 import { VAULT_OPS_TOOL_NAMES } from "./vault-ops/definition";
 import { EDIT_TOOL_NAMES } from "./editing/definition";
+import { MEMORY_MUTATION_TOOL_NAMES } from "./memory/definition";
 
 /** Obsidian icon name for each tool (used in AgenticTimeline). */
 export const TOOL_ICONS: Record<string, string> = {
@@ -35,6 +36,9 @@ export const TOOL_ICONS: Record<string, string> = {
   trash_folder: "folder-x",
   replace_in_vault: "replace",
   think: "brain",
+  recall_memory: "brain",
+  add_memory: "brain-circuit",
+  forget_memory: "eraser",
 };
 
 /** Past-tense label for completed tool calls (used in AgenticTimeline). */
@@ -62,6 +66,9 @@ export const TOOL_LABELS: Record<string, string> = {
   trash_folder: "Trashed folder",
   replace_in_vault: "Replaced across notes",
   think: "Thought",
+  recall_memory: "Recalled memory",
+  add_memory: "Added memory",
+  forget_memory: "Forgot memory",
 };
 
 /**
@@ -82,6 +89,8 @@ export const TOOL_PENDING_LABELS: Record<string, string> = {
   trash_file: "Trash file",
   trash_folder: "Trash folder",
   replace_in_vault: "Replace across notes",
+  add_memory: "Add memory",
+  forget_memory: "Forget memory",
 };
 
 /** Label for a tool-call step that is announced/pending (present tense where it matters). */
@@ -114,6 +123,9 @@ export const TOOL_STATUS_LABELS: Record<string, string> = {
   trash_folder: "Trashing folder...",
   replace_in_vault: "Replacing text...",
   think: "Thinking...",
+  recall_memory: "Recalling memory...",
+  add_memory: "Adding memory...",
+  forget_memory: "Forgetting memory...",
 };
 
 /**
@@ -127,6 +139,7 @@ export const TOOL_STATUS_LABELS: Record<string, string> = {
 export const MUTATING_TOOL_NAMES: ReadonlySet<string> = new Set<string>([
   ...VAULT_OPS_TOOL_NAMES,
   ...EDIT_TOOL_NAMES,
+  ...MEMORY_MUTATION_TOOL_NAMES,
 ]);
 
 /** True when a tool mutates the vault/document (vault op or edit), false for read-only tools. */
@@ -174,6 +187,11 @@ export function extractToolInput(
         ? `"${args.search}" → "${args.replace}"`
         : undefined;
     case "think": return typeof args.thought === "string" ? args.thought : undefined;
+    case "recall_memory":
+      return Array.isArray(args.names) ? `${args.names.length} memory name(s)` : undefined;
+    case "add_memory":
+    case "forget_memory":
+      return typeof args.name === "string" ? args.name : undefined;
     default: return undefined;
   }
 }

@@ -11,12 +11,14 @@ import {
 import { VAULT_OPS_TOOL_NAMES } from "../../tools/vault-ops/definition";
 import { buildVaultOpToolSystemPrompt } from "../../tools/vault-ops/systemPrompt";
 import { buildVaultToolSystemPrompt } from "../../tools/vault/systemPrompt";
+import { MEMORY_TOOL_NAMES } from "../../tools/memory/definition";
+import { buildMemoryToolSystemPrompt } from "../../tools/memory/systemPrompt";
 import {
-  CLOUD_STABLE_TOOL_SET,
   anthropicLayer2ToolSet,
   anthropicNonDeferredToolNames,
   cloudAllowedToolNames,
   cloudAllowedToolSet,
+  cloudStableToolSet,
   resolveLocalToolSet,
 } from "../../tools/toolSurface";
 import { writesPermitted } from "../../vault-ops/gateway";
@@ -199,6 +201,7 @@ export async function prepareApiMessages(
     posture,
     policy: settings.vaultOpPolicy,
     useThinkTool,
+    memoriesEnabled: settings.memoriesEnabled,
   };
   const availability = ragService?.availability() ?? "no-backend";
 
@@ -237,11 +240,13 @@ export async function prepareApiMessages(
         tools = filterSemanticSearchByAvailability(anthropicLayer2ToolSet(surfaceOpts), availability);
         toolSearch = {
           variant: "regex",
-          nonDeferredToolNames: [...anthropicNonDeferredToolNames()],
+          nonDeferredToolNames: [
+            ...anthropicNonDeferredToolNames(settings.memoriesEnabled),
+          ],
         };
       } else {
         // Layer 1: the full stable superset, held byte-identical across postures.
-        tools = CLOUD_STABLE_TOOL_SET;
+        tools = cloudStableToolSet(settings.memoriesEnabled);
       }
     } else {
       const lean = filterSemanticSearchByAvailability(resolveLocalToolSet(surfaceOpts), availability);
@@ -265,6 +270,15 @@ export async function prepareApiMessages(
     ? buildVaultOpToolSystemPrompt(activeVaultOpTools)
     : "";
   const vaultOpGuidance = activeVaultOpTools.length > 0 ? "\n\n" + vaultOpGuidanceBody : "";
+  const activeMemoryTools = guidanceTools.filter((tool) =>
+    MEMORY_TOOL_NAMES.has(tool.name),
+  );
+  const memoryGuidanceBody =
+    activeMemoryTools.length > 0
+      ? buildMemoryToolSystemPrompt(activeMemoryTools)
+      : "";
+  const memoryGuidance =
+    activeMemoryTools.length > 0 ? "\n\n" + memoryGuidanceBody : "";
   // Non-agentic regex-edit format guidance (ambient editing without tools). The
   // SEARCH/REPLACE format the diff engine parses, taught only when no edit tools carry
   // it (agentic edits are described by editGuidance instead).
@@ -278,7 +292,14 @@ export async function prepareApiMessages(
 
   const finalSystemPrompt = disableBuiltinSystemPrompts
     ? cachedSystemPrompt
-    : systemPrompt + groundingNote + vaultGuidance + editGuidance + vaultOpGuidance + toolSearchNote + regexEditGuidance;
+    : systemPrompt +
+      groundingNote +
+      vaultGuidance +
+      editGuidance +
+      vaultOpGuidance +
+      memoryGuidance +
+      toolSearchNote +
+      regexEditGuidance;
 
   // Layer 1 (prompt-cache design section 6.1.2): on the billed paths that have a tail
   // mechanism, hold the cached `system` block invariant (profile prompt plus pinned
@@ -299,6 +320,7 @@ export async function prepareApiMessages(
       vaultGuidanceBody,
       editGuidanceBody,
       vaultOpGuidanceBody,
+      memoryGuidanceBody,
       toolSearchNoteBody,
       regexEditGuidanceBody,
     ],

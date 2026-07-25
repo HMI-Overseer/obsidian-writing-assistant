@@ -55,6 +55,10 @@ export class ServiceContainer {
       app,
       getSettings,
       () => this.ragService,
+      () => this.memoryService,
+      async () => {
+        await this.persistSettings?.();
+      },
       // Effort-level harvest from a fresh session's handshake (section 3.1 layer 2):
       // feed the live lookup and persist last-seen, so after one session the
       // offered levels are the harness's own report, surviving restarts.

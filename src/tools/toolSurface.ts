@@ -144,6 +144,7 @@ export const CLAUDE_CODE_STABLE_TOOL_SET: CanonicalToolDefinition[] = [
   ...ALL_VAULT_TOOLS,
   ...ALL_EDIT_TOOLS,
   ...ALL_VAULT_OPS_TOOLS,
+  ...CORE_INTERACTION_TOOLS,
 ];
 
 /** Feature-conditional Layer 1 superset. The flag is its only varying input. */
@@ -162,7 +163,6 @@ export function cloudStableToolSet(
   return memoriesEnabled
     ? [
         ...CLAUDE_CODE_STABLE_TOOL_SET,
-        ...CORE_INTERACTION_TOOLS,
         ...ALL_MEMORY_TOOLS,
         THINK_TOOL,
       ]

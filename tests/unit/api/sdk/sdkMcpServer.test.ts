@@ -32,7 +32,7 @@ describe("buildVaultSdkTools (Layer-2 core/tail alwaysLoad split, ADR-0009)", ()
     }
   });
 
-  it("the always-loaded core is exactly the core reads in the stable set (small, no think)", () => {
+  it("marks ask_user alwaysLoad exactly once with the core reads", () => {
     const alwaysLoaded = tools
       .filter((t) => alwaysLoadOf(t._meta) === true)
       .map((t) => t.name)
@@ -41,10 +41,10 @@ describe("buildVaultSdkTools (Layer-2 core/tail alwaysLoad split, ADR-0009)", ()
       .map((d) => d.name)
       .sort();
     expect(alwaysLoaded).toEqual(expectedCore);
-    // The Claude Code core is the 6 retrieval / navigation reads; `think` is not bridged
-    // to Claude Code, so it never lands here. A change to this number is a real signal.
-    expect(alwaysLoaded).toHaveLength(6);
-    expect(tools.map((tool) => tool.name)).not.toContain("ask_user");
+    // The Claude Code core is the 6 retrieval / navigation reads plus ask_user.
+    // `think` is not bridged to Claude Code, so it never lands here.
+    expect(alwaysLoaded).toHaveLength(7);
+    expect(alwaysLoaded.filter((name) => name === "ask_user")).toHaveLength(1);
   });
 
   it("does not perturb the advertised tool names (the toolNames fingerprint is unchanged)", () => {

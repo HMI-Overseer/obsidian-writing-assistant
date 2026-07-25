@@ -166,26 +166,26 @@ describe("stable cloud surfaces (Layer 1 superset)", () => {
   it("the Claude Code superset covers the allow-list minus think (think is never bridged)", () => {
     const superset = new Set(CLAUDE_CODE_STABLE_TOOL_SET.map((t) => t.name));
     expect(superset.has("think")).toBe(false);
-    expect(superset.has("ask_user")).toBe(false);
+    expect(superset.has("ask_user")).toBe(true);
     for (const posture of ["ask", "auto"] as const) {
       for (const name of cloudAllowedToolNames(opts({ posture, useThinkTool: false }))) {
-        if (name === "ask_user") continue;
         expect(superset.has(name)).toBe(true);
       }
     }
   });
 
-  it("the Anthropic superset adds ask_user and think over the Claude Code superset", () => {
+  it("the Anthropic superset adds only think over the Claude Code superset", () => {
     expect(CLOUD_STABLE_TOOL_SET.map((t) => t.name)).toEqual([
       ...CLAUDE_CODE_STABLE_TOOL_SET.map((t) => t.name),
-      "ask_user",
       "think",
     ]);
   });
 
-  it("keeps Claude Code unadvertised until Phase 4", () => {
-    expect(names(CLAUDE_CODE_STABLE_TOOL_SET)).not.toContain("ask_user");
-    expect(names(claudeCodeStableToolSet(true))).not.toContain("ask_user");
+  it("advertises ask_user exactly once in both Claude Code memory variants", () => {
+    expect(names(CLAUDE_CODE_STABLE_TOOL_SET).filter((name) => name === "ask_user"))
+      .toHaveLength(1);
+    expect(names(claudeCodeStableToolSet(true)).filter((name) => name === "ask_user"))
+      .toHaveLength(1);
   });
 
   it("keeps both stable catalogs byte-identical to baseline while memories are off", () => {

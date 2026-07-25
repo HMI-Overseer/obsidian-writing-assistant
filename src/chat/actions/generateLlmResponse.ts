@@ -304,6 +304,10 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
     // tool loop, route those lifecycle events into the same timeline, created on
     // first use so tool-less turns stay clean.
     if (claudeCodeAgentic) {
+      plugin.services.claudeCode.setAskUserResponder(
+        askCoordinator,
+        abortController.signal,
+      );
       plugin.services.claudeCode.setLiveReview(liveReview);
       plugin.services.claudeCode.setToolListener((event) => {
         const tl = timeline ?? (timeline = new AgenticTimeline(assistantBubble.timelineEl));
@@ -565,6 +569,7 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
       transcript.renderPlainTextContent(assistantBubble, errorText);
     }
   } finally {
+    plugin.services.claudeCode.setAskUserResponder(null);
     plugin.services.claudeCode.setToolListener(null);
     plugin.services.claudeCode.setLiveReview(null);
     // Resolve any op still parked on the user so no await leaks past the turn.

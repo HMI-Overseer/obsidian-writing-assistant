@@ -112,8 +112,11 @@ import type {
   ConversationMessage,
 } from "../../../../src/shared/types";
 import { ASK_USER_TOOL } from "../../../../src/tools/ask/definition";
-import type { AskAnswers } from "../../../../src/tools/ask/types";
+import { buildAskUserResult } from "../../../../src/tools/ask/result";
+import type { AskAnswers, AskUserResponder } from "../../../../src/tools/ask/types";
+import { formatAgenticReplayLines } from "../../../../src/tools/resultDigest";
 import type { ToolCall } from "../../../../src/tools/types";
+import type { ClaudeCodeToolEvent } from "../../../../src/services/ClaudeCodeService";
 import { DEFAULT_VAULT_OP_POLICY } from "../../../../src/vault-ops/gateway";
 
 const question = "Which format should I use?";
@@ -240,6 +243,78 @@ function makeClient(rounds: RoundScript[]): ChatClient & {
   };
 }
 
+interface FakeClaudeCodeBridge {
+  setAskUserResponder: ReturnType<typeof vi.fn>;
+  setLiveReview: ReturnType<typeof vi.fn>;
+  setToolListener: ReturnType<typeof vi.fn>;
+  takeCollectedEdits(): ToolCall[];
+  takeCollectedVaultOps(): ToolCall[];
+  getAskUserResponder(): AskUserResponder | null;
+  emitToolEvent(event: ClaudeCodeToolEvent): void;
+}
+
+function makeClaudeCodeClient(
+  bridge: FakeClaudeCodeBridge,
+  options: { failAfterSubmit?: boolean; responseText?: string } = {},
+): ChatClient {
+  return {
+    complete: vi.fn(),
+    stream: vi.fn(
+      (
+        _request: ChatRequest,
+        _model: string,
+        _params: unknown,
+        signal?: AbortSignal,
+      ): StreamResult => {
+        const deltas = (async function* () {
+          const responder = bridge.getAskUserResponder();
+          if (!responder || !signal) {
+            throw new Error("Claude Code ask responder was not installed before streaming.");
+          }
+
+          bridge.emitToolEvent({
+            phase: "start",
+            toolName: "ask_user",
+            toolCallId: askCall.id,
+          });
+          let content = "The tool threw an unexpected error.";
+          let isError = true;
+          try {
+            const answers = await responder.ask(askCall.arguments, {
+              interactionId: "claude-code-ask",
+              toolCallId: askCall.id,
+              signal,
+            });
+            const result = buildAskUserResult(answers);
+            content = result.content;
+            isError = false;
+          } finally {
+            bridge.emitToolEvent({
+              phase: "end",
+              toolName: "ask_user",
+              args: askCall.arguments,
+              isError,
+              content,
+              toolCallId: askCall.id,
+            });
+          }
+
+          if (options.failAfterSubmit) {
+            throw new Error("Claude Code provider failed after submission");
+          }
+          if (options.responseText) yield options.responseText;
+        })();
+        return {
+          deltas,
+          usage: Promise.resolve(null),
+          toolCalls: Promise.resolve(null),
+          stopReason: Promise.resolve("end_turn"),
+        };
+      },
+    ),
+  } as ChatClient;
+}
+
 function harness(finalization: "append" | "replace" = "append") {
   const messages: ConversationMessage[] = [];
   const store = {
@@ -280,6 +355,23 @@ function harness(finalization: "append" | "replace" = "append") {
       memory: "deny" as const,
     },
   };
+  let askUserResponder: AskUserResponder | null = null;
+  let toolListener: ((event: ClaudeCodeToolEvent) => void) | null = null;
+  const claudeCode: FakeClaudeCodeBridge = {
+    setAskUserResponder: vi.fn((responder: AskUserResponder | null) => {
+      askUserResponder = responder;
+    }),
+    setLiveReview: vi.fn(),
+    setToolListener: vi.fn((listener: ((event: ClaudeCodeToolEvent) => void) | null) => {
+      toolListener = listener;
+    }),
+    takeCollectedEdits: () => [],
+    takeCollectedVaultOps: () => [],
+    getAskUserResponder: () => askUserResponder,
+    emitToolEvent: (event) => {
+      toolListener?.(event);
+    },
+  };
   const plugin = {
     settings,
     app: {
@@ -304,12 +396,7 @@ function harness(finalization: "append" | "replace" = "append") {
         resolveContextWindow: () => undefined,
         reportContextWindow: vi.fn(),
       },
-      claudeCode: {
-        setLiveReview: vi.fn(),
-        setToolListener: vi.fn(),
-        takeCollectedEdits: () => [],
-        takeCollectedVaultOps: () => [],
-      },
+      claudeCode,
     },
   } as unknown as WritingAssistantChat;
   const oldMessage: ConversationMessage = {
@@ -324,6 +411,7 @@ function harness(finalization: "append" | "replace" = "append") {
     transcript,
     interactionHost,
     activeControllers,
+    claudeCode,
     options: {
       plugin,
       owner: {} as Component,
@@ -494,5 +582,55 @@ describe("generateLlmResponse ask_user integration", () => {
     expect(state.interactionHost.clearIfOwner).toHaveBeenCalledTimes(1);
     expect(state.messages).toHaveLength(0);
     expect(state.activeControllers.at(-1)).toBeNull();
+  });
+
+  it("binds the Claude Code responder for the generation and clears it on Stop", async () => {
+    const state = harness();
+    state.options.activeModel = {
+      provider: "claudecode",
+      modelId: "claude-sonnet-test",
+      name: "Claude test",
+    };
+    const pending = generateLlmResponse({
+      ...state.options,
+      client: makeClaudeCodeClient(state.claudeCode),
+    });
+    await state.interactionHost.mounted;
+
+    expect(state.claudeCode.getAskUserResponder()).not.toBeNull();
+    expect(state.claudeCode.setAskUserResponder).toHaveBeenCalledTimes(1);
+
+    state.activeControllers[0]?.abort();
+    await pending;
+
+    expect(state.interactionHost.interaction).toBeNull();
+    expect(state.claudeCode.getAskUserResponder()).toBeNull();
+    expect(state.claudeCode.setAskUserResponder).toHaveBeenLastCalledWith(null);
+    expect(state.activeControllers.at(-1)).toBeNull();
+  });
+
+  it("persists and replays Claude Code guidance when the provider fails after submit", async () => {
+    const state = harness();
+    state.options.activeModel = {
+      provider: "claudecode",
+      modelId: "claude-sonnet-test",
+      name: "Claude test",
+    };
+    const pending = generateLlmResponse({
+      ...state.options,
+      client: makeClaudeCodeClient(state.claudeCode, { failAfterSubmit: true }),
+    });
+    await state.interactionHost.mounted;
+    state.interactionHost.submit({ [question]: "Detailed" });
+    await pending;
+
+    expect(state.messages).toHaveLength(1);
+    expect(state.messages[0].isError).toBe(true);
+    expect(completedAskStep(state.messages[0])?.askGuidance).toBeDefined();
+    const guidance =
+      '[ask_user guidance: {"questions":[{"question":"Which format should I use?","header":"Output","answer":"Detailed"}]}]';
+    expect(formatAgenticReplayLines(state.messages[0].agenticSteps ?? [])).toEqual([
+      guidance,
+    ]);
   });
 });

@@ -20,6 +20,19 @@ import type { SessionConfig } from "../api/harnessSession";
 import { isCliVersionCompatible } from "../api/sdkVersionGuard";
 import type { RagService } from "../rag/ragService";
 import type { MemoryService } from "../memory/MemoryService";
+import {
+  AskInteractionPreconditionError,
+  AskInteractionValidationError,
+} from "../chat/interactions/AskInteractionCoordinator";
+import { ASK_TOOL_NAMES } from "../tools/ask/definition";
+import {
+  askCancellationFailure,
+  askConcurrentFailure,
+  askInvalidRequestFailure,
+  askSkippedSiblingFailure,
+  buildAskUserResult,
+} from "../tools/ask/result";
+import type { AskUserResponder } from "../tools/ask/types";
 import type { CanonicalToolDefinition, ToolCall, ToolResult } from "../tools/types";
 import type { VaultOpDisposition } from "../vault-ops/disposition";
 import { VAULT_TOOL_NAMES } from "../tools/vault/definition";
@@ -161,6 +174,16 @@ export class ClaudeCodeService {
    *  user's approve/decline and return the real disposition rather than collecting
    *  for a post-run panel (in-loop-tool-approval-blocking-flow). */
   private liveReview: VaultOpReviewer | null = null;
+  /** Generation-owned responder for plugin-owned blocking user questions. */
+  private askUserResponder: AskUserResponder | null = null;
+  /** Active generation signal passed to the ask interaction context. */
+  private askUserSignal: AbortSignal | null = null;
+  /**
+   * Callback-entry barrier for the unresolved ask callback. This refuses only
+   * callbacks that enter after the ask has claimed it. It cannot cancel a sibling
+   * callback the SDK already dispatched.
+   */
+  private askPending = false;
 
   constructor(
     private readonly app: App,
@@ -204,6 +227,7 @@ export class ClaudeCodeService {
     const settings = this.getSettings();
     this.collectedEdits = [];
     this.collectedVaultOps = [];
+    this.askPending = false;
     const useSdk = await this.isSdkUsable();
     const agentic = settings.agenticMode;
     // Forwarded onto every runtime shape below for the send-path preflight (section 6.4).
@@ -382,6 +406,19 @@ export class ClaudeCodeService {
     this.liveReview = review;
   }
 
+  /**
+   * Installs the responder for one generation. Clearing it also releases any
+   * defensive latch state left behind by transport teardown.
+   */
+  setAskUserResponder(
+    responder: AskUserResponder | null,
+    signal: AbortSignal | null = null,
+  ): void {
+    this.askUserResponder = responder;
+    this.askUserSignal = responder ? signal : null;
+    if (!responder) this.askPending = false;
+  }
+
   /** Returns and clears the edit-tool calls Claude Code made during the last run. */
   takeCollectedEdits(): ToolCall[] {
     const edits = this.collectedEdits;
@@ -456,6 +493,17 @@ export class ClaudeCodeService {
         // the collected op, and the timeline all see the same resolved path.
         const call = normalizeVaultToolCall(this.app, rawCall);
         const toolCallId = call.id || generateId();
+        const isAsk = ASK_TOOL_NAMES.has(call.name);
+        let claimedAsk = false;
+        let barrierResult: ToolResult | null = null;
+        if (this.askPending) {
+          barrierResult = isAsk
+            ? askConcurrentFailure()
+            : askSkippedSiblingFailure(call.name);
+        } else if (isAsk) {
+          this.askPending = true;
+          claimedAsk = true;
+        }
         this.toolListener?.({ phase: "start", toolName: call.name, toolCallId });
         let isError = true;
         // The result text the model received, carried to the timeline so a failed
@@ -465,12 +513,18 @@ export class ClaudeCodeService {
         // records the outcome for the cold-rebuild replay digest (ADR-0016).
         let disposition: VaultOpDisposition | undefined;
         try {
+          if (barrierResult) {
+            content = barrierResult.content;
+            return barrierResult;
+          }
+
           const result = await this.executeTool(call, toolCallId);
           isError = result.isError ?? false;
           content = result.content;
           disposition = result.disposition;
           return result;
         } finally {
+          if (claimedAsk) this.askPending = false;
           this.toolListener?.({
             phase: "end",
             toolName: call.name,
@@ -496,6 +550,9 @@ export class ClaudeCodeService {
     // the live-review deny check as defense in depth.
     if (!this.runAllowedTools.has(call.name)) {
       return toolNotAllowedFailure(call.name);
+    }
+    if (ASK_TOOL_NAMES.has(call.name)) {
+      return this.executeAskUser(call, toolCallId);
     }
     if (VAULT_TOOL_NAMES.has(call.name)) {
       return executeVaultTool(call, {
@@ -554,7 +611,37 @@ export class ClaudeCodeService {
     });
   }
 
+  private async executeAskUser(
+    call: ToolCall,
+    toolCallId: string,
+  ): Promise<ToolResult> {
+    const responder = this.askUserResponder;
+    if (!responder) return askConcurrentFailure();
+
+    try {
+      const answers = await responder.ask(call.arguments, {
+        interactionId: generateId(),
+        toolCallId,
+        signal: this.askUserSignal ?? new AbortController().signal,
+      });
+      return buildAskUserResult(answers);
+    } catch (error) {
+      if (error instanceof AskInteractionValidationError) {
+        return askInvalidRequestFailure(error.issue);
+      }
+      if (error instanceof AskInteractionPreconditionError) {
+        return askConcurrentFailure();
+      }
+      if (isAbortError(error)) {
+        return askCancellationFailure("stopped");
+      }
+      throw error;
+    }
+  }
+
   destroy(): void {
+    this.askUserResponder?.cancelPending("destroyed");
+    this.setAskUserResponder(null);
     // Kill every live SDK process, the "don't leak processes" rule.
     this.sessionRegistry.disposeAll();
     this.mcpServer?.stop();
@@ -568,6 +655,10 @@ export class ClaudeCodeService {
       saveSettings: this.persistSettings,
     };
   }
+}
+
+function isAbortError(error: unknown): boolean {
+  return error instanceof Error && error.name === "AbortError";
 }
 
 /** Builds the `--mcp-config` JSON describing the loopback HTTP MCP server. */

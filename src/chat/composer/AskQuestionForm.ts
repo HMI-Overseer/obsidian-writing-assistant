@@ -26,6 +26,8 @@ export interface AskQuestionFormCallbacks {
 }
 
 interface QuestionFormRefs {
+  panelEl: HTMLElement;
+  tabEl: HTMLButtonElement;
   fieldsetEl: HTMLFieldSetElement;
   optionInputs: HTMLInputElement[];
   otherInput: HTMLInputElement;
@@ -38,6 +40,12 @@ interface ListenerRegistration {
   target: EventTarget;
   type: string;
   listener: EventListener;
+}
+
+interface RenderedForm {
+  formEl: HTMLFormElement;
+  errorEl: HTMLElement;
+  submitButton: HTMLButtonElement;
 }
 
 let nextFormId = 0;
@@ -56,6 +64,7 @@ export class AskQuestionForm {
   private disabled = false;
   private destroyed = false;
   private showValidation = false;
+  private activeQuestionIndex = 0;
 
   constructor(
     private readonly dependencies: AskQuestionFormDependencies,
@@ -64,9 +73,10 @@ export class AskQuestionForm {
   ) {
     this.formId = `lmsa-ask-form-${++nextFormId}`;
     this.state = createAskAnswerState(dependencies.request);
-    this.formEl = this.renderForm();
-    this.errorEl = this.renderError();
-    this.submitButton = this.renderSubmit();
+    const rendered = this.renderForm();
+    this.formEl = rendered.formEl;
+    this.errorEl = rendered.errorEl;
+    this.submitButton = rendered.submitButton;
     this.listen(this.formEl, "submit", (event) => this.onSubmit(event));
     this.refresh();
     this.questionRefs[0]?.firstControl.focus();
@@ -90,7 +100,7 @@ export class AskQuestionForm {
     this.formEl.remove();
   }
 
-  private renderForm(): HTMLFormElement {
+  private renderForm(): RenderedForm {
     const formEl = this.refs.containerEl.createEl("form", {
       cls: "lmsa-ask-form",
       attr: {
@@ -98,22 +108,17 @@ export class AskQuestionForm {
         novalidate: "true",
       },
     });
-    const headingEl = formEl.createDiv({ cls: "lmsa-ask-form-heading" });
-    headingEl.createDiv({
-      cls: "lmsa-ask-form-title",
-      text: "Your guidance is needed",
+    const tabsEl = formEl.createDiv({
+      cls: "lmsa-ask-form-tabs",
+      attr: {
+        role: "tablist",
+        "aria-label": "Questions",
+      },
     });
-    headingEl.createDiv({
-      cls: "lmsa-ask-form-intro",
-      text: "Review every question, then submit all answers together.",
-    });
-    formEl.createDiv({
-      cls: "lmsa-ask-form-secrets",
-      text: "Do not enter passwords, API keys, payment details, or other secrets.",
-      attr: { role: "note" },
-    });
-
     const questionsEl = formEl.createDiv({ cls: "lmsa-ask-form-questions" });
+    const tabs = this.dependencies.request.questions.map((question, index) =>
+      this.renderTab(tabsEl, question, index),
+    );
     this.dependencies.request.questions.forEach((question, index) => {
       this.questionRefs.push(
         this.renderQuestion(
@@ -121,10 +126,57 @@ export class AskQuestionForm {
           question,
           index,
           this.dependencies.request.questions.length,
+          tabs[index],
         ),
       );
     });
-    return formEl;
+    const errorEl = this.renderError(formEl);
+    const submitButton = this.renderSubmit(formEl);
+    return {
+      formEl,
+      errorEl,
+      submitButton,
+    };
+  }
+
+  private renderTab(
+    containerEl: HTMLElement,
+    question: ValidatedAskQuestion,
+    questionIndex: number,
+  ): HTMLButtonElement {
+    const tabId = `${this.formId}-tab-${questionIndex}`;
+    const panelId = `${this.formId}-panel-${questionIndex}`;
+    const tabEl = containerEl.createEl("button", {
+      cls: "lmsa-ask-form-tab",
+      attr: {
+        type: "button",
+        id: tabId,
+        role: "tab",
+        "aria-controls": panelId,
+        "aria-selected": "false",
+        tabindex: "-1",
+      },
+    });
+    tabEl.createSpan({
+      cls: "lmsa-ask-form-tab-number",
+      text: String(questionIndex + 1),
+      attr: { "aria-hidden": "true" },
+    });
+    tabEl.createSpan({
+      cls: "lmsa-ask-form-tab-label",
+      text: question.header,
+      attr: { "aria-hidden": "true" },
+    });
+    tabEl.createSpan({
+      cls: "lmsa-ask-form-tab-status",
+      attr: { "aria-hidden": "true" },
+    });
+    this.controls.push(tabEl);
+    this.listen(tabEl, "click", () => this.showQuestion(questionIndex));
+    this.listen(tabEl, "keydown", (event) => {
+      this.onTabKeydown(event as KeyboardEvent, questionIndex);
+    });
+    return tabEl;
   }
 
   private renderQuestion(
@@ -132,8 +184,17 @@ export class AskQuestionForm {
     question: ValidatedAskQuestion,
     questionIndex: number,
     questionCount: number,
+    tabEl: HTMLButtonElement,
   ): QuestionFormRefs {
-    const fieldsetEl = containerEl.createEl("fieldset", {
+    const panelEl = containerEl.createDiv({
+      cls: "lmsa-ask-form-question-panel",
+      attr: {
+        id: `${this.formId}-panel-${questionIndex}`,
+        role: "tabpanel",
+        "aria-labelledby": `${this.formId}-tab-${questionIndex}`,
+      },
+    });
+    const fieldsetEl = panelEl.createEl("fieldset", {
       cls: "lmsa-ask-form-question",
     });
     const legendEl = fieldsetEl.createEl("legend", {
@@ -143,10 +204,6 @@ export class AskQuestionForm {
     metaEl.createSpan({
       cls: "lmsa-ask-form-question-number",
       text: `Question ${questionIndex + 1} of ${questionCount}`,
-    });
-    metaEl.createSpan({
-      cls: "lmsa-ask-form-question-header",
-      text: question.header,
     });
     legendEl.createSpan({
       cls: "lmsa-ask-form-question-text",
@@ -161,6 +218,8 @@ export class AskQuestionForm {
     );
     const other = this.renderOther(optionsEl, question, questionIndex);
     return {
+      panelEl,
+      tabEl,
       fieldsetEl,
       optionInputs,
       otherInput: other.input,
@@ -229,7 +288,6 @@ export class AskQuestionForm {
     textarea: HTMLTextAreaElement;
   } {
     const inputId = `${this.formId}-q${questionIndex}-other`;
-    const descriptionId = `${inputId}-description`;
     const textId = `${inputId}-text`;
     const rowEl = containerEl.createDiv({
       cls: "lmsa-ask-form-option lmsa-ask-form-other-option",
@@ -240,7 +298,6 @@ export class AskQuestionForm {
         type: question.multiSelect ? "checkbox" : "radio",
         id: inputId,
         name: `${this.formId}-q${questionIndex}`,
-        "aria-describedby": descriptionId,
       },
     });
     const labelEl = rowEl.createEl("label", {
@@ -251,23 +308,14 @@ export class AskQuestionForm {
       cls: "lmsa-ask-form-option-name",
       text: "Other",
     });
-    labelEl.createSpan({
-      cls: "lmsa-ask-form-option-description",
-      text: "Write a different answer in your own words.",
-      attr: { id: descriptionId },
-    });
 
     const textWrap = rowEl.createDiv({ cls: "lmsa-ask-form-other-text" });
     textWrap.hidden = true;
-    textWrap.createEl("label", {
-      cls: "lmsa-ask-form-other-label",
-      text: "Your answer",
-      attr: { for: textId },
-    });
     const textarea = textWrap.createEl("textarea", {
       cls: "lmsa-ask-form-other-textarea",
       attr: {
         id: textId,
+        "aria-label": "Other answer",
         rows: "3",
         maxlength: String(ASK_USER_LIMITS.otherText),
         placeholder: "Type your answer",
@@ -302,8 +350,8 @@ export class AskQuestionForm {
     return { input, textWrap, textarea };
   }
 
-  private renderError(): HTMLElement {
-    return this.formEl.createDiv({
+  private renderError(formEl: HTMLFormElement): HTMLElement {
+    return formEl.createDiv({
       cls: "lmsa-ask-form-error lmsa-hidden",
       attr: {
         role: "alert",
@@ -312,17 +360,17 @@ export class AskQuestionForm {
     });
   }
 
-  private renderSubmit(): HTMLButtonElement {
-    const actionsEl = this.formEl.createDiv({
+  private renderSubmit(formEl: HTMLFormElement): HTMLButtonElement {
+    const actionsEl = formEl.createDiv({
       cls: "lmsa-ask-form-actions",
     });
-    const button = actionsEl.createEl("button", {
+    const submitButton = actionsEl.createEl("button", {
       cls: "lmsa-ui-btn lmsa-ui-btn-primary lmsa-ask-form-submit",
       text: "Submit answers",
       attr: { type: "submit" },
     });
-    this.controls.push(button);
-    return button;
+    this.controls.push(submitButton);
+    return submitButton;
   }
 
   private refresh(): void {
@@ -330,6 +378,7 @@ export class AskQuestionForm {
       this.dependencies.request,
       this.state,
     );
+    const questionCount = this.questionRefs.length;
     this.questionRefs.forEach((refs, questionIndex) => {
       const questionState = this.state.questions[questionIndex];
       refs.optionInputs.forEach((input, optionIndex) => {
@@ -345,6 +394,18 @@ export class AskQuestionForm {
       refs.fieldsetEl.toggleClass(
         "is-incomplete",
         this.showValidation && !complete,
+      );
+      const active = questionIndex === this.activeQuestionIndex;
+      refs.panelEl.hidden = !active;
+      refs.tabEl.toggleClass("is-active", active);
+      refs.tabEl.toggleClass("is-complete", complete);
+      refs.tabEl.setAttribute("aria-selected", active ? "true" : "false");
+      refs.tabEl.setAttribute("tabindex", active ? "0" : "-1");
+      refs.tabEl.setAttribute(
+        "aria-label",
+        `Question ${questionIndex + 1} of ${questionCount}: ${
+          this.dependencies.request.questions[questionIndex].header
+        }. ${complete ? "Answered" : "Unanswered"}`,
       );
     });
     this.submitButton.disabled = this.disabled || !completeness.isComplete;
@@ -377,7 +438,41 @@ export class AskQuestionForm {
     );
     const questionIndex = completeness.firstIncompleteQuestionIndex;
     if (questionIndex === null) return;
-    this.questionRefs[questionIndex]?.firstControl.focus();
+    this.showQuestion(questionIndex, true);
+  }
+
+  private showQuestion(questionIndex: number, focusControl = false): void {
+    if (
+      this.disabled ||
+      questionIndex < 0 ||
+      questionIndex >= this.questionRefs.length
+    ) {
+      return;
+    }
+    this.activeQuestionIndex = questionIndex;
+    this.refresh();
+    if (focusControl) {
+      this.questionRefs[questionIndex]?.firstControl.focus();
+    }
+  }
+
+  private onTabKeydown(event: KeyboardEvent, questionIndex: number): void {
+    let nextIndex: number | null = null;
+    if (event.key === "ArrowLeft") {
+      nextIndex =
+        (questionIndex - 1 + this.questionRefs.length) %
+        this.questionRefs.length;
+    } else if (event.key === "ArrowRight") {
+      nextIndex = (questionIndex + 1) % this.questionRefs.length;
+    } else if (event.key === "Home") {
+      nextIndex = 0;
+    } else if (event.key === "End") {
+      nextIndex = this.questionRefs.length - 1;
+    }
+    if (nextIndex === null) return;
+    event.preventDefault();
+    this.showQuestion(nextIndex);
+    this.questionRefs[nextIndex]?.tabEl.focus();
   }
 
   private hideError(): void {

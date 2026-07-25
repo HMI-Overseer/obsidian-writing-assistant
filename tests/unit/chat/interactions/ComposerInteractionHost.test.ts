@@ -50,6 +50,10 @@ class FakeElement {
     this.attributes.set(name, value);
   }
 
+  removeAttribute(name: string): void {
+    this.attributes.delete(name);
+  }
+
   empty(): void {
     this.emptyCalls++;
   }
@@ -113,8 +117,9 @@ describe("ComposerInteractionHost", () => {
     expect(host.isActive("ask-1")).toBe(true);
     expect(refs.composerPanelEl.classes.has("is-interacting")).toBe(true);
     expect(refs.composerPanelEl.classes.has("is-ask-interaction")).toBe(true);
-    expect(refs.composerNormalBodyEl.hidden).toBe(true);
+    expect(refs.composerNormalBodyEl.hidden).toBe(false);
     expect(refs.composerNormalBodyEl.attributes.get("aria-hidden")).toBe("true");
+    expect(refs.composerNormalBodyEl.attributes.has("inert")).toBe(true);
     expect(refs.composerInteractionEl.hidden).toBe(false);
     expect(refs.composerInteractionEl.attributes.get("aria-hidden")).toBe("false");
     expect(formCapture.instances).toHaveLength(1);
@@ -131,6 +136,8 @@ describe("ComposerInteractionHost", () => {
     expect(host.isActive()).toBe(false);
     expect(formCapture.instances[0]).toMatchObject({ disabled: 1, destroyed: 1 });
     expect(refs.composerNormalBodyEl.hidden).toBe(false);
+    expect(refs.composerNormalBodyEl.attributes.get("aria-hidden")).toBe("false");
+    expect(refs.composerNormalBodyEl.attributes.has("inert")).toBe(false);
     expect(refs.composerInteractionEl.hidden).toBe(true);
     expect(refs.composerInteractionEl.emptyCalls).toBe(1);
     expect(refs.actionBtn.focusCalls).toBe(1);

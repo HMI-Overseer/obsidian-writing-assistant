@@ -113,11 +113,16 @@ export class ComposerInteractionHost implements ComposerInteractionHostPort {
     this.refs.composerPanelEl.toggleClass("is-ask-interaction", visible);
     this.refs.composerFooterEl.toggleClass("is-interacting", visible);
 
-    this.refs.composerNormalBodyEl.hidden = visible;
+    this.refs.composerNormalBodyEl.hidden = false;
     this.refs.composerNormalBodyEl.setAttribute(
       "aria-hidden",
       visible ? "true" : "false",
     );
+    if (visible) {
+      this.refs.composerNormalBodyEl.setAttribute("inert", "");
+    } else {
+      this.refs.composerNormalBodyEl.removeAttribute("inert");
+    }
     this.refs.composerInteractionEl.hidden = !visible;
     this.refs.composerInteractionEl.setAttribute(
       "aria-hidden",

@@ -116,6 +116,12 @@ export function createChatLayout(contentEl: HTMLElement): ChatLayoutRefs {
 
   const composerPanel = composer.createDiv({ cls: "lmsa-chat-composer-panel" });
   const contextPickerPopoverEl = composerPanel.createDiv({ cls: "lmsa-context-picker-popover lmsa-hidden" });
+  const composerInteractionEl = composerPanel.createDiv({
+    cls: "lmsa-chat-composer-interaction-body",
+    attr: { "aria-hidden": "true" },
+  });
+  composerInteractionEl.hidden = true;
+
   const composerNormalBodyEl = composerPanel.createDiv({
     cls: "lmsa-chat-composer-normal-body",
   });
@@ -134,12 +140,6 @@ export function createChatLayout(contentEl: HTMLElement): ChatLayoutRefs {
     cls: "lmsa-chat-composer-textarea",
     attr: { placeholder: "Ask anything about your writing...", rows: "1" },
   });
-
-  const composerInteractionEl = composerPanel.createDiv({
-    cls: "lmsa-chat-composer-interaction-body",
-    attr: { "aria-hidden": "true" },
-  });
-  composerInteractionEl.hidden = true;
 
   const composerFooter = composerPanel.createDiv({ cls: "lmsa-chat-composer-footer" });
 

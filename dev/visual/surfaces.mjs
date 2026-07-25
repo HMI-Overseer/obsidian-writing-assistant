@@ -228,11 +228,11 @@ const askOption = (
   name,
   label,
   description,
-  { checked = false, multi = false } = {},
+  { checked = false, focused = false, multi = false } = {},
 ) =>
   `<div class="lmsa-ask-form-option">
     <input class="lmsa-ask-form-option-input" type="${multi ? "checkbox" : "radio"}"
-      id="${id}" name="${name}" aria-describedby="${id}-description"${checked ? " checked" : ""}>
+      id="${id}" name="${name}" aria-describedby="${id}-description"${checked ? " checked" : ""}${focused ? " autofocus" : ""}>
     <label class="lmsa-ask-form-option-label" for="${id}">
       <span class="lmsa-ask-form-option-name">${label}</span>
       <span class="lmsa-ask-form-option-description" id="${id}-description">${description}</span>
@@ -246,14 +246,12 @@ const askOther = (
 ) =>
   `<div class="lmsa-ask-form-option lmsa-ask-form-other-option">
     <input class="lmsa-ask-form-option-input" type="${multi ? "checkbox" : "radio"}"
-      id="${id}" name="${name}" aria-describedby="${id}-description"${checked ? " checked" : ""}>
+      id="${id}" name="${name}"${checked ? " checked" : ""}>
     <label class="lmsa-ask-form-option-label" for="${id}">
       <span class="lmsa-ask-form-option-name">Other</span>
-      <span class="lmsa-ask-form-option-description" id="${id}-description">Write a different answer in your own words.</span>
     </label>
     <div class="lmsa-ask-form-other-text"${checked ? "" : " hidden"}>
-      <label class="lmsa-ask-form-other-label" for="${id}-text">Your answer</label>
-      <textarea class="lmsa-ask-form-other-textarea" id="${id}-text" rows="3"
+      <textarea class="lmsa-ask-form-other-textarea" id="${id}-text" aria-label="Other answer" rows="3"
         maxlength="500" placeholder="Type your answer">${text}</textarea>
     </div>
   </div>`;
@@ -269,48 +267,71 @@ const askQuestion = ({
   other,
   complete = false,
   incomplete = false,
-}) =>
-  `<fieldset class="lmsa-ask-form-question${complete ? " is-complete" : ""}${incomplete ? " is-incomplete" : ""}">
-    <legend class="lmsa-ask-form-legend">
-      <span class="lmsa-ask-form-question-meta">
-        <span class="lmsa-ask-form-question-number">Question ${index} of ${total}</span>
-        <span class="lmsa-ask-form-question-header">${header}</span>
-      </span>
-      <span class="lmsa-ask-form-question-text">${question}</span>
-    </legend>
-    <div class="lmsa-ask-form-options">
-      ${options.map((option, optionIndex) => askOption(
-        `${id}-o${optionIndex}`,
-        id,
-        option.label,
-        option.description,
-        { checked: option.checked, multi },
-      )).join("")}
-      ${askOther(`${id}-other`, id, { ...other, multi })}
-    </div>
-  </fieldset>`;
+}) => ({
+  id,
+  index,
+  total,
+  header,
+  complete,
+  html: (active) =>
+    `<div class="lmsa-ask-form-question-panel" id="${id}-panel" role="tabpanel"
+      aria-labelledby="${id}-tab"${active ? "" : " hidden"}>
+      <fieldset class="lmsa-ask-form-question${complete ? " is-complete" : ""}${incomplete ? " is-incomplete" : ""}">
+        <legend class="lmsa-ask-form-legend">
+          <span class="lmsa-ask-form-question-meta">
+            <span class="lmsa-ask-form-question-number">Question ${index} of ${total}</span>
+          </span>
+          <span class="lmsa-ask-form-question-text">${question}</span>
+        </legend>
+        <div class="lmsa-ask-form-options">
+          ${options.map((option, optionIndex) => askOption(
+            `${id}-o${optionIndex}`,
+            id,
+            option.label,
+            option.description,
+            { checked: option.checked, focused: option.focused, multi },
+          )).join("")}
+          ${askOther(`${id}-other`, id, { ...other, multi })}
+        </div>
+      </fieldset>
+    </div>`,
+});
 
-const askForm = (questions, { ready = false, showError = false } = {}) =>
-  `<form class="lmsa-ask-form" aria-label="Answer questions from the writing assistant">
-    <div class="lmsa-ask-form-heading">
-      <div class="lmsa-ask-form-title">Your guidance is needed</div>
-      <div class="lmsa-ask-form-intro">Review every question, then submit all answers together.</div>
-    </div>
-    <div class="lmsa-ask-form-secrets" role="note">Do not enter passwords, API keys, payment details, or other secrets.</div>
-    <div class="lmsa-ask-form-questions">${questions.join("")}</div>
+const askForm = (
+  questions,
+  { ready = false, showError = false, activeIndex = 0 } = {},
+) => {
+  const tabs = questions.map((question, questionIndex) => {
+    const active = questionIndex === activeIndex;
+    return `<button class="lmsa-ask-form-tab${active ? " is-active" : ""}${question.complete ? " is-complete" : ""}"
+      id="${question.id}-tab" type="button" role="tab" aria-controls="${question.id}-panel"
+      aria-selected="${active ? "true" : "false"}" tabindex="${active ? "0" : "-1"}"
+      aria-label="Question ${question.index} of ${question.total}: ${question.header}. ${question.complete ? "Answered" : "Unanswered"}">
+      <span class="lmsa-ask-form-tab-number" aria-hidden="true">${question.index}</span>
+      <span class="lmsa-ask-form-tab-label" aria-hidden="true">${question.header}</span>
+      <span class="lmsa-ask-form-tab-status" aria-hidden="true"></span>
+    </button>`;
+  }).join("");
+  const panels = questions
+    .map((question, questionIndex) => question.html(questionIndex === activeIndex))
+    .join("");
+  return `<form class="lmsa-ask-form" aria-label="Answer questions from the writing assistant">
+    <div class="lmsa-ask-form-tabs" role="tablist" aria-label="Questions">${tabs}</div>
+    <div class="lmsa-ask-form-questions">${panels}</div>
     <div class="lmsa-ask-form-error${showError ? "" : " lmsa-hidden"}" role="alert">Answer every question before submitting.</div>
     <div class="lmsa-ask-form-actions">
       <button class="lmsa-ui-btn lmsa-ui-btn-primary lmsa-ask-form-submit" type="submit"${ready ? "" : " disabled"}>Submit answers</button>
     </div>
   </form>`;
+};
 
 const askComposerHtml = (questions, state) =>
   `<div class="lmsa-chat-composer"><div class="lmsa-chat-composer-panel is-interacting is-ask-interaction">
-    <div class="lmsa-chat-composer-normal-body" aria-hidden="true" hidden>
-      <textarea class="lmsa-chat-composer-textarea">An exact draft remains mounted here.</textarea>
-    </div>
     <div class="lmsa-chat-composer-interaction-body" aria-hidden="false">
       ${askForm(questions, state)}
+    </div>
+    <div class="lmsa-chat-composer-normal-body" aria-hidden="true" inert>
+      <textarea class="lmsa-chat-composer-textarea" rows="1" disabled>An exact draft remains mounted here.</textarea>
     </div>
     ${composerFooter(true, true)}
   </div></div>`;
@@ -363,7 +384,12 @@ const mixedReadyQuestions = [
     question: "Which output shape should I optimize for while keeping the final result easy to scan?",
     options: [
       { label: "Concise", description: "Lead with the recommendation and keep supporting detail compact." },
-      { label: "Detailed", description: "Include rationale, trade-offs, implementation notes, and examples.", checked: true },
+      {
+        label: "Detailed",
+        description: "Include rationale, trade-offs, implementation notes, and examples.",
+        checked: true,
+        focused: true,
+      },
     ],
     other: {},
     complete: true,
@@ -527,8 +553,8 @@ export const SURFACES = {
     ),
   },
 
-  // Phase 2 ask interaction: four ready questions mixing radios, checkboxes, long
-  // copy, and an application-owned Other textarea with user text.
+  // Four ready question tabs mixing radios, checkboxes, long copy, and an
+  // application-owned Other textarea with user text.
   askMixedReady: {
     w: 600,
     shot: ".lmsa-chat-composer",
@@ -538,8 +564,8 @@ export const SURFACES = {
     ),
   },
 
-  // The same four-question mixed form at narrow sidebar width. Its question stack must
-  // remain inside the bounded scroll region while the Stop action stays reachable.
+  // The same four-question drawer at narrow sidebar width. Its active panel stays
+  // inside the bounded scroll region while navigation and Stop remain reachable.
   askMixedNarrow: {
     w: 320,
     shot: ".lmsa-chat-composer",

@@ -28,6 +28,15 @@ describe("ask question rendering security", () => {
   it("retains native controls, accessible descriptions, and focus handling", () => {
     const form = source("src/chat/composer/AskQuestionForm.ts");
 
+    expect(form).toContain('role: "tablist"');
+    expect(form).toContain('role: "tab"');
+    expect(form).toContain('role: "tabpanel"');
+    expect(form).toContain('"aria-controls": panelId');
+    expect(form).toContain('"aria-selected", active ? "true" : "false"');
+    expect(form).toContain('event.key === "ArrowLeft"');
+    expect(form).toContain('event.key === "ArrowRight"');
+    expect(form).toContain('event.key === "Home"');
+    expect(form).toContain('event.key === "End"');
     expect(form).toContain('createEl("fieldset"');
     expect(form).toContain('createEl("legend"');
     expect(form).toContain('question.multiSelect ? "checkbox" : "radio"');
@@ -35,5 +44,29 @@ describe("ask question rendering security", () => {
     expect(form).toContain("attr: { for: inputId }");
     expect(form).toContain("this.questionRefs[0]?.firstControl.focus()");
     expect(form).toContain("this.focusFirstIncomplete()");
+  });
+
+  it("shows one question panel at a time and keeps submission global", () => {
+    const form = source("src/chat/composer/AskQuestionForm.ts");
+    const styles = source("src/chat/composer/AskQuestionForm.css");
+
+    expect(form).toContain("refs.panelEl.hidden = !active");
+    expect(form).toContain(
+      "this.submitButton.disabled = this.disabled || !completeness.isComplete",
+    );
+    expect(form).toContain('"aria-label": "Other answer"');
+    expect(form).not.toContain("A few details");
+    expect(form).not.toContain("Do not enter passwords");
+    expect(form).not.toContain("lmsa-ask-form-progress");
+    expect(form).not.toContain("lmsa-ask-form-page");
+    expect(form).not.toContain("Write a different answer in your own words.");
+    expect(form).not.toContain("Your answer");
+    expect(form).not.toContain("lmsa-ask-form-question-header");
+    expect(form.match(/text: question\.header/gu)).toHaveLength(1);
+    expect(form).not.toContain("this.callbacks.onSubmit(question");
+    expect(styles).toContain("width: fit-content");
+    expect(styles).not.toContain("overflow-x: auto");
+    expect(styles).toContain("align-items: center");
+    expect(styles).toContain("border-radius: 8px");
   });
 });

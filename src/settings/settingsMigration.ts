@@ -22,6 +22,7 @@ import type {
   EmbeddingModel,
   KnowledgeGraphSettings,
   LmStudioModelCache,
+  Memory,
   ModelRole,
   PluginSettings,
   ProviderOption,
@@ -35,10 +36,20 @@ import {
   DEFAULT_BENCHMARK_SETTINGS,
   DEFAULT_CHAT_HISTORY,
   DEFAULT_KNOWLEDGE_GRAPH_SETTINGS,
+  DEFAULT_MEMORIES,
   DEFAULT_RAG_SETTINGS,
   DEFAULT_SETTINGS,
   MAX_BENCHMARK_HISTORY,
 } from "../constants";
+import {
+  MEMORY_CONTENT_MAX_CODE_POINTS,
+  MEMORY_DESCRIPTION_MAX_CODE_POINTS,
+  codePointLength,
+  isMemoryType,
+  isSingleLine,
+  isValidMemoryName,
+  normalizeMemoryName,
+} from "../memory/validation";
 import { DEFAULT_VAULT_OP_POLICY, type Gate, type VaultOpPolicy } from "../vault-ops/gateway";
 import { isReasoningLevel } from "../shared/reasoning";
 import { PROVIDER_DESCRIPTORS } from "../providers/descriptors";
@@ -155,6 +166,7 @@ export function normalizeVaultOpPolicy(raw: unknown): VaultOpPolicy {
     trash: normalizeGate(data.trash, d.trash),
     createDir: normalizeGate(data.createDir, d.createDir),
     edit: normalizeGate(data.edit, d.edit),
+    memory: normalizeGate(data.memory, d.memory),
     scopes: Array.isArray(data.scopes)
       ? data.scopes.filter((s): s is string => typeof s === "string")
       : [...d.scopes],
@@ -547,6 +559,61 @@ function normalizeFavoriteModelKeys(raw: unknown): string[] {
   return keys;
 }
 
+/**
+ * One stored memory element, or null to drop it. Modeled on
+ * {@link normalizeFavoriteModelKeys}: a structurally bad element is dropped, not
+ * repaired into a synthetic record. The one normalization applied is the name's
+ * canonical form (case / spacing), which changes spelling, never identity, so a
+ * hand-edited "No-Emdashes" survives as "no-emdashes" while a record missing
+ * its description is dropped whole. A missing `enabled` defaults to false: a
+ * disabled memory is inert, so the safe reading of an absent flag is off.
+ */
+function normalizeStoredMemory(entry: unknown): Memory | null {
+  if (typeof entry !== "object" || entry === null) return null;
+  const data = entry as Record<string, unknown>;
+  if (typeof data.name !== "string") return null;
+  const name = normalizeMemoryName(data.name);
+  if (!isValidMemoryName(name)) return null;
+  if (!isMemoryType(data.type)) return null;
+  const description = data.description;
+  if (typeof description !== "string" || description.trim().length === 0) return null;
+  if (!isSingleLine(description)) return null;
+  if (codePointLength(description) > MEMORY_DESCRIPTION_MAX_CODE_POINTS) return null;
+  const content = data.content;
+  if (content !== undefined) {
+    if (typeof content !== "string") return null;
+    if (codePointLength(content) > MEMORY_CONTENT_MAX_CODE_POINTS) return null;
+  }
+  const enabled = typeof data.enabled === "boolean" ? data.enabled : false;
+  return content === undefined
+    ? { name, type: data.type, description, enabled }
+    : { name, type: data.type, description, content, enabled };
+}
+
+/**
+ * Seed-once semantics, deliberately unlike every other normalizer here: only a
+ * truly absent `memories` field (a blob from before the feature existed) seeds
+ * {@link DEFAULT_MEMORIES}. Any present value, including `[]` after the user
+ * deletes all memories and any junk shape, is normalized without re-seeding,
+ * so bundled defaults are copied exactly once and thereafter user-owned
+ * (RFC-0007: never merged back). Elements are drop-bad + dedupe-by-name
+ * (first occurrence wins; comparison is on the normalized name, so duplicates
+ * differing only in case collapse).
+ */
+export function normalizeMemories(raw: unknown): Memory[] {
+  if (raw === undefined) return DEFAULT_MEMORIES.map((memory) => ({ ...memory }));
+  if (!Array.isArray(raw)) return [];
+  const memories: Memory[] = [];
+  const seen = new Set<string>();
+  for (const entry of raw) {
+    const memory = normalizeStoredMemory(entry);
+    if (memory === null || seen.has(memory.name)) continue;
+    seen.add(memory.name);
+    memories.push(memory);
+  }
+  return memories;
+}
+
 export function normalizePluginSettings(data: Partial<PluginSettings> | null): PluginSettings {
   const legacyCompletion = readLegacyModelRows(data, "completionModels");
   const legacyEmbedding = readLegacyModelRows(data, "embeddingModels");
@@ -619,6 +686,11 @@ export function normalizePluginSettings(data: Partial<PluginSettings> | null): P
         : DEFAULT_SETTINGS.diffMinMatchConfidence,
     rag,
     knowledgeGraph,
+    memoriesEnabled:
+      typeof data?.memoriesEnabled === "boolean"
+        ? data.memoriesEnabled
+        : DEFAULT_SETTINGS.memoriesEnabled,
+    memories: normalizeMemories(data?.memories),
     systemPromptPrefix: migrateSystemPromptPrefix(data),
     apiKeysDisclaimerAccepted:
       typeof data?.apiKeysDisclaimerAccepted === "boolean"

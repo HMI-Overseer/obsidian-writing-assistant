@@ -17,6 +17,7 @@ function policy(overrides: Partial<VaultOpPolicy> = {}): VaultOpPolicy {
     trash: "ask",
     createDir: "ask",
     edit: "ask",
+    memory: "ask",
     scopes: [],
     maxAutoOps: 20,
     ...overrides,

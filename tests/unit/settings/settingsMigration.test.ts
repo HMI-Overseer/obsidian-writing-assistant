@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   normalizeClaudeCodeEffortLevels,
   normalizeGate,
+  normalizeMemories,
   normalizePluginSettings,
   normalizeProviderProfiles,
   normalizeReasoningByModelKey,
@@ -9,7 +10,7 @@ import {
   normalizeActiveProfileIds,
   normalizeRagSettings,
 } from "../../../src/settings/settingsMigration";
-import { DEFAULT_SETTINGS, DEFAULT_ACTIVE_PROFILE_IDS, DEFAULT_RAG_SETTINGS } from "../../../src/constants";
+import { DEFAULT_SETTINGS, DEFAULT_ACTIVE_PROFILE_IDS, DEFAULT_MEMORIES, DEFAULT_RAG_SETTINGS } from "../../../src/constants";
 import { DEFAULT_VAULT_OP_POLICY } from "../../../src/vault-ops/gateway";
 import { PROVIDER_DESCRIPTORS } from "../../../src/providers/descriptors";
 
@@ -125,6 +126,15 @@ describe("normalizePluginSettings", () => {
     });
     expect(wrongType.favoriteModelKeys).toEqual([]);
   });
+
+  it("defaults memoriesEnabled off and seeds memories once; a stored state survives", () => {
+    const fresh = normalizePluginSettings({});
+    expect(fresh.memoriesEnabled).toBe(false);
+    expect(fresh.memories).toEqual(DEFAULT_MEMORIES);
+    const on = normalizePluginSettings({ memoriesEnabled: true, memories: [] });
+    expect(on.memoriesEnabled).toBe(true);
+    expect(on.memories).toEqual([]);
+  });
 });
 
 describe("normalizeGate", () => {
@@ -170,6 +180,85 @@ describe("normalizeVaultOpPolicy", () => {
     expect(normalizeVaultOpPolicy({ maxAutoOps: -1 }).maxAutoOps).toBe(
       DEFAULT_VAULT_OP_POLICY.maxAutoOps,
     );
+  });
+
+  it("defaults the memory gate to ask and honors a valid stored value", () => {
+    expect(normalizeVaultOpPolicy(undefined).memory).toBe("ask");
+    expect(normalizeVaultOpPolicy({}).memory).toBe("ask");
+    expect(normalizeVaultOpPolicy({ memory: "auto" }).memory).toBe("auto");
+    expect(normalizeVaultOpPolicy({ memory: "deny" }).memory).toBe("deny");
+    expect(normalizeVaultOpPolicy({ memory: "maybe" }).memory).toBe("ask");
+  });
+});
+
+describe("normalizeMemories", () => {
+  const valid = {
+    name: "pov-limited",
+    type: "rule",
+    description: "Write in third person limited.",
+    enabled: true,
+  };
+
+  it("seeds bundled defaults only when the field is truly absent, as copies", () => {
+    const seeded = normalizeMemories(undefined);
+    expect(seeded).toEqual(DEFAULT_MEMORIES);
+    expect(seeded[0]).not.toBe(DEFAULT_MEMORIES[0]);
+  });
+
+  it("does not re-seed an empty list (the user deleted all memories)", () => {
+    expect(normalizeMemories([])).toEqual([]);
+  });
+
+  it("round-trips the bundled defaults unchanged (they are structurally valid records)", () => {
+    expect(normalizeMemories([...DEFAULT_MEMORIES])).toEqual(DEFAULT_MEMORIES);
+  });
+
+  it("normalizes a non-array to empty, never to defaults", () => {
+    expect(normalizeMemories(42)).toEqual([]);
+    expect(normalizeMemories({ name: "not-a-list" })).toEqual([]);
+    expect(normalizeMemories(null)).toEqual([]);
+  });
+
+  it("drops structurally bad elements and keeps valid ones", () => {
+    const result = normalizeMemories([
+      null,
+      "junk",
+      { name: "no-description", type: "rule", enabled: true },
+      { ...valid, type: "vibe" },
+      { ...valid, description: "multi\nline" },
+      { ...valid, description: "x".repeat(201) },
+      { ...valid, content: 42 },
+      { ...valid, content: "x".repeat(4001) },
+      valid,
+    ]);
+    expect(result).toEqual([valid]);
+  });
+
+  it("normalizes a hand-edited name's case and spelling, not its identity", () => {
+    const result = normalizeMemories([{ ...valid, name: "Pov Limited" }]);
+    expect(result).toHaveLength(1);
+    expect(result[0].name).toBe("pov-limited");
+  });
+
+  it("dedupes case-insensitively, first occurrence wins", () => {
+    const result = normalizeMemories([
+      { ...valid, description: "first" },
+      { ...valid, name: "POV-Limited", description: "second" },
+    ]);
+    expect(result).toHaveLength(1);
+    expect(result[0].description).toBe("first");
+  });
+
+  it("defaults a missing enabled flag to false (a disabled memory is inert)", () => {
+    const { enabled: _enabled, ...withoutEnabled } = valid;
+    const result = normalizeMemories([withoutEnabled]);
+    expect(result[0].enabled).toBe(false);
+  });
+
+  it("preserves a valid content body verbatim, including newlines", () => {
+    const content = "Milestone one.\nMilestone two.";
+    const result = normalizeMemories([{ ...valid, type: "context", content }]);
+    expect(result[0].content).toBe(content);
   });
 });
 

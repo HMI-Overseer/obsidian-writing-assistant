@@ -172,6 +172,28 @@ export interface CustomCommand {
 }
 
 /**
+ * How a {@link Memory} is treated: a `rule` carries its constraint in the
+ * `description` and governs from the index alone; a `context` carries substance
+ * in `content`, fetched on demand via recall.
+ */
+export type MemoryType = "rule" | "context";
+
+/**
+ * A persistent memory (RFC-0007 canonical shape). `name` is the identity: unique
+ * normalized lowercase kebab-case, no separate id. `description` is the always-on
+ * index line (single-line, bounded); `content` is the recalled body (bounded,
+ * optional: a rule often has none). A disabled memory is absent from the index
+ * and not recallable. Never confuse with the unrelated `ChatSessionMemory`.
+ */
+export interface Memory {
+  name: string;
+  type: MemoryType;
+  description: string;
+  content?: string;
+  enabled: boolean;
+}
+
+/**
  * Why the Claude Code live session cold-rebuilt instead of reusing the held
  * process for a turn (Phase 0 cache instrumentation, 2026-06-27 prompt-cache
  * design). Attributed to a single change so a baseline plan→chat→edit session
@@ -648,6 +670,14 @@ export interface PluginSettings {
   rag: RagSettings;
   /** Knowledge graph settings. */
   knowledgeGraph: KnowledgeGraphSettings;
+  /**
+   * Master toggle for the memories feature, default off. While false the plugin
+   * emits no index bytes and no memory tools: every prompt and tool surface is
+   * byte-identical to the feature not existing.
+   */
+  memoriesEnabled: boolean;
+  /** Persistent memories (RFC-0007 shape); seeded once from `DEFAULT_MEMORIES`, then user-owned. */
+  memories: Memory[];
   /**
    * The unified system prompt prefix, prepended before the profile's custom prompt on
    * every turn (the plan/chat/edit modes are gone, section 6.3). Edit-format guidance

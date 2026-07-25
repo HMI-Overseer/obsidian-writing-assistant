@@ -85,6 +85,7 @@ const POLICY = (overrides: Partial<VaultOpPolicy> = {}): VaultOpPolicy => ({
   trash: "auto",
   createDir: "auto",
   edit: "auto",
+  memory: "ask",
   scopes: [],
   maxAutoOps: 20,
   ...overrides,

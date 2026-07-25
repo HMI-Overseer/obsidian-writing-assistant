@@ -1,4 +1,4 @@
-import type { BenchmarkSettings, ChatHistory, KnowledgeGraphSettings, PluginSettings, ProviderOption, ProviderProfile, RagSettings } from "./shared/types";
+import type { BenchmarkSettings, ChatHistory, KnowledgeGraphSettings, Memory, PluginSettings, ProviderOption, ProviderProfile, RagSettings } from "./shared/types";
 import { DEFAULT_VAULT_OP_POLICY } from "./vault-ops/gateway";
 import type { ImageMimeType } from "./shared/types";
 
@@ -59,6 +59,27 @@ export const DEFAULT_KNOWLEDGE_GRAPH_SETTINGS: KnowledgeGraphSettings = {
   activeEmbeddingModelId: null,
   excludePatterns: ["templates/**"],
 };
+
+/**
+ * Bundled starter memories, copied into settings once when the `memories` field
+ * is first introduced and thereafter ordinary user-owned records (never merged
+ * back). Every entry ships disabled: nothing changes model behavior until the
+ * user opts in twice, the feature toggle and the entry toggle.
+ */
+export const DEFAULT_MEMORIES: readonly Memory[] = [
+  {
+    name: "no-emdashes",
+    type: "rule",
+    description: "Never use em dashes; use commas for asides and colons before lists.",
+    enabled: false,
+  },
+  {
+    name: "no-emojis",
+    type: "rule",
+    description: "Never use emojis.",
+    enabled: false,
+  },
+];
 
 // The unified system prompt prefix (the plan/chat/edit modes are gone, section 6.3). Edit
 // capability rides the dynamic tool/regex guidance, so the prefix stays general.
@@ -136,6 +157,8 @@ export const DEFAULT_SETTINGS: PluginSettings = {
   diffMinMatchConfidence: 0.7,
   rag: { ...DEFAULT_RAG_SETTINGS },
   knowledgeGraph: { ...DEFAULT_KNOWLEDGE_GRAPH_SETTINGS },
+  memoriesEnabled: false,
+  memories: DEFAULT_MEMORIES.map((memory) => ({ ...memory })),
   systemPromptPrefix: DEFAULT_SYSTEM_PROMPT_PREFIX,
   apiKeysDisclaimerAccepted: false,
   agenticMode: true,

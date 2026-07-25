@@ -37,6 +37,16 @@ export interface VaultOpPolicy {
    * including on a non-active file. See ADR-0018.
    */
   edit: Gate;
+  /**
+   * Memory mutations (`add_memory` / `forget_memory`). A gate class that is not
+   * an operation kind, like `edit`, but resolved by its own posture-independent
+   * `resolveMemoryGate`, never by {@link resolveGate}: the session-level "Edit
+   * automatically" posture must not auto-apply a memory mutation (RFC-0007).
+   * Deliberately not counted by {@link writesPermitted} (a memory-only session
+   * is not a vault-writing session) and not rendered in the VaultOpsTab gate
+   * list; the Memories tab is its one surfacing.
+   */
+  memory: Gate;
   /** Folder prefixes eligible for "auto"; empty ⇒ whole vault. */
   scopes: string[];
   /**
@@ -61,6 +71,7 @@ export const DEFAULT_VAULT_OP_POLICY: VaultOpPolicy = {
   trash: "ask",
   createDir: "ask",
   edit: "ask",
+  memory: "ask",
   scopes: [],
   maxAutoOps: 50,
 };

@@ -5,6 +5,7 @@ import {
   resolveEditGate,
   resolveGate,
   targetPaths,
+  writesPermitted,
 } from "../../../src/vault-ops/gateway";
 import type { VaultOpPolicy } from "../../../src/vault-ops/gateway";
 import type { VaultOperation } from "../../../src/vault-ops/types";
@@ -18,6 +19,7 @@ const basePolicy: VaultOpPolicy = {
   trash: "deny",
   createDir: "auto",
   edit: "ask",
+  memory: "ask",
   scopes: [],
   maxAutoOps: 20,
 };
@@ -195,5 +197,31 @@ describe("approval posture override", () => {
     expect(resolveGate(trash, policy, 2, "auto")).toBe("auto");
     expect(resolveGate(trash, policy, 999, "auto")).toBe("auto");
     expect(resolveEditGate(policy, "Story.md", 999, "auto")).toBe("auto");
+  });
+});
+
+// The memory gate class is not a vault-write class: a session whose only
+// permitted mutation is memory must stay a read-only session for the ambient
+// edit pipeline (no diff renderer, no edit guidance).
+describe("writesPermitted ignores the memory gate", () => {
+  const denyAllWrites: VaultOpPolicy = {
+    create: "deny",
+    overwrite: "deny",
+    move: "deny",
+    trash: "deny",
+    createDir: "deny",
+    edit: "deny",
+    memory: "auto",
+    scopes: [],
+    maxAutoOps: 20,
+  };
+
+  test("a memory-only policy is a read-only session under the ask posture", () => {
+    expect(writesPermitted(denyAllWrites, "ask")).toBe(false);
+  });
+
+  test("any non-deny write class still permits writes; the auto posture always does", () => {
+    expect(writesPermitted({ ...denyAllWrites, edit: "ask" }, "ask")).toBe(true);
+    expect(writesPermitted(denyAllWrites, "auto")).toBe(true);
   });
 });

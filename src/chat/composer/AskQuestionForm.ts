@@ -1,3 +1,5 @@
+import { setIcon } from "obsidian";
+
 import type {
   AskAnswers,
   ValidatedAskQuestion,
@@ -45,6 +47,8 @@ interface ListenerRegistration {
 
 interface RenderedForm {
   formEl: HTMLFormElement;
+  bodyEl: HTMLElement;
+  collapseButton: HTMLButtonElement;
   errorEl: HTMLElement;
   submitButton: HTMLButtonElement;
 }
@@ -54,6 +58,8 @@ let nextFormId = 0;
 export class AskQuestionForm {
   private readonly formId: string;
   private readonly formEl: HTMLFormElement;
+  private readonly bodyEl: HTMLElement;
+  private readonly collapseButton: HTMLButtonElement;
   private readonly errorEl: HTMLElement;
   private readonly submitButton: HTMLButtonElement;
   private readonly questionRefs: QuestionFormRefs[] = [];
@@ -66,6 +72,7 @@ export class AskQuestionForm {
   private destroyed = false;
   private showValidation = false;
   private activeQuestionIndex = 0;
+  private collapsed = false;
 
   constructor(
     private readonly dependencies: AskQuestionFormDependencies,
@@ -76,6 +83,8 @@ export class AskQuestionForm {
     this.state = createAskAnswerState(dependencies.request);
     const rendered = this.renderForm();
     this.formEl = rendered.formEl;
+    this.bodyEl = rendered.bodyEl;
+    this.collapseButton = rendered.collapseButton;
     this.errorEl = rendered.errorEl;
     this.submitButton = rendered.submitButton;
     this.listen(this.formEl, "submit", (event) => this.onSubmit(event));
@@ -98,6 +107,7 @@ export class AskQuestionForm {
       target.removeEventListener(type, listener);
     }
     this.listeners.length = 0;
+    this.refs.containerEl.removeClass("is-collapsed");
     this.formEl.remove();
   }
 
@@ -105,18 +115,35 @@ export class AskQuestionForm {
     const formEl = this.refs.containerEl.createEl("form", {
       cls: "lmsa-ask-form",
       attr: {
-        "aria-label": "Answer questions from the writing assistant",
         novalidate: "true",
       },
     });
-    const tabsEl = formEl.createDiv({
+    const toolbarEl = formEl.createDiv({
+      cls: "lmsa-ask-form-toolbar",
+    });
+    const tabsEl = toolbarEl.createDiv({
       cls: "lmsa-ask-form-tabs",
       attr: {
         role: "tablist",
         "aria-label": "Questions",
       },
     });
-    const questionsEl = formEl.createDiv({ cls: "lmsa-ask-form-questions" });
+    const bodyId = `${this.formId}-body`;
+    const collapseButton = toolbarEl.createEl("button", {
+      cls: "lmsa-ask-form-collapse",
+      attr: {
+        type: "button",
+        "aria-label": "Minimize questions",
+        "aria-controls": bodyId,
+        "aria-expanded": "true",
+      },
+    });
+    setIcon(collapseButton, "chevron-down");
+    const bodyEl = formEl.createDiv({
+      cls: "lmsa-ask-form-body",
+      attr: { id: bodyId },
+    });
+    const questionsEl = bodyEl.createDiv({ cls: "lmsa-ask-form-questions" });
     const tabs = this.dependencies.request.questions.map((question, index) =>
       this.renderTab(tabsEl, question, index),
     );
@@ -131,10 +158,16 @@ export class AskQuestionForm {
         ),
       );
     });
-    const errorEl = this.renderError(formEl);
-    const submitButton = this.renderSubmit(formEl);
+    const errorEl = this.renderError(bodyEl);
+    const submitButton = this.renderSubmit(bodyEl);
+    this.controls.push(collapseButton);
+    this.listen(collapseButton, "click", () => {
+      this.setCollapsed(!this.collapsed);
+    });
     return {
       formEl,
+      bodyEl,
+      collapseButton,
       errorEl,
       submitButton,
     };
@@ -173,7 +206,11 @@ export class AskQuestionForm {
       attr: { "aria-hidden": "true" },
     });
     this.controls.push(tabEl);
-    this.listen(tabEl, "click", () => this.showQuestion(questionIndex));
+    this.listen(tabEl, "click", () => {
+      const restore = this.collapsed;
+      if (restore) this.setCollapsed(false);
+      this.showQuestion(questionIndex, restore);
+    });
     this.listen(tabEl, "keydown", (event) => {
       this.onTabKeydown(event as KeyboardEvent, questionIndex);
     });
@@ -353,8 +390,8 @@ export class AskQuestionForm {
     return { row: rowEl, input, textWrap, textarea };
   }
 
-  private renderError(formEl: HTMLFormElement): HTMLElement {
-    return formEl.createDiv({
+  private renderError(containerEl: HTMLElement): HTMLElement {
+    return containerEl.createDiv({
       cls: "lmsa-ask-form-error lmsa-hidden",
       attr: {
         role: "alert",
@@ -363,8 +400,8 @@ export class AskQuestionForm {
     });
   }
 
-  private renderSubmit(formEl: HTMLFormElement): HTMLButtonElement {
-    const actionsEl = formEl.createDiv({
+  private renderSubmit(containerEl: HTMLElement): HTMLButtonElement {
+    const actionsEl = containerEl.createDiv({
       cls: "lmsa-ask-form-actions",
     });
     const submitButton = actionsEl.createEl("button", {
@@ -480,6 +517,25 @@ export class AskQuestionForm {
     event.preventDefault();
     this.showQuestion(nextIndex);
     this.questionRefs[nextIndex]?.tabEl.focus();
+  }
+
+  private setCollapsed(collapsed: boolean): void {
+    if (this.disabled || this.collapsed === collapsed) return;
+    this.collapsed = collapsed;
+    this.bodyEl.inert = collapsed;
+    this.bodyEl.setAttribute("aria-hidden", collapsed ? "true" : "false");
+    this.formEl.toggleClass("is-collapsed", collapsed);
+    this.refs.containerEl.toggleClass("is-collapsed", collapsed);
+    this.collapseButton.setAttribute(
+      "aria-label",
+      collapsed ? "Expand questions" : "Minimize questions",
+    );
+    this.collapseButton.setAttribute(
+      "aria-expanded",
+      collapsed ? "false" : "true",
+    );
+    this.collapseButton.empty();
+    setIcon(this.collapseButton, collapsed ? "chevron-up" : "chevron-down");
   }
 
   private hideError(): void {

@@ -78,6 +78,12 @@ export const SCAFFOLD = `
   .lmsa-drawer-probe{position:relative;display:flex;width:340px;height:180px;
     border:1px solid var(--background-modifier-border);border-radius:8px;background:var(--background-primary)}
   .lmsa-drawer-probe-content{margin:auto;color:var(--text-muted);font-size:13px}
+  .lmsa-ask-visual-stage{position:relative;height:760px;overflow:hidden}
+  .lmsa-ask-visual-stage>.lmsa-chat-composer{position:absolute;right:0;bottom:0;left:0}
+  .lmsa-ask-visual-transcript{display:flex;flex-direction:column;gap:18px;padding:28px 24px}
+  .lmsa-ask-visual-bubble{max-width:72%;padding:12px 14px;border-radius:14px;
+    background:var(--background-secondary);color:var(--text-normal);font-size:14px;line-height:1.5}
+  .lmsa-ask-visual-bubble.is-user{align-self:flex-end;background:var(--background-modifier-hover)}
 `;
 
 // Wrap component markup in the Obsidian view chain the plugin renders into
@@ -299,7 +305,12 @@ const askQuestion = ({
 
 const askForm = (
   questions,
-  { ready = false, showError = false, activeIndex = 0 } = {},
+  {
+    ready = false,
+    showError = false,
+    activeIndex = 0,
+    collapsed = false,
+  } = {},
 ) => {
   const tabs = questions.map((question, questionIndex) => {
     const active = questionIndex === activeIndex;
@@ -315,26 +326,47 @@ const askForm = (
   const panels = questions
     .map((question, questionIndex) => question.html(questionIndex === activeIndex))
     .join("");
-  return `<form class="lmsa-ask-form" aria-label="Answer questions from the writing assistant">
-    <div class="lmsa-ask-form-tabs" role="tablist" aria-label="Questions">${tabs}</div>
-    <div class="lmsa-ask-form-questions">${panels}</div>
-    <div class="lmsa-ask-form-error${showError ? "" : " lmsa-hidden"}" role="alert">Answer every question before submitting.</div>
-    <div class="lmsa-ask-form-actions">
-      <button class="lmsa-ui-btn lmsa-ui-btn-primary lmsa-ask-form-submit" type="submit"${ready ? "" : " disabled"}>Submit answers</button>
+  return `<form class="lmsa-ask-form${collapsed ? " is-collapsed" : ""}">
+    <div class="lmsa-ask-form-toolbar">
+      <div class="lmsa-ask-form-tabs" role="tablist" aria-label="Questions">${tabs}</div>
+      <button class="lmsa-ask-form-collapse" type="button"
+        aria-label="${collapsed ? "Expand questions" : "Minimize questions"}"
+        aria-controls="ask-visual-body" aria-expanded="${collapsed ? "false" : "true"}">
+        ${collapsed ? I.chevronUp : I.chevronDown}
+      </button>
+    </div>
+    <div class="lmsa-ask-form-body" id="ask-visual-body" aria-hidden="${collapsed ? "true" : "false"}"${collapsed ? " inert" : ""}>
+      <div class="lmsa-ask-form-questions">${panels}</div>
+      <div class="lmsa-ask-form-error${showError ? "" : " lmsa-hidden"}" role="alert">Answer every question before submitting.</div>
+      <div class="lmsa-ask-form-actions">
+        <button class="lmsa-ui-btn lmsa-ui-btn-primary lmsa-ask-form-submit" type="submit"${ready ? "" : " disabled"}>Submit answers</button>
+      </div>
     </div>
   </form>`;
 };
 
 const askComposerHtml = (questions, state) =>
-  `<div class="lmsa-chat-composer"><div class="lmsa-chat-composer-panel is-interacting is-ask-interaction">
-    <div class="lmsa-chat-composer-interaction-body" aria-hidden="false">
+  `<div class="lmsa-chat-composer">
+    <div class="lmsa-chat-composer-interaction-body${state?.collapsed ? " is-collapsed" : ""}" aria-hidden="false">
       ${askForm(questions, state)}
     </div>
+    <div class="lmsa-chat-composer-panel is-interacting is-ask-interaction">
     <div class="lmsa-chat-composer-normal-body" aria-hidden="true" inert>
       <textarea class="lmsa-chat-composer-textarea" rows="1" disabled>An exact draft remains mounted here.</textarea>
     </div>
     ${composerFooter(true, true)}
   </div></div>`;
+
+const askStageHtml = (questions, state) =>
+  `<div class="lmsa-ask-visual-stage">
+    <div class="lmsa-ask-visual-transcript">
+      <div class="lmsa-ask-visual-bubble is-user">Help me decide how this handoff should be structured.</div>
+      <div class="lmsa-ask-visual-bubble">I need a few choices before I can finish the recommendation.</div>
+      <div class="lmsa-ask-visual-bubble is-user">Keep the answer practical and easy to review.</div>
+      <div class="lmsa-ask-visual-bubble">The form opens over this conversation without moving the composer.</div>
+    </div>
+    ${askComposerHtml(questions, state)}
+  </div>`;
 
 const singleIncompleteQuestion = askQuestion({
   id: "ask-single-q0",
@@ -532,9 +564,9 @@ export const SURFACES = {
   // message and disabled explicit submit action show the incomplete state.
   askSingleIncomplete: {
     w: 600,
-    shot: ".lmsa-chat-composer",
+    shot: ".lmsa-ask-visual-stage",
     html: view(
-      askComposerHtml([singleIncompleteQuestion], {
+      askStageHtml([singleIncompleteQuestion], {
         ready: false,
         showError: true,
       }),
@@ -546,9 +578,9 @@ export const SURFACES = {
   // expanded, populated, and included alongside a model-authored choice.
   askOtherReady: {
     w: 600,
-    shot: ".lmsa-chat-composer",
+    shot: ".lmsa-ask-visual-stage",
     html: view(
-      askComposerHtml([otherReadyQuestion], { ready: true }),
+      askStageHtml([otherReadyQuestion], { ready: true }),
       600,
     ),
   },
@@ -557,9 +589,9 @@ export const SURFACES = {
   // application-owned Other textarea with user text.
   askMixedReady: {
     w: 600,
-    shot: ".lmsa-chat-composer",
+    shot: ".lmsa-ask-visual-stage",
     html: view(
-      askComposerHtml(mixedReadyQuestions, { ready: true }),
+      askStageHtml(mixedReadyQuestions, { ready: true }),
       600,
     ),
   },
@@ -568,9 +600,9 @@ export const SURFACES = {
   // inside the bounded scroll region while navigation and Stop remain reachable.
   askMixedNarrow: {
     w: 320,
-    shot: ".lmsa-chat-composer",
+    shot: ".lmsa-ask-visual-stage",
     html: view(
-      askComposerHtml(mixedReadyQuestions, { ready: true }),
+      askStageHtml(mixedReadyQuestions, { ready: true }),
       320,
     ),
   },
@@ -579,9 +611,9 @@ export const SURFACES = {
   // and one 500-code-point Other answer.
   askMaximumContract: {
     w: 600,
-    shot: ".lmsa-chat-composer",
+    shot: ".lmsa-ask-visual-stage",
     html: view(
-      askComposerHtml(maximumContractQuestions, { ready: true }),
+      askStageHtml(maximumContractQuestions, { ready: true }),
       600,
     ),
   },
@@ -589,10 +621,24 @@ export const SURFACES = {
   // Exact contract maximum at the narrow sidebar width.
   askMaximumContractNarrow: {
     w: 320,
-    shot: ".lmsa-chat-composer",
+    shot: ".lmsa-ask-visual-stage",
     html: view(
-      askComposerHtml(maximumContractQuestions, { ready: true }),
+      askStageHtml(maximumContractQuestions, { ready: true }),
       320,
+    ),
+  },
+
+  // The minimized drawer keeps its tab state and restore control while exposing
+  // the transcript behind it.
+  askMixedMinimized: {
+    w: 600,
+    shot: ".lmsa-ask-visual-stage",
+    html: view(
+      askStageHtml(mixedReadyQuestions, {
+        ready: true,
+        collapsed: true,
+      }),
+      600,
     ),
   },
 

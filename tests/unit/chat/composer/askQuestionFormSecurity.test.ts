@@ -49,6 +49,7 @@ describe("ask question rendering security", () => {
   it("shows one question panel at a time and keeps submission global", () => {
     const form = source("src/chat/composer/AskQuestionForm.ts");
     const styles = source("src/chat/composer/AskQuestionForm.css");
+    const layout = source("src/chat/view/createChatLayout.ts");
 
     expect(form).toContain("refs.panelEl.hidden = !active");
     expect(form).toContain(
@@ -62,6 +63,7 @@ describe("ask question rendering security", () => {
     expect(form).not.toContain("Write a different answer in your own words.");
     expect(form).not.toContain("Your answer");
     expect(form).not.toContain("lmsa-ask-form-question-header");
+    expect(form).not.toContain("Answer questions from the writing assistant");
     expect(form.match(/text: question\.header/gu)).toHaveLength(1);
     expect(form).toContain('"is-other-expanded"');
     expect(form).not.toContain("this.callbacks.onSubmit(question");
@@ -71,5 +73,20 @@ describe("ask question rendering security", () => {
     expect(styles).toContain("border-radius: 8px");
     expect(styles).toContain("grid-row: 1 / span 2");
     expect(styles).toContain("margin-top: 12px");
+    expect(form).toContain('"aria-label": "Minimize questions"');
+    expect(form).toContain('collapsed ? "Expand questions" : "Minimize questions"');
+    expect(form).toContain("this.bodyEl.inert = collapsed");
+    expect(form).toContain('this.bodyEl.setAttribute("aria-hidden"');
+    expect(form).toContain('setIcon(this.collapseButton, collapsed ? "chevron-up" : "chevron-down")');
+    expect(styles).toContain("grid-template-rows: auto minmax(0, 0fr)");
+    expect(styles).toContain("transform: scaleX(0)");
+    expect(styles).toContain("transform: scaleX(1)");
+    expect(styles).toContain("position: absolute");
+    expect(styles).toContain("right: 24px");
+    expect(styles).toContain("bottom: calc(100% - 12px)");
+    expect(styles).toContain("left: 24px");
+    expect(layout.indexOf("const composerInteractionEl")).toBeLessThan(
+      layout.indexOf("const composerPanel"),
+    );
   });
 });

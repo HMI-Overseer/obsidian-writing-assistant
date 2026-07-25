@@ -114,13 +114,14 @@ export function createChatLayout(contentEl: HTMLElement): ChatLayoutRefs {
   setIcon(genBtnIcon, "sparkles");
   generateResponseBtn.createSpan({ text: "Generate response" });
 
-  const composerPanel = composer.createDiv({ cls: "lmsa-chat-composer-panel" });
-  const contextPickerPopoverEl = composerPanel.createDiv({ cls: "lmsa-context-picker-popover lmsa-hidden" });
-  const composerInteractionEl = composerPanel.createDiv({
+  const composerInteractionEl = composer.createDiv({
     cls: "lmsa-chat-composer-interaction-body",
     attr: { "aria-hidden": "true" },
   });
   composerInteractionEl.hidden = true;
+
+  const composerPanel = composer.createDiv({ cls: "lmsa-chat-composer-panel" });
+  const contextPickerPopoverEl = composerPanel.createDiv({ cls: "lmsa-context-picker-popover lmsa-hidden" });
 
   const composerNormalBodyEl = composerPanel.createDiv({
     cls: "lmsa-chat-composer-normal-body",

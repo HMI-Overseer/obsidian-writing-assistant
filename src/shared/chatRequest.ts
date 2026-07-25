@@ -31,7 +31,7 @@ export interface AdditionalContextItem {
 export interface ToolSearchConfig {
   /** The native tool-search variant. Regex today (the one swappable wire entry). */
   variant: "regex";
-  /** Tool names kept non-deferred (the core reads + `think`); everything else defers. */
+  /** Tool names kept non-deferred (always-loaded core + `think`); everything else defers. */
   nonDeferredToolNames: string[];
 }
 

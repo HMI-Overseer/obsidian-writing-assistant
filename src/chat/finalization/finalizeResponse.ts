@@ -9,6 +9,7 @@ import type { ChatSessionStore } from "../conversation/ChatSessionStore";
 import type { ChatTranscript } from "../messages/ChatTranscript";
 import type { StreamingRenderer } from "../streaming/StreamingRenderer";
 import { estimateCost } from "../../api/pricing";
+import { hasCompletedAskGuidance } from "../../tools/resultDigest";
 
 export function attachUsageToMessage(
   message: ReturnType<typeof makeMessage>,
@@ -57,7 +58,7 @@ export async function finalizeResponse(
   // equals getFullResponse().
   const response = renderer.getCurrentRoundResponse();
 
-  if (response) {
+  if (response || hasCompletedAskGuidance(agenticSteps)) {
     const assistantMessage = makeMessage("assistant", response);
     attachUsageToMessage(assistantMessage, modelId, provider, usage);
     if (ragSources) assistantMessage.ragSources = ragSources;
@@ -68,13 +69,20 @@ export async function finalizeResponse(
     transcript.registerBubble(assistantMessage.id, bubble);
 
     if (
-      !renderer.hasStreamRenderedMarkdown() ||
-      renderer.getLastRenderedText() !== response
+      response &&
+      (
+        !renderer.hasStreamRenderedMarkdown() ||
+        renderer.getLastRenderedText() !== response
+      )
     ) {
       await transcript.renderBubbleContent(bubble, response);
     }
 
-    if (autoInsertAfterResponse) {
+    if (!response) {
+      transcript.renderPlainTextContent(bubble, "(no response)");
+    }
+
+    if (autoInsertAfterResponse && response) {
       await insertLastResponse(plugin, response);
     }
   } else {
@@ -121,7 +129,7 @@ export async function finalizeAbortedResponse(
     // rebuilds with a mislabeled `turn-count` reason (ADR-0016,
     // question 7). Partial steps ride it for replay fidelity. Other providers keep
     // today's behavior (no empty turn appended, so their histories don't grow one).
-    if (provider === "claudecode") {
+    if (provider === "claudecode" || hasCompletedAskGuidance(agenticSteps)) {
       const assistantMessage = makeMessage("assistant", "");
       attachUsageToMessage(assistantMessage, modelId, provider);
       if (ragSources) assistantMessage.ragSources = ragSources;

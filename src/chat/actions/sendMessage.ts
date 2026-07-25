@@ -6,6 +6,7 @@ import type { ChatComposer } from "../composer/ChatComposer";
 import type { ChatSessionStore } from "../conversation/ChatSessionStore";
 import type { ChatTranscript } from "../messages/ChatTranscript";
 import type { ChatModelSelector } from "../models/ChatModelSelector";
+import type { ComposerInteractionHostPort } from "../interactions/ComposerInteractionHost";
 import { makeMessage } from "../conversation/conversationUtils";
 import { validateSendRequest } from "./validateSendRequest";
 import { generateLlmResponse } from "./generateLlmResponse";
@@ -19,6 +20,7 @@ export type SendMessageOptions = {
   transcript: ChatTranscript;
   composer: ChatComposer;
   modelSelector: ChatModelSelector;
+  interactionHost: ComposerInteractionHostPort;
   getIsGenerating: () => boolean;
   setIsGenerating: (sending: boolean) => void;
   setActiveAbortController: (controller: AbortController | null) => void;
@@ -38,6 +40,7 @@ export async function sendMessage(options: SendMessageOptions): Promise<void> {
     transcript,
     composer,
     modelSelector,
+    interactionHost,
     getIsGenerating,
     setIsGenerating,
     setActiveAbortController,
@@ -128,6 +131,7 @@ export async function sendMessage(options: SendMessageOptions): Promise<void> {
     transcript,
     activeModel,
     client,
+    interactionHost,
     posture,
     finalization: { kind: "append", autoInsert: autoInsertAfterResponse },
     setIsGenerating,

@@ -16,7 +16,10 @@ import { assertNever } from "../utils";
 import type { AgenticStep, CompletedAskGuidanceRecord } from "../shared/types";
 import type { VaultOpDisposition } from "../vault-ops/disposition";
 import { ASK_USER_TOOL_NAME } from "./ask/definition";
-import { deriveAskGuidanceCapture } from "./ask/result";
+import {
+  deriveAskGuidanceCapture,
+  formatAskGuidanceDigest,
+} from "./ask/result";
 
 /**
  * Cap (chars) on a stored full-result record (issue question 9), so vault content
@@ -230,6 +233,32 @@ export function formatAgenticReplayLines(steps: AgenticStep[]): string[] {
   return lines;
 }
 
+/** Exact ask-only replay lines for direct-provider and error-history shaping. */
+export function formatAskGuidanceReplayLines(steps: AgenticStep[]): string[] {
+  return steps.flatMap((step) => {
+    if (
+      step.type !== "tool_call" ||
+      step.toolName !== ASK_USER_TOOL_NAME ||
+      !step.askGuidance
+    ) {
+      return [];
+    }
+    return [formatAskGuidanceDigest(step.askGuidance)];
+  });
+}
+
+/** Whether a persisted step set contains at least one completed ask answer. */
+export function hasCompletedAskGuidance(
+  steps: AgenticStep[] | undefined,
+): boolean {
+  return steps?.some(
+    (step) =>
+      step.type === "tool_call" &&
+      step.toolName === ASK_USER_TOOL_NAME &&
+      step.askGuidance !== undefined,
+  ) ?? false;
+}
+
 /**
  * The replay line for a single step, or `null` when the step contributes none.
  * Discovery tools replay their precomputed pointers-only
@@ -247,6 +276,11 @@ export function formatAgenticReplayLines(steps: AgenticStep[]): string[] {
  */
 export function formatStepReplayLine(step: AgenticStep): string | null {
   if (step.type !== "tool_call" || !step.toolName) return null;
+  if (step.toolName === ASK_USER_TOOL_NAME) {
+    return step.askGuidance
+      ? formatAskGuidanceDigest(step.askGuidance)
+      : null;
+  }
   if (
     step.resultDigest === undefined &&
     step.resultRecord === undefined &&

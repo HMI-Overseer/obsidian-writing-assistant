@@ -106,12 +106,18 @@ export class AgenticTimeline {
         if (queue.length === 0) this.pendingToolCallEls.delete(step.toolName);
         stepEl.classList.remove("lmsa-agentic-timeline-step--pending");
         if (step.toolCallId) stepEl.dataset.toolCallId = step.toolCallId;
+        const nameEl = stepEl.querySelector<HTMLElement>(
+          ".lmsa-agentic-timeline-step-name",
+        );
+        if (nameEl) nameEl.textContent = toolStepLabel(step);
         if (step.toolInput) {
           detailEl.textContent = step.toolInput;
         } else {
           detailEl.remove();
         }
-        if (step.toolArgs) {
+        if (step.askGuidance) {
+          this.renderAskGuidance(stepEl, step);
+        } else if (step.toolArgs) {
           this.renderExpandableArgs(stepEl, step.toolArgs);
         }
         if (step.isError) {
@@ -299,12 +305,14 @@ export class AgenticTimeline {
     const bodyEl = stepEl.createDiv({ cls: "lmsa-agentic-timeline-step-body" });
 
     if (step.type === "tool_call") {
-      const label = TOOL_LABELS[step.toolName ?? ""] ?? (step.toolName ?? "Tool call");
+      const label = toolStepLabel(step);
       bodyEl.createSpan({ cls: "lmsa-agentic-timeline-step-name", text: label });
       if (step.toolInput) {
         bodyEl.createSpan({ cls: "lmsa-agentic-timeline-step-detail", text: step.toolInput });
       }
-      if (step.toolArgs) {
+      if (step.askGuidance) {
+        this.renderAskGuidance(stepEl, step);
+      } else if (step.toolArgs) {
         this.renderExpandableArgs(stepEl, step.toolArgs);
       }
       if (step.isError) {
@@ -339,6 +347,26 @@ export class AgenticTimeline {
       entryEl.createSpan({ cls: "lmsa-agentic-timeline-arg-key", text: key });
       const valueStr = typeof value === "string" ? value : JSON.stringify(value, null, 2);
       entryEl.createEl("pre", { cls: "lmsa-agentic-timeline-arg-value", text: valueStr });
+    }
+  }
+
+  /** Render completed ask detail from the exact structured guidance record. */
+  private renderAskGuidance(stepEl: HTMLElement, step: AgenticStep): void {
+    const rows = askGuidanceDetailRows(step);
+    if (rows.length === 0) return;
+    const expandEl = this.ensureExpandBlock(stepEl);
+    for (const row of rows) {
+      const entryEl = expandEl.createDiv({
+        cls: "lmsa-agentic-timeline-arg-entry",
+      });
+      entryEl.createSpan({
+        cls: "lmsa-agentic-timeline-arg-key",
+        text: row.header,
+      });
+      entryEl.createEl("pre", {
+        cls: "lmsa-agentic-timeline-arg-value",
+        text: `${row.question}\n${row.answers.join("\n")}`,
+      });
     }
   }
 
@@ -402,6 +430,37 @@ export function toolStepClasses(toolName: string | undefined, ...extra: string[]
   if (isMutatingTool(toolName)) classes.push("lmsa-agentic-timeline-step--mutating");
   classes.push(...extra);
   return classes.join(" ");
+}
+
+/** Terminal tool-step label, including structured ask outcomes. */
+export function toolStepLabel(step: AgenticStep): string {
+  if (step.toolName === "ask_user") {
+    if (step.askStatus === "cancelled") {
+      return "Question cancelled when generation stopped";
+    }
+    if (step.askStatus === "skipped") {
+      return "Question skipped";
+    }
+  }
+  return TOOL_LABELS[step.toolName ?? ""] ?? (step.toolName ?? "Tool call");
+}
+
+export interface AskGuidanceDetailRow {
+  header: string;
+  question: string;
+  answers: string[];
+}
+
+/** Completed ask detail derived only from the persisted structured record. */
+export function askGuidanceDetailRows(step: AgenticStep): AskGuidanceDetailRow[] {
+  if (step.toolName !== "ask_user" || !step.askGuidance) return [];
+  return step.askGuidance.questions.map((question) => ({
+    header: question.header,
+    question: question.question,
+    answers: Array.isArray(question.answer)
+      ? [...question.answer]
+      : [question.answer],
+  }));
 }
 
 /**

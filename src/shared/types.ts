@@ -385,6 +385,11 @@ export interface AgenticStep {
    * answers. Optional forever for old conversations and every non-ask step.
    */
   askGuidance?: CompletedAskGuidanceRecord;
+  /**
+   * Structured ask timeline outcome. Pending exists only as a live placeholder,
+   * completed, cancelled, and skipped survive transcript persistence.
+   */
+  askStatus?: "completed" | "cancelled" | "skipped";
 }
 
 /**

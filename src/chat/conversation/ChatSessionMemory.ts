@@ -140,7 +140,16 @@ export class ChatSessionMemory {
   finalizeRegeneration(
     oldMessage: ConversationMessage,
     newContent: string,
-    metadata?: Pick<ConversationMessage, "modelId" | "provider" | "usage" | "ragSources" | "rewrittenQuery" | "agenticSteps">,
+    metadata?: Pick<
+      ConversationMessage,
+      | "modelId"
+      | "provider"
+      | "usage"
+      | "ragSources"
+      | "rewrittenQuery"
+      | "agenticSteps"
+      | "interrupted"
+    >,
   ): ConversationMessage {
     const now = Date.now();
 

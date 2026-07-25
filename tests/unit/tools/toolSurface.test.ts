@@ -8,8 +8,11 @@ import {
   CLAUDE_CODE_STABLE_TOOL_SET,
   cloudStableToolSet,
   claudeCodeStableToolSet,
+  CORE_INTERACTION_TOOLS,
+  ALWAYS_LOADED_CORE_TOOLS,
   CORE_READ_TOOLS,
   CORE_READ_TOOL_NAMES,
+  isAlwaysLoadedCoreTool,
   isCoreReadTool,
   anthropicNonDeferredToolNames,
   anthropicLayer2ToolSet,
@@ -100,12 +103,13 @@ describe("resolveLocalToolSet (full reads + permitted writes + think)", () => {
     const readPart = got.slice(0, VAULT_TOOL_NAMES.size);
     expect(readPart.every((n) => VAULT_TOOL_NAMES.has(n))).toBe(true);
     expect(readPart.length).toBe(VAULT_TOOL_NAMES.size);
-    expect(got).toEqual([...readPart, ...EDIT_NAMES, ...VAULT_OP_NAMES, "think"]);
+    expect(got).toEqual([...readPart, "ask_user", ...EDIT_NAMES, ...VAULT_OP_NAMES, "think"]);
   });
 
   it("read-only (deny-all policy) emits the read suite + think, no writes", () => {
     const got = names(resolveLocalToolSet(opts({ policy: DENY_ALL })));
     expect(got[got.length - 1]).toBe("think");
+    expect(got).toContain("ask_user");
     expect(got.some((n) => EDIT_TOOL_NAMES.has(n) || VAULT_OPS_TOOL_NAMES.has(n))).toBe(false);
   });
 
@@ -116,6 +120,14 @@ describe("resolveLocalToolSet (full reads + permitted writes + think)", () => {
 });
 
 describe("cloudAllowedToolSet (reads unrestricted, writes posture/policy-gated)", () => {
+  it("always permits ask_user under every posture and vault policy", () => {
+    for (const posture of ["ask", "auto"] as const) {
+      for (const policy of [DEFAULT_VAULT_OP_POLICY, DENY_ALL]) {
+        expect(cloudAllowedToolNames(opts({ posture, policy }))).toContain("ask_user");
+      }
+    }
+  });
+
   it("allows every read tool (no read shrink)", () => {
     const got = cloudAllowedToolNames(opts());
     for (const readName of VAULT_TOOL_NAMES) expect(got).toContain(readName);
@@ -154,18 +166,26 @@ describe("stable cloud surfaces (Layer 1 superset)", () => {
   it("the Claude Code superset covers the allow-list minus think (think is never bridged)", () => {
     const superset = new Set(CLAUDE_CODE_STABLE_TOOL_SET.map((t) => t.name));
     expect(superset.has("think")).toBe(false);
+    expect(superset.has("ask_user")).toBe(false);
     for (const posture of ["ask", "auto"] as const) {
       for (const name of cloudAllowedToolNames(opts({ posture, useThinkTool: false }))) {
+        if (name === "ask_user") continue;
         expect(superset.has(name)).toBe(true);
       }
     }
   });
 
-  it("the Anthropic superset adds think over the Claude Code superset", () => {
+  it("the Anthropic superset adds ask_user and think over the Claude Code superset", () => {
     expect(CLOUD_STABLE_TOOL_SET.map((t) => t.name)).toEqual([
       ...CLAUDE_CODE_STABLE_TOOL_SET.map((t) => t.name),
+      "ask_user",
       "think",
     ]);
+  });
+
+  it("keeps Claude Code unadvertised until Phase 4", () => {
+    expect(names(CLAUDE_CODE_STABLE_TOOL_SET)).not.toContain("ask_user");
+    expect(names(claudeCodeStableToolSet(true))).not.toContain("ask_user");
   });
 
   it("keeps both stable catalogs byte-identical to baseline while memories are off", () => {
@@ -203,6 +223,10 @@ describe("toolNotAllowedFailure", () => {
     expect(toolNotAllowedFailure("forget_memory").isReadOnly).toBe(false);
     expect(toolNotAllowedFailure("recall_memory").isReadOnly).toBe(true);
   });
+
+  it("classifies ask_user as read-only defensively", () => {
+    expect(toolNotAllowedFailure("ask_user").isReadOnly).toBe(true);
+  });
 });
 
 describe("Layer 2 progressive-disclosure core (ADR-0009 / section 6.2.5)", () => {
@@ -217,7 +241,7 @@ describe("Layer 2 progressive-disclosure core (ADR-0009 / section 6.2.5)", () =>
   // primitive earn a non-deferred slot" conversation (the get_outline / read_section
   // watch-item), not a silent bump.
   // See docs/03-decisions/ADR-0009-layer-2-progressive-disclosure-deferred.md.
-  const NON_DEFERRED_CORE_MAX = 8;
+  const NON_DEFERRED_CORE_MAX = 9;
 
   it("gives recall_memory the seventh core read slot", () => {
     expect(names(CORE_READ_TOOLS)).toEqual([
@@ -232,14 +256,32 @@ describe("Layer 2 progressive-disclosure core (ADR-0009 / section 6.2.5)", () =>
     expect(CORE_READ_TOOL_NAMES.size).toBe(7);
   });
 
-  it("holds the enabled anthropic non-deferred core at the deliberate eight-slot cap", () => {
-    // 7 core reads + think. The native tool-search entry is non-deferred at the wire
+  it("holds the enabled anthropic non-deferred core at the deliberate nine-slot cap", () => {
+    // 7 core reads + ask_user + think. The native tool-search entry is non-deferred at the wire
     // layer but is not a canonical tool, so it is not counted here.
     const nonDeferred = anthropicNonDeferredToolNames(true);
     expect(nonDeferred.size).toBeLessThanOrEqual(NON_DEFERRED_CORE_MAX);
-    expect(nonDeferred.size).toBe(8);
+    expect(nonDeferred.size).toBe(9);
     expect(nonDeferred.has("recall_memory")).toBe(true);
+    expect(nonDeferred.has("ask_user")).toBe(true);
     expect(nonDeferred.has("think")).toBe(true);
+  });
+
+  it("uses one fewer non-deferred slot when memories are disabled", () => {
+    const nonDeferred = anthropicNonDeferredToolNames(false);
+    expect(nonDeferred.size).toBe(8);
+    expect(nonDeferred.has("recall_memory")).toBe(false);
+    expect(nonDeferred.has("ask_user")).toBe(true);
+  });
+
+  it("keeps ask_user in a separate always-loaded interaction family", () => {
+    expect(names(CORE_INTERACTION_TOOLS)).toEqual(["ask_user"]);
+    expect(names(ALWAYS_LOADED_CORE_TOOLS)).toEqual([
+      ...names(CORE_READ_TOOLS),
+      "ask_user",
+    ]);
+    expect(isAlwaysLoadedCoreTool("ask_user")).toBe(true);
+    expect(isCoreReadTool("ask_user")).toBe(false);
   });
 
   it("classifies recall as core, never its memory mutation siblings", () => {
@@ -331,7 +373,7 @@ describe("memory catalog and runtime denial semantics", () => {
 describe("anthropicLayer2ToolSet (the direct-API L2 emission)", () => {
   it("emits the non-deferred core (core reads + think) then the deferred tail", () => {
     const got = names(anthropicLayer2ToolSet(opts()));
-    // Core reads first (CORE_READ_TOOLS order), then think.
+    // Core reads first (CORE_READ_TOOLS order), then ask_user and think.
     expect(got.slice(0, 6)).toEqual([
       "list_directory",
       "semantic_search",
@@ -340,9 +382,10 @@ describe("anthropicLayer2ToolSet (the direct-API L2 emission)", () => {
       "get_outline",
       "read_section",
     ]);
-    expect(got[6]).toBe("think");
+    expect(got[6]).toBe("ask_user");
+    expect(got[7]).toBe("think");
     // Then the six deferred tail reads, then the posture/policy-permitted writes.
-    expect(got.slice(7)).toEqual([
+    expect(got.slice(8)).toEqual([
       "directory_tree",
       "search_files",
       "find_notes_by_tag",
@@ -357,6 +400,7 @@ describe("anthropicLayer2ToolSet (the direct-API L2 emission)", () => {
   it("places enabled recall in the core and memory mutations in the deferred tail", () => {
     const got = names(anthropicLayer2ToolSet(opts({ memoriesEnabled: true })));
     expect(got.indexOf("recall_memory")).toBe(6);
+    expect(got.indexOf("ask_user")).toBe(7);
     expect(got.indexOf("add_memory")).toBeGreaterThan(got.indexOf("get_frontmatter"));
     expect(got.indexOf("forget_memory")).toBeGreaterThan(got.indexOf("add_memory"));
   });
@@ -398,9 +442,10 @@ describe("anthropicLayer2ToolSet (the direct-API L2 emission)", () => {
     const deferred = names(anthropicLayer2ToolSet(opts())).filter((n) => !nonDeferred.has(n));
     expect(deferred.length).toBeGreaterThan(0);
     for (const n of deferred) expect(nonDeferred.has(n)).toBe(false);
-    // And the non-deferred core stays exactly the six reads + think (held small, section 6.2.5).
+    // And the non-deferred core stays exactly the six reads + ask_user + think.
     expect([...nonDeferred].sort()).toEqual(
       [
+        "ask_user",
         "get_outline",
         "list_directory",
         "read_file",

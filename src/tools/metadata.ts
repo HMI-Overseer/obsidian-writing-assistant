@@ -39,6 +39,7 @@ export const TOOL_ICONS: Record<string, string> = {
   recall_memory: "brain",
   add_memory: "brain-circuit",
   forget_memory: "eraser",
+  ask_user: "circle-help",
 };
 
 /** Past-tense label for completed tool calls (used in AgenticTimeline). */
@@ -69,6 +70,7 @@ export const TOOL_LABELS: Record<string, string> = {
   recall_memory: "Recalled memory",
   add_memory: "Added memory",
   forget_memory: "Forgot memory",
+  ask_user: "Asked for guidance",
 };
 
 /**
@@ -91,6 +93,7 @@ export const TOOL_PENDING_LABELS: Record<string, string> = {
   replace_in_vault: "Replace across notes",
   add_memory: "Add memory",
   forget_memory: "Forget memory",
+  ask_user: "Waiting for your answer",
 };
 
 /** Label for a tool-call step that is announced/pending (present tense where it matters). */
@@ -126,6 +129,7 @@ export const TOOL_STATUS_LABELS: Record<string, string> = {
   recall_memory: "Recalling memory...",
   add_memory: "Adding memory...",
   forget_memory: "Forgetting memory...",
+  ask_user: "Waiting for your answer",
 };
 
 /**
@@ -192,6 +196,10 @@ export function extractToolInput(
     case "add_memory":
     case "forget_memory":
       return typeof args.name === "string" ? args.name : undefined;
+    case "ask_user":
+      return Array.isArray(args.questions)
+        ? `${args.questions.length} question(s)`
+        : undefined;
     default: return undefined;
   }
 }

@@ -1,5 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { toHistoryTurn } from "../../../src/chat/finalization/prepareApiMessages";
+import {
+  toHistoryTurn,
+  toRequestHistoryTurns,
+} from "../../../src/chat/finalization/prepareApiMessages";
 import type { AgenticStep, ConversationMessage } from "../../../src/shared/types";
 import type { DiffHunk, EditProposal, EditStatus } from "../../../src/editing/editTypes";
 
@@ -87,6 +90,99 @@ describe("toHistoryTurn", () => {
     };
     expect(toHistoryTurn(message, false).attachments?.map((a) => a.type)).toEqual(["note"]);
     expect(toHistoryTurn(message, true).attachments?.map((a) => a.type)).toEqual(["image", "note"]);
+  });
+
+  it.each(["anthropic", "openai", "lmstudio"] as const)(
+    "replays only exact ask guidance for direct %s history",
+    (provider) => {
+      const message: ConversationMessage = {
+        id: "m-ask",
+        role: "assistant",
+        content: "I continued with your choice.",
+        provider,
+        agenticSteps: [
+          {
+            type: "tool_call",
+            round: 0,
+            toolName: "read_file",
+            resultRecord: "ordinary direct tool result",
+          },
+          {
+            type: "tool_call",
+            round: 1,
+            toolName: "ask_user",
+            resultRecord: '{"answers":{"Format":"Detailed"}}',
+            resultDigest: "[stale display digest]",
+            askGuidance: {
+              questions: [
+                {
+                  question: "Format",
+                  header: "Output",
+                  answer: "Detailed",
+                },
+              ],
+            },
+          },
+        ],
+      };
+
+      const turn = toHistoryTurn(message, false, false);
+
+      expect(turn.content).toBe(
+        "I continued with your choice.\n\n" +
+          '[ask_user guidance: {"questions":[{"question":"Format","header":"Output","answer":"Detailed"}]}]',
+      );
+      expect(turn.content).not.toContain("read_file");
+      expect(turn.content).not.toContain("stale display digest");
+      expect(turn.rawContent).toBeUndefined();
+    },
+  );
+});
+
+describe("toRequestHistoryTurns error filtering", () => {
+  it("emits a guidance-only assistant turn when error prose is filtered", () => {
+    const message: ConversationMessage = {
+      id: "m-error",
+      role: "assistant",
+      content: "Error: provider failed after submission.",
+      isError: true,
+      agenticSteps: [
+        {
+          type: "tool_call",
+          round: 0,
+          toolName: "ask_user",
+          askStatus: "completed",
+          askGuidance: {
+            questions: [
+              {
+                question: "Format",
+                header: "Output",
+                answer: "Detailed",
+              },
+            ],
+          },
+        },
+      ],
+    };
+
+    expect(toRequestHistoryTurns([message], false, false)).toEqual([
+      {
+        role: "assistant",
+        content:
+          '[ask_user guidance: {"questions":[{"question":"Format","header":"Output","answer":"Detailed"}]}]',
+      },
+    ]);
+  });
+
+  it("still drops ordinary error messages without completed ask guidance", () => {
+    const message: ConversationMessage = {
+      id: "m-error",
+      role: "assistant",
+      content: "Error: provider failed.",
+      isError: true,
+    };
+
+    expect(toRequestHistoryTurns([message], false, false)).toEqual([]);
   });
 });
 
@@ -202,5 +298,40 @@ describe("toHistoryTurn, Claude Code replay annotation", () => {
       interrupted: true,
     };
     expect(toHistoryTurn(message, false, true)).toEqual({ role: "user", content: "read_file for me" });
+  });
+
+  it("replays ask guidance exactly once and keeps Claude Code rawContent unchanged", () => {
+    const message: ConversationMessage = {
+      id: "m-ask",
+      role: "assistant",
+      content: "Continuing.",
+      provider: "claudecode",
+      agenticSteps: [
+        {
+          type: "tool_call",
+          round: 0,
+          toolName: "ask_user",
+          resultRecord: '{"answers":{"Format":"Detailed"}}',
+          resultDigest: "[stale ask digest]",
+          askGuidance: {
+            questions: [
+              {
+                question: "Format",
+                header: "Output",
+                answer: "Detailed",
+              },
+            ],
+          },
+        },
+      ],
+    };
+
+    const turn = toHistoryTurn(message, false, true);
+    const guidance =
+      '[ask_user guidance: {"questions":[{"question":"Format","header":"Output","answer":"Detailed"}]}]';
+
+    expect(turn.content).toBe(`Continuing.\n\n${guidance}`);
+    expect(turn.content.split(guidance)).toHaveLength(2);
+    expect(turn.rawContent).toBe("Continuing.");
   });
 });

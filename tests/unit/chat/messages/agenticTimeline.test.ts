@@ -1,5 +1,10 @@
 import { describe, test, expect } from "vitest";
-import { toolStepClasses, selectClaimIndex } from "../../../../src/chat/messages/AgenticTimeline";
+import {
+  askGuidanceDetailRows,
+  selectClaimIndex,
+  toolStepClasses,
+  toolStepLabel,
+} from "../../../../src/chat/messages/AgenticTimeline";
 
 describe("toolStepClasses", () => {
   test("a read-only tool yields the base tool-call classes only", () => {
@@ -50,5 +55,71 @@ describe("selectClaimIndex", () => {
 
   test("skips untagged placeholders to reach the id-matched one", () => {
     expect(selectClaimIndex([undefined, "x", undefined], "x")).toBe(1);
+  });
+});
+
+describe("ask_user timeline presentation", () => {
+  test("derives completed, cancelled, and skipped labels from structured status", () => {
+    expect(
+      toolStepLabel({
+        type: "tool_call",
+        round: 0,
+        toolName: "ask_user",
+        askStatus: "completed",
+      }),
+    ).toBe("Asked for guidance");
+    expect(
+      toolStepLabel({
+        type: "tool_call",
+        round: 0,
+        toolName: "ask_user",
+        askStatus: "cancelled",
+      }),
+    ).toBe("Question cancelled when generation stopped");
+    expect(
+      toolStepLabel({
+        type: "tool_call",
+        round: 0,
+        toolName: "ask_user",
+        askStatus: "skipped",
+      }),
+    ).toBe("Question skipped");
+  });
+
+  test("builds completed expansion rows only from exact structured guidance", () => {
+    const rows = askGuidanceDetailRows({
+      type: "tool_call",
+      round: 0,
+      toolName: "ask_user",
+      toolArgs: { questions: [{ header: "Wrong", question: "Do not parse me" }] },
+      resultRecord: "bounded display text",
+      askGuidance: {
+        questions: [
+          {
+            question: "Which format?",
+            header: "Output",
+            answer: "Detailed",
+          },
+          {
+            question: "Which sections?",
+            header: "Sections",
+            answer: ["Testing", "Accessibility"],
+          },
+        ],
+      },
+    });
+
+    expect(rows).toEqual([
+      {
+        header: "Output",
+        question: "Which format?",
+        answers: ["Detailed"],
+      },
+      {
+        header: "Sections",
+        question: "Which sections?",
+        answers: ["Testing", "Accessibility"],
+      },
+    ]);
   });
 });

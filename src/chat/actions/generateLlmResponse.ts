@@ -29,8 +29,13 @@ import type {
 import { LiveVaultReview } from "./liveVaultReview";
 import { AgenticTimeline } from "../messages/AgenticTimeline";
 import { extractToolInput } from "../../tools/metadata";
-import { captureStepFields } from "../../tools/resultDigest";
+import {
+  captureStepFields,
+  hasCompletedAskGuidance,
+} from "../../tools/resultDigest";
 import { CONTEXT_DANGER_THRESHOLD } from "../../constants";
+import type { ComposerInteractionHostPort } from "../interactions/ComposerInteractionHost";
+import { AskInteractionCoordinator } from "../interactions/AskInteractionCoordinator";
 
 /**
  * How to commit the completed generation to the store.
@@ -48,6 +53,7 @@ export interface LlmGenerationOptions {
   transcript: ChatTranscript;
   activeModel: CompletionModel;
   client: ChatClient;
+  interactionHost: ComposerInteractionHostPort;
   /** Session approval posture, the replacement for the plan/chat/edit mode (section 6.3). */
   posture: ApprovalPosture;
   finalization: FinalizationMode;
@@ -108,6 +114,7 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
     transcript,
     activeModel,
     client,
+    interactionHost,
     posture,
     finalization,
     setIsGenerating,
@@ -129,36 +136,49 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
   // first delta. The liveReview cancel listener is attached later, once liveReview exists.
   const abortController = new AbortController();
   setActiveAbortController(abortController);
+  const askCoordinator = new AskInteractionCoordinator(
+    interactionHost,
+    abortController.signal,
+  );
 
-  const apiMessages = await prepareApiMessages({
-    app: plugin.app,
-    store,
-    settings: plugin.settings,
-    posture,
-    signal: abortController.signal,
-    ragService: plugin.services.ragService,
-    memoryService: plugin.services.memoryService,
-    activeProvider: activeModel.provider,
-    modelCapabilities: {
-      trainedForToolUse:
-        activeModel.trainedForToolUse ??
-        plugin.services.modelAvailability.getTrainedForToolUse(activeModel.modelId),
-    },
-    chatClient: client,
-    completionModelId: activeModel.modelId,
-    profileSystemPrompt: activeProfile.systemPrompt,
-    disableBuiltinSystemPrompts: activeProfile.disableBuiltinSystemPrompts,
-    // Layer-2 enablement rides this same toggle (ADR-0009): tool search activates on the
-    // direct anthropic agentic path only when caching is on. The cache settings themselves
-    // are attached just below; prepareApiMessages needs the flag up front to choose the
-    // tool emission.
-    anthropicCacheEnabled: activeProfile.anthropicCacheSettings.enabled,
-    // Unknown vision capability is treated as allow-the-attempt: keep image attachments in
-    // the request for an unprobed model rather than stripping them (matches the attach gate).
-    supportsVision: activeModel.vision
-      ?? plugin.services.modelAvailability.getVision(activeModel.modelId)
-      ?? true,
-  });
+  let apiMessages;
+  try {
+    apiMessages = await prepareApiMessages({
+      app: plugin.app,
+      store,
+      settings: plugin.settings,
+      posture,
+      signal: abortController.signal,
+      ragService: plugin.services.ragService,
+      memoryService: plugin.services.memoryService,
+      activeProvider: activeModel.provider,
+      modelCapabilities: {
+        trainedForToolUse:
+          activeModel.trainedForToolUse ??
+          plugin.services.modelAvailability.getTrainedForToolUse(activeModel.modelId),
+      },
+      chatClient: client,
+      completionModelId: activeModel.modelId,
+      profileSystemPrompt: activeProfile.systemPrompt,
+      disableBuiltinSystemPrompts: activeProfile.disableBuiltinSystemPrompts,
+      // Layer-2 enablement rides this same toggle (ADR-0009): tool search activates on the
+      // direct anthropic agentic path only when caching is on. The cache settings themselves
+      // are attached just below; prepareApiMessages needs the flag up front to choose the
+      // tool emission.
+      anthropicCacheEnabled: activeProfile.anthropicCacheSettings.enabled,
+      // Unknown vision capability is treated as allow-the-attempt: keep image attachments in
+      // the request for an unprobed model rather than stripping them (matches the attach gate).
+      supportsVision: activeModel.vision
+        ?? plugin.services.modelAvailability.getVision(activeModel.modelId)
+        ?? true,
+    });
+  } catch (error) {
+    askCoordinator.destroy();
+    setActiveAbortController(null);
+    await store.persistActiveConversation();
+    setIsGenerating(false);
+    throw error;
+  }
 
   const ragSources = apiMessages.ragContext?.map(
     ({ filePath, headingPath, score, content, graphContext }) => ({
@@ -376,6 +396,7 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
       editToolContext,
       vaultOpToolContext,
       memoryToolContext,
+      askCoordinator,
     );
 
     await renderer.flush();
@@ -434,7 +455,7 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
       });
     } else if (finalization.kind === "replace") {
       const response = chatRenderer?.getCurrentRoundResponse() ?? "";
-      if (response) {
+      if (response || hasCompletedAskGuidance(agenticSteps)) {
         store.finalizeRegeneration(finalization.oldMessage, response, {
           modelId: activeModel.modelId,
           provider: activeModel.provider,
@@ -483,6 +504,7 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
           modelId: activeModel.modelId,
           provider: activeModel.provider,
           agenticSteps: partialSteps,
+          interrupted: true,
           posture,
           prebuiltVaultOpProposal: liveReview.getProposal() ?? undefined,
           prebuiltVaultOpRecord: liveReview.getAppliedRecord() ?? undefined,
@@ -492,11 +514,12 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
         });
       } else if (finalization.kind === "replace") {
         const response = chatRenderer?.getCurrentRoundResponse() ?? "";
-        if (response) {
+        if (response || hasCompletedAskGuidance(partialSteps)) {
           store.finalizeRegeneration(finalization.oldMessage, response, {
             modelId: activeModel.modelId,
             provider: activeModel.provider,
             ...(partialSteps?.length && { agenticSteps: partialSteps }),
+            interrupted: true,
           });
           transcript.registerBubble(finalization.oldMessage.id, assistantBubble);
         } else {
@@ -532,6 +555,10 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
       errorMessage.isError = true;
       errorMessage.modelId = activeModel.modelId;
       errorMessage.provider = activeModel.provider;
+      const partialSteps = timeline?.getSteps();
+      if (hasCompletedAskGuidance(partialSteps)) {
+        errorMessage.agenticSteps = partialSteps;
+      }
       store.appendMessage(errorMessage);
       transcript.registerBubble(errorMessage.id, assistantBubble);
       assistantBubble.bodyEl.addClass("is-error");
@@ -542,6 +569,9 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
     plugin.services.claudeCode.setLiveReview(null);
     // Resolve any op still parked on the user so no await leaks past the turn.
     liveReview.cancelPending();
+    // The generation owns exactly one coordinator. Destroying it settles any
+    // remaining interaction before the active generation state is cleared.
+    askCoordinator.destroy();
     setActiveAbortController(null);
     await store.persistActiveConversation();
     setIsGenerating(false);

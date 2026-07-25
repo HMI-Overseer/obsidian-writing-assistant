@@ -10,6 +10,7 @@ import type {
 } from "../../shared/types";
 import type { AppliedEditRecord, EditProposal } from "../../editing/editTypes";
 import { normalizeCompletedAskGuidance } from "../../tools/ask/result";
+import { ASK_USER_TOOL_NAME } from "../../tools/ask/definition";
 import { generateId } from "../../utils";
 
 /** Coerce a raw persisted value to a known posture, defaulting to `ask`. */
@@ -201,6 +202,16 @@ export function normalizeConversation(raw: unknown): Conversation | null {
                   const guidance = normalizeCompletedAskGuidance(normalizedStep.askGuidance);
                   if (guidance) normalizedStep.askGuidance = guidance;
                   else delete normalizedStep.askGuidance;
+                }
+                if (
+                  normalizedStep.toolName !== ASK_USER_TOOL_NAME ||
+                  (
+                    normalizedStep.askStatus !== "completed" &&
+                    normalizedStep.askStatus !== "cancelled" &&
+                    normalizedStep.askStatus !== "skipped"
+                  )
+                ) {
+                  delete normalizedStep.askStatus;
                 }
                 return normalizedStep;
               }) as unknown as ConversationMessage["agenticSteps"];

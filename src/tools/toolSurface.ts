@@ -17,6 +17,10 @@ import {
   RECALL_MEMORY_TOOL,
   allowedMemoryTools,
 } from "./memory/definition";
+import {
+  ASK_TOOL_NAMES,
+  ASK_USER_TOOL,
+} from "./ask/definition";
 import { toolFailure } from "./toolFailure";
 
 /**
@@ -51,6 +55,11 @@ export interface ToolSurfaceOptions {
   memoriesEnabled: boolean;
 }
 
+/** Blocking control interactions that remain available without tool discovery. */
+export const CORE_INTERACTION_TOOLS: CanonicalToolDefinition[] = [
+  ASK_USER_TOOL,
+];
+
 /**
  * The mutating tools the session permits, policy-filtered. **The single source for
  * the write gate**, consumed by local materialization ({@link resolveLocalToolSet})
@@ -78,6 +87,7 @@ export function resolveWriteTools(opts: ToolSurfaceOptions): CanonicalToolDefini
 function permittedTools(opts: ToolSurfaceOptions): CanonicalToolDefinition[] {
   return [
     ...ALL_VAULT_TOOLS,
+    ...CORE_INTERACTION_TOOLS,
     ...(opts.memoriesEnabled ? allowedMemoryTools(opts.policy, opts.posture) : []),
     ...resolveWriteTools(opts),
     ...(opts.useThinkTool ? [THINK_TOOL] : []),
@@ -120,6 +130,7 @@ export const CLOUD_STABLE_TOOL_SET: CanonicalToolDefinition[] = [
   ...ALL_VAULT_TOOLS,
   ...ALL_EDIT_TOOLS,
   ...ALL_VAULT_OPS_TOOLS,
+  ...CORE_INTERACTION_TOOLS,
   THINK_TOOL,
 ];
 
@@ -148,10 +159,14 @@ export function claudeCodeStableToolSet(
 export function cloudStableToolSet(
   memoriesEnabled: boolean,
 ): CanonicalToolDefinition[] {
-  return [
-    ...claudeCodeStableToolSet(memoriesEnabled),
-    THINK_TOOL,
-  ];
+  return memoriesEnabled
+    ? [
+        ...CLAUDE_CODE_STABLE_TOOL_SET,
+        ...CORE_INTERACTION_TOOLS,
+        ...ALL_MEMORY_TOOLS,
+        THINK_TOOL,
+      ]
+    : CLOUD_STABLE_TOOL_SET;
 }
 
 /*
@@ -185,9 +200,23 @@ export const CORE_READ_TOOLS: CanonicalToolDefinition[] = [
   RECALL_MEMORY_TOOL,
 ];
 
+/**
+ * The complete always-loaded core. Interaction tools stay distinct from vault
+ * reads while sharing the same non-deferred transport treatment.
+ */
+export const ALWAYS_LOADED_CORE_TOOLS: CanonicalToolDefinition[] = [
+  ...CORE_READ_TOOLS,
+  ...CORE_INTERACTION_TOOLS,
+];
+
 /** Names of {@link CORE_READ_TOOLS}, for the wire-layer defer / `alwaysLoad` split. */
 export const CORE_READ_TOOL_NAMES: ReadonlySet<string> = new Set(
   CORE_READ_TOOLS.map((tool) => tool.name),
+);
+
+/** Names of every always-loaded core tool, including blocking interactions. */
+export const ALWAYS_LOADED_CORE_TOOL_NAMES: ReadonlySet<string> = new Set(
+  ALWAYS_LOADED_CORE_TOOLS.map((tool) => tool.name),
 );
 
 /**
@@ -198,6 +227,11 @@ export const CORE_READ_TOOL_NAMES: ReadonlySet<string> = new Set(
  */
 export function isCoreReadTool(name: string): boolean {
   return CORE_READ_TOOL_NAMES.has(name);
+}
+
+/** Whether a tool belongs to the canonical always-loaded core. */
+export function isAlwaysLoadedCoreTool(name: string): boolean {
+  return ALWAYS_LOADED_CORE_TOOL_NAMES.has(name);
 }
 
 /**
@@ -211,9 +245,9 @@ export function anthropicNonDeferredToolNames(
   memoriesEnabled = false,
 ): Set<string> {
   const names = memoriesEnabled
-    ? CORE_READ_TOOL_NAMES
+    ? ALWAYS_LOADED_CORE_TOOL_NAMES
     : new Set(
-        [...CORE_READ_TOOL_NAMES].filter(
+        [...ALWAYS_LOADED_CORE_TOOL_NAMES].filter(
           (name) => name !== RECALL_MEMORY_TOOL.name,
         ),
       );
@@ -248,6 +282,7 @@ export function anthropicLayer2ToolSet(opts: ToolSurfaceOptions): CanonicalToolD
     : [];
   return [
     ...coreReads,
+    ...CORE_INTERACTION_TOOLS,
     ...(opts.useThinkTool ? [THINK_TOOL] : []),
     ...tailReads,
     ...resolveWriteTools(opts),
@@ -266,6 +301,7 @@ export function anthropicLayer2ToolSet(opts: ToolSurfaceOptions): CanonicalToolD
 export function toolNotAllowedFailure(name: string): ToolResult {
   const isReadOnly =
     VAULT_TOOL_NAMES.has(name) ||
+    ASK_TOOL_NAMES.has(name) ||
     name === THINK_TOOL_NAME ||
     name === RECALL_MEMORY_TOOL.name;
   return toolFailure({

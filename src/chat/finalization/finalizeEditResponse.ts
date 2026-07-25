@@ -39,6 +39,7 @@ import type { BubbleRefs } from "../types";
 import type { EditStreamingRenderer } from "../streaming/EditStreamingRenderer";
 import type WritingAssistantChat from "../../main";
 import type { AgenticStep, ApprovalPosture, ConversationMessage, ProviderOption } from "../../shared/types";
+import { hasCompletedAskGuidance } from "../../tools/resultDigest";
 import type { ToolCall } from "../../tools/types";
 import type { UsageResult } from "../../api/usageTypes";
 import { attachUsageToMessage } from "./finalizeResponse";
@@ -82,6 +83,8 @@ export interface FinalizeEditOptions {
   prebuiltEditRecords?: AppliedEditRecord[];
   /** Flip the session to auto-apply; powers the review's "Accept all this session" action. */
   onEnterAutoApply?: () => void;
+  /** The generation stopped after producing this partial or guidance-only turn. */
+  interrupted?: boolean;
 }
 
 /**
@@ -103,11 +106,15 @@ export async function finalizeEditResponse(options: FinalizeEditOptions): Promis
     app, owner, store, transcript, bubble, renderer, plugin, modelId, provider, usage,
     toolCalls, agenticSteps, stoppedForMaxTokens,
     prebuiltVaultOpProposal, prebuiltVaultOpRecord,
-    prebuiltEditProposals, prebuiltEditRecords, onEnterAutoApply,
+    prebuiltEditProposals, prebuiltEditRecords, onEnterAutoApply, interrupted,
   } = options;
 
   const fullResponse = renderer.getFullResponse();
-  if (!fullResponse && (!toolCalls || toolCalls.length === 0)) {
+  if (
+    !fullResponse &&
+    (!toolCalls || toolCalls.length === 0) &&
+    !hasCompletedAskGuidance(agenticSteps)
+  ) {
     transcript.renderPlainTextContent(bubble, "(no response)");
     return;
   }
@@ -179,7 +186,17 @@ export async function finalizeEditResponse(options: FinalizeEditOptions): Promis
     if (!hasToolCalls && fullResponse.includes("<<<SEARCH")) {
       new Notice("Edit blocks were detected but couldn't be parsed.");
     }
-    await renderAsNormalMessage(store, transcript, bubble, fullResponse, modelId, provider, usage, agenticSteps);
+    await renderAsNormalMessage(
+      store,
+      transcript,
+      bubble,
+      fullResponse,
+      modelId,
+      provider,
+      usage,
+      agenticSteps,
+      interrupted,
+    );
     return;
   }
 
@@ -191,6 +208,7 @@ export async function finalizeEditResponse(options: FinalizeEditOptions): Promis
   if (prebuiltVaultOpRecord) assistantMessage.appliedVaultOps = prebuiltVaultOpRecord;
   if (hasToolCalls) assistantMessage.toolCalls = toolCalls;
   if (agenticSteps?.length) assistantMessage.agenticSteps = agenticSteps;
+  if (interrupted) assistantMessage.interrupted = true;
   attachUsageToMessage(assistantMessage, modelId, provider, usage);
   store.appendMessage(assistantMessage);
   store.setLastAssistantResponse(fullResponse);
@@ -480,13 +498,19 @@ async function renderAsNormalMessage(
   modelId?: string,
   provider?: ProviderOption,
   usage?: UsageResult | null,
-  agenticSteps?: AgenticStep[]
+  agenticSteps?: AgenticStep[],
+  interrupted?: boolean,
 ): Promise<void> {
   const assistantMessage = makeMessage("assistant", fullResponse);
   attachUsageToMessage(assistantMessage, modelId, provider, usage);
   if (agenticSteps?.length) assistantMessage.agenticSteps = agenticSteps;
+  if (interrupted) assistantMessage.interrupted = true;
   store.appendMessage(assistantMessage);
   store.setLastAssistantResponse(fullResponse);
   transcript.registerBubble(assistantMessage.id, bubble);
-  await transcript.renderBubbleContent(bubble, fullResponse);
+  if (fullResponse) {
+    await transcript.renderBubbleContent(bubble, fullResponse);
+  } else {
+    transcript.renderPlainTextContent(bubble, "(no response)");
+  }
 }

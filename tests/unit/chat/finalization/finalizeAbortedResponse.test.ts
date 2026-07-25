@@ -98,6 +98,49 @@ describe("finalizeAbortedResponse", () => {
     expect(transcript.renderPlainTextContent).toHaveBeenCalledWith(bubble, "Generation stopped.");
   });
 
+  it("persists an empty interrupted direct turn when completed ask guidance exists", async () => {
+    const { store, messages } = makeStore();
+    const transcript = makeTranscript();
+    const bubble = makeBubble();
+    const renderer = new StreamingRenderer(bubble, transcript as unknown as ChatTranscript);
+    const steps: AgenticStep[] = [
+      {
+        type: "tool_call",
+        round: 0,
+        toolName: "ask_user",
+        askStatus: "completed",
+        askGuidance: {
+          questions: [
+            {
+              question: "Format",
+              header: "Output",
+              answer: "Detailed",
+            },
+          ],
+        },
+      },
+    ];
+
+    await finalizeAbortedResponse(
+      store,
+      transcript as unknown as ChatTranscript,
+      bubble,
+      renderer,
+      "gpt-5",
+      "openai",
+      undefined,
+      undefined,
+      steps,
+    );
+
+    expect(messages).toHaveLength(1);
+    expect(messages[0]).toMatchObject({
+      content: "",
+      interrupted: true,
+      agenticSteps: steps,
+    });
+  });
+
   it("persists the aborted content verbatim as the concatenated stream deltas (claudecode)", async () => {
     const { store, messages } = makeStore();
     const transcript = makeTranscript();

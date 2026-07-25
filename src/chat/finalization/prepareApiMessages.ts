@@ -13,6 +13,8 @@ import { buildVaultOpToolSystemPrompt } from "../../tools/vault-ops/systemPrompt
 import { buildVaultToolSystemPrompt } from "../../tools/vault/systemPrompt";
 import { MEMORY_TOOL_NAMES } from "../../tools/memory/definition";
 import { buildMemoryToolSystemPrompt } from "../../tools/memory/systemPrompt";
+import { ASK_TOOL_NAMES } from "../../tools/ask/definition";
+import { buildAskUserSystemPrompt } from "../../tools/ask/systemPrompt";
 import {
   anthropicLayer2ToolSet,
   anthropicNonDeferredToolNames,
@@ -22,7 +24,11 @@ import {
   resolveLocalToolSet,
 } from "../../tools/toolSurface";
 import { writesPermitted } from "../../vault-ops/gateway";
-import { formatAgenticReplayLines, INTERRUPTED_REPLAY_MARKER } from "../../tools/resultDigest";
+import {
+  formatAgenticReplayLines,
+  formatAskGuidanceReplayLines,
+  INTERRUPTED_REPLAY_MARKER,
+} from "../../tools/resultDigest";
 import type { CanonicalToolDefinition } from "../../tools/types";
 import type { App } from "obsidian";
 import type { ChatSessionStore } from "../conversation/ChatSessionStore";
@@ -132,10 +138,11 @@ export async function prepareApiMessages(
   // (the section 10/section 13 cache-coupling anti-pattern is gone).
   const activeFilePath = app.workspace.getActiveFile()?.path;
 
-  const messages: ChatTurn[] = store
-    .getSnapshot()
-    .messageHistory.filter((message) => !message.isError)
-    .map((message) => toHistoryTurn(message, supportsVision, isClaudeCode));
+  const messages = toRequestHistoryTurns(
+    store.getSnapshot().messageHistory,
+    supportsVision,
+    isClaudeCode,
+  );
 
   // Retrieve RAG context based on the latest user message. Skipped when vault tools are
   // active: in agentic mode the model controls retrieval itself via semantic_search, and
@@ -279,6 +286,11 @@ export async function prepareApiMessages(
       : "";
   const memoryGuidance =
     activeMemoryTools.length > 0 ? "\n\n" + memoryGuidanceBody : "";
+  const askGuidanceBody = buildAskUserSystemPrompt({
+    askUserAvailable: guidanceTools.some((tool) => ASK_TOOL_NAMES.has(tool.name)),
+    builtInPromptsEnabled: !disableBuiltinSystemPrompts,
+  });
+  const askGuidance = askGuidanceBody ? "\n\n" + askGuidanceBody : "";
   // Non-agentic regex-edit format guidance (ambient editing without tools). The
   // SEARCH/REPLACE format the diff engine parses, taught only when no edit tools carry
   // it (agentic edits are described by editGuidance instead).
@@ -298,6 +310,7 @@ export async function prepareApiMessages(
       editGuidance +
       vaultOpGuidance +
       memoryGuidance +
+      askGuidance +
       toolSearchNote +
       regexEditGuidance;
 
@@ -321,6 +334,7 @@ export async function prepareApiMessages(
       editGuidanceBody,
       vaultOpGuidanceBody,
       memoryGuidanceBody,
+      askGuidanceBody,
       toolSearchNoteBody,
       regexEditGuidanceBody,
     ],
@@ -410,12 +424,47 @@ export function toHistoryTurn(
   }
 
   const annotated = editProposalsOf(message).length > 0;
+  const baseContent = annotated ? formatEditMessageContent(message) : message.content;
+  const askGuidanceLines =
+    message.role === "assistant"
+      ? formatAskGuidanceReplayLines(message.agenticSteps ?? [])
+      : [];
+  const content = appendReplayLines(baseContent, askGuidanceLines);
   return {
     role: message.role,
-    content: annotated ? formatEditMessageContent(message) : message.content,
+    content,
     ...(annotated && message.toolCalls?.length ? { rawContent: message.content } : {}),
     ...(attachments?.length ? { attachments } : {}),
   };
+}
+
+/**
+ * Shapes persisted messages for a provider request. Ordinary error prose stays
+ * filtered, but a completed ask on an error message emits a guidance-only turn.
+ */
+export function toRequestHistoryTurns(
+  messages: ConversationMessage[],
+  supportsVision: boolean,
+  isClaudeCode = false,
+): ChatTurn[] {
+  const turns: ChatTurn[] = [];
+  for (const message of messages) {
+    if (!message.isError) {
+      turns.push(toHistoryTurn(message, supportsVision, isClaudeCode));
+      continue;
+    }
+    const guidanceLines =
+      message.role === "assistant"
+        ? formatAskGuidanceReplayLines(message.agenticSteps ?? [])
+        : [];
+    if (guidanceLines.length > 0) {
+      turns.push({
+        role: "assistant",
+        content: guidanceLines.join("\n\n"),
+      });
+    }
+  }
+  return turns;
 }
 
 /**
@@ -430,6 +479,11 @@ function annotateClaudeCodeReplay(message: ConversationMessage): string {
   if (message.agenticSteps?.length) parts.push(...formatAgenticReplayLines(message.agenticSteps));
   if (message.interrupted) parts.push(INTERRUPTED_REPLAY_MARKER);
   return parts.join("\n\n");
+}
+
+function appendReplayLines(content: string, lines: string[]): string {
+  if (lines.length === 0) return content;
+  return [content, ...lines].filter(Boolean).join("\n\n");
 }
 
 /**

@@ -5,6 +5,18 @@ import type { AgenticStep, ProviderOption, SamplingParams } from "../../shared/t
 import type { ToolCall, ToolResult } from "../../tools/types";
 import type { VaultOpDisposition } from "../../vault-ops/disposition";
 import { captureStepFields } from "../../tools/resultDigest";
+import {
+  askCancellationFailure,
+  askConcurrentFailure,
+  askInvalidRequestFailure,
+  askRepeatedFailure,
+  askSkippedSiblingFailure,
+  buildAskUserResult,
+} from "../../tools/ask/result";
+import {
+  ASK_TOOL_NAMES,
+} from "../../tools/ask/definition";
+import type { AskUserResponder } from "../../tools/ask/types";
 import type { UsageResult, StopReason } from "../../api/usageTypes";
 import { VAULT_TOOL_NAMES } from "../../tools/vault/definition";
 import { executeVaultTool } from "../../tools/vault/handlers";
@@ -30,6 +42,11 @@ import { extractToolInput } from "../../tools/metadata";
 import { normalizeVaultToolCall } from "../../tools/paths";
 import { streamWithRetry } from "../../api/retry";
 import type { LiveVaultReview } from "./liveVaultReview";
+import {
+  AskInteractionPreconditionError,
+  AskInteractionValidationError,
+} from "../interactions/AskInteractionCoordinator";
+import { generateId } from "../../utils";
 
 export type { VaultToolContext, ToolExecutionContext };
 export type { MemoryToolContext };
@@ -51,6 +68,7 @@ const ALL_LOOP_TOOL_NAMES = new Set([
   ...EDIT_TOOL_NAMES,
   ...VAULT_OPS_TOOL_NAMES,
   ...MEMORY_TOOL_NAMES,
+  ...ASK_TOOL_NAMES,
   THINK_TOOL_NAME,
 ]);
 
@@ -139,6 +157,7 @@ export async function runToolLoop(
   editToolContext?: ToolExecutionContext,
   vaultOpToolContext?: VaultOpToolContext,
   memoryToolContext?: MemoryToolContext,
+  askUserResponder?: AskUserResponder,
 ): Promise<ToolLoopResult> {
   const toolLoopTurns: ChatTurn[] = [];
   let allWriteToolCalls: ToolCall[] = [];
@@ -187,6 +206,7 @@ export async function runToolLoop(
     let stopReason: StopReason;
     let roundText: string;
     let usage: UsageResult | null = null;
+    let askBarrierPlan: AskBarrierBatchPlan | null = null;
     // Anthropic only: thinking blocks captured from this round's stream, echoed
     // back on the round's assistant turn (required when thinking + tool use
     // co-occur). Drain rounds are synthetic turns the model never emitted, so
@@ -260,6 +280,9 @@ export async function runToolLoop(
       // the same resolved path (tools/paths.ts).
       const normalizedCalls =
         rawToolCalls && app ? rawToolCalls.map((tc) => normalizeVaultToolCall(app, tc)) : rawToolCalls;
+      askBarrierPlan = normalizedCalls
+        ? planAskBarrierBatch(normalizedCalls)
+        : null;
       // Enforce one mutation per round (see capRoundToMutation). The model emits an
       // assistant message atomically, so the in-loop approval gate can only feed the
       // user's approve/decline back to it *between* rounds. The request-level
@@ -270,7 +293,10 @@ export async function runToolLoop(
       // (above), so the batch's full intent survives without relying on the model to
       // re-emit it.
       const roundStopReason = await streamResult.stopReason;
-      const capped = normalizedCalls ? capRoundToMutation(normalizedCalls) : normalizedCalls;
+      const capped =
+        normalizedCalls && !askBarrierPlan
+          ? capRoundToMutation(normalizedCalls)
+          : normalizedCalls;
       if (normalizedCalls && capped && capped.length < normalizedCalls.length) {
         deferredCalls = normalizedCalls.slice(capped.length);
         deferredStopReason = roundStopReason;
@@ -315,6 +341,54 @@ export async function runToolLoop(
       answerProse = appendAnswerProse(answerProse, roundText);
       callbacks.onReasoningRoundFinished?.(false, round);
       break;
+    }
+
+    // A fresh provider batch containing ask_user is owned by the barrier branch
+    // before mutation capping, allow-list checks, spin counting, accumulation, or
+    // any executor. A deferred drain can never enter this branch because such a
+    // batch is never buffered.
+    if (askBarrierPlan) {
+      if (capHit) {
+        answerProse = appendAnswerProse(answerProse, roundText);
+        callbacks.onReasoningRoundFinished?.(false, round);
+        break;
+      }
+
+      const reachedCap = modelRounds >= maxRounds;
+      const barrierResults = await resolveAskBarrierBatch({
+        plan: askBarrierPlan,
+        responder: askUserResponder,
+        signal,
+        round,
+        callbacks,
+      });
+
+      // Ask prose explains why guidance is needed. It belongs to the control-plane
+      // timeline, not the user-facing mutation answer track.
+      callbacks.onReasoningRoundFinished?.(true, round);
+      toolLoopTurns.push({
+        role: "assistant",
+        content: roundText || null,
+        toolCalls: askBarrierPlan.toolCalls.map((tc) => ({
+          id: tc.id,
+          name: tc.name,
+          arguments: tc.arguments,
+        })),
+        ...(roundThinkingBlocks ? { anthropicThinkingBlocks: roundThinkingBlocks } : {}),
+      });
+      for (const { tc, result } of barrierResults) {
+        toolLoopTurns.push({
+          role: "tool",
+          content: result.content,
+          toolCallId: tc.id,
+        });
+      }
+
+      previousRoundsText = fullText;
+      callbacks.onNewRound?.();
+      if (streamedThisRound) modelRounds++;
+      if (reachedCap) capHit = true;
+      continue;
     }
 
     // Classify this round's tool calls into the buckets the loop routes
@@ -571,6 +645,154 @@ export interface ClassifiedCalls {
   thinkCalls: ToolCall[];
   memoryReadCalls: ToolCall[];
   memoryMutationCalls: ToolCall[];
+}
+
+/** A complete fresh-provider batch claimed by the ask_user barrier. */
+export interface AskBarrierBatchPlan {
+  toolCalls: ToolCall[];
+  primaryAsk: ToolCall;
+  laterAsks: ToolCall[];
+  blockedSiblings: ToolCall[];
+}
+
+/**
+ * Inspect a complete normalized provider batch for ask_user before any other
+ * scheduling decision. The first ask is primary, later asks and ordinary
+ * siblings retain their original call objects and order.
+ */
+export function planAskBarrierBatch(
+  toolCalls: ToolCall[],
+): AskBarrierBatchPlan | null {
+  const asks = toolCalls.filter((toolCall) =>
+    ASK_TOOL_NAMES.has(toolCall.name),
+  );
+  const primaryAsk = asks[0];
+  if (!primaryAsk) return null;
+  return {
+    toolCalls: [...toolCalls],
+    primaryAsk,
+    laterAsks: asks.slice(1),
+    blockedSiblings: toolCalls.filter((toolCall) =>
+      !ASK_TOOL_NAMES.has(toolCall.name),
+    ),
+  };
+}
+
+interface ResolveAskBarrierBatchDeps {
+  plan: AskBarrierBatchPlan;
+  responder: AskUserResponder | undefined;
+  signal: AbortSignal;
+  round: number;
+  callbacks: ToolLoopCallbacks;
+}
+
+/**
+ * Settle every call in an ask-containing batch. Sibling and repeated-ask
+ * timeline steps are recorded before the primary responder is awaited.
+ */
+async function resolveAskBarrierBatch(
+  deps: ResolveAskBarrierBatchDeps,
+): Promise<Array<{ tc: ToolCall; result: ToolResult }>> {
+  const { plan, responder, signal, round, callbacks } = deps;
+  const results = new Map<ToolCall, ToolResult>();
+
+  for (const toolCall of plan.toolCalls) {
+    if (toolCall === plan.primaryAsk) continue;
+    const isLaterAsk = ASK_TOOL_NAMES.has(toolCall.name);
+    const result = isLaterAsk
+      ? askRepeatedFailure()
+      : askSkippedSiblingFailure(toolCall.name);
+    results.set(toolCall, result);
+    callbacks.onStepRecorded?.(
+      barrierStep(
+        toolCall,
+        result,
+        round,
+        isLaterAsk ? "skipped" : undefined,
+      ),
+    );
+  }
+
+  let primaryResult: ToolResult;
+  let primaryStatus: AgenticStep["askStatus"];
+  try {
+    if (!responder) {
+      primaryResult = askConcurrentFailure();
+      primaryStatus = "skipped";
+    } else {
+      const answers = await responder.ask(
+        plan.primaryAsk.arguments,
+        {
+          interactionId: generateId(),
+          toolCallId: plan.primaryAsk.id,
+          signal,
+        },
+      );
+      primaryResult = buildAskUserResult(answers);
+      primaryStatus = "completed";
+    }
+  } catch (error) {
+    if (error instanceof AskInteractionValidationError) {
+      primaryResult = askInvalidRequestFailure(error.issue);
+      primaryStatus = "skipped";
+    } else if (error instanceof AskInteractionPreconditionError) {
+      primaryResult = askConcurrentFailure();
+      primaryStatus = "skipped";
+    } else if (isAbortError(error)) {
+      primaryResult = askCancellationFailure("stopped");
+      callbacks.onStepRecorded?.(
+        barrierStep(
+          plan.primaryAsk,
+          primaryResult,
+          round,
+          "cancelled",
+        ),
+      );
+      throw error;
+    } else {
+      throw error;
+    }
+  }
+
+  results.set(plan.primaryAsk, primaryResult);
+  callbacks.onStepRecorded?.(
+    barrierStep(
+      plan.primaryAsk,
+      primaryResult,
+      round,
+      primaryStatus,
+    ),
+  );
+  return plan.toolCalls.map((tc) => ({
+    tc,
+    result: results.get(tc) ?? askSkippedSiblingFailure(tc.name),
+  }));
+}
+
+function barrierStep(
+  toolCall: ToolCall,
+  result: ToolResult,
+  round: number,
+  askStatus?: AgenticStep["askStatus"],
+): AgenticStep {
+  return {
+    type: "tool_call",
+    round,
+    toolName: toolCall.name,
+    toolCallId: toolCall.id,
+    toolInput: extractToolInput(toolCall),
+    toolArgs: toolCall.arguments,
+    ...(askStatus && { askStatus }),
+    ...(result.isError && {
+      isError: true,
+      errorContent: result.content,
+    }),
+    ...captureStepFields(toolCall.name, toolCall.arguments, result),
+  };
+}
+
+function isAbortError(error: unknown): boolean {
+  return error instanceof Error && error.name === "AbortError";
 }
 
 /**

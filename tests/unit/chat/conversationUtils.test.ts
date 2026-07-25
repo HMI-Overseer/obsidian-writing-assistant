@@ -427,6 +427,7 @@ describe("normalizeConversation, phase-2 agenticStep capture fields", () => {
         round: 0,
         toolName: "ask_user",
         toolCallId: "ask-1",
+        askStatus: "completed",
         askGuidance: {
           questions: [{
             question: "Which areas should I cover?",
@@ -440,6 +441,9 @@ describe("normalizeConversation, phase-2 agenticStep capture fields", () => {
     const raw = jsonRoundTrip(makeConversation([msg])) as Record<string, unknown>;
     expect(normalizeConversation(raw)!.messages[0].agenticSteps![0].askGuidance).toEqual(
       msg.agenticSteps![0].askGuidance,
+    );
+    expect(normalizeConversation(raw)!.messages[0].agenticSteps![0].askStatus).toBe(
+      "completed",
     );
   });
 
@@ -467,6 +471,25 @@ describe("normalizeConversation, phase-2 agenticStep capture fields", () => {
     };
 
     expect(normalizeConversation(raw)!.messages[0].agenticSteps![0].askGuidance).toBeUndefined();
+  });
+
+  test("drops an invalid structured ask status", () => {
+    const msg: ConversationMessage = {
+      id: "msg-ask",
+      role: "assistant",
+      content: "Done.",
+      agenticSteps: [{
+        type: "tool_call",
+        round: 0,
+        toolName: "ask_user",
+      }],
+    };
+    const raw = jsonRoundTrip(makeConversation([msg])) as Record<string, unknown>;
+    const messages = raw.messages as Array<Record<string, unknown>>;
+    const steps = messages[0].agenticSteps as Array<Record<string, unknown>>;
+    steps[0].askStatus = "pending";
+
+    expect(normalizeConversation(raw)!.messages[0].agenticSteps![0].askStatus).toBeUndefined();
   });
 });
 

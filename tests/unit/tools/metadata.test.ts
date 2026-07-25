@@ -6,6 +6,7 @@ import {
   TOOL_ICONS,
   TOOL_LABELS,
   TOOL_STATUS_LABELS,
+  pendingToolLabel,
 } from "../../../src/tools/metadata";
 import { VAULT_TOOL_NAMES } from "../../../src/tools/vault/definition";
 import { EDIT_TOOL_NAMES } from "../../../src/tools/editing/definition";
@@ -14,6 +15,7 @@ import {
   MEMORY_MUTATION_TOOL_NAMES,
   MEMORY_TOOL_NAMES,
 } from "../../../src/tools/memory/definition";
+import { ASK_TOOL_NAMES } from "../../../src/tools/ask/definition";
 
 describe("isMutatingTool", () => {
   test("every vault-op, edit, and memory mutation tool is classified as mutating", () => {
@@ -31,6 +33,7 @@ describe("isMutatingTool", () => {
       expect(isMutatingTool(name)).toBe(false);
     }
     expect(isMutatingTool("recall_memory")).toBe(false);
+    expect(isMutatingTool("ask_user")).toBe(false);
   });
 
   // Drift guard: if a new vault-op / edit tool is added, it must be classified here
@@ -63,6 +66,7 @@ describe("display-metadata coverage", () => {
     ...EDIT_TOOL_NAMES,
     ...VAULT_TOOL_NAMES,
     ...MEMORY_TOOL_NAMES,
+    ...ASK_TOOL_NAMES,
   ];
 
   // A single args object carrying every key any tool reads, so extractToolInput
@@ -87,6 +91,7 @@ describe("display-metadata coverage", () => {
     names: ["vault-tone"],
     description: "Tone guide",
     content: "Restrained and uncanny",
+    questions: [{ question: "Which format?" }],
   };
 
   test("TOOL_ICONS covers every tool", () => {
@@ -112,5 +117,9 @@ describe("display-metadata coverage", () => {
       const input = extractToolInput({ name, arguments: KITCHEN_SINK_ARGS });
       expect(input, `extractToolInput has no case for "${name}"`).toBeDefined();
     }
+  });
+
+  test("uses the blocking pending label for ask_user", () => {
+    expect(pendingToolLabel("ask_user")).toBe("Waiting for your answer");
   });
 });

@@ -13,6 +13,7 @@ import type { ChatLayoutRefs } from "./types";
 import { sendMessage } from "./actions/sendMessage";
 import { generateLlmResponse } from "./actions/generateLlmResponse";
 import { regenerateMessage } from "./actions/regenerateMessage";
+import { hasCompletedAskGuidance } from "../tools/resultDigest";
 
 export type GenerationOrchestratorDeps = {
   plugin: WritingAssistantChat;
@@ -61,8 +62,9 @@ export class ChatGenerationOrchestrator {
     const store = this.deps.getStore();
     const transcript = this.deps.getTranscript();
     const composer = this.deps.getComposer();
+    const interactionHost = this.deps.getInteractionHost();
     const modelSelector = this.deps.getModelSelector();
-    if (!store || !transcript || !composer || !modelSelector) return;
+    if (!store || !transcript || !composer || !interactionHost || !modelSelector) return;
 
     const posture = composer.getPosture();
 
@@ -73,6 +75,7 @@ export class ChatGenerationOrchestrator {
       transcript,
       composer,
       modelSelector,
+      interactionHost,
       getIsGenerating: () => this.isGenerating,
       setIsGenerating: (sending) => this.setIsGeneratingAndSync(sending),
       setActiveAbortController: (controller) => {
@@ -92,8 +95,9 @@ export class ChatGenerationOrchestrator {
     const store = this.deps.getStore();
     const transcript = this.deps.getTranscript();
     const composer = this.deps.getComposer();
+    const interactionHost = this.deps.getInteractionHost();
     const modelSelector = this.deps.getModelSelector();
-    if (!store || !transcript || !composer || !modelSelector) return;
+    if (!store || !transcript || !composer || !interactionHost || !modelSelector) return;
 
     await regenerateMessage({
       plugin: this.deps.plugin,
@@ -102,6 +106,7 @@ export class ChatGenerationOrchestrator {
       transcript,
       composer,
       modelSelector,
+      interactionHost,
       messageId,
       getIsGenerating: () => this.isGenerating,
       setIsGenerating: (generating) => this.setIsGeneratingAndSync(generating),
@@ -119,8 +124,9 @@ export class ChatGenerationOrchestrator {
     const store = this.deps.getStore();
     const transcript = this.deps.getTranscript();
     const composer = this.deps.getComposer();
+    const interactionHost = this.deps.getInteractionHost();
     const modelSelector = this.deps.getModelSelector();
-    if (!store || !transcript || !composer || !modelSelector) return;
+    if (!store || !transcript || !composer || !interactionHost || !modelSelector) return;
     if (this.isGenerating) return;
 
     const snapshot = store.getSnapshot();
@@ -146,7 +152,7 @@ export class ChatGenerationOrchestrator {
     while (store.getSnapshot().messageHistory.length > 0) {
       const msgs = store.getSnapshot().messageHistory;
       const tail = msgs[msgs.length - 1];
-      if (tail.isError) {
+      if (tail.isError && !hasCompletedAskGuidance(tail.agenticSteps)) {
         store.removeLastMessage();
         removed = true;
       } else {
@@ -182,6 +188,7 @@ export class ChatGenerationOrchestrator {
       transcript,
       activeModel,
       client,
+      interactionHost,
       posture,
       finalization: { kind: "append" },
       setIsGenerating: (v) => this.setIsGeneratingAndSync(v),

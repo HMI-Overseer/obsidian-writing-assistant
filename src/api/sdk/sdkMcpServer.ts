@@ -2,7 +2,7 @@ import { jsonSchemaToZodShape } from "../../mcp/sdkToolSchema";
 import type { ZodRawShape } from "../../mcp/sdkToolSchema";
 import type { McpToolProvider } from "../../mcp/VaultMcpServer";
 import { generateId } from "../../utils";
-import { isCoreReadTool } from "../../tools/toolSurface";
+import { isAlwaysLoadedCoreTool } from "../../tools/toolSurface";
 import { createSdkMcpServer, tool } from "./claudeAgentSdk";
 import type { McpSdkServerConfigWithInstance, SdkMcpToolDefinition } from "./claudeAgentSdk";
 
@@ -10,12 +10,12 @@ import type { McpSdkServerConfigWithInstance, SdkMcpToolDefinition } from "./cla
  * Builds the SDK `tool()` definitions the bridge advertises, applying the Layer-2
  * core/tail split as per-tool `alwaysLoad` (ADR-0009 / prompt-cache design section 6.2.4,
  * section 6.2.5). This is the Claude Code analogue of the direct-API defer split: the core
- * reads ({@link isCoreReadTool}, the retrieval / navigation primitives) carry
+ * core tools ({@link isAlwaysLoadedCoreTool}) carry
  * `alwaysLoad: true` so they stay in the prompt, and the tail (the rest of the reads +
  * every write) is left deferrable, so once the CLI / model layer enables tool search the
  * model discovers a tail tool on demand instead of paying for its schema every turn.
  * `think` is never bridged to Claude Code, so it cannot appear here; the split is exactly
- * {@link isCoreReadTool}.
+ * {@link isAlwaysLoadedCoreTool}.
  *
  * `alwaysLoad` rides as `_meta['anthropic/alwaysLoad']` metadata, NOT a tool name, and is
  * inert when tool search is not enabled (the SDK only defers behind tool search). The
@@ -44,7 +44,7 @@ export function buildVaultSdkTools(
           isError: result.isError ?? false,
         };
       },
-      isCoreReadTool(definition.name) ? { alwaysLoad: true } : undefined,
+      isAlwaysLoadedCoreTool(definition.name) ? { alwaysLoad: true } : undefined,
     ),
   );
 }

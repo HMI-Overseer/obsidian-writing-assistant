@@ -6,6 +6,7 @@ import type { ChatComposer } from "../composer/ChatComposer";
 import type { ChatSessionStore } from "../conversation/ChatSessionStore";
 import type { ChatTranscript } from "../messages/ChatTranscript";
 import type { ChatModelSelector } from "../models/ChatModelSelector";
+import type { ComposerInteractionHostPort } from "../interactions/ComposerInteractionHost";
 import { generateLlmResponse } from "./generateLlmResponse";
 
 export type RegenerateOptions = {
@@ -15,6 +16,7 @@ export type RegenerateOptions = {
   transcript: ChatTranscript;
   composer: ChatComposer;
   modelSelector: ChatModelSelector;
+  interactionHost: ComposerInteractionHostPort;
   messageId: string;
   getIsGenerating: () => boolean;
   setIsGenerating: (generating: boolean) => void;
@@ -32,6 +34,7 @@ export async function regenerateMessage(options: RegenerateOptions): Promise<voi
     transcript,
     composer,
     modelSelector,
+    interactionHost,
     messageId,
     getIsGenerating,
     setIsGenerating,
@@ -93,6 +96,7 @@ export async function regenerateMessage(options: RegenerateOptions): Promise<voi
     transcript,
     activeModel,
     client,
+    interactionHost,
     posture,
     finalization: { kind: "replace", oldMessage },
     setIsGenerating,

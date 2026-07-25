@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { buildVaultSdkTools } from "../../../../src/api/sdk/sdkMcpServer";
 import {
   CLAUDE_CODE_STABLE_TOOL_SET,
-  isCoreReadTool,
+  isAlwaysLoadedCoreTool,
 } from "../../../../src/tools/toolSurface";
 import type { McpToolProvider } from "../../../../src/mcp/VaultMcpServer";
 import type { ToolResult } from "../../../../src/tools/types";
@@ -24,7 +24,7 @@ describe("buildVaultSdkTools (Layer-2 core/tail alwaysLoad split, ADR-0009)", ()
 
   it("marks every core read alwaysLoad and leaves the tail deferrable", () => {
     for (const t of tools) {
-      if (isCoreReadTool(t.name)) {
+      if (isAlwaysLoadedCoreTool(t.name)) {
         expect(alwaysLoadOf(t._meta), `${t.name} (core) must be alwaysLoad`).toBe(true);
       } else {
         expect(alwaysLoadOf(t._meta), `${t.name} (tail) must stay deferrable`).toBeUndefined();
@@ -37,13 +37,14 @@ describe("buildVaultSdkTools (Layer-2 core/tail alwaysLoad split, ADR-0009)", ()
       .filter((t) => alwaysLoadOf(t._meta) === true)
       .map((t) => t.name)
       .sort();
-    const expectedCore = CLAUDE_CODE_STABLE_TOOL_SET.filter((d) => isCoreReadTool(d.name))
+    const expectedCore = CLAUDE_CODE_STABLE_TOOL_SET.filter((d) => isAlwaysLoadedCoreTool(d.name))
       .map((d) => d.name)
       .sort();
     expect(alwaysLoaded).toEqual(expectedCore);
     // The Claude Code core is the 6 retrieval / navigation reads; `think` is not bridged
     // to Claude Code, so it never lands here. A change to this number is a real signal.
     expect(alwaysLoaded).toHaveLength(6);
+    expect(tools.map((tool) => tool.name)).not.toContain("ask_user");
   });
 
   it("does not perturb the advertised tool names (the toolNames fingerprint is unchanged)", () => {

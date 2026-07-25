@@ -25,6 +25,7 @@ import { ReasoningPill } from "./composer/ReasoningPill";
 import { PosturePill } from "./composer/PosturePill";
 import { ContextPickerPopover } from "./composer/ContextPickerPopover";
 import { KnowledgePopover } from "./composer/KnowledgePopover";
+import { createMemoriesSectionCallbacks } from "./composer/memoriesSection";
 import { ToolUsePopover } from "./composer/ToolUsePopover";
 import { ChatSessionStore } from "./conversation/ChatSessionStore";
 import { ChatTranscript } from "./messages/ChatTranscript";
@@ -246,6 +247,14 @@ export class ChatView extends ItemView {
       },
     });
 
+    // The memories section's snapshot and master toggle (the toggle persists,
+    // then clears every pin, so the next turn re-renders the index).
+    const memories = createMemoriesSectionCallbacks({
+      getSettings: () => this.plugin.settings,
+      saveSettings: () => this.plugin.saveSettings(),
+      getMemoryService: () => this.plugin.services.memoryService,
+    });
+
     this.knowledgePopover = new KnowledgePopover(this.layout, {
       getRagSnapshot: () => {
         const rag = this.plugin.settings.rag;
@@ -269,6 +278,7 @@ export class ChatView extends ItemView {
           buildState: this.plugin.services.graphService.getBuildState(),
         };
       },
+      getMemoriesSnapshot: memories.getMemoriesSnapshot,
       getEmbeddingModels: () => getSelectableEmbeddingModels(this.plugin.settings),
       getActiveEmbeddingModelId: () => this.plugin.settings.rag.activeEmbeddingModelId,
       getModelDeps: () => pluginModelDropdownDeps(this.plugin),
@@ -293,6 +303,7 @@ export class ChatView extends ItemView {
         );
         this.syncKnowledgeIndicator();
       },
+      onMemoriesToggle: memories.onMemoriesToggle,
       onEmbeddingModelSelect: async (modelId) => {
         this.plugin.settings.rag.activeEmbeddingModelId = modelId;
         await this.plugin.saveSettings();

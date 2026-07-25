@@ -18,6 +18,17 @@ export function estimateStringTokens(text: string): number {
 }
 
 /**
+ * Compact token figure for capacity readouts: exact below a thousand, one
+ * decimal above. Shared so the composer context ring and the memory index
+ * budget bar read the same way.
+ */
+export function formatTokens(count: number): string {
+  if (count >= 1_000_000) return `${(count / 1_000_000).toFixed(1)}M`;
+  if (count >= 1_000) return `${(count / 1_000).toFixed(1)}k`;
+  return String(count);
+}
+
+/**
  * Estimate the token count of a ChatRequest before sending it to the API.
  *
  * Uses a `chars / 4` heuristic. The estimate is within ~15-25% of actual

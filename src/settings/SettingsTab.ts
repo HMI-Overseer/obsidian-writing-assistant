@@ -7,10 +7,11 @@ import { renderProvidersTab } from "./ProvidersTab";
 import { renderGeneralTab } from "./GeneralTab";
 import { renderRagTab } from "./RagTab";
 import { renderKnowledgeGraphTab } from "./KnowledgeGraphTab";
+import { renderMemoriesTab } from "./MemoriesTab";
 import { renderBenchmarkTab } from "./BenchmarkTab";
 import { renderVaultOpsTab } from "./VaultOpsTab";
 
-type TabName = "General" | "Providers" | "Retrieval" | "Knowledge Graph" | "Commands" | "Vault Operations" | "Advanced" | "Benchmark";
+type TabName = "General" | "Providers" | "Retrieval" | "Knowledge Graph" | "Memories" | "Commands" | "Vault Operations" | "Advanced" | "Benchmark";
 
 type NavItem = { tab: TabName; rail: string; icon: string };
 type NavGroup = { label: string; items: NavItem[] };
@@ -21,8 +22,9 @@ const NAV_GROUPS: NavGroup[] = [
     { tab: "Providers", rail: "Providers", icon: "plug" },
   ]},
   { label: "Knowledge", items: [
-    { tab: "Retrieval",        rail: "RAG",   icon: "search" },
-    { tab: "Knowledge Graph",  rail: "Graph", icon: "git-fork" },
+    { tab: "Retrieval",        rail: "RAG",      icon: "search" },
+    { tab: "Knowledge Graph",  rail: "Graph",    icon: "git-fork" },
+    { tab: "Memories",         rail: "Memories", icon: "brain" },
   ]},
   { label: "Config", items: [
     { tab: "Commands",         rail: "Commands",  icon: "terminal" },
@@ -42,6 +44,7 @@ const TAB_SLUGS: Record<TabName, string> = {
   "Providers": "providers",
   "Retrieval": "retrieval",
   "Knowledge Graph": "knowledge-graph",
+  "Memories": "memories",
   "Commands": "commands",
   "Vault Operations": "vault-operations",
   "Advanced": "advanced",
@@ -64,6 +67,10 @@ const TAB_META: Record<TabName, TabMeta> = {
   "Knowledge Graph": {
     title: "Knowledge Graph",
     description: "Extract entities and relationships from your vault using an LLM to build a semantic knowledge graph.",
+  },
+  "Memories": {
+    title: "Memories",
+    description: "Keep standing facts about your work, rules the assistant always follows and context it can recall on demand.",
   },
   "Commands": {
     title: "Quick Commands",
@@ -175,6 +182,9 @@ export class WritingAssistantSettingTab extends PluginSettingTab {
         break;
       case "Knowledge Graph":
         this.cleanupKg = renderKnowledgeGraphTab(content, this.plugin);
+        break;
+      case "Memories":
+        renderMemoriesTab(content, this.plugin);
         break;
       case "Commands":
         renderCommandsTab(content, this.plugin, refresh);

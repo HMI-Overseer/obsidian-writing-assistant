@@ -6,6 +6,10 @@ import { Toggle, createModelSelector } from "../../settings/ui";
 import type { ModelDropdownDeps, ModelSelectorRefs } from "../../settings/ui";
 import type { ChatLayoutRefs } from "../types";
 import { voidAsync } from "../../asyncCallbacks";
+import { syncMemoriesSection } from "./memoriesSection";
+import type { MemoriesSectionRefs, MemoriesSnapshot } from "./memoriesSection";
+
+export type { MemoriesSnapshot } from "./memoriesSection";
 
 export type RagSnapshot = {
   enabled: boolean;
@@ -29,12 +33,14 @@ export type GraphSnapshot = {
 export type KnowledgePopoverCallbacks = {
   getRagSnapshot: () => RagSnapshot;
   getGraphSnapshot: () => GraphSnapshot;
+  getMemoriesSnapshot: () => MemoriesSnapshot;
   getEmbeddingModels: () => EmbeddingModel[];
   getActiveEmbeddingModelId: () => string | null;
   /** Deps for the shared model dropdown (availability, favorites, refresh). */
   getModelDeps: () => ModelDropdownDeps;
   onRagToggle: (enabled: boolean) => Promise<void>;
   onGraphToggle: (enabled: boolean) => Promise<void>;
+  onMemoriesToggle: (enabled: boolean) => Promise<void>;
   onEmbeddingModelSelect: (modelId: string | null) => Promise<void>;
   onRagBuild: () => Promise<void>;
   onRagRebuild: () => Promise<void>;
@@ -61,6 +67,7 @@ export class KnowledgePopover {
   private popoverOpen = false;
   private ragRefs: RagSectionRefs | null = null;
   private graphRefs: GraphSectionRefs | null = null;
+  private memoriesRefs: MemoriesSectionRefs | null = null;
   private readonly onIndicatorClick: (event: MouseEvent) => void;
   private readonly onPopoverClick: (event: MouseEvent) => void;
 
@@ -103,6 +110,7 @@ export class KnowledgePopover {
     this.callbacks.onUnsubscribe();
     this.ragRefs = null;
     this.graphRefs = null;
+    this.memoriesRefs = null;
   }
 
   isOpen(): boolean {
@@ -128,6 +136,7 @@ export class KnowledgePopover {
 
     this.ragRefs = this.renderRagSection(body);
     this.graphRefs = this.renderGraphSection(body);
+    this.memoriesRefs = this.renderMemoriesSection(body);
     this.refresh();
   }
 
@@ -202,6 +211,28 @@ export class KnowledgePopover {
     return { toggle, statusEl };
   }
 
+  private renderMemoriesSection(container: HTMLElement): MemoriesSectionRefs {
+    const section = container.createDiv({ cls: "lmsa-knowledge-popover-section" });
+
+    // Toggle row
+    const headerRow = section.createDiv({ cls: "lmsa-knowledge-popover-row" });
+    headerRow.createSpan({ cls: "lmsa-knowledge-popover-label", text: "Memories" });
+    const toggleWrap = headerRow.createDiv({ cls: "lmsa-knowledge-popover-control" });
+    const toggle = new Toggle(toggleWrap);
+    toggle.onChange((value) => void this.callbacks.onMemoriesToggle(value));
+
+    // Status
+    const statusEl = section.createSpan({ cls: "lmsa-knowledge-popover-status" });
+
+    // Hint
+    section.createSpan({
+      cls: "lmsa-knowledge-popover-hint",
+      text: "Manage memories in plugin settings.",
+    });
+
+    return { toggle, statusEl };
+  }
+
   // ---------------------------------------------------------------------------
   // Model availability validation
   // ---------------------------------------------------------------------------
@@ -230,9 +261,11 @@ export class KnowledgePopover {
 
     const ragSnap = this.callbacks.getRagSnapshot();
     const graphSnap = this.callbacks.getGraphSnapshot();
+    const memoriesSnap = this.callbacks.getMemoriesSnapshot();
 
     if (this.ragRefs) this.syncRagSection(this.ragRefs, ragSnap);
     if (this.graphRefs) this.syncGraphSection(this.graphRefs, graphSnap);
+    if (this.memoriesRefs) syncMemoriesSection(this.memoriesRefs, memoriesSnap);
   }
 
   private syncRagSection(refs: RagSectionRefs, snap: RagSnapshot): void {

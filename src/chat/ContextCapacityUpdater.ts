@@ -1,6 +1,6 @@
 import type { ConversationMessage, ProviderOption } from "../shared/types";
 import type { DocumentContext } from "../shared/chatRequest";
-import { estimateTokenCount, anchoredContextEstimate } from "../shared/tokenEstimation";
+import { estimateTokenCount, anchoredContextEstimate, formatTokens } from "../shared/tokenEstimation";
 import { sumConversationUsage } from "./usageSummary";
 import type { UsageTotals } from "./usageSummary";
 import { isMeteredProvider } from "../providers/descriptors";
@@ -51,12 +51,6 @@ export interface ContextInputs {
   contextWindowSize: number | undefined;
   /** Active provider; provider-reported context anchors from another provider are ignored. */
   activeProvider: ProviderOption | undefined;
-}
-
-function formatTokens(n: number): string {
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
-  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}k`;
-  return String(n);
 }
 
 const RING_CIRCUMFERENCE = 2 * Math.PI * 12;

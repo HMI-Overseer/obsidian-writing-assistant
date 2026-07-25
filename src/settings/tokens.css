@@ -110,6 +110,11 @@
   --lmsa-section-accent-secondary: var(--color-red, var(--interactive-accent));
 }
 
+.lmsa-settings-root .lmsa-settings-shell[data-tab="memories"] {
+  --lmsa-section-accent: var(--color-orange, var(--interactive-accent));
+  --lmsa-section-accent-secondary: var(--color-orange, var(--interactive-accent));
+}
+
 .lmsa-settings-root .lmsa-settings-shell[data-tab="commands"] {
   --lmsa-section-accent: var(--color-orange, var(--interactive-accent));
   --lmsa-section-accent-secondary: var(--color-orange, var(--interactive-accent));

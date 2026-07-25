@@ -96,18 +96,18 @@ const sw = (state = "") => `<div class="lmsa-toggle${state ? " " + state : ""}">
 // Settings tabs render into the plugin's own settings chain inside Obsidian's modal, NOT the chat root.
 // Reconstruct that chain so the panel gradient/backdrop and card cascade are in play. Screenshot the
 // panel to frame the cards. (Obsidian-chrome-heavy: these carry the most reconstruction risk.)
-const settingsView = (inner, w = 720) =>
+const settingsView = (inner, w = 720, tab = "") =>
   `<div class="lmsa-harness-stage" style="width:${w}px">
-     <div class="lmsa-settings-root"><div class="lmsa-settings-shell"><div class="lmsa-settings-stage">
+     <div class="lmsa-settings-root"><div class="lmsa-settings-shell"${tab ? ` data-tab="${tab}"` : ""}><div class="lmsa-settings-stage">
        <div class="lmsa-settings-panel lmsa-ui-panel"><div class="lmsa-settings-content">${inner}</div></div>
      </div></div></div></div>`;
 
 // A settings section card shell (ui.ts createSection). `title` heads it; `body` is the inner markup.
-const section = (title, body, extraCls = "") =>
+const section = (title, body, extraCls = "", icon = I.gear) =>
   `<div class="lmsa-settings-section lmsa-ui-card${extraCls ? " " + extraCls : ""}">
     <div class="lmsa-settings-section-header">
       <div class="lmsa-settings-section-heading">
-        <div class="lmsa-settings-section-icon">${I.gear}</div>
+        <div class="lmsa-settings-section-icon">${icon}</div>
         <h3 class="lmsa-settings-section-title">${title}</h3>
       </div>
       <div class="lmsa-settings-section-actions"></div>
@@ -216,6 +216,44 @@ const composerHtml = (dragover = false) =>
     </div>
     <textarea class="lmsa-chat-composer-textarea" rows="1" placeholder="Ask anything about your writing..."></textarea>
     ${composerFooter}
+  </div></div>`;
+
+const memoryRow = (name, type, desc, on = true, confirming = false) =>
+  `<tr class="${on ? "" : "is-off"}${confirming ? " is-confirming-delete" : ""}">
+    <td class="lmsa-memory-col-switch">${sw(on ? "is-enabled" : "")}</td>
+    <td class="lmsa-memory-cell-name">${name}</td>
+    <td><span class="lmsa-memory-badge is-${type}">${type === "rule" ? "Rule" : "Context"}</span></td>
+    <td class="lmsa-memory-cell-desc">${desc}</td>
+    <td class="lmsa-memory-col-actions">${
+      confirming
+        ? `<button class="lmsa-ui-compact-btn lmsa-ui-compact-btn-danger">Delete</button>
+           <button class="lmsa-ui-compact-btn lmsa-ui-compact-btn-secondary">Cancel</button>`
+        : `<button class="lmsa-ui-btn lmsa-ui-btn-secondary lmsa-memory-icon-btn" aria-label="Edit">${I.pencil}</button>
+           <button class="lmsa-ui-btn lmsa-btn-danger lmsa-memory-icon-btn" aria-label="Delete">${I.trash}</button>`
+    }</td>
+  </tr>`;
+
+const memoryTable = (rows) =>
+  `<div class="lmsa-memory-list"><table class="lmsa-memory-table">
+    <thead><tr>
+      <th class="lmsa-memory-col-switch"></th><th>Name</th><th>Type</th><th>Description</th>
+      <th class="lmsa-memory-col-actions"></th>
+    </tr></thead>
+    <tbody>${rows}</tbody>
+  </table></div>
+  <div class="lmsa-memory-capacity">
+    <div class="lmsa-memory-capacity-header">
+      <span class="lmsa-memory-capacity-label">Index budget (advisory)</span>
+      <span class="lmsa-memory-capacity-value">~180 of 3.0k tokens (6%)</span>
+    </div>
+    <div class="lmsa-index-progress-bar"><div class="lmsa-index-progress-fill" style="width:6%"></div></div>
+  </div>`;
+
+// Feature off: the table is not rendered at all, the body carries the message.
+const memoryOffState = () =>
+  `<div class="lmsa-memory-list"><div class="lmsa-memory-off-state">
+    <div class="lmsa-memory-off-title">Memories are off</div>
+    <div class="lmsa-memory-off-hint">Enable memories above to edit, delete, add and use these entries.</div>
   </div></div>`;
 
 export const SURFACES = {
@@ -354,6 +392,13 @@ export const SURFACES = {
             </div>
             <span class="lmsa-knowledge-popover-status">Graph disabled.</span>
             <span class="lmsa-knowledge-popover-hint">Configure in settings.</span>
+          </div>
+          <div class="lmsa-knowledge-popover-section">
+            <div class="lmsa-knowledge-popover-row">
+              <span class="lmsa-knowledge-popover-label">Memories</span>${toggle}
+            </div>
+            <span class="lmsa-knowledge-popover-status">2 enabled of 5, ~180 tokens</span>
+            <span class="lmsa-knowledge-popover-hint">Manage memories in plugin settings.</span>
           </div>
         </div>
       </div>`,
@@ -984,6 +1029,60 @@ export const SURFACES = {
              <button class="lmsa-ui-btn lmsa-ui-btn-secondary">Reset to default</button>`,
           )}`,
         ),
+    ),
+  },
+
+  // S21d: settings Memories tab (feature card + the records table + budget bar).
+  settingsMemories: {
+    shot: ".lmsa-settings-panel",
+    html: settingsView(
+      section(
+        "Memory",
+        `${settingItem("Enable memories", "Deliver the memory index with every request and offer the memory tools.", sw("is-enabled"))}
+        ${settingItem("Auto-apply memory changes", "Add and forget without review. The vault edit posture never does this.", sw())}
+`,
+        "",
+        I.brain,
+      ) +
+        section(
+          "Stored memories",
+          memoryTable(
+            `${memoryRow("no-emdashes", "rule", "Never use em dashes; use commas for asides and colons before lists.")}
+             ${memoryRow("no-emojis", "rule", "Never use emojis.", false)}
+             ${memoryRow("pov-limited", "rule", "Write in third person limited, one viewpoint per scene.", true, true)}
+             ${memoryRow("vault-tone", "context", "The vault's grimdark tone and genre; recall when setting scene mood.")}`,
+          ),
+          "",
+          I.file,
+        ),
+      720,
+      "memories",
+    ),
+  },
+
+  // S21e: settings Memories tab with the feature switched off (records card inactive).
+  settingsMemoriesOff: {
+    shot: ".lmsa-settings-panel",
+    html: settingsView(
+      section(
+        "Memory",
+        `${settingItem("Enable memories", "Deliver the memory index with every request and offer the memory tools.", sw())}
+        ${settingItem("Auto-apply memory changes", "Add and forget without review. The vault edit posture never does this.", sw())}
+`,
+        "",
+        I.brain,
+      ) +
+        section(
+          "Stored memories",
+          memoryOffState(),
+          "",
+          I.file,
+        ).replace(
+          '<div class="lmsa-settings-section-footer"></div>',
+          '<div class="lmsa-settings-section-footer"><button class="lmsa-btn-add lmsa-ui-btn lmsa-ui-btn-primary" disabled>Add memory</button></div>',
+        ),
+      720,
+      "memories",
     ),
   },
 

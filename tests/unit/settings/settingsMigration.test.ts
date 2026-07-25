@@ -205,6 +205,15 @@ describe("normalizeMemories", () => {
     expect(seeded[0]).not.toBe(DEFAULT_MEMORIES[0]);
   });
 
+  // The master switch is the single opt-in. Seeding the bundled records off too
+  // made turning the feature on do visibly nothing, which reads as broken.
+  it("seeds the bundled defaults enabled, behind a default-off master switch", () => {
+    expect(DEFAULT_MEMORIES.length).toBeGreaterThan(0);
+    expect(DEFAULT_MEMORIES.every((memory) => memory.enabled)).toBe(true);
+    expect(DEFAULT_SETTINGS.memoriesEnabled).toBe(false);
+    expect(normalizeMemories(undefined).every((memory) => memory.enabled)).toBe(true);
+  });
+
   it("does not re-seed an empty list (the user deleted all memories)", () => {
     expect(normalizeMemories([])).toEqual([]);
   });

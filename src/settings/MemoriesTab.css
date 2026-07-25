@@ -1,0 +1,191 @@
+/* ── Memories tab ─────────────────────────────────────────────────────────
+ * Records are tabular (one row, five fixed columns), not stacked cards: the
+ * whole point of the list is scanning names, types, and switches down a column.
+ * Only the description column flexes; everything else is content-width.
+ * The budget bar reuses .lmsa-index-progress-bar / -fill, so the memory budget
+ * and the RAG / graph progress bars stay one family.
+ * ─────────────────────────────────────────────────────────────────────── */
+
+/* ── Records card, feature-off state ──────────────────────────────────────
+ * The table is not rendered while the feature is off, so this is a plain
+ * centered message in the card body: no scrim, no overlay, nothing to lock.
+ * ─────────────────────────────────────────────────────────────────────── */
+
+.lmsa-memory-off-state {
+  @apply lmsa:flex lmsa:flex-col lmsa:items-center lmsa:justify-center lmsa:gap-1 lmsa:text-center;
+  padding: 26px 8px;
+}
+
+.lmsa-memory-off-title {
+  @apply lmsa:font-semibold;
+  color: var(--lmsa-text-primary);
+}
+
+.lmsa-memory-off-hint {
+  color: var(--lmsa-text-secondary);
+  font-size: var(--font-ui-smaller);
+  line-height: 1.5;
+}
+
+/* ── Records table ────────────────────────────────────────────────────── */
+
+.lmsa-memory-table {
+  @apply lmsa:w-full;
+  border-collapse: collapse;
+}
+
+.lmsa-memory-table th {
+  @apply lmsa:text-left lmsa:text-xs lmsa:font-semibold lmsa:uppercase;
+  padding: 0 10px 8px;
+  color: var(--lmsa-text-secondary);
+  letter-spacing: 0.08em;
+}
+
+.lmsa-memory-table td {
+  padding: 8px 10px;
+  vertical-align: middle;
+  border-top: 1px solid var(--lmsa-border-subtle);
+}
+
+/* First and last columns hug the panel edges; the rest keep their gutters. */
+.lmsa-memory-table th:first-child,
+.lmsa-memory-table td:first-child {
+  padding-left: 0;
+}
+
+.lmsa-memory-table th:last-child,
+.lmsa-memory-table td:last-child {
+  padding-right: 0;
+}
+
+.lmsa-memory-col-switch {
+  width: 1px;
+}
+
+.lmsa-memory-col-actions {
+  @apply lmsa:whitespace-nowrap;
+  width: 1px;
+  text-align: right;
+}
+
+.lmsa-memory-cell-name {
+  @apply lmsa:whitespace-nowrap lmsa:font-semibold;
+  color: var(--lmsa-text-primary);
+}
+
+/* The only flexing column: it absorbs the leftover width and truncates. */
+.lmsa-memory-cell-desc {
+  @apply lmsa:truncate;
+  width: 100%;
+  max-width: 0;
+  color: var(--lmsa-text-secondary);
+}
+
+/* A switched-off entry is inert: absent from the index, not recallable. */
+.lmsa-memory-table tr.is-off .lmsa-memory-cell-name,
+.lmsa-memory-table tr.is-off .lmsa-memory-cell-desc,
+.lmsa-memory-table tr.is-off .lmsa-memory-badge {
+  opacity: 0.5;
+}
+
+/* ── Type badge ───────────────────────────────────────────────────────── */
+
+.lmsa-memory-badge {
+  @apply lmsa:inline-flex lmsa:items-center lmsa:rounded-full lmsa:px-2 lmsa:py-0.5 lmsa:text-xs lmsa:font-semibold;
+  background: color-mix(in srgb, var(--background-modifier-hover) 84%, transparent);
+  color: var(--lmsa-text-secondary);
+}
+
+/* A rule governs every request, so it carries the accent; a context is inert
+   until recalled and stays neutral. */
+.lmsa-memory-badge.is-rule {
+  background: color-mix(in srgb, var(--lmsa-section-accent) 14%, transparent);
+  color: color-mix(in srgb, var(--lmsa-section-accent) 74%, var(--lmsa-text-primary));
+}
+
+/* ── Row actions ──────────────────────────────────────────────────────── */
+
+/* Two classes, so the square sizing beats Obsidian's base button chrome. */
+.lmsa-memory-table .lmsa-memory-icon-btn {
+  @apply lmsa:p-0;
+  width: 28px;
+  height: 28px;
+  min-height: 28px;
+}
+
+.lmsa-memory-table .lmsa-memory-icon-btn + .lmsa-memory-icon-btn {
+  margin-left: 6px;
+}
+
+/* Two classes (0,3,0) so the danger tint beats Obsidian's `button:not(.clickable-icon)`
+   color (0,1,1). On an icon-only button the tint is the only danger signal there is. */
+.lmsa-memory-table .lmsa-memory-icon-btn.lmsa-btn-danger {
+  color: var(--lmsa-status-error);
+}
+
+/* Same fight, for the two-step confirm that replaces the icons in place. */
+.lmsa-memory-table .lmsa-ui-compact-btn-danger {
+  color: var(--lmsa-status-error);
+}
+
+.lmsa-memory-table .lmsa-memory-icon-btn.lmsa-btn-danger:hover {
+  background: color-mix(in srgb, var(--lmsa-status-error) 12%, transparent);
+}
+
+.lmsa-memory-icon-btn svg {
+  width: 15px;
+  height: 15px;
+}
+
+/* ── Index budget ─────────────────────────────────────────────────────── */
+
+/* Carries the same gradient rule the setting items separate themselves with, so
+   the budget reads as the card's next row rather than as loose trailing chrome. */
+.lmsa-memory-capacity {
+  @apply lmsa:relative lmsa:flex lmsa:flex-col lmsa:gap-2;
+  padding-top: 16px;
+}
+
+.lmsa-memory-capacity::before {
+  content: "";
+  @apply lmsa:pointer-events-none lmsa:absolute lmsa:inset-x-0 lmsa:top-0 lmsa:h-px;
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--lmsa-section-accent) 20%, transparent),
+    var(--lmsa-border-subtle),
+    color-mix(in srgb, var(--lmsa-section-accent-secondary) 20%, transparent)
+  );
+}
+
+.lmsa-memory-capacity-header {
+  @apply lmsa:flex lmsa:items-center lmsa:justify-between lmsa:gap-4;
+}
+
+.lmsa-memory-capacity-label {
+  @apply lmsa:font-semibold;
+  color: var(--lmsa-text-primary);
+}
+
+.lmsa-memory-capacity-value {
+  color: var(--lmsa-text-secondary);
+  font-size: var(--font-ui-smaller);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Same warning / danger vocabulary as the composer context ring, so both
+   readouts change color at the same fullness. */
+.lmsa-memory-capacity.is-warning .lmsa-index-progress-fill {
+  background: var(--lmsa-status-warning);
+}
+
+.lmsa-memory-capacity.is-warning .lmsa-memory-capacity-value {
+  color: var(--lmsa-status-warning);
+}
+
+.lmsa-memory-capacity.is-danger .lmsa-index-progress-fill {
+  background: var(--lmsa-status-error);
+}
+
+.lmsa-memory-capacity.is-danger .lmsa-memory-capacity-value {
+  color: var(--lmsa-status-error);
+}

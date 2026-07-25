@@ -63,21 +63,25 @@ export const DEFAULT_KNOWLEDGE_GRAPH_SETTINGS: KnowledgeGraphSettings = {
 /**
  * Bundled starter memories, copied into settings once when the `memories` field
  * is first introduced and thereafter ordinary user-owned records (never merged
- * back). Every entry ships disabled: nothing changes model behavior until the
- * user opts in twice, the feature toggle and the entry toggle.
+ * back).
+ *
+ * They ship **enabled**, and `memoriesEnabled` (default off) is the single opt-in
+ * that governs them. The earlier double opt-in made turning the feature on do
+ * visibly nothing, which reads as broken rather than as safe; the master switch
+ * already guarantees that a user who never opts in sends a byte-identical prompt.
  */
 export const DEFAULT_MEMORIES: readonly Memory[] = [
   {
     name: "no-emdashes",
     type: "rule",
     description: "Never use em dashes; use commas for asides and colons before lists.",
-    enabled: false,
+    enabled: true,
   },
   {
     name: "no-emojis",
     type: "rule",
     description: "Never use emojis.",
-    enabled: false,
+    enabled: true,
   },
 ];
 

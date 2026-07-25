@@ -10,6 +10,7 @@ import {
 } from "../providers/selectableModels";
 import { RagService } from "../rag";
 import { GraphService } from "../rag/graph";
+import { MemoryService } from "../memory/MemoryService";
 import { getProviderDescriptor } from "../providers/registry";
 import { ClaudeCodeService } from "./ClaudeCodeService";
 
@@ -25,6 +26,7 @@ export class ServiceContainer {
   readonly modelAvailability: ModelAvailabilityService;
   readonly ragService: RagService;
   readonly graphService: GraphService;
+  readonly memoryService: MemoryService;
   readonly claudeCode: ClaudeCodeService;
 
   constructor(
@@ -48,6 +50,7 @@ export class ServiceContainer {
     // call), cloud models only with the user's opt-in.
     this.ragService.setAutoEmbedGate((model) => this.canAutoEmbed(model));
     this.graphService = new GraphService(app, pluginDir);
+    this.memoryService = new MemoryService(() => this.getSettings().memories);
     this.claudeCode = new ClaudeCodeService(
       app,
       getSettings,
@@ -127,6 +130,7 @@ export class ServiceContainer {
   destroy(): void {
     this.ragService.destroy();
     this.graphService.destroy();
+    this.memoryService.destroy();
     this.claudeCode.destroy();
   }
 

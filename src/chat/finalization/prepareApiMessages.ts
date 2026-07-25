@@ -26,6 +26,7 @@ import type { App } from "obsidian";
 import type { ChatSessionStore } from "../conversation/ChatSessionStore";
 import { editProposalsOf } from "../conversation/conversationUtils";
 import type { RagService } from "../../rag";
+import type { MemoryService } from "../../memory/MemoryService";
 import type { ChatClient } from "../../api/chatClient";
 import { rewriteQueryForRetrieval } from "../../rag/queryRewriter";
 import type { EditProposal } from "../../editing/editTypes";
@@ -47,6 +48,7 @@ export interface PrepareMessagesOptions {
   /** Session approval posture, the cloud surface's replacement for the plan/chat/edit mode (section 6.3). */
   posture: ApprovalPosture;
   ragService?: RagService;
+  memoryService: MemoryService;
   /** Active provider, needed to decide tool use. */
   activeProvider?: ProviderOption;
   /** Per-model capabilities (LM Studio). */
@@ -59,7 +61,7 @@ export interface PrepareMessagesOptions {
   completionModelId?: string;
   /** System prompt from the active provider profile. */
   profileSystemPrompt?: string;
-  /** When true, all built-in additions are omitted, only profileSystemPrompt is sent. */
+  /** When true, built-in guidance is omitted; the profile and enabled memory index remain. */
   disableBuiltinSystemPrompts?: boolean;
   /**
    * Whether Anthropic prompt caching is enabled for this turn (the active profile's
@@ -85,6 +87,7 @@ export async function prepareApiMessages(
     settings,
     posture,
     ragService,
+    memoryService,
     activeProvider,
     modelCapabilities,
     chatClient,
@@ -114,7 +117,11 @@ export async function prepareApiMessages(
   const useRegexEditGuidance = !useVaultTools && !claudeCodeRetrievesViaMcp && editsPermitted;
 
   const basePrefix = settings.systemPromptPrefix;
-  const systemPrompt = [basePrefix, profileSystemPrompt].filter(Boolean).join("\n\n");
+  const memoryIndex = settings.memoriesEnabled
+    ? memoryService.getPinnedIndex(store.getActiveConversationId())
+    : "";
+  const cachedSystemPrompt = [profileSystemPrompt, memoryIndex].filter(Boolean).join("\n\n");
+  const systemPrompt = [basePrefix, cachedSystemPrompt].filter(Boolean).join("\n\n");
 
   // The active note + extra notes (and their embedded images) are frozen into a
   // point-in-time snapshot bound to the user turn at send time (snapshotNoteAttachments),
@@ -270,11 +277,12 @@ export async function prepareApiMessages(
   const toolSearchNote = useToolSearch ? "\n\n" + toolSearchNoteBody : "";
 
   const finalSystemPrompt = disableBuiltinSystemPrompts
-    ? profileSystemPrompt
+    ? cachedSystemPrompt
     : systemPrompt + groundingNote + vaultGuidance + editGuidance + vaultOpGuidance + toolSearchNote + regexEditGuidance;
 
   // Layer 1 (prompt-cache design section 6.1.2): on the billed paths that have a tail
-  // mechanism, hold the cached `system` block invariant (profile prompt only) and
+  // mechanism, hold the cached `system` block invariant (profile prompt plus pinned
+  // memory index) and
   // carry the per-turn wording + tool guidance in the message tail. Local providers
   // (and disableBuiltinSystemPrompts) keep the full system prompt, byte-for-byte, with
   // no tail. The clients place modeTail in their own tail mechanism (ChatRequest.modeTail).
@@ -284,7 +292,7 @@ export async function prepareApiMessages(
   const { systemPrompt: outSystemPrompt, modeTail } = splitSystemForTail({
     useModeTail,
     fullSystemPrompt: finalSystemPrompt,
-    cachedSystemPrompt: profileSystemPrompt,
+    cachedSystemPrompt,
     tailParts: [
       basePrefix,
       groundingNoteBody,
@@ -314,9 +322,9 @@ export async function prepareApiMessages(
  * per-turn tail (prompt-cache design section 6.1.2).
  *
  * When `useModeTail` is false (local providers, or built-in prompts disabled),
- * returns the full system prompt unchanged with no tail. When true, the cached
- * `system` becomes the profile prompt only and the per-turn pieces (`tailParts`, in
- * render order) are joined into `modeTail`. An all-empty tail yields
+ * returns the full system prompt unchanged with no tail. When true, the supplied
+ * cached prompt stays in `system` and the per-turn pieces (`tailParts`, in render
+ * order) are joined into `modeTail`. An all-empty tail yields
  * `modeTail: undefined` so callers never emit an empty block.
  */
 export function splitSystemForTail(opts: {

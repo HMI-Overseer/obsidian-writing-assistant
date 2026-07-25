@@ -132,6 +132,7 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
     posture,
     signal: abortController.signal,
     ragService: plugin.services.ragService,
+    memoryService: plugin.services.memoryService,
     activeProvider: activeModel.provider,
     modelCapabilities: {
       trainedForToolUse:

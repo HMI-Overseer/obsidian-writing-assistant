@@ -34,6 +34,7 @@ export const I = {
   eye: ic('<path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>'),
   plus: ic('<path d="M12 5v14M5 12h14"/>'),
   arrowUp: ic('<path d="M12 19V5M5 12l7-7 7 7"/>'),
+  square: ic('<rect x="7" y="7" width="10" height="10" rx="1"/>'),
   more: ic('<circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/>'),
   x: ic('<path d="M6 6l12 12M18 6L6 18"/>', 12),
   file: ic('<path d="M5 3h9l5 5v13H5z"/>', 12),
@@ -173,7 +174,8 @@ const menuItem = (label, { icon, selected } = {}) =>
 
 // Composer footer row (context-capacity ring + reasoning/posture pills + indicators). Shared so the
 // at-rest composer, the drag-over state, and the footer-ring shot all render the identical markup.
-const composerFooter = `<div class="lmsa-chat-composer-footer"><div class="lmsa-chat-composer-footer-row">
+const composerFooter = (stopped = false, interacting = false) =>
+  `<div class="lmsa-chat-composer-footer${interacting ? " is-interacting" : ""}"><div class="lmsa-chat-composer-footer-row">
   <div class="lmsa-chat-composer-footer-left">
     <div class="lmsa-chat-composer-context-capacity">
       <svg class="lmsa-context-ring-svg" viewBox="0 0 32 32" role="presentation">
@@ -198,7 +200,7 @@ const composerFooter = `<div class="lmsa-chat-composer-footer"><div class="lmsa-
       <span class="lmsa-chat-composer-posture-pill-label">Ask</span>
       <span class="lmsa-chat-composer-posture-pill-chevron">${I.chevronUp}</span>
     </button>
-    <button class="lmsa-chat-composer-send-btn">${I.arrowUp}</button>
+    <button class="lmsa-chat-composer-send-btn${stopped ? " is-stop" : ""}" aria-label="${stopped ? "Stop generation" : "Send message"}">${stopped ? I.square : I.arrowUp}</button>
   </div>
 </div></div>`;
 
@@ -206,17 +208,213 @@ const composerFooter = `<div class="lmsa-chat-composer-footer"><div class="lmsa-
 // painted outside the box so it exercises compensation #3's reserved-invisible-border case).
 const composerHtml = (dragover = false) =>
   `<div class="lmsa-chat-composer"><div class="lmsa-chat-composer-panel${dragover ? " is-dragover" : ""}">
-    <div class="lmsa-chat-composer-chips">
-      <button class="lmsa-chat-composer-add-context-btn" aria-label="Add context">${I.plus}</button>
-      <div class="lmsa-chat-composer-chip">
-        <span class="lmsa-chat-composer-chip-icon">${I.file}</span>
-        <span class="lmsa-chat-composer-chip-label">Draft.md</span>
-        <button class="lmsa-chat-composer-chip-remove"><span>${I.x}</span></button>
+    <div class="lmsa-chat-composer-normal-body" aria-hidden="false">
+      <div class="lmsa-chat-composer-chips">
+        <button class="lmsa-chat-composer-add-context-btn" aria-label="Add context">${I.plus}</button>
+        <div class="lmsa-chat-composer-chip">
+          <span class="lmsa-chat-composer-chip-icon">${I.file}</span>
+          <span class="lmsa-chat-composer-chip-label">Draft.md</span>
+          <button class="lmsa-chat-composer-chip-remove"><span>${I.x}</span></button>
+        </div>
       </div>
+      <textarea class="lmsa-chat-composer-textarea" rows="1" placeholder="Ask anything about your writing..."></textarea>
     </div>
-    <textarea class="lmsa-chat-composer-textarea" rows="1" placeholder="Ask anything about your writing..."></textarea>
-    ${composerFooter}
+    <div class="lmsa-chat-composer-interaction-body" aria-hidden="true" hidden></div>
+    ${composerFooter()}
   </div></div>`;
+
+const askOption = (
+  id,
+  name,
+  label,
+  description,
+  { checked = false, multi = false } = {},
+) =>
+  `<div class="lmsa-ask-form-option">
+    <input class="lmsa-ask-form-option-input" type="${multi ? "checkbox" : "radio"}"
+      id="${id}" name="${name}" aria-describedby="${id}-description"${checked ? " checked" : ""}>
+    <label class="lmsa-ask-form-option-label" for="${id}">
+      <span class="lmsa-ask-form-option-name">${label}</span>
+      <span class="lmsa-ask-form-option-description" id="${id}-description">${description}</span>
+    </label>
+  </div>`;
+
+const askOther = (
+  id,
+  name,
+  { checked = false, multi = false, text = "" } = {},
+) =>
+  `<div class="lmsa-ask-form-option lmsa-ask-form-other-option">
+    <input class="lmsa-ask-form-option-input" type="${multi ? "checkbox" : "radio"}"
+      id="${id}" name="${name}" aria-describedby="${id}-description"${checked ? " checked" : ""}>
+    <label class="lmsa-ask-form-option-label" for="${id}">
+      <span class="lmsa-ask-form-option-name">Other</span>
+      <span class="lmsa-ask-form-option-description" id="${id}-description">Write a different answer in your own words.</span>
+    </label>
+    <div class="lmsa-ask-form-other-text"${checked ? "" : " hidden"}>
+      <label class="lmsa-ask-form-other-label" for="${id}-text">Your answer</label>
+      <textarea class="lmsa-ask-form-other-textarea" id="${id}-text" rows="3"
+        placeholder="Type your answer">${text}</textarea>
+    </div>
+  </div>`;
+
+const askQuestion = ({
+  id,
+  index,
+  total,
+  header,
+  question,
+  multi = false,
+  options,
+  other,
+  complete = false,
+  incomplete = false,
+}) =>
+  `<fieldset class="lmsa-ask-form-question${complete ? " is-complete" : ""}${incomplete ? " is-incomplete" : ""}">
+    <legend class="lmsa-ask-form-legend">
+      <span class="lmsa-ask-form-question-meta">
+        <span class="lmsa-ask-form-question-number">Question ${index} of ${total}</span>
+        <span class="lmsa-ask-form-question-header">${header}</span>
+      </span>
+      <span class="lmsa-ask-form-question-text">${question}</span>
+    </legend>
+    <div class="lmsa-ask-form-options">
+      ${options.map((option, optionIndex) => askOption(
+        `${id}-o${optionIndex}`,
+        id,
+        option.label,
+        option.description,
+        { checked: option.checked, multi },
+      )).join("")}
+      ${askOther(`${id}-other`, id, { ...other, multi })}
+    </div>
+  </fieldset>`;
+
+const askForm = (questions, { ready = false, showError = false } = {}) =>
+  `<form class="lmsa-ask-form" aria-label="Answer questions from the writing assistant">
+    <div class="lmsa-ask-form-heading">
+      <div class="lmsa-ask-form-title">Your guidance is needed</div>
+      <div class="lmsa-ask-form-intro">Review every question, then submit all answers together.</div>
+    </div>
+    <div class="lmsa-ask-form-secrets" role="note">Do not enter passwords, API keys, payment details, or other secrets.</div>
+    <div class="lmsa-ask-form-questions">${questions.join("")}</div>
+    <div class="lmsa-ask-form-error${showError ? "" : " lmsa-hidden"}" role="alert">Answer every question before submitting.</div>
+    <div class="lmsa-ask-form-actions">
+      <button class="lmsa-ui-btn lmsa-ui-btn-primary lmsa-ask-form-submit" type="submit"${ready ? "" : " disabled"}>Submit answers</button>
+    </div>
+  </form>`;
+
+const askComposerHtml = (questions, state) =>
+  `<div class="lmsa-chat-composer"><div class="lmsa-chat-composer-panel is-interacting is-ask-interaction">
+    <div class="lmsa-chat-composer-normal-body" aria-hidden="true" hidden>
+      <textarea class="lmsa-chat-composer-textarea">An exact draft remains mounted here.</textarea>
+    </div>
+    <div class="lmsa-chat-composer-interaction-body" aria-hidden="false">
+      ${askForm(questions, state)}
+    </div>
+    ${composerFooter(true, true)}
+  </div></div>`;
+
+const singleIncompleteQuestion = askQuestion({
+  id: "ask-single-q0",
+  index: 1,
+  total: 1,
+  header: "Output",
+  question: "Which output shape should I optimize for?",
+  options: [
+    { label: "Concise", description: "A short result focused on the final recommendation." },
+    { label: "Detailed", description: "A fuller result with rationale, trade-offs, and examples." },
+  ],
+  other: {},
+  incomplete: true,
+});
+
+const otherReadyQuestion = askQuestion({
+  id: "ask-other-q0",
+  index: 1,
+  total: 1,
+  header: "Coverage",
+  question: "Which areas should I cover in the handoff?",
+  multi: true,
+  options: [
+    {
+      label: "Testing",
+      description: "Cover automated behavior and regression evidence.",
+      checked: true,
+    },
+    {
+      label: "Migration",
+      description: "Explain compatibility and rollout concerns.",
+    },
+  ],
+  other: {
+    checked: true,
+    text: "Include keyboard-only failure modes and provider recovery.",
+  },
+  complete: true,
+});
+
+const mixedReadyQuestions = [
+  askQuestion({
+    id: "ask-mixed-q0",
+    index: 1,
+    total: 4,
+    header: "Output",
+    question: "Which output shape should I optimize for while keeping the final result easy to scan?",
+    options: [
+      { label: "Concise", description: "Lead with the recommendation and keep supporting detail compact." },
+      { label: "Detailed", description: "Include rationale, trade-offs, implementation notes, and examples.", checked: true },
+    ],
+    other: {},
+    complete: true,
+  }),
+  askQuestion({
+    id: "ask-mixed-q1",
+    index: 2,
+    total: 4,
+    header: "Coverage",
+    question: "Which areas need explicit treatment in the implementation handoff?",
+    multi: true,
+    options: [
+      { label: "Testing", description: "Cover automated behavior and regression evidence.", checked: true },
+      { label: "Migration", description: "Explain compatibility and rollout concerns." },
+      { label: "Accessibility", description: "Cover keyboard, focus, labels, and narrow layouts.", checked: true },
+    ],
+    other: {
+      checked: true,
+      text: "Include provider-failure recovery and submit/abort races.",
+    },
+    complete: true,
+  }),
+  askQuestion({
+    id: "ask-mixed-q2",
+    index: 3,
+    total: 4,
+    header: "Audience",
+    question: "Who should the explanation assume will maintain this feature after the initial release?",
+    options: [
+      { label: "Plugin maintainer", description: "Assume familiarity with this repository and Obsidian APIs.", checked: true },
+      { label: "New contributor", description: "Explain the architecture and local conventions from first principles." },
+    ],
+    other: {},
+    complete: true,
+  }),
+  askQuestion({
+    id: "ask-mixed-q3",
+    index: 4,
+    total: 4,
+    header: "Emphasis",
+    question: "Which qualities should be most visible in the final recommendation?",
+    multi: true,
+    options: [
+      { label: "Readability", description: "Prefer code that is clear on first encounter.", checked: true },
+      { label: "Development speed", description: "Keep future changes localized and low-boilerplate.", checked: true },
+      { label: "Scalability", description: "Preserve a clean seam for later interaction kinds." },
+    ],
+    other: {},
+    complete: true,
+  }),
+];
 
 const memoryRow = (name, type, desc, on = true, confirming = false) =>
   `<tr class="${on ? "" : "is-off"}${confirming ? " is-confirming-delete" : ""}">
@@ -263,6 +461,53 @@ export const SURFACES = {
     w: 600,
     shot: ".lmsa-chat-composer",
     html: view(composerHtml(), 600),
+  },
+
+  // Phase 2 ask interaction: one unanswered radio question. The local validation
+  // message and disabled explicit submit action show the incomplete state.
+  askSingleIncomplete: {
+    w: 600,
+    shot: ".lmsa-chat-composer",
+    html: view(
+      askComposerHtml([singleIncompleteQuestion], {
+        ready: false,
+        showError: true,
+      }),
+      600,
+    ),
+  },
+
+  // One ready multi-select question with the application-owned Other control
+  // expanded, populated, and included alongside a model-authored choice.
+  askOtherReady: {
+    w: 600,
+    shot: ".lmsa-chat-composer",
+    html: view(
+      askComposerHtml([otherReadyQuestion], { ready: true }),
+      600,
+    ),
+  },
+
+  // Phase 2 ask interaction: four ready questions mixing radios, checkboxes, long
+  // copy, and an application-owned Other textarea with user text.
+  askMixedReady: {
+    w: 600,
+    shot: ".lmsa-chat-composer",
+    html: view(
+      askComposerHtml(mixedReadyQuestions, { ready: true }),
+      600,
+    ),
+  },
+
+  // The same maximum mixed form at narrow sidebar width. Its question stack must
+  // remain inside the bounded scroll region while the Stop action stays reachable.
+  askMixedNarrow: {
+    w: 320,
+    shot: ".lmsa-chat-composer",
+    html: view(
+      askComposerHtml(mixedReadyQuestions, { ready: true }),
+      320,
+    ),
   },
 
   // Empty state (createChatLayout.ts + EmptyStateCarousel.ts): the writing-prompt carousel. The controller

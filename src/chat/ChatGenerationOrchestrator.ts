@@ -4,6 +4,7 @@ import type { ConversationMessage } from "../shared/types";
 import type WritingAssistantChat from "../main";
 import { createChatClient } from "../providers/registry";
 import type { ChatComposer } from "./composer/ChatComposer";
+import type { ComposerInteractionHost } from "./interactions/ComposerInteractionHost";
 import type { ChatSessionStore } from "./conversation/ChatSessionStore";
 import type { ContextCapacityUpdater } from "./ContextCapacityUpdater";
 import type { ChatTranscript } from "./messages/ChatTranscript";
@@ -19,6 +20,7 @@ export type GenerationOrchestratorDeps = {
   getStore: () => ChatSessionStore | null;
   getTranscript: () => ChatTranscript | null;
   getComposer: () => ChatComposer | null;
+  getInteractionHost: () => ComposerInteractionHost | null;
   getModelSelector: () => ChatModelSelector | null;
   getContextUpdater: () => ContextCapacityUpdater | null;
   getLayout: () => ChatLayoutRefs | null;

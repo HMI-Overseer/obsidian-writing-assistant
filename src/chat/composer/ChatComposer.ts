@@ -56,6 +56,7 @@ export class ChatComposer {
     private readonly plugin: WritingAssistantChat,
     private readonly refs: Pick<
       ChatLayoutRefs,
+      | "composerPanelEl"
       | "contextChipsEl"
       | "textareaEl"
       | "toolUseIndicatorEl"
@@ -71,6 +72,7 @@ export class ChatComposer {
       this.plugin.settings.includeNoteContext && !!this.app.workspace.getActiveFile();
 
     this.handleKeydown = (event: KeyboardEvent) => {
+      if (this.isSending) return;
       if (
         event.key === "Enter" &&
         !event.shiftKey &&
@@ -101,6 +103,10 @@ export class ChatComposer {
 
     // Image attachment handlers
     this.handlePaste = (event: ClipboardEvent) => {
+      if (this.isSending) {
+        if ((event.clipboardData?.files.length ?? 0) > 0) event.preventDefault();
+        return;
+      }
       const files = event.clipboardData?.files;
       if (!files || files.length === 0) return;
       const imageFiles = Array.from(files).filter((f) => SUPPORTED_IMAGE_TYPES.has(f.type));
@@ -121,15 +127,16 @@ export class ChatComposer {
       // incompatible "copy" makes the browser reject the drop. preventDefault alone marks
       // us a valid drop target; the browser's default effect is always compatible.
       event.preventDefault();
-      this.refs.textareaEl.parentElement?.addClass("is-dragover");
+      if (this.isSending) return;
+      this.refs.composerPanelEl.addClass("is-dragover");
     };
     this.handleDragLeave = (event: DragEvent) => {
       // dragleave also fires when crossing into a child (chips, textarea, footer); keep the
       // ring lit while the pointer is still anywhere inside the panel.
-      const composerPanel = this.refs.textareaEl.parentElement;
+      const composerPanel = this.refs.composerPanelEl;
       const related = event.relatedTarget as Node | null;
-      if (related && composerPanel?.contains(related)) return;
-      composerPanel?.removeClass("is-dragover");
+      if (related && composerPanel.contains(related)) return;
+      composerPanel.removeClass("is-dragover");
     };
     this.handleDrop = (event: DragEvent) => {
       // preventDefault only: do NOT stopPropagation here. Obsidian removes its drag ghost
@@ -137,7 +144,8 @@ export class ChatComposer {
       // strands that ghost inside the composer. Letting the drop reach the document lets
       // Obsidian finalize the drag while we've already consumed the payload below.
       event.preventDefault();
-      this.refs.textareaEl.parentElement?.removeClass("is-dragover");
+      this.refs.composerPanelEl.removeClass("is-dragover");
+      if (this.isSending) return;
 
       // Vault file-explorer drag: route markdown notes to context chips, identical to
       // picking them from the context picker (resolved from the vault at send time).
@@ -163,12 +171,9 @@ export class ChatComposer {
         this.refs.textareaEl.focus();
       }
     };
-    const composerPanel = this.refs.textareaEl.parentElement;
-    if (composerPanel) {
-      composerPanel.addEventListener("dragover", this.handleDragOver);
-      composerPanel.addEventListener("dragleave", this.handleDragLeave);
-      composerPanel.addEventListener("drop", this.handleDrop);
-    }
+    this.refs.composerPanelEl.addEventListener("dragover", this.handleDragOver);
+    this.refs.composerPanelEl.addEventListener("dragleave", this.handleDragLeave);
+    this.refs.composerPanelEl.addEventListener("drop", this.handleDrop);
   }
 
   /**
@@ -241,7 +246,12 @@ export class ChatComposer {
     this.refs.actionBtn.empty();
     setIcon(this.refs.actionBtn, sending ? "square" : "arrow-up");
     this.refs.actionBtn.toggleClass("is-stop", sending);
+    this.refs.actionBtn.setAttribute(
+      "aria-label",
+      sending ? "Stop generation" : "Send message",
+    );
     this.refs.textareaEl.disabled = sending;
+    if (sending) this.refs.composerPanelEl.removeClass("is-dragover");
   }
 
   isActiveNoteAttached(): boolean {
@@ -442,12 +452,9 @@ export class ChatComposer {
     this.refs.textareaEl.removeEventListener("input", this.handleInput);
     this.refs.actionBtn.removeEventListener("click", this.handleActionClick);
     this.refs.textareaEl.removeEventListener("paste", this.handlePaste);
-    const composerPanel = this.refs.textareaEl.parentElement;
-    if (composerPanel) {
-      composerPanel.removeEventListener("dragover", this.handleDragOver);
-      composerPanel.removeEventListener("dragleave", this.handleDragLeave);
-      composerPanel.removeEventListener("drop", this.handleDrop);
-    }
+    this.refs.composerPanelEl.removeEventListener("dragover", this.handleDragOver);
+    this.refs.composerPanelEl.removeEventListener("dragleave", this.handleDragLeave);
+    this.refs.composerPanelEl.removeEventListener("drop", this.handleDrop);
   }
 
   private renderChip(icon: string, label: string, onRemove: () => void): void {

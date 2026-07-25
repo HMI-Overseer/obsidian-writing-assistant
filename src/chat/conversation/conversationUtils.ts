@@ -203,7 +203,7 @@ export function normalizeConversation(raw: unknown): Conversation | null {
                   else delete normalizedStep.askGuidance;
                 }
                 return normalizedStep;
-              }) as ConversationMessage["agenticSteps"];
+              }) as unknown as ConversationMessage["agenticSteps"];
           }
           if (Array.isArray(message.attachments)) {
             const valid = (message.attachments as unknown[]).filter(isValidAttachment);

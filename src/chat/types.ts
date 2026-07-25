@@ -36,6 +36,10 @@ export type ChatLayoutRefs = {
   messagesEl: HTMLElement;
   emptyStateEl: HTMLElement;
   emptyCopyEl: HTMLElement;
+  composerPanelEl: HTMLElement;
+  composerNormalBodyEl: HTMLElement;
+  composerInteractionEl: HTMLElement;
+  composerFooterEl: HTMLElement;
   contextChipsEl: HTMLElement;
   textareaEl: HTMLTextAreaElement;
   posturePillEl: HTMLButtonElement;

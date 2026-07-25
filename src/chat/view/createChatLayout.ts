@@ -116,19 +116,30 @@ export function createChatLayout(contentEl: HTMLElement): ChatLayoutRefs {
 
   const composerPanel = composer.createDiv({ cls: "lmsa-chat-composer-panel" });
   const contextPickerPopoverEl = composerPanel.createDiv({ cls: "lmsa-context-picker-popover lmsa-hidden" });
-  const contextChipsEl = composerPanel.createDiv({ cls: "lmsa-chat-composer-chips" });
+  const composerNormalBodyEl = composerPanel.createDiv({
+    cls: "lmsa-chat-composer-normal-body",
+  });
+  const contextChipsEl = composerNormalBodyEl.createDiv({ cls: "lmsa-chat-composer-chips" });
   const contextAddBtnEl = contextChipsEl.createEl("button", {
     cls: "lmsa-chat-composer-add-context-btn",
     attr: { "aria-label": "Add context" },
   });
   setIcon(contextAddBtnEl, "plus");
 
-  const attachmentsEl = composerPanel.createDiv({ cls: "lmsa-chat-composer-attachments" });
+  const attachmentsEl = composerNormalBodyEl.createDiv({
+    cls: "lmsa-chat-composer-attachments",
+  });
 
-  const textareaEl = composerPanel.createEl("textarea", {
+  const textareaEl = composerNormalBodyEl.createEl("textarea", {
     cls: "lmsa-chat-composer-textarea",
     attr: { placeholder: "Ask anything about your writing...", rows: "1" },
   });
+
+  const composerInteractionEl = composerPanel.createDiv({
+    cls: "lmsa-chat-composer-interaction-body",
+    attr: { "aria-hidden": "true" },
+  });
+  composerInteractionEl.hidden = true;
 
   const composerFooter = composerPanel.createDiv({ cls: "lmsa-chat-composer-footer" });
 
@@ -232,6 +243,10 @@ export function createChatLayout(contentEl: HTMLElement): ChatLayoutRefs {
 
   const actionBtn = composerFooterActions.createEl("button", {
     cls: "lmsa-chat-composer-send-btn",
+    attr: {
+      "aria-label": "Send message",
+      type: "button",
+    },
   });
   setIcon(actionBtn, "arrow-up");
 
@@ -254,6 +269,10 @@ export function createChatLayout(contentEl: HTMLElement): ChatLayoutRefs {
     messagesEl,
     emptyStateEl,
     emptyCopyEl,
+    composerPanelEl: composerPanel,
+    composerNormalBodyEl,
+    composerInteractionEl,
+    composerFooterEl: composerFooter,
     contextChipsEl,
     textareaEl,
     posturePillEl,

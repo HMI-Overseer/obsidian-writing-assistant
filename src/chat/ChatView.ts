@@ -28,6 +28,7 @@ import { KnowledgePopover } from "./composer/KnowledgePopover";
 import { createMemoriesSectionCallbacks } from "./composer/memoriesSection";
 import { ToolUsePopover } from "./composer/ToolUsePopover";
 import { ChatSessionStore } from "./conversation/ChatSessionStore";
+import { ComposerInteractionHost } from "./interactions/ComposerInteractionHost";
 import { ChatTranscript } from "./messages/ChatTranscript";
 import { ChatModelSelector } from "./models/ChatModelSelector";
 import { pluginModelDropdownDeps } from "./models/ModelDropdownView";
@@ -49,6 +50,7 @@ export class ChatView extends ItemView {
   private transcript: ChatTranscript | null = null;
   private emptyStateCarousel: EmptyStateCarousel | null = null;
   private composer: ChatComposer | null = null;
+  private interactionHost: ComposerInteractionHost | null = null;
   private modelSelector: ChatModelSelector | null = null;
   private profilePopover: ProfileSettingsPopover | null = null;
   private contextPickerPopover: ContextPickerPopover | null = null;
@@ -95,6 +97,7 @@ export class ChatView extends ItemView {
       getStore: () => this.sessionStore,
       getTranscript: () => this.transcript,
       getComposer: () => this.composer,
+      getInteractionHost: () => this.interactionHost,
       getModelSelector: () => this.modelSelector,
       getContextUpdater: () => this.contextUpdater,
       getLayout: () => this.layout,
@@ -164,6 +167,7 @@ export class ChatView extends ItemView {
         this.contextUpdater?.immediateUpdate(this.buildContextInputs());
       },
     });
+    this.interactionHost = new ComposerInteractionHost(this.layout);
 
     if (this.layout) {
       this.layout.rootEl.dataset.posture = this.composer?.getPosture() ?? "ask";
@@ -526,6 +530,7 @@ export class ChatView extends ItemView {
     this.reasoningPill?.destroy();
     this.posturePill?.destroy();
     this.overflowMenu?.destroy();
+    this.interactionHost?.destroy();
     this.composer?.destroy();
   }
 

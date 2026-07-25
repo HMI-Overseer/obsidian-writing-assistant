@@ -15,6 +15,7 @@
 @import "../chat/models/ProviderRail.css";
 @import "../chat/models/ProfileSettingsPopover.css";
 @import "../chat/composer/ChatComposer.css";
+@import "../chat/composer/AskQuestionForm.css";
 @import "../chat/composer/ContextPickerPopover.css";
 @import "../chat/composer/KnowledgePopover.css";
 @import "../chat/composer/ToolUsePopover.css";

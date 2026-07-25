@@ -104,8 +104,8 @@ beforeEach(() => {
 });
 
 describe("LiveVaultReview memory channel", () => {
-  it("still asks when vault posture is auto but policy.memory is ask", async () => {
-    const { review, memories } = harness(POLICY("ask"), "auto");
+  it("asks under the default posture and applies on approval", async () => {
+    const { review, memories } = harness(POLICY("ask"), "ask");
     const pending = review.resolveMemories([addCall()]);
     await flush();
 
@@ -119,7 +119,17 @@ describe("LiveVaultReview memory channel", () => {
     expect(memories.map((memory) => memory.name)).toEqual(["vault-tone"]);
   });
 
-  it("auto-applies only when the separate memory gate is auto", async () => {
+  // Memory gates like any other class: the session posture wins first.
+  it("auto-applies when the vault posture is auto and the class only asks", async () => {
+    const { review, memories, saveSettings } = harness(POLICY("ask"), "auto");
+    const [{ result }] = await review.resolveMemories([addCall()]);
+
+    expect(result.disposition).toBe("auto-applied");
+    expect(memories.map((memory) => memory.name)).toEqual(["vault-tone"]);
+    expect(saveSettings).toHaveBeenCalledOnce();
+  });
+
+  it("auto-applies when the memory class is auto under the default posture", async () => {
     const { review, memories, saveSettings } = harness(POLICY("auto"), "ask");
     const [{ result }] = await review.resolveMemories([addCall()]);
 
@@ -128,8 +138,8 @@ describe("LiveVaultReview memory channel", () => {
     expect(saveSettings).toHaveBeenCalledOnce();
   });
 
-  it("denies a memory mutation even when vault posture is auto", async () => {
-    const { review, memories, saveSettings } = harness(POLICY("deny"), "auto");
+  it("denies a memory mutation when the class is deny under the default posture", async () => {
+    const { review, memories, saveSettings } = harness(POLICY("deny"), "ask");
     const [{ result }] = await review.resolveMemories([addCall()]);
 
     expect(result.isError).toBe(true);
@@ -137,6 +147,15 @@ describe("LiveVaultReview memory channel", () => {
     expect(memories).toEqual([]);
     expect(saveSettings).not.toHaveBeenCalled();
     expect(captured.proposals).toEqual([]);
+  });
+
+  // The posture overrules deny for every class, and memory is no longer excepted.
+  it("overrules a denied memory class under the auto posture", async () => {
+    const { review, memories } = harness(POLICY("deny"), "auto");
+    const [{ result }] = await review.resolveMemories([addCall()]);
+
+    expect(result.disposition).toBe("auto-applied");
+    expect(memories.map((memory) => memory.name)).toEqual(["vault-tone"]);
   });
 
   it("returns declined without mutating when the proposal is rejected", async () => {

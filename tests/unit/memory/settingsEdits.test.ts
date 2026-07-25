@@ -4,7 +4,7 @@ import type { Gate, VaultOpPolicy } from "../../../src/vault-ops/gateway";
 import { DEFAULT_VAULT_OP_POLICY } from "../../../src/vault-ops/gateway";
 import {
   applyMemoryMutation,
-  commitMemoryAutoApply,
+  commitMemoryGate,
   commitMemoryFeatureToggle,
   commitMemoryMutation,
   memoryInvalidationFor,
@@ -417,7 +417,7 @@ describe("commitMemoryFeatureToggle", () => {
   });
 });
 
-describe("commitMemoryAutoApply", () => {
+describe("commitMemoryGate", () => {
   function createPolicy(failing = false) {
     const policy: VaultOpPolicy = {
       ...DEFAULT_VAULT_OP_POLICY,
@@ -437,31 +437,29 @@ describe("commitMemoryAutoApply", () => {
     };
   }
 
-  it("maps the toggle onto policy.memory and nothing else", async () => {
+  it("writes the chosen gate onto policy.memory and nothing else", async () => {
     const { policy, access } = createPolicy();
-    await commitMemoryAutoApply(access, true);
+    await commitMemoryGate(access, "auto");
     expect(policy.memory).toBe("auto");
     expect({ ...policy, memory: DEFAULT_VAULT_OP_POLICY.memory }).toEqual({
       ...DEFAULT_VAULT_OP_POLICY,
       scopes: [...DEFAULT_VAULT_OP_POLICY.scopes],
     });
-
-    await commitMemoryAutoApply(access, false);
-    expect(policy.memory).toBe("ask");
   });
 
-  it("never writes deny from the toggle", async () => {
+  it("reaches all three positions, deny included", async () => {
     const { policy, access } = createPolicy();
-    policy.memory = "deny";
-    await commitMemoryAutoApply(access, false);
-    expect(policy.memory).toBe("ask");
+    for (const gate of ["auto", "deny", "ask"] as const) {
+      await commitMemoryGate(access, gate);
+      expect(policy.memory).toBe(gate);
+    }
   });
 
   it("restores the previous gate when persistence fails", async () => {
     const { policy, access } = createPolicy(true);
     policy.memory = "auto";
 
-    await expect(commitMemoryAutoApply(access, false)).rejects.toThrow("disk full");
+    await expect(commitMemoryGate(access, "deny")).rejects.toThrow("disk full");
 
     expect(policy.memory).toBe("auto");
   });

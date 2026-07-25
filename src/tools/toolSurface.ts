@@ -78,7 +78,7 @@ export function resolveWriteTools(opts: ToolSurfaceOptions): CanonicalToolDefini
 function permittedTools(opts: ToolSurfaceOptions): CanonicalToolDefinition[] {
   return [
     ...ALL_VAULT_TOOLS,
-    ...(opts.memoriesEnabled ? allowedMemoryTools(opts.policy) : []),
+    ...(opts.memoriesEnabled ? allowedMemoryTools(opts.policy, opts.posture) : []),
     ...resolveWriteTools(opts),
     ...(opts.useThinkTool ? [THINK_TOOL] : []),
   ];
@@ -242,7 +242,7 @@ export function anthropicLayer2ToolSet(opts: ToolSurfaceOptions): CanonicalToolD
     : CORE_READ_TOOLS.filter((tool) => tool.name !== RECALL_MEMORY_TOOL.name);
   const tailReads = ALL_VAULT_TOOLS.filter((tool) => !isCoreReadTool(tool.name));
   const memoryMutations = opts.memoriesEnabled
-    ? allowedMemoryTools(opts.policy).filter((tool) =>
+    ? allowedMemoryTools(opts.policy, opts.posture).filter((tool) =>
         MEMORY_MUTATION_TOOL_NAMES.has(tool.name),
       )
     : [];

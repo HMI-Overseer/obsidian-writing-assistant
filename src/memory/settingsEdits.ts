@@ -227,25 +227,17 @@ export interface MemoryGateAccess {
 }
 
 /**
- * "Auto-apply memory changes", the one surfacing of `policy.memory`. It writes
- * only `"auto"` or `"ask"`: `"deny"` exists for the gate resolver but is not a
- * toggle position. No pin is touched, because the gate changes who approves a
- * mutation, not what the index says (and a policy change must stay
- * fingerprint-neutral for Claude Code, per plan decision 6).
+ * The memory approval gate, the one surfacing of `policy.memory`. All three
+ * positions are reachable, so `deny` no longer needs a hand-edit of `data.json`.
+ * No pin is touched: the gate changes who approves a mutation, not what the index
+ * says, and a policy change must stay fingerprint-neutral for Claude Code (plan
+ * decision 6).
  */
-export async function commitMemoryAutoApply(
-  access: MemoryGateAccess,
-  autoApply: boolean,
-): Promise<void> {
+export async function commitMemoryGate(access: MemoryGateAccess, gate: Gate): Promise<void> {
   const previous = access.getGate();
   await commitSettingsChange({
-    apply: () => access.setGate(autoApply ? "auto" : "ask"),
+    apply: () => access.setGate(gate),
     rollback: () => access.setGate(previous),
     save: access.save,
   });
-}
-
-/** Whether the tab's auto-apply toggle reads as on for a stored gate. */
-export function isMemoryAutoApply(gate: Gate): boolean {
-  return gate === "auto";
 }

@@ -279,7 +279,7 @@ describe("memory catalog and runtime denial semantics", () => {
   it("keeps recall and drops mutations from Layer 2 and local under deny", () => {
     const policy = { ...DEFAULT_VAULT_OP_POLICY, memory: "deny" as const };
     for (const resolver of [resolveLocalToolSet, anthropicLayer2ToolSet]) {
-      const got = names(resolver(opts({ memoriesEnabled: true, policy })));
+      const got = names(resolver(opts({ memoriesEnabled: true, policy, posture: "ask" })));
       expect(got).toContain("recall_memory");
       for (const mutationName of MEMORY_MUTATION_TOOL_NAMES) {
         expect(got).not.toContain(mutationName);
@@ -290,11 +290,28 @@ describe("memory catalog and runtime denial semantics", () => {
   it("refuses denied mutations in the cloud runtime allow-list but permits recall", () => {
     const policy = { ...DEFAULT_VAULT_OP_POLICY, memory: "deny" as const };
     const got = cloudAllowedToolNames(
-      opts({ memoriesEnabled: true, policy, posture: "auto" }),
+      opts({ memoriesEnabled: true, policy, posture: "ask" }),
     );
     expect(got).toContain("recall_memory");
     expect(got).not.toContain("add_memory");
     expect(got).not.toContain("forget_memory");
+  });
+
+  // Memory is an ordinary gate class: the "Edit automatically" posture overrules a
+  // denied class and re-offers its tools, exactly as it does for every write class.
+  it("re-offers denied memory mutations under the auto posture", () => {
+    const policy = { ...DEFAULT_VAULT_OP_POLICY, memory: "deny" as const };
+    for (const resolver of [resolveLocalToolSet, anthropicLayer2ToolSet]) {
+      const got = names(resolver(opts({ memoriesEnabled: true, policy, posture: "auto" })));
+      for (const mutationName of MEMORY_MUTATION_TOOL_NAMES) {
+        expect(got).toContain(mutationName);
+      }
+    }
+    const allowed = cloudAllowedToolNames(
+      opts({ memoriesEnabled: true, policy, posture: "auto" }),
+    );
+    expect(allowed).toContain("add_memory");
+    expect(allowed).toContain("forget_memory");
   });
 
   it("keeps the enabled Layer 1 and Claude Code catalog bytes policy-invariant", () => {

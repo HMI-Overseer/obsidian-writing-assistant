@@ -1039,7 +1039,7 @@ export const SURFACES = {
       section(
         "Memory",
         `${settingItem("Enable memories", "Deliver the memory index with every request and offer the memory tools.", sw("is-enabled"))}
-        ${settingItem("Auto-apply memory changes", "Add and forget without review. The vault edit posture never does this.", sw())}
+        ${settingItem("Memory changes", "How the assistant's add and forget requests are handled. Deny removes both tools. The vault edit posture overrides this, as it does every other approval class.", `<select><option>Ask</option><option>Auto-apply</option><option>Deny</option></select>`)}
 `,
         "",
         I.brain,
@@ -1067,7 +1067,7 @@ export const SURFACES = {
       section(
         "Memory",
         `${settingItem("Enable memories", "Deliver the memory index with every request and offer the memory tools.", sw())}
-        ${settingItem("Auto-apply memory changes", "Add and forget without review. The vault edit posture never does this.", sw())}
+        ${settingItem("Memory changes", "How the assistant's add and forget requests are handled. Deny removes both tools. The vault edit posture overrides this, as it does every other approval class.", `<select><option>Ask</option><option>Auto-apply</option><option>Deny</option></select>`)}
 `,
         "",
         I.brain,

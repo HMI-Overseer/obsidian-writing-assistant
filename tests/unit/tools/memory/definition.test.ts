@@ -65,25 +65,36 @@ describe("memory tool definitions", () => {
 });
 
 describe("memory policy gate", () => {
-  it("resolves only policy.memory", () => {
-    expect(resolveMemoryGate({ ...DEFAULT_VAULT_OP_POLICY, memory: "ask" })).toBe("ask");
-    expect(resolveMemoryGate({ ...DEFAULT_VAULT_OP_POLICY, memory: "auto" })).toBe("auto");
-    expect(resolveMemoryGate({ ...DEFAULT_VAULT_OP_POLICY, memory: "deny" })).toBe("deny");
+  it("resolves policy.memory under the default ask posture", () => {
+    for (const memory of ["ask", "auto", "deny"] as const) {
+      expect(resolveMemoryGate({ ...DEFAULT_VAULT_OP_POLICY, memory }, "ask")).toBe(memory);
+    }
+  });
+
+  // Memory is an ordinary gate class, so the session posture wins first and
+  // overrules the per-class value, deny included, as it does for every class.
+  it("resolves auto under the auto posture whatever the class says", () => {
+    for (const memory of ["ask", "auto", "deny"] as const) {
+      expect(resolveMemoryGate({ ...DEFAULT_VAULT_OP_POLICY, memory }, "auto")).toBe("auto");
+    }
   });
 
   it("keeps recall but hides mutations when memory writes are denied", () => {
-    const denied = allowedMemoryTools({
-      ...DEFAULT_VAULT_OP_POLICY,
-      memory: "deny",
-    });
+    const denied = allowedMemoryTools({ ...DEFAULT_VAULT_OP_POLICY, memory: "deny" }, "ask");
     expect(names(denied)).toEqual(["recall_memory"]);
   });
 
   it("offers all three tools when memory writes are ask or auto", () => {
     for (const memory of ["ask", "auto"] as const) {
-      expect(
-        names(allowedMemoryTools({ ...DEFAULT_VAULT_OP_POLICY, memory })),
-      ).toEqual(names(ALL_MEMORY_TOOLS));
+      expect(names(allowedMemoryTools({ ...DEFAULT_VAULT_OP_POLICY, memory }, "ask"))).toEqual(
+        names(ALL_MEMORY_TOOLS),
+      );
     }
+  });
+
+  it("re-offers denied mutations under the auto posture", () => {
+    expect(
+      names(allowedMemoryTools({ ...DEFAULT_VAULT_OP_POLICY, memory: "deny" }, "auto")),
+    ).toEqual(names(ALL_MEMORY_TOOLS));
   });
 });

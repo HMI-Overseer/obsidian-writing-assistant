@@ -1,5 +1,6 @@
 import type { CanonicalToolDefinition } from "../types";
 import type { VaultOpPolicy, Gate } from "../../vault-ops/gateway";
+import type { ApprovalPosture } from "../../shared/types";
 
 export const RECALL_MEMORY_TOOL: CanonicalToolDefinition = {
   name: "recall_memory",
@@ -117,12 +118,27 @@ export const MEMORY_MUTATION_TOOL_NAMES: ReadonlySet<string> = new Set([
   FORGET_MEMORY_TOOL.name,
 ]);
 
-/** Memory authorization is independent of the vault editing posture. */
-export function resolveMemoryGate(policy: VaultOpPolicy): Gate {
+/**
+ * Memory mutations gate like any other class: the session posture wins first, then
+ * the per-class policy, exactly as {@link resolveGate} and {@link resolveEditGate}
+ * do. `scopes` and `maxAutoOps` have nothing to bite on here, a memory mutation has
+ * no path to confine and spends no vault write budget, so this resolver is short
+ * rather than special.
+ */
+export function resolveMemoryGate(policy: VaultOpPolicy, posture: ApprovalPosture): Gate {
+  if (posture === "auto") return "auto";
   return policy.memory;
 }
 
-/** Recall is always readable, while deny removes both mutation tools. */
-export function allowedMemoryTools(policy: VaultOpPolicy): CanonicalToolDefinition[] {
+/**
+ * Recall is a read and is never gated. `deny` removes both mutation tools, unless
+ * the `auto` posture overrules the per-class policy and re-offers them, which is
+ * what {@link resolveWriteTools} already does for every write class.
+ */
+export function allowedMemoryTools(
+  policy: VaultOpPolicy,
+  posture: ApprovalPosture,
+): CanonicalToolDefinition[] {
+  if (posture === "auto") return ALL_MEMORY_TOOLS;
   return policy.memory === "deny" ? [RECALL_MEMORY_TOOL] : ALL_MEMORY_TOOLS;
 }

@@ -262,8 +262,8 @@ export class LiveVaultReview implements VaultOpReviewer {
   }
 
   /**
-   * Resolve memory proposals sequentially. The memory gate reads only
-   * policy.memory, never the vault editing posture.
+   * Resolve memory proposals sequentially, gated by the session posture and then
+   * `policy.memory`, the same order every write class follows.
    */
   async resolveMemories(
     calls: ToolCall[],
@@ -575,7 +575,7 @@ export class LiveVaultReview implements VaultOpReviewer {
 
     const prepared = prepareMemoryMutation(call, deps.getMemories());
     if (!prepared.ok) return prepared.result;
-    const gate = resolveMemoryGate(this.policy);
+    const gate = resolveMemoryGate(this.policy, this.posture);
     if (gate === "deny") {
       return toolFailure({
         kind: "denied",

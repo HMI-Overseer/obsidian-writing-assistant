@@ -5,18 +5,25 @@ import { MemoryModal } from "./modals";
 import { createSettingsSection, SettingItem, Toggle } from "./ui";
 import { voidAsync } from "../asyncCallbacks";
 import { computeMemoryCapacity } from "../memory/capacity";
+import type { Gate } from "../vault-ops/gateway";
 import type { MemoryMutation } from "../memory/settingsEdits";
 import {
-  commitMemoryAutoApply,
   commitMemoryFeatureToggle,
+  commitMemoryGate,
   commitMemoryMutation,
-  isMemoryAutoApply,
 } from "../memory/settingsEdits";
 
 const TYPE_LABELS: Record<Memory["type"], string> = {
   rule: "Rule",
   context: "Context",
 };
+
+/** The same three positions and wording the vault-op gate dropdowns use. */
+const MEMORY_GATE_OPTIONS: ReadonlyArray<{ value: Gate; label: string }> = [
+  { value: "ask", label: "Ask" },
+  { value: "auto", label: "Auto-apply" },
+  { value: "deny", label: "Deny" },
+];
 
 /**
  * "Memories" settings (RFC-0005 + RFC-0007), the user-owned half of the feature:
@@ -82,14 +89,17 @@ export function renderMemoriesTab(container: HTMLElement, plugin: WritingAssista
     });
 
   new SettingItem(feature.bodyEl)
-    .setName("Auto-apply memory changes")
-    .setDesc("Add and forget without review. The vault edit posture never does this.")
-    .addToggle((toggle) => {
-      toggle.setValue(isMemoryAutoApply(settings.vaultOpPolicy.memory));
-      toggle.onChange(
-        voidAsync(async (value: boolean) => {
+    .setName("Memory changes")
+    .setDesc(
+      "How the assistant's add and forget requests are handled. Deny removes both tools. The vault edit posture overrides this, as it does every other approval class."
+    )
+    .addDropdown((dropdown) => {
+      for (const option of MEMORY_GATE_OPTIONS) dropdown.addOption(option.value, option.label);
+      dropdown.setValue(settings.vaultOpPolicy.memory);
+      dropdown.onChange(
+        voidAsync(async (value: string) => {
           try {
-            await commitMemoryAutoApply(
+            await commitMemoryGate(
               {
                 getGate: () => settings.vaultOpPolicy.memory,
                 setGate: (gate) => {
@@ -97,10 +107,10 @@ export function renderMemoriesTab(container: HTMLElement, plugin: WritingAssista
                 },
                 save: () => plugin.saveSettings(),
               },
-              value
+              value as Gate
             );
           } finally {
-            toggle.setValue(isMemoryAutoApply(settings.vaultOpPolicy.memory));
+            dropdown.setValue(settings.vaultOpPolicy.memory);
           }
         }, "Failed to save the memory approval setting.")
       );

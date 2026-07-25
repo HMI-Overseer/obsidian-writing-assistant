@@ -39,12 +39,16 @@ export interface VaultOpPolicy {
   edit: Gate;
   /**
    * Memory mutations (`add_memory` / `forget_memory`). A gate class that is not
-   * an operation kind, like `edit`, but resolved by its own posture-independent
-   * `resolveMemoryGate`, never by {@link resolveGate}: the session-level "Edit
-   * automatically" posture must not auto-apply a memory mutation (RFC-0007).
-   * Deliberately not counted by {@link writesPermitted} (a memory-only session
-   * is not a vault-writing session) and not rendered in the VaultOpsTab gate
-   * list; the Memories tab is its one surfacing.
+   * an operation kind, exactly like `edit`, resolved by `resolveMemoryGate`,
+   * which applies the same posture-then-policy order {@link resolveGate} does:
+   * the "Edit automatically" posture auto-applies memory mutations too, and
+   * overrules a `deny` here as it does everywhere else.
+   *
+   * Two things stay deliberately different, neither an exception to the gating
+   * model. It is not counted by {@link writesPermitted}, because that drives the
+   * ambient edit pipeline and a memory-only session must not switch on the diff
+   * renderer. And it is surfaced in the Memories tab rather than the VaultOpsTab
+   * gate list, which is framed around note operations.
    */
   memory: Gate;
   /** Folder prefixes eligible for "auto"; empty ⇒ whole vault. */

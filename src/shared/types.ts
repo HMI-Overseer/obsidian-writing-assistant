@@ -308,6 +308,18 @@ export interface MessageVersion {
   ragSources?: RagSourceRef[];
 }
 
+/** Exact completed user guidance captured from one successful ask_user call. */
+export interface CompletedAskGuidanceRecord {
+  questions: CompletedAskGuidanceQuestion[];
+}
+
+/** One question and its submitted answer in a completed ask_user guidance record. */
+export interface CompletedAskGuidanceQuestion {
+  question: string;
+  header: string;
+  answer: string | string[];
+}
+
 /**
  * A single step recorded during agentic tool-call execution. Stored with the
  * message. Still never sent to the API *verbatim*, but as of phase 2 it carries the
@@ -368,6 +380,11 @@ export interface AgenticStep {
    * questions 9/10); bounded so vault content in the conversation JSON stays small.
    */
   resultRecord?: string;
+  /**
+   * For a successful ask_user call: the exact validated questions and submitted
+   * answers. Optional forever for old conversations and every non-ask step.
+   */
+  askGuidance?: CompletedAskGuidanceRecord;
 }
 
 /**

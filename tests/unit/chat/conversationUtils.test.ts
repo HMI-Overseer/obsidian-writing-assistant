@@ -416,6 +416,58 @@ describe("normalizeConversation, phase-2 agenticStep capture fields", () => {
     expect(step.resultDigest).toBeUndefined();
     expect(step.resultRecord).toBeUndefined();
   });
+
+  test("preserves a valid exact ask guidance record across a JSON round-trip", () => {
+    const msg: ConversationMessage = {
+      id: "msg-ask",
+      role: "assistant",
+      content: "Done.",
+      agenticSteps: [{
+        type: "tool_call",
+        round: 0,
+        toolName: "ask_user",
+        toolCallId: "ask-1",
+        askGuidance: {
+          questions: [{
+            question: "Which areas should I cover?",
+            header: "Coverage",
+            answer: ["Testing", "Also include accessibility\nfailure modes"],
+          }],
+        },
+      }],
+    };
+
+    const raw = jsonRoundTrip(makeConversation([msg])) as Record<string, unknown>;
+    expect(normalizeConversation(raw)!.messages[0].agenticSteps![0].askGuidance).toEqual(
+      msg.agenticSteps![0].askGuidance,
+    );
+  });
+
+  test("drops a malformed ask guidance record instead of repairing it", () => {
+    const msg: ConversationMessage = {
+      id: "msg-ask",
+      role: "assistant",
+      content: "Done.",
+      agenticSteps: [{
+        type: "tool_call",
+        round: 0,
+        toolName: "ask_user",
+        toolCallId: "ask-1",
+      }],
+    };
+    const raw = jsonRoundTrip(makeConversation([msg])) as Record<string, unknown>;
+    const messages = raw.messages as Array<Record<string, unknown>>;
+    const steps = messages[0].agenticSteps as Array<Record<string, unknown>>;
+    steps[0].askGuidance = {
+      questions: [{
+        question: "Which areas should I cover?",
+        header: " Coverage ",
+        answer: ["Testing"],
+      }],
+    };
+
+    expect(normalizeConversation(raw)!.messages[0].agenticSteps![0].askGuidance).toBeUndefined();
+  });
 });
 
 describe("normalizeConversation, interrupted marker (section 4.C)", () => {

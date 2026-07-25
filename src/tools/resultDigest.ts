@@ -13,8 +13,10 @@
  */
 
 import { assertNever } from "../utils";
-import type { AgenticStep } from "../shared/types";
+import type { AgenticStep, CompletedAskGuidanceRecord } from "../shared/types";
 import type { VaultOpDisposition } from "../vault-ops/disposition";
+import { ASK_USER_TOOL_NAME } from "./ask/definition";
+import { deriveAskGuidanceCapture } from "./ask/result";
 
 /**
  * Cap (chars) on a stored full-result record (issue question 9), so vault content
@@ -42,6 +44,7 @@ export interface StepCaptureFields {
   resultDigest?: string;
   resultRecord?: string;
   disposition?: VaultOpDisposition;
+  askGuidance?: CompletedAskGuidanceRecord;
 }
 
 /**
@@ -67,10 +70,13 @@ export function captureStepFields(
   result: ResolvedToolResult,
 ): StepCaptureFields {
   const fields: StepCaptureFields = {};
-  const digest = formatResultDigest(toolName, args, result);
+  const askCapture =
+    toolName === ASK_USER_TOOL_NAME ? deriveAskGuidanceCapture(args, result) : null;
+  const digest = askCapture?.digest ?? formatResultDigest(toolName, args, result);
   if (digest !== undefined) fields.resultDigest = digest;
   if (result.content) fields.resultRecord = boundToolResult(result.content);
   if (result.disposition !== undefined) fields.disposition = result.disposition;
+  if (askCapture) fields.askGuidance = askCapture.guidance;
   return fields;
 }
 

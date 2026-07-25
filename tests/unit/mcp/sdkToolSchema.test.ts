@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { jsonSchemaToZodShape } from "../../../src/mcp/sdkToolSchema";
 import type { CanonicalToolDefinition } from "../../../src/tools/types";
+import { ASK_USER_TOOL } from "../../../src/tools/ask/definition";
 import { RECALL_MEMORY_TOOL } from "../../../src/tools/memory/definition";
 
 function shapeFor(parameters: CanonicalToolDefinition["parameters"]) {
@@ -120,5 +121,26 @@ describe("jsonSchemaToZodShape", () => {
     expect(shape.operations.safeParse([{ key: "title" }]).success).toBe(false);
     // `value` is optional, so omitting it is fine.
     expect(shape.operations.safeParse([{ key: "title", action: "remove" }]).success).toBe(true);
+  });
+
+  it("round-trips the ask_user array of questions and nested option arrays", () => {
+    const shape = shapeFor(ASK_USER_TOOL.parameters);
+    const valid = [{
+      question: "Which output shape?",
+      header: "Output",
+      options: [
+        { label: "Concise", description: "Keep it short." },
+        { label: "Detailed", description: "Include rationale." },
+      ],
+      multiSelect: false,
+    }];
+
+    expect(shape.questions.safeParse(valid).success).toBe(true);
+    expect(shape.questions.safeParse([{ ...valid[0], multiSelect: "false" }]).success).toBe(false);
+    expect(shape.questions.safeParse([{
+      ...valid[0],
+      options: [{ label: "Concise" }, valid[0].options[1]],
+    }]).success).toBe(false);
+    expect(shape.questions.safeParse([{ ...valid[0], options: "Concise" }]).success).toBe(false);
   });
 });

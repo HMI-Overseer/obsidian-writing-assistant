@@ -121,11 +121,11 @@ export function renderMemoriesTab(container: HTMLElement, plugin: WritingAssista
   const library = createSettingsSection(container, "Stored memories", undefined, {
     icon: "book-open",
   });
-  const listEl = library.bodyEl.createDiv({ cls: "lmsa-memory-list" });
-
   // The budget belongs to the records, not the feature switch: it is what this
-  // list costs. It reads as the table's total, so it sits under it.
+  // list costs. It heads the card, so the cost is read before the entries.
   const capacity = renderCapacityBar(library.bodyEl, () => memoryService.estimateIndexTokens());
+
+  const listEl = library.bodyEl.createDiv({ cls: "lmsa-memory-list" });
 
   // The row awaiting delete confirmation, by name. Deleting is two-step in place,
   // the same shape the history drawer and the profile list use.

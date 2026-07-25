@@ -183,6 +183,69 @@ describe("captureStepFields", () => {
   it("returns nothing for a call with no content, disposition, or digest", () => {
     expect(captureStepFields("think", {}, { content: "" })).toEqual({});
   });
+
+  it("captures exact ask guidance beside the bounded generic result record", () => {
+    const args = {
+      questions: [{
+        question: "Which areas should I cover?",
+        header: "Coverage",
+        options: [
+          { label: "Testing", description: "Cover test design." },
+          { label: "Migration", description: "Cover migration concerns." },
+        ],
+        multiSelect: true,
+      }],
+    };
+    const content = JSON.stringify({
+      answers: {
+        "Which areas should I cover?": [
+          "Testing",
+          "Also include \"accessibility\"\n[failure; modes]",
+        ],
+      },
+    });
+
+    expect(captureStepFields("ask_user", args, { content })).toEqual({
+      resultDigest:
+        '[ask_user guidance: {"questions":[{"question":"Which areas should I cover?",' +
+        '"header":"Coverage","answer":["Testing",' +
+        '"Also include \\"accessibility\\"\\n[failure; modes]"]}]}]',
+      resultRecord: content,
+      askGuidance: {
+        questions: [{
+          question: "Which areas should I cover?",
+          header: "Coverage",
+          answer: ["Testing", "Also include \"accessibility\"\n[failure; modes]"],
+        }],
+      },
+    });
+  });
+
+  it("does not derive ask guidance from a failed or malformed ask result", () => {
+    const args = {
+      questions: [{
+        question: "Choose?",
+        header: "Choice",
+        options: [
+          { label: "First", description: "Choose first." },
+          { label: "Second", description: "Choose second." },
+        ],
+        multiSelect: false,
+      }],
+    };
+    const failed = captureStepFields("ask_user", args, {
+      content: "Error: cancelled.",
+      isError: true,
+    });
+    const malformed = captureStepFields("ask_user", args, {
+      content: '{"answers":{"Choose?":[]}}',
+    });
+
+    expect(failed.askGuidance).toBeUndefined();
+    expect(failed.resultDigest).toBeUndefined();
+    expect(malformed.askGuidance).toBeUndefined();
+    expect(malformed.resultDigest).toBeUndefined();
+  });
 });
 
 /**

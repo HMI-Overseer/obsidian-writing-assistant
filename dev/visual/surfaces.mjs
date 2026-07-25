@@ -234,20 +234,21 @@ const memoryRow = (name, type, desc, on = true, confirming = false) =>
   </tr>`;
 
 const memoryTable = (rows) =>
-  `<div class="lmsa-memory-list"><table class="lmsa-memory-table">
+  `<div class="lmsa-memory-capacity">
+    <div class="lmsa-memory-capacity-header">
+      <span class="lmsa-memory-capacity-label">Index budget (advisory)</span>
+      <span class="lmsa-memory-capacity-value">~180 of 3.0k tokens (6%)</span>
+    </div>
+    <div class="lmsa-index-progress-bar"><div class="lmsa-index-progress-fill" style="width:6%"></div></div>
+  </div>
+  <div class="lmsa-memory-list"><table class="lmsa-memory-table">
     <thead><tr>
       <th class="lmsa-memory-col-switch"></th><th>Name</th><th>Type</th><th>Description</th>
       <th class="lmsa-memory-col-actions"></th>
     </tr></thead>
     <tbody>${rows}</tbody>
   </table></div>
-  <div class="lmsa-memory-capacity">
-    <div class="lmsa-memory-capacity-header">
-      <span class="lmsa-memory-capacity-label">Index budget (advisory)</span>
-      <span class="lmsa-memory-capacity-value">~180 of 3.0k tokens (6%)</span>
-    </div>
-    <div class="lmsa-index-progress-bar"><div class="lmsa-index-progress-fill" style="width:6%"></div></div>
-  </div>`;
+`;
 
 // Feature off: the table is not rendered at all, the body carries the message.
 const memoryOffState = () =>

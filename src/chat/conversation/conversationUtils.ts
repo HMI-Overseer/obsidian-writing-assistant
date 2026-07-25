@@ -9,6 +9,7 @@ import type {
   MessageVersion,
 } from "../../shared/types";
 import type { AppliedEditRecord, EditProposal } from "../../editing/editTypes";
+import { normalizeCompletedAskGuidance } from "../../tools/ask/result";
 import { generateId } from "../../utils";
 
 /** Coerce a raw persisted value to a known posture, defaulting to `ask`. */
@@ -189,7 +190,20 @@ export function normalizeConversation(raw: unknown): Conversation | null {
             base.rewrittenQuery = message.rewrittenQuery;
           }
           if (Array.isArray(message.agenticSteps)) {
-            base.agenticSteps = message.agenticSteps as ConversationMessage["agenticSteps"];
+            base.agenticSteps = (message.agenticSteps as unknown[])
+              .filter(
+                (step): step is Record<string, unknown> =>
+                  typeof step === "object" && step !== null && !Array.isArray(step),
+              )
+              .map((step) => {
+                const normalizedStep = { ...step };
+                if (Object.prototype.hasOwnProperty.call(normalizedStep, "askGuidance")) {
+                  const guidance = normalizeCompletedAskGuidance(normalizedStep.askGuidance);
+                  if (guidance) normalizedStep.askGuidance = guidance;
+                  else delete normalizedStep.askGuidance;
+                }
+                return normalizedStep;
+              }) as ConversationMessage["agenticSteps"];
           }
           if (Array.isArray(message.attachments)) {
             const valid = (message.attachments as unknown[]).filter(isValidAttachment);

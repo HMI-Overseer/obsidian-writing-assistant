@@ -139,22 +139,12 @@
 
 /* ── Index budget ─────────────────────────────────────────────────────── */
 
-/* Carries the same gradient rule the setting items separate themselves with, so
-   the budget reads as the card's next row rather than as loose trailing chrome. */
+/* No separator rule under this block. The progress track is already a full-width
+   horizontal line, so a divider beneath it reads as a second underline rather
+   than as a division; the gap does the separating instead. */
 .lmsa-memory-capacity {
-  @apply lmsa:relative lmsa:flex lmsa:flex-col lmsa:gap-2;
-  padding-top: 16px;
-}
-
-.lmsa-memory-capacity::before {
-  content: "";
-  @apply lmsa:pointer-events-none lmsa:absolute lmsa:inset-x-0 lmsa:top-0 lmsa:h-px;
-  background: linear-gradient(
-    90deg,
-    color-mix(in srgb, var(--lmsa-section-accent) 20%, transparent),
-    var(--lmsa-border-subtle),
-    color-mix(in srgb, var(--lmsa-section-accent-secondary) 20%, transparent)
-  );
+  @apply lmsa:flex lmsa:flex-col lmsa:gap-2;
+  margin-bottom: 18px;
 }
 
 .lmsa-memory-capacity-header {

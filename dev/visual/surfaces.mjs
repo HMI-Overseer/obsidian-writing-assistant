@@ -244,7 +244,7 @@ const askOther = (
   name,
   { checked = false, multi = false, text = "" } = {},
 ) =>
-  `<div class="lmsa-ask-form-option lmsa-ask-form-other-option">
+  `<div class="lmsa-ask-form-option lmsa-ask-form-other-option${checked ? " is-other-expanded" : ""}">
     <input class="lmsa-ask-form-option-input" type="${multi ? "checkbox" : "radio"}"
       id="${id}" name="${name}"${checked ? " checked" : ""}>
     <label class="lmsa-ask-form-option-label" for="${id}">

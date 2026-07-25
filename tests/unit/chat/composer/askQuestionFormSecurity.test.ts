@@ -63,10 +63,13 @@ describe("ask question rendering security", () => {
     expect(form).not.toContain("Your answer");
     expect(form).not.toContain("lmsa-ask-form-question-header");
     expect(form.match(/text: question\.header/gu)).toHaveLength(1);
+    expect(form).toContain('"is-other-expanded"');
     expect(form).not.toContain("this.callbacks.onSubmit(question");
     expect(styles).toContain("width: fit-content");
     expect(styles).not.toContain("overflow-x: auto");
     expect(styles).toContain("align-items: center");
     expect(styles).toContain("border-radius: 8px");
+    expect(styles).toContain("grid-row: 1 / span 2");
+    expect(styles).toContain("margin-top: 12px");
   });
 });

@@ -254,18 +254,31 @@ button.lmsa-ask-form-tab.is-active {
   min-width: 0;
   flex-direction: column;
   grid-column: 2;
-  gap: 4px;
-  padding: 5px 0 2px;
+  grid-row: 2;
+  padding: 2px 0;
 }
 
 .lmsa-ask-form-other-text[hidden] {
   display: none;
 }
 
+.lmsa-ask-form-other-option.is-other-expanded
+  > .lmsa-ask-form-option-input {
+  grid-row: 1 / span 2;
+  align-self: start;
+  margin-top: 12px;
+}
+
+.lmsa-ask-form-other-option > .lmsa-ask-form-option-label {
+  grid-column: 2;
+  grid-row: 1;
+}
+
 .lmsa-ask-form-other-textarea {
   box-sizing: border-box;
   width: 100%;
   min-height: 72px;
+  margin: 0;
   resize: vertical;
   border: 1px solid var(--background-modifier-border);
   border-radius: 6px;

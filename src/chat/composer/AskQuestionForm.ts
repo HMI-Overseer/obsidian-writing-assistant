@@ -30,6 +30,7 @@ interface QuestionFormRefs {
   tabEl: HTMLButtonElement;
   fieldsetEl: HTMLFieldSetElement;
   optionInputs: HTMLInputElement[];
+  otherRowEl: HTMLElement;
   otherInput: HTMLInputElement;
   otherTextWrapEl: HTMLElement;
   otherTextEl: HTMLTextAreaElement;
@@ -222,6 +223,7 @@ export class AskQuestionForm {
       tabEl,
       fieldsetEl,
       optionInputs,
+      otherRowEl: other.row,
       otherInput: other.input,
       otherTextWrapEl: other.textWrap,
       otherTextEl: other.textarea,
@@ -283,6 +285,7 @@ export class AskQuestionForm {
     question: ValidatedAskQuestion,
     questionIndex: number,
   ): {
+    row: HTMLElement;
     input: HTMLInputElement;
     textWrap: HTMLElement;
     textarea: HTMLTextAreaElement;
@@ -347,7 +350,7 @@ export class AskQuestionForm {
       );
       this.refresh();
     });
-    return { input, textWrap, textarea };
+    return { row: rowEl, input, textWrap, textarea };
   }
 
   private renderError(formEl: HTMLFormElement): HTMLElement {
@@ -386,6 +389,10 @@ export class AskQuestionForm {
           questionState?.selectedOptionIndexes.includes(optionIndex) ?? false;
       });
       refs.otherInput.checked = questionState?.otherSelected ?? false;
+      refs.otherRowEl.toggleClass(
+        "is-other-expanded",
+        questionState?.otherSelected ?? false,
+      );
       refs.otherTextWrapEl.hidden = !questionState?.otherSelected;
       refs.otherTextEl.disabled =
         this.disabled || !(questionState?.otherSelected ?? false);

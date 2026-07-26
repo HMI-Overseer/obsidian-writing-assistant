@@ -13,7 +13,7 @@ import type { ChatLayoutRefs } from "./types";
 import { sendMessage } from "./actions/sendMessage";
 import { generateLlmResponse } from "./actions/generateLlmResponse";
 import { regenerateMessage } from "./actions/regenerateMessage";
-import { hasCompletedAskGuidance } from "../tools/resultDigest";
+import { assistantHasCompletedAskGuidance } from "./conversation/assistantRevisions";
 
 export type GenerationOrchestratorDeps = {
   plugin: WritingAssistantChat;
@@ -152,7 +152,7 @@ export class ChatGenerationOrchestrator {
     while (store.getSnapshot().messageHistory.length > 0) {
       const msgs = store.getSnapshot().messageHistory;
       const tail = msgs[msgs.length - 1];
-      if (tail.isError && !hasCompletedAskGuidance(tail.agenticSteps)) {
+      if (tail.isError && !assistantHasCompletedAskGuidance(tail)) {
         store.removeLastMessage();
         removed = true;
       } else {

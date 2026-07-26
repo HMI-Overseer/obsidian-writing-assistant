@@ -112,6 +112,11 @@ export interface AssistantTurnKeyedUpdatePlan {
   removed: string[];
 }
 
+export interface AssistantTurnRenderUpdatePlan
+  extends AssistantTurnKeyedUpdatePlan {
+  updated: string[];
+}
+
 /** Derive display-only marker, connector, lifecycle, and empty-turn state. */
 export function buildAssistantTurnRenderModel(
   turn: AssistantTurnSnapshot,
@@ -278,7 +283,6 @@ export function selectAssistantMessageRenderSource(
           ? "interrupted"
           : "completed",
       content: legacyVisibleContent(message.content, message.isError),
-      steps: message.agenticSteps,
       ...legacyErrorOption(
         message.content,
         message.isError,
@@ -301,6 +305,35 @@ export function planAssistantTurnKeyedUpdate(
     reused: next.filter((id) => currentSet.has(id)),
     added: next.filter((id) => !currentSet.has(id)),
     removed: current.filter((id) => !nextSet.has(id)),
+  };
+}
+
+/**
+ * Plan item-local rendering work.
+ *
+ * Existing hosts remain keyed by item ID. `updated` contains only retained items
+ * whose visible render model changed, so one lifecycle event does not repaint
+ * every tool and diagnostic body in a long turn.
+ */
+export function planAssistantTurnRenderUpdate(
+  currentItems: readonly AssistantTurnRenderItem[],
+  nextItems: readonly AssistantTurnRenderItem[],
+): AssistantTurnRenderUpdatePlan {
+  const keyed = planAssistantTurnKeyedUpdate(
+    currentItems.map((item) => item.id),
+    nextItems.map((item) => item.id),
+  );
+  const currentById = new Map(
+    currentItems.map((item) => [item.id, item]),
+  );
+  return {
+    ...keyed,
+    updated: nextItems.flatMap((item) => {
+      const current = currentById.get(item.id);
+      return current && !sameRenderItem(current, item)
+        ? [item.id]
+        : [];
+    }),
   };
 }
 
@@ -520,6 +553,13 @@ function uniqueIds(ids: readonly string[], label: string): string[] {
     throw new Error(`The ${label} assistant turn order contains duplicate item IDs.`);
   }
   return [...ids];
+}
+
+function sameRenderItem(
+  current: AssistantTurnRenderItem,
+  next: AssistantTurnRenderItem,
+): boolean {
+  return JSON.stringify(current) === JSON.stringify(next);
 }
 
 function actionLedgerForTurn(

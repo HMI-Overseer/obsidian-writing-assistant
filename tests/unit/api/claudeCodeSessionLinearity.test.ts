@@ -9,6 +9,7 @@ import {
   type SessionTurn,
 } from "../../../src/api/harnessSession";
 import { toHistoryTurns } from "../../../src/chat/finalization/prepareApiMessages";
+import { normalizeConversation } from "../../../src/chat/conversation/conversationUtils";
 import type { ChatRequest, ChatTurn } from "../../../src/shared/chatRequest";
 import type {
   AgenticStep,
@@ -217,7 +218,24 @@ describe("Claude Code session linearity across edit annotations", () => {
       provider: "claudecode",
       agenticSteps: steps,
     };
-    const [annotated] = toHistoryTurns(message, false, "claudecode");
+    const loaded = normalizeConversation({
+      id: "conversation-linearity",
+      title: "Linearity",
+      createdAt: 1,
+      updatedAt: 1,
+      modelId: "claudecode:claude-test",
+      modelName: "Claude test",
+      messages: [message],
+      draft: "",
+    });
+    if (!loaded?.messages[0]) {
+      throw new Error("Legacy linearity fixture did not normalize.");
+    }
+    const [annotated] = toHistoryTurns(
+      loaded.messages[0],
+      false,
+      "claudecode",
+    );
     expect(annotated.content).not.toBe(RAW_REPLY); // the digest was appended
     expect(annotated.rawContent).toBe(RAW_REPLY); // raw bytes preserved for the hash
 

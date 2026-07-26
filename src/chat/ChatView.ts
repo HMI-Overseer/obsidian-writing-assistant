@@ -18,7 +18,7 @@ import { ChatConversationController } from "./ChatConversationController";
 import type { ContextInputs } from "./ContextCapacityUpdater";
 import { ContextCapacityUpdater } from "./ContextCapacityUpdater";
 import { lastReportedContextWindow } from "../shared/tokenEstimation";
-import { renderProposalPanels } from "./finalization/finalizeEditResponse";
+import { renderLegacyReviewPanels } from "./finalization/legacyReviewPanels";
 import { ChatComposer } from "./composer/ChatComposer";
 import { ComposerOverflowMenu } from "./composer/ComposerOverflowMenu";
 import { ReasoningPill } from "./composer/ReasoningPill";
@@ -582,15 +582,7 @@ export class ChatView extends ItemView {
       if (message.editProposals?.length || message.vaultOpProposal) {
         const bubble = this.transcript.getBubbleForMessage(message.id);
         if (bubble?.role === "assistant") {
-          renderProposalPanels(
-            this.app,
-            this,
-            this.sessionStore,
-            bubble,
-            message,
-            this.plugin.inlineDiff,
-            { onEnterAutoApply: () => this.composer?.setPosture("auto") },
-          );
+          renderLegacyReviewPanels(this.app, bubble, message);
         }
       }
     }

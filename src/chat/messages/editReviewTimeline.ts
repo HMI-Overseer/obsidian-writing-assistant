@@ -5,7 +5,6 @@ import type {
   HunkReviewChange,
   InitialHunkView,
 } from "../../editing/EditReviewController";
-import { EDIT_TOOL_NAMES } from "../../tools/editing/definition";
 import { DiffHunkView } from "./DiffHunkView";
 import type { DiffMode } from "./DiffHunkView";
 
@@ -22,9 +21,8 @@ import type { DiffMode } from "./DiffHunkView";
  * A pure view over {@link EditReviewController}: approve/decline/undo route through
  * the controller and its broadcasts keep this view and the in-note overlay in sync.
  * Hunks map to steps by {@link DiffHunk.id} (=== the originating tool-call id, tagged
- * on the element as `data-tool-call-id`), with a positional fallback by edit-tool name
- * and a synthetic fallback row, so a regex-parsed edit (no tool call) is never
- * silently unreviewable.
+ * on the element as `data-tool-call-id`). A review without exact identity uses a
+ * synthetic history row and never claims a provider declaration.
  */
 
 export interface EditReviewTimelineOptions {
@@ -159,13 +157,12 @@ export class EditReviewTimelineView {
   }
 
   private paint(): void {
-    const used = new Set<HTMLElement>();
     // One card per hunk across every file's controller; the file name is derived per
     // controller so a multi-file turn labels each card with its own note (ADR-0010).
     for (const controller of this.opts.controllers) {
       const fileName = fileNameOf(controller);
       for (const hunk of controller.proposal.hunks) {
-        this.decorateStep(this.locateStep(hunk, used), hunk, controller, fileName);
+        this.decorateStep(this.locateStep(hunk), hunk, controller, fileName);
       }
     }
     this.renderBulkBar();
@@ -231,11 +228,9 @@ export class EditReviewTimelineView {
   }
 
   /**
-   * Find the timeline step for a hunk, or lazily create a synthetic stand-in.
-   * Primary match is by tool-call id (`hunk.id` === `data-tool-call-id`); fallback
-   * is the next unclaimed edit-tool step in document order.
+   * Find the exact timeline step for a hunk, or create a synthetic history row.
    */
-  private locateStep(hunk: DiffHunk, used: Set<HTMLElement>): HTMLElement {
+  private locateStep(hunk: DiffHunk): HTMLElement {
     if (this.opts.findActionHostByToolCallId) {
       const host = this.opts.findActionHostByToolCallId(hunk.id);
       if (!host) {
@@ -243,31 +238,12 @@ export class EditReviewTimelineView {
           `No assistant turn action host exists for edit call "${hunk.id}".`,
         );
       }
-      used.add(host);
       return host;
     }
     const byId = this.opts.timelineEl.querySelector<HTMLElement>(
       `[data-tool-call-id="${CSS.escape(hunk.id)}"]`,
     );
-    if (byId && !used.has(byId)) {
-      used.add(byId);
-      return byId;
-    }
-
-    const positional = Array.from(
-      this.opts.timelineEl.querySelectorAll<HTMLElement>(
-        ".lmsa-agentic-timeline-step--tool_call[data-tool-name]",
-      ),
-    ).find(
-      (s) =>
-        EDIT_TOOL_NAMES.has(s.dataset.toolName ?? "") &&
-        !s.closest(".lmsa-edit-review-fallback") &&
-        !used.has(s),
-    );
-    if (positional) {
-      used.add(positional);
-      return positional;
-    }
+    if (byId) return byId;
 
     return this.ensureSyntheticStep(hunk);
   }

@@ -315,6 +315,30 @@ describe("assistant turn render model", () => {
 
     expect(source).toEqual(before);
   });
+
+  it("preserves HTML-looking prose, arguments, and errors only as display text", () => {
+    const html = '<img src=x onerror="fixture()"> <script>fixture()</script>';
+    const model = buildAssistantTurnRenderModel(
+      turn("failed", [
+        prose("p1", "s1", html),
+        {
+          ...tool("t1", "s1", "call-1", "failed"),
+          toolArguments: JSON.stringify({ value: html }),
+          toolArgs: { value: html },
+          errorContent: html,
+          isError: true,
+        },
+      ]),
+    );
+
+    expect(model.items[0]).toMatchObject({ type: "prose", text: html });
+    expect(model.items[1]).toMatchObject({
+      type: "tool_call",
+      toolArguments: JSON.stringify({ value: html }),
+      toolArgs: { value: html },
+      errorContent: html,
+    });
+  });
 });
 
 function sourceItemKeys(value: object): string[] {

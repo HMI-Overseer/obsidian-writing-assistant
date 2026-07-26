@@ -24,7 +24,7 @@ const OP_KIND_ICONS: Record<VaultOperation["kind"], string> = {
   replaceInVault: "replace",
 };
 
-/** Tool name behind each op kind, for the positional fallback (`data-tool-name`). */
+/** Tool name behind each operation kind, used for historical labels. */
 const TOOL_NAME_BY_KIND: Record<VaultOperation["kind"], string> = {
   create: "write_file",
   overwrite: "write_file",
@@ -48,9 +48,8 @@ const TOOL_NAME_BY_KIND: Record<VaultOperation["kind"], string> = {
  *
  * Steps are matched to ops by tool-call id (`AgenticStep.toolCallId` ===
  * `ReviewableVaultOp.sourceToolCallId`, tagged on the element as
- * `data-tool-call-id`). An op with no matching step (e.g. the Claude Code MCP
- * path, which doesn't carry the id) falls back to a synthetic step row so it is
- * never silently unreviewable.
+ * `data-tool-call-id`). An op without exact identity uses a synthetic history row
+ * and never claims a provider declaration.
  */
 
 export type VaultReviewCallbacks = {
@@ -170,33 +169,17 @@ export class VaultReviewTimelineView {
         )?.id ?? null
       : null;
 
-    // Per-paint state for step matching: a cursor per tool name (which ordinal of
-    // that tool we're on) and the set of steps already claimed, so two ops never
-    // decorate the same row.
-    const cursors = new Map<string, number>();
-    const used = new Set<HTMLElement>();
     for (const op of this.opts.proposal.ops) {
-      this.decorateStep(this.locateStep(op, cursors, used), op);
+      this.decorateStep(this.locateStep(op), op);
     }
     this.paintFooter();
   }
 
   /**
-   * Find the timeline step for an op, or lazily create a synthetic stand-in.
-   * Primary match is by tool-call id (`sourceToolCallId` === `data-tool-call-id`).
-   * Belt-and-braces: if the id is missing or unmatched, bind to the Nth live
-   * tool-call step of the same tool name, so any future id gap degrades to the
-   * right row rather than a synthetic duplicate.
+   * Find the exact timeline step for an operation, or create a synthetic history
+   * row when the legacy record has no trustworthy declaration identity.
    */
-  private locateStep(
-    op: ReviewableVaultOp,
-    cursors: Map<string, number>,
-    used: Set<HTMLElement>,
-  ): HTMLElement {
-    const toolName = TOOL_NAME_BY_KIND[op.op.kind];
-    const ordinal = cursors.get(toolName) ?? 0;
-    cursors.set(toolName, ordinal + 1);
-
+  private locateStep(op: ReviewableVaultOp): HTMLElement {
     const id = op.sourceToolCallId;
     if (id) {
       if (this.opts.findActionHostByToolCallId) {
@@ -206,27 +189,12 @@ export class VaultReviewTimelineView {
             `No assistant turn action host exists for vault call "${id}".`,
           );
         }
-        used.add(host);
         return host;
       }
       const el = this.opts.timelineEl.querySelector<HTMLElement>(
         `[data-tool-call-id="${CSS.escape(id)}"]`,
       );
-      if (el) {
-        used.add(el);
-        return el;
-      }
-    }
-
-    const candidates = Array.from(
-      this.opts.timelineEl.querySelectorAll<HTMLElement>(
-        `.lmsa-agentic-timeline-step--tool_call[data-tool-name="${CSS.escape(toolName)}"]`,
-      ),
-    ).filter((el) => !el.closest(".lmsa-vault-review-fallback"));
-    const positional = candidates[ordinal];
-    if (positional && !used.has(positional)) {
-      used.add(positional);
-      return positional;
+      if (el) return el;
     }
 
     return this.ensureSyntheticStep(op);

@@ -1,10 +1,55 @@
 import { describe, it, expect } from "vitest";
 import {
-  toHistoryTurns,
-  toRequestHistoryTurns,
+  toHistoryTurns as projectHistoryTurns,
+  toRequestHistoryTurns as projectRequestHistoryTurns,
 } from "../../../src/chat/finalization/prepareApiMessages";
+import {
+  normalizeConversation,
+} from "../../../src/chat/conversation/conversationUtils";
 import type { AgenticStep, ConversationMessage } from "../../../src/shared/types";
 import type { DiffHunk, EditProposal, EditStatus } from "../../../src/editing/editTypes";
+
+function loadMessage(
+  message: ConversationMessage,
+): ConversationMessage {
+  if (message.role === "user") return message;
+  const normalized = normalizeConversation({
+    id: "conversation-fixture",
+    title: "Fixture",
+    createdAt: 1,
+    updatedAt: 1,
+    modelId: "openai:gpt-fixture",
+    modelName: "GPT fixture",
+    messages: [message],
+    draft: "",
+  });
+  if (!normalized?.messages[0]) {
+    throw new Error("Fixture assistant message did not normalize.");
+  }
+  return normalized.messages[0];
+}
+
+function toHistoryTurns(
+  message: ConversationMessage,
+  supportsVision: boolean,
+  provider?: "anthropic" | "openai" | "lmstudio" | "claudecode",
+) {
+  return projectHistoryTurns(
+    loadMessage(message),
+    supportsVision,
+    provider,
+  );
+}
+
+function toRequestHistoryTurns(
+  messages: ConversationMessage[],
+  supportsVision: boolean,
+) {
+  return projectRequestHistoryTurns(
+    messages.map(loadMessage),
+    supportsVision,
+  );
+}
 
 function makeHunk(id: string, rawBlock: string, searchText: string, status: EditStatus): DiffHunk {
   return {

@@ -19,8 +19,8 @@ import { writesPermitted } from "../../vault-ops/gateway";
 import { getActiveProfile } from "../../shared/profileUtils";
 import { prepareApiMessages } from "../finalization/prepareApiMessages";
 import { estimateTokenCount } from "../../shared/tokenEstimation";
-import { insertLastResponse } from "../finalization/finalizeResponse";
-import { buildRegexEditProposals } from "../finalization/finalizeEditResponse";
+import { insertLastResponse } from "../finalization/insertLastResponse";
+import { buildRegexEditProposals } from "../finalization/regexEditProposals";
 import { estimateCost } from "../../api/pricing";
 import type { UsageResult } from "../../api/usageTypes";
 import type { MessageUsage } from "../../shared/types";
@@ -106,8 +106,8 @@ function buildMessageUsage(modelId: string, usage: UsageResult): MessageUsage {
       sessionRebuildReason: usage.sessionRebuildReason,
     }),
     ...(usage.resumeCursor !== undefined && { resumeCursor: usage.resumeCursor }),
-    // Provider-reported cost wins over the price-table estimate (mirrors
-    // finalizeResponse): Claude Code's aliases have no price-table entry at all.
+    // Provider-reported cost wins over the price-table estimate because Claude
+    // Code aliases have no price-table entry.
     estimatedCostUsd: usage.costUsd ?? estimateCost(modelId, usage) ?? undefined,
   };
 }
@@ -168,7 +168,7 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
   const claudeToolCorrelations: Record<string, "provider_id"> = {};
 
   // Ambient editing (prompt-cache design section 6.3): the edit pipeline (edit renderer, edit
-  // review channel, finalizeEditResponse) is active whenever the session permits any
+  // review channel is active whenever the session permits any
   // write. A read-only session is exactly a deny-all policy under the `ask` posture.
   const editsActive = writesPermitted(plugin.settings.vaultOpPolicy, posture);
   const activeFilePath = plugin.app.workspace.getActiveFile()?.path;

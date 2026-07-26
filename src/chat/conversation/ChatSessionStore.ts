@@ -6,6 +6,7 @@ import type {
   Conversation,
   ConversationMeta,
   ConversationMessage,
+  ProviderOption,
   ToolActionEvent,
   ToolActionLedgerEntry,
 } from "../../shared/types";
@@ -137,8 +138,22 @@ export class ChatSessionStore {
     this.memory.setLastAssistantResponse(text);
   }
 
-  updateMessageContent(messageId: string, newContent: string): boolean {
-    return this.memory.updateMessageContent(messageId, newContent);
+  updateUserMessageContent(messageId: string, newContent: string): boolean {
+    return this.memory.updateUserMessageContent(messageId, newContent);
+  }
+
+  editLegacyAssistantContent(
+    messageId: string,
+    text: string,
+    provider: ProviderOption,
+    modelId: string,
+  ): boolean {
+    return this.memory.editLegacyAssistantContent(
+      messageId,
+      text,
+      provider,
+      modelId,
+    );
   }
 
   editAssistantProseItem(
@@ -191,31 +206,6 @@ export class ChatSessionStore {
 
   getMessagesUpToInclusive(messageId: string): ConversationMessage[] {
     return this.memory.getMessagesUpToInclusive(messageId);
-  }
-
-  finalizeRegeneration(
-    oldMessage: ConversationMessage,
-    newContent: string,
-    metadata?: Pick<
-      ConversationMessage,
-      | "modelId"
-      | "provider"
-      | "usage"
-      | "ragSources"
-      | "rewrittenQuery"
-      | "agenticSteps"
-      | "interrupted"
-    >,
-  ): ConversationMessage {
-    return this.memory.finalizeRegeneration(oldMessage, newContent, metadata);
-  }
-
-  restoreRegeneration(oldMessage: ConversationMessage): void {
-    this.memory.restoreRegeneration(oldMessage);
-  }
-
-  switchMessageVersion(messageId: string, newIndex: number): boolean {
-    return this.memory.switchMessageVersion(messageId, newIndex);
   }
 
   switchMessageRevision(messageId: string, revisionId: string): boolean {

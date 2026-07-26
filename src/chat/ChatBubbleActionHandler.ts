@@ -60,9 +60,9 @@ export class ChatBubbleActionHandler {
           this.deps.getOrchestrator().regenerate(messageId),
           "Failed to regenerate the response.",
         ),
-      onVersionChange: (messageId, newIndex) =>
+      onVersionChange: (messageId, revisionId) =>
         reportIfRejected(
-          this.handleVersionChange(messageId, newIndex),
+          this.handleVersionChange(messageId, revisionId),
           "Failed to switch the message version.",
         ),
       getActionEligibility: (messageId, actionRef, targetId) =>
@@ -182,19 +182,36 @@ export class ChatBubbleActionHandler {
         if (this.blockedDuringGeneration()) return;
         const currentStore = this.deps.getStore();
         if (!currentStore) return;
-        const saved =
+        let saved = false;
+        if (
           message.role === "assistant" &&
           activeRevision?.kind === "turn" &&
           proseItemId
-            ? currentStore.editAssistantProseItem(
+        ) {
+          saved = currentStore.editAssistantProseItem(
+            messageId,
+            proseItemId,
+            newContent,
+          );
+        } else if (
+          message.role === "assistant" &&
+          activeRevision?.kind === "legacy"
+        ) {
+          const model = currentStore.getResolvedConversationModel();
+          saved = model
+            ? currentStore.editLegacyAssistantContent(
                 messageId,
-                proseItemId,
                 newContent,
+                model.provider,
+                model.modelId,
               )
-            : currentStore.updateMessageContent(
-                messageId,
-                newContent,
-              );
+            : false;
+        } else if (message.role === "user") {
+          saved = currentStore.updateUserMessageContent(
+            messageId,
+            newContent,
+          );
+        }
         if (!saved) return;
         await currentStore.persistActiveConversation();
         await this.deps.syncConversationUi();
@@ -227,14 +244,17 @@ export class ChatBubbleActionHandler {
     });
   }
 
-  async handleVersionChange(messageId: string, newIndex: number): Promise<void> {
+  async handleVersionChange(
+    messageId: string,
+    revisionId: string,
+  ): Promise<void> {
     if (this.blockedDuringGeneration()) return;
 
     const store = this.deps.getStore();
     const transcript = this.deps.getTranscript();
     if (!store || !transcript) return;
 
-    store.switchMessageVersion(messageId, newIndex);
+    store.switchMessageRevision(messageId, revisionId);
     await store.persistActiveConversation();
 
     const snapshot = store.getSnapshot();

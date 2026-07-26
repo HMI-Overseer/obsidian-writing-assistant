@@ -448,8 +448,6 @@ function harness(
     persistActiveConversation: vi.fn(() => Promise.resolve()),
     appendMessage: vi.fn((message: ConversationMessage) => messages.push(message)),
     setLastAssistantResponse: vi.fn(),
-    finalizeRegeneration: vi.fn(),
-    restoreRegeneration: vi.fn(),
     commitRevisionReplacement: vi.fn(
       (
         messageId: string,

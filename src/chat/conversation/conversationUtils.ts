@@ -15,6 +15,7 @@ import type {
   RagSourceRef,
 } from "../../shared/types";
 import type { AppliedEditRecord, EditProposal } from "../../editing/editTypes";
+import type { ToolCall } from "../../tools/types";
 import { normalizeCompletedAskGuidance } from "../../tools/ask/result";
 import { ASK_USER_TOOL_NAME } from "../../tools/ask/definition";
 import { generateId } from "../../utils";
@@ -305,6 +306,7 @@ function normalizeLegacyAssistantMessage(
   });
   preserveLegacyVersionFields(message, candidates, value.activeVersionIndex);
   preserveLegacyReviewFields(message, value);
+  preserveLegacyToolCalls(message, value.toolCalls);
   const active = message.revisions?.find(
     (revision) => revision.revisionId === message.activeRevisionId,
   );
@@ -312,6 +314,31 @@ function normalizeLegacyAssistantMessage(
     message.agenticSteps = structuredClone(active.legacySteps);
   }
   return message;
+}
+
+function preserveLegacyToolCalls(
+  message: ConversationMessage,
+  value: unknown,
+): void {
+  if (!Array.isArray(value)) return;
+  const calls = value.flatMap((candidate): ToolCall[] => {
+    if (
+      !isRecord(candidate) ||
+      !isNonEmptyString(candidate.id) ||
+      !isNonEmptyString(candidate.name) ||
+      !isRecord(candidate.arguments)
+    ) {
+      return [];
+    }
+    return [
+      {
+        id: candidate.id,
+        name: candidate.name,
+        arguments: structuredClone(candidate.arguments),
+      },
+    ];
+  });
+  if (calls.length > 0) message.toolCalls = calls;
 }
 
 function normalizeLegacyVersions(

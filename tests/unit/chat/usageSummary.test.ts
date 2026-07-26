@@ -1,205 +1,119 @@
-import { describe, test, expect } from "vitest";
+import { describe, expect, test } from "vitest";
 import { sumConversationUsage } from "../../../src/chat/usageSummary";
-import type { ConversationMessage, MessageUsage } from "../../../src/shared/types";
+import type {
+  ConversationMessage,
+  MessageUsage,
+} from "../../../src/shared/types";
 
-function makeMsg(
-  role: "user" | "assistant",
-  overrides: Partial<ConversationMessage> = {}
-): ConversationMessage {
+function usage(
+  inputTokens: number,
+  outputTokens: number,
+  estimatedCostUsd?: number,
+): MessageUsage {
   return {
-    id: `msg-${Math.random().toString(36).slice(2, 8)}`,
-    role,
-    content: "test",
-    ...overrides,
+    inputTokens,
+    outputTokens,
+    ...(estimatedCostUsd === undefined
+      ? {}
+      : { estimatedCostUsd }),
   };
 }
 
-function makeUsage(overrides: Partial<MessageUsage> = {}): MessageUsage {
+function assistant(
+  usages: Array<MessageUsage | undefined>,
+): ConversationMessage {
   return {
-    inputTokens: 100,
-    outputTokens: 50,
-    ...overrides,
+    id: "assistant-1",
+    role: "assistant",
+    content: "Active.",
+    revisions: usages.map((entry, index) => ({
+      revisionId: `revision-${index}`,
+      kind: "legacy",
+      content: `Revision ${index}.`,
+      ...(entry ? { usage: entry } : {}),
+    })),
+    activeRevisionId: `revision-${usages.length - 1}`,
+    actionLedger: [],
   };
 }
 
 describe("sumConversationUsage", () => {
-  test("returns zero totals for empty message list", () => {
-    const result = sumConversationUsage([]);
-    expect(result.hasUsage).toBe(false);
-    expect(result.totalInputTokens).toBe(0);
-    expect(result.totalOutputTokens).toBe(0);
-    expect(result.totalCost).toBe(0);
+  test("returns zero totals when no immutable revision has usage", () => {
+    expect(sumConversationUsage([])).toEqual({
+      totalInputTokens: 0,
+      totalOutputTokens: 0,
+      totalCost: 0,
+      hasUsage: false,
+    });
+    expect(
+      sumConversationUsage([
+        { id: "user-1", role: "user", content: "Question" },
+        assistant([undefined]),
+      ]).hasUsage,
+    ).toBe(false);
   });
 
-  test("returns zero totals when no messages have usage", () => {
-    const messages = [
-      makeMsg("user"),
-      makeMsg("assistant"),
+  test("sums every immutable revision once", () => {
+    const message = assistant([
+      usage(100, 50, 0.001),
+      usage(120, 60, 0.002),
+      usage(110, 55, 0.0015),
+    ]);
+    message.versions = [
+      {
+        content: "stale duplicate",
+        createdAt: 1,
+        usage: usage(999, 999, 9),
+      },
     ];
-    const result = sumConversationUsage(messages);
-    expect(result.hasUsage).toBe(false);
+    message.usage = usage(110, 55, 0.0015);
+
+    const result = sumConversationUsage([message]);
+    expect(result).toMatchObject({
+      totalInputTokens: 330,
+      totalOutputTokens: 165,
+      hasUsage: true,
+    });
+    expect(result.totalCost).toBeCloseTo(0.0045);
   });
 
-  test("sums single message with usage", () => {
-    const messages = [
-      makeMsg("user"),
-      makeMsg("assistant", {
-        usage: makeUsage({ inputTokens: 200, outputTokens: 100, estimatedCostUsd: 0.005 }),
-      }),
-    ];
-    const result = sumConversationUsage(messages);
-    expect(result.hasUsage).toBe(true);
-    expect(result.totalInputTokens).toBe(200);
-    expect(result.totalOutputTokens).toBe(100);
-    expect(result.totalCost).toBeCloseTo(0.005);
+  test("handles revisions without usage", () => {
+    expect(
+      sumConversationUsage([
+        assistant([undefined, usage(200, 80, 0.003)]),
+      ]),
+    ).toMatchObject({
+      totalInputTokens: 200,
+      totalOutputTokens: 80,
+      totalCost: 0.003,
+      hasUsage: true,
+    });
   });
 
-  test("sums multiple messages with usage", () => {
-    const messages = [
-      makeMsg("user"),
-      makeMsg("assistant", {
-        usage: makeUsage({ inputTokens: 100, outputTokens: 50, estimatedCostUsd: 0.001 }),
-      }),
-      makeMsg("user"),
-      makeMsg("assistant", {
-        usage: makeUsage({ inputTokens: 200, outputTokens: 80, estimatedCostUsd: 0.003 }),
-      }),
-    ];
-    const result = sumConversationUsage(messages);
-    expect(result.totalInputTokens).toBe(300);
-    expect(result.totalOutputTokens).toBe(130);
-    expect(result.totalCost).toBeCloseTo(0.004);
+  test("sums several assistant messages", () => {
+    expect(
+      sumConversationUsage([
+        assistant([usage(100, 50, 0.001)]),
+        {
+          ...assistant([usage(200, 80, 0.003)]),
+          id: "assistant-2",
+        },
+      ]),
+    ).toMatchObject({
+      totalInputTokens: 300,
+      totalOutputTokens: 130,
+      totalCost: 0.004,
+    });
   });
 
-  test("sums ALL version costs for regenerated messages", () => {
-    const messages = [
-      makeMsg("user"),
-      makeMsg("assistant", {
-        versions: [
-          { content: "v1", createdAt: 1000, usage: makeUsage({ inputTokens: 100, outputTokens: 50, estimatedCostUsd: 0.001 }) },
-          { content: "v2", createdAt: 2000, usage: makeUsage({ inputTokens: 120, outputTokens: 60, estimatedCostUsd: 0.002 }) },
-          { content: "v3", createdAt: 3000, usage: makeUsage({ inputTokens: 110, outputTokens: 55, estimatedCostUsd: 0.0015 }) },
-        ],
-        activeVersionIndex: 2,
-        usage: makeUsage({ inputTokens: 110, outputTokens: 55, estimatedCostUsd: 0.0015 }),
-      }),
-    ];
-    const result = sumConversationUsage(messages);
-    // Should sum ALL three version costs, not just the active one
-    expect(result.totalInputTokens).toBe(100 + 120 + 110);
-    expect(result.totalOutputTokens).toBe(50 + 60 + 55);
-    expect(result.totalCost).toBeCloseTo(0.001 + 0.002 + 0.0015);
-  });
-
-  test("sums immutable revisions before legacy versions without double counting", () => {
-    const messages = [
-      makeMsg("assistant", {
-        revisions: [
-          {
-            revisionId: "revision-1",
-            kind: "legacy",
-            content: "One.",
-            usage: makeUsage({
-              inputTokens: 100,
-              outputTokens: 50,
-              estimatedCostUsd: 0.001,
-            }),
-          },
-          {
-            revisionId: "revision-2",
-            kind: "legacy",
-            content: "Two.",
-            usage: makeUsage({
-              inputTokens: 120,
-              outputTokens: 60,
-              estimatedCostUsd: 0.002,
-            }),
-          },
-        ],
-        activeRevisionId: "revision-2",
-        actionLedger: [],
-        versions: [
-          {
-            content: "stale duplicate",
-            createdAt: 1,
-            usage: makeUsage({ inputTokens: 999, outputTokens: 999 }),
-          },
-        ],
-      }),
-    ];
-
-    const result = sumConversationUsage(messages);
-
-    expect(result.totalInputTokens).toBe(220);
-    expect(result.totalOutputTokens).toBe(110);
-    expect(result.totalCost).toBeCloseTo(0.003);
-  });
-
-  test("handles versions where some lack usage", () => {
-    const messages = [
-      makeMsg("assistant", {
-        versions: [
-          { content: "v1", createdAt: 1000 },  // no usage (old version before tracking)
-          { content: "v2", createdAt: 2000, usage: makeUsage({ inputTokens: 200, outputTokens: 80, estimatedCostUsd: 0.003 }) },
-        ],
-        activeVersionIndex: 1,
-        usage: makeUsage({ inputTokens: 200, outputTokens: 80, estimatedCostUsd: 0.003 }),
-      }),
-    ];
-    const result = sumConversationUsage(messages);
-    expect(result.totalInputTokens).toBe(200);
-    expect(result.totalOutputTokens).toBe(80);
-    expect(result.totalCost).toBeCloseTo(0.003);
-  });
-
-  test("mixes versioned and non-versioned messages correctly", () => {
-    const messages = [
-      makeMsg("user"),
-      makeMsg("assistant", {
-        usage: makeUsage({ inputTokens: 100, outputTokens: 50, estimatedCostUsd: 0.001 }),
-      }),
-      makeMsg("user"),
-      makeMsg("assistant", {
-        versions: [
-          { content: "v1", createdAt: 1000, usage: makeUsage({ inputTokens: 150, outputTokens: 70, estimatedCostUsd: 0.002 }) },
-          { content: "v2", createdAt: 2000, usage: makeUsage({ inputTokens: 160, outputTokens: 75, estimatedCostUsd: 0.0025 }) },
-        ],
-        activeVersionIndex: 1,
-        usage: makeUsage({ inputTokens: 160, outputTokens: 75, estimatedCostUsd: 0.0025 }),
-      }),
-    ];
-    const result = sumConversationUsage(messages);
-    // msg1: 100+50, msg2 versions: (150+70) + (160+75)
-    expect(result.totalInputTokens).toBe(100 + 150 + 160);
-    expect(result.totalOutputTokens).toBe(50 + 70 + 75);
-    expect(result.totalCost).toBeCloseTo(0.001 + 0.002 + 0.0025);
-  });
-
-  test("excludes error messages without usage from totals", () => {
-    const messages = [
-      makeMsg("user"),
-      makeMsg("assistant", {
-        usage: makeUsage({ inputTokens: 100, outputTokens: 50, estimatedCostUsd: 0.001 }),
-      }),
-      makeMsg("user"),
-      makeMsg("assistant", { isError: true, content: "Error: Rate limit exceeded" }),
-    ];
-    const result = sumConversationUsage(messages);
-    expect(result.totalInputTokens).toBe(100);
-    expect(result.totalOutputTokens).toBe(50);
-    expect(result.totalCost).toBeCloseTo(0.001);
-  });
-
-  test("handles usage without estimatedCostUsd (LM Studio)", () => {
-    const messages = [
-      makeMsg("assistant", {
-        usage: makeUsage({ inputTokens: 500, outputTokens: 200 }),
-      }),
-    ];
-    const result = sumConversationUsage(messages);
-    expect(result.hasUsage).toBe(true);
-    expect(result.totalInputTokens).toBe(500);
-    expect(result.totalOutputTokens).toBe(200);
-    expect(result.totalCost).toBe(0);
+  test("supports local-model usage without a price", () => {
+    expect(
+      sumConversationUsage([assistant([usage(500, 200)])]),
+    ).toMatchObject({
+      totalInputTokens: 500,
+      totalOutputTokens: 200,
+      totalCost: 0,
+      hasUsage: true,
+    });
   });
 });

@@ -313,6 +313,32 @@ export function assistantRevisionErrorMessage(
   return getActiveAssistantRevision(message)?.errorMessage ?? null;
 }
 
+/** Whether the selected revision contains completed ask-user guidance. */
+export function assistantHasCompletedAskGuidance(
+  message: ConversationMessage,
+): boolean {
+  const revision = getActiveAssistantRevision(message);
+  if (revision?.kind === "turn") {
+    return revision.turn.items.some(
+      (item) =>
+        item.type === "tool_call" &&
+        item.toolName === "ask_user" &&
+        item.askGuidance !== undefined,
+    );
+  }
+  if (revision?.kind === "legacy") {
+    return (
+      revision.legacySteps?.some(
+        (step) =>
+          step.type === "tool_call" &&
+          step.toolName === "ask_user" &&
+          step.askGuidance !== undefined,
+      ) ?? false
+    );
+  }
+  return false;
+}
+
 /**
  * The only writer for top-level assistant compatibility fields.
  *

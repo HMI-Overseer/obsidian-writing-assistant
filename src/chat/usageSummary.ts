@@ -18,8 +18,9 @@ function addUsage(totals: UsageTotals, usage: MessageUsage): void {
 
 /**
  * Sum token counts and costs across all messages in a conversation.
- * Revision-backed messages sum every immutable revision because each generation
- * is a real API call. Legacy versions remain the compatibility fallback.
+ * Assistant messages sum every immutable revision because each generation is a
+ * real API call. Historical content-only versions are normalized into revisions
+ * before this projection runs.
  */
 export function sumConversationUsage(messages: ConversationMessage[]): UsageTotals {
   const totals: UsageTotals = {
@@ -30,20 +31,10 @@ export function sumConversationUsage(messages: ConversationMessage[]): UsageTota
   };
 
   for (const msg of messages) {
-    if (msg.revisions) {
-      for (const revision of msg.revisions) {
-        if (revision.usage) {
-          addUsage(totals, revision.usage);
-        }
+    for (const revision of msg.revisions ?? []) {
+      if (revision.usage) {
+        addUsage(totals, revision.usage);
       }
-    } else if (msg.versions) {
-      for (const version of msg.versions) {
-        if (version.usage) {
-          addUsage(totals, version.usage);
-        }
-      }
-    } else if (msg.usage) {
-      addUsage(totals, msg.usage);
     }
   }
 

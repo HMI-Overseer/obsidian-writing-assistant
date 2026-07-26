@@ -1,338 +1,260 @@
-import { describe, test, expect } from "vitest";
+import { describe, expect, test } from "vitest";
 import { ChatSessionMemory } from "../../../src/chat/conversation/ChatSessionMemory";
-import type { ClaudeCodeResumeCursor, Conversation, ConversationMessage } from "../../../src/shared/types";
+import type {
+  ClaudeCodeResumeCursor,
+  Conversation,
+  ConversationMessage,
+} from "../../../src/shared/types";
 
-function makeConversation(): Conversation {
+function legacyAssistant(
+  id: string,
+  revisions: string[],
+  activeIndex = revisions.length - 1,
+): ConversationMessage {
   return {
-    id: "conv-1",
-    title: "Test conversation",
-    createdAt: 1000,
-    updatedAt: 1000,
-    modelId: "model-1",
-    modelName: "Model 1",
-    draft: "",
-    messages: [
-      {
-        id: "assistant-1",
-        role: "assistant",
-        content: "Second version",
-        versions: [
-          { content: "First version", createdAt: 1000 },
-          { content: "Second version", createdAt: 2000 },
-        ],
-        activeVersionIndex: 1,
-      },
-    ],
+    id,
+    role: "assistant",
+    content: revisions[activeIndex] ?? "",
+    revisions: revisions.map((content, index) => ({
+      revisionId: `${id}-revision-${index}`,
+      kind: "legacy",
+      content,
+      createdAt: index + 1,
+    })),
+    activeRevisionId: `${id}-revision-${activeIndex}`,
+    actionLedger: [],
   };
 }
 
-describe("ChatSessionMemory.updateMessageContent", () => {
-  test("appends an immutable compatibility revision without rewriting legacy versions", () => {
+function conversation(
+  messages: ConversationMessage[] = [
+    legacyAssistant("assistant-1", ["First version", "Second version"]),
+  ],
+): Conversation {
+  return {
+    id: "conversation-1",
+    title: "Test conversation",
+    createdAt: 1,
+    updatedAt: 1,
+    modelId: "openai:gpt-test",
+    modelName: "GPT test",
+    messages,
+    draft: "",
+  };
+}
+
+describe("ChatSessionMemory canonical writes", () => {
+  test("edits a user message without accepting an assistant compatibility write", () => {
     const memory = new ChatSessionMemory();
-    memory.hydrateFromConversation(makeConversation());
+    memory.hydrateFromConversation(
+      conversation([
+        { id: "user-1", role: "user", content: "Before" },
+        legacyAssistant("assistant-1", ["Answer"]),
+      ]),
+    );
 
-    const updated = memory.updateMessageContent("assistant-1", "Edited assistant text");
-    const snapshot = memory.getSnapshot();
-    const message = snapshot.messageHistory[0];
+    expect(
+      memory.updateUserMessageContent("user-1", "After"),
+    ).toBe(true);
+    expect(
+      memory.updateUserMessageContent("assistant-1", "Not allowed"),
+    ).toBe(false);
+    expect(memory.getSnapshot().messageHistory[0].content).toBe("After");
+  });
 
-    expect(updated).toBe(true);
+  test("turns a legacy inline edit into a canonical edited revision", () => {
+    const memory = new ChatSessionMemory();
+    const source = legacyAssistant("assistant-1", [
+      "First version",
+      "Second version",
+    ]);
+    source.versions = [
+      { content: "First version", createdAt: 1 },
+      { content: "Second version", createdAt: 2 },
+    ];
+    source.activeVersionIndex = 1;
+    memory.hydrateFromConversation(conversation([source]));
+
+    expect(
+      memory.editLegacyAssistantContent(
+        "assistant-1",
+        "Edited assistant text",
+        "openai",
+        "gpt-test",
+      ),
+    ).toBe(true);
+
+    const message = memory.getSnapshot().messageHistory[0];
+    const edited = message.revisions?.at(-1);
+    expect(edited).toMatchObject({
+      kind: "turn",
+      origin: "edited",
+      parentRevisionId: "assistant-1-revision-1",
+      provider: "openai",
+      modelId: "gpt-test",
+    });
+    expect(
+      edited?.kind === "turn"
+        ? edited.turn.items.map((item) =>
+            item.type === "prose" ? item.text : null,
+          )
+        : [],
+    ).toEqual(["Edited assistant text"]);
+    expect(message.versions?.map((version) => version.content)).toEqual([
+      "First version",
+      "Second version",
+    ]);
+    expect(message.activeVersionIndex).toBe(1);
     expect(message.content).toBe("Edited assistant text");
-    expect(message.versions?.[1]?.content).toBe("Second version");
-    expect(message.revisions?.map((revision) =>
-      revision.kind === "legacy" ? revision.content : null,
-    )).toEqual(["First version", "Second version", "Edited assistant text"]);
-    expect(message.activeRevisionId).toBe(message.revisions?.[2]?.revisionId);
-    expect(snapshot.lastAssistantResponse).toBe("Edited assistant text");
+  });
+
+  test("rejects a newly appended assistant message without a revision", () => {
+    const memory = new ChatSessionMemory();
+
+    expect(() =>
+      memory.appendMessage({
+        id: "assistant-raw",
+        role: "assistant",
+        content: "Legacy writer",
+      }),
+    ).toThrow(/immutable revision/u);
   });
 });
 
-describe("ChatSessionMemory.restoreRegeneration", () => {
-  // Regression for the "regenerate then immediately Stop loses the original
-  // message + its version history" data-loss bug. regenerateMessage pops the
-  // original up front; an empty-response abort must put it back EXACTLY, same
-  // object, same versions, no spurious duplicate version appended.
-  test("re-appends the popped message with its version history untouched", () => {
+describe("ChatSessionMemory revision navigation", () => {
+  test("selects by revision ID without updating load-only version fields", () => {
     const memory = new ChatSessionMemory();
-    memory.hydrateFromConversation(makeConversation());
-
-    // regenerateMessage pops the original assistant message before generating.
-    const old = memory.removeLastMessage();
-    expect(old?.id).toBe("assistant-1");
-    expect(memory.getSnapshot().messageHistory).toHaveLength(0);
-
-    // The user stops before any text streams: restore must be loss-free.
-    memory.restoreRegeneration(old!);
-
-    const snapshot = memory.getSnapshot();
-    expect(snapshot.messageHistory).toHaveLength(1);
-    const restored = snapshot.messageHistory[0];
-    expect(restored).toBe(old); // same object, never re-versioned
-    expect(restored.content).toBe("Second version");
-    expect(restored.versions?.map((v) => v.content)).toEqual([
+    const message = legacyAssistant("assistant-1", [
       "First version",
       "Second version",
     ]);
-    expect(restored.activeVersionIndex).toBe(1);
-    expect(snapshot.lastAssistantResponse).toBe("Second version");
-  });
-});
+    message.versions = [
+      { content: "First version", createdAt: 1 },
+      { content: "Second version", createdAt: 2 },
+    ];
+    message.activeVersionIndex = 1;
+    memory.hydrateFromConversation(conversation([message]));
 
-describe("ChatSessionMemory.finalizeRegeneration", () => {
-  test("seeds a base revision from a version-less original, then appends the new content", () => {
-    const memory = new ChatSessionMemory();
-    memory.hydrateFromConversation({
-      ...makeConversation(),
-      messages: [{ id: "assistant-1", role: "assistant", content: "Original" }],
-    });
+    expect(
+      memory.switchMessageRevision(
+        "assistant-1",
+        "assistant-1-revision-0",
+      ),
+    ).toBe(true);
 
-    const old = memory.removeLastMessage();
-    const result = memory.finalizeRegeneration(old!, "Regenerated");
-
-    expect(result.content).toBe("Regenerated");
-    expect(result.versions).toBeUndefined();
-    expect(result.revisions?.map((revision) =>
-      revision.kind === "legacy" ? revision.content : null,
-    )).toEqual(["Original", "Regenerated"]);
-    expect(result.activeRevisionId).toBe(result.revisions?.[1]?.revisionId);
-    expect(memory.getSnapshot().lastAssistantResponse).toBe("Regenerated");
-  });
-
-  test("preserves legacy version evidence and appends a new revision when regenerating", () => {
-    const memory = new ChatSessionMemory();
-    memory.hydrateFromConversation(makeConversation());
-
-    const old = memory.removeLastMessage();
-    const result = memory.finalizeRegeneration(old!, "Third version");
-
-    expect(result.versions?.map((version) => version.content)).toEqual([
+    const selected = memory.getSnapshot().messageHistory[0];
+    expect(selected.activeRevisionId).toBe(
+      "assistant-1-revision-0",
+    );
+    expect(selected.content).toBe("First version");
+    expect(selected.activeVersionIndex).toBe(1);
+    expect(memory.getSnapshot().lastAssistantResponse).toBe(
       "First version",
-      "Second version",
-    ]);
-    expect(result.revisions?.map((revision) =>
-      revision.kind === "legacy" ? revision.content : null,
-    )).toEqual([
-      "First version",
-      "Second version",
-      "Third version",
-    ]);
-    expect(result.activeRevisionId).toBe(result.revisions?.[2]?.revisionId);
+    );
   });
 
-  test("keeps historical version metadata separate from the active regeneration metadata", () => {
+  test("rejects an unknown revision without mutating selection", () => {
     const memory = new ChatSessionMemory();
-    memory.hydrateFromConversation({
-      ...makeConversation(),
-      messages: [
-        {
-          id: "assistant-1",
-          role: "assistant",
-          content: "Second version",
-          versions: [
-            {
-              content: "First version",
-              createdAt: 1000,
-              usage: { inputTokens: 1, outputTokens: 2 },
-              ragSources: [
-                { filePath: "Fixtures/first.md", headingPath: "", score: 0.7 },
-              ],
-            },
-            {
-              content: "Second version",
-              createdAt: 2000,
-              usage: { inputTokens: 3, outputTokens: 4 },
-              ragSources: [
-                { filePath: "Fixtures/second.md", headingPath: "", score: 0.8 },
-              ],
-            },
-          ],
-          activeVersionIndex: 1,
-        },
-      ],
-    });
+    memory.hydrateFromConversation(conversation());
 
-    const old = memory.removeLastMessage();
-    const result = memory.finalizeRegeneration(old!, "Third version", {
-      provider: "anthropic",
-      modelId: "claude-fixture",
-      usage: { inputTokens: 5, outputTokens: 6 },
-      ragSources: [
-        { filePath: "Fixtures/third.md", headingPath: "", score: 0.9 },
-      ],
-      rewrittenQuery: "synthetic rewritten query",
-      interrupted: true,
-    });
-
-    expect(result.revisions?.map((revision) => revision.usage?.inputTokens)).toEqual([
-      1,
-      3,
-      5,
-    ]);
-    expect(result.revisions?.map((revision) => revision.ragSources?.[0]?.filePath)).toEqual([
-      "Fixtures/first.md",
-      "Fixtures/second.md",
-      "Fixtures/third.md",
-    ]);
-    expect(result.provider).toBe("anthropic");
-    expect(result.modelId).toBe("claude-fixture");
-    expect(result.rewrittenQuery).toBe("synthetic rewritten query");
-    expect(result.interrupted).toBe(true);
+    expect(
+      memory.switchMessageRevision("assistant-1", "missing"),
+    ).toBe(false);
+    expect(
+      memory.getSnapshot().messageHistory[0].activeRevisionId,
+    ).toBe("assistant-1-revision-1");
   });
 });
 
-describe("ChatSessionMemory.switchMessageVersion", () => {
-  test("activates the selected version and updates the last-assistant response", () => {
+describe("ChatSessionMemory removal", () => {
+  test("recalculates the last assistant response after removal", () => {
     const memory = new ChatSessionMemory();
-    memory.hydrateFromConversation(makeConversation());
+    memory.hydrateFromConversation(
+      conversation([
+        legacyAssistant("assistant-1", ["First answer"]),
+        { id: "user-1", role: "user", content: "Question" },
+        legacyAssistant("assistant-2", ["Second answer"]),
+      ]),
+    );
 
-    expect(memory.switchMessageVersion("assistant-1", 0)).toBe(true);
-    const snapshot = memory.getSnapshot();
-    expect(snapshot.messageHistory[0].content).toBe("First version");
-    expect(snapshot.messageHistory[0].activeVersionIndex).toBe(0);
-    expect(snapshot.lastAssistantResponse).toBe("First version");
+    expect(memory.removeLastMessage()?.id).toBe("assistant-2");
+    expect(memory.getSnapshot().lastAssistantResponse).toBe(
+      "First answer",
+    );
   });
 
-  test("rejects an out-of-range index without mutating state", () => {
-    const memory = new ChatSessionMemory();
-    memory.hydrateFromConversation(makeConversation());
-
-    expect(memory.switchMessageVersion("assistant-1", 5)).toBe(false);
-    expect(memory.switchMessageVersion("assistant-1", -1)).toBe(false);
-    expect(memory.getSnapshot().messageHistory[0].content).toBe("Second version");
+  test("returns null for an empty history", () => {
+    expect(new ChatSessionMemory().removeLastMessage()).toBeNull();
   });
 });
 
-describe("ChatSessionMemory.removeLastMessage", () => {
-  /** Build a conversation with an explicit message list. */
-  function withMessages(messages: Conversation["messages"]): Conversation {
-    return { ...makeConversation(), messages };
-  }
-
-  test("returns null and does not mutate when the history is empty", () => {
-    const memory = new ChatSessionMemory();
-
-    expect(memory.removeLastMessage()).toBeNull();
-    expect(memory.getSnapshot().messageHistory).toHaveLength(0);
-  });
-
-  test("pops the last message and recalculates the last-assistant response", () => {
-    const memory = new ChatSessionMemory();
-    memory.hydrateFromConversation(
-      withMessages([
-        { id: "u1", role: "user", content: "q1" },
-        { id: "a1", role: "assistant", content: "First answer" },
-        { id: "u2", role: "user", content: "q2" },
-        { id: "a2", role: "assistant", content: "Second answer" },
-      ]),
-    );
-    expect(memory.getSnapshot().lastAssistantResponse).toBe("Second answer");
-
-    const removed = memory.removeLastMessage();
-
-    expect(removed?.id).toBe("a2");
-    const snapshot = memory.getSnapshot();
-    expect(snapshot.messageHistory).toHaveLength(3);
-    // The newest assistant is gone, so the meter falls back to the prior one.
-    expect(snapshot.lastAssistantResponse).toBe("First answer");
-  });
-
-  test("keeps the last-assistant response when a trailing user message is popped", () => {
-    const memory = new ChatSessionMemory();
-    memory.hydrateFromConversation(
-      withMessages([
-        { id: "a1", role: "assistant", content: "Hello" },
-        { id: "u1", role: "user", content: "pending question" },
-      ]),
-    );
-
-    const removed = memory.removeLastMessage();
-
-    expect(removed?.id).toBe("u1");
-    expect(memory.getSnapshot().lastAssistantResponse).toBe("Hello");
-  });
-
-  test("clears the last-assistant response when no assistant message remains", () => {
-    const memory = new ChatSessionMemory();
-    memory.hydrateFromConversation(
-      withMessages([
-        { id: "u1", role: "user", content: "q1" },
-        { id: "a1", role: "assistant", content: "Only answer" },
-      ]),
-    );
-
-    memory.removeLastMessage();
-
-    expect(memory.getSnapshot().lastAssistantResponse).toBe("");
-  });
-});
-
-describe("ChatSessionMemory.getClaudeCodeResumeCursor", () => {
+describe("ChatSessionMemory Claude Code cursor selection", () => {
   const cursor = (sessionId: string): ClaudeCodeResumeCursor => ({
     sessionId,
     coveredCount: 2,
-    prefixHash: "h",
-    configFingerprint: "fp",
+    prefixHash: "hash",
+    configFingerprint: "fingerprint",
   });
 
-  function convWith(messages: ConversationMessage[]): Conversation {
-    return { ...makeConversation(), messages };
+  function claudeAssistant(
+    id: string,
+    resumeCursor?: ClaudeCodeResumeCursor,
+  ): ConversationMessage {
+    return {
+      id,
+      role: "assistant",
+      content: "Answer",
+      revisions: [
+        {
+          revisionId: `${id}-revision`,
+          kind: "turn",
+          origin: "generated",
+          createdAt: 1,
+          provider: "claudecode",
+          modelId: "claude-test",
+          usage: {
+            inputTokens: 1,
+            outputTokens: 1,
+            ...(resumeCursor ? { resumeCursor } : {}),
+          },
+          turn: {
+            schemaVersion: 1,
+            id: `${id}-turn`,
+            status: "completed",
+            segments: [{ id: `${id}-segment` }],
+            items: [
+              {
+                type: "prose",
+                id: `${id}-prose`,
+                segmentId: `${id}-segment`,
+                text: "Answer",
+              },
+            ],
+          },
+        },
+      ],
+      activeRevisionId: `${id}-revision`,
+      actionLedger: [],
+    };
   }
 
-  test("returns the cursor from the most recent claudecode assistant turn", () => {
+  test("returns the newest selected Claude Code revision cursor", () => {
     const memory = new ChatSessionMemory();
     memory.hydrateFromConversation(
-      convWith([
-        { id: "u1", role: "user", content: "hi" },
-        {
-          id: "a1",
-          role: "assistant",
-          content: "one",
-          provider: "claudecode",
-          usage: { inputTokens: 1, outputTokens: 1, resumeCursor: cursor("old") },
-        },
-        { id: "u2", role: "user", content: "again" },
-        {
-          id: "a2",
-          role: "assistant",
-          content: "two",
-          provider: "claudecode",
-          usage: { inputTokens: 1, outputTokens: 1, resumeCursor: cursor("new") },
-        },
+      conversation([
+        claudeAssistant("assistant-1", cursor("old")),
+        { id: "user-1", role: "user", content: "Again" },
+        claudeAssistant("assistant-2", cursor("new")),
       ]),
     );
 
     expect(memory.getClaudeCodeResumeCursor()?.sessionId).toBe("new");
   });
 
-  test("returns undefined when no claudecode turn has banked a cursor", () => {
+  test("returns undefined when the selected revision has no cursor", () => {
     const memory = new ChatSessionMemory();
     memory.hydrateFromConversation(
-      convWith([
-        { id: "u1", role: "user", content: "hi" },
-        {
-          id: "a1",
-          role: "assistant",
-          content: "one",
-          provider: "claudecode",
-          usage: { inputTokens: 1, outputTokens: 1 },
-        },
-      ]),
-    );
-
-    expect(memory.getClaudeCodeResumeCursor()).toBeUndefined();
-  });
-
-  test("ignores a cursor carried by a non-claudecode provider", () => {
-    const memory = new ChatSessionMemory();
-    memory.hydrateFromConversation(
-      convWith([
-        {
-          id: "a1",
-          role: "assistant",
-          content: "one",
-          provider: "anthropic",
-          usage: { inputTokens: 1, outputTokens: 1, resumeCursor: cursor("foreign") },
-        },
-      ]),
+      conversation([claudeAssistant("assistant-1")]),
     );
 
     expect(memory.getClaudeCodeResumeCursor()).toBeUndefined();

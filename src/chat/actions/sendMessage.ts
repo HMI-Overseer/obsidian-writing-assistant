@@ -10,7 +10,6 @@ import type { ComposerInteractionHostPort } from "../interactions/ComposerIntera
 import { makeMessage } from "../conversation/conversationUtils";
 import { validateSendRequest } from "./validateSendRequest";
 import { generateLlmResponse } from "./generateLlmResponse";
-import { supersedePriorProposals } from "./supersedePriorProposals";
 import { snapshotNoteAttachments } from "../../context/noteAttachment";
 
 export type SendMessageOptions = {
@@ -62,15 +61,6 @@ export async function sendMessage(options: SendMessageOptions): Promise<void> {
   if (!validated) return;
 
   const { text, activeModel } = validated;
-
-  // A new user turn supersedes every prior proposal (both channels): pending work
-  // is rejected (interjection = implicit rejection) and applied vault batches go
-  // historical. See supersedePriorProposals, scoped to this user-message boundary.
-  const history = store.getSnapshot().messageHistory;
-  if (supersedePriorProposals(history)) {
-    await store.persistActiveConversation();
-    await syncConversationUi();
-  }
 
   const pendingAttachments = composer.getAttachments();
 

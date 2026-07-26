@@ -34,6 +34,17 @@ function assistantMessage(
   turn: AssistantTurnRecord,
   overrides: Partial<ConversationMessage> = {},
 ): ConversationMessage {
+  const revisionMetadata = {
+    ...(overrides.isError === undefined
+      ? {}
+      : { isError: overrides.isError }),
+    ...(overrides.interrupted === undefined
+      ? {}
+      : { interrupted: overrides.interrupted }),
+    ...(overrides.errorMessage === undefined
+      ? {}
+      : { errorMessage: overrides.errorMessage }),
+  };
   return {
     id: "assistant-1",
     role: "assistant",
@@ -47,6 +58,7 @@ function assistantMessage(
         provider: "anthropic",
         modelId: "claude-test",
         turn,
+        ...revisionMetadata,
       },
     ],
     activeRevisionId: "revision-1",

@@ -18,7 +18,7 @@ function makeHandler(opts: {
   messages?: Array<{ id: string; role: "user" | "assistant"; content: string }>;
 }) {
   const removeMessage = vi.fn();
-  const switchMessageVersion = vi.fn();
+  const switchMessageRevision = vi.fn();
   const persistActiveConversation = vi.fn(opts.persist ?? (() => Promise.resolve()));
   const getBubbleForMessage = vi.fn().mockReturnValue(null);
   const updateBubbleVersion = vi.fn().mockResolvedValue(undefined);
@@ -37,7 +37,7 @@ function makeHandler(opts: {
   const store = {
     getSnapshot: () => snapshot,
     removeMessage,
-    switchMessageVersion,
+    switchMessageRevision,
     persistActiveConversation,
   };
   const transcript = { getBubbleForMessage, updateBubbleVersion };
@@ -55,7 +55,7 @@ function makeHandler(opts: {
   return {
     handler: new ChatBubbleActionHandler(deps),
     removeMessage,
-    switchMessageVersion,
+    switchMessageRevision,
     getBubbleForMessage,
   };
 }
@@ -83,16 +83,19 @@ describe("ChatBubbleActionHandler, generation gate (P1-12)", () => {
 
   describe("handleVersionChange", () => {
     it("refuses to switch versions while a response is generating", async () => {
-      const { handler, switchMessageVersion } = makeHandler({ isGenerating: true });
-      await handler.handleVersionChange("m2", 1);
-      expect(switchMessageVersion).not.toHaveBeenCalled();
+      const { handler, switchMessageRevision } = makeHandler({ isGenerating: true });
+      await handler.handleVersionChange("m2", "revision-2");
+      expect(switchMessageRevision).not.toHaveBeenCalled();
       expect(vi.mocked(Notice)).toHaveBeenCalledTimes(1);
     });
 
     it("switches versions when no response is generating", async () => {
-      const { handler, switchMessageVersion } = makeHandler({ isGenerating: false });
-      await handler.handleVersionChange("m2", 1);
-      expect(switchMessageVersion).toHaveBeenCalledWith("m2", 1);
+      const { handler, switchMessageRevision } = makeHandler({ isGenerating: false });
+      await handler.handleVersionChange("m2", "revision-2");
+      expect(switchMessageRevision).toHaveBeenCalledWith(
+        "m2",
+        "revision-2",
+      );
       expect(vi.mocked(Notice)).not.toHaveBeenCalled();
     });
   });

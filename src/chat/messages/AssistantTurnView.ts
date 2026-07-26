@@ -22,7 +22,7 @@ import { AssistantTurnRenderSequencer } from "./AssistantTurnRenderSequencer";
 import {
   buildAssistantTurnRenderModel,
   buildLegacyAssistantRenderModel,
-  planAssistantTurnKeyedUpdate,
+  planAssistantTurnRenderUpdate,
   type AssistantTurnRenderItem,
   type AssistantTurnRenderModel,
   type AssistantTurnToolRenderItem,
@@ -98,6 +98,7 @@ export class AssistantTurnView {
   private readonly itemStates = new Map<string, ItemViewState>();
   private readonly pendingRenders = new Set<Promise<void>>();
   private itemOrder: string[] = [];
+  private renderItems = new Map<string, AssistantTurnRenderItem>();
   private actionLedger: readonly ToolActionLedgerEntry[] = [];
   private getActionEligibility: (
     entry: ToolActionLedgerEntry,
@@ -279,6 +280,7 @@ export class AssistantTurnView {
     }
     this.itemStates.clear();
     this.itemOrder = [];
+    this.renderItems.clear();
     this.actionCoordinator.destroy();
     this.registry.clear();
     this.rootEl.remove();
@@ -297,11 +299,15 @@ export class AssistantTurnView {
     );
     this.rootEl.addClass(`is-${model.status}`);
 
-    const plan = planAssistantTurnKeyedUpdate(
-      this.itemOrder,
-      model.items.map((item) => item.id),
+    const plan = planAssistantTurnRenderUpdate(
+      this.itemOrder.flatMap((itemId) => {
+        const item = this.renderItems.get(itemId);
+        return item ? [item] : [];
+      }),
+      model.items,
     );
     for (const itemId of plan.removed) this.removeItem(itemId);
+    const changed = new Set([...plan.added, ...plan.updated]);
 
     const proseRenders: Promise<void>[] = [];
     let cursor = this.listEl.firstElementChild;
@@ -311,25 +317,32 @@ export class AssistantTurnView {
         this.removeItem(item.id);
         state = undefined;
       }
+      let created = false;
       if (!state) {
         state = this.createItem(item);
         this.itemStates.set(item.id, state);
+        created = true;
       }
       if (state.itemEl !== cursor) {
         this.listEl.insertBefore(state.itemEl, cursor);
       } else {
         cursor = cursor.nextElementSibling;
       }
-      this.updateItemIdentity(state, item);
-      this.updateMarker(state, item);
-      if (item.type === "prose") {
-        proseRenders.push(this.updateProse(state, item.text));
-      } else {
-        this.updateTool(state, item);
+      if (created || changed.has(item.id)) {
+        this.updateItemIdentity(state, item);
+        this.updateMarker(state, item);
+        if (item.type === "prose") {
+          proseRenders.push(this.updateProse(state, item.text));
+        } else {
+          this.updateTool(state, item);
+        }
       }
       cursor = state.itemEl.nextElementSibling;
     }
     this.itemOrder = plan.order;
+    this.renderItems = new Map(
+      model.items.map((item) => [item.id, item]),
+    );
     this.updateEmptyState(model);
     this.updateNotice(model);
     this.updateRegexEditPreview(regexEditPreview);

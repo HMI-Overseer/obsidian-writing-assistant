@@ -23,10 +23,11 @@ import {
   type SessionConfig,
   type SessionTurn,
 } from "../../src/api/harnessSession";
-import { finalizeAbortedResponse } from "../../src/chat/finalization/finalizeResponse";
 import type { ChatSessionStore } from "../../src/chat/conversation/ChatSessionStore";
-import type { ChatTranscript } from "../../src/chat/messages/ChatTranscript";
-import type { AssistantBubbleRefs } from "../../src/chat/types";
+import {
+  createAssistantTurnMessage,
+  createAssistantTurnRevision,
+} from "../../src/chat/finalization/assistantTurnFinalization";
 import type { Options } from "../../src/api/sdk/claudeAgentSdk";
 import type { ConversationMessage } from "../../src/shared/types";
 
@@ -61,24 +62,6 @@ function makeStore() {
     setLastAssistantResponse: () => undefined,
   } as unknown as ChatSessionStore;
   return { store, messages };
-}
-
-function makeTranscript(): ChatTranscript {
-  return {
-    registerBubble: () => undefined,
-    renderPlainTextContent: () => undefined,
-    renderBubbleContent: () => Promise.resolve(),
-    scrollToBottom: () => undefined,
-  } as unknown as ChatTranscript;
-}
-
-function makeBubble(): AssistantBubbleRefs {
-  return {
-    role: "assistant",
-    turnView: {
-      refreshLegacy: () => Promise.resolve(),
-    },
-  } as unknown as AssistantBubbleRefs;
 }
 
 describe("claudecode zero-text interrupt → next-turn reuse", () => {
@@ -126,9 +109,36 @@ describe("claudecode zero-text interrupt → next-turn reuse", () => {
 
     // The chat layer persists the aborted turn (zero text) for claudecode.
     const { store, messages } = makeStore();
-    const transcript = makeTranscript();
-    const bubble = makeBubble();
-    await finalizeAbortedResponse(store, transcript, bubble, "", cfg().model, "claudecode");
+    store.appendMessage(
+      createAssistantTurnMessage({
+        messageId: "assistant-interrupted",
+        revision: createAssistantTurnRevision({
+          revisionId: "revision-interrupted",
+          origin: "generated",
+          createdAt: 1,
+          provider: "claudecode",
+          modelId: cfg().model,
+          interrupted: true,
+          replayEvidence: {
+            tier: "native",
+            capabilities: {
+              captureOrder: "exact",
+              toolCorrelation: "provider_id",
+              coldReplay: "textual",
+              nativeResume: true,
+            },
+          },
+          turn: {
+            schemaVersion: 1,
+            id: "turn-interrupted",
+            status: "interrupted",
+            segments: [],
+            items: [],
+          },
+        }),
+        actionLedger: [],
+      }),
+    );
 
     // Build the next turn's transcript exactly as the store now holds it, then a
     // new user message. With persist-always this is [user, assistant(""), user].

@@ -34,10 +34,11 @@ describe("getVersionNavigationState", () => {
     expect(getVersionNavigationState(message)).toEqual({
       activeIndex: 0,
       total: 2,
+      nextRevisionId: "revision-2",
     });
   });
 
-  it("keeps the legacy adapter only when no revision chain exists", () => {
+  it("requires normalized revisions instead of reading legacy version fields", () => {
     const message: ConversationMessage = {
       id: "assistant-1",
       role: "assistant",
@@ -49,10 +50,7 @@ describe("getVersionNavigationState", () => {
       activeVersionIndex: 1,
     };
 
-    expect(getVersionNavigationState(message)).toEqual({
-      activeIndex: 1,
-      total: 2,
-    });
+    expect(getVersionNavigationState(message)).toBeNull();
   });
 
   it("returns null for one revision or a broken active revision pointer", () => {

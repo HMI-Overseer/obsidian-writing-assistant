@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  ASSISTANT_MESSAGE_MAX_LEDGER_ENTRIES,
+  ASSISTANT_MESSAGE_MAX_REVISIONS,
   validateAssistantMessageState,
 } from "../../../../src/chat/conversation/assistantMessageValidation";
 import type {
@@ -355,6 +357,41 @@ describe("assistant message action-ledger validation", () => {
     expect(validateAssistantMessageState(oversized)).toMatchObject({
       ok: false,
       reason: { code: "payload_invalid" },
+    });
+  });
+
+  it("rejects oversized revision and ledger collections before traversing them", () => {
+    const revisions = Array.from(
+      { length: ASSISTANT_MESSAGE_MAX_REVISIONS + 1 },
+      (_, index) => ({
+        revisionId: `revision-${index}`,
+        kind: "legacy" as const,
+        content: `Revision ${index}`,
+      }),
+    );
+    const entries = Array.from(
+      { length: ASSISTANT_MESSAGE_MAX_LEDGER_ENTRIES + 1 },
+      () => ledger(),
+    );
+
+    expect(
+      validateAssistantMessageState({
+        revisions,
+        activeRevisionId: "revision-0",
+        actionLedger: [],
+      }),
+    ).toMatchObject({
+      ok: false,
+      reason: { code: "revisions_too_many" },
+    });
+    expect(
+      validateAssistantMessageState({
+        ...validState(),
+        actionLedger: entries,
+      }),
+    ).toMatchObject({
+      ok: false,
+      reason: { code: "ledger_too_many" },
     });
   });
 

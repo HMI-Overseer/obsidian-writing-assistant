@@ -735,13 +735,11 @@ function annotateLegacyClaudeCodeReplay(
   if (rawContent) parts.push(rawContent);
   const revision = getActiveAssistantRevision(message);
   const legacySteps =
-    revision?.kind === "legacy"
-      ? revision.legacySteps
-      : message.agenticSteps;
+    revision?.kind === "legacy" ? revision.legacySteps : undefined;
   if (legacySteps?.length) {
     parts.push(...formatAgenticReplayLines(legacySteps));
   }
-  if (revision?.interrupted ?? message.interrupted) {
+  if (revision?.interrupted) {
     parts.push(INTERRUPTED_REPLAY_MARKER);
   }
   return parts.join("\n\n");
@@ -759,15 +757,13 @@ function selectedAskGuidanceLines(
     );
   }
   const steps =
-    revision?.kind === "legacy"
-      ? revision.legacySteps
-      : message.agenticSteps;
+    revision?.kind === "legacy" ? revision.legacySteps : undefined;
   return formatAskGuidanceReplayLines(steps ?? []);
 }
 
 function messageIsError(message: ConversationMessage): boolean {
   if (message.role !== "assistant") return message.isError === true;
-  return getActiveAssistantRevision(message)?.isError ?? message.isError ?? false;
+  return getActiveAssistantRevision(message)?.isError ?? false;
 }
 
 function requestReplayEvidence(

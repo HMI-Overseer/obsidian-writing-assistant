@@ -180,7 +180,7 @@ describe("ChatSessionMemory revision ownership", () => {
     expect(snapshot.lastAssistantResponse).toBe("First.");
   });
 
-  it("keeps the index adapter narrow by selecting the corresponding revision ID", () => {
+  it("selects a revision without updating load-only legacy indices", () => {
     const memory = new ChatSessionMemory();
     const message = assistantMessage();
     message.versions = [
@@ -190,12 +190,15 @@ describe("ChatSessionMemory revision ownership", () => {
     message.activeVersionIndex = 1;
     memory.hydrateFromConversation(conversation(message));
 
-    expect(memory.switchMessageVersion("assistant-1", 0)).toBe(true);
+    expect(
+      memory.switchMessageRevision("assistant-1", "revision-1"),
+    ).toBe(true);
 
     const selected = memory.getSnapshot().messageHistory[0];
     expect(selected.activeRevisionId).toBe("revision-1");
     expect(selected.content).toBe("First.");
     expect(selected.versions?.[0]?.content).toBe("stale first");
+    expect(selected.activeVersionIndex).toBe(1);
   });
 
   it("atomically appends, selects, and supersedes unresolved replacement work", () => {

@@ -12,7 +12,7 @@ describe("AssistantTurnView architecture", () => {
 
     expect(view).toContain('createEl("ol"');
     expect(view).toContain('createEl("li"');
-    expect(view).toContain("planAssistantTurnKeyedUpdate");
+    expect(view).toContain("planAssistantTurnRenderUpdate");
     expect(view).toContain("AssistantTurnItemHostRegistry");
     expect(view).not.toMatch(
       /\b(?:innerHTML|outerHTML|insertAdjacentHTML|setCssStyles)\b/u,

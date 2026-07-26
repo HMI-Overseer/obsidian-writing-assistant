@@ -27,7 +27,7 @@ export type BubbleActionCallbacks = {
   onDelete: (messageId: string) => void;
   onBranch: (messageId: string) => void;
   onRegenerate: (messageId: string) => void;
-  onVersionChange: (messageId: string, newIndex: number) => void;
+  onVersionChange: (messageId: string, revisionId: string) => void;
   getActionEligibility: (
     messageId: string,
     actionRef: string,

@@ -113,6 +113,12 @@ describe("AssistantTurnView architecture", () => {
     const editReview = source(
       "src/chat/messages/editReviewTimeline.ts",
     );
+    const vaultReview = source(
+      "src/chat/messages/vaultReviewTimeline.ts",
+    );
+    const vaultStyles = source(
+      "src/chat/messages/vaultReviewTimeline.css",
+    );
 
     expect(view).toContain("item.actionRef");
     expect(view).toContain("item.toolCallId");
@@ -125,6 +131,18 @@ describe("AssistantTurnView architecture", () => {
     expect(editReview).toContain("controlsHostEl.createDiv");
     expect(editReview).toContain("presentationHostEl.createDiv");
     expect(editReview).toContain("controlsHostEl.after(hunkWrap)");
+    expect(vaultReview).toContain("resolveVaultReviewMounts");
+    expect(vaultReview).toContain("controlsHostEl.createDiv");
+    expect(vaultReview).toContain(
+      "this.ensurePreview(presentationHostEl, op)",
+    );
+    expect(vaultReview).toMatch(
+      /this\.ensureReplaceList\(\s*presentationHostEl,\s*op,\s*\)/u,
+    );
+    expect(vaultReview).toContain("controlsHostEl.after(presentationEl)");
+    expect(vaultStyles).toContain(
+      ".lmsa-assistant-turn-item.is-vault-awaiting",
+    );
   });
 
   it("places edit controls on prose hosts and derives review controls from the ledger", () => {

@@ -9,38 +9,49 @@
 
 /* Awaiting: a softened dot tint, the "pending approval" label is now the
    primary "needs you" signal, so the dot only whispers. */
-.lmsa-agentic-timeline-step.is-vault-awaiting .lmsa-agentic-timeline-dot {
+.lmsa-agentic-timeline-step.is-vault-awaiting .lmsa-agentic-timeline-dot,
+.lmsa-assistant-turn-item.is-vault-awaiting
+  .lmsa-assistant-turn-marker {
   color: var(--lmsa-mode-accent);
   border-color: color-mix(in srgb, var(--lmsa-mode-accent) 40%, var(--background-modifier-border));
   background: color-mix(in srgb, var(--lmsa-mode-accent) 8%, var(--background-primary));
 }
 
-.lmsa-agentic-timeline-step.is-vault-applied .lmsa-agentic-timeline-dot {
+.lmsa-agentic-timeline-step.is-vault-applied .lmsa-agentic-timeline-dot,
+.lmsa-assistant-turn-item.is-vault-applied
+  .lmsa-assistant-turn-marker {
   color: var(--text-success);
   border-color: color-mix(in srgb, var(--text-success) 55%, var(--background-modifier-border));
   background: color-mix(in srgb, var(--text-success) 12%, var(--background-primary));
 }
 
-.lmsa-agentic-timeline-step.is-vault-failed .lmsa-agentic-timeline-dot {
+.lmsa-agentic-timeline-step.is-vault-failed .lmsa-agentic-timeline-dot,
+.lmsa-assistant-turn-item.is-vault-failed
+  .lmsa-assistant-turn-marker {
   color: var(--text-error);
   border-color: color-mix(in srgb, var(--text-error) 55%, var(--background-modifier-border));
   background: color-mix(in srgb, var(--text-error) 12%, var(--background-primary));
 }
 
 /* Declined by the user in review, red, like a failure: the op did not happen. */
-.lmsa-agentic-timeline-step.is-vault-rejected .lmsa-agentic-timeline-dot {
+.lmsa-agentic-timeline-step.is-vault-rejected .lmsa-agentic-timeline-dot,
+.lmsa-assistant-turn-item.is-vault-rejected
+  .lmsa-assistant-turn-marker {
   color: var(--text-error);
   border-color: color-mix(in srgb, var(--text-error) 55%, var(--background-modifier-border));
   background: color-mix(in srgb, var(--text-error) 12%, var(--background-primary));
 }
 
-.lmsa-agentic-timeline-step.is-vault-cancelled {
+.lmsa-agentic-timeline-step.is-vault-cancelled,
+.lmsa-assistant-turn-item.is-vault-cancelled {
   opacity: 0.6;
 }
 
 /* Satisfied no-op (e.g. folder already exists): a neutral, unremarkable dot,
    it isn't an error and needs nothing from the user. */
-.lmsa-agentic-timeline-step.is-vault-satisfied .lmsa-agentic-timeline-dot {
+.lmsa-agentic-timeline-step.is-vault-satisfied .lmsa-agentic-timeline-dot,
+.lmsa-assistant-turn-item.is-vault-satisfied
+  .lmsa-assistant-turn-marker {
   color: var(--text-muted);
   border-color: var(--background-modifier-border);
   background: var(--background-primary);
@@ -136,7 +147,11 @@
 
 /* Declined / cancelled: dim the preview so it reads as inactive, like the edit diff. */
 .lmsa-agentic-timeline-step.is-vault-rejected .lmsa-vault-timeline-preview,
-.lmsa-agentic-timeline-step.is-vault-cancelled .lmsa-vault-timeline-preview {
+.lmsa-agentic-timeline-step.is-vault-cancelled .lmsa-vault-timeline-preview,
+.lmsa-assistant-turn-item.is-vault-rejected
+  .lmsa-vault-timeline-preview,
+.lmsa-assistant-turn-item.is-vault-cancelled
+  .lmsa-vault-timeline-preview {
   opacity: 0.6;
 }
 

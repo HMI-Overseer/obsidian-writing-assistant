@@ -1911,13 +1911,14 @@ export const SURFACES = {
             {
               after: false,
               state: "running",
+              reviewState: "vault-awaiting",
               mutating: true,
               action: `<div class="lmsa-vault-step-controls">
                 <span class="lmsa-vault-step-pending">pending approval</span>
                 <button class="lmsa-vault-step-btn lmsa-vault-step-btn--approve" aria-label="Approve">${I.check}</button>
                 <button class="lmsa-vault-step-btn lmsa-vault-step-btn--decline" aria-label="Decline">${I.x}</button>
-              </div>
-              <div class="lmsa-vault-timeline-preview">
+              </div>`,
+              presentation: `<div class="lmsa-vault-timeline-preview">
                 <div class="lmsa-chat-window-diff-hunk" data-status="pending">
                   <div class="lmsa-chat-window-diff-hunk-body lmsa-chat-window-diff-hunk-body--split">
                     <div class="lmsa-chat-window-diff-row">

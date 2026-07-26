@@ -116,6 +116,51 @@ const ALL_STATE_CLASSES = [
   "is-vault-satisfied",
 ];
 
+interface VaultReviewMounts {
+  stateEl: HTMLElement;
+  labelHostEl: HTMLElement;
+  controlsHostEl: HTMLElement;
+  presentationHostEl: HTMLElement;
+}
+
+/**
+ * The canonical assistant turn exposes a compact action host inside the tool
+ * body. Controls belong there, while previews and affected-file lists need the
+ * complete tool body as their full-width sibling host.
+ */
+export function resolveVaultReviewMounts(
+  reviewHostEl: HTMLElement,
+): VaultReviewMounts {
+  if (reviewHostEl.matches(".lmsa-assistant-turn-action-host")) {
+    const presentationHostEl =
+      reviewHostEl.parentElement ?? reviewHostEl;
+    const labelHostEl =
+      presentationHostEl.querySelector<HTMLElement>(
+        ":scope > .lmsa-assistant-turn-tool-summary",
+      ) ?? presentationHostEl;
+    return {
+      stateEl:
+        reviewHostEl.closest<HTMLElement>(
+          ".lmsa-assistant-turn-item",
+        ) ?? presentationHostEl,
+      labelHostEl,
+      controlsHostEl: reviewHostEl,
+      presentationHostEl,
+    };
+  }
+
+  const bodyEl =
+    reviewHostEl.querySelector<HTMLElement>(
+      ".lmsa-agentic-timeline-step-body",
+    ) ?? reviewHostEl;
+  return {
+    stateEl: reviewHostEl,
+    labelHostEl: bodyEl,
+    controlsHostEl: bodyEl,
+    presentationHostEl: bodyEl,
+  };
+}
+
 export class VaultReviewTimelineView {
   private appliedRecord: AppliedVaultOpRecord | null;
   private isProcessing = false;
@@ -154,7 +199,9 @@ export class VaultReviewTimelineView {
     );
     t.querySelectorAll(".lmsa-vault-step-controls").forEach((element) => {
       element
-        .closest(".lmsa-agentic-timeline-step")
+        .closest(
+          ".lmsa-agentic-timeline-step, .lmsa-assistant-turn-item",
+        )
         ?.classList.remove(...ALL_STATE_CLASSES);
       element.remove();
     });
@@ -226,27 +273,48 @@ export class VaultReviewTimelineView {
 
   private decorateStep(stepEl: HTMLElement, op: ReviewableVaultOp): void {
     const historical = !!this.opts.proposal.historical;
-    stepEl.classList.remove(...ALL_STATE_CLASSES);
-    stepEl.classList.add(statusClass(op.status, historical));
+    const {
+      stateEl,
+      labelHostEl,
+      controlsHostEl,
+      presentationHostEl,
+    } = resolveVaultReviewMounts(stepEl);
+    stateEl.classList.remove(...ALL_STATE_CLASSES);
+    stateEl.classList.add(statusClass(op.status, historical));
 
-    const bodyEl =
-      stepEl.querySelector<HTMLElement>(".lmsa-agentic-timeline-step-body") ?? stepEl;
-    bodyEl.querySelector(":scope > .lmsa-vault-step-controls")?.remove();
+    controlsHostEl
+      .querySelector(":scope > .lmsa-vault-step-controls")
+      ?.remove();
     // This step is reviewed, so the overlay owns its state label, drop the base
     // "Failed" word the timeline may have added (it paints first on a history re-render).
-    bodyEl.querySelector(":scope > .lmsa-agentic-timeline-step-failed")?.remove();
-    this.relabelStep(bodyEl, stepEl, op);
-    const controls = bodyEl.createDiv({ cls: "lmsa-vault-step-controls" });
+    presentationHostEl
+      .querySelector(":scope > .lmsa-agentic-timeline-step-failed")
+      ?.remove();
+    this.relabelStep(labelHostEl, stateEl, op);
+    const controls = controlsHostEl.createDiv({
+      cls: "lmsa-vault-step-controls",
+    });
     // A tool-call step with args carries a row-level click-to-expand handler;
     // approving/declining must not also toggle that, so stop clicks here.
     controls.addEventListener("click", (e) => e.stopPropagation());
     this.renderControls(controls, op, historical);
     // Content preview (write_file only): the diff of what will be written, always
     // visible under the step, so the user reviews the change before approving (F1).
-    this.ensurePreview(bodyEl, op);
+    const previewEl = this.ensurePreview(presentationHostEl, op);
     // Affected-file list (replace_in_vault only): which notes the vault-wide replace
     // rewrites, so its blast radius is reviewable, not just an "N notes" count (F2).
-    this.ensureReplaceList(bodyEl, op);
+    const replaceListEl = this.ensureReplaceList(
+      presentationHostEl,
+      op,
+    );
+    if (presentationHostEl !== controlsHostEl) {
+      const presentationEls = [previewEl, replaceListEl].filter(
+        (element): element is HTMLElement => element !== null,
+      );
+      for (const presentationEl of presentationEls.reverse()) {
+        controlsHostEl.after(presentationEl);
+      }
+    }
   }
 
   /**
@@ -264,9 +332,13 @@ export class VaultReviewTimelineView {
    * the op so the path is visible at decision time. The plugin loop already sets the
    * same text, so this is idempotent there.
    */
-  private relabelStep(bodyEl: HTMLElement, stepEl: HTMLElement, op: ReviewableVaultOp): void {
-    if (stepEl.closest(".lmsa-vault-review-fallback")) return;
-    const nameEl = bodyEl.querySelector<HTMLElement>(
+  private relabelStep(
+    labelHostEl: HTMLElement,
+    stateEl: HTMLElement,
+    op: ReviewableVaultOp,
+  ): void {
+    if (stateEl.closest(".lmsa-vault-review-fallback")) return;
+    const nameEl = labelHostEl.querySelector<HTMLElement>(
       ":scope > .lmsa-agentic-timeline-step-name",
     );
     const toolName = TOOL_NAME_BY_KIND[op.op.kind];
@@ -275,12 +347,16 @@ export class VaultReviewTimelineView {
         op.status === "applied" ? TOOL_LABELS[toolName] ?? toolName : pendingToolLabel(toolName);
     }
 
-    let detailEl = bodyEl.querySelector<HTMLElement>(
+    let detailEl = labelHostEl.querySelector<HTMLElement>(
       ":scope > .lmsa-agentic-timeline-step-detail",
     );
     if (!detailEl) {
-      detailEl = bodyEl.createSpan({ cls: "lmsa-agentic-timeline-step-detail" });
-      if (nameEl) bodyEl.insertBefore(detailEl, nameEl.nextSibling);
+      detailEl = labelHostEl.createSpan({
+        cls: "lmsa-agentic-timeline-step-detail",
+      });
+      if (nameEl) {
+        labelHostEl.insertBefore(detailEl, nameEl.nextSibling);
+      }
     }
     detailEl.textContent = opDetailLine(op.op);
   }
@@ -292,24 +368,32 @@ export class VaultReviewTimelineView {
    * later re-paint (or the op applying) never re-reads the file and shows an empty diff.
    * Non-write ops render nothing here; their whole change is the path in the step detail.
    */
-  private ensurePreview(bodyEl: HTMLElement, op: ReviewableVaultOp): void {
-    if (op.op.kind !== "create" && op.op.kind !== "overwrite") return;
+  private ensurePreview(
+    presentationHostEl: HTMLElement,
+    op: ReviewableVaultOp,
+  ): HTMLElement | null {
+    if (op.op.kind !== "create" && op.op.kind !== "overwrite") {
+      return null;
+    }
 
-    const existing = bodyEl.querySelector<HTMLElement>(
+    const existing = presentationHostEl.querySelector<HTMLElement>(
       ":scope > .lmsa-vault-timeline-preview",
     );
     const container =
-      existing ?? bodyEl.createDiv({ cls: "lmsa-vault-timeline-preview" });
+      existing ??
+      presentationHostEl.createDiv({
+        cls: "lmsa-vault-timeline-preview",
+      });
     // Clicks inside the diff must not toggle the step's raw-args expand.
     if (!existing) container.addEventListener("click", (e) => e.stopPropagation());
     // Keep the preview last so re-created controls sit above it.
-    bodyEl.appendChild(container);
-    if (existing) return;
+    presentationHostEl.appendChild(container);
+    if (existing) return container;
 
     const writeOp = op.op;
     if (writeOp.kind === "create") {
       this.renderPreviewDiff(container, null, writeOp.content, op.id);
-      return;
+      return container;
     }
 
     // Overwrite: prefer the applied record's inverse (the captured pre-apply content,
@@ -318,12 +402,12 @@ export class VaultReviewTimelineView {
     const recorded = this.overwriteBefore(op);
     if (recorded !== null) {
       this.renderPreviewDiff(container, recorded, writeOp.content, op.id);
-      return;
+      return container;
     }
     const file = this.opts.app.vault.getFileByPath(normalizePath(writeOp.path));
     if (!file) {
       container.remove(); // nothing to diff against; the step detail still names the file
-      return;
+      return null;
     }
     void this.opts.app.vault.read(file).then(
       (before) => {
@@ -334,6 +418,7 @@ export class VaultReviewTimelineView {
       },
       () => container.remove(),
     );
+    return container;
   }
 
   /** Render the write preview's diff into its container (idempotent). */
@@ -378,21 +463,29 @@ export class VaultReviewTimelineView {
    * collapsed disclosure of internal links + per-file match count (per-file diffs are
    * waived as clutter, matching how editors surface a bulk replace). Built once and kept.
    */
-  private ensureReplaceList(bodyEl: HTMLElement, op: ReviewableVaultOp): void {
-    if (op.op.kind !== "replaceInVault") return;
-    const existing = bodyEl.querySelector<HTMLElement>(
+  private ensureReplaceList(
+    presentationHostEl: HTMLElement,
+    op: ReviewableVaultOp,
+  ): HTMLElement | null {
+    if (op.op.kind !== "replaceInVault") return null;
+    const existing = presentationHostEl.querySelector<HTMLElement>(
       ":scope > .lmsa-vault-replace-files",
     );
-    const details = existing ?? this.buildReplaceList(bodyEl, op.op);
+    const details =
+      existing ??
+      this.buildReplaceList(presentationHostEl, op.op);
     // Keep it last so re-created controls sit above it.
-    bodyEl.appendChild(details);
+    presentationHostEl.appendChild(details);
+    return details;
   }
 
   private buildReplaceList(
-    bodyEl: HTMLElement,
+    presentationHostEl: HTMLElement,
     op: Extract<VaultOperation, { kind: "replaceInVault" }>,
   ): HTMLElement {
-    const details = bodyEl.createEl("details", { cls: "lmsa-vault-replace-files" });
+    const details = presentationHostEl.createEl("details", {
+      cls: "lmsa-vault-replace-files",
+    });
     // Clicks (toggle, link) must not also toggle the step's raw-args expand.
     details.addEventListener("click", (e) => e.stopPropagation());
     const count = op.targets.length;

@@ -10,6 +10,7 @@ import { existsSync, mkdirSync, readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { getAppCss } from "./appCss.mjs";
+import { getObsidianChromiumVersion } from "./obsidianInstall.mjs";
 import { SCAFFOLD, SURFACES } from "./surfaces.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -44,6 +45,21 @@ try {
 } catch {
   // No system Chrome: fall back to a Playwright-managed Chromium (run `npx playwright install chromium`).
   browser = await chromium.launch();
+}
+
+// The harness renders in whatever Chromium is on this machine; Obsidian renders in the one its
+// Electron bundles. Where they diverge, CSS newer than Obsidian's engine looks fine here and does
+// nothing in the app, so state both rather than letting the gap stay invisible.
+const engine = browser.version();
+const obsidianEngine = getObsidianChromiumVersion();
+const major = (v) => Number.parseInt(v, 10);
+if (obsidianEngine && major(engine) !== major(obsidianEngine)) {
+  console.log(
+    `engine: Chromium ${engine}, Obsidian renders on ${obsidianEngine}. ` +
+      "Features newer than Obsidian's engine will look right here and fail in the app.",
+  );
+} else {
+  console.log(`engine: Chromium ${engine}${obsidianEngine ? " (matches Obsidian)" : ""}`);
 }
 
 for (const id of targets) {

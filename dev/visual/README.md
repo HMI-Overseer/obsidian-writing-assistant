@@ -30,21 +30,51 @@ Each surface in [`surfaces.mjs`](./surfaces.mjs) reconstructs a component's DOM 
 then screenshots the surface element in headless Chrome (your installed Chrome via Playwright's
 `channel: "chrome"`, no browser download; falls back to a managed Chromium if none is found).
 
-## Obsidian app.css (not committed)
+## What comes from the installed Obsidian (not committed)
 
-The harness needs Obsidian's `app.css`, which is **Obsidian's proprietary asset**. It is extracted from
-your locally installed app into `dev/visual/.cache/app.css` (gitignored) on first run and must not be
-committed or redistributed. Auto-located on Windows at `%APPDATA%/obsidian/obsidian-<version>.asar`; set
-`OBSIDIAN_ASAR=<full path to the asar>` to override on other platforms or non-standard installs.
+[`obsidianInstall.mjs`](./obsidianInstall.mjs) locates the local app and reads out of it into a
+gitignored `dev/visual/.cache/`. All of it is **Obsidian's proprietary asset** and must not be committed
+or redistributed:
+
+- **`app.css`**, via [`appCss.mjs`](./appCss.mjs), for the cascade described above.
+- **Lucide icon geometry**, via [`lucideIcons.mjs`](./lucideIcons.mjs). Obsidian draws every `setIcon()`
+  glyph from a table in its `app.js` and tags the result `class="svg-icon lucide-<name>"`. That class is
+  load-bearing: `app.css` sizes and strokes icons through it (`var(--icon-size)` / `var(--icon-stroke)`,
+  18px / 1.75px by default) and the plugin's own CSS never sets `stroke-width`. Reading the real table
+  also picks up Obsidian's legacy name aliasing, which is not cosmetic: `setIcon(el, "pencil")` draws
+  lucide `edit-3`, not lucide `pencil`.
+- **The Chromium version** Obsidian's Electron bundles, scanned out of the binary. Advisory only, see
+  below.
+
+The asar is auto-located on Windows at `%APPDATA%/obsidian/obsidian-<version>.asar`; set
+`OBSIDIAN_ASAR=<full path>` to override on other platforms or non-standard installs, and `OBSIDIAN_EXE`
+for the executable.
 
 ## Adding a surface
 
 Read the component's render `.ts`, mirror the element/class structure into a new entry in `SURFACES`
-(`shot` is the CSS selector to screenshot, `w` an optional stage width), and re-run. The DOM is a faithful
-model of the live app, not the live DOM: Obsidian-chrome-heavy surfaces (settings modal) are worth a final
-glance in the running app.
+(`shot` is the CSS selector to screenshot, `w` an optional stage width), and re-run. Use the icon names
+the component passes to `setIcon()`; `I` in `surfaces.mjs` maps the surfaces' shorthand onto those names,
+and an unknown name throws rather than rendering nothing.
 
-## Limitation
+`w` is the width of the **component under test**: the stage is `content-box`, so its own padding sits
+outside that number. This matters because width-sensitive components read it: the composer footer is a
+`@container`, and a surface 50px narrower than intended silently renders a different responsive variant.
 
-Static appearance only: no runtime state transitions, and reconstructed DOM can drift from the live app if
-a component's markup changes. Keep surfaces in step with their render source.
+The DOM is a faithful model of the live app, not the live DOM: Obsidian-chrome-heavy surfaces (settings
+modal) are worth a final glance in the running app.
+
+## Limitations
+
+**Static appearance only:** no runtime state transitions, and reconstructed DOM can drift from the live
+app if a component's markup changes. Keep surfaces in step with their render source.
+
+**A different browser engine:** the harness renders in whatever Chromium is on this machine, while
+Obsidian renders in the one its Electron bundles, and the two are usually several majors apart. CSS
+newer than Obsidian's engine looks correct here and does nothing in the app. `render.mjs` prints both
+versions on every run so the gap stays visible; when a surface hinges on a recent CSS feature, confirm it
+in the running app.
+
+**Obsidian's bundled fonts do not load:** its `@font-face` rules point at paths inside the asar. Low
+impact in practice, because `--font-default` and `--font-monospace` both lead with `ui-sans-serif` /
+`ui-monospace`, which resolve to the same system fonts in both engines.

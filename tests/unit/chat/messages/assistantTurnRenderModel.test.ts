@@ -85,6 +85,9 @@ describe("assistant turn render model", () => {
       { before: true, after: true },
       { before: true, after: false },
     ]);
+    expect(
+      model.items.map((item) => item.fadeIncomingConnector),
+    ).toEqual([false, false, false, false, true]);
   });
 
   it("derives live placeholders without persisting a prose classification", () => {
@@ -104,9 +107,21 @@ describe("assistant turn render model", () => {
     expect(streaming.items[0].marker).toBe("streaming");
     expect(settled.items[0].marker).toBe("thinking");
     expect(completed.items[0].marker).toBe("none");
+    expect(streaming.items[0].fadeIncomingConnector).toBe(false);
+    expect(settled.items[1].fadeIncomingConnector).toBe(false);
+    expect(completed.items[0].fadeIncomingConnector).toBe(true);
     expect(sourceItemKeys(streaming.items[0])).not.toContain("reasoning");
     expect(sourceItemKeys(streaming.items[0])).not.toContain("answer");
     expect(sourceItemKeys(streaming.items[0])).not.toContain("final");
+  });
+
+  it("does not fade an interrupted prose endpoint", () => {
+    const model = buildAssistantTurnRenderModel(
+      turn("interrupted", [prose("p1", "s1", "Partial response")]),
+    );
+
+    expect(model.items[0].marker).toBe("none");
+    expect(model.items[0].fadeIncomingConnector).toBe(false);
   });
 
   it("covers completed, running, failed, and interrupted tool lifecycle text", () => {

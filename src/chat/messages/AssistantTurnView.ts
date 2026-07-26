@@ -46,12 +46,13 @@ interface ItemViewState {
 }
 
 interface ToolItemRefs {
+  toolSummaryEl: HTMLElement;
   nameEl: HTMLElement;
   detailEl: HTMLElement;
   stateEl: HTMLElement;
-  disclosureButtonEl: HTMLButtonElement;
   diagnosticsEl: HTMLElement;
   expanded: boolean;
+  hasDisclosure: boolean;
 }
 
 const ITEM_STATE_CLASSES = [
@@ -97,9 +98,6 @@ export class AssistantTurnView {
   ) {
     this.rootEl = containerEl.createDiv({
       cls: "lmsa-assistant-turn",
-      attr: {
-        "aria-label": "Assistant response",
-      },
     });
     this.listEl = this.rootEl.createEl("ol", {
       cls: "lmsa-assistant-turn-list",
@@ -317,34 +315,28 @@ export class AssistantTurnView {
   }
 
   private initializeTool(state: ItemViewState): void {
-    const nameEl = state.contentEl.createSpan({
+    const toolSummaryEl = state.contentEl.createSpan({
+      cls: "lmsa-assistant-turn-tool-summary",
+    });
+    const nameEl = toolSummaryEl.createSpan({
       cls: "lmsa-agentic-timeline-step-name",
     });
-    const detailEl = state.contentEl.createSpan({
+    const detailEl = toolSummaryEl.createSpan({
       cls: "lmsa-agentic-timeline-step-detail",
     });
-    const stateEl = state.contentEl.createSpan({
+    const stateEl = toolSummaryEl.createSpan({
       cls: "lmsa-assistant-turn-tool-state",
     });
-    const disclosureButtonEl = state.contentEl.createEl("button", {
-      cls: "lmsa-assistant-turn-disclosure lmsa-hidden",
-      attr: {
-        type: "button",
-        "aria-expanded": "false",
-        "aria-label": "Show tool details",
-      },
-    });
-    setIcon(disclosureButtonEl, "chevron-down");
     const diagnosticsEl = state.contentEl.createDiv({
       cls: "lmsa-agentic-timeline-step-expand lmsa-hidden",
       attr: { "aria-hidden": "true" },
     });
     state.contentEl.appendChild(state.actionEl);
-    const onDisclosureClick = () => {
+    const toggleDisclosure = () => {
       const tool = state.tool;
-      if (!tool) return;
+      if (!tool?.hasDisclosure) return;
       tool.expanded = !tool.expanded;
-      tool.disclosureButtonEl.setAttribute(
+      tool.toolSummaryEl.setAttribute(
         "aria-expanded",
         String(tool.expanded),
       );
@@ -353,22 +345,27 @@ export class AssistantTurnView {
         "aria-hidden",
         String(!tool.expanded),
       );
-      setIcon(
-        tool.disclosureButtonEl,
-        tool.expanded ? "chevron-up" : "chevron-down",
-      );
     };
-    disclosureButtonEl.addEventListener("click", onDisclosureClick);
+    const onToolSummaryClick = () => toggleDisclosure();
+    const onToolSummaryKeydown = (event: KeyboardEvent) => {
+      if (event.key !== "Enter" && event.key !== " ") return;
+      event.preventDefault();
+      toggleDisclosure();
+    };
+    toolSummaryEl.addEventListener("click", onToolSummaryClick);
+    toolSummaryEl.addEventListener("keydown", onToolSummaryKeydown);
     state.tool = {
+      toolSummaryEl,
       nameEl,
       detailEl,
       stateEl,
-      disclosureButtonEl,
       diagnosticsEl,
       expanded: false,
+      hasDisclosure: false,
     };
     state.destroy = () => {
-      disclosureButtonEl.removeEventListener("click", onDisclosureClick);
+      toolSummaryEl.removeEventListener("click", onToolSummaryClick);
+      toolSummaryEl.removeEventListener("keydown", onToolSummaryKeydown);
     };
   }
 
@@ -409,6 +406,10 @@ export class AssistantTurnView {
     state.itemEl.toggleClass(
       "has-connector-after",
       item.connector.after,
+    );
+    state.itemEl.toggleClass(
+      "has-fading-endpoint",
+      item.fadeIncomingConnector,
     );
     state.markerEl.empty();
     state.markerEl.removeClass(
@@ -503,16 +504,20 @@ export class AssistantTurnView {
       "is-error",
       item.state === "failed" || item.isError === true,
     );
-    refs.disclosureButtonEl.toggleClass(
-      "lmsa-hidden",
-      !item.hasDisclosure,
-    );
-    refs.disclosureButtonEl.setAttrs({
-      "aria-label": `Show details for ${item.label}`,
-    });
-    if (!item.hasDisclosure) {
+    refs.hasDisclosure = item.hasDisclosure;
+    refs.toolSummaryEl.toggleClass("is-expandable", item.hasDisclosure);
+    if (item.hasDisclosure) {
+      refs.toolSummaryEl.setAttribute("role", "button");
+      refs.toolSummaryEl.setAttribute("tabindex", "0");
+      refs.toolSummaryEl.setAttribute(
+        "aria-expanded",
+        String(refs.expanded),
+      );
+    } else {
       refs.expanded = false;
-      refs.disclosureButtonEl.setAttribute("aria-expanded", "false");
+      refs.toolSummaryEl.removeAttribute("role");
+      refs.toolSummaryEl.removeAttribute("tabindex");
+      refs.toolSummaryEl.removeAttribute("aria-expanded");
       refs.diagnosticsEl.addClass("lmsa-hidden");
       refs.diagnosticsEl.setAttribute("aria-hidden", "true");
     }

@@ -25,6 +25,7 @@ interface AssistantTurnRenderItemBase {
   segmentId: string;
   marker: AssistantTurnMarker;
   connector: AssistantTurnConnector;
+  fadeIncomingConnector: boolean;
   actionRef?: string;
   sourceItemId?: string;
   legacy: boolean;
@@ -321,6 +322,10 @@ function buildRenderItem(
         : next?.type === "tool_call"
           ? "thinking"
           : "none";
+    const fadeIncomingConnector =
+      status === "completed" &&
+      index === itemCount - 1 &&
+      marker === "none";
     return {
       type: "prose",
       id: item.id,
@@ -328,6 +333,7 @@ function buildRenderItem(
       text: item.text,
       marker,
       connector,
+      fadeIncomingConnector,
       ...(item.actionRef === undefined
         ? {}
         : { actionRef: item.actionRef }),
@@ -382,6 +388,7 @@ function buildRenderItem(
     hasDisclosure: hasToolDisclosure(item),
     marker: "tool",
     connector,
+    fadeIncomingConnector: false,
     legacy: false,
   };
 }

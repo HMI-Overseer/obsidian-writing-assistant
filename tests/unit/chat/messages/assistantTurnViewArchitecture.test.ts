@@ -20,15 +20,51 @@ describe("AssistantTurnView architecture", () => {
     expect(view).not.toMatch(/\bstyle\s*:/u);
   });
 
-  it("keeps tool disclosures and terminal state accessible without color alone", () => {
+  it("uses the tool text as the disclosure trigger without a detached chevron button", () => {
     const view = source("src/chat/messages/AssistantTurnView.ts");
 
-    expect(view).toContain('"aria-label": `Show details for ${item.label}`');
+    expect(view).toContain("toolSummaryEl");
+    expect(view).toContain('"role", "button"');
+    expect(view).toContain('"keydown"');
     expect(view).toContain('"aria-expanded"');
-    expect(view).toContain('type: "button"');
+    expect(view).not.toContain("disclosureButtonEl");
+    expect(view).not.toContain('"chevron-down"');
+    expect(view).not.toContain('"chevron-up"');
+  });
+
+  it("keeps terminal state accessible without a hover tooltip on the turn", () => {
+    const view = source("src/chat/messages/AssistantTurnView.ts");
+
     expect(view).toContain("item.accessibleState");
     expect(view).toContain('markerEl.setAttribute("aria-hidden", "true")');
     expect(view).toContain("emptyState.announce");
+    expect(view).not.toContain('"aria-label": "Assistant response"');
+  });
+
+  it("keeps the avatar above the rail and tool copy close to its marker", () => {
+    const styles = source("src/chat/messages/AssistantTurnView.css");
+
+    expect(styles).toMatch(
+      /\.lmsa-chat-window-message--assistant\s*>\s*\.lmsa-chat-window-message-avatar[\s\S]*z-index:\s*1;/u,
+    );
+    expect(styles).toContain(
+      "margin-left: calc(-1 * var(--lmsa-turn-rail-gap));",
+    );
+    expect(styles).toContain(
+      ".lmsa-assistant-turn-tool-summary.is-expandable:hover",
+    );
+    expect(styles).not.toContain(".lmsa-assistant-turn-disclosure");
+  });
+
+  it("fades only the incoming connector selected by the render model", () => {
+    const view = source("src/chat/messages/AssistantTurnView.ts");
+    const styles = source("src/chat/messages/AssistantTurnView.css");
+
+    expect(view).toContain('"has-fading-endpoint"');
+    expect(view).toContain("item.fadeIncomingConnector");
+    expect(styles).toMatch(
+      /\.lmsa-assistant-turn-item\.has-fading-endpoint::before[\s\S]*linear-gradient/u,
+    );
   });
 
   it("cleans item listeners, markdown work, action views, and detached hosts", () => {

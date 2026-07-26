@@ -464,7 +464,15 @@ export class LiveVaultReview implements VaultOpReviewer {
         }
 
         const controller = this.ensureEditController(file.path, docText);
-        const hunk: DiffHunk = { id: generateId(), resolvedEdit: resolved, status: "pending", baselineEpoch };
+        // One in-loop edit call produces one review hunk. Preserve the tool-call
+        // identity so the review mounts on that exact declaration instead of the
+        // provisional out-of-band action section.
+        const hunk: DiffHunk = {
+          id: call.id,
+          resolvedEdit: resolved,
+          status: "pending",
+          baselineEpoch,
+        };
         controller.proposal.hunks.push(hunk);
 
         const matchType = resolved.matchType;

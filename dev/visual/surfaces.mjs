@@ -42,6 +42,8 @@ const ICON_NAMES = {
   wrench: "wrench",
   database: "database",
   eye: "eye",
+  columns2: "columns-2",
+  rows2: "rows-2",
   plus: "plus",
   arrowUp: "arrow-up",
   square: "square",
@@ -156,36 +158,47 @@ const settingItem = (name, desc, control) =>
 
 // A split-view diff hunk (DiffHunkView + SplitDiffRenderer): a context row and a changed row
 // (removed left / added right), with a word-level highlight. Used by the edit-review timeline shots.
-const splitHunk = (status = "pending") =>
+const splitHunk = (
+  status = "pending",
+  {
+    location = "Lines 3-4",
+    fileName = "Chapter 1.md",
+    contextLine = "2",
+    contextText = "The sky was gray.",
+    changeLine = "3",
+    removedText = 'She <span class="lmsa-chat-window-diff-highlight">walked</span> home.',
+    addedText = 'She <span class="lmsa-chat-window-diff-highlight">hurried</span> home.',
+  } = {},
+) =>
   `<div class="lmsa-chat-window-diff-hunk" data-status="${status}">
     <div class="lmsa-chat-window-diff-hunk-header">
       <div class="lmsa-chat-window-diff-hunk-meta">
-        <span class="lmsa-chat-window-diff-hunk-location">Lines 3-4</span>
-        <a class="lmsa-chat-window-diff-hunk-file internal-link" href="#">Chapter 1.md</a>
+        <span class="lmsa-chat-window-diff-hunk-location">${location}</span>
+        <a class="lmsa-chat-window-diff-hunk-file internal-link" href="#">${fileName}</a>
         <span class="lmsa-chat-window-diff-hunk-confidence">Exact match</span>
       </div>
       <div class="lmsa-chat-window-diff-hunk-actions">
         <div class="lmsa-chat-window-btn-group">
-          <button class="lmsa-chat-window-btn-group-item is-active" aria-label="Side-by-side view">${I.eye}</button>
-          <button class="lmsa-chat-window-btn-group-item" aria-label="Unified view">${I.fileText}</button>
+          <button class="lmsa-chat-window-btn-group-item is-active" aria-label="Side-by-side view">${I.columns2}</button>
+          <button class="lmsa-chat-window-btn-group-item" aria-label="Unified view">${I.rows2}</button>
         </div>
       </div>
     </div>
     <div class="lmsa-chat-window-diff-hunk-body lmsa-chat-window-diff-hunk-body--split">
       <div class="lmsa-chat-window-diff-row">
         <div class="lmsa-chat-window-diff-side lmsa-chat-window-diff-side--left lmsa-chat-window-diff-line--context">
-          <span class="lmsa-chat-window-diff-gutter">2</span><span class="lmsa-chat-window-diff-text">The sky was gray.</span>
+          <span class="lmsa-chat-window-diff-gutter">${contextLine}</span><span class="lmsa-chat-window-diff-text">${contextText}</span>
         </div>
         <div class="lmsa-chat-window-diff-side lmsa-chat-window-diff-side--right lmsa-chat-window-diff-line--context">
-          <span class="lmsa-chat-window-diff-gutter">2</span><span class="lmsa-chat-window-diff-text">The sky was gray.</span>
+          <span class="lmsa-chat-window-diff-gutter">${contextLine}</span><span class="lmsa-chat-window-diff-text">${contextText}</span>
         </div>
       </div>
       <div class="lmsa-chat-window-diff-row">
         <div class="lmsa-chat-window-diff-side lmsa-chat-window-diff-side--left lmsa-chat-window-diff-line--removed">
-          <span class="lmsa-chat-window-diff-gutter">3</span><span class="lmsa-chat-window-diff-text">She <span class="lmsa-chat-window-diff-highlight">walked</span> home.</span>
+          <span class="lmsa-chat-window-diff-gutter">${changeLine}</span><span class="lmsa-chat-window-diff-text">${removedText}</span>
         </div>
         <div class="lmsa-chat-window-diff-side lmsa-chat-window-diff-side--right lmsa-chat-window-diff-line--added">
-          <span class="lmsa-chat-window-diff-gutter"></span><span class="lmsa-chat-window-diff-text">She <span class="lmsa-chat-window-diff-highlight">hurried</span> home.</span>
+          <span class="lmsa-chat-window-diff-gutter"></span><span class="lmsa-chat-window-diff-text">${addedText}</span>
         </div>
       </div>
     </div>
@@ -205,15 +218,17 @@ const turnItem = (
     fade = false,
     segment = "segment-1",
     action = "",
+    presentation = "",
+    reviewState = "",
   } = {},
 ) => {
   const actionHost =
     `<div class="lmsa-assistant-turn-action-host">${action}</div>`;
   const renderedBody =
     type === "tool_call"
-      ? body.replace(TOOL_ACTION_SLOT, actionHost)
+      ? body.replace(TOOL_ACTION_SLOT, `${actionHost}${presentation}`)
       : `${body}${actionHost}`;
-  return `<li class="lmsa-assistant-turn-item lmsa-assistant-turn-item--${type} has-connector-before${after ? " has-connector-after" : ""}${state ? ` is-${state}` : ""}${mutating ? " is-mutating" : ""}${fade ? " has-fading-endpoint" : ""}"
+  return `<li class="lmsa-assistant-turn-item lmsa-assistant-turn-item--${type} has-connector-before${after ? " has-connector-after" : ""}${state ? ` is-${state}` : ""}${reviewState ? ` is-${reviewState}` : ""}${mutating ? " is-mutating" : ""}${fade ? " has-fading-endpoint" : ""}"
     data-item-id="${id}" data-segment-id="${segment}">
     <div class="lmsa-assistant-turn-marker is-${marker}" aria-hidden="true">${
       marker === "thinking"
@@ -1834,39 +1849,48 @@ export const SURFACES = {
     ),
   },
 
-  // S22: edit review attached to the exact ordered assistant item.
+  // S22: historical edit-review reference, attached to the exact ordered assistant item.
   diffTimeline: {
-    w: 620,
+    w: 700,
     shot: ".lmsa-chat-window-message--assistant",
     html: view(
       assistantBubble(
         assistantTurn(
           turnItem(
-            "edit-prose",
-            "prose",
-            "thinking",
-            "<p>I will tighten the opening line.</p>",
-          ) +
-            turnItem(
-              "edit-tool",
-              "tool_call",
-              "tool",
-              toolTurnBody("Propose edit", "Chapter 1.md", "Running"),
-              {
-                after: false,
-                state: "running",
-                mutating: true,
-                action: `<div class="lmsa-edit-step-controls">
-                  <span class="lmsa-edit-step-pending">pending review</span>
-                  <button class="lmsa-edit-step-btn lmsa-edit-step-btn--approve" aria-label="Accept">${I.check}</button>
-                  <button class="lmsa-edit-step-btn lmsa-edit-step-btn--decline" aria-label="Reject">${I.x}</button>
-                </div>
-                <div class="lmsa-edit-timeline-hunk">${splitHunk("pending")}</div>`,
-              },
+            "edit-tool",
+            "tool_call",
+            "tool",
+            toolTurnBody(
+              "Proposed edit",
+              "Updating Alex's role to Co-Leader and age to 35.",
+              "Running",
             ),
+            {
+              after: false,
+              state: "running",
+              reviewState: "edit-pending",
+              mutating: true,
+              action: `<div class="lmsa-edit-step-controls">
+                <span class="lmsa-edit-step-pending">pending review</span>
+                <button class="lmsa-edit-step-btn lmsa-edit-step-btn--approve" aria-label="Accept">${I.check}</button>
+                <button class="lmsa-edit-step-btn lmsa-edit-step-btn--decline" aria-label="Reject">${I.x}</button>
+              </div>`,
+              presentation: `<div class="lmsa-edit-timeline-hunk">${splitHunk("pending", {
+                location: "Lines 6-17",
+                fileName: "Alex.md",
+                contextLine: "5",
+                contextText: "affiliations: [The Cast, Survival Group Alpha]",
+                changeLine: "6",
+                removedText:
+                  'role: <span class="lmsa-chat-window-diff-highlight">Primary POV / Leader</span>',
+                addedText:
+                  'role: <span class="lmsa-chat-window-diff-highlight">Co-Leader</span>',
+              })}</div>`,
+            },
+          ),
         ),
       ),
-      620,
+      700,
     ),
   },
 
@@ -1933,12 +1957,13 @@ export const SURFACES = {
             toolTurnBody("Proposed edit", "Chapter 1.md", "Completed"),
             {
               state: "completed",
+              reviewState: "edit-applied",
               mutating: true,
               action: `<div class="lmsa-edit-step-controls">
                 <span class="lmsa-edit-step-state">Applied</span>
                 <button class="lmsa-edit-step-btn lmsa-edit-step-btn--undo" aria-label="Undo">${I.refresh}</button>
-              </div>
-              <div class="lmsa-edit-timeline-hunk">${splitHunk("applied")}</div>`,
+              </div>`,
+              presentation: `<div class="lmsa-edit-timeline-hunk">${splitHunk("applied")}</div>`,
             },
           ) +
             turnItem(
@@ -1949,13 +1974,14 @@ export const SURFACES = {
               {
                 after: false,
                 state: "running",
+                reviewState: "edit-pending",
                 mutating: true,
                 action: `<div class="lmsa-edit-step-controls">
                   <span class="lmsa-edit-step-pending">pending review</span>
                   <button class="lmsa-edit-step-btn lmsa-edit-step-btn--approve" aria-label="Accept">${I.check}</button>
                   <button class="lmsa-edit-step-btn lmsa-edit-step-btn--decline" aria-label="Reject">${I.x}</button>
-                </div>
-                <div class="lmsa-edit-timeline-hunk">${splitHunk("pending")}</div>`,
+                </div>`,
+                presentation: `<div class="lmsa-edit-timeline-hunk">${splitHunk("pending")}</div>`,
               },
             ),
           "streaming",

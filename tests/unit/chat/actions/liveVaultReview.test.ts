@@ -11,6 +11,8 @@ const captured = vi.hoisted(() => ({
     onOpResolved?: (opId: string, disposition: "applied" | "declined") => void;
   } | null,
   proposalOps: [] as Array<{ id: string; status: string; gate: string }>,
+  editHunkIds: [] as string[],
+  editReviewHosts: [] as Array<HTMLElement | null>,
 }));
 
 vi.mock("../../../../src/chat/messages/vaultReviewTimeline", () => ({
@@ -38,6 +40,20 @@ vi.mock("../../../../src/vault-ops/applyBatch", () => ({
 // real, so accepts actually splice the in-memory document.
 vi.mock("../../../../src/chat/messages/editReviewTimeline", () => ({
   EditReviewTimelineView: class {
+    constructor(opts: {
+      controllers: Array<{
+        proposal: { hunks: Array<{ id: string }> };
+      }>;
+      findActionHostByToolCallId?: (toolCallId: string) => HTMLElement | null;
+    }) {
+      captured.editHunkIds = opts.controllers.flatMap((controller) =>
+        controller.proposal.hunks.map((hunk) => hunk.id),
+      );
+      captured.editReviewHosts = captured.editHunkIds.map(
+        (hunkId) => opts.findActionHostByToolCallId?.(hunkId) ?? null,
+      );
+    }
+
     destroy() {}
   },
 }));
@@ -115,6 +131,8 @@ const flush = () => new Promise((r) => setTimeout(r, 0));
 beforeEach(() => {
   captured.callbacks = null;
   captured.proposalOps = [];
+  captured.editHunkIds = [];
+  captured.editReviewHosts = [];
 });
 
 describe("LiveVaultReview", () => {
@@ -351,6 +369,42 @@ describe("LiveVaultReview", () => {
 
     expect(result.isError).toBeFalsy();
     expect(result.content).toBe('Applied edit to "Notes/A.md" (auto-applied).');
+  });
+
+  it("anchors an edit review to its exact declared tool-call host", async () => {
+    const declaredHost = {} as HTMLElement;
+    const findDeclaredHost = vi.fn((toolCallId: string) =>
+      toolCallId === "edit-call-1" ? declaredHost : null,
+    );
+    const getProvisionalHost = vi.fn(() => ({} as HTMLElement));
+    const review = new LiveVaultReview({
+      app: makeApp({
+        files: ["Notes/A.md"],
+        content: "She nodded.\n",
+      }),
+      timelineEl: TIMELINE_EL,
+      findActionHostByToolCallId: findDeclaredHost,
+      getProvisionalActionHost: getProvisionalHost,
+      policy: POLICY({ edit: "auto" }),
+      edit: EDIT_DEPS(),
+    });
+
+    await review.resolveEdits([
+      {
+        id: "edit-call-1",
+        name: "propose_edit",
+        arguments: {
+          path: "Notes/A.md",
+          search: "She nodded.",
+          replace: "She smiled.",
+        },
+      },
+    ]);
+
+    expect(captured.editHunkIds).toEqual(["edit-call-1"]);
+    expect(captured.editReviewHosts).toEqual([declaredHost]);
+    expect(findDeclaredHost).toHaveBeenCalledWith("edit-call-1");
+    expect(getProvisionalHost).not.toHaveBeenCalled();
   });
 
   it("edits two different files in one turn, one proposal per file (ADR-0010, no cross-file rejection)", async () => {

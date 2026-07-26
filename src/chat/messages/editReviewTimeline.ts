@@ -79,8 +79,40 @@ interface HunkEntry {
   controller: EditReviewController;
   diffView: DiffHunkView;
   controlsEl: HTMLElement;
-  stepEl: HTMLElement;
+  stateEl: HTMLElement;
   noMatch: boolean;
+}
+
+interface EditReviewMounts {
+  stateEl: HTMLElement;
+  controlsHostEl: HTMLElement;
+  presentationHostEl: HTMLElement;
+}
+
+/**
+ * The canonical assistant turn exposes a compact inline action host inside the
+ * tool body. Keep only controls there, and mount the full review presentation as
+ * a sibling so its 100% flex basis is relative to the complete tool row.
+ */
+function resolveEditReviewMounts(stepEl: HTMLElement): EditReviewMounts {
+  if (stepEl.matches(".lmsa-assistant-turn-action-host")) {
+    const presentationHostEl = stepEl.parentElement ?? stepEl;
+    return {
+      stateEl:
+        stepEl.closest<HTMLElement>(".lmsa-assistant-turn-item") ?? stepEl,
+      controlsHostEl: stepEl,
+      presentationHostEl,
+    };
+  }
+
+  const bodyEl =
+    stepEl.querySelector<HTMLElement>(".lmsa-agentic-timeline-step-body") ??
+    stepEl;
+  return {
+    stateEl: stepEl,
+    controlsHostEl: bodyEl,
+    presentationHostEl: bodyEl,
+  };
 }
 
 export class EditReviewTimelineView {
@@ -121,9 +153,9 @@ export class EditReviewTimelineView {
     t.querySelectorAll(".lmsa-edit-step-controls, .lmsa-edit-timeline-hunk").forEach((e) =>
       e.remove(),
     );
-    t.querySelectorAll(".lmsa-agentic-timeline-step").forEach((e) =>
-      e.classList.remove(...ALL_EDIT_STATE_CLASSES),
-    );
+    t.querySelectorAll(
+      ".lmsa-agentic-timeline-step, .lmsa-assistant-turn-item",
+    ).forEach((e) => e.classList.remove(...ALL_EDIT_STATE_CLASSES));
   }
 
   private paint(): void {
@@ -270,27 +302,35 @@ export class EditReviewTimelineView {
     const view = this.opts.live
       ? controller.liveHunkView(hunk.id)
       : controller.initialHunkView(hunk.id);
+    const { stateEl, controlsHostEl, presentationHostEl } =
+      resolveEditReviewMounts(stepEl);
 
-    stepEl.classList.remove(...ALL_EDIT_STATE_CLASSES);
-    stepEl.classList.add(stateClass(view, noMatch));
+    stateEl.classList.remove(...ALL_EDIT_STATE_CLASSES);
+    stateEl.classList.add(stateClass(view, noMatch));
 
-    const bodyEl =
-      stepEl.querySelector<HTMLElement>(".lmsa-agentic-timeline-step-body") ?? stepEl;
-    bodyEl.querySelector(":scope > .lmsa-edit-step-controls")?.remove();
-    bodyEl.querySelector(":scope > .lmsa-edit-timeline-hunk")?.remove();
+    controlsHostEl.querySelector(":scope > .lmsa-edit-step-controls")?.remove();
+    presentationHostEl.querySelector(":scope > .lmsa-edit-timeline-hunk")?.remove();
     // This step is reviewed, so the overlay owns its state label, drop the base
     // "Failed" word the timeline may have added (it paints first on a history re-render).
-    bodyEl.querySelector(":scope > .lmsa-agentic-timeline-step-failed")?.remove();
+    presentationHostEl
+      .querySelector(":scope > .lmsa-agentic-timeline-step-failed")
+      ?.remove();
 
     // Approve / decline / undo live inline on the step row (parity with vault ops).
     // Clicks here must not toggle the step's raw-args expand.
-    const controlsEl = bodyEl.createDiv({ cls: "lmsa-edit-step-controls" });
+    const controlsEl = controlsHostEl.createDiv({
+      cls: "lmsa-edit-step-controls",
+    });
     controlsEl.addEventListener("click", (e) => e.stopPropagation());
 
-    // The diff renders always-visible, nested under the step row (full-width, so it
-    // wraps below the row and stays left of the timeline's connecting line). It is a
-    // pure display, its accept/reject are suppressed; the step controls own those.
-    const hunkWrap = bodyEl.createDiv({ cls: "lmsa-edit-timeline-hunk" });
+    // The diff is a full-width presentation below the row. It must not be nested in
+    // the canonical inline action host, whose width is intentionally content-sized.
+    const hunkWrap = presentationHostEl.createDiv({
+      cls: "lmsa-edit-timeline-hunk",
+    });
+    if (presentationHostEl !== controlsHostEl) {
+      controlsHostEl.after(hunkWrap);
+    }
     hunkWrap.addEventListener("click", (e) => e.stopPropagation());
     const diffView = new DiffHunkView(
       hunkWrap,
@@ -308,7 +348,14 @@ export class EditReviewTimelineView {
     );
     diffView.setStatus(toEditStatus(view));
 
-    const entry: HunkEntry = { hunk, controller, diffView, controlsEl, stepEl, noMatch };
+    const entry: HunkEntry = {
+      hunk,
+      controller,
+      diffView,
+      controlsEl,
+      stateEl,
+      noMatch,
+    };
     this.entries.set(hunk.id, entry);
     this.renderControls(entry, view);
   }
@@ -401,8 +448,8 @@ export class EditReviewTimelineView {
     const view: InitialHunkView =
       change.status === "accepted" ? "applied" : change.status === "rejected" ? "skipped" : "pending";
 
-    entry.stepEl.classList.remove(...ALL_EDIT_STATE_CLASSES);
-    entry.stepEl.classList.add(stateClass(view, entry.noMatch));
+    entry.stateEl.classList.remove(...ALL_EDIT_STATE_CLASSES);
+    entry.stateEl.classList.add(stateClass(view, entry.noMatch));
     entry.diffView.setStatus(change.status);
     this.renderControls(entry, view);
     this.renderBulkBar();

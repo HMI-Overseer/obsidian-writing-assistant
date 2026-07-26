@@ -110,6 +110,9 @@ describe("AssistantTurnView architecture", () => {
     const registry = source(
       "src/chat/messages/AssistantTurnItemHostRegistry.ts",
     );
+    const editReview = source(
+      "src/chat/messages/editReviewTimeline.ts",
+    );
 
     expect(view).toContain("item.actionRef");
     expect(view).toContain("item.toolCallId");
@@ -118,6 +121,10 @@ describe("AssistantTurnView architecture", () => {
     expect(registry).toContain("getActionRefByToolCallId");
     expect(registry).not.toContain("toolName");
     expect(registry).not.toContain("FIFO");
+    expect(editReview).toContain("resolveEditReviewMounts");
+    expect(editReview).toContain("controlsHostEl.createDiv");
+    expect(editReview).toContain("presentationHostEl.createDiv");
+    expect(editReview).toContain("controlsHostEl.after(hunkWrap)");
   });
 
   it("places edit controls on prose hosts and derives review controls from the ledger", () => {

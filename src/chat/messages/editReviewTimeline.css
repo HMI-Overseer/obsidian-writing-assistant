@@ -9,13 +9,15 @@
 
 /* ── Status on the step dot (state, not class) ──────────────────── */
 
-.lmsa-agentic-timeline-step.is-edit-pending .lmsa-agentic-timeline-dot {
+.lmsa-agentic-timeline-step.is-edit-pending .lmsa-agentic-timeline-dot,
+.lmsa-assistant-turn-item.is-edit-pending .lmsa-assistant-turn-marker {
   color: var(--lmsa-mode-accent);
   border-color: color-mix(in srgb, var(--lmsa-mode-accent) 40%, var(--background-modifier-border));
   background: color-mix(in srgb, var(--lmsa-mode-accent) 8%, var(--background-primary));
 }
 
-.lmsa-agentic-timeline-step.is-edit-applied .lmsa-agentic-timeline-dot {
+.lmsa-agentic-timeline-step.is-edit-applied .lmsa-agentic-timeline-dot,
+.lmsa-assistant-turn-item.is-edit-applied .lmsa-assistant-turn-marker {
   color: var(--text-success);
   border-color: color-mix(in srgb, var(--text-success) 55%, var(--background-modifier-border));
   background: color-mix(in srgb, var(--text-success) 12%, var(--background-primary));
@@ -23,17 +25,20 @@
 
 /* Declined by the user, red dot (the edit did not happen), with the diff itself
    dimmed below to read as inactive. Parity with the vault op decline. */
-.lmsa-agentic-timeline-step.is-edit-skipped .lmsa-agentic-timeline-dot {
+.lmsa-agentic-timeline-step.is-edit-skipped .lmsa-agentic-timeline-dot,
+.lmsa-assistant-turn-item.is-edit-skipped .lmsa-assistant-turn-marker {
   color: var(--text-error);
   border-color: color-mix(in srgb, var(--text-error) 55%, var(--background-modifier-border));
   background: color-mix(in srgb, var(--text-error) 12%, var(--background-primary));
 }
 
-.lmsa-agentic-timeline-step.is-edit-skipped .lmsa-edit-timeline-hunk {
+.lmsa-agentic-timeline-step.is-edit-skipped .lmsa-edit-timeline-hunk,
+.lmsa-assistant-turn-item.is-edit-skipped .lmsa-edit-timeline-hunk {
   opacity: 0.6;
 }
 
-.lmsa-agentic-timeline-step.is-edit-nomatch .lmsa-agentic-timeline-dot {
+.lmsa-agentic-timeline-step.is-edit-nomatch .lmsa-agentic-timeline-dot,
+.lmsa-assistant-turn-item.is-edit-nomatch .lmsa-assistant-turn-marker {
   color: var(--text-error);
   border-color: color-mix(in srgb, var(--text-error) 55%, var(--background-modifier-border));
   background: color-mix(in srgb, var(--text-error) 12%, var(--background-primary));

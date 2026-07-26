@@ -28,8 +28,19 @@ const MAX_BODY_BYTES = 4 * 1024 * 1024;
 /** Supplies the tools advertised and executed over MCP. */
 export interface McpToolProvider {
   listTools(): CanonicalToolDefinition[];
-  callTool(call: ToolCall): Promise<ToolResult>;
+  callTool(call: ToolCall, context?: McpToolCallContext): Promise<ToolResult>;
 }
+
+export type McpToolCallContext =
+  | {
+      toolCorrelation: "provider_id";
+    }
+  | {
+      toolCorrelation: "none";
+      transport: "claude-agent-sdk" | "claude-code-loopback";
+      reason: "claude_code_tool_use_id_missing";
+      transportId?: string;
+    };
 
 export interface McpServerHandle {
   /** Full endpoint URL, e.g. http://127.0.0.1:51234/mcp */
@@ -182,7 +193,17 @@ export class VaultMcpServer {
         case "tools/call": {
           const name = typeof params?.name === "string" ? params.name : "";
           const args = (params?.arguments as Record<string, unknown> | undefined) ?? {};
-          const toolResult = await this.provider.callTool({ id: String(id ?? ""), name, arguments: args });
+          const toolResult = await this.provider.callTool(
+            { id: "", name, arguments: args },
+            {
+              toolCorrelation: "none",
+              transport: "claude-code-loopback",
+              reason: "claude_code_tool_use_id_missing",
+              ...(id === undefined || id === null
+                ? {}
+                : { transportId: String(id) }),
+            },
+          );
           // MCP carries only text + isError, so a structured `failure` is flattened to
           // its sentence here, the recovery contract still reaches the model via
           // `content`; the typed kind stays plugin-loop-only (telemetry/UI branching).

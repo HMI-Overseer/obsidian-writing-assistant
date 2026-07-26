@@ -3,6 +3,8 @@ import type {
   ReasoningLevel,
   SessionRebuildReason,
 } from "../../shared/types";
+import type { AssistantStreamEvent } from "../usageTypes";
+import { generateId } from "../../utils";
 import type { FlagSettableEffort } from "../../shared/reasoning";
 import { createAbortError } from "../httpTransport";
 import { extractClaudeCodeContextTokens, type ClaudeCodeResultUsage } from "../claudeCodeProcess";
@@ -16,7 +18,8 @@ import {
   type SessionRecovery,
   type SessionTurn,
 } from "../harnessSession";
-import { resultErrorMessage, resultUsage, textDelta } from "./sdkQueryEngine";
+import { resultErrorMessage, resultUsage } from "./sdkQueryEngine";
+import { ClaudeCodeSdkMessageTranslator } from "./claudeCodeSdkMessageTranslator";
 import { AbortError, query } from "./claudeAgentSdk";
 import type { ModelInfo, Options, Query, SDKMessage, SDKUserMessage } from "./claudeAgentSdk";
 
@@ -229,7 +232,10 @@ export class SdkSession {
    * watermark (`coveredCount` + `prefixHash`) advances to cover the new user turn
    * plus the reply it just generated, so the next turn's reuse check is exact.
    */
-  async *runTurn(prompt: string, ctx: SessionTurnContext): AsyncGenerator<string> {
+  async *runTurnEvents(
+    prompt: string,
+    ctx: SessionTurnContext,
+  ): AsyncGenerator<AssistantStreamEvent> {
     if (this.disposed) throw new Error("Claude Code session was disposed");
     // The chat UI serializes generation, but guard against a second turn racing
     // into one session's single message stream.
@@ -256,7 +262,11 @@ export class SdkSession {
     };
     ctx.signal?.addEventListener("abort", onAbort, { once: true });
 
-    let assistantText = "";
+    const segmentPrefix = `claude-segment-${generateId()}`;
+    const translator = new ClaudeCodeSdkMessageTranslator({
+      createSegmentId: (index) => `${segmentPrefix}-${index}`,
+      toolCorrelation: "provider_id",
+    });
     let contextTokens: number | null = null;
     try {
       this.input.push(userMessage(prompt));
@@ -268,11 +278,10 @@ export class SdkSession {
         if (next.done) throw new Error("Claude Code session ended unexpectedly");
         const message = next.value;
 
-        const text = textDelta(message);
-        if (text) {
-          assistantText += text;
-          yield text;
-          continue;
+        const translated = translator.translate(message);
+        for (const event of translated) {
+          if (interruptRequested && event.type === "turn_end") continue;
+          yield event;
         }
 
         contextTokens = extractClaudeCodeContextTokens(message) ?? contextTokens;
@@ -298,7 +307,7 @@ export class SdkSession {
             const usage = resultUsage(message, contextTokens);
             this.sessionId = usage.sessionId ?? this.sessionId;
             ctx.onResult?.(usage);
-            this.advanceWatermark(ctx.turns, assistantText);
+            this.advanceWatermark(ctx.turns, translator.rawText());
             this.interruptedCleanly = true;
             this.lastUsedAt = Date.now();
             throw createAbortError();
@@ -309,7 +318,7 @@ export class SdkSession {
           const usage = resultUsage(message, contextTokens);
           this.sessionId = usage.sessionId ?? this.sessionId;
           ctx.onResult?.(usage);
-          this.advanceWatermark(ctx.turns, assistantText);
+          this.advanceWatermark(ctx.turns, translator.rawText());
           this.lastUsedAt = Date.now();
           return;
         }
@@ -320,6 +329,16 @@ export class SdkSession {
     } finally {
       ctx.signal?.removeEventListener("abort", onAbort);
       this.busy = false;
+    }
+  }
+
+  /** Text-only compatibility projection for non-canonical session callers. */
+  async *runTurn(
+    prompt: string,
+    ctx: SessionTurnContext,
+  ): AsyncGenerator<string> {
+    for await (const event of this.runTurnEvents(prompt, ctx)) {
+      if (event.type === "prose_delta") yield event.delta;
     }
   }
 
@@ -460,7 +479,10 @@ export class SdkSessionRegistry {
    * a synthetic rebuild *within the same turn* (section 6.3). Any failure disposes the
    * session so the next turn starts clean, the transcript can always rebuild.
    */
-  async *runTurn(conversationId: string, req: SessionTurnRequest): AsyncGenerator<string> {
+  async *runTurnEvents(
+    conversationId: string,
+    req: SessionTurnRequest,
+  ): AsyncGenerator<AssistantStreamEvent> {
     const existing = this.sessions.get(conversationId);
     const effort = req.effort ?? null;
     let decision = decideRecovery(
@@ -496,8 +518,8 @@ export class SdkSessionRegistry {
     // and propagates like any other turn error.
     if (decision.outcome === "resumed") {
       const resumed = this.mintSession(conversationId, req, effort, decision.cursor);
-      const attempt = resumed.runTurn(req.deltaPrompt, this.turnCtx(req));
-      let first: IteratorResult<string> | undefined;
+      const attempt = resumed.runTurnEvents(req.deltaPrompt, this.turnCtx(req));
+      let first: IteratorResult<AssistantStreamEvent> | undefined;
       try {
         first = await attempt.next();
       } catch (error) {
@@ -542,12 +564,22 @@ export class SdkSessionRegistry {
     }
 
     try {
-      yield* session.runTurn(prompt, this.turnCtx(req));
+      yield* session.runTurnEvents(prompt, this.turnCtx(req));
     } catch (error) {
       this.afterTurnError(conversationId, session);
       throw error;
     }
     this.afterTurnSuccess(conversationId, session, req);
+  }
+
+  /** Text-only compatibility projection for registry diagnostics and tests. */
+  async *runTurn(
+    conversationId: string,
+    req: SessionTurnRequest,
+  ): AsyncGenerator<string> {
+    for await (const event of this.runTurnEvents(conversationId, req)) {
+      if (event.type === "prose_delta") yield event.delta;
+    }
   }
 
   /**

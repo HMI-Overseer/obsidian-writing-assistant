@@ -213,22 +213,106 @@ describe("direct provider action ledger", () => {
     });
   });
 
-  it("refuses review state without exact declaration placement", () => {
-    expect(() =>
+  it("retains consequential undeclared decisions without fabricating placement", () => {
+    let eventIndex = 0;
+    const ledger = buildDirectProviderActionLedger({
+      revisionId: "revision-1",
+      turn: {
+        ...turn,
+        items: turn.items.filter((item) => item.id !== "item-edit"),
+      },
+      toolCorrelations: { "call-edit": "provider_id" },
+      actionRefsByToolCallId: { "call-edit": "action-edit" },
+      editProposals: [editProposal],
+      createEventId: () => `event-unplaced-${eventIndex++}`,
+      createdAt: 25,
+    });
+
+    expect(ledger).toHaveLength(1);
+    expect(ledger[0]).toMatchObject({
+      actionRef: "action-edit",
+      placement: {
+        state: "unplaced",
+        reason: "declaration_missing",
+        correlation: {
+          kind: "provider_id",
+          toolCallId: "call-edit",
+        },
+      },
+      events: [
+        { type: "proposed" },
+        { type: "declined" },
+      ],
+    });
+  });
+
+  it("discards proposed-only undeclared work", () => {
+    const pendingProposal: VaultOperationProposal = {
+      ...vaultProposal,
+      ops: vaultProposal.ops.map((operation) => ({
+        ...operation,
+        status: "pending",
+      })),
+    };
+
+    expect(
       buildDirectProviderActionLedger({
         revisionId: "revision-1",
         turn: {
           ...turn,
-          items: turn.items.filter((item) => item.id !== "item-edit"),
+          items: turn.items.filter((item) => item.id !== "item-vault"),
         },
-        toolCorrelations: { "call-edit": "provider_id" },
-        editProposals: [editProposal],
-        createEventId: () => "event",
+        toolCorrelations: { "call-vault": "provider_id" },
+        actionRefsByToolCallId: { "call-vault": "action-vault" },
+        vaultOpProposal: pendingProposal,
+        createEventId: () => "event-proposed-only",
         createdAt: 25,
       }),
-    ).toThrow("no canonical action placement");
+    ).toEqual([]);
   });
 
+  it.each([
+    ["declined", "rejected", undefined],
+    ["failed", "failed", undefined],
+    ["auto-applied", "applied", vaultRecord],
+  ] as const)(
+    "keeps an undeclared %s vault operation auditable",
+    (_label, status, appliedRecord) => {
+      let eventIndex = 0;
+      const proposal: VaultOperationProposal = {
+        ...vaultProposal,
+        ops: vaultProposal.ops.map((operation) => ({
+          ...operation,
+          gate: status === "applied" ? "auto" : operation.gate,
+          status,
+        })),
+      };
+      const ledger = buildDirectProviderActionLedger({
+        revisionId: "revision-1",
+        turn: {
+          ...turn,
+          items: turn.items.filter((item) => item.id !== "item-vault"),
+        },
+        toolCorrelations: { "call-vault": "provider_id" },
+        actionRefsByToolCallId: { "call-vault": "action-vault" },
+        vaultOpProposal: proposal,
+        ...(appliedRecord
+          ? { appliedVaultOpRecord: appliedRecord }
+          : {}),
+        createEventId: () => `event-${status}-${eventIndex++}`,
+        createdAt: 25,
+      });
+
+      expect(ledger).toHaveLength(1);
+      expect(ledger[0].placement).toMatchObject({
+        state: "unplaced",
+        reason: "declaration_missing",
+      });
+      expect(ledger[0].events.some((event) => event.type !== "proposed")).toBe(
+        true,
+      );
+    },
+  );
   it("anchors regex edit fallback honestly on the parsed prose item", () => {
     const parsedTurn: AssistantTurnRecord = {
       schemaVersion: 1,

@@ -10,6 +10,7 @@ import type {
   ReasoningLevel,
 } from "../shared/types";
 import type { ClaudeCodeRuntime, SdkSessionTurnInput } from "../api/ClaudeCodeClient";
+import type { AssistantStreamEvent } from "../api/usageTypes";
 import { resolveClaudeBinary } from "../api/claudeCodeProcess";
 import { isSdkAvailable } from "../api/sdk/claudeAgentSdk";
 import type { Options } from "../api/sdk/claudeAgentSdk";
@@ -49,10 +50,18 @@ import {
   toolNotAllowedFailure,
 } from "../tools/toolSurface";
 import { normalizeVaultToolCall } from "../tools/paths";
-import { VaultMcpServer, type McpServerHandle, type McpToolProvider } from "../mcp/VaultMcpServer";
+import {
+  VaultMcpServer,
+  type McpServerHandle,
+  type McpToolCallContext,
+  type McpToolProvider,
+} from "../mcp/VaultMcpServer";
 import type { VaultOpReviewer } from "../tools/types";
 import { generateId } from "../utils";
-import { MEMORY_TOOL_NAMES } from "../tools/memory/definition";
+import {
+  MEMORY_MUTATION_TOOL_NAMES,
+  MEMORY_TOOL_NAMES,
+} from "../tools/memory/definition";
 import {
   executeMemoryTool,
   type MemoryToolContext,
@@ -187,6 +196,8 @@ export class ClaudeCodeService {
    * callback the SDK already dispatched.
    */
   private askPending = false;
+  /** Exact correlation fidelity observed by the current Claude Code bridge. */
+  private runToolCorrelation: "provider_id" | "none" = "provider_id";
 
   constructor(
     private readonly app: App,
@@ -232,6 +243,7 @@ export class ClaudeCodeService {
     this.collectedVaultOps = [];
     this.askPending = false;
     const useSdk = await this.isSdkUsable();
+    this.runToolCorrelation = useSdk ? "provider_id" : "none";
     const agentic = settings.agenticMode;
     // Forwarded onto every runtime shape below for the send-path preflight (section 6.4).
     const contextWindow = options.contextWindow ? { contextWindow: options.contextWindow } : {};
@@ -272,6 +284,7 @@ export class ClaudeCodeService {
           conversationId,
           run: (input) => this.runSessionTurn(conversationId, input, agentic, resumeCursor),
         },
+        getToolCorrelation: () => this.runToolCorrelation,
       };
     }
 
@@ -291,11 +304,19 @@ export class ClaudeCodeService {
               },
             }
           : {}),
+        getToolCorrelation: () => this.runToolCorrelation,
       };
     }
 
     // Agentic mode off on the legacy path → pure analyst with no tools.
-    if (!agentic) return { vaultRoot: this.vaultRoot, useSdk, ...contextWindow };
+    if (!agentic) {
+      return {
+        vaultRoot: this.vaultRoot,
+        useSdk,
+        ...contextWindow,
+        getToolCorrelation: () => this.runToolCorrelation,
+      };
+    }
 
     // Fallback path (incompatible/missing CLI): the legacy loopback-HTTP bridge.
     const handle = await this.ensureMcpServer();
@@ -307,6 +328,7 @@ export class ClaudeCodeService {
         configJson: buildMcpConfigJson(MCP_SERVER_NAME, handle),
         allowedTools: `mcp__${MCP_SERVER_NAME}`,
       },
+      getToolCorrelation: () => this.runToolCorrelation,
     };
   }
 
@@ -321,7 +343,7 @@ export class ClaudeCodeService {
     input: SdkSessionTurnInput,
     agentic: boolean,
     resumeCursor?: ClaudeCodeResumeCursor,
-  ): AsyncGenerator<string> {
+  ): AsyncGenerator<AssistantStreamEvent> {
     const toolNames = agentic
       ? this.createToolProvider().listTools().map((definition) => definition.name)
       : [];
@@ -357,7 +379,7 @@ export class ClaudeCodeService {
       );
     };
 
-    return this.sessionRegistry.runTurn(conversationId, {
+    return this.sessionRegistry.runTurnEvents(conversationId, {
       cfg,
       effort: input.reasoning ?? null,
       turns: input.turns,
@@ -481,7 +503,10 @@ export class ClaudeCodeService {
       // in executeTool) restricts writes per mode, not this catalogue.
       listTools: (): CanonicalToolDefinition[] =>
         claudeCodeStableToolSet(this.getSettings().memoriesEnabled),
-      callTool: async (rawCall: ToolCall): Promise<ToolResult> => {
+      callTool: async (
+        rawCall: ToolCall,
+        context?: McpToolCallContext,
+      ): Promise<ToolResult> => {
         // Surface tool activity to the chat UI's timeline (Claude Code runs its
         // loop internally, so this MCP hook is the only place we see its calls).
         // The `end` event fires in finally so a thrown tool never leaves a stuck
@@ -495,7 +520,21 @@ export class ClaudeCodeService {
         // Translate absolute paths to vault-relative up front so the executor,
         // the collected op, and the timeline all see the same resolved path.
         const call = normalizeVaultToolCall(this.app, rawCall);
-        const toolCallId = call.id || generateId();
+        const requestedCorrelation =
+          context?.toolCorrelation ?? (call.id.length > 0 ? "provider_id" : "none");
+        const correlation =
+          requestedCorrelation === "provider_id" && call.id.trim().length > 0
+            ? "provider_id"
+            : "none";
+        if (correlation === "none") this.runToolCorrelation = "none";
+        const toolCallId = correlation === "provider_id" ? call.id : "";
+        if (correlation === "none" && requiresExactToolCorrelation(call.name)) {
+          return toolFailure({
+            kind: "precondition",
+            what: `tool "${call.name}" cannot run without exact provider correlation`,
+            recovery: "retry after the Claude Code bridge supplies its provider tool-use ID",
+          });
+        }
         const isAsk = ASK_TOOL_NAMES.has(call.name);
         let claimedAsk = false;
         let barrierResult: ToolResult | null = null;
@@ -507,7 +546,9 @@ export class ClaudeCodeService {
           this.askPending = true;
           claimedAsk = true;
         }
-        this.toolListener?.({ phase: "start", toolName: call.name, toolCallId });
+        if (correlation === "provider_id") {
+          this.toolListener?.({ phase: "start", toolName: call.name, toolCallId });
+        }
         let isError = true;
         // The result text the model received, carried to the timeline so a failed
         // call shows its error. Defaults cover a thrown executor (no result object).
@@ -528,16 +569,18 @@ export class ClaudeCodeService {
           return result;
         } finally {
           if (claimedAsk) this.askPending = false;
-          this.toolListener?.({
-            phase: "end",
-            toolName: call.name,
-            args: call.arguments,
-            isError,
-            content,
-            toolCallId,
-            disposition,
-            ...(isAsk && { askStatus: askStatusFromResult(isError, content) }),
-          });
+          if (correlation === "provider_id") {
+            this.toolListener?.({
+              phase: "end",
+              toolName: call.name,
+              args: call.arguments,
+              isError,
+              content,
+              toolCallId,
+              disposition,
+              ...(isAsk && { askStatus: askStatusFromResult(isError, content) }),
+            });
+          }
         }
       },
     };
@@ -579,7 +622,11 @@ export class ClaudeCodeService {
       if (this.liveReview) {
         const result = await this.liveReview.resolveEditOne(call, toolCallId);
         if (!result.isError) {
-          this.collectedEdits.push({ id: generateId(), name: call.name, arguments: call.arguments });
+          this.collectedEdits.push({
+            id: toolCallId,
+            name: call.name,
+            arguments: call.arguments,
+          });
         }
         return result;
       }
@@ -587,7 +634,11 @@ export class ClaudeCodeService {
       // can self-correct), and stash the call so the diff panel renders after the run.
       const result = await executeEditTool(call, { app: this.app, filePath: this.editTargetPath });
       if (!result.isError) {
-        this.collectedEdits.push({ id: generateId(), name: call.name, arguments: call.arguments });
+        this.collectedEdits.push({
+          id: toolCallId,
+          name: call.name,
+          arguments: call.arguments,
+        });
       }
       return result;
     }
@@ -666,6 +717,15 @@ export class ClaudeCodeService {
 
 function isAbortError(error: unknown): boolean {
   return error instanceof Error && error.name === "AbortError";
+}
+
+function requiresExactToolCorrelation(toolName: string): boolean {
+  return (
+    ASK_TOOL_NAMES.has(toolName) ||
+    EDIT_TOOL_NAMES.has(toolName) ||
+    VAULT_OPS_TOOL_NAMES.has(toolName) ||
+    MEMORY_MUTATION_TOOL_NAMES.has(toolName)
+  );
 }
 
 function askStatusFromResult(

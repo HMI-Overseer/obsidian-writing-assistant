@@ -221,6 +221,7 @@ export async function runToolLoop(
     let usage: UsageResult | null = null;
     let askBarrierPlan: AskBarrierBatchPlan | null = null;
     let roundThinkingBlocks: unknown[] | null = null;
+    let streamedSegmentIds: string[] = [];
     const streamedThisRound = deferredCalls.length === 0;
 
     if (!streamedThisRound) {
@@ -242,10 +243,14 @@ export async function runToolLoop(
         { signal },
       );
       const segmentIds: string[] = [];
+      streamedSegmentIds = segmentIds;
       roundText = "";
       for await (const event of streamResult.events) {
         if (event.type === "segment_start") segmentIds.push(event.segmentId);
-        if (event.type === "tool_call_identity") {
+        if (
+          event.type === "tool_call_identity" &&
+          event.correlation !== "none"
+        ) {
           toolCorrelations.set(event.toolCallId, event.correlation);
         }
         if (event.type === "prose_delta") {
@@ -267,10 +272,10 @@ export async function runToolLoop(
         replayEvidence,
         await streamResult.replayEvidence,
       );
-      const rawToolCalls = executableCallsForSegments(
-        turnBuilder.snapshot(),
-        segmentIds,
-      );
+      const rawToolCalls =
+        provider === "claudecode"
+          ? null
+          : executableCallsForSegments(turnBuilder.snapshot(), segmentIds);
       // Translate any absolute paths to vault-relative *once*, here, so every
       // downstream consumer, overlay, accumulation, finalization, timeline, sees
       // the same resolved path (tools/paths.ts).
@@ -331,19 +336,26 @@ export async function runToolLoop(
     // the empty-response classification runs on streamed rounds only. `modelRounds` (not
     // the raw loop index, which drains inflate) drives the round-count diagnostics.
     if (streamedThisRound) {
-      checkForFailedToolCall({
-        hasToolCalls,
-        roundText,
-        stopReason,
-        round: modelRounds,
-        maxRounds,
-        usage,
-        model,
-        provider,
-        agenticMode,
-        toolCount: baseRequest.tools?.length ?? 0,
-        mode: baseRequest.documentContext ? "edit" : "chat",
-      });
+      const hasClaudeStructure =
+        provider === "claudecode" &&
+        turnBuilder
+          .snapshot()
+          .items.some((item) => streamedSegmentIds.includes(item.segmentId));
+      if (!hasClaudeStructure) {
+        checkForFailedToolCall({
+          hasToolCalls,
+          roundText,
+          stopReason,
+          round: modelRounds,
+          maxRounds,
+          usage,
+          model,
+          provider,
+          agenticMode,
+          toolCount: baseRequest.tools?.length ?? 0,
+          mode: baseRequest.documentContext ? "edit" : "chat",
+        });
+      }
     }
 
     if (!hasToolCalls || !toolCalls) break;
@@ -667,12 +679,16 @@ export function applyAssistantStreamEvent(
       });
       break;
     case "prose_delta":
-      builder.appendProseDelta(event.segmentId, event.delta);
+      builder.appendProseDelta(event.segmentId, event.delta, {
+        providerBlockId: event.providerBlockId,
+        deltaKey: event.deltaKey,
+      });
       break;
     case "tool_call_start":
       builder.startToolCall(event.segmentId, {
         declarationKey: event.declarationKey,
         toolName: event.toolName,
+        providerBlockId: event.providerBlockId,
         round,
       });
       if (
@@ -690,6 +706,7 @@ export function applyAssistantStreamEvent(
         builder.appendToolArgumentsDelta(
           event.declarationKey,
           event.argumentsDelta,
+          { deltaKey: event.deltaKey },
         );
       }
       break;
@@ -697,8 +714,45 @@ export function applyAssistantStreamEvent(
       builder.bindToolCallId(
         event.declarationKey,
         event.toolCallId,
-        event.correlation,
+        event.correlation === "none" ? "provider_id" : event.correlation,
       );
+      break;
+    case "segment_reconcile":
+      builder.reconcileCompletedSegment({
+        segmentId: event.segmentId,
+        providerMessageId: event.providerMessageId,
+        blocks: event.blocks,
+      });
+      break;
+    case "tool_result": {
+      const item = builder
+        .snapshot()
+        .items.find(
+          (candidate) =>
+            candidate.type === "tool_call" &&
+            candidate.toolCallId === event.toolCallId,
+        );
+      const capture =
+        item?.type === "tool_call"
+          ? captureStepFields(
+              item.toolName,
+              item.toolArgs ?? {},
+              {
+                content: event.content,
+                isError: event.isError,
+              },
+            )
+          : { resultRecord: event.content };
+      builder.updateToolLifecycle(event.toolCallId, {
+        state: event.isError ? "failed" : "completed",
+        ...capture,
+        ...(event.isError
+          ? { isError: true, errorContent: event.content }
+          : {}),
+      });
+      break;
+    }
+    case "stream_diagnostic":
       break;
     case "segment_end":
       builder.finishSegment(event.segmentId);
@@ -896,7 +950,7 @@ function textualFallbackEvidence(
   };
 }
 
-function isActionTool(toolName: string): boolean {
+export function isActionTool(toolName: string): boolean {
   return (
     EDIT_TOOL_NAMES.has(toolName) ||
     VAULT_OPS_TOOL_NAMES.has(toolName) ||

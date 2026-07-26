@@ -70,7 +70,6 @@ import {
   buildAskUserResult,
 } from "../../../../src/tools/ask/result";
 import type { AskAnswers, AskUserResponder } from "../../../../src/tools/ask/types";
-import { formatAgenticReplayLines } from "../../../../src/tools/resultDigest";
 import type { ToolCall } from "../../../../src/tools/types";
 import type { ClaudeCodeToolEvent } from "../../../../src/services/ClaudeCodeService";
 import { DEFAULT_VAULT_OP_POLICY } from "../../../../src/vault-ops/gateway";
@@ -296,7 +295,7 @@ function makeClaudeCodeClient(
           }
           if (options.responseText) yield options.responseText;
         })();
-        return textStreamResult(deltas, "claude-code-ask");
+        return textStreamResult(deltas, "claude-code-ask", askCall);
       },
     ),
   } as ChatClient;
@@ -344,7 +343,7 @@ function makeCleanInterruptClaudeCodeClient(
             });
           }
         })();
-        return textStreamResult(deltas, "claude-code-interrupt");
+        return textStreamResult(deltas, "claude-code-interrupt", askCall);
       },
     ),
   } as ChatClient;
@@ -384,7 +383,7 @@ function makeEarlySettlingClaudeCodeClient(
             );
           });
         })();
-        return textStreamResult(deltas, "claude-code-early");
+        return textStreamResult(deltas, "claude-code-early", askCall);
       },
     ),
   } as ChatClient;
@@ -393,14 +392,35 @@ function makeEarlySettlingClaudeCodeClient(
 function textStreamResult(
   deltas: AsyncGenerator<string>,
   segmentId: string,
+  toolCall?: ToolCall,
 ): StreamResult {
   const events = (async function* (): AsyncGenerator<AssistantStreamEvent> {
     yield { type: "segment_start", segmentId };
+    if (toolCall) {
+      const declarationKey = `${segmentId}:tool-0`;
+      yield {
+        type: "tool_call_start",
+        segmentId,
+        declarationKey,
+        toolName: toolCall.name,
+      };
+      yield {
+        type: "tool_call_identity",
+        declarationKey,
+        toolCallId: toolCall.id,
+        correlation: "provider_id",
+      };
+      yield {
+        type: "tool_call_delta",
+        declarationKey,
+        argumentsDelta: JSON.stringify(toolCall.arguments),
+      };
+    }
     for await (const delta of deltas) {
       yield { type: "prose_delta", segmentId, delta };
     }
     yield { type: "segment_end", segmentId };
-    yield { type: "turn_end", stopReason: "end_turn" };
+    yield { type: "turn_end", status: "completed" };
   })();
   return {
     events,
@@ -806,13 +826,15 @@ describe("generateLlmResponse ask_user integration", () => {
     expect(state.messages).toHaveLength(1);
     expect(state.messages[0]).toMatchObject({
       content: "",
-      interrupted: true,
-      agenticSteps: expect.arrayContaining([
-        expect.objectContaining({
-          toolName: "ask_user",
-          askStatus: "cancelled",
-        }),
-      ]),
+    });
+    expect(
+      state.messages[0].revisions?.find(
+        (revision) => revision.revisionId === state.messages[0].activeRevisionId,
+      ),
+    ).toMatchObject({ kind: "turn", interrupted: true });
+    expect(completedAskStep(state.messages[0])).toMatchObject({
+      toolName: "ask_user",
+      askStatus: "cancelled",
     });
     expect(state.interactionHost.interaction).toBeNull();
     expect(state.claudeCode.getAskUserResponder()).toBeNull();
@@ -868,10 +890,6 @@ describe("generateLlmResponse ask_user integration", () => {
     expect(state.messages).toHaveLength(1);
     expect(state.messages[0].isError).toBe(true);
     expect(completedAskStep(state.messages[0])?.askGuidance).toBeDefined();
-    const guidance =
-      '[ask_user guidance: {"questions":[{"question":"Which format should I use?","header":"Output","answer":"Detailed"}]}]';
-    expect(formatAgenticReplayLines(state.messages[0].agenticSteps ?? [])).toEqual([
-      guidance,
-    ]);
+    expect(state.messages[0].agenticSteps).toBeUndefined();
   });
 });

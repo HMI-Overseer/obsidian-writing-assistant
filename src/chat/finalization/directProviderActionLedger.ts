@@ -16,8 +16,10 @@ import type {
 } from "../../vault-ops/types";
 import {
   appendActionEvent,
+  createProvisionalAction,
   createPlacedParsedEditAction,
   createPlacedToolAction,
+  finalizeUndeclaredAction,
 } from "../conversation/actionLedger";
 import { validateAskRequest } from "../../tools/ask/validation";
 
@@ -25,6 +27,7 @@ export interface DirectProviderActionLedgerInput {
   revisionId: string;
   turn: AssistantTurnRecord;
   toolCorrelations: Record<string, "provider_id" | "plugin_id">;
+  actionRefsByToolCallId?: Record<string, string>;
   editProposals?: EditProposal[];
   appliedEditRecords?: AppliedEditRecord[];
   vaultOpProposal?: VaultOperationProposal;
@@ -55,12 +58,17 @@ export function buildDirectProviderActionLedger(
         .map((item) => [item.toolCallId, item]),
     ),
   };
-  return [
+  const entries = [
     ...buildEditEntries(context),
     ...buildVaultOpEntries(context),
     ...buildMemoryEntries(context),
     ...buildInteractionEntries(context),
   ];
+  return entries.flatMap((entry) => {
+    if (entry.placement.state !== "provisional") return [entry];
+    const finalized = finalizeUndeclaredAction(entry);
+    return finalized ? [finalized] : [];
+  });
 }
 
 function buildEditEntries(context: LedgerContext): ToolActionLedgerEntry[] {
@@ -78,12 +86,7 @@ function buildEditEntries(context: LedgerContext): ToolActionLedgerEntry[] {
     );
     for (const [toolCallId, hunks] of byToolCallId) {
       if (!context.itemByToolCallId.has(toolCallId)) {
-        if (!context.input.parsedEditPlacement) {
-          throw new Error(
-            `Review state for tool call "${toolCallId}" has no canonical action placement.`,
-          );
-        }
-        continue;
+        if (context.input.parsedEditPlacement) continue;
       }
       let entry = createToolEntry(context, toolCallId, "edit", {
         proposalId: proposal.id,
@@ -341,6 +344,7 @@ function buildInteractionEntries(
   const entries: ToolActionLedgerEntry[] = [];
   for (const item of context.itemByToolCallId.values()) {
     if (item.toolName !== "ask_user" || !item.actionRef) continue;
+    if (!context.input.toolCorrelations[item.toolCallId]) continue;
     const request = validateAskRequest(item.toolArgs);
     if (!request.ok) continue;
     let entry = createToolEntry(context, item.toolCallId, "interaction", {
@@ -395,9 +399,11 @@ function createToolEntry(
   proposed: Array<{ targetId: string; createdAt: number }>,
 ): ToolActionLedgerEntry {
   const item = context.itemByToolCallId.get(toolCallId);
-  if (!item?.actionRef) {
+  const actionRef =
+    item?.actionRef ?? context.input.actionRefsByToolCallId?.[toolCallId];
+  if (!actionRef) {
     throw new Error(
-      `Review state for tool call "${toolCallId}" has no canonical action placement.`,
+      `Review state for tool call "${toolCallId}" has no action reference.`,
     );
   }
   const correlation = context.input.toolCorrelations[toolCallId];
@@ -407,9 +413,8 @@ function createToolEntry(
     );
   }
   const common = {
-    actionRef: item.actionRef,
+    actionRef,
     revisionId: context.input.revisionId,
-    itemId: item.id,
     correlation: {
       kind: correlation,
       toolCallId,
@@ -426,7 +431,7 @@ function createToolEntry(
   };
   switch (family) {
     case "edit":
-      return createPlacedToolAction({
+      return createToolOrProvisionalAction(context, toolCallId, {
         ...common,
         family,
         payload: payload as Extract<
@@ -435,7 +440,7 @@ function createToolEntry(
         >["payload"],
       });
     case "vault_op":
-      return createPlacedToolAction({
+      return createToolOrProvisionalAction(context, toolCallId, {
         ...common,
         family,
         payload: payload as Extract<
@@ -444,7 +449,7 @@ function createToolEntry(
         >["payload"],
       });
     case "memory":
-      return createPlacedToolAction({
+      return createToolOrProvisionalAction(context, toolCallId, {
         ...common,
         family,
         payload: payload as Extract<
@@ -453,7 +458,7 @@ function createToolEntry(
         >["payload"],
       });
     case "interaction":
-      return createPlacedToolAction({
+      return createToolOrProvisionalAction(context, toolCallId, {
         ...common,
         family,
         payload: payload as Extract<
@@ -462,6 +467,17 @@ function createToolEntry(
         >["payload"],
       });
   }
+}
+
+function createToolOrProvisionalAction(
+  context: LedgerContext,
+  toolCallId: string,
+  input: Parameters<typeof createProvisionalAction>[0],
+): ToolActionLedgerEntry {
+  const item = context.itemByToolCallId.get(toolCallId);
+  return item
+    ? createPlacedToolAction({ ...input, itemId: item.id })
+    : createProvisionalAction(input);
 }
 
 type EventWithoutIdentity =

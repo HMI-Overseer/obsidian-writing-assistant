@@ -1,10 +1,16 @@
-import type { SamplingParams } from "../shared/types";
+import type { ClaudeCodeResumeCursor, SamplingParams } from "../shared/types";
 import type { ChatRequest, ChatTurn } from "../shared/chatRequest";
 import type { ChatClient } from "./chatClient";
 import { formatNoteAttachment } from "./contextFormatting";
-import type { CompletionResult, StreamResult, StopReason, UsageResult } from "./usageTypes";
+import type {
+  AssistantStreamEvent,
+  CompletionResult,
+  StreamResult,
+  StopReason,
+  UsageResult,
+} from "./usageTypes";
 import {
-  streamClaudeCode,
+  streamClaudeCodeMessages,
   claudeCodeHarnessEnv,
   extractClaudeCodeResult,
   extractClaudeCodeContextTokens,
@@ -12,9 +18,12 @@ import {
   type ClaudeCodeResultUsage,
 } from "./claudeCodeProcess";
 import { assertMintBlobFits } from "./claudeCodeContextPreflight";
-import { streamSdkTurn, DISALLOWED_NATIVE_TOOLS } from "./sdk/sdkQueryEngine";
+import {
+  DISALLOWED_NATIVE_TOOLS,
+  streamSdkTurn,
+} from "./sdk/sdkQueryEngine";
+import { ClaudeCodeSdkMessageTranslator } from "./sdk/claudeCodeSdkMessageTranslator";
 import { isEffortLevel } from "../shared/reasoning";
-import type { ClaudeCodeResumeCursor } from "../shared/types";
 import type { McpSdkServerConfigWithInstance } from "./sdk/claudeAgentSdk";
 import type { SessionRecovery, SessionTurn } from "./harnessSession";
 import { generateId } from "../utils";
@@ -71,7 +80,7 @@ export interface ClaudeCodeRuntime {
    */
   sdkSession?: {
     conversationId: string;
-    run: (input: SdkSessionTurnInput) => AsyncGenerator<string>;
+    run: (input: SdkSessionTurnInput) => AsyncGenerator<AssistantStreamEvent>;
   };
   /**
    * In-process SDK MCP server bridging the plugin's toolstack. Present on the
@@ -90,6 +99,8 @@ export interface ClaudeCodeRuntime {
     /** allowedTools value granting the plugin's MCP server, e.g. "mcp__writing_assistant". */
     allowedTools: string;
   };
+  /** Exact correlation fidelity observed by the active MCP bridge. */
+  getToolCorrelation?: () => "provider_id" | "none";
 }
 
 /**
@@ -118,7 +129,8 @@ export class ClaudeCodeClient implements ChatClient {
     let captured: ClaudeCodeResultUsage | null = null;
     let decision: SessionRecovery | undefined;
     let bankedCursor: ClaudeCodeResumeCursor | undefined;
-    const parts: string[] = [];
+    const segmentOrder: string[] = [];
+    const textBySegment = new Map<string, string>();
 
     const deltas = this.runTurn(
       request,
@@ -130,10 +142,28 @@ export class ClaudeCodeClient implements ChatClient {
       (cursor) => { bankedCursor = cursor; },
     );
 
-    for await (const delta of deltas) parts.push(delta);
+    for await (const event of deltas) {
+      if (event.type === "segment_start" && !textBySegment.has(event.segmentId)) {
+        segmentOrder.push(event.segmentId);
+        textBySegment.set(event.segmentId, "");
+      } else if (event.type === "prose_delta") {
+        textBySegment.set(
+          event.segmentId,
+          (textBySegment.get(event.segmentId) ?? "") + event.delta,
+        );
+      } else if (event.type === "segment_reconcile") {
+        textBySegment.set(
+          event.segmentId,
+          event.blocks
+            .filter((block) => block.type === "prose")
+            .map((block) => block.text)
+            .join(""),
+        );
+      }
+    }
 
     return {
-      text: parts.join(""),
+      text: segmentOrder.map((id) => textBySegment.get(id) ?? "").join(""),
       usage: applyRecoveryDecision(toUsageResult(captured), decision, bankedCursor),
       toolCalls: null,
       stopReason: "end_turn",
@@ -162,9 +192,7 @@ export class ClaudeCodeClient implements ChatClient {
     >((resolve) => {
       resolveReplayEvidence = resolve;
     });
-    const segmentId = `segment-${generateId()}`;
-
-    const rawDeltas = this.runTurn(
+    const rawEvents = this.runTurn(
       request,
       model,
       params,
@@ -173,33 +201,35 @@ export class ClaudeCodeClient implements ChatClient {
       (d) => { decision = d; },
       (cursor) => { bankedCursor = cursor; },
     );
+    const runtime = this.runtime;
 
     async function* events(): StreamResult["events"] {
       try {
-        yield { type: "segment_start", segmentId };
-        for await (const delta of rawDeltas) {
-          if (delta.length > 0) {
-            yield { type: "prose_delta", segmentId, delta };
-          }
-        }
-        yield { type: "segment_end", segmentId };
-        yield { type: "turn_end", status: "completed" };
+        yield* rawEvents;
       } finally {
         resolveUsage(applyRecoveryDecision(toUsageResult(captured), decision, bankedCursor));
         resolveStopReason("end_turn");
+        const nativeContinuation =
+          decision?.outcome === "reused" || decision?.outcome === "resumed";
+        const sdkCapture = runtime.useSdk || runtime.sdkSession !== undefined;
+        const correlation = sdkCapture
+          ? runtime.getToolCorrelation?.() ?? "provider_id"
+          : "none";
         resolveReplayEvidence({
-          tier:
-            decision?.outcome === "reused" || decision?.outcome === "resumed"
-              ? "native"
-              : "textual",
+          tier: nativeContinuation ? "native" : "textual",
           capabilities: {
-            captureOrder: "text_only",
-            toolCorrelation: "none",
+            captureOrder: sdkCapture ? "exact" : "segment",
+            toolCorrelation: correlation,
             coldReplay: "textual",
-            nativeResume:
-              decision?.outcome === "reused" || decision?.outcome === "resumed",
+            nativeResume: nativeContinuation,
           },
-          loweredReason: "claude_code_structured_translation_deferred",
+          ...(!sdkCapture
+            ? { loweredReason: "claude_code_legacy_stream_json_capture" }
+            : correlation === "none"
+              ? { loweredReason: "claude_code_tool_correlation_missing" }
+              : nativeContinuation
+                ? {}
+                : { loweredReason: "claude_code_structural_cold_replay_deferred" }),
         });
       }
     }
@@ -231,7 +261,7 @@ export class ClaudeCodeClient implements ChatClient {
     onResult: (result: ClaudeCodeResultUsage) => void,
     onRecoveryDecision?: (decision: SessionRecovery) => void,
     onSessionBanked?: (cursor: ClaudeCodeResumeCursor) => void,
-  ): AsyncGenerator<string> {
+  ): AsyncGenerator<AssistantStreamEvent> {
     const prompt = buildClaudeCodePrompt(request);
     // Passive preflight: refuse a mint blob that would overflow the discovered
     // window (leaving no room for a reply) rather than let it die opaquely
@@ -239,7 +269,7 @@ export class ClaudeCodeClient implements ChatClient {
     assertMintBlobFits(prompt, request.systemPrompt, this.runtime.contextWindow);
 
     if (this.runtime.sdkSession) {
-      yield* this.runtime.sdkSession.run({
+      const sessionEvents = this.runtime.sdkSession.run({
         fullPrompt: prompt,
         deltaPrompt: buildDeltaPrompt(request),
         model,
@@ -258,6 +288,30 @@ export class ClaudeCodeClient implements ChatClient {
         onRecoveryDecision,
         onSessionBanked,
       });
+      let compatibilitySegmentId: string | null = null;
+      for await (const event of sessionEvents as AsyncGenerator<
+        AssistantStreamEvent | string
+      >) {
+        if (typeof event !== "string") {
+          yield event;
+          continue;
+        }
+        if (compatibilitySegmentId === null) {
+          compatibilitySegmentId = `claude-session-segment-${generateId()}`;
+          yield { type: "segment_start", segmentId: compatibilitySegmentId };
+        }
+        if (event.length > 0) {
+          yield {
+            type: "prose_delta",
+            segmentId: compatibilitySegmentId,
+            delta: event,
+          };
+        }
+      }
+      if (compatibilitySegmentId !== null) {
+        yield { type: "segment_end", segmentId: compatibilitySegmentId };
+        yield { type: "turn_end", status: "completed" };
+      }
       return;
     }
 
@@ -277,7 +331,12 @@ export class ClaudeCodeClient implements ChatClient {
     }
 
     let contextTokens: number | null = null;
-    yield* streamClaudeCode({
+    const segmentPrefix = `claude-legacy-segment-${generateId()}`;
+    const translator = new ClaudeCodeSdkMessageTranslator({
+      createSegmentId: (index) => `${segmentPrefix}-${index}`,
+      toolCorrelation: "none",
+    });
+    for await (const message of streamClaudeCodeMessages({
       command: this.command,
       args: this.buildLegacyArgs(request, model, params),
       cwd: this.runtime.vaultRoot,
@@ -292,7 +351,9 @@ export class ClaudeCodeClient implements ChatClient {
           onResult(result);
         }
       },
-    });
+    })) {
+      for (const event of translator.translate(message)) yield event;
+    }
   }
 
   private get command(): string {

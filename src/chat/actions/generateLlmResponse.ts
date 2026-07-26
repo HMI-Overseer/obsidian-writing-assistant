@@ -8,31 +8,23 @@ import { createAbortError } from "../../api/httpTransport";
 import type { ChatSessionStore } from "../conversation/ChatSessionStore";
 import type { ChatTranscript } from "../messages/ChatTranscript";
 import type {
-  AgenticStep,
   ApprovalPosture,
   AssistantReplayEvidence,
   AssistantTurnRecord,
   CompletionModel,
   ConversationMessage,
+  ProviderOption,
 } from "../../shared/types";
 import { writesPermitted } from "../../vault-ops/gateway";
 import { getActiveProfile } from "../../shared/profileUtils";
-import { makeMessage } from "../conversation/conversationUtils";
 import { prepareApiMessages } from "../finalization/prepareApiMessages";
 import { estimateTokenCount } from "../../shared/tokenEstimation";
-import {
-  finalizeResponse,
-  finalizeAbortedResponse,
-  insertLastResponse,
-} from "../finalization/finalizeResponse";
-import {
-  buildRegexEditProposals,
-  finalizeEditResponse,
-} from "../finalization/finalizeEditResponse";
+import { insertLastResponse } from "../finalization/finalizeResponse";
+import { buildRegexEditProposals } from "../finalization/finalizeEditResponse";
 import { estimateCost } from "../../api/pricing";
 import type { UsageResult } from "../../api/usageTypes";
 import type { MessageUsage } from "../../shared/types";
-import { runToolLoop } from "./toolLoop";
+import { isActionTool, runToolLoop } from "./toolLoop";
 import type {
   MemoryToolContext,
   ToolExecutionContext,
@@ -40,11 +32,7 @@ import type {
   VaultToolContext,
 } from "./toolLoop";
 import { LiveVaultReview } from "./liveVaultReview";
-import { extractToolInput } from "../../tools/metadata";
-import {
-  captureStepFields,
-  hasCompletedAskGuidance,
-} from "../../tools/resultDigest";
+import { captureStepFields } from "../../tools/resultDigest";
 import { CONTEXT_DANGER_THRESHOLD } from "../../constants";
 import type { ComposerInteractionHostPort } from "../interactions/ComposerInteractionHost";
 import { AskInteractionCoordinator } from "../interactions/AskInteractionCoordinator";
@@ -108,6 +96,12 @@ function buildMessageUsage(modelId: string, usage: UsageResult): MessageUsage {
     ...(usage.cacheCreationInputTokens !== undefined && { cacheCreationInputTokens: usage.cacheCreationInputTokens }),
     ...(usage.cacheReadInputTokens !== undefined && { cacheReadInputTokens: usage.cacheReadInputTokens }),
     ...(usage.contextTokens !== undefined && { contextTokens: usage.contextTokens }),
+    ...(usage.sessionReused !== undefined && { sessionReused: usage.sessionReused }),
+    ...(usage.sessionResumed !== undefined && { sessionResumed: usage.sessionResumed }),
+    ...(usage.sessionRebuildReason !== undefined && {
+      sessionRebuildReason: usage.sessionRebuildReason,
+    }),
+    ...(usage.resumeCursor !== undefined && { resumeCursor: usage.resumeCursor }),
     // Provider-reported cost wins over the price-table estimate (mirrors
     // finalizeResponse): Claude Code's aliases have no price-table entry at all.
     estimatedCostUsd: usage.costUsd ?? estimateCost(modelId, usage) ?? undefined,
@@ -137,7 +131,6 @@ function contextTokensOf(usage: UsageResult): number {
 export async function generateLlmResponse(options: LlmGenerationOptions): Promise<void> {
   const {
     plugin,
-    owner,
     store,
     transcript,
     activeModel,
@@ -152,7 +145,6 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
   } = options;
 
   const activeProfile = getActiveProfile(plugin.settings, activeModel.provider);
-  const directProvider = activeModel.provider !== "claudecode";
   const draftIdentity = {
     messageId: generateId(),
     revisionId: `revision-${generateId()}`,
@@ -168,6 +160,8 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
     string,
     "provider_id" | "plugin_id"
   > = {};
+  const claudeActionRefsByToolCallId: Record<string, string> = {};
+  const claudeToolCorrelations: Record<string, "provider_id"> = {};
 
   // Ambient editing (prompt-cache design section 6.3): the edit pipeline (edit renderer, edit
   // review channel, finalizeEditResponse) is active whenever the session permits any
@@ -255,39 +249,21 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
 
   const assistantBubble = transcript.createBubble("assistant");
 
-  // Two distinct agentic shapes feed the timeline:
-  //  - pluginAgentic: the plugin runs its own tool loop (tools attached to the
-  //    request). Its ordered provider events already update the canonical builder.
-  //  - claudeCodeAgentic: Claude Code runs its loop internally over MCP. Its text
-  //    streams through the legacy compatibility projection until Phase 5 adds
-  //    structural subprocess capture.
+  // The plugin loop and Claude Code's internal MCP loop now feed the same
+  // canonical builder. Claude lifecycle callbacks update state by exact ID but
+  // never position a tool item.
   const pluginAgentic = !!apiMessages.tools?.length;
   const claudeCodeAgentic =
     activeModel.provider === "claudecode" && plugin.settings.agenticMode;
-  const legacySteps: AgenticStep[] = [];
-  const runningLegacyToolIds = new Set<string>();
   let latestSnapshot = turnBuilder.snapshot();
   const refreshLiveTurn = (snapshot: AssistantTurnSnapshot): void => {
     latestSnapshot = snapshot;
-    if (directProvider) {
-      void assistantBubble.turnView.refresh(snapshot, {
-        regexEditPreview:
-          editsActive && !pluginAgentic
-            ? projectRegexEditPreview(snapshot)
-            : null,
-      });
-      return;
-    }
-    void assistantBubble.turnView.refreshLegacy({
-      key: draftIdentity.turnId,
-      status: snapshot.status,
-      content: allVisibleProse(snapshot),
-      steps: legacySteps,
-      runningToolCallIds: runningLegacyToolIds,
+    void assistantBubble.turnView.refresh(snapshot, {
+      regexEditPreview:
+        editsActive && !pluginAgentic && !claudeCodeAgentic
+          ? projectRegexEditPreview(snapshot)
+          : null,
     });
-  };
-  const refreshLegacyTurn = (): void => {
-    refreshLiveTurn(latestSnapshot);
   };
   refreshLiveTurn(latestSnapshot);
 
@@ -361,6 +337,7 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
       revisionId: draftIdentity.revisionId,
       turn: input.turn,
       toolCorrelations: input.toolCorrelations,
+      actionRefsByToolCallId: claudeActionRefsByToolCallId,
       editProposals:
         input.editProposals ?? liveReview.getEditProposals(),
       appliedEditRecords: liveReview.getEditAppliedRecords(),
@@ -453,9 +430,8 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
     // Only the plugin-owned tool loop buffers deltas; Claude Code streams live.
     const agenticMode = pluginAgentic;
 
-    // Claude Code's tools fire inside its subprocess over MCP. Phase 4 keeps the
-    // existing conservative legacy evidence and projects it through the unified
-    // view. Phase 5 owns structural subprocess correlation.
+    // Claude Code lifecycle callbacks may beat the SDK declaration. They reserve
+    // identity and state by exact ID, while SDK events remain the only positioner.
     if (claudeCodeAgentic) {
       plugin.services.claudeCode.setAskUserResponder(
         askCoordinator,
@@ -463,54 +439,37 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
       );
       plugin.services.claudeCode.setLiveReview(liveReview);
       plugin.services.claudeCode.setToolListener((event) => {
+        claudeToolCorrelations[event.toolCallId] = "provider_id";
         if (event.phase === "start") {
-          runningLegacyToolIds.add(event.toolCallId);
-          if (
-            !legacySteps.some(
-              (step) => step.toolCallId === event.toolCallId,
-            )
-          ) {
-            legacySteps.push({
-              type: "tool_call",
-              round: 0,
-              toolName: event.toolName,
-              toolCallId: event.toolCallId,
-            });
+          const actionRef = isActionTool(event.toolName)
+            ? `action-${draftIdentity.revisionId}-${event.toolCallId}`
+            : undefined;
+          if (actionRef) {
+            claudeActionRefsByToolCallId[event.toolCallId] = actionRef;
           }
-        } else {
-          runningLegacyToolIds.delete(event.toolCallId);
-          const completedStep: AgenticStep = {
-            type: "tool_call",
-            round: 0,
+          turnBuilder.updateToolLifecycle(event.toolCallId, {
+            state: "running",
             toolName: event.toolName,
-            toolInput: extractToolInput({ name: event.toolName, arguments: event.args }),
-            toolArgs: event.args,
-            // Same id the vault op carries (minted in ClaudeCodeService.callTool),
-            // so the review binds approve/decline to this step.
-            toolCallId: event.toolCallId,
+            ...(actionRef ? { actionRef } : {}),
+          });
+        } else {
+          const capture = captureStepFields(event.toolName, event.args, {
+            content: event.content,
+            isError: event.isError,
+            disposition: event.disposition,
+          });
+          turnBuilder.updateToolLifecycle(event.toolCallId, {
+            state: event.isError ? "failed" : "completed",
+            toolName: event.toolName,
+            toolInput: JSON.stringify(event.args),
+            resultRecord: capture.resultRecord,
+            resultDigest: capture.resultDigest,
+            askGuidance: capture.askGuidance,
             ...(event.askStatus && { askStatus: event.askStatus }),
-            // A failed call (e.g. an edit no-match, which never reaches the review
-            // overlay) flags its step red and reveals the error returned to the model.
             ...(event.isError && { isError: true, errorContent: event.content }),
-            // Phase-2 replay capture: disposition + discovery digest + bounded record.
-            // This is the Claude Code choke point (the MCP loop is otherwise opaque to
-            // the plugin transcript); the plugin tool loop is the sibling choke point.
-            ...captureStepFields(event.toolName, event.args, {
-              content: event.content,
-              isError: event.isError,
-              disposition: event.disposition,
-            }),
-          };
-          const stepIndex = legacySteps.findIndex(
-            (step) => step.toolCallId === event.toolCallId,
-          );
-          if (stepIndex === -1) {
-            legacySteps.push(completedStep);
-          } else {
-            legacySteps[stepIndex] = completedStep;
-          }
+          });
         }
-        refreshLegacyTurn();
+        refreshLiveTurn(turnBuilder.snapshot());
       });
     }
 
@@ -555,29 +514,22 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
         `action-${draftIdentity.revisionId}-${toolCallId}`,
     );
     const {
-      writeToolCalls,
       usage: finalUsage,
-      writeStopReason,
       turn,
       replayEvidence,
       toolCorrelations,
     } = loopResult;
     capturedTurn = turn;
     capturedReplayEvidence = replayEvidence;
-    capturedToolCorrelations = toolCorrelations;
+    const exactToolCorrelations = {
+      ...claudeToolCorrelations,
+      ...toolCorrelations,
+    };
+    capturedToolCorrelations = exactToolCorrelations;
     if (abortController.signal.aborted) throw createAbortError();
 
-    if (directProvider) {
-      await assistantBubble.turnView.refresh(turn);
-    } else {
-      latestSnapshot = turn;
-      await assistantBubble.turnView.refreshLegacy({
-        key: draftIdentity.turnId,
-        status: turn.status,
-        content: allVisibleProse(turn),
-        steps: legacySteps,
-      });
-    }
+    latestSnapshot = turn;
+    await assistantBubble.turnView.refresh(turn);
     await assistantBubble.turnView.flush();
 
     // Claude Code reports its own context window per turn (its catalog aliases
@@ -590,230 +542,83 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
       );
     }
 
-    const agenticSteps =
-      legacySteps.length > 0 ? structuredClone(legacySteps) : undefined;
-
-    // Claude Code runs its tools internally, so its write proposals (edits and
-    // vault ops) arrive via the MCP server (collected on the service) rather than
-    // through the tool loop. Both channels surface to the same finalizer, which
-    // partitions them back apart by tool name.
-    const isClaudeCode = activeModel.provider === "claudecode";
-    const ccWriteToolCalls = isClaudeCode
-      ? [
-          ...plugin.services.claudeCode.takeCollectedEdits(),
-          ...plugin.services.claudeCode.takeCollectedVaultOps(),
-        ]
-      : [];
-    const effectiveWriteToolCalls = ccWriteToolCalls.length > 0 ? ccWriteToolCalls : writeToolCalls;
-
-    if (directProvider) {
-      let persistedTurn = turn;
-      let regexEditProposals:
-        | ReturnType<LiveVaultReview["getEditProposals"]>
-        | undefined;
-      let parsedEditPlacement:
-        | { itemId: string; actionRef: string }
-        | undefined;
-      if (editsActive && !pluginAgentic) {
-        regexEditProposals = await buildRegexEditProposals(
-          plugin.app,
-          plugin,
-          rawConcatenatedProse(turn),
-        );
-        if (regexEditProposals.length > 0) {
-          const actionRef =
-            `action-${draftIdentity.revisionId}-parsed-edit`;
-          const anchored = anchorParsedEditTurn(turn, actionRef);
-          persistedTurn = anchored.turn;
-          parsedEditPlacement = {
-            itemId: anchored.itemId,
-            actionRef,
-          };
-        }
-      }
-      await persistDirectTurn({
-        turn: persistedTurn,
-        replayEvidence,
-        toolCorrelations,
-        usage: finalUsage,
-        editProposals: regexEditProposals,
-        parsedEditPlacement,
-      });
-    } else if (editsActive) {
-      // Drop the transient in-loop edit panel so it can't double up with the
-      // durable one finalize renders into the message body.
-      liveReview.detachEditPanel();
-      await finalizeEditResponse({
-        app: plugin.app,
-        owner,
-        store,
-        transcript,
-        bubble: assistantBubble,
-        response: allVisibleProse(turn),
+    let persistedTurn = turn;
+    let regexEditProposals:
+      | ReturnType<LiveVaultReview["getEditProposals"]>
+      | undefined;
+    let parsedEditPlacement:
+      | { itemId: string; actionRef: string }
+      | undefined;
+    if (editsActive && !pluginAgentic && !claudeCodeAgentic) {
+      regexEditProposals = await buildRegexEditProposals(
+        plugin.app,
         plugin,
-        modelId: activeModel.modelId,
-        provider: activeModel.provider,
-        usage: finalUsage,
-        toolCalls: effectiveWriteToolCalls,
-        agenticSteps,
-        stoppedForMaxTokens: writeStopReason === "max_tokens",
-        posture,
-        prebuiltVaultOpProposal: liveReview.getProposal() ?? undefined,
-        prebuiltVaultOpRecord: liveReview.getAppliedRecord() ?? undefined,
-        prebuiltEditProposals: liveReview.getEditProposals(),
-        prebuiltEditRecords: liveReview.getEditAppliedRecords(),
-        ...(onEnterAutoApply && { onEnterAutoApply }),
-      });
-    } else if (finalization.kind === "replace") {
-      const response = allVisibleProse(turn);
-      if (response || hasCompletedAskGuidance(agenticSteps)) {
-        store.finalizeRegeneration(finalization.oldMessage, response, {
-          modelId: activeModel.modelId,
-          provider: activeModel.provider,
-          ...(finalUsage && { usage: buildMessageUsage(activeModel.modelId, finalUsage) }),
-          ragSources,
-          rewrittenQuery,
-          ...(agenticSteps?.length && { agenticSteps }),
-        });
-        transcript.registerBubble(finalization.oldMessage.id, assistantBubble);
-      } else {
-        transcript.renderPlainTextContent(assistantBubble, "(no response)");
-      }
-    } else {
-      await finalizeResponse(
-        store,
-        transcript,
-        assistantBubble,
-        allVisibleProse(turn),
-        finalization.autoInsert ?? false,
-        plugin,
-        activeModel.modelId,
-        activeModel.provider,
-        finalUsage,
-        ragSources,
-        rewrittenQuery,
-        agenticSteps,
+        rawConcatenatedProse(turn),
       );
+      if (regexEditProposals.length > 0) {
+        const actionRef =
+          `action-${draftIdentity.revisionId}-parsed-edit`;
+        const anchored = anchorParsedEditTurn(turn, actionRef);
+        persistedTurn = anchored.turn;
+        parsedEditPlacement = {
+          itemId: anchored.itemId,
+          actionRef,
+        };
+      }
     }
+    await persistDirectTurn({
+      turn: persistedTurn,
+      replayEvidence,
+      toolCorrelations: exactToolCorrelations,
+      usage: finalUsage,
+      editProposals: regexEditProposals,
+      parsedEditPlacement,
+    });
   } catch (error) {
     if (isAbortError(error) || abortController.signal.aborted) {
-      const partialSteps =
-        legacySteps.length > 0 ? structuredClone(legacySteps) : undefined;
-      if (directProvider) {
-        const interruptedTurn =
-          capturedTurn ??
-          finishDirectTurn(turnBuilder, "interrupted", "Generation stopped.");
-        await persistDirectTurn({
-          turn: interruptedTurn,
-          replayEvidence:
-            capturedReplayEvidence ??
-            directFallbackReplayEvidence("stream_interrupted"),
-          toolCorrelations:
-            Object.keys(capturedToolCorrelations).length > 0
-              ? capturedToolCorrelations
-              : inferDirectToolCorrelations(interruptedTurn),
-          interrupted: interruptedTurn.status === "interrupted",
-        });
-      } else if (editsActive) {
-        liveReview.detachEditPanel();
-        await finalizeEditResponse({
-          app: plugin.app,
-          owner,
-          store,
-          transcript,
-          bubble: assistantBubble,
-          response: allVisibleProse(latestSnapshot),
-          plugin,
-          modelId: activeModel.modelId,
-          provider: activeModel.provider,
-          agenticSteps: partialSteps,
-          interrupted: true,
-          posture,
-          prebuiltVaultOpProposal: liveReview.getProposal() ?? undefined,
-          prebuiltVaultOpRecord: liveReview.getAppliedRecord() ?? undefined,
-          prebuiltEditProposals: liveReview.getEditProposals(),
-          prebuiltEditRecords: liveReview.getEditAppliedRecords(),
-          ...(onEnterAutoApply && { onEnterAutoApply }),
-        });
-      } else if (finalization.kind === "replace") {
-        const response = allVisibleProse(latestSnapshot);
-        if (response || hasCompletedAskGuidance(partialSteps)) {
-          store.finalizeRegeneration(finalization.oldMessage, response, {
-            modelId: activeModel.modelId,
-            provider: activeModel.provider,
-            ...(partialSteps?.length && { agenticSteps: partialSteps }),
-            interrupted: true,
-          });
-          transcript.registerBubble(finalization.oldMessage.id, assistantBubble);
-        } else {
-          // Stopped before any text arrived. regenerateMessage popped the
-          // original message up front (removeLastMessage), so unless we put it
-          // back here the original content AND its whole version history are
-          // dropped by the finally-persist below. Restore it exactly (no spurious
-          // version) and show it back in the bubble. This is the abort-side
-          // counterpart to the error branch's restore.
-          store.restoreRegeneration(finalization.oldMessage);
-          transcript.registerBubble(finalization.oldMessage.id, assistantBubble);
-          await transcript.renderBubbleContent(assistantBubble, finalization.oldMessage.content);
-        }
-      } else {
-        await finalizeAbortedResponse(
-          store,
-          transcript,
-          assistantBubble,
-          allVisibleProse(latestSnapshot),
-          activeModel.modelId,
+      const interruptedTurn =
+        capturedTurn
+          ? interruptCapturedTurn(capturedTurn)
+          : finishDirectTurn(
+              turnBuilder,
+              "interrupted",
+              "Generation stopped.",
+            );
+      await persistDirectTurn({
+        turn: interruptedTurn,
+        replayEvidence:
+          capturedReplayEvidence ??
+          directFallbackReplayEvidence("stream_interrupted"),
+        toolCorrelations: correlationsForIncompleteTurn(
           activeModel.provider,
-          ragSources,
-          rewrittenQuery,
-          partialSteps,
-        );
-      }
+          interruptedTurn,
+          capturedToolCorrelations,
+          claudeToolCorrelations,
+        ),
+        interrupted: interruptedTurn.status === "interrupted",
+      });
     } else {
-      const errorText = `Error: ${getErrorMessage(error)}`;
-      if (directProvider) {
-        const failedTurn =
-          capturedTurn ??
-          finishDirectTurn(
-            turnBuilder,
-            "failed",
-            getErrorMessage(error),
-          );
-        await persistDirectTurn({
-          turn: failedTurn,
-          replayEvidence:
-            capturedReplayEvidence ??
-            directFallbackReplayEvidence("stream_failed"),
-          toolCorrelations:
-            Object.keys(capturedToolCorrelations).length > 0
-              ? capturedToolCorrelations
-              : inferDirectToolCorrelations(failedTurn),
-          isError: true,
-          errorMessage: getErrorMessage(error),
-        });
-      } else {
-        if (finalization.kind === "replace") {
-          store.finalizeRegeneration(finalization.oldMessage, finalization.oldMessage.content);
-        }
-        const errorMessage = makeMessage("assistant", errorText);
-        errorMessage.isError = true;
-        errorMessage.modelId = activeModel.modelId;
-        errorMessage.provider = activeModel.provider;
-        const partialSteps =
-          legacySteps.length > 0 ? structuredClone(legacySteps) : undefined;
-        if (hasCompletedAskGuidance(partialSteps)) {
-          errorMessage.agenticSteps = partialSteps;
-        }
-        store.appendMessage(errorMessage);
-        transcript.registerBubble(errorMessage.id, assistantBubble);
-        await assistantBubble.turnView.refreshLegacy({
-          key: errorMessage.id,
-          status: "failed",
-          content: "",
-          steps: partialSteps,
-          errorMessage: getErrorMessage(error),
-        });
-      }
+      const failedTurn =
+        capturedTurn ??
+        finishDirectTurn(
+          turnBuilder,
+          "failed",
+          getErrorMessage(error),
+        );
+      await persistDirectTurn({
+        turn: failedTurn,
+        replayEvidence:
+          capturedReplayEvidence ??
+          directFallbackReplayEvidence("stream_failed"),
+        toolCorrelations: correlationsForIncompleteTurn(
+          activeModel.provider,
+          failedTurn,
+          capturedToolCorrelations,
+          claudeToolCorrelations,
+        ),
+        isError: true,
+        errorMessage: getErrorMessage(error),
+      });
     }
   } finally {
     plugin.services.claudeCode.setAskUserResponder(null);
@@ -863,6 +668,21 @@ function finishDirectTurn(
   }
 }
 
+function interruptCapturedTurn(
+  turn: AssistantTurnRecord,
+): AssistantTurnRecord {
+  return {
+    ...structuredClone(turn),
+    status: "interrupted",
+    items: turn.items.map((item) =>
+      item.type === "tool_call" &&
+      (item.state === "declared" || item.state === "running")
+        ? { ...structuredClone(item), state: "interrupted" as const }
+        : structuredClone(item),
+    ),
+  };
+}
+
 function inferDirectToolCorrelations(
   turn: AssistantTurnRecord,
 ): Record<string, "provider_id" | "plugin_id"> {
@@ -876,6 +696,18 @@ function inferDirectToolCorrelations(
           : "provider_id",
       ]),
   );
+}
+
+function correlationsForIncompleteTurn(
+  provider: ProviderOption,
+  turn: AssistantTurnRecord,
+  captured: Record<string, "provider_id" | "plugin_id">,
+  lifecycle: Record<string, "provider_id">,
+): Record<string, "provider_id" | "plugin_id"> {
+  const observed = { ...lifecycle, ...captured };
+  return provider === "claudecode"
+    ? observed
+    : { ...inferDirectToolCorrelations(turn), ...observed };
 }
 
 function directFallbackReplayEvidence(

@@ -1,7 +1,6 @@
 import { jsonSchemaToZodShape } from "../../mcp/sdkToolSchema";
 import type { ZodRawShape } from "../../mcp/sdkToolSchema";
 import type { McpToolProvider } from "../../mcp/VaultMcpServer";
-import { generateId } from "../../utils";
 import { isAlwaysLoadedCoreTool } from "../../tools/toolSurface";
 import { createSdkMcpServer, tool } from "./claudeAgentSdk";
 import type { McpSdkServerConfigWithInstance, SdkMcpToolDefinition } from "./claudeAgentSdk";
@@ -33,12 +32,22 @@ export function buildVaultSdkTools(
       definition.name,
       definition.description,
       jsonSchemaToZodShape(definition.parameters),
-      async (args) => {
-        const result = await provider.callTool({
-          id: generateId(),
-          name: definition.name,
-          arguments: (args ?? {}),
-        });
+      async (args, extra) => {
+        const toolUseId = extractClaudeCodeToolUseId(extra);
+        const result = await provider.callTool(
+          {
+            id: toolUseId ?? "",
+            name: definition.name,
+            arguments: (args ?? {}),
+          },
+          toolUseId === null
+            ? {
+                toolCorrelation: "none",
+                transport: "claude-agent-sdk",
+                reason: "claude_code_tool_use_id_missing",
+              }
+            : { toolCorrelation: "provider_id" },
+        );
         return {
           content: [{ type: "text", text: result.content }],
           isError: result.isError ?? false,
@@ -47,6 +56,28 @@ export function buildVaultSdkTools(
       isAlwaysLoadedCoreTool(definition.name) ? { alwaysLoad: true } : undefined,
     ),
   );
+}
+
+/**
+ * Extracts the SDK bridge's exact provider tool-use ID. No alternate metadata
+ * key, generated ID, or request/transport ID is accepted as a substitute.
+ */
+export function extractClaudeCodeToolUseId(extra: unknown): string | null {
+  if (!isOwnRecord(extra) || !hasOwn(extra, "_meta")) return null;
+  const metadata = extra._meta;
+  if (!isOwnRecord(metadata) || !hasOwn(metadata, "claudecode/toolUseId")) {
+    return null;
+  }
+  const value = metadata["claudecode/toolUseId"];
+  return typeof value === "string" && value.trim().length > 0 ? value : null;
+}
+
+function isOwnRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function hasOwn(value: object, key: PropertyKey): boolean {
+  return Object.prototype.hasOwnProperty.call(value, key);
 }
 
 /**

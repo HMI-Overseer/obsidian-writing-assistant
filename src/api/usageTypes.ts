@@ -75,24 +75,62 @@ export type AssistantStreamEvent =
       segmentId: string;
       providerMessageId?: string;
     }
-  | { type: "prose_delta"; segmentId: string; delta: string }
+  | {
+      type: "prose_delta";
+      segmentId: string;
+      delta: string;
+      providerBlockId?: string;
+      deltaKey?: string;
+    }
   | {
       type: "tool_call_start";
       segmentId: string;
       declarationKey: string;
       toolName?: string;
+      providerBlockId?: string;
     }
   | {
       type: "tool_call_delta";
       declarationKey: string;
       nameDelta?: string;
       argumentsDelta?: string;
+      deltaKey?: string;
     }
   | {
       type: "tool_call_identity";
       declarationKey: string;
       toolCallId: string;
-      correlation: "provider_id" | "plugin_id";
+      correlation: "provider_id" | "plugin_id" | "none";
+    }
+  | {
+      type: "segment_reconcile";
+      segmentId: string;
+      providerMessageId?: string;
+      blocks: Array<
+        | {
+            type: "prose";
+            providerBlockId: string;
+            text: string;
+          }
+        | {
+            type: "tool_call";
+            providerBlockId: string;
+            toolCallId: string;
+            toolName: string;
+            toolArguments: string;
+          }
+      >;
+    }
+  | {
+      type: "tool_result";
+      toolCallId: string;
+      content: string;
+      isError: boolean;
+    }
+  | {
+      type: "stream_diagnostic";
+      code: string;
+      message: string;
     }
   | { type: "segment_end"; segmentId: string }
   | { type: "turn_end"; status: AssistantTurnStatus };

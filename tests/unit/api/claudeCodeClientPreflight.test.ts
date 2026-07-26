@@ -1,14 +1,20 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-// Stub only `streamClaudeCode` (the legacy subprocess spawn) so the legacy-env
+// Stub only `streamClaudeCodeMessages` (the legacy subprocess spawn) so the legacy-env
 // assertion can capture the env without a real `claude` process; everything else
 // in the module (claudeCodeHarnessEnv, resolveClaudeBinary, result parsers) stays
 // real, so the env the client builds is the genuine one.
-const { streamClaudeCodeMock } = vi.hoisted(() => ({ streamClaudeCodeMock: vi.fn() }));
+const { streamClaudeCodeMessagesMock } = vi.hoisted(() => ({
+  streamClaudeCodeMessagesMock: vi.fn(),
+}));
 
 vi.mock("../../../src/api/claudeCodeProcess", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../../../src/api/claudeCodeProcess")>();
-  return { ...actual, streamClaudeCode: (opts: unknown) => streamClaudeCodeMock(opts) };
+  return {
+    ...actual,
+    streamClaudeCodeMessages: (opts: unknown) =>
+      streamClaudeCodeMessagesMock(opts),
+  };
 });
 
 import { ClaudeCodeClient, type ClaudeCodeRuntime } from "../../../src/api/ClaudeCodeClient";
@@ -56,7 +62,7 @@ async function drain(
 const OVERSIZED = "x".repeat(1_000_000);
 
 describe("ClaudeCodeClient send-path preflight", () => {
-  beforeEach(() => streamClaudeCodeMock.mockReset());
+  beforeEach(() => streamClaudeCodeMessagesMock.mockReset());
 
   it("blocks an oversized mint blob before any dispatch (zero API calls)", async () => {
     const run = vi.fn(() => okGen());
@@ -119,14 +125,33 @@ describe("ClaudeCodeClient send-path preflight", () => {
   });
 
   it("carries DISABLE_COMPACT into the legacy subprocess env", async () => {
-    streamClaudeCodeMock.mockImplementation(() => okGen());
+    streamClaudeCodeMessagesMock.mockImplementation(() =>
+      (async function* () {
+        yield {
+          type: "stream_event",
+          event: {
+            type: "content_block_delta",
+            index: 0,
+            delta: { type: "text_delta", text: "ok" },
+          },
+        };
+        yield {
+          type: "result",
+          subtype: "success",
+          is_error: false,
+          usage: { input_tokens: 1, output_tokens: 1 },
+        };
+      })(),
+    );
     // Legacy path: no session, SDK unusable, no MCP → pure-analyst subprocess.
     const client = new ClaudeCodeClient("claude", { useSdk: false });
 
     await drain(client.stream(request("hello"), "haiku", params).events);
 
-    expect(streamClaudeCodeMock).toHaveBeenCalledTimes(1);
-    const opts = streamClaudeCodeMock.mock.calls[0][0] as { env: Record<string, string> };
+    expect(streamClaudeCodeMessagesMock).toHaveBeenCalledTimes(1);
+    const opts = streamClaudeCodeMessagesMock.mock.calls[0][0] as {
+      env: Record<string, string>;
+    };
     expect(opts.env.DISABLE_COMPACT).toBe("1");
   });
 });

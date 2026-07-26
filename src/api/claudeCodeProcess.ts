@@ -274,9 +274,22 @@ export function extractClaudeCodeError(json: unknown): string | null {
 export async function* streamClaudeCode(
   opts: ClaudeCodeSpawnOptions,
 ): AsyncGenerator<string> {
+  for await (const message of streamClaudeCodeMessages(opts)) {
+    const delta = extractClaudeCodeDelta(message);
+    if (delta) yield delta;
+  }
+}
+
+/**
+ * Streams every parsed legacy stream-json message in source order. Transport
+ * request IDs remain transport facts and are never translated into tool IDs.
+ */
+export async function* streamClaudeCodeMessages(
+  opts: ClaudeCodeSpawnOptions,
+): AsyncGenerator<unknown> {
   if (opts.signal?.aborted) throw createAbortError();
 
-  const queue: string[] = [];
+  const queue: unknown[] = [];
   let done = false;
   let error: Error | null = null;
   let wake: (() => void) | null = null;
@@ -347,11 +360,8 @@ export async function* streamClaudeCode(
           return;
         }
 
-        const delta = extractClaudeCodeDelta(parsed);
-        if (delta) {
-          queue.push(delta);
-          notify();
-        }
+        queue.push(parsed);
+        notify();
       }
     });
 
@@ -371,8 +381,8 @@ export async function* streamClaudeCode(
 
     while (true) {
       if (queue.length > 0) {
-        const token = queue.shift();
-        if (token !== undefined) yield token;
+        const message = queue.shift();
+        if (message !== undefined) yield message;
       } else if (done) {
         break;
       } else {

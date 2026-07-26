@@ -17,6 +17,7 @@ import { renderRagSources } from "./RagSourcesList";
 import { ImagePreviewModal } from "./ImagePreviewModal";
 import { AssistantTurnView } from "./AssistantTurnView";
 import { selectAssistantMessageRenderSource } from "./assistantTurnRenderModel";
+import { getActiveAssistantRevision } from "../conversation/assistantRevisions";
 
 export type BubbleActionCallbacks = {
   onCopy: (messageId: string) => void;
@@ -466,7 +467,16 @@ export class ChatTranscript {
   ): void {
     // Usage badge, shown below assistant bubbles before the toolbar.
     if (message.role === "assistant") {
-      renderUsageBadge(bubble.rowEl, message.usage, message.modelId, message.provider);
+      const activeRevision = getActiveAssistantRevision(message);
+      renderUsageBadge(
+        bubble.rowEl,
+        activeRevision?.usage ?? message.usage,
+        activeRevision?.modelId ?? message.modelId,
+        activeRevision?.provider ?? message.provider,
+        activeRevision?.kind === "turn"
+          ? activeRevision.replayEvidence
+          : undefined,
+      );
       if (message.ragSources?.length && bubble.role === "assistant") {
         renderRagSources(
           bubble.turnView.rootEl,

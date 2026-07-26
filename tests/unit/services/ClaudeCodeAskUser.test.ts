@@ -328,7 +328,7 @@ describe("ClaudeCodeService ask_user", () => {
     });
   });
 
-  it("aborts a pending legacy callback without leaving a form, promise, or latch", async () => {
+  it("refuses a legacy ask callback without mounting a form or latch", async () => {
     const { service, seam, provider } = harness();
     const host = new FakeInteractionHost();
     const abortController = new AbortController();
@@ -339,19 +339,14 @@ describe("ClaudeCodeService ask_user", () => {
     const handle = await server.start();
 
     try {
-      const pending = postToolCall(handle, "ask_user", askArguments);
-      await host.waitForMount();
-
-      abortController.abort();
-      abortController.abort();
-      const response = await pending;
+      const response = await postToolCall(handle, "ask_user", askArguments);
 
       expect(response).toMatchObject({
         result: {
           isError: true,
         },
       });
-      expect(JSON.stringify(response)).toContain("ask_cancelled");
+      expect(JSON.stringify(response)).toContain("exact provider correlation");
       expect(host.interaction).toBeNull();
       expect(coordinator.hasPending()).toBe(false);
       expect(seam.askPending).toBe(false);
@@ -362,7 +357,7 @@ describe("ClaudeCodeService ask_user", () => {
     }
   });
 
-  it("routes SDK and legacy loopback calls through the same responder", async () => {
+  it("routes an exactly correlated SDK call and refuses legacy loopback", async () => {
     const { service, seam, provider } = harness();
     const host = new FakeInteractionHost();
     const coordinator = new AskInteractionCoordinator(host, new AbortController().signal);
@@ -371,7 +366,11 @@ describe("ClaudeCodeService ask_user", () => {
 
     const sdkAsk = buildVaultSdkTools(provider).find((tool) => tool.name === "ask_user");
     expect(sdkAsk).toBeDefined();
-    const sdkPending = sdkAsk!.handler(askArguments);
+    const sdkPending = sdkAsk!.handler(askArguments, {
+      _meta: {
+        "claudecode/toolUseId": "toolu-sdk-ask",
+      },
+    });
     await host.waitForMount();
     host.submit({ [question]: "Concise" });
     await expect(sdkPending).resolves.toMatchObject({
@@ -386,21 +385,13 @@ describe("ClaudeCodeService ask_user", () => {
     const server = new VaultMcpServer("writing_assistant", provider);
     const handle = await server.start();
     try {
-      const legacyPending = postToolCall(handle, "ask_user", askArguments);
-      await host.waitForMount();
-      host.submit({ [question]: "Detailed" });
-      const response = await legacyPending;
+      const response = await postToolCall(handle, "ask_user", askArguments);
       expect(response).toMatchObject({
         result: {
-          content: [
-            {
-              type: "text",
-              text: JSON.stringify({ answers: { [question]: "Detailed" } }),
-            },
-          ],
-          isError: false,
+          isError: true,
         },
       });
+      expect(JSON.stringify(response)).toContain("exact provider correlation");
     } finally {
       server.stop();
       coordinator.destroy();

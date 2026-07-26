@@ -133,6 +133,34 @@ describe("ClaudeCodeService memory tools", () => {
     expect(resolveMemoryOne).toHaveBeenCalledWith(mutation, "mcp-call");
   });
 
+  it("refuses a reviewable mutation when exact provider correlation is unavailable", async () => {
+    const { seam, provider } = harness();
+    seam.runAllowedTools = new Set(["add_memory"]);
+    const resolveMemoryOne = vi.fn();
+    seam.liveReview = {
+      resolveOne: vi.fn(),
+      resolveEditOne: vi.fn(),
+      resolveMemoryOne,
+    };
+
+    const result = await provider.callTool(
+      call("add_memory", {
+        name: "new-rule",
+        type: "rule",
+        description: "Keep replies concise.",
+      }),
+      {
+        toolCorrelation: "none",
+        transport: "claude-agent-sdk",
+        reason: "claude_code_tool_use_id_missing",
+      },
+    );
+
+    expect(result.isError).toBe(true);
+    expect(result.content).toContain("exact provider correlation");
+    expect(resolveMemoryOne).not.toHaveBeenCalled();
+  });
+
   it("refuses a denied mutation at runtime even though the stable catalog advertises it", async () => {
     const { seam, provider } = harness();
     seam.runAllowedTools = new Set(["recall_memory"]);

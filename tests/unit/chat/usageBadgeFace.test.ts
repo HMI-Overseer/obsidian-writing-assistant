@@ -3,6 +3,7 @@ import type { MessageUsage } from "../../../src/shared/types";
 import {
   buildHeadline,
   describeCache,
+  describeReplayFidelity,
   composeUsageTooltip,
 } from "../../../src/chat/messages/UsageBadge";
 import { PRICING_AS_OF } from "../../../src/api/pricing";
@@ -33,6 +34,63 @@ describe("buildHeadline", () => {
 
   it("shows total tokens for a free local model", () => {
     expect(buildHeadline(usage(), "lmstudio")).toEqual({ text: "12.8k tok", isCost: false });
+  });
+});
+
+describe("describeReplayFidelity", () => {
+  it.each([
+    [
+      "native Claude continuation",
+      {
+        tier: "native",
+        capabilities: {
+          captureOrder: "exact",
+          toolCorrelation: "provider_id",
+          coldReplay: "textual",
+          nativeResume: true,
+        },
+      },
+    ],
+    [
+      "structural direct replay",
+      {
+        tier: "structural",
+        capabilities: {
+          captureOrder: "exact",
+          toolCorrelation: "provider_id",
+          coldReplay: "structural",
+          nativeResume: false,
+        },
+      },
+    ],
+    [
+      "textual Claude rebuild",
+      {
+        tier: "textual",
+        capabilities: {
+          captureOrder: "exact",
+          toolCorrelation: "provider_id",
+          coldReplay: "textual",
+          nativeResume: false,
+        },
+        loweredReason: "claude_code_structural_cold_replay_deferred",
+      },
+    ],
+    [
+      "degraded legacy capture",
+      {
+        tier: "textual",
+        capabilities: {
+          captureOrder: "segment",
+          toolCorrelation: "none",
+          coldReplay: "textual",
+          nativeResume: false,
+        },
+        loweredReason: "claude_code_legacy_stream_json_capture",
+      },
+    ],
+  ] as const)("labels %s", (expected, evidence) => {
+    expect(describeReplayFidelity(evidence)).toBe(expected);
   });
 });
 

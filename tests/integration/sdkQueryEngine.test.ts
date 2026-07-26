@@ -19,6 +19,7 @@ vi.mock("../../src/api/sdk/claudeAgentSdk", () => ({
 
 import { streamSdkTurn, buildSdkOptions, type SdkTurnOptions } from "../../src/api/sdk/sdkQueryEngine";
 import type { ClaudeCodeResultUsage } from "../../src/api/claudeCodeProcess";
+import type { AssistantStreamEvent } from "../../src/api/usageTypes";
 
 function textDeltaMessage(text: string) {
   return {
@@ -64,8 +65,10 @@ function baseOptions(overrides: Partial<SdkTurnOptions> = {}): SdkTurnOptions {
   };
 }
 
-async function drain(gen: AsyncGenerator<string>): Promise<string[]> {
-  const out: string[] = [];
+async function drain(
+  gen: AsyncGenerator<AssistantStreamEvent>,
+): Promise<AssistantStreamEvent[]> {
+  const out: AssistantStreamEvent[] = [];
   for await (const d of gen) out.push(d);
   return out;
 }
@@ -79,9 +82,19 @@ describe("streamSdkTurn", () => {
     feed([textDeltaMessage("Hel"), textDeltaMessage("lo"), successResult()]);
 
     let captured: ClaudeCodeResultUsage | null = null;
-    const deltas = await drain(streamSdkTurn(baseOptions({ onResult: (r) => (captured = r) })));
+    const events = await drain(
+      streamSdkTurn(baseOptions({ onResult: (r) => (captured = r) })),
+    );
 
-    expect(deltas).toEqual(["Hel", "lo"]);
+    expect(
+      events
+        .filter((event) => event.type === "prose_delta")
+        .map((event) => event.delta),
+    ).toEqual(["Hel", "lo"]);
+    expect(events.at(-1)).toEqual({
+      type: "turn_end",
+      status: "completed",
+    });
     expect(captured).toEqual({
       inputTokens: 100,
       outputTokens: 20,

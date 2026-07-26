@@ -1,4 +1,9 @@
-import type { MessageUsage, ProviderOption, SessionRebuildReason } from "../../shared/types";
+import type {
+  AssistantReplayEvidence,
+  MessageUsage,
+  ProviderOption,
+  SessionRebuildReason,
+} from "../../shared/types";
 import { isMeteredProvider } from "../../providers/descriptors";
 import { PRICING_AS_OF } from "../../api/pricing";
 
@@ -98,6 +103,7 @@ export function composeUsageTooltip(
   usage: MessageUsage,
   modelId: string | undefined,
   provider: ProviderOption | undefined,
+  replayEvidence?: AssistantReplayEvidence,
 ): string {
   const lines: string[] = [
     `${withThousands(usage.inputTokens)} in · ${withThousands(usage.outputTokens)} out`,
@@ -115,6 +121,9 @@ export function composeUsageTooltip(
 
   const session = describeSession(usage);
   if (session) lines.push(session.text);
+  if (replayEvidence) {
+    lines.push(`Replay fidelity: ${describeReplayFidelity(replayEvidence)}`);
+  }
 
   if (provider === "claudecode") {
     lines.push("Subscription (no per-message cost)");
@@ -139,7 +148,8 @@ export function renderUsageBadge(
   parentEl: HTMLElement,
   usage: MessageUsage | undefined,
   modelId: string | undefined,
-  provider: ProviderOption | undefined
+  provider: ProviderOption | undefined,
+  replayEvidence?: AssistantReplayEvidence,
 ): HTMLElement | null {
   // Nothing to show for messages without usage or model info.
   if (!usage && !modelId) return null;
@@ -155,7 +165,10 @@ export function renderUsageBadge(
   }
 
   // The face stays minimal; the full breakdown rides the hover tooltip.
-  badgeEl.setAttribute("title", composeUsageTooltip(usage, modelId, provider));
+  badgeEl.setAttribute(
+    "title",
+    composeUsageTooltip(usage, modelId, provider, replayEvidence),
+  );
 
   const headline = buildHeadline(usage, provider);
   const headlineEl = badgeEl.createSpan({
@@ -185,6 +198,28 @@ export function renderUsageBadge(
   }
 
   return badgeEl;
+}
+
+/** Human-readable replay surface selected for the committed assistant revision. */
+export function describeReplayFidelity(
+  evidence: AssistantReplayEvidence,
+): string {
+  if (
+    evidence.loweredReason === "claude_code_legacy_stream_json_capture" ||
+    (evidence.capabilities.captureOrder === "segment" &&
+      evidence.capabilities.toolCorrelation === "none")
+  ) {
+    return "degraded legacy capture";
+  }
+  if (evidence.tier === "native") return "native Claude continuation";
+  if (evidence.tier === "structural") return "structural direct replay";
+  if (
+    evidence.loweredReason?.startsWith("claude_code_") ||
+    evidence.capabilities.captureOrder === "exact"
+  ) {
+    return "textual Claude rebuild";
+  }
+  return "textual replay";
 }
 
 /**

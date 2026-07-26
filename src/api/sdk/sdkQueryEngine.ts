@@ -1,4 +1,6 @@
 import type { SamplingParams } from "../../shared/types";
+import type { AssistantStreamEvent } from "../usageTypes";
+import { generateId } from "../../utils";
 import { isEffortLevel } from "../../shared/reasoning";
 import { createAbortError } from "../httpTransport";
 import {
@@ -9,6 +11,7 @@ import {
 } from "../claudeCodeProcess";
 import { AbortError, query } from "./claudeAgentSdk";
 import type { McpSdkServerConfigWithInstance, Options, SDKMessage } from "./claudeAgentSdk";
+import { ClaudeCodeSdkMessageTranslator } from "./claudeCodeSdkMessageTranslator";
 
 /**
  * SDK-backed engine for one Claude Code turn (R1: stateless, one-shot parity).
@@ -73,7 +76,9 @@ export interface SdkTurnOptions {
  * `onResult`. Aborts surface as an `AbortError`-named error so the chat layer's
  * abort handling recognizes them; SDK/CLI errors surface as plain `Error`s.
  */
-export async function* streamSdkTurn(opts: SdkTurnOptions): AsyncGenerator<string> {
+export async function* streamSdkTurn(
+  opts: SdkTurnOptions,
+): AsyncGenerator<AssistantStreamEvent> {
   if (opts.signal?.aborted) throw createAbortError();
 
   const abortController = new AbortController();
@@ -82,13 +87,14 @@ export async function* streamSdkTurn(opts: SdkTurnOptions): AsyncGenerator<strin
 
   try {
     const session = query({ prompt: opts.prompt, options: buildSdkOptions(opts, abortController) });
+    const segmentPrefix = `claude-segment-${generateId()}`;
+    const translator = new ClaudeCodeSdkMessageTranslator({
+      createSegmentId: (index) => `${segmentPrefix}-${index}`,
+      toolCorrelation: "provider_id",
+    });
     let contextTokens: number | null = null;
     for await (const message of session) {
-      const text = textDelta(message);
-      if (text) {
-        yield text;
-        continue;
-      }
+      for (const event of translator.translate(message)) yield event;
 
       contextTokens = extractClaudeCodeContextTokens(message) ?? contextTokens;
 
@@ -108,6 +114,15 @@ export async function* streamSdkTurn(opts: SdkTurnOptions): AsyncGenerator<strin
     throw error;
   } finally {
     opts.signal?.removeEventListener("abort", onAbort);
+  }
+}
+
+/** Text-only compatibility projection for callers outside the canonical turn path. */
+export async function* streamSdkTextTurn(
+  opts: SdkTurnOptions,
+): AsyncGenerator<string> {
+  for await (const event of streamSdkTurn(opts)) {
+    if (event.type === "prose_delta") yield event.delta;
   }
 }
 

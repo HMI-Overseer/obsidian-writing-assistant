@@ -67,6 +67,20 @@ describe("AssistantTurnView architecture", () => {
     expect(styles).not.toContain(".lmsa-assistant-turn-disclosure");
   });
 
+  it("keeps timeline connectors on an isolated layer behind their markers", () => {
+    const styles = source("src/chat/messages/AssistantTurnView.css");
+
+    expect(styles).toMatch(
+      /\.lmsa-assistant-turn-item\s*\{[\s\S]*isolation:\s*isolate;/u,
+    );
+    expect(styles).toMatch(
+      /\.lmsa-assistant-turn-item::before,\s*\.lmsa-assistant-turn-item::after\s*\{[\s\S]*z-index:\s*-1;/u,
+    );
+    expect(styles).toMatch(
+      /\.lmsa-assistant-turn-marker\s*\{[\s\S]*z-index:\s*1;/u,
+    );
+  });
+
   it("fades only the incoming connector selected by the render model", () => {
     const view = source("src/chat/messages/AssistantTurnView.ts");
     const styles = source("src/chat/messages/AssistantTurnView.css");

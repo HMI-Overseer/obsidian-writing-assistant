@@ -61,6 +61,7 @@
 .lmsa-assistant-turn-item {
   --lmsa-turn-item-marker-center: var(--lmsa-turn-marker-center);
   position: relative;
+  isolation: isolate;
   display: grid;
   grid-template-columns: var(--lmsa-turn-rail-width) minmax(0, 1fr);
   column-gap: var(--lmsa-turn-rail-gap);
@@ -73,7 +74,7 @@
 .lmsa-assistant-turn-item::after {
   content: "";
   position: absolute;
-  z-index: 0;
+  z-index: -1;
   left: calc((var(--lmsa-turn-rail-width) - 2px) / 2);
   width: 2px;
   border-radius: 999px;

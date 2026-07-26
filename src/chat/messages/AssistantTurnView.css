@@ -265,44 +265,6 @@
   min-width: 0;
 }
 
-.lmsa-assistant-turn-item--prose
-  > .lmsa-assistant-turn-item-body
-  > .lmsa-assistant-turn-action-host {
-  display: flex;
-  justify-content: flex-end;
-}
-
-.lmsa-assistant-turn-prose-edit {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 24px;
-  height: 24px;
-  padding: 0;
-  border: none;
-  border-radius: 4px;
-  background: transparent;
-  color: var(--text-muted);
-  opacity: 0;
-  box-shadow: none;
-}
-
-.lmsa-assistant-turn-item--prose:hover
-  .lmsa-assistant-turn-prose-edit,
-.lmsa-assistant-turn-prose-edit:focus-visible {
-  opacity: 1;
-}
-
-.lmsa-assistant-turn-prose-edit:hover {
-  background: var(--background-modifier-hover);
-  color: var(--text-normal);
-}
-
-.lmsa-assistant-turn-prose-edit svg {
-  width: 14px;
-  height: 14px;
-}
-
 .lmsa-assistant-turn-item--tool_call
   > .lmsa-agentic-timeline-step-body
   > .lmsa-assistant-turn-action-host {

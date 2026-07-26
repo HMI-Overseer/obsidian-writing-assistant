@@ -18,6 +18,7 @@ const USER_ACTIONS: ActionDef[] = [
 const ASSISTANT_ACTIONS: ActionDef[] = [
   { action: "branch", icon: "git-branch", label: "Branch after this" },
   { action: "copy", icon: "copy", label: "Copy message" },
+  { action: "edit", icon: "pencil", label: "Edit message" },
   { action: "delete", icon: "trash-2", label: "Delete message" },
 ];
 
@@ -40,24 +41,7 @@ export class BubbleActionToolbar {
 
     const actionsEl = chromeEl.createDiv({ cls: "lmsa-chat-window-message-actions" });
     const actions =
-      message.role === "user"
-        ? USER_ACTIONS
-        : [
-            ...ASSISTANT_ACTIONS,
-            ...(message.revisions?.some(
-              (revision) =>
-                revision.revisionId === message.activeRevisionId &&
-                revision.kind === "turn",
-            )
-              ? []
-              : [
-                  {
-                    action: "edit",
-                    icon: "pencil",
-                    label: "Edit message",
-                  },
-                ]),
-          ];
+      message.role === "user" ? [...USER_ACTIONS] : [...ASSISTANT_ACTIONS];
 
     if (message.role === "assistant" && isLastAssistant) {
       actions.unshift(REGENERATE_ACTION);

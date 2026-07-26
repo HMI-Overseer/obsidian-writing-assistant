@@ -50,8 +50,6 @@ interface ItemViewState {
   renderedText?: string;
   requestedText?: string;
   tool?: ToolItemRefs;
-  editButtonEl?: HTMLButtonElement;
-  editButtonListener?: () => void;
   destroy(): void;
 }
 
@@ -109,7 +107,6 @@ export class AssistantTurnView {
     targetId: string,
     control: ActionReviewControl,
   ) => void = () => undefined;
-  private proseEditHandler: ((proseItemId: string) => void) | null = null;
   private destroyed = false;
 
   constructor(
@@ -236,15 +233,6 @@ export class AssistantTurnView {
   getProseHost(proseItemId: string): HTMLElement | null {
     const state = this.itemStates.get(proseItemId);
     return state?.type === "prose" ? state.contentEl : null;
-  }
-
-  setProseEditHandler(
-    handler: ((proseItemId: string) => void) | null,
-  ): void {
-    this.proseEditHandler = handler;
-    for (const state of this.itemStates.values()) {
-      this.updateProseEditButton(state);
-    }
   }
 
   setActionReviewContext(
@@ -390,65 +378,8 @@ export class AssistantTurnView {
       actionEl,
       destroy: () => undefined,
     };
-    if (item.type === "tool_call") {
-      this.initializeTool(state);
-    } else {
-      this.initializeProse(state);
-    }
+    if (item.type === "tool_call") this.initializeTool(state);
     return state;
-  }
-
-  private initializeProse(state: ItemViewState): void {
-    const onEdit = () => {
-      const itemId = state.itemEl.dataset.itemId;
-      if (itemId) this.proseEditHandler?.(itemId);
-    };
-    state.destroy = () => {
-      if (state.editButtonListener) {
-        state.editButtonEl?.removeEventListener(
-          "click",
-          state.editButtonListener,
-        );
-      }
-    };
-    this.updateProseEditButton(state, onEdit);
-  }
-
-  private updateProseEditButton(
-    state: ItemViewState,
-    onEdit?: () => void,
-  ): void {
-    if (state.type !== "prose") return;
-    if (!this.proseEditHandler) {
-      if (state.editButtonListener) {
-        state.editButtonEl?.removeEventListener(
-          "click",
-          state.editButtonListener,
-        );
-      }
-      state.editButtonEl?.remove();
-      state.editButtonEl = undefined;
-      state.editButtonListener = undefined;
-      return;
-    }
-    if (state.editButtonEl) return;
-    const editButtonEl = state.actionEl.createEl("button", {
-      cls: "lmsa-assistant-turn-prose-edit",
-      attr: {
-        type: "button",
-        "aria-label": "Edit this prose block",
-      },
-    });
-    setIcon(editButtonEl, "pencil");
-    const listener =
-      onEdit ??
-      (() => {
-        const itemId = state.itemEl.dataset.itemId;
-        if (itemId) this.proseEditHandler?.(itemId);
-      });
-    editButtonEl.addEventListener("click", listener);
-    state.editButtonEl = editButtonEl;
-    state.editButtonListener = listener;
   }
 
   private initializeTool(state: ItemViewState): void {

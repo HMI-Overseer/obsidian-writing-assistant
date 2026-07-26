@@ -235,18 +235,16 @@ describe("meaningful assistant replacement", () => {
   });
 });
 
-describe("item-scoped assistant editing", () => {
+describe("turn-scoped assistant editing", () => {
   it("copies every item, replaces only the addressed prose, and supersedes pending work", () => {
     const memory = new ChatSessionMemory();
     memory.hydrateFromConversation(conversation());
     const before = structuredClone(memory.getSnapshot().messageHistory[0]);
 
     expect(
-      memory.editAssistantProseItem(
-        "assistant-1",
-        "prose-after",
-        "Edited after.",
-      ),
+      memory.editAssistantTurnProse("assistant-1", [
+        { sourceProseItemId: "prose-after", text: "Edited after." },
+      ]),
     ).toBe(true);
 
     const message = memory.getSnapshot().messageHistory[0];
@@ -303,19 +301,58 @@ describe("item-scoped assistant editing", () => {
     expect(message.activeRevisionId).toBe(edited.revisionId);
   });
 
-  it("refuses tool-item editing and invalidates the copied Claude resume cursor", () => {
+  it("commits one revision for a session that changes every prose item", () => {
     const memory = new ChatSessionMemory();
     memory.hydrateFromConversation(conversation());
 
     expect(
-      memory.editAssistantProseItem("assistant-1", "tool-item", "No."),
+      memory.editAssistantTurnProse("assistant-1", [
+        { sourceProseItemId: "prose-before", text: "Edited before." },
+        { sourceProseItemId: "prose-after", text: "Edited after." },
+      ]),
+    ).toBe(true);
+
+    const message = memory.getSnapshot().messageHistory[0];
+    expect(message.revisions).toHaveLength(2);
+    const edited = message.revisions?.[1];
+    if (edited?.kind !== "turn") throw new Error("Expected an edited turn.");
+    expect(
+      edited.turn.items.map((item) =>
+        item.type === "prose" ? item.text : item.type,
+      ),
+    ).toEqual(["Edited before.", "tool_call", "Edited after."]);
+    expect(message.activeRevisionId).toBe(edited.revisionId);
+  });
+
+  it("refuses a session that addresses a tool item or changes nothing", () => {
+    const memory = new ChatSessionMemory();
+    memory.hydrateFromConversation(conversation());
+
+    expect(
+      memory.editAssistantTurnProse("assistant-1", [
+        { sourceProseItemId: "tool-item", text: "No." },
+      ]),
     ).toBe(false);
     expect(
-      memory.editAssistantProseItem(
-        "assistant-1",
-        "prose-after",
-        "Changed.",
-      ),
+      memory.editAssistantTurnProse("assistant-1", [
+        { sourceProseItemId: "prose-before", text: "Fine." },
+        { sourceProseItemId: "tool-item", text: "No." },
+      ]),
+    ).toBe(false);
+    expect(memory.editAssistantTurnProse("assistant-1", [])).toBe(false);
+    expect(
+      memory.getSnapshot().messageHistory[0].revisions,
+    ).toHaveLength(1);
+  });
+
+  it("invalidates the copied Claude resume cursor on an edit", () => {
+    const memory = new ChatSessionMemory();
+    memory.hydrateFromConversation(conversation());
+
+    expect(
+      memory.editAssistantTurnProse("assistant-1", [
+        { sourceProseItemId: "prose-after", text: "Changed." },
+      ]),
     ).toBe(true);
     const edited =
       memory.getSnapshot().messageHistory[0].revisions?.at(-1);

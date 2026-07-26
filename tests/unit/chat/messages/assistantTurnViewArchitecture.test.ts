@@ -145,8 +145,9 @@ describe("AssistantTurnView architecture", () => {
     );
   });
 
-  it("places edit controls on prose hosts and derives review controls from the ledger", () => {
+  it("keeps edit in the canonical action bar and off the item hosts", () => {
     const view = source("src/chat/messages/AssistantTurnView.ts");
+    const styles = source("src/chat/messages/AssistantTurnView.css");
     const toolbar = source(
       "src/chat/messages/BubbleActionToolbar.ts",
     );
@@ -156,13 +157,25 @@ describe("AssistantTurnView architecture", () => {
         /const ASSISTANT_ACTIONS: ActionDef\[\] = \[([\s\S]*?)\];/u,
       )?.[1] ?? "";
 
-    expect(view).toContain("setProseEditHandler");
+    expect(assistantActions).toContain('action: "edit"');
+    expect(assistantActions.indexOf('action: "edit"')).toBeGreaterThan(
+      assistantActions.indexOf('action: "copy"'),
+    );
+    expect(assistantActions.indexOf('action: "edit"')).toBeLessThan(
+      assistantActions.indexOf('action: "delete"'),
+    );
+    expect(toolbar).not.toContain("activeRevisionId");
+
+    expect(view).not.toContain("setProseEditHandler");
+    expect(view).not.toContain('"Edit this prose block"');
+    expect(view).not.toContain("lmsa-assistant-turn-prose-edit");
+    expect(styles).not.toContain("lmsa-assistant-turn-prose-edit");
+    expect(styles).not.toContain("justify-content: flex-end;");
+
     expect(view).toContain("getProseHost");
-    expect(view).toContain('"Edit this prose block"');
     expect(view).toContain("buildActionLedgerReviewModel");
     expect(view).toContain("setActionReviewContext");
-    expect(assistantActions).not.toContain('action: "edit"');
-    expect(handler).toContain("editAssistantProseItem");
+    expect(handler).toContain("editAssistantTurnProse");
     expect(handler).toContain("executeMessageAction");
   });
 

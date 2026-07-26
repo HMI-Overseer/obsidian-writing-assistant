@@ -19,6 +19,7 @@ import {
   selectAssistantRevision,
   syncAssistantCompatibilityProjection,
 } from "./assistantRevisions";
+import type { ProseItemEdit } from "./assistantRevisions";
 import {
   appendActionEvent,
   deriveActionControlEligibility,
@@ -260,17 +261,22 @@ export class ChatSessionMemory {
     return true;
   }
 
-  editAssistantProseItem(
+  /** Commit one edit session over the active turn as a single edited revision. */
+  editAssistantTurnProse(
     messageId: string,
-    proseItemId: string,
-    text: string,
+    edits: readonly ProseItemEdit[],
   ): boolean {
     const message = this.messageHistory.find((entry) => entry.id === messageId);
     if (!message || message.role !== "assistant") return false;
     const source = getActiveAssistantRevision(message);
-    if (source?.kind !== "turn") return false;
-    const target = source.turn.items.find((item) => item.id === proseItemId);
-    if (target?.type !== "prose" || text.length === 0) return false;
+    if (source?.kind !== "turn" || edits.length === 0) return false;
+    const targetable = edits.every((edit) => {
+      const target = source.turn.items.find(
+        (item) => item.id === edit.sourceProseItemId,
+      );
+      return target?.type === "prose" && edit.text.length > 0;
+    });
+    if (!targetable) return false;
 
     const createdAt = Date.now();
     const revision = createEditedRevision({
@@ -278,8 +284,7 @@ export class ChatSessionMemory {
       revisionId: generateId(),
       turnId: generateId(),
       createdAt,
-      targetProseItemId: proseItemId,
-      text,
+      edits,
       itemId: () => generateId(),
     });
     const supersessionCreatedAt = Math.max(

@@ -1,63 +1,84 @@
 import { setIcon } from "obsidian";
 import type { BubbleRefs } from "../types";
+import { collectInlineEdits } from "./inlineEditSession";
+import type { InlineEdit, InlineEditTarget } from "./inlineEditSession";
 
+interface EditorSurface {
+  target: InlineEditTarget;
+  hostEl: HTMLElement;
+  textareaEl: HTMLTextAreaElement;
+}
+
+/**
+ * One edit session over one assistant turn or one message.
+ *
+ * An agentic turn opens every prose item at once, because the turn is the unit
+ * that regeneration and branching already address; there is no way to act on
+ * half of one. The session therefore has one Save and one Cancel, in the
+ * bubble's own action bar, and commits once.
+ */
 export class InlineMessageEditor {
-  private textareaEl: HTMLTextAreaElement | null = null;
-  private editingContentEl: HTMLElement | null = null;
+  private surfaces: EditorSurface[] = [];
   private injectedEls: HTMLElement[] = [];
 
   constructor(
     private readonly bubble: BubbleRefs,
-    private readonly originalContent: string,
+    private readonly targets: readonly InlineEditTarget[],
     private readonly callbacks: {
-      onSave: (newContent: string) => void;
+      onSave: (edits: InlineEdit[]) => void;
       onCancel: () => void;
     },
-    private readonly assistantProseItemId?: string,
   ) {}
 
   activate(): void {
-    const contentEl =
-      this.bubble.role === "assistant"
-        ? this.assistantProseItemId
-          ? this.bubble.turnView.getProseHost(this.assistantProseItemId)
-          : this.bubble.turnView.getPrimaryProseHost()
-        : this.bubble.contentEl;
-    if (!contentEl) {
-      this.callbacks.onCancel();
-      return;
+    for (const target of this.targets) {
+      const hostEl = this.resolveHost(target);
+      const textareaEl = hostEl ? this.openSurface(hostEl, target) : null;
+      if (hostEl && textareaEl) {
+        this.surfaces.push({ target, hostEl, textareaEl });
+      }
     }
-    const editorHostEl =
-      this.bubble.role === "assistant"
-        ? contentEl.parentElement
-        : this.bubble.bodyEl;
-    if (!editorHostEl) {
+    if (this.surfaces.length === 0) {
       this.callbacks.onCancel();
       return;
     }
 
     this.bubble.rowEl.addClass("is-editing");
-    contentEl.addClass("lmsa-hidden");
-    this.editingContentEl = contentEl;
+    this.renderActions();
 
-    // Edit in place: the textarea takes the content's exact spot in the bubble
-    // body, transparent and borderless, so no extra box appears around the text.
+    window.requestAnimationFrame(() => {
+      this.surfaces[0]?.textareaEl.focus();
+    });
+  }
+
+  private resolveHost(target: InlineEditTarget): HTMLElement | null {
+    if (this.bubble.role !== "assistant") return this.bubble.contentEl;
+    return target.proseItemId
+      ? this.bubble.turnView.getProseHost(target.proseItemId)
+      : this.bubble.turnView.getPrimaryProseHost();
+  }
+
+  /**
+   * Edit in place: the textarea takes the content's exact spot, transparent and
+   * borderless, so no extra box appears around the text.
+   */
+  private openSurface(
+    hostEl: HTMLElement,
+    target: InlineEditTarget,
+  ): HTMLTextAreaElement | null {
+    const editorHostEl =
+      this.bubble.role === "assistant" ? hostEl.parentElement : this.bubble.bodyEl;
+    if (!editorHostEl) return null;
     const textareaEl = editorHostEl.createEl("textarea", {
       cls: "lmsa-chat-window-inline-editor-textarea",
       attr: { rows: "1" },
     });
     if (this.bubble.role === "assistant") {
       textareaEl.addClass("lmsa-assistant-turn-item-body");
-      contentEl.before(textareaEl);
+      hostEl.before(textareaEl);
     }
-    this.textareaEl = textareaEl;
-    textareaEl.value = this.originalContent;
-
-    this.renderActions();
-
-    window.requestAnimationFrame(() => {
-      this.textareaEl?.focus();
-    });
+    hostEl.addClass("lmsa-hidden");
+    textareaEl.value = target.originalText;
 
     textareaEl.addEventListener("keydown", (e) => {
       if (e.key === "Escape") {
@@ -69,6 +90,7 @@ export class InlineMessageEditor {
         this.save();
       }
     });
+    return textareaEl;
   }
 
   /**
@@ -108,24 +130,27 @@ export class InlineMessageEditor {
 
   destroy(): void {
     this.bubble.rowEl.removeClass("is-editing");
-    this.editingContentEl?.removeClass("lmsa-hidden");
-    this.textareaEl?.remove();
+    for (const surface of this.surfaces) {
+      surface.hostEl.removeClass("lmsa-hidden");
+      surface.textareaEl.remove();
+    }
+    this.surfaces = [];
     for (const el of this.injectedEls) el.remove();
     this.injectedEls = [];
-    this.textareaEl = null;
-    this.editingContentEl = null;
   }
 
   private save(): void {
-    const newContent = this.textareaEl?.value ?? this.originalContent;
-    const trimmed = newContent.trim();
+    const edits = collectInlineEdits(
+      this.surfaces.map((surface) => surface.target),
+      this.surfaces.map((surface) => surface.textareaEl.value),
+    );
 
-    if (!trimmed || trimmed === this.originalContent) {
+    if (edits.length === 0) {
       this.cancel();
       return;
     }
 
-    this.callbacks.onSave(trimmed);
+    this.callbacks.onSave(edits);
     this.destroy();
   }
 

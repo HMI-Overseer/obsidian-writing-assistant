@@ -26,6 +26,7 @@ import type {
   ActionControlEligibility,
   SupersessionEventIdentity,
 } from "./actionLedger";
+import type { ProseItemEdit } from "./assistantRevisions";
 
 const CHAT_DRAFT_SAVE_DELAY_MS = 300;
 
@@ -156,16 +157,11 @@ export class ChatSessionStore {
     );
   }
 
-  editAssistantProseItem(
+  editAssistantTurnProse(
     messageId: string,
-    proseItemId: string,
-    text: string,
+    edits: readonly ProseItemEdit[],
   ): boolean {
-    return this.memory.editAssistantProseItem(
-      messageId,
-      proseItemId,
-      text,
-    );
+    return this.memory.editAssistantTurnProse(messageId, edits);
   }
 
   getActionControlEligibility(

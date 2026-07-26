@@ -1,4 +1,8 @@
 import { Notice } from "obsidian";
+import type {
+  AssistantMessageRevision,
+  ConversationMessage,
+} from "../shared/types";
 import { reportIfRejected, voidAsync } from "../asyncCallbacks";
 import type WritingAssistantChat from "../main";
 import type { ChatGenerationOrchestrator } from "./ChatGenerationOrchestrator";
@@ -13,6 +17,10 @@ import type { ChatSessionStore } from "./conversation/ChatSessionStore";
 import type { BubbleActionCallbacks } from "./messages/ChatTranscript";
 import type { ChatTranscript } from "./messages/ChatTranscript";
 import { InlineMessageEditor } from "./messages/InlineMessageEditor";
+import type {
+  InlineEdit,
+  InlineEditTarget,
+} from "./messages/inlineEditSession";
 import type { ActionReviewControl } from "./messages/actionLedgerReview";
 import { generateId } from "../utils";
 import { executeMessageAction } from "./actions/messageActionExecutor";
@@ -49,8 +57,7 @@ export class ChatBubbleActionHandler {
   createCallbacks(): BubbleActionCallbacks {
     return {
       onCopy: (messageId) => this.handleCopy(messageId),
-      onEdit: (messageId, proseItemId) =>
-        this.handleEdit(messageId, proseItemId),
+      onEdit: (messageId) => this.handleEdit(messageId),
       onDelete: (messageId) =>
         reportIfRejected(this.handleDelete(messageId), "Failed to delete the message."),
       onBranch: (messageId) =>
@@ -144,7 +151,12 @@ export class ChatBubbleActionHandler {
     });
   }
 
-  handleEdit(messageId: string, proseItemId?: string): void {
+  /**
+   * Open one edit session over the message. An agentic turn opens every prose
+   * item at once and commits as a single revision, because the turn is already
+   * the unit regeneration and branching address.
+   */
+  handleEdit(messageId: string): void {
     if (this.blockedDuringGeneration()) return;
 
     const store = this.deps.getStore();
@@ -156,42 +168,25 @@ export class ChatBubbleActionHandler {
     const message = snapshot.messageHistory.find((m) => m.id === messageId);
     if (!bubble || !message) return;
     const activeRevision = getActiveAssistantRevision(message);
-    const proseItem =
-      activeRevision?.kind === "turn" && proseItemId
-        ? activeRevision.turn.items.find(
-            (item) => item.id === proseItemId,
-          )
-        : null;
-    if (
-      activeRevision?.kind === "turn" &&
-      proseItem?.type !== "prose"
-    ) {
-      return;
-    }
-    const originalContent =
-      proseItem?.type === "prose"
-        ? proseItem.text
-        : message.role === "assistant"
-          ? assistantDisplayText(message)
-          : message.content;
+    const targets = this.buildEditTargets(message, activeRevision);
+    if (targets.length === 0) return;
 
-    const editor = new InlineMessageEditor(bubble, originalContent, {
-      onSave: voidAsync(async (newContent: string) => {
+    const editor = new InlineMessageEditor(bubble, targets, {
+      onSave: voidAsync(async (edits: InlineEdit[]) => {
         // Re-check at commit time: the editor can outlive the start of a new
         // generation, and committing then would race the in-flight persist.
         if (this.blockedDuringGeneration()) return;
         const currentStore = this.deps.getStore();
         if (!currentStore) return;
         let saved = false;
-        if (
-          message.role === "assistant" &&
-          activeRevision?.kind === "turn" &&
-          proseItemId
-        ) {
-          saved = currentStore.editAssistantProseItem(
+        if (message.role === "assistant" && activeRevision?.kind === "turn") {
+          saved = currentStore.editAssistantTurnProse(
             messageId,
-            proseItemId,
-            newContent,
+            edits.flatMap((edit) =>
+              edit.proseItemId
+                ? [{ sourceProseItemId: edit.proseItemId, text: edit.text }]
+                : [],
+            ),
           );
         } else if (
           message.role === "assistant" &&
@@ -201,7 +196,7 @@ export class ChatBubbleActionHandler {
           saved = model
             ? currentStore.editLegacyAssistantContent(
                 messageId,
-                newContent,
+                edits[0].text,
                 model.provider,
                 model.modelId,
               )
@@ -209,7 +204,7 @@ export class ChatBubbleActionHandler {
         } else if (message.role === "user") {
           saved = currentStore.updateUserMessageContent(
             messageId,
-            newContent,
+            edits[0].text,
           );
         }
         if (!saved) return;
@@ -217,8 +212,34 @@ export class ChatBubbleActionHandler {
         await this.deps.syncConversationUi();
       }, "Failed to save your edit."),
       onCancel: () => {},
-    }, proseItemId);
+    });
     editor.activate();
+  }
+
+  /**
+   * A canonical turn contributes one target per prose item, in turn order. A
+   * tool-only turn contributes none, so its edit action is inert rather than
+   * opening an empty session. Everything else is one undivided surface.
+   */
+  private buildEditTargets(
+    message: ConversationMessage,
+    activeRevision: AssistantMessageRevision | null,
+  ): InlineEditTarget[] {
+    if (message.role === "assistant" && activeRevision?.kind === "turn") {
+      return activeRevision.turn.items.flatMap((item) =>
+        item.type === "prose"
+          ? [{ proseItemId: item.id, originalText: item.text }]
+          : [],
+      );
+    }
+    return [
+      {
+        originalText:
+          message.role === "assistant"
+            ? assistantDisplayText(message)
+            : message.content,
+      },
+    ];
   }
 
   async handleDelete(messageId: string): Promise<void> {

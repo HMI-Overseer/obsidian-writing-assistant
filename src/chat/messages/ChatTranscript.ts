@@ -23,7 +23,7 @@ import type { ActionReviewControl } from "./actionLedgerReview";
 
 export type BubbleActionCallbacks = {
   onCopy: (messageId: string) => void;
-  onEdit: (messageId: string, proseItemId?: string) => void;
+  onEdit: (messageId: string) => void;
   onDelete: (messageId: string) => void;
   onBranch: (messageId: string) => void;
   onRegenerate: (messageId: string) => void;
@@ -490,12 +490,6 @@ export class ChatTranscript {
     if (message.role === "assistant") {
       const activeRevision = getActiveAssistantRevision(message);
       if (bubble.role === "assistant") {
-        bubble.turnView.setProseEditHandler(
-          activeRevision?.kind === "turn"
-            ? (proseItemId) =>
-                callbacks.onEdit(message.id, proseItemId)
-            : null,
-        );
         bubble.turnView.setActionReviewContext(
           (entry, targetId) =>
             callbacks.getActionEligibility(

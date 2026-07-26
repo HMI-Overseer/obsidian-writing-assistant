@@ -165,11 +165,9 @@ describe("Phase 8 mixed-history compatibility", () => {
       ),
     ).toBe(true);
     expect(
-      memory.editAssistantProseItem(
-        "assistant-legacy",
-        "prose-regenerated",
-        "Edited prose.",
-      ),
+      memory.editAssistantTurnProse("assistant-legacy", [
+        { sourceProseItemId: "prose-regenerated", text: "Edited prose." },
+      ]),
     ).toBe(true);
     const editedMessage = memory.getSnapshot().messageHistory[0];
     const editedRevisionId = editedMessage.activeRevisionId;

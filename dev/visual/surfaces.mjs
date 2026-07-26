@@ -63,6 +63,7 @@ const ICON_NAMES = {
   gitBranch: "git-branch",
   copy: "copy",
   pencil: "pencil",
+  save: "save",
   trash: "trash-2",
   hand: "hand",
   zap: "zap",
@@ -244,6 +245,22 @@ const turnItem = (
       : " lmsa-agentic-timeline-step-body"}">${renderedBody}</div>
   </li>`;
 };
+
+// One prose item mid-edit. InlineMessageEditor hides the rendered body where it sits and drops a
+// transparent textarea into the same grid slot, one per prose item, since an edit session owns the
+// whole turn. Tool items are untouched by the session.
+const editingProseItem = (id, marker, text, { after = true, segment = "segment-1" } = {}) =>
+  `<li class="lmsa-assistant-turn-item lmsa-assistant-turn-item--prose has-connector-before${after ? " has-connector-after" : ""}"
+    data-item-id="${id}" data-segment-id="${segment}">
+    <div class="lmsa-assistant-turn-marker is-${marker}" aria-hidden="true">${
+      marker === "thinking" ? I.brain : ""
+    }</div>
+    <textarea class="lmsa-chat-window-inline-editor-textarea lmsa-assistant-turn-item-body" rows="1">${text}</textarea>
+    <div class="lmsa-assistant-turn-item-body lmsa-assistant-turn-prose lmsa-chat-window-message-content lmsa-chat-window-message-content--markdown lmsa-hidden">
+      <p>${text}</p>
+      <div class="lmsa-assistant-turn-action-host"></div>
+    </div>
+  </li>`;
 
 const toolTurnBody = (name, detail, state, diagnostics = "") =>
   `<span class="lmsa-assistant-turn-tool-summary is-expandable" role="button" tabindex="0" aria-label="${name}, ${detail}, ${state}" aria-expanded="${diagnostics ? "true" : "false"}">
@@ -1811,6 +1828,59 @@ export const SURFACES = {
           </section>`,
         ),
       ),
+      650,
+    ),
+  },
+
+  // Turn-wide edit session: every prose item of the turn is open at once, the tool item is left
+  // alone, and the canonical action bar swaps its five icons for one Cancel and one Save. Gate: no
+  // per-item edit affordance anywhere, and the bar does not reflow when the icons swap.
+  assistantTurnEditSession: {
+    w: 650,
+    shot: ".lmsa-chat-window-message--assistant",
+    html: view(
+      `<div class="lmsa-chat-window-message lmsa-chat-window-message--assistant is-editing">
+        <div class="lmsa-chat-window-message-avatar">${I.bot}</div>
+        <div class="lmsa-chat-window-message-column">
+          <div class="lmsa-chat-window-message-chrome"><div class="lmsa-chat-window-message-role">Assistant</div></div>
+        </div>
+        ${assistantTurn(
+          editingProseItem(
+            "prose-1",
+            "thinking",
+            "I will inspect the opening before changing it.",
+          ) +
+            turnItem(
+              "tool-1",
+              "tool_call",
+              "tool",
+              toolTurnBody("Read file", "Drafts/Opening.md", "Completed"),
+              { state: "completed" },
+            ) +
+            editingProseItem(
+              "prose-2",
+              "iconless",
+              "The opening is tighter now. The revised line keeps the silence while giving the movement more urgency.",
+              { after: false },
+            ),
+        )}
+        <div class="lmsa-chat-window-bubble-toolbar">
+          <div class="lmsa-chat-window-version-nav">
+            <button class="lmsa-chat-window-version-prev" aria-label="Previous version" type="button">${I.chevronLeft}</button>
+            <span class="lmsa-chat-window-version-indicator">1/1</span>
+            <button class="lmsa-chat-window-version-next" aria-label="Next version" type="button" disabled>${I.chevronRight}</button>
+          </div>
+          <div class="lmsa-chat-window-message-actions">
+            <button class="lmsa-chat-window-action-btn" data-action="regenerate" aria-label="Regenerate response" type="button">${I.refreshCw}</button>
+            <button class="lmsa-chat-window-action-btn" data-action="branch" aria-label="Branch after this" type="button">${I.gitBranch}</button>
+            <button class="lmsa-chat-window-action-btn" data-action="copy" aria-label="Copy message" type="button">${I.copy}</button>
+            <button class="lmsa-chat-window-action-btn" data-action="edit" aria-label="Edit message" type="button">${I.pencil}</button>
+            <button class="lmsa-chat-window-action-btn" data-action="delete" aria-label="Delete message" type="button">${I.trash}</button>
+            <button class="lmsa-chat-window-action-btn is-edit-control" aria-label="Cancel (esc)" type="button">${I.x}</button>
+            <button class="lmsa-chat-window-action-btn is-edit-control lmsa-chat-window-inline-editor-save" aria-label="Save changes (Ctrl+Enter)" type="button">${I.save}</button>
+          </div>
+        </div>
+      </div>`,
       650,
     ),
   },

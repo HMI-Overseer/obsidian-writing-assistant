@@ -256,8 +256,9 @@ describe("assistant edited revisions", () => {
       revisionId: "revision-edited",
       turnId: "turn-edited",
       createdAt: 300,
-      targetProseItemId: "prose-2",
-      text: "Edited closing prose.",
+      edits: [
+        { sourceProseItemId: "prose-2", text: "Edited closing prose." },
+      ],
       itemId: (sourceId) => `edited-${sourceId}`,
     });
 
@@ -276,5 +277,74 @@ describe("assistant edited revisions", () => {
       id: "prose-2",
       text: "After.",
     });
+  });
+
+  it("folds every prose item of one edit session into a single revision", () => {
+    const source = makeRevision();
+    const edited = createEditedRevision({
+      sourceRevision: source,
+      revisionId: "revision-edited",
+      turnId: "turn-edited",
+      createdAt: 300,
+      edits: [
+        { sourceProseItemId: "prose-1", text: "Edited opening prose." },
+        { sourceProseItemId: "prose-2", text: "Edited closing prose." },
+      ],
+      itemId: (sourceId) => `edited-${sourceId}`,
+    });
+
+    expect(edited.turn.items.map((item) => item.id)).toEqual([
+      "edited-prose-1",
+      "edited-tool-item-1",
+      "edited-prose-2",
+    ]);
+    expect(edited.turn.items.map((item) => item.sourceItemId)).toEqual([
+      "prose-1",
+      "tool-item-1",
+      "prose-2",
+    ]);
+    expect(edited.turn.items[0]).toMatchObject({
+      text: "Edited opening prose.",
+    });
+    expect(edited.turn.items[2]).toMatchObject({
+      text: "Edited closing prose.",
+    });
+    expect(edited.turn.items[1]).toMatchObject({
+      type: "tool_call",
+      toolCallId: "tool-call-1",
+      actionRef: "action-1",
+    });
+    expect(source.turn.items[0]).toMatchObject({ text: "Before." });
+    expect(source.turn.items[2]).toMatchObject({ text: "After." });
+  });
+
+  it("refuses an empty session and a prose item edited twice", () => {
+    const source = makeRevision();
+    const input = {
+      sourceRevision: source,
+      revisionId: "revision-edited",
+      turnId: "turn-edited",
+      createdAt: 300,
+      itemId: (sourceId: string) => `edited-${sourceId}`,
+    };
+
+    expect(() => createEditedRevision({ ...input, edits: [] })).toThrow(
+      /at least one prose item/i,
+    );
+    expect(() =>
+      createEditedRevision({
+        ...input,
+        edits: [
+          { sourceProseItemId: "prose-2", text: "First." },
+          { sourceProseItemId: "prose-2", text: "Second." },
+        ],
+      }),
+    ).toThrow(/twice/i);
+    expect(() =>
+      createEditedRevision({
+        ...input,
+        edits: [{ sourceProseItemId: "tool-item-1", text: "No." }],
+      }),
+    ).toThrow(/prose item/i);
   });
 });

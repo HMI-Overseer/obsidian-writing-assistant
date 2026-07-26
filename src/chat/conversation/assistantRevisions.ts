@@ -36,13 +36,18 @@ export interface CopyTurnWithProvenanceOptions {
   itemId: (sourceItemId: string, index: number) => string;
 }
 
+/** One prose item of the source turn, addressed by its pre-copy identity. */
+export interface ProseItemEdit {
+  sourceProseItemId: string;
+  text: string;
+}
+
 export interface CreateEditedRevisionInput {
   sourceRevision: AssistantTurnRevision;
   revisionId: string;
   turnId: string;
   createdAt: number;
-  targetProseItemId: string;
-  text: string;
+  edits: readonly ProseItemEdit[];
   itemId: (sourceItemId: string, index: number) => string;
 }
 
@@ -180,27 +185,39 @@ export function replaceProseItemText(
   return cloneValidatedTurn({ ...structuredClone(turn), items });
 }
 
-/** Create one copy-on-write edited child revision. */
+/**
+ * Create one copy-on-write edited child revision.
+ *
+ * An edit session owns the whole turn, so every changed prose item lands in the
+ * same child revision. The turn is the unit regeneration and branching already
+ * address, and a session that produced one revision per block would let version
+ * navigation walk through states the writer never intended to publish.
+ */
 export function createEditedRevision(
   input: CreateEditedRevisionInput,
 ): AssistantTurnRevision {
+  if (input.edits.length === 0) {
+    throw new Error("An edited revision must change at least one prose item.");
+  }
+  const sourceIds = new Set(input.edits.map((edit) => edit.sourceProseItemId));
+  if (sourceIds.size !== input.edits.length) {
+    throw new Error("An edited revision cannot change one prose item twice.");
+  }
   const copied = copyTurnWithProvenance(input.sourceRevision.turn, {
     turnId: input.turnId,
     itemId: input.itemId,
   });
-  const copiedTarget = copied.items.filter(
-    (item) => item.sourceItemId === input.targetProseItemId,
-  );
-  if (copiedTarget.length !== 1) {
-    throw new Error(
-      `Expected exactly one copied source item "${input.targetProseItemId}".`,
+  const editedTurn = input.edits.reduce((turn, edit) => {
+    const copiedTarget = copied.items.filter(
+      (item) => item.sourceItemId === edit.sourceProseItemId,
     );
-  }
-  const editedTurn = replaceProseItemText(
-    copied,
-    copiedTarget[0].id,
-    input.text,
-  );
+    if (copiedTarget.length !== 1) {
+      throw new Error(
+        `Expected exactly one copied source item "${edit.sourceProseItemId}".`,
+      );
+    }
+    return replaceProseItemText(turn, copiedTarget[0].id, edit.text);
+  }, copied);
   const source = input.sourceRevision;
   return createTurnRevision({
     revisionId: input.revisionId,

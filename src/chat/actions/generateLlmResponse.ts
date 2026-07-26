@@ -7,7 +7,13 @@ import type { ChatClient } from "../../api/chatClient";
 import { createAbortError } from "../../api/httpTransport";
 import type { ChatSessionStore } from "../conversation/ChatSessionStore";
 import type { ChatTranscript } from "../messages/ChatTranscript";
-import type { ApprovalPosture, CompletionModel, ConversationMessage } from "../../shared/types";
+import type {
+  ApprovalPosture,
+  AssistantReplayEvidence,
+  AssistantTurnRecord,
+  CompletionModel,
+  ConversationMessage,
+} from "../../shared/types";
 import { writesPermitted } from "../../vault-ops/gateway";
 import { getActiveProfile } from "../../shared/profileUtils";
 import { makeMessage } from "../conversation/conversationUtils";
@@ -15,8 +21,15 @@ import { prepareApiMessages } from "../finalization/prepareApiMessages";
 import { estimateTokenCount } from "../../shared/tokenEstimation";
 import { StreamingRenderer } from "../streaming/StreamingRenderer";
 import { EditStreamingRenderer } from "../streaming/EditStreamingRenderer";
-import { finalizeResponse, finalizeAbortedResponse } from "../finalization/finalizeResponse";
-import { finalizeEditResponse } from "../finalization/finalizeEditResponse";
+import {
+  finalizeResponse,
+  finalizeAbortedResponse,
+  insertLastResponse,
+} from "../finalization/finalizeResponse";
+import {
+  buildRegexEditProposals,
+  finalizeEditResponse,
+} from "../finalization/finalizeEditResponse";
 import { estimateCost } from "../../api/pricing";
 import type { UsageResult } from "../../api/usageTypes";
 import type { MessageUsage } from "../../shared/types";
@@ -37,6 +50,19 @@ import {
 import { CONTEXT_DANGER_THRESHOLD } from "../../constants";
 import type { ComposerInteractionHostPort } from "../interactions/ComposerInteractionHost";
 import { AskInteractionCoordinator } from "../interactions/AskInteractionCoordinator";
+import { generateId } from "../../utils";
+import { AssistantTurnBuilder } from "../turns/AssistantTurnBuilder";
+import {
+  createAssistantTurnMessage,
+  createAssistantTurnRevision,
+} from "../finalization/assistantTurnFinalization";
+import { buildDirectProviderActionLedger } from "../finalization/directProviderActionLedger";
+import { getActiveAssistantRevision } from "../conversation/assistantRevisions";
+import {
+  allVisibleProse,
+  rawConcatenatedProse,
+} from "../turns/assistantTurnProjections";
+import { GENERATION_STOPPED_LABEL } from "../types";
 
 /**
  * How to commit the completed generation to the store.
@@ -125,6 +151,22 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
   } = options;
 
   const activeProfile = getActiveProfile(plugin.settings, activeModel.provider);
+  const directProvider = activeModel.provider !== "claudecode";
+  const draftIdentity = {
+    messageId: generateId(),
+    revisionId: `revision-${generateId()}`,
+    turnId: `turn-${generateId()}`,
+    createdAt: Date.now(),
+  };
+  const turnBuilder = new AssistantTurnBuilder({
+    turnId: draftIdentity.turnId,
+  });
+  let capturedTurn: AssistantTurnRecord | null = null;
+  let capturedReplayEvidence: AssistantReplayEvidence | null = null;
+  let capturedToolCorrelations: Record<
+    string,
+    "provider_id" | "plugin_id"
+  > = {};
 
   // Ambient editing (prompt-cache design section 6.3): the edit pipeline (edit renderer, edit
   // review channel, finalizeEditResponse) is active whenever the session permits any
@@ -172,6 +214,9 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
       supportsVision: activeModel.vision
         ?? plugin.services.modelAvailability.getVision(activeModel.modelId)
         ?? true,
+      ...(finalization.kind === "replace"
+        ? { excludeMessageId: finalization.oldMessage.id }
+        : {}),
     });
   } catch (error) {
     askCoordinator.destroy();
@@ -290,6 +335,100 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
 
   const editRenderer = renderer instanceof EditStreamingRenderer ? renderer : null;
   const chatRenderer = renderer instanceof StreamingRenderer ? renderer : null;
+  const persistDirectTurn = async (input: {
+    turn: AssistantTurnRecord;
+    replayEvidence: AssistantReplayEvidence;
+    toolCorrelations: Record<string, "provider_id" | "plugin_id">;
+    usage?: UsageResult | null;
+    isError?: boolean;
+    interrupted?: boolean;
+    errorMessage?: string;
+    editProposals?: ReturnType<LiveVaultReview["getEditProposals"]>;
+    parsedEditPlacement?: { itemId: string; actionRef: string };
+  }): Promise<boolean> => {
+    const actionLedger = buildDirectProviderActionLedger({
+      revisionId: draftIdentity.revisionId,
+      turn: input.turn,
+      toolCorrelations: input.toolCorrelations,
+      editProposals:
+        input.editProposals ?? liveReview.getEditProposals(),
+      appliedEditRecords: liveReview.getEditAppliedRecords(),
+      vaultOpProposal: liveReview.getProposal() ?? undefined,
+      appliedVaultOpRecord: liveReview.getAppliedRecord() ?? undefined,
+      memoryProposals: liveReview.getMemoryProposals(),
+      parsedEditPlacement: input.parsedEditPlacement,
+      createEventId: () => `event-${generateId()}`,
+      createdAt: draftIdentity.createdAt,
+    });
+    const parentRevision =
+      finalization.kind === "replace"
+        ? getActiveAssistantRevision(finalization.oldMessage)
+        : null;
+    const revision = createAssistantTurnRevision({
+      revisionId: draftIdentity.revisionId,
+      origin:
+        finalization.kind === "replace"
+          ? "regenerated"
+          : "generated",
+      ...(parentRevision
+        ? { parentRevisionId: parentRevision.revisionId }
+        : {}),
+      createdAt: draftIdentity.createdAt,
+      provider: activeModel.provider,
+      modelId: activeModel.modelId,
+      turn: input.turn,
+      replayEvidence: input.replayEvidence,
+      ...(input.usage
+        ? { usage: buildMessageUsage(activeModel.modelId, input.usage) }
+        : {}),
+      ...(ragSources ? { ragSources } : {}),
+      ...(rewrittenQuery ? { rewrittenQuery } : {}),
+      ...(input.isError ? { isError: true } : {}),
+      ...(input.interrupted ? { interrupted: true } : {}),
+      ...(input.errorMessage
+        ? { errorMessage: input.errorMessage }
+        : {}),
+    });
+    const response = allVisibleProse(input.turn);
+    if (finalization.kind === "replace") {
+      if (input.turn.items.length === 0) return false;
+      const committed = store.commitRevisionReplacement(
+        finalization.oldMessage.id,
+        revision,
+        (_actionRef, _targetId, index) => ({
+          eventId: `event-${generateId()}-${index}`,
+          createdAt: Math.max(Date.now(), draftIdentity.createdAt),
+        }),
+        actionLedger,
+      );
+      if (!committed) {
+        throw new Error("Could not commit the regenerated assistant revision.");
+      }
+      transcript.registerBubble(finalization.oldMessage.id, assistantBubble);
+    } else {
+      const assistantMessage = createAssistantTurnMessage({
+        messageId: draftIdentity.messageId,
+        revision,
+        actionLedger,
+      });
+      store.appendMessage(assistantMessage);
+      transcript.registerBubble(assistantMessage.id, assistantBubble);
+    }
+    store.setLastAssistantResponse(response);
+    if (response) {
+      await transcript.renderBubbleContent(assistantBubble, response);
+    } else {
+      transcript.renderPlainTextContent(assistantBubble, "(no response)");
+    }
+    if (
+      finalization.kind === "append" &&
+      finalization.autoInsert &&
+      response
+    ) {
+      await insertLastResponse(plugin, response);
+    }
+    return true;
+  };
 
   try {
 
@@ -343,7 +482,7 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
       });
     }
 
-    const { writeToolCalls, usage: finalUsage, writeStopReason } = await runToolLoop(
+    const loopResult = await runToolLoop(
       client,
       apiMessages,
       activeModel.modelId,
@@ -371,19 +510,11 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
         // Code the loop runs a single pass with no tool calls, and the timeline is
         // driven by the MCP listener below, so they stay unset there to avoid
         // mirroring the streamed answer text into the timeline as reasoning.
-        onToolCallStreaming: pluginTimeline ? (name) => pluginTimeline.addPendingToolCall(name) : undefined,
+        onToolDeclared: pluginTimeline
+          ? (name) => pluginTimeline.addPendingToolCall(name)
+          : undefined,
         onStepRecorded: pluginTimeline ? (step) => pluginTimeline.addStep(step) : undefined,
         onStepResult: pluginTimeline ? (id, result) => pluginTimeline.setStepResult(id, result) : undefined,
-        onReasoningDelta: pluginTimeline ? (delta) => pluginTimeline.addReasoningDelta(delta) : undefined,
-        onReasoningRoundFinished: pluginTimeline
-          ? (committed, round) => {
-              if (committed) {
-                pluginTimeline.commitLiveReasoning(round);
-              } else {
-                pluginTimeline.discardLiveReasoning();
-              }
-            }
-          : undefined,
         onCalibrate: onCalibrate
           ? (request, usage) => {
               // A provider that reports its context size directly (Claude Code)
@@ -403,7 +534,21 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
       vaultOpToolContext,
       memoryToolContext,
       askCoordinator,
+      turnBuilder,
+      (toolCallId) =>
+        `action-${draftIdentity.revisionId}-${toolCallId}`,
     );
+    const {
+      writeToolCalls,
+      usage: finalUsage,
+      writeStopReason,
+      turn,
+      replayEvidence,
+      toolCorrelations,
+    } = loopResult;
+    capturedTurn = turn;
+    capturedReplayEvidence = replayEvidence;
+    capturedToolCorrelations = toolCorrelations;
     if (abortController.signal.aborted) throw createAbortError();
 
     await renderer.flush();
@@ -435,7 +580,40 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
       : [];
     const effectiveWriteToolCalls = ccWriteToolCalls.length > 0 ? ccWriteToolCalls : writeToolCalls;
 
-    if (editsActive && renderer instanceof EditStreamingRenderer) {
+    if (directProvider) {
+      let persistedTurn = turn;
+      let regexEditProposals:
+        | ReturnType<LiveVaultReview["getEditProposals"]>
+        | undefined;
+      let parsedEditPlacement:
+        | { itemId: string; actionRef: string }
+        | undefined;
+      if (editsActive && !pluginAgentic) {
+        regexEditProposals = await buildRegexEditProposals(
+          plugin.app,
+          plugin,
+          rawConcatenatedProse(turn),
+        );
+        if (regexEditProposals.length > 0) {
+          const actionRef =
+            `action-${draftIdentity.revisionId}-parsed-edit`;
+          const anchored = anchorParsedEditTurn(turn, actionRef);
+          persistedTurn = anchored.turn;
+          parsedEditPlacement = {
+            itemId: anchored.itemId,
+            actionRef,
+          };
+        }
+      }
+      await persistDirectTurn({
+        turn: persistedTurn,
+        replayEvidence,
+        toolCorrelations,
+        usage: finalUsage,
+        editProposals: regexEditProposals,
+        parsedEditPlacement,
+      });
+    } else if (editsActive && renderer instanceof EditStreamingRenderer) {
       // Drop the transient in-loop edit panel so it can't double up with the
       // durable one finalize renders into the message body.
       liveReview.detachEditPanel();
@@ -498,7 +676,29 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
 
     if (isAbortError(error) || abortController.signal.aborted) {
       const partialSteps = timeline?.getSteps();
-      if (editsActive && renderer instanceof EditStreamingRenderer) {
+      if (directProvider) {
+        const interruptedTurn =
+          capturedTurn ??
+          finishDirectTurn(turnBuilder, "interrupted", "Generation stopped.");
+        await persistDirectTurn({
+          turn: interruptedTurn,
+          replayEvidence:
+            capturedReplayEvidence ??
+            directFallbackReplayEvidence("stream_interrupted"),
+          toolCorrelations:
+            Object.keys(capturedToolCorrelations).length > 0
+              ? capturedToolCorrelations
+              : inferDirectToolCorrelations(interruptedTurn),
+          interrupted: interruptedTurn.status === "interrupted",
+        });
+        if (interruptedTurn.items.length === 0) {
+          transcript.renderPlainTextContent(
+            assistantBubble,
+            GENERATION_STOPPED_LABEL,
+          );
+          assistantBubble.bodyEl.addClass("is-muted");
+        }
+      } else if (editsActive && renderer instanceof EditStreamingRenderer) {
         liveReview.detachEditPanel();
         await finalizeEditResponse({
           app: plugin.app,
@@ -555,21 +755,45 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
       }
     } else {
       const errorText = `Error: ${getErrorMessage(error)}`;
-      if (finalization.kind === "replace") {
-        store.finalizeRegeneration(finalization.oldMessage, finalization.oldMessage.content);
+      if (directProvider) {
+        const failedTurn =
+          capturedTurn ??
+          finishDirectTurn(
+            turnBuilder,
+            "failed",
+            getErrorMessage(error),
+          );
+        await persistDirectTurn({
+          turn: failedTurn,
+          replayEvidence:
+            capturedReplayEvidence ??
+            directFallbackReplayEvidence("stream_failed"),
+          toolCorrelations:
+            Object.keys(capturedToolCorrelations).length > 0
+              ? capturedToolCorrelations
+              : inferDirectToolCorrelations(failedTurn),
+          isError: true,
+          errorMessage: getErrorMessage(error),
+        });
+        assistantBubble.bodyEl.addClass("is-error");
+        transcript.renderPlainTextContent(assistantBubble, errorText);
+      } else {
+        if (finalization.kind === "replace") {
+          store.finalizeRegeneration(finalization.oldMessage, finalization.oldMessage.content);
+        }
+        const errorMessage = makeMessage("assistant", errorText);
+        errorMessage.isError = true;
+        errorMessage.modelId = activeModel.modelId;
+        errorMessage.provider = activeModel.provider;
+        const partialSteps = timeline?.getSteps();
+        if (hasCompletedAskGuidance(partialSteps)) {
+          errorMessage.agenticSteps = partialSteps;
+        }
+        store.appendMessage(errorMessage);
+        transcript.registerBubble(errorMessage.id, assistantBubble);
+        assistantBubble.bodyEl.addClass("is-error");
+        transcript.renderPlainTextContent(assistantBubble, errorText);
       }
-      const errorMessage = makeMessage("assistant", errorText);
-      errorMessage.isError = true;
-      errorMessage.modelId = activeModel.modelId;
-      errorMessage.provider = activeModel.provider;
-      const partialSteps = timeline?.getSteps();
-      if (hasCompletedAskGuidance(partialSteps)) {
-        errorMessage.agenticSteps = partialSteps;
-      }
-      store.appendMessage(errorMessage);
-      transcript.registerBubble(errorMessage.id, assistantBubble);
-      assistantBubble.bodyEl.addClass("is-error");
-      transcript.renderPlainTextContent(assistantBubble, errorText);
     }
   } finally {
     plugin.services.claudeCode.setAskUserResponder(null);
@@ -585,4 +809,91 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
     setIsGenerating(false);
     renderer.destroy();
   }
+}
+
+function finishDirectTurn(
+  builder: AssistantTurnBuilder,
+  status: "interrupted" | "failed",
+  errorMessage: string,
+): AssistantTurnRecord {
+  if (status === "failed") {
+    for (const item of builder.snapshot().items) {
+      if (
+        item.type === "tool_call" &&
+        item.toolCallId &&
+        (item.state === "declared" || item.state === "running")
+      ) {
+        builder.updateToolLifecycle(item.toolCallId, {
+          state: "failed",
+          isError: true,
+          errorContent: errorMessage,
+        });
+      }
+    }
+  }
+  try {
+    return builder.finishTurn(status);
+  } catch {
+    return {
+      schemaVersion: 1,
+      id: builder.snapshot().id,
+      status,
+      segments: [],
+      items: [],
+    };
+  }
+}
+
+function inferDirectToolCorrelations(
+  turn: AssistantTurnRecord,
+): Record<string, "provider_id" | "plugin_id"> {
+  return Object.fromEntries(
+    turn.items
+      .filter((item) => item.type === "tool_call")
+      .map((item) => [
+        item.toolCallId,
+        item.toolCallId.startsWith("lmsa-tool-")
+          ? "plugin_id"
+          : "provider_id",
+      ]),
+  );
+}
+
+function directFallbackReplayEvidence(
+  loweredReason: string,
+): AssistantReplayEvidence {
+  return {
+    tier: "textual",
+    capabilities: {
+      captureOrder: "text_only",
+      toolCorrelation: "none",
+      coldReplay: "textual",
+      nativeResume: false,
+    },
+    loweredReason,
+  };
+}
+
+function anchorParsedEditTurn(
+  turn: AssistantTurnRecord,
+  actionRef: string,
+): { turn: AssistantTurnRecord; itemId: string } {
+  const items = structuredClone(turn.items);
+  for (let index = items.length - 1; index >= 0; index -= 1) {
+    const item = items[index];
+    if (item.type !== "prose") continue;
+    items[index] = {
+      ...item,
+      actionRef,
+      actionAnchor: "parsed_edit",
+    };
+    return {
+      turn: {
+        ...structuredClone(turn),
+        items,
+      },
+      itemId: item.id,
+    };
+  }
+  throw new Error("Parsed edit response has no prose item to anchor.");
 }

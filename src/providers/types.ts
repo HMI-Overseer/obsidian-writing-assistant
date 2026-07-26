@@ -1,4 +1,8 @@
-import type { ProviderOption, ReasoningLevel } from "../shared/types";
+import type {
+  ProviderOption,
+  ProviderTurnCapabilities,
+  ReasoningLevel,
+} from "../shared/types";
 
 export type ProviderKind = "local" | "cloud";
 export type BillingModel = "free" | "per-token";
@@ -32,6 +36,8 @@ export interface ProviderDescriptor {
   reasoningLevels: ReasoningLevel[];
   supportsModelDiscovery: boolean;
   supportsToolUse: boolean;
+  /** Maximum ordered-turn fidelity. One request may persist a lower actual tier. */
+  turnCapabilities: ProviderTurnCapabilities;
   /** null = fixed URL (e.g. Anthropic). Non-null = configurable default. */
   defaultBaseUrl: string | null;
   requiresBaseUrl: boolean;

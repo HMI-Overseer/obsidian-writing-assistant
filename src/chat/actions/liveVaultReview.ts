@@ -9,7 +9,7 @@ import type {
 import { diskState, diskFingerprint } from "../../vault-ops/apply";
 import { applyVaultOpBatch } from "../../vault-ops/applyBatch";
 import { resolveEditGate, targetPaths, type VaultOpPolicy } from "../../vault-ops/gateway";
-import type { ApprovalPosture } from "../../shared/types";
+import type { ApprovalPosture, Memory } from "../../shared/types";
 import { escapesVault, outsideVaultMessage } from "../../vault-ops/pathSafety";
 import {
   preReadTrashSnapshots,
@@ -49,6 +49,7 @@ import { toolFailure } from "../../tools/toolFailure";
 import {
   applyApprovedMemoryMutation,
   prepareMemoryMutation,
+  type MemoryMutation,
   type MemoryToolContext,
 } from "../../tools/memory/handlers";
 import { resolveMemoryGate } from "../../tools/memory/definition";
@@ -70,6 +71,30 @@ type Entry =
 interface PendingResolution {
   resolve: (outcome: { disposition: VaultOpDisposition; reason?: string }) => void;
   promise: Promise<{ disposition: VaultOpDisposition; reason?: string }>;
+}
+
+function memoryBeforeMutation(
+  mutation: MemoryMutation,
+  memories: Memory[],
+): Memory | null {
+  if (mutation.kind === "add") {
+    return (
+      memories.find((memory) => memory.name === mutation.memory.name) ??
+      null
+    );
+  }
+  return (
+    memories.find((memory) => memory.name === mutation.name) ??
+    null
+  );
+}
+
+function memoryAfterMutation(
+  mutation: MemoryMutation,
+): Memory | null {
+  return mutation.kind === "add"
+    ? structuredClone(mutation.memory)
+    : null;
 }
 
 interface PendingMemoryResolution {
@@ -515,6 +540,11 @@ export class LiveVaultReview implements VaultOpReviewer {
     return [...this.editAppliedRecords.values()];
   }
 
+  /** Detached memory review evidence for canonical action-ledger finalization. */
+  getMemoryProposals(): ReviewableMemoryProposal[] {
+    return structuredClone(this.memoryProposals);
+  }
+
   /**
    * Drop the in-loop edit timeline view's controller subscription before
    * finalization mounts the durable one. The proposal/record live on; finalization's
@@ -595,6 +625,10 @@ export class LiveVaultReview implements VaultOpReviewer {
     this.memoryProposals.push(proposal);
 
     if (gate === "auto") {
+      const before = memoryBeforeMutation(
+        proposal.mutation,
+        deps.getMemories(),
+      );
       const result = await applyApprovedMemoryMutation(
         call,
         deps,
@@ -602,6 +636,13 @@ export class LiveVaultReview implements VaultOpReviewer {
       );
       proposal.status = result.isError ? "failed" : "applied";
       if (result.isError) proposal.error = result.content;
+      else {
+        proposal.effect = {
+          before,
+          after: memoryAfterMutation(proposal.mutation),
+          appliedAt: Date.now(),
+        };
+      }
       this.remountMemories();
       return result;
     }
@@ -630,6 +671,10 @@ export class LiveVaultReview implements VaultOpReviewer {
     if (!deps || !proposal || !parked || proposal.status !== "pending") return;
 
     this.pendingMemories.delete(proposalId);
+    const before = memoryBeforeMutation(
+      proposal.mutation,
+      deps.getMemories(),
+    );
     const result = await applyApprovedMemoryMutation(
       proposal.call,
       deps,
@@ -637,6 +682,13 @@ export class LiveVaultReview implements VaultOpReviewer {
     );
     proposal.status = result.isError ? "failed" : "applied";
     if (result.isError) proposal.error = result.content;
+    else {
+      proposal.effect = {
+        before,
+        after: memoryAfterMutation(proposal.mutation),
+        appliedAt: Date.now(),
+      };
+    }
     parked.resolve(result);
     this.remountMemories();
   }

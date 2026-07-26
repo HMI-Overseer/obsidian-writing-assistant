@@ -11,6 +11,10 @@ import { renderUsageBadge } from "./UsageBadge";
 import { renderRagSources } from "./RagSourcesList";
 import { AgenticTimeline } from "./AgenticTimeline";
 import { ImagePreviewModal } from "./ImagePreviewModal";
+import {
+  assistantRevisionErrorMessage,
+  assistantToolStepProjection,
+} from "../conversation/assistantRevisions";
 
 export type BubbleActionCallbacks = {
   onCopy: (messageId: string) => void;
@@ -140,13 +144,20 @@ export class ChatTranscript {
    * the same muted face `finalizeAbortedResponse` shows live, not a blank bubble.
    */
   private async renderMessageBody(bubble: BubbleRefs, message: ConversationMessage): Promise<void> {
-    if (message.role === "assistant" && message.agenticSteps?.length) {
-      AgenticTimeline.render(bubble.timelineEl, message.agenticSteps);
+    const projectedSteps =
+      message.role === "assistant"
+        ? message.agenticSteps ?? assistantToolStepProjection(message)
+        : [];
+    if (projectedSteps.length > 0) {
+      AgenticTimeline.render(bubble.timelineEl, projectedSteps);
     }
 
     if (message.isError) {
       bubble.bodyEl.addClass("is-error");
-      this.renderPlainTextContent(bubble, message.content);
+      this.renderPlainTextContent(
+        bubble,
+        assistantRevisionErrorMessage(message) ?? message.content,
+      );
     } else if (message.role === "assistant" && message.content === "") {
       this.renderPlainTextContent(bubble, GENERATION_STOPPED_LABEL);
       bubble.bodyEl.addClass("is-muted");

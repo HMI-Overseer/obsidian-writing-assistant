@@ -5,6 +5,7 @@ import type {
   ConversationMeta,
   ConversationMessage,
   RagSourceRef,
+  ToolActionLedgerEntry,
 } from "../../shared/types";
 import { generateId } from "../../utils";
 import type { ChatSessionSnapshot } from "../types";
@@ -291,6 +292,7 @@ export class ChatSessionMemory {
       targetId: string,
       index: number,
     ) => SupersessionEventIdentity,
+    newActionLedger: ToolActionLedgerEntry[] = [],
   ): boolean {
     const index = this.messageHistory.findIndex((message) => message.id === messageId);
     if (index === -1) return false;
@@ -298,10 +300,17 @@ export class ChatSessionMemory {
     const replacedRevisionId = current.activeRevisionId;
     if (!replacedRevisionId) return false;
     const appended = appendAssistantRevision(current, revision);
-    this.messageHistory[index] = {
+    const withNewActions = {
       ...appended,
+      actionLedger: [
+        ...(appended.actionLedger ?? []),
+        ...structuredClone(newActionLedger),
+      ],
+    };
+    this.messageHistory[index] = {
+      ...withNewActions,
       actionLedger: supersedeUnresolvedActions(
-        appended.actionLedger ?? [],
+        withNewActions.actionLedger,
         replacedRevisionId,
         revision.revisionId,
         identity,

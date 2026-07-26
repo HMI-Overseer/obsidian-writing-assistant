@@ -146,7 +146,7 @@ export async function finalizeAbortedResponse(
   }
 }
 
-async function insertLastResponse(
+export async function insertLastResponse(
   plugin: WritingAssistantChat,
   lastAssistantResponse: string
 ): Promise<void> {

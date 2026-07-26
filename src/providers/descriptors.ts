@@ -24,6 +24,12 @@ const lmstudio: ProviderDescriptor = {
   reasoningLevels: [],
   supportsModelDiscovery: true,
   supportsToolUse: false,
+  turnCapabilities: {
+    captureOrder: "exact",
+    toolCorrelation: "provider_id",
+    coldReplay: "structural",
+    nativeResume: false,
+  },
   defaultBaseUrl: "http://localhost:1234/v1",
   requiresBaseUrl: true,
 };
@@ -49,6 +55,12 @@ const anthropic: ProviderDescriptor = {
   reasoningLevels: ["off", "low", "medium", "high"],
   supportsModelDiscovery: true,
   supportsToolUse: true,
+  turnCapabilities: {
+    captureOrder: "exact",
+    toolCorrelation: "provider_id",
+    coldReplay: "structural",
+    nativeResume: false,
+  },
   defaultBaseUrl: null,
   requiresBaseUrl: false,
 };
@@ -73,6 +85,12 @@ const openai: ProviderDescriptor = {
   reasoningLevels: ["off", "low", "medium", "high", "on"],
   supportsModelDiscovery: true,
   supportsToolUse: true,
+  turnCapabilities: {
+    captureOrder: "exact",
+    toolCorrelation: "provider_id",
+    coldReplay: "structural",
+    nativeResume: false,
+  },
   defaultBaseUrl: "https://api.openai.com/v1",
   requiresBaseUrl: true,
 };
@@ -103,6 +121,12 @@ const claudecode: ProviderDescriptor = {
   // `prepareApiMessages` deliberately skips attaching CanonicalToolDefinition tools
   // for this provider so the plugin's own tool loop/timeline stays out of the way.
   supportsToolUse: true,
+  turnCapabilities: {
+    captureOrder: "exact",
+    toolCorrelation: "provider_id",
+    coldReplay: "textual",
+    nativeResume: true,
+  },
   defaultBaseUrl: null,
   requiresBaseUrl: false,
 };

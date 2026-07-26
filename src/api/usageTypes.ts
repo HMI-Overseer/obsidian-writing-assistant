@@ -1,5 +1,11 @@
+import type {
+  AssistantReplayEvidence,
+  AssistantTurnStatus,
+  ClaudeCodeResumeCursor,
+  ProviderReplayCapsule,
+  SessionRebuildReason,
+} from "../shared/types";
 import type { ToolCall } from "../tools/types";
-import type { ClaudeCodeResumeCursor, SessionRebuildReason } from "../shared/types";
 
 /** Token usage returned by a provider after a completion request. */
 export interface UsageResult {
@@ -62,23 +68,55 @@ export interface UsageResult {
  */
 export type StopReason = "end_turn" | "tool_use" | "max_tokens" | "pause_turn" | "unknown";
 
+/** Ordered provider-neutral declarations emitted by one assistant stream attempt. */
+export type AssistantStreamEvent =
+  | {
+      type: "segment_start";
+      segmentId: string;
+      providerMessageId?: string;
+    }
+  | { type: "prose_delta"; segmentId: string; delta: string }
+  | {
+      type: "tool_call_start";
+      segmentId: string;
+      declarationKey: string;
+      toolName?: string;
+    }
+  | {
+      type: "tool_call_delta";
+      declarationKey: string;
+      nameDelta?: string;
+      argumentsDelta?: string;
+    }
+  | {
+      type: "tool_call_identity";
+      declarationKey: string;
+      toolCallId: string;
+      correlation: "provider_id" | "plugin_id";
+    }
+  | { type: "segment_end"; segmentId: string }
+  | { type: "turn_end"; status: AssistantTurnStatus };
+
+/** Terminal facts selected while translating one committed provider attempt. */
+export interface AssistantStreamMetadata {
+  usage: UsageResult | null;
+  stopReason: StopReason;
+  replayCapsule: ProviderReplayCapsule | null;
+  replayEvidence: AssistantReplayEvidence;
+}
+
 /** Wrapper returned by ChatClient.stream(). */
 export interface StreamResult {
-  /** Async generator yielding text deltas. */
-  deltas: AsyncGenerator<string>;
+  /** Async generator yielding ordered assistant declarations. */
+  events: AsyncGenerator<AssistantStreamEvent>;
   /** Resolves when the stream ends. null if the provider does not report usage. */
   usage: Promise<UsageResult | null>;
-  /** Resolves when the stream ends. null if the model returned no tool calls. */
-  toolCalls: Promise<ToolCall[] | null>;
   /** Resolves when the stream ends with the reason the model stopped. */
   stopReason: Promise<StopReason>;
-  /**
-   * Anthropic only: raw thinking / redacted_thinking blocks captured verbatim
-   * from this response, for the tool-use round trip (the tool loop attaches
-   * them to the assistant turn via {@link ../shared/chatRequest.ChatTurn}).
-   * Absent on providers without a thinking round-trip requirement.
-   */
-  thinkingBlocks?: Promise<unknown[] | null>;
+  /** Resolves with a validated provider-private capsule, when one is required. */
+  replayCapsule: Promise<ProviderReplayCapsule | null>;
+  /** Resolves with the actual capture and replay fidelity of this attempt. */
+  replayEvidence: Promise<AssistantReplayEvidence>;
 }
 
 /** Wrapper returned by ChatClient.complete(). */
@@ -87,6 +125,6 @@ export interface CompletionResult {
   usage: UsageResult | null;
   toolCalls?: ToolCall[] | null;
   stopReason?: StopReason;
-  /** Anthropic only: raw thinking blocks, mirroring {@link StreamResult.thinkingBlocks}. */
+  /** Anthropic non-streaming replay blocks. */
   thinkingBlocks?: unknown[] | null;
 }

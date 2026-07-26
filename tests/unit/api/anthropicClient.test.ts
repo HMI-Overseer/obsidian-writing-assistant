@@ -16,6 +16,10 @@ import { nodeRequestWithHeaders } from "../../../src/api/httpTransport";
 import { streamNode } from "../../../src/api/streamingTransport";
 import type { ChatRequest } from "../../../src/shared/chatRequest";
 import type { SamplingParams } from "../../../src/shared/types";
+import type {
+  AssistantStreamEvent,
+  StreamResult,
+} from "../../../src/api/usageTypes";
 
 const mockRequest = vi.mocked(nodeRequestWithHeaders);
 const mockStreamNode = vi.mocked(streamNode);
@@ -128,10 +132,8 @@ describe("AnthropicClient.stream tool-call parsing", () => {
     mockStreamNode.mockImplementation(streamNodeImpl(events));
     const client = new AnthropicClient("test-key");
     const result = client.stream(makeRequest(), "claude-opus-4-8", makeParams());
-    // Drain the delta stream so the wrapped generator's finally resolves the promises.
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    for await (const _delta of result.deltas) { /* no text deltas in these cases */ }
-    return result.toolCalls;
+    const ordered = await collectEvents(result);
+    return toolCallsOf(ordered);
   }
 
   test("parses a well-formed tool call's JSON arguments", async () => {
@@ -157,9 +159,8 @@ describe("AnthropicClient.stream thinking-block capture (tool round trip)", () =
     mockStreamNode.mockImplementation(streamNodeImpl(events));
     const client = new AnthropicClient("test-key");
     const result = client.stream(makeRequest(), "claude-opus-4-8", makeParams());
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    for await (const _delta of result.deltas) { /* no text deltas in these cases */ }
-    return result.thinkingBlocks;
+    await collectEvents(result);
+    return (await result.replayCapsule)?.thinkingBlocks ?? null;
   }
 
   test("assembles streamed thinking deltas + signature into a verbatim block", async () => {
@@ -205,6 +206,50 @@ describe("AnthropicClient.stream thinking-block capture (tool round trip)", () =
     expect(blocks).toBeNull();
   });
 });
+
+async function collectEvents(
+  result: StreamResult,
+): Promise<AssistantStreamEvent[]> {
+  const events: AssistantStreamEvent[] = [];
+  for await (const event of result.events) events.push(event);
+  return events;
+}
+
+function toolCallsOf(events: AssistantStreamEvent[]) {
+  const declarations = new Map<
+    string,
+    { id?: string; name: string; arguments: string }
+  >();
+  for (const event of events) {
+    if (event.type === "tool_call_start") {
+      declarations.set(event.declarationKey, {
+        name: event.toolName ?? "",
+        arguments: "",
+      });
+    } else if (event.type === "tool_call_delta") {
+      const declaration = declarations.get(event.declarationKey);
+      if (!declaration) continue;
+      declaration.name += event.nameDelta ?? "";
+      declaration.arguments += event.argumentsDelta ?? "";
+    } else if (event.type === "tool_call_identity") {
+      const declaration = declarations.get(event.declarationKey);
+      if (declaration) declaration.id = event.toolCallId;
+    }
+  }
+  return [...declarations.values()].map((declaration) => {
+    let args: Record<string, unknown> = {};
+    try {
+      args = JSON.parse(declaration.arguments) as Record<string, unknown>;
+    } catch {
+      args = {};
+    }
+    return {
+      id: declaration.id,
+      name: declaration.name,
+      arguments: args,
+    };
+  });
+}
 
 describe("AnthropicClient.complete Layer-2 block tolerance", () => {
   beforeEach(() => {

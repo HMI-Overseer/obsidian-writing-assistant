@@ -6,6 +6,7 @@ import type {
   Conversation,
   ConversationMeta,
   ConversationMessage,
+  ToolActionLedgerEntry,
 } from "../../shared/types";
 import type WritingAssistantChat from "../../main";
 import { resolveCompletionModel } from "../../utils";
@@ -185,11 +186,13 @@ export class ChatSessionStore {
       targetId: string,
       index: number,
     ) => SupersessionEventIdentity,
+    newActionLedger: ToolActionLedgerEntry[] = [],
   ): boolean {
     return this.memory.commitRevisionReplacement(
       messageId,
       revision,
       identity,
+      newActionLedger,
     );
   }
 

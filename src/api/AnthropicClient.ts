@@ -1,7 +1,13 @@
 import type { SamplingParams } from "../shared/types";
 import type { ChatRequest } from "../shared/chatRequest";
 import type { ChatClient } from "./chatClient";
-import type { UsageResult, StreamResult, CompletionResult, StopReason } from "./usageTypes";
+import type {
+  AssistantStreamEvent,
+  CompletionResult,
+  StopReason,
+  StreamResult,
+  UsageResult,
+} from "./usageTypes";
 import type { ToolCall } from "../tools/types";
 import { formatAnthropicTools, formatAnthropicToolsWithSearch } from "../tools/formatters/anthropic";
 import type { AnthropicToolEntry } from "../tools/formatters/anthropic";
@@ -10,12 +16,14 @@ import { withRetry } from "./retry";
 import { streamNode } from "./streamingTransport";
 import type { DeltaExtractor } from "./streamingTransport";
 import { ANTHROPIC_BASE_URL, ANTHROPIC_VERSION } from "./anthropicConstants";
-import { parseToolArguments } from "./parsing";
 import {
   buildAnthropicMessages,
   buildAnthropicHeaders,
   buildAnthropicPayload,
 } from "./buildAnthropicPayload";
+import { generateId } from "../utils";
+import { AnthropicStreamTranslator } from "./anthropicStreamTranslator";
+import { createAssistantEventStream } from "./assistantEventStream";
 
 /** Extracts text deltas from Anthropic SSE content_block_delta events. */
 const anthropicDeltaExtractor: DeltaExtractor = (json: unknown): string | null => {
@@ -144,164 +152,25 @@ export class AnthropicClient implements ChatClient {
     model: string,
     params: SamplingParams,
     signal?: AbortSignal,
-    onToolCallStreaming?: (index: number, name: string) => void,
   ): StreamResult {
     const cacheSettings = request.anthropicCacheSettings;
     const { system, messages } = buildAnthropicMessages(request, cacheSettings, model);
     const anthropicTools = formatRequestTools(request);
     const payload = buildAnthropicPayload(model, system, messages, params, true, anthropicTools);
     const url = `${ANTHROPIC_BASE_URL}/v1/messages`;
-
-    // Accumulate usage from SSE metadata events.
-    let inputTokens = 0;
-    let outputTokens = 0;
-    let cacheCreationInputTokens: number | undefined;
-    let cacheReadInputTokens: number | undefined;
-    let streamStopReason: StopReason = "unknown";
-    let resolved = false;
-    let resolveUsage: (value: UsageResult | null) => void;
-    let resolveToolCalls: (value: ToolCall[] | null) => void;
-    let resolveStopReason: (value: StopReason) => void;
-
-    const usagePromise = new Promise<UsageResult | null>((r) => { resolveUsage = r; });
-    const toolCallsPromise = new Promise<ToolCall[] | null>((r) => { resolveToolCalls = r; });
-    const stopReasonPromise = new Promise<StopReason>((r) => { resolveStopReason = r; });
-
-    let resolveThinkingBlocks: (value: unknown[] | null) => void;
-    const thinkingBlocksPromise = new Promise<unknown[] | null>((r) => {
-      resolveThinkingBlocks = r;
+    const translator = new AnthropicStreamTranslator({
+      segmentId: `segment-${generateId()}`,
     });
-
-    // Tool call accumulation state.
-    const pendingToolCalls = new Map<number, { id: string; name: string; jsonChunks: string[] }>();
-    const completedToolCalls: ToolCall[] = [];
-
-    // Thinking-block accumulation (adaptive thinking + tool use, P1-6 lift).
-    // Blocks are captured VERBATIM, signature included, because Anthropic
-    // requires them echoed back unmodified with the tool results; under the
-    // default display ("omitted" on current-gen models) the thinking text can
-    // legitimately be empty while the signature still matters.
-    const pendingThinking = new Map<number, { thinking: string; signature: string }>();
-    const completedThinkingBlocks: Record<string, unknown>[] = [];
-
-    const onEvent = (json: unknown): void => {
-      const record = json as Record<string, unknown>;
-
-      if (record.type === "message_start") {
-        const message = record.message as Record<string, unknown> | undefined;
-        const usage = message?.usage as Record<string, unknown> | undefined;
-        if (usage) {
-          if (typeof usage.input_tokens === "number") inputTokens = usage.input_tokens;
-          if (typeof usage.cache_creation_input_tokens === "number") {
-            cacheCreationInputTokens = usage.cache_creation_input_tokens;
-          }
-          if (typeof usage.cache_read_input_tokens === "number") {
-            cacheReadInputTokens = usage.cache_read_input_tokens;
-          }
-        }
-      } else if (record.type === "message_delta") {
-        const usage = record.usage as Record<string, unknown> | undefined;
-        if (usage && typeof usage.output_tokens === "number") {
-          outputTokens = usage.output_tokens;
-        }
-        const delta = record.delta as Record<string, unknown> | undefined;
-        if (delta?.stop_reason) {
-          streamStopReason = mapAnthropicStopReason(delta.stop_reason as string);
-        }
-      } else if (record.type === "content_block_start") {
-        const block = record.content_block as Record<string, unknown> | undefined;
-        if (block?.type === "tool_use") {
-          const idx = record.index as number;
-          const name = block.name as string;
-          pendingToolCalls.set(idx, { id: block.id as string, name, jsonChunks: [] });
-          onToolCallStreaming?.(idx, name);
-        } else if (block?.type === "thinking") {
-          pendingThinking.set(record.index as number, { thinking: "", signature: "" });
-        } else if (block?.type === "redacted_thinking") {
-          // Redacted blocks arrive whole (opaque data, no deltas); keep verbatim.
-          completedThinkingBlocks.push({ type: "redacted_thinking", data: block.data });
-        }
-      } else if (record.type === "content_block_delta") {
-        const delta = record.delta as Record<string, unknown> | undefined;
-        if (delta?.type === "input_json_delta") {
-          pendingToolCalls.get(record.index as number)?.jsonChunks.push(delta.partial_json as string);
-        } else if (delta?.type === "thinking_delta") {
-          const pending = pendingThinking.get(record.index as number);
-          if (pending) pending.thinking += (delta.thinking as string) ?? "";
-        } else if (delta?.type === "signature_delta") {
-          const pending = pendingThinking.get(record.index as number);
-          if (pending) pending.signature = (delta.signature as string) ?? "";
-        }
-      } else if (record.type === "content_block_stop") {
-        const idx = record.index as number;
-        const pending = pendingToolCalls.get(idx);
-        if (pending) {
-          // Malformed (or empty) args surface as {} rather than dropping the call,
-          // so the tool loop returns a self-correcting validation error on the
-          // timeline step and the model can retry, a dropped call would silently
-          // vanish from the turn.
-          completedToolCalls.push({
-            id: pending.id,
-            name: pending.name,
-            arguments: parseToolArguments(pending.jsonChunks.join("")),
-          });
-          pendingToolCalls.delete(idx);
-        }
-        const thinking = pendingThinking.get(idx);
-        if (thinking) {
-          completedThinkingBlocks.push({
-            type: "thinking",
-            thinking: thinking.thinking,
-            signature: thinking.signature,
-          });
-          pendingThinking.delete(idx);
-        }
-      }
-    };
-
-    const resolveAndFinish = (): void => {
-      if (resolved) return;
-      resolved = true;
-
-      if (inputTokens > 0 || outputTokens > 0) {
-        const result: UsageResult = { inputTokens, outputTokens };
-        if (cacheCreationInputTokens !== undefined) result.cacheCreationInputTokens = cacheCreationInputTokens;
-        if (cacheReadInputTokens !== undefined) result.cacheReadInputTokens = cacheReadInputTokens;
-        resolveUsage(result);
-      } else {
-        resolveUsage(null);
-      }
-
-      resolveToolCalls(completedToolCalls.length > 0 ? completedToolCalls : null);
-      resolveStopReason(streamStopReason);
-      resolveThinkingBlocks(completedThinkingBlocks.length > 0 ? completedThinkingBlocks : null);
-    };
-
-    // Wrap the raw generator so we can resolve usage + tool calls when it ends.
+    const pendingEvents: AssistantStreamEvent[] = [];
     const rawGenerator = streamNode(
-      url, payload, signal, buildAnthropicHeaders(this.apiKey, ANTHROPIC_VERSION), anthropicDeltaExtractor, onEvent
+      url,
+      payload,
+      signal,
+      buildAnthropicHeaders(this.apiKey, ANTHROPIC_VERSION),
+      anthropicDeltaExtractor,
+      (event) => pendingEvents.push(...translator.translate(event)),
     );
-
-    /**
-     * Wraps the raw SSE generator to resolve deferred promises once the stream
-     * ends. CONTRACT: promises resolve only after `deltas` is fully consumed
-     * (iterated to completion, thrown, or returned).
-     */
-    async function* wrappedDeltas(): AsyncGenerator<string> {
-      try {
-        yield* rawGenerator;
-      } finally {
-        resolveAndFinish();
-      }
-    }
-
-    return {
-      deltas: wrappedDeltas(),
-      usage: usagePromise,
-      toolCalls: toolCallsPromise,
-      stopReason: stopReasonPromise,
-      thinkingBlocks: thinkingBlocksPromise,
-    };
+    return createAssistantEventStream(rawGenerator, pendingEvents, translator);
   }
 
 }

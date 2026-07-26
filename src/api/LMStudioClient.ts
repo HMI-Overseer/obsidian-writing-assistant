@@ -8,7 +8,13 @@ import {
   formatNoteAttachment,
   noteImageLabel,
 } from "./contextFormatting";
-import type { CompletionResult, StreamResult, UsageResult, StopReason } from "./usageTypes";
+import type {
+  AssistantStreamEvent,
+  CompletionResult,
+  StreamResult,
+  UsageResult,
+  StopReason,
+} from "./usageTypes";
 import type { ToolCall } from "../tools/types";
 import type { LMStudioModel, LMStudioModelListResult } from "./types";
 import { formatOpenAITools } from "../tools/formatters/openai";
@@ -20,6 +26,8 @@ import { streamNode, streamFetch } from "./streamingTransport";
 import { buildCompletionPayload } from "./buildPayload";
 import { formatRagContext } from "../rag/formatContext";
 import { generateId } from "../utils";
+import { OpenAICompatibleStreamTranslator } from "./openAICompatibleStreamTranslator";
+import { createAssistantEventStream } from "./assistantEventStream";
 
 // Re-export for consumers that import from this file
 export { normalizeLMStudioBaseUrl } from "./urlResolution";
@@ -171,7 +179,6 @@ export class LMStudioClient implements ChatClient {
     model: string,
     params: SamplingParams,
     signal?: AbortSignal,
-    onToolCallStreaming?: (index: number, name: string) => void,
   ): StreamResult {
     const messages = this.buildMessages(request);
     const openAITools = request.tools?.length
@@ -180,75 +187,24 @@ export class LMStudioClient implements ChatClient {
     const url = `${this.openAIBaseUrl}/chat/completions`;
     const body = buildCompletionPayload(model, messages, params, true, openAITools);
 
-    // Tool call accumulation state.
-    const pendingToolCalls = new Map<number, { id: string; name: string; argChunks: string[] }>();
-    const completedToolCalls: ToolCall[] = [];
-    let streamStopReason: StopReason = "unknown";
-    let resolveToolCalls: (value: ToolCall[] | null) => void;
-    let resolveStopReason: (value: StopReason) => void;
-    const toolCallsPromise = new Promise<ToolCall[] | null>((r) => { resolveToolCalls = r; });
-    const stopReasonPromise = new Promise<StopReason>((r) => { resolveStopReason = r; });
-
-    const onEvent = openAITools ? (json: unknown): void => {
-      const record = json as Record<string, unknown>;
-      const choices = record.choices as Array<Record<string, unknown>> | undefined;
-      const choice = choices?.[0];
-      const delta = choice?.delta as Record<string, unknown> | undefined;
-      const toolCallDeltas = delta?.tool_calls as Array<Record<string, unknown>> | undefined;
-
-      // Track finish_reason from streaming chunks.
-      if (choice?.finish_reason && typeof choice.finish_reason === "string") {
-        streamStopReason = mapOpenAIStopReason(choice.finish_reason);
-      }
-
-      if (toolCallDeltas) {
-        for (const tc of toolCallDeltas) {
-          const idx = tc.index as number;
-          if (tc.id) {
-            const fn = tc.function as Record<string, unknown> | undefined;
-            const name = (fn?.name as string) ?? "";
-            pendingToolCalls.set(idx, { id: tc.id as string, name, argChunks: [] });
-            onToolCallStreaming?.(idx, name);
-          }
-          const fn = tc.function as Record<string, unknown> | undefined;
-          if (fn?.arguments && typeof fn.arguments === "string") {
-            pendingToolCalls.get(idx)?.argChunks.push(fn.arguments);
-          }
-        }
-      }
-    } : undefined;
-
-    const rawDeltas = this.bypassCors
+    const translator = new OpenAICompatibleStreamTranslator({
+      segmentId: `segment-${generateId()}`,
+      provider: "lmstudio",
+    });
+    const pendingEvents: AssistantStreamEvent[] = [];
+    const onEvent = (event: unknown): void => {
+      pendingEvents.push(...translator.translate(event));
+    };
+    const rawStream = this.bypassCors
       ? streamNode(url, body, signal, undefined, undefined, onEvent)
       : streamFetch(url, body, signal, undefined, undefined, onEvent);
 
-    // Wrap so we can resolve tool calls when the stream ends.
-    async function* wrappedDeltas(): AsyncGenerator<string> {
-      try {
-        yield* rawDeltas;
-      } catch (error) {
-        throw decorateJinjaTemplateError(error, openAITools !== undefined);
-      } finally {
-        // Finalize any pending tool calls.
-        for (const [, pending] of pendingToolCalls) {
-          completedToolCalls.push({
-            // A local model that streams a tool call without an id would
-            // otherwise leave the echoed tool_call_id empty and break the
-            // review's step↔op id match, mint one so it's always non-empty.
-            id: pending.id || generateId(),
-            name: pending.name,
-            // Malformed args surface as {} so the loop returns a self-correcting
-            // validation error on the timeline step, rather than dropping the call.
-            arguments: parseToolArguments(pending.argChunks.join("")),
-          });
-        }
-        pendingToolCalls.clear();
-        resolveToolCalls(completedToolCalls.length > 0 ? completedToolCalls : null);
-        resolveStopReason(streamStopReason);
-      }
-    }
-
-    return { deltas: wrappedDeltas(), usage: Promise.resolve(null), toolCalls: toolCallsPromise, stopReason: stopReasonPromise };
+    return createAssistantEventStream(
+      rawStream,
+      pendingEvents,
+      translator,
+      (error) => decorateJinjaTemplateError(error, openAITools !== undefined),
+    );
   }
 
   private buildMessages(request: ChatRequest): Message[] {

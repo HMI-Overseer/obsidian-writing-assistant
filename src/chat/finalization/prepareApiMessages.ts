@@ -84,6 +84,8 @@ export interface PrepareMessagesOptions {
    * until streaming begins. An interrupted prep simply yields no retrieved context.
    */
   signal?: AbortSignal;
+  /** Message omitted from provider history while an ephemeral regeneration draft streams. */
+  excludeMessageId?: string;
 }
 
 export async function prepareApiMessages(
@@ -105,6 +107,7 @@ export async function prepareApiMessages(
     supportsVision = false,
     anthropicCacheEnabled = false,
     signal,
+    excludeMessageId,
   } = options;
 
   // Claude Code reports as tool-capable, but it bridges the plugin's tools via its
@@ -139,7 +142,10 @@ export async function prepareApiMessages(
   const activeFilePath = app.workspace.getActiveFile()?.path;
 
   const messages = toRequestHistoryTurns(
-    store.getSnapshot().messageHistory,
+    store
+      .getSnapshot()
+      .messageHistory
+      .filter((message) => message.id !== excludeMessageId),
     supportsVision,
     isClaudeCode,
   );

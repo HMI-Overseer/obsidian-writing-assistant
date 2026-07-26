@@ -39,7 +39,6 @@ export async function regenerateMessage(options: RegenerateOptions): Promise<voi
     getIsGenerating,
     setIsGenerating,
     setActiveAbortController,
-    syncConversationUi,
     onCalibrate,
     onEnterAutoApply,
   } = options;
@@ -67,13 +66,12 @@ export async function regenerateMessage(options: RegenerateOptions): Promise<voi
 
   const posture = composer.getPosture();
 
-  const oldMessage = store.removeLastMessage();
-  if (!oldMessage) return;
+  const oldMessage = lastMessage;
 
   setIsGenerating(true);
 
-  await store.persistActiveConversation();
-  await syncConversationUi();
+  // Keep the original revision and ledger active while an ephemeral replacement
+  // draft streams. Generation commits the replacement atomically when meaningful.
 
   const client = createChatClient(
     activeModel.provider,

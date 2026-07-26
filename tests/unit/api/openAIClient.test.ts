@@ -10,6 +10,10 @@ import { OpenAIClient } from "../../../src/api/OpenAIClient";
 import { streamFetch } from "../../../src/api/streamingTransport";
 import type { ChatRequest } from "../../../src/shared/chatRequest";
 import type { SamplingParams } from "../../../src/shared/types";
+import type {
+  AssistantStreamEvent,
+  StreamResult,
+} from "../../../src/api/usageTypes";
 
 const mockStreamFetch = vi.mocked(streamFetch);
 
@@ -62,11 +66,54 @@ function makeParams(): SamplingParams {
   };
 }
 
-/** Drain the deltas generator so the wrapper's finally runs and promises resolve. */
-async function drain(deltas: AsyncGenerator<string>): Promise<string> {
-  let text = "";
-  for await (const d of deltas) text += d;
-  return text;
+/** Drain ordered events so terminal stream metadata resolves. */
+async function drain(result: StreamResult): Promise<AssistantStreamEvent[]> {
+  const events: AssistantStreamEvent[] = [];
+  for await (const event of result.events) events.push(event);
+  return events;
+}
+
+function proseOf(events: AssistantStreamEvent[]): string {
+  return events
+    .filter((event) => event.type === "prose_delta")
+    .map((event) => event.type === "prose_delta" ? event.delta : "")
+    .join("");
+}
+
+function toolCallsOf(events: AssistantStreamEvent[]) {
+  const declarations = new Map<
+    string,
+    { id?: string; name: string; arguments: string }
+  >();
+  for (const event of events) {
+    if (event.type === "tool_call_start") {
+      declarations.set(event.declarationKey, {
+        name: event.toolName ?? "",
+        arguments: "",
+      });
+    } else if (event.type === "tool_call_delta") {
+      const declaration = declarations.get(event.declarationKey);
+      if (!declaration) continue;
+      declaration.name += event.nameDelta ?? "";
+      declaration.arguments += event.argumentsDelta ?? "";
+    } else if (event.type === "tool_call_identity") {
+      const declaration = declarations.get(event.declarationKey);
+      if (declaration) declaration.id = event.toolCallId;
+    }
+  }
+  return [...declarations.values()].map((declaration) => {
+    let args: Record<string, unknown> = {};
+    try {
+      args = JSON.parse(declaration.arguments) as Record<string, unknown>;
+    } catch {
+      args = {};
+    }
+    return {
+      id: declaration.id,
+      name: declaration.name,
+      arguments: args,
+    };
+  });
 }
 
 describe("OpenAIClient.stream usage accounting", () => {
@@ -79,7 +126,7 @@ describe("OpenAIClient.stream usage accounting", () => {
     const client = new OpenAIClient("key", "https://api.openai.com/v1");
 
     const result = client.stream(makeRequest(), "gpt-4o", makeParams());
-    await drain(result.deltas);
+    await drain(result);
 
     const body = JSON.parse(mockStreamFetch.mock.calls[0][1] as string);
     expect(body.stream_options).toEqual({ include_usage: true });
@@ -95,9 +142,9 @@ describe("OpenAIClient.stream usage accounting", () => {
     const client = new OpenAIClient("key", "https://api.openai.com/v1");
 
     const result = client.stream(makeRequest(), "gpt-4o", makeParams());
-    const text = await drain(result.deltas);
+    const events = await drain(result);
 
-    expect(text).toBe("Hi");
+    expect(proseOf(events)).toBe("Hi");
     expect(await result.usage).toEqual({ inputTokens: 12, outputTokens: 5 });
     expect(await result.stopReason).toBe("end_turn");
   });
@@ -112,7 +159,7 @@ describe("OpenAIClient.stream usage accounting", () => {
     const client = new OpenAIClient("key", "https://api.openai.com/v1");
 
     const result = client.stream(makeRequest(), "gpt-4o", makeParams());
-    await drain(result.deltas);
+    await drain(result);
 
     expect(await result.usage).toBeNull();
   });
@@ -134,9 +181,9 @@ describe("OpenAIClient.stream usage accounting", () => {
     });
 
     const result = client.stream(request, "gpt-4o", makeParams());
-    await drain(result.deltas);
+    const events = await drain(result);
 
-    expect(await result.toolCalls).toEqual([
+    expect(toolCallsOf(events)).toEqual([
       { id: "call_1", name: "propose_edit", arguments: { a: 1 } },
     ]);
     expect(await result.usage).toEqual({ inputTokens: 20, outputTokens: 8 });
@@ -161,9 +208,9 @@ describe("OpenAIClient.stream usage accounting", () => {
     });
 
     const result = client.stream(request, "gpt-4o", makeParams());
-    await drain(result.deltas);
+    const events = await drain(result);
 
-    expect(await result.toolCalls).toEqual([
+    expect(toolCallsOf(events)).toEqual([
       { id: "call_1", name: "propose_edit", arguments: {} },
     ]);
   });

@@ -1,114 +1,184 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { streamWithRetry } from "../../../src/api/retry";
-import type { StreamResult, UsageResult, StopReason } from "../../../src/api/usageTypes";
-import type { ToolCall } from "../../../src/tools/types";
+import type {
+  AssistantStreamEvent,
+  StopReason,
+  StreamResult,
+  UsageResult,
+} from "../../../src/api/usageTypes";
+import type {
+  AssistantReplayEvidence,
+  ProviderReplayCapsule,
+} from "../../../src/shared/types";
+
+const STRUCTURAL_EVIDENCE: AssistantReplayEvidence = {
+  tier: "structural",
+  capabilities: {
+    captureOrder: "exact",
+    toolCorrelation: "provider_id",
+    coldReplay: "structural",
+    nativeResume: false,
+  },
+};
 
 type StreamShape = {
-  deltas?: string[];
-  /** Thrown after `deltas` are yielded (mid-stream) or, with empty deltas, before the first delta. */
+  events?: AssistantStreamEvent[];
+  /** Thrown after events are yielded, or before the first event when the list is empty. */
   throwAfter?: Error;
   usage?: UsageResult | null;
-  toolCalls?: ToolCall[] | null;
   stopReason?: StopReason;
+  replayCapsule?: ProviderReplayCapsule | null;
+  replayEvidence?: AssistantReplayEvidence;
 };
 
 /**
- * Build a StreamResult honoring the real contract: the deferred fields resolve only
- * once the delta generator is fully consumed (its finally runs), matching
- * AnthropicClient.stream's wrappedDeltas.
+ * Build a StreamResult honoring the runtime contract: terminal facts resolve only
+ * once the event generator is fully consumed.
  */
 function makeStream(shape: StreamShape): StreamResult {
-  let resolveUsage!: (v: UsageResult | null) => void;
-  let resolveToolCalls!: (v: ToolCall[] | null) => void;
-  let resolveStopReason!: (v: StopReason) => void;
-  const usage = new Promise<UsageResult | null>((r) => { resolveUsage = r; });
-  const toolCalls = new Promise<ToolCall[] | null>((r) => { resolveToolCalls = r; });
-  const stopReason = new Promise<StopReason>((r) => { resolveStopReason = r; });
+  let resolveUsage!: (value: UsageResult | null) => void;
+  let resolveStopReason!: (value: StopReason) => void;
+  let resolveReplayCapsule!: (value: ProviderReplayCapsule | null) => void;
+  let resolveReplayEvidence!: (value: AssistantReplayEvidence) => void;
+  const usage = new Promise<UsageResult | null>((resolve) => {
+    resolveUsage = resolve;
+  });
+  const stopReason = new Promise<StopReason>((resolve) => {
+    resolveStopReason = resolve;
+  });
+  const replayCapsule = new Promise<ProviderReplayCapsule | null>((resolve) => {
+    resolveReplayCapsule = resolve;
+  });
+  const replayEvidence = new Promise<AssistantReplayEvidence>((resolve) => {
+    resolveReplayEvidence = resolve;
+  });
 
-  async function* gen(): AsyncGenerator<string> {
+  async function* events(): AsyncGenerator<AssistantStreamEvent> {
     try {
-      for (const d of shape.deltas ?? []) yield d;
+      for (const event of shape.events ?? []) yield event;
       if (shape.throwAfter) throw shape.throwAfter;
     } finally {
       resolveUsage(shape.usage ?? null);
-      resolveToolCalls(shape.toolCalls ?? null);
       resolveStopReason(shape.stopReason ?? "end_turn");
+      resolveReplayCapsule(shape.replayCapsule ?? null);
+      resolveReplayEvidence(shape.replayEvidence ?? STRUCTURAL_EVIDENCE);
     }
   }
 
-  return { deltas: gen(), usage, toolCalls, stopReason };
+  return {
+    events: events(),
+    usage,
+    stopReason,
+    replayCapsule,
+    replayEvidence,
+  };
 }
 
-async function collect(result: StreamResult): Promise<string[]> {
-  const out: string[] = [];
-  for await (const d of result.deltas) out.push(d);
-  return out;
+async function collect(result: StreamResult): Promise<AssistantStreamEvent[]> {
+  const output: AssistantStreamEvent[] = [];
+  for await (const event of result.events) output.push(event);
+  return output;
 }
 
 describe("streamWithRetry", () => {
-  it("passes through deltas and forwards deferred fields on first success", async () => {
+  const start: AssistantStreamEvent = {
+    type: "segment_start",
+    segmentId: "segment-committed",
+  };
+
+  it("passes through ordered events and terminal facts on first success", async () => {
+    const end: AssistantStreamEvent = {
+      type: "segment_end",
+      segmentId: "segment-committed",
+    };
     const factory = vi.fn(() =>
       makeStream({
-        deltas: ["a", "b"],
+        events: [start, end],
         usage: { inputTokens: 1, outputTokens: 2 },
         stopReason: "end_turn",
       }),
     );
 
     const result = streamWithRetry(factory, { initialDelayMs: 1 });
-    expect(await collect(result)).toEqual(["a", "b"]);
+    expect(await collect(result)).toEqual([start, end]);
     expect(await result.usage).toEqual({ inputTokens: 1, outputTokens: 2 });
     expect(await result.stopReason).toBe("end_turn");
+    expect(await result.replayEvidence).toEqual(STRUCTURAL_EVIDENCE);
     expect(factory).toHaveBeenCalledTimes(1);
   });
 
-  it("retries a retryable error thrown before the first delta, then forwards the new attempt", async () => {
+  it("retries an error before the attempt publishes any ordered event", async () => {
     const factory = vi
-      .fn<[], StreamResult>()
-      .mockReturnValueOnce(makeStream({ throwAfter: new Error("HTTP 529: overloaded") }))
+      .fn<() => StreamResult>()
       .mockReturnValueOnce(
-        makeStream({ deltas: ["ok"], usage: { inputTokens: 3, outputTokens: 4 } }),
+        makeStream({ throwAfter: new Error("HTTP 529: overloaded") }),
+      )
+      .mockReturnValueOnce(
+        makeStream({
+          events: [start],
+          usage: { inputTokens: 3, outputTokens: 4 },
+        }),
       );
 
     const result = streamWithRetry(factory, { initialDelayMs: 1 });
-    expect(await collect(result)).toEqual(["ok"]);
+    expect(await collect(result)).toEqual([start]);
     expect(await result.usage).toEqual({ inputTokens: 3, outputTokens: 4 });
     expect(factory).toHaveBeenCalledTimes(2);
   });
 
   it("does not retry a non-retryable first error", async () => {
-    const factory = vi.fn(() => makeStream({ throwAfter: new Error("HTTP 400: bad request") }));
+    const factory = vi.fn(() =>
+      makeStream({ throwAfter: new Error("HTTP 400: bad request") }),
+    );
 
     const result = streamWithRetry(factory, { initialDelayMs: 1 });
     await expect(collect(result)).rejects.toThrow("HTTP 400");
     expect(factory).toHaveBeenCalledTimes(1);
   });
 
-  it("does not retry once the first delta has been yielded (mid-stream error propagates)", async () => {
+  it("does not retry once any ordered event has been published", async () => {
     const factory = vi.fn(() =>
-      makeStream({ deltas: ["partial"], throwAfter: new Error("HTTP 500: server error") }),
+      makeStream({
+        events: [start],
+        throwAfter: new Error("HTTP 500: server error"),
+      }),
     );
 
     const result = streamWithRetry(factory, { initialDelayMs: 1 });
-    const out: string[] = [];
+    const output: AssistantStreamEvent[] = [];
     await expect(
       (async () => {
-        for await (const d of result.deltas) out.push(d);
+        for await (const event of result.events) output.push(event);
       })(),
     ).rejects.toThrow("HTTP 500");
-    expect(out).toEqual(["partial"]);
+    expect(output).toEqual([start]);
     expect(factory).toHaveBeenCalledTimes(1);
   });
 
-  it("throws after exhausting retries and still resolves deferred fields so awaiters never hang", async () => {
-    const factory = vi.fn(() => makeStream({ throwAfter: new Error("HTTP 503: unavailable") }));
+  it("exhausts rejected attempts without publishing their events", async () => {
+    const factory = vi.fn(() =>
+      makeStream({ throwAfter: new Error("HTTP 503: unavailable") }),
+    );
 
-    const result = streamWithRetry(factory, { maxAttempts: 3, initialDelayMs: 1 });
+    const result = streamWithRetry(factory, {
+      maxAttempts: 3,
+      initialDelayMs: 1,
+    });
     await expect(collect(result)).rejects.toThrow("HTTP 503");
     expect(factory).toHaveBeenCalledTimes(3);
     expect(await result.usage).toBeNull();
-    expect(await result.toolCalls).toBeNull();
     expect(await result.stopReason).toBe("unknown");
+    expect(await result.replayCapsule).toBeNull();
+    expect(await result.replayEvidence).toEqual({
+      tier: "textual",
+      capabilities: {
+        captureOrder: "text_only",
+        toolCorrelation: "none",
+        coldReplay: "textual",
+        nativeResume: false,
+      },
+      loweredReason: "stream_attempt_failed_before_commit",
+    });
   });
 
   it("does not retry an AbortError", async () => {

@@ -12,7 +12,10 @@ import {
 } from "../../../../src/chat/actions/toolLoop";
 import type { ToolLoopCallbacks } from "../../../../src/chat/actions/toolLoop";
 import type { ChatClient } from "../../../../src/api/chatClient";
-import type { StreamResult } from "../../../../src/api/usageTypes";
+import type {
+  AssistantStreamEvent,
+  StreamResult,
+} from "../../../../src/api/usageTypes";
 import type { ChatRequest } from "../../../../src/shared/chatRequest";
 import type { ToolCall } from "../../../../src/tools/types";
 import { THINK_TOOL_NAME } from "../../../../src/tools/think/definition";
@@ -35,6 +38,7 @@ interface RoundScript {
   deltas: string[];
   toolCalls: ToolCall[] | null;
   stopReason: string;
+  thinkingBlocks?: unknown[] | null;
 }
 
 function makeClient(rounds: RoundScript[]): ChatClient {
@@ -42,28 +46,17 @@ function makeClient(rounds: RoundScript[]): ChatClient {
   return {
     complete: vi.fn(),
     stream: (): StreamResult => {
-      const round = rounds[i++];
-      const deltas = (async function* () {
-        for (const d of round.deltas) yield d;
-      })();
-      return {
-        deltas,
-        usage: Promise.resolve(null),
-        toolCalls: Promise.resolve(round.toolCalls),
-        stopReason: Promise.resolve(round.stopReason),
-      } as unknown as StreamResult;
+      const roundIndex = i++;
+      return makeRoundStream(rounds[roundIndex], roundIndex);
     },
   } as unknown as ChatClient;
 }
 
 function makeCallbacks(): ToolLoopCallbacks & {
   onDelta: ReturnType<typeof vi.fn>;
-  onReasoningRoundFinished: ReturnType<typeof vi.fn>;
 } {
   return {
     onDelta: vi.fn(),
-    onReasoningDelta: vi.fn(),
-    onReasoningRoundFinished: vi.fn(),
     onNewRound: vi.fn(),
     onStepRecorded: vi.fn(),
   };
@@ -87,10 +80,71 @@ function run(rounds: RoundScript[], callbacks: ToolLoopCallbacks) {
   );
 }
 
-/** The text from a single onDelta flush (the loop delivers the answer in one shot). */
+/** Exact prose bytes delivered in structural provider order. */
 function flushedAnswer(cb: ReturnType<typeof makeCallbacks>): string {
-  expect(cb.onDelta).toHaveBeenCalledTimes(1);
-  return cb.onDelta.mock.calls[0][0];
+  return cb.onDelta.mock.calls.map(([delta]) => delta).join("");
+}
+
+function makeRoundStream(
+  round: RoundScript,
+  roundIndex: number,
+): StreamResult {
+  const segmentId = `segment-${roundIndex}`;
+  const events = (async function* (): AsyncGenerator<AssistantStreamEvent> {
+    yield { type: "segment_start", segmentId };
+    for (const delta of round.deltas) {
+      yield { type: "prose_delta", segmentId, delta };
+    }
+    for (let index = 0; index < (round.toolCalls?.length ?? 0); index += 1) {
+      const toolCall = round.toolCalls?.[index];
+      if (!toolCall) continue;
+      const declarationKey = `${segmentId}-tool-${index}`;
+      yield {
+        type: "tool_call_start",
+        segmentId,
+        declarationKey,
+        toolName: toolCall.name,
+      };
+      yield {
+        type: "tool_call_delta",
+        declarationKey,
+        argumentsDelta: JSON.stringify(toolCall.arguments),
+      };
+      yield {
+        type: "tool_call_identity",
+        declarationKey,
+        toolCallId: toolCall.id,
+        correlation: "provider_id",
+      };
+    }
+    yield { type: "segment_end", segmentId };
+    yield {
+      type: "turn_end",
+      stopReason: round.stopReason as never,
+    };
+  })();
+  const replayCapsule = round.thinkingBlocks
+    ? {
+        provider: "anthropic" as const,
+        version: 1 as const,
+        thinkingBlocks: round.thinkingBlocks as never,
+      }
+    : null;
+  return {
+    events,
+    usage: Promise.resolve(null),
+    stopReason: Promise.resolve(round.stopReason as never),
+    replayCapsule: Promise.resolve(replayCapsule),
+    replayEvidence: Promise.resolve({
+      tier: replayCapsule ? "native" : "structural",
+      capabilities: {
+        captureOrder: "exact",
+        toolCorrelation: "provider_id",
+        coldReplay: "structural",
+        nativeResume: false,
+      },
+    }),
+  };
 }
 
 describe("runToolLoop anthropic thinking round trip", () => {
@@ -116,17 +170,8 @@ describe("runToolLoop anthropic thinking round trip", () => {
       complete: vi.fn(),
       stream: (request: ChatRequest): StreamResult => {
         seenRequests.push(request);
-        const round = rounds[i++];
-        const deltas = (async function* () {
-          for (const d of round.deltas) yield d;
-        })();
-        return {
-          deltas,
-          usage: Promise.resolve(null),
-          toolCalls: Promise.resolve(round.toolCalls),
-          stopReason: Promise.resolve(round.stopReason),
-          thinkingBlocks: Promise.resolve(round.thinkingBlocks ?? null),
-        } as unknown as StreamResult;
+        const roundIndex = i++;
+        return makeRoundStream(rounds[roundIndex], roundIndex);
       },
     } as unknown as ChatClient;
 
@@ -158,16 +203,8 @@ describe("runToolLoop anthropic thinking round trip", () => {
       complete: vi.fn(),
       stream: (request: ChatRequest): StreamResult => {
         seenRequests.push(request);
-        const round = rounds[i++];
-        const deltas = (async function* () {
-          for (const d of round.deltas) yield d;
-        })();
-        return {
-          deltas,
-          usage: Promise.resolve(null),
-          toolCalls: Promise.resolve(round.toolCalls),
-          stopReason: Promise.resolve(round.stopReason),
-        } as unknown as StreamResult;
+        const roundIndex = i++;
+        return makeRoundStream(rounds[roundIndex], roundIndex);
       },
     } as unknown as ChatClient;
 
@@ -201,8 +238,6 @@ describe("runToolLoop answer-track prose", () => {
     );
 
     expect(flushedAnswer(cb)).toBe("Created it: ```md\n# Hi\n```");
-    // The mutating round's prose must NOT be committed as reasoning.
-    expect(cb.onReasoningRoundFinished).toHaveBeenCalledWith(false, 0);
   });
 
   it("joins mutating-round narration with a final wrap-up message", async () => {
@@ -215,10 +250,10 @@ describe("runToolLoop answer-track prose", () => {
       cb,
     );
 
-    expect(flushedAnswer(cb)).toBe("Creating the file: ```md\n# Hi\n```\n\nDone, the file is ready.");
+    expect(flushedAnswer(cb)).toBe("Creating the file: ```md\n# Hi\n```Done, the file is ready.");
   });
 
-  it("keeps prose that precedes a read-only tool as reasoning, not answer", async () => {
+  it("keeps prose that precedes a read-only tool in canonical order", async () => {
     const cb = makeCallbacks();
     await run(
       [
@@ -228,10 +263,9 @@ describe("runToolLoop answer-track prose", () => {
       cb,
     );
 
-    // Only the final answer reaches the bubble; the think-round prose is committed
-    // as reasoning instead.
-    expect(flushedAnswer(cb)).toBe("Here is the answer.");
-    expect(cb.onReasoningRoundFinished).toHaveBeenCalledWith(true, 0);
+    expect(flushedAnswer(cb)).toBe(
+      "Let me think about thisHere is the answer.",
+    );
   });
 });
 
@@ -239,16 +273,8 @@ describe("runToolLoop answer-track prose", () => {
 function countingClient(rounds: RoundScript[]): ChatClient & { stream: ReturnType<typeof vi.fn> } {
   let i = 0;
   const stream = vi.fn((): StreamResult => {
-    const round = rounds[i++];
-    const deltas = (async function* () {
-      for (const d of round.deltas) yield d;
-    })();
-    return {
-      deltas,
-      usage: Promise.resolve(null),
-      toolCalls: Promise.resolve(round.toolCalls),
-      stopReason: Promise.resolve(round.stopReason),
-    } as unknown as StreamResult;
+    const roundIndex = i++;
+    return makeRoundStream(rounds[roundIndex], roundIndex);
   });
   return { complete: vi.fn(), stream } as unknown as ChatClient & {
     stream: ReturnType<typeof vi.fn>;
@@ -261,8 +287,8 @@ describe("runToolLoop round cap", () => {
   it("injects one synthesis pass when the cap is hit, then ends without re-executing tools", async () => {
     const cb = makeCallbacks();
     const client = countingClient([
-      { deltas: ["look 0"], toolCalls: [call(THINK_TOOL_NAME)], stopReason: "tool_use" }, // round 0
-      { deltas: ["look 1"], toolCalls: [call(THINK_TOOL_NAME)], stopReason: "tool_use" }, // round 1: cap
+      { deltas: ["look 0"], toolCalls: [{ ...call(THINK_TOOL_NAME), id: "think-0" }], stopReason: "tool_use" }, // round 0
+      { deltas: ["look 1"], toolCalls: [{ ...call(THINK_TOOL_NAME), id: "think-1" }], stopReason: "tool_use" }, // round 1: cap
       { deltas: ["Here is what I found."], toolCalls: null, stopReason: "end_turn" }, // round 2: synthesis
     ]);
 
@@ -282,7 +308,9 @@ describe("runToolLoop round cap", () => {
     // The capped round's tool is replaced by a terminal result, never executed, so
     // only round 0's think tool records a step.
     expect(cb.onStepRecorded).toHaveBeenCalledTimes(1);
-    expect(flushedAnswer(cb)).toBe("Here is what I found.");
+    expect(flushedAnswer(cb)).toBe(
+      "look 0look 1Here is what I found.",
+    );
   });
 
   it("hard-stops when the model keeps calling tools after the cap warning", async () => {
@@ -290,15 +318,15 @@ describe("runToolLoop round cap", () => {
     // No fourth round is scripted: if the loop failed to hard-stop it would read
     // past the script and throw, so a clean return proves the hard stop.
     const client = countingClient([
-      { deltas: ["look 0"], toolCalls: [call(THINK_TOOL_NAME)], stopReason: "tool_use" }, // round 0
-      { deltas: ["look 1"], toolCalls: [call(THINK_TOOL_NAME)], stopReason: "tool_use" }, // round 1: cap
-      { deltas: ["still going"], toolCalls: [call(THINK_TOOL_NAME)], stopReason: "tool_use" }, // round 2: ignored warning
+      { deltas: ["look 0"], toolCalls: [{ ...call(THINK_TOOL_NAME), id: "think-0" }], stopReason: "tool_use" }, // round 0
+      { deltas: ["look 1"], toolCalls: [{ ...call(THINK_TOOL_NAME), id: "think-1" }], stopReason: "tool_use" }, // round 1: cap
+      { deltas: ["still going"], toolCalls: [{ ...call(THINK_TOOL_NAME), id: "think-2" }], stopReason: "tool_use" }, // round 2: ignored warning
     ]);
 
     await runToolLoop(client, baseRequest, "test-model", "lmstudio", {} as never, signal(), cb, 1, true);
 
     expect(client.stream).toHaveBeenCalledTimes(3); // hard stop at round 2, no round 3
-    expect(flushedAnswer(cb)).toBe("still going");
+    expect(flushedAnswer(cb)).toBe("look 0look 1still going");
   });
 });
 
@@ -384,13 +412,27 @@ describe("runToolLoop abort handling", () => {
       complete: vi.fn(),
       stream: () =>
         ({
-          deltas: (async function* () {
-            yield "partial answer";
+          events: (async function* (): AsyncGenerator<AssistantStreamEvent> {
+            yield { type: "segment_start", segmentId: "segment-abort" };
+            yield {
+              type: "prose_delta",
+              segmentId: "segment-abort",
+              delta: "partial answer",
+            };
             throw new Error("aborted");
           })(),
           usage: Promise.resolve(null),
-          toolCalls: Promise.resolve(null),
           stopReason: Promise.resolve("end_turn"),
+          replayCapsule: Promise.resolve(null),
+          replayEvidence: Promise.resolve({
+            tier: "textual",
+            capabilities: {
+              captureOrder: "text_only",
+              toolCorrelation: "none",
+              coldReplay: "textual",
+              nativeResume: false,
+            },
+          }),
         }) as unknown as StreamResult,
     } as unknown as ChatClient;
 
@@ -569,8 +611,8 @@ describe("runToolLoop phase-2 replay capture", () => {
  * of every callback across a representative multi-round turn that drives all
  * three concurrent channels in one round (read-only vault tool + vault-op +
  * edit). It is the lock the refactor must keep green: the order of
- * onReasoningDelta / onReasoningRoundFinished / onToolStatus / onStepRecorded /
- * onStepResult / onNewRound / onDelta must not change.
+ * onDelta / onToolStatus / onStepRecorded / onStepResult / onNewRound must
+ * retain declaration-driven order.
  */
 describe("runToolLoop callback-sequence characterization", () => {
   // Minimal app: not a FileSystemAdapter and an empty name, so the path
@@ -582,8 +624,6 @@ describe("runToolLoop callback-sequence characterization", () => {
   function recordingCallbacks(seq: string[]): ToolLoopCallbacks {
     return {
       onDelta: (text) => seq.push(`delta:${text}`),
-      onReasoningDelta: (text) => seq.push(`rdelta:${text}`),
-      onReasoningRoundFinished: (committed, round) => seq.push(`rrf:${committed}:${round}`),
       onToolStatus: (name) => seq.push(`status:${name}`),
       onStepRecorded: (step) => seq.push(`recorded:${step.toolName}:${step.toolCallId}`),
       onStepResult: (id, result) => seq.push(`result:${id}:${result.isError ? "err" : "ok"}`),
@@ -643,37 +683,31 @@ describe("runToolLoop callback-sequence characterization", () => {
     );
 
     expect(seq).toEqual([
-      // Round 0, read-only round: reasoning committed, then the read-only branch.
-      "rdelta:Let me look around. ",
-      "rrf:true:0",
+      // Round 0 prose is visible in declaration order, then tools execute.
+      "delta:Let me look around. ",
       `status:${vaultName}`,
       `recorded:${vaultName}:vr-0`,
       `recorded:${THINK_TOOL_NAME}:th-0`,
       "newRound",
-      // Round 1, mutating round: answer-track reasoning discarded. The mutation cap
-      // kept vr1 + vo1 and deferred the trailing edit (ed1), so only the read-only and
+      // Round 1 keeps its prose. The mutation cap kept vr1 + vo1 and deferred the trailing edit
+      // (ed1), so only the read-only and
       // vault-op channels fire their synchronous prefixes in array order (read-only
       // status, then vault-op status+record), and the post-await processing records the
       // read-only step and reports the single vault-op disposition.
-      "rdelta:Now I'll make changes.",
-      "rrf:false:1",
+      "delta:Now I'll make changes.",
       `status:${vaultName}`,
       `status:${vaultOpName}`,
       `recorded:${vaultOpName}:vo-1`,
       `recorded:${vaultName}:vr-1`,
       "result:vo-1:ok",
       "newRound",
-      // Round 2, DRAIN of the deferred edit (ed1): no model stream (no rdelta), the
-      // mutating branch discards reasoning, and the edit channel gates the buffered op.
-      "rrf:false:2",
+      // Round 2 drains the deferred edit with no provider prose.
       `status:${editName}`,
       `recorded:${editName}:ed-1`,
       "result:ed-1:ok",
       "newRound",
-      // Round 3, final answer: committed false, loop breaks, single bubble flush.
-      "rdelta:All done.",
-      "rrf:false:3",
-      "delta:Now I'll make changes.\n\nAll done.",
+      // Round 3 final prose remains the last declared item.
+      "delta:All done.",
     ]);
   });
 });

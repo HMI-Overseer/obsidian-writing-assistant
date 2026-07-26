@@ -1,6 +1,7 @@
 import { setIcon } from "obsidian";
 import type { MemoryMutation } from "../../tools/memory/handlers";
 import type { ToolCall } from "../../tools/types";
+import type { Memory } from "../../shared/types";
 import { TOOL_LABELS, pendingToolLabel } from "../../tools/metadata";
 
 export type MemoryReviewStatus = "pending" | "applied" | "declined" | "failed";
@@ -12,6 +13,11 @@ export interface ReviewableMemoryProposal {
   mutation: MemoryMutation;
   status: MemoryReviewStatus;
   error?: string;
+  effect?: {
+    before: Memory | null;
+    after: Memory | null;
+    appliedAt: number;
+  };
 }
 
 export interface MemoryReviewTimelineOptions {

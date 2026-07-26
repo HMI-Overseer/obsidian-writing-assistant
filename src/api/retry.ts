@@ -1,5 +1,10 @@
-import type { StreamResult, UsageResult, StopReason } from "./usageTypes";
-import type { ToolCall } from "../tools/types";
+import type { AssistantReplayEvidence, ProviderReplayCapsule } from "../shared/types";
+import type {
+  AssistantStreamEvent,
+  StopReason,
+  StreamResult,
+  UsageResult,
+} from "./usageTypes";
 
 export interface RetryOptions {
   /** Maximum number of attempts (including the initial one). Default: 3. */
@@ -134,37 +139,42 @@ export function streamWithRetry(
   const maxDelayMs = options?.maxDelayMs ?? DEFAULT_MAX_DELAY_MS;
   const signal = options?.signal;
 
-  // Deferred fields, forwarded from whichever attempt we commit to. Per the
-  // StreamResult contract these resolve only after `deltas` is fully consumed.
+  // Deferred fields are forwarded only from the committed attempt. Rejected
+  // attempts keep their translator state private and never reach the turn builder.
   let resolveUsage!: (value: UsageResult | null) => void;
-  let resolveToolCalls!: (value: ToolCall[] | null) => void;
   let resolveStopReason!: (value: StopReason) => void;
-  let resolveThinkingBlocks!: (value: unknown[] | null) => void;
+  let resolveReplayCapsule!: (value: ProviderReplayCapsule | null) => void;
+  let resolveReplayEvidence!: (value: AssistantReplayEvidence) => void;
   const usage = new Promise<UsageResult | null>((r) => { resolveUsage = r; });
-  const toolCalls = new Promise<ToolCall[] | null>((r) => { resolveToolCalls = r; });
   const stopReason = new Promise<StopReason>((r) => { resolveStopReason = r; });
-  const thinkingBlocks = new Promise<unknown[] | null>((r) => { resolveThinkingBlocks = r; });
+  const replayCapsule = new Promise<ProviderReplayCapsule | null>((r) => {
+    resolveReplayCapsule = r;
+  });
+  const replayEvidence = new Promise<AssistantReplayEvidence>((r) => {
+    resolveReplayEvidence = r;
+  });
 
-  // Forward a committed attempt's deferred fields onto ours. A failed attempt's own
-  // generator already resolved its (discarded) promises in its finally; we ignore those.
+  // A failed attempt's generator resolves its own discarded promises in finally.
   const forward = (chosen: StreamResult): void => {
     void chosen.usage.then(resolveUsage, () => resolveUsage(null));
-    void chosen.toolCalls.then(resolveToolCalls, () => resolveToolCalls(null));
     void chosen.stopReason.then(resolveStopReason, () => resolveStopReason("unknown"));
-    if (chosen.thinkingBlocks) {
-      void chosen.thinkingBlocks.then(resolveThinkingBlocks, () => resolveThinkingBlocks(null));
-    } else {
-      resolveThinkingBlocks(null);
-    }
+    void chosen.replayCapsule.then(
+      resolveReplayCapsule,
+      () => resolveReplayCapsule(null),
+    );
+    void chosen.replayEvidence.then(
+      resolveReplayEvidence,
+      () => resolveReplayEvidence(failedAttemptEvidence()),
+    );
   };
 
-  async function* deltas(): AsyncGenerator<string> {
+  async function* events(): AsyncGenerator<AssistantStreamEvent> {
     let lastError: unknown;
     try {
       for (let attempt = 1; attempt <= maxAttempts; attempt++) {
         const result = makeStream();
-        const iterator = result.deltas[Symbol.asyncIterator]();
-        let first: IteratorResult<string>;
+        const iterator = result.events[Symbol.asyncIterator]();
+        let first: IteratorResult<AssistantStreamEvent>;
         try {
           first = await iterator.next();
         } catch (error) {
@@ -192,12 +202,31 @@ export function streamWithRetry(
       // mid-flight). Resolve our promises so awaiters never hang; if a stream was
       // committed these are already resolved via forward() and these are no-ops.
       resolveUsage(null);
-      resolveToolCalls(null);
       resolveStopReason("unknown");
-      resolveThinkingBlocks(null);
+      resolveReplayCapsule(null);
+      resolveReplayEvidence(failedAttemptEvidence());
       throw error;
     }
   }
 
-  return { deltas: deltas(), usage, toolCalls, stopReason, thinkingBlocks };
+  return {
+    events: events(),
+    usage,
+    stopReason,
+    replayCapsule,
+    replayEvidence,
+  };
+}
+
+function failedAttemptEvidence(): AssistantReplayEvidence {
+  return {
+    tier: "textual",
+    capabilities: {
+      captureOrder: "text_only",
+      toolCorrelation: "none",
+      coldReplay: "textual",
+      nativeResume: false,
+    },
+    loweredReason: "stream_attempt_failed_before_commit",
+  };
 }

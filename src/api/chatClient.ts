@@ -18,7 +18,5 @@ export interface ChatClient {
     model: string,
     params: SamplingParams,
     signal?: AbortSignal,
-    /** Called as soon as the provider identifies a tool call by name, before arguments finish streaming. */
-    onToolCallStreaming?: (index: number, name: string) => void,
   ): StreamResult;
 }

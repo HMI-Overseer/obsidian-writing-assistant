@@ -1,7 +1,13 @@
 import type { App } from "obsidian";
 import type { ChatClient } from "../../api/chatClient";
 import type { ChatRequest, ChatTurn } from "../../shared/chatRequest";
-import type { AgenticStep, ProviderOption, SamplingParams } from "../../shared/types";
+import type {
+  AgenticStep,
+  AssistantReplayEvidence,
+  AssistantTurnRecord,
+  ProviderOption,
+  SamplingParams,
+} from "../../shared/types";
 import type { ToolCall, ToolResult } from "../../tools/types";
 import type { VaultOpDisposition } from "../../vault-ops/disposition";
 import { captureStepFields } from "../../tools/resultDigest";
@@ -17,7 +23,11 @@ import {
   ASK_TOOL_NAMES,
 } from "../../tools/ask/definition";
 import type { AskUserResponder } from "../../tools/ask/types";
-import type { UsageResult, StopReason } from "../../api/usageTypes";
+import type {
+  AssistantStreamEvent,
+  UsageResult,
+  StopReason,
+} from "../../api/usageTypes";
 import { VAULT_TOOL_NAMES } from "../../tools/vault/definition";
 import { executeVaultTool } from "../../tools/vault/handlers";
 import type { VaultToolContext } from "../../tools/vault/handlers";
@@ -47,6 +57,10 @@ import {
   AskInteractionValidationError,
 } from "../interactions/AskInteractionCoordinator";
 import { generateId } from "../../utils";
+import {
+  AssistantTurnBuilder,
+  type AssistantTurnSnapshot,
+} from "../turns/AssistantTurnBuilder";
 
 export type { VaultToolContext, ToolExecutionContext };
 export type { MemoryToolContext };
@@ -72,20 +86,14 @@ const ALL_LOOP_TOOL_NAMES = new Set([
   THINK_TOOL_NAME,
 ]);
 
-/** Append a round's prose to the accumulated answer, blank-line separated. */
-function appendAnswerProse(existing: string, addition: string): string {
-  if (!addition.trim()) return existing;
-  return existing ? `${existing}\n\n${addition}` : addition;
-}
-
 /** Callbacks the tool loop uses to interact with the streaming UI. */
 export interface ToolLoopCallbacks {
-  /** Called with text that should appear in the chat bubble. In agentic mode this is only called for the final round's text (flushed after the stream ends). */
+  /** Called with visible prose bytes in provider declaration order. */
   onDelta: (delta: string) => void;
   /** Called when a read-only tool is about to execute. */
   onToolStatus?: (toolName: string) => void;
   /** Called as soon as a read-only tool call is identified by name during streaming, before execution. */
-  onToolCallStreaming?: (toolName: string) => void;
+  onToolDeclared?: (toolName: string) => void;
   /** Called to reset the renderer between tool-loop rounds. */
   onNewRound?: () => void;
   /** Called after each read-only tool call completes, with a record of what was done. */
@@ -100,17 +108,8 @@ export interface ToolLoopCallbacks {
     toolCallId: string,
     result: { isError?: boolean; content: string; disposition?: VaultOpDisposition },
   ) => void;
-  /** Called with each text delta during streaming for live reasoning display in the timeline. */
-  onReasoningDelta?: (delta: string) => void;
-  /**
-   * Called when a round ends with reasoning that should stay in the timeline.
-   * committed=true: keep the live reasoning entry (genuine intermediate scratch
-   * before a read-only tool). committed=false: discard it, either because the
-   * round produced no reasoning, or because its prose was answer-track (it
-   * narrated a mutating action / is the final answer) and will be delivered to
-   * the bubble via {@link onDelta} instead.
-   */
-  onReasoningRoundFinished?: (committed: boolean, round: number) => void;
+  /** Receives the current canonical snapshot for projection-only compatibility UI. */
+  onTurnSnapshot?: (snapshot: AssistantTurnSnapshot) => void;
   /** Called with the first round's usage for token estimation calibration. */
   onCalibrate?: (request: ChatRequest, usage: UsageResult) => void;
 }
@@ -127,6 +126,18 @@ export interface ToolLoopResult {
    * Null when no round produced write calls.
    */
   writeStopReason: StopReason | null;
+  /** Frozen canonical assistant turn built from the ordered stream. */
+  turn: AssistantTurnRecord;
+  /** Lowest actual replay fidelity selected across this turn's provider rounds. */
+  replayEvidence: AssistantReplayEvidence;
+  /** Exact identity evidence used to place tool-owned action-ledger entries. */
+  toolCorrelations: Record<string, "provider_id" | "plugin_id">;
+}
+
+interface PendingProviderEmission {
+  assistantTurn: ChatTurn;
+  toolCalls: ToolCall[];
+  results: Map<string, ToolResult>;
 }
 
 /**
@@ -158,12 +169,20 @@ export async function runToolLoop(
   vaultOpToolContext?: VaultOpToolContext,
   memoryToolContext?: MemoryToolContext,
   askUserResponder?: AskUserResponder,
+  turnBuilder: AssistantTurnBuilder = new AssistantTurnBuilder({
+    turnId: `turn-${generateId()}`,
+  }),
+  createActionRef: (toolCallId: string) => string = (toolCallId) =>
+    `action-${toolCallId}`,
 ): Promise<ToolLoopResult> {
   const toolLoopTurns: ChatTurn[] = [];
   let allWriteToolCalls: ToolCall[] = [];
-  let fullText = "";
-  let previousRoundsText = "";
   let finalUsage: UsageResult | null = null;
+  let replayEvidence: AssistantReplayEvidence | null = null;
+  const toolCorrelations = new Map<
+    string,
+    "provider_id" | "plugin_id"
+  >();
   let calibrated = false;
   // Set to true once a cap-hit synthesis pass has been injected.
   let capHit = false;
@@ -172,13 +191,6 @@ export async function runToolLoop(
   const callCounts = new Map<string, number>();
   // Stop reason of the latest round that accumulated write calls (truncation guard).
   let writeStopReason: StopReason | null = null;
-  // Answer-track prose accumulated across rounds: prose that narrates a mutating
-  // action (write/edit/vault-op) plus the final round's prose. This is the
-  // user-facing answer and is flushed to the bubble at the end (agentic mode);
-  // prose that merely precedes a read-only tool stays in the timeline as
-  // reasoning instead. Solves the model saying its piece, e.g. a fenced code
-  // block, alongside a write and having it stranded as plain-text reasoning.
-  let answerProse = "";
   // Mutations the round cap deferred (see capRoundToMutation), waiting to be drained.
   // A model that ignores parallel_tool_calls (LM Studio / llama.cpp) emits its whole
   // batch in one assistant message; rather than discard the surplus and rely on the
@@ -189,6 +201,7 @@ export async function runToolLoop(
   // round's stop reason so a max_tokens truncation on the batch's tail is not lost.
   let deferredCalls: ToolCall[] = [];
   let deferredStopReason: StopReason = "tool_use";
+  let pendingEmission: PendingProviderEmission | null = null;
   // Rounds where the model was actually streamed; drain rounds don't count. The round
   // cap limits model turns, not replayed drains, so a large batch can't exhaust it.
   let modelRounds = 0;
@@ -207,11 +220,6 @@ export async function runToolLoop(
     let roundText: string;
     let usage: UsageResult | null = null;
     let askBarrierPlan: AskBarrierBatchPlan | null = null;
-    // Anthropic only: thinking blocks captured from this round's stream, echoed
-    // back on the round's assistant turn (required when thinking + tool use
-    // co-occur). Drain rounds are synthetic turns the model never emitted, so
-    // they carry none; with disable_parallel_tool_use Anthropic emits one call
-    // per round and drains effectively never occur there.
     let roundThinkingBlocks: unknown[] | null = null;
     const streamedThisRound = deferredCalls.length === 0;
 
@@ -229,52 +237,40 @@ export async function runToolLoop(
       const requestMessages = [...baseRequest.messages, ...toolLoopTurns];
       const roundRequest = { ...baseRequest, messages: requestMessages };
 
-      const { onToolCallStreaming } = callbacks;
-      // Retry the stream on a transient first-error (429 / 5xx incl. Anthropic 529),
-      // matching the protection withRetry already gives the non-streaming complete()
-      // path. Retry is safe only before the first delta reaches the bubble; once
-      // tokens stream we are committed to the attempt (streamWithRetry enforces this).
       const streamResult = streamWithRetry(
-        () =>
-          client.stream(
-            roundRequest, model, params, signal,
-            onToolCallStreaming
-              ? (_idx, name) => { if (ALL_LOOP_TOOL_NAMES.has(name)) onToolCallStreaming(name); }
-              : undefined,
-          ),
+        () => client.stream(roundRequest, model, params, signal),
         { signal },
       );
-
-      // In agentic mode, buffer deltas internally, only the timeline receives
-      // live updates per round. Answer-track prose is accumulated and flushed to
-      // the bubble once, after the loop. In non-agentic mode, deltas flow directly
-      // to the bubble as they arrive.
-      let roundBuffer = "";
-      try {
-        for await (const delta of streamResult.deltas) {
-          fullText += delta;
-          roundBuffer += delta;
-          if (!agenticMode) {
-            callbacks.onDelta(delta);
-          }
-          callbacks.onReasoningDelta?.(delta);
+      const segmentIds: string[] = [];
+      roundText = "";
+      for await (const event of streamResult.events) {
+        if (event.type === "segment_start") segmentIds.push(event.segmentId);
+        if (event.type === "tool_call_identity") {
+          toolCorrelations.set(event.toolCallId, event.correlation);
         }
-      } catch (e) {
-        // On abort (or other errors), flush whatever we have so partial text is
-        // preserved in the renderer for finalizeAbortedResponse: earlier rounds'
-        // answer prose plus this round's partial buffer.
-        if (agenticMode) {
-          const partial = appendAnswerProse(answerProse, roundBuffer);
-          if (partial) callbacks.onDelta(partial);
+        if (event.type === "prose_delta") {
+          roundText += event.delta;
+          callbacks.onDelta(event.delta);
         }
-        throw e;
+        applyAssistantStreamEvent(turnBuilder, event, modelRounds, callbacks);
       }
-
       usage = await streamResult.usage;
-      const rawToolCalls = await streamResult.toolCalls;
-      roundThinkingBlocks = streamResult.thinkingBlocks
-        ? await streamResult.thinkingBlocks
-        : null;
+      const replayCapsule = await streamResult.replayCapsule;
+      if (replayCapsule && segmentIds[0]) {
+        turnBuilder.startSegment({
+          segmentId: segmentIds[0],
+          replayCapsule,
+        });
+        roundThinkingBlocks = replayCapsule.thinkingBlocks;
+      }
+      replayEvidence = lowerReplayEvidence(
+        replayEvidence,
+        await streamResult.replayEvidence,
+      );
+      const rawToolCalls = executableCallsForSegments(
+        turnBuilder.snapshot(),
+        segmentIds,
+      );
       // Translate any absolute paths to vault-relative *once*, here, so every
       // downstream consumer, overlay, accumulation, finalization, timeline, sees
       // the same resolved path (tools/paths.ts).
@@ -283,6 +279,24 @@ export async function runToolLoop(
       askBarrierPlan = normalizedCalls
         ? planAskBarrierBatch(normalizedCalls)
         : null;
+      if (normalizedCalls && !askBarrierPlan) {
+        pendingEmission = {
+          assistantTurn: {
+            role: "assistant",
+            content: roundText || null,
+            toolCalls: normalizedCalls.map((tc) => ({
+              id: tc.id,
+              name: tc.name,
+              arguments: tc.arguments,
+            })),
+            ...(roundThinkingBlocks
+              ? { anthropicThinkingBlocks: roundThinkingBlocks }
+              : {}),
+          },
+          toolCalls: normalizedCalls,
+          results: new Map(),
+        };
+      }
       // Enforce one mutation per round (see capRoundToMutation). The model emits an
       // assistant message atomically, so the in-loop approval gate can only feed the
       // user's approve/decline back to it *between* rounds. The request-level
@@ -309,8 +323,6 @@ export async function runToolLoop(
         calibrated = true;
       }
       if (usage) finalUsage = usage;
-
-      roundText = fullText.slice(previousRoundsText.length);
     }
 
     const hasToolCalls = toolCalls !== null && toolCalls.length > 0;
@@ -334,13 +346,14 @@ export async function runToolLoop(
       });
     }
 
-    if (!hasToolCalls || !toolCalls) {
-      // Final round: its prose is the answer (or its tail). Accumulate it and
-      // discard the live reasoning entry, the answer is delivered to the bubble
-      // via the single flush after the loop.
-      answerProse = appendAnswerProse(answerProse, roundText);
-      callbacks.onReasoningRoundFinished?.(false, round);
-      break;
+    if (!hasToolCalls || !toolCalls) break;
+    for (const toolCall of toolCalls) {
+      turnBuilder.updateToolLifecycle(toolCall.id, {
+        state: "running",
+        ...(isActionTool(toolCall.name)
+          ? { actionRef: createActionRef(toolCall.id) }
+          : {}),
+      });
     }
 
     // A fresh provider batch containing ask_user is owned by the barrier branch
@@ -349,8 +362,7 @@ export async function runToolLoop(
     // batch is never buffered.
     if (askBarrierPlan) {
       if (capHit) {
-        answerProse = appendAnswerProse(answerProse, roundText);
-        callbacks.onReasoningRoundFinished?.(false, round);
+        recordCapResults(turnBuilder, toolCalls, round);
         break;
       }
 
@@ -363,9 +375,6 @@ export async function runToolLoop(
         callbacks,
       });
 
-      // Ask prose explains why guidance is needed. It belongs to the control-plane
-      // timeline, not the user-facing mutation answer track.
-      callbacks.onReasoningRoundFinished?.(true, round);
       toolLoopTurns.push({
         role: "assistant",
         content: roundText || null,
@@ -377,6 +386,7 @@ export async function runToolLoop(
         ...(roundThinkingBlocks ? { anthropicThinkingBlocks: roundThinkingBlocks } : {}),
       });
       for (const { tc, result } of barrierResults) {
+        recordToolResult(turnBuilder, tc, result, round);
         toolLoopTurns.push({
           role: "tool",
           content: result.content,
@@ -384,7 +394,6 @@ export async function runToolLoop(
         });
       }
 
-      previousRoundsText = fullText;
       callbacks.onNewRound?.();
       if (streamedThisRound) modelRounds++;
       if (reachedCap) capHit = true;
@@ -405,6 +414,15 @@ export async function runToolLoop(
       memoryReadCalls,
       memoryMutationCalls,
     } = classifyToolCalls(toolCalls);
+    const unknownResults = unknownCalls.map((tc) => ({
+      tc,
+      result: {
+        content:
+          `Tool "${tc.name}" is not executable in the direct-provider loop.`,
+        isError: true,
+        isReadOnly: false,
+      } satisfies ToolResult,
+    }));
 
     // Two pre-execution guards, both BEFORE a call executes or accumulates as a
     // write (so a refused mutating call is never applied). Blocked calls stay in
@@ -458,62 +476,42 @@ export async function runToolLoop(
     // user-facing answer, e.g. "Here's the file I created: ```…```", not
     // reasoning. Accumulate it toward the bubble; prose before a read-only tool
     // stays in the timeline as reasoning (committed below).
-    const roundIsMutating =
-      unknownCalls.length > 0 ||
-      liveEditCalls.length > 0 ||
-      liveVaultOpCalls.length > 0 ||
-      liveMemoryMutationCalls.length > 0;
-
     // Cap reached: push terminal error results to keep history valid, then let
     // the model produce one synthesis response. If it calls tools again after
     // the warning, hard-stop. The cap counts streamed model turns (`modelRounds`),
     // so replayed buffer drains never trip it.
     if (capHit || modelRounds >= maxRounds) {
       if (capHit) {
-        // Model ignored the cap warning and called tools again, hard stop.
-        answerProse = appendAnswerProse(answerProse, roundText);
-        callbacks.onReasoningRoundFinished?.(false, round);
+        recordPendingCapResults(
+          turnBuilder,
+          pendingEmission,
+          toolCalls,
+          round,
+        );
+        deferredCalls = [];
+        pendingEmission = flushPendingEmission(
+          toolLoopTurns,
+          pendingEmission,
+        );
         break;
       }
       capHit = true;
       // Out of model rounds: abandon any buffered mutations rather than draining
       // them past the cap (finalize() sweeps their orphaned pending placeholders).
       deferredCalls = [];
-      toolLoopTurns.push({
-        role: "assistant",
-        content: roundText || null,
-        toolCalls: loopCalls.map((tc) => ({ id: tc.id, name: tc.name, arguments: tc.arguments })),
-        ...(roundThinkingBlocks ? { anthropicThinkingBlocks: roundThinkingBlocks } : {}),
-      });
-      for (const tc of loopCalls) {
-        toolLoopTurns.push({
-          role: "tool",
-          content: "Retrieval limit reached. Synthesize an answer from the information gathered so far.",
-          toolCallId: tc.id,
-        });
-      }
-      callbacks.onReasoningRoundFinished?.(true, round);
-      previousRoundsText = fullText;
+      recordPendingCapResults(
+        turnBuilder,
+        pendingEmission,
+        toolCalls,
+        round,
+      );
+      pendingEmission = flushPendingEmission(
+        toolLoopTurns,
+        pendingEmission,
+      );
       callbacks.onNewRound?.();
       continue;
     }
-
-    // Normal intermediate tool execution round. Mutating prose is answer-track
-    // (accumulate, discard its live reasoning); read-only prose is genuine
-    // reasoning (keep it in the timeline).
-    if (roundIsMutating) {
-      answerProse = appendAnswerProse(answerProse, roundText);
-      callbacks.onReasoningRoundFinished?.(false, round);
-    } else {
-      callbacks.onReasoningRoundFinished?.(true, round);
-    }
-
-    toolLoopTurns.push({
-      role: "assistant",
-      content: roundText || null,
-      toolCalls: loopCalls.map((tc) => ({ id: tc.id, name: tc.name, arguments: tc.arguments })),
-      ...(roundThinkingBlocks ? { anthropicThinkingBlocks: roundThinkingBlocks } : {}),
-    });
 
     // Read-only / think tools and the (possibly suspending) vault ops and edits run
     // concurrently. Vault-op and edit steps are recorded BEFORE resolving so their
@@ -581,8 +579,13 @@ export async function runToolLoop(
 
     // Read-only / think results plus any spin-guard refusals record their step with
     // the result in hand (a refusal flags its step like a failed read-only call).
-    for (const { tc, result } of [...otherResults, ...blockedResults]) {
-      toolLoopTurns.push({ role: "tool", content: result.content, toolCallId: tc.id });
+    for (const { tc, result } of [
+      ...otherResults,
+      ...blockedResults,
+      ...unknownResults,
+    ]) {
+      recordToolResult(turnBuilder, tc, result, round);
+      pendingEmission?.results.set(tc.id, result);
       callbacks.onStepRecorded?.({
         type: "tool_call",
         round,
@@ -606,7 +609,8 @@ export async function runToolLoop(
       ...editResults,
       ...memoryResults,
     ]) {
-      toolLoopTurns.push({ role: "tool", content: result.content, toolCallId: tc.id });
+      recordToolResult(turnBuilder, tc, result, round);
+      pendingEmission?.results.set(tc.id, result);
       callbacks.onStepResult?.(tc.id, {
         isError: result.isError,
         content: result.content,
@@ -614,23 +618,284 @@ export async function runToolLoop(
       });
     }
 
-    previousRoundsText = fullText;
+    if (deferredCalls.length === 0) {
+      pendingEmission = flushPendingEmission(
+        toolLoopTurns,
+        pendingEmission,
+      );
+    }
     callbacks.onNewRound?.();
     // Only a streamed round counts toward the model-turn cap; drains are free.
     if (streamedThisRound) modelRounds++;
   }
 
-  // Deliver the accumulated answer to the bubble in one shot. In non-agentic
-  // mode the deltas already streamed live, so there is nothing to flush.
-  if (agenticMode && answerProse) {
-    callbacks.onDelta(answerProse);
-  }
-
+  const turn = turnBuilder.finishTurn("completed");
   return {
     writeToolCalls: allWriteToolCalls.length > 0 ? allWriteToolCalls : null,
     usage: finalUsage,
     writeStopReason,
+    turn,
+    replayEvidence: replayEvidence ?? textualFallbackEvidence(
+      "provider_replay_evidence_missing",
+    ),
+    toolCorrelations: Object.fromEntries(toolCorrelations),
   };
+}
+
+/** Apply one ordered declaration event to the canonical turn builder. */
+export function applyAssistantStreamEvent(
+  builder: AssistantTurnBuilder,
+  event: AssistantStreamEvent,
+  round: number,
+  callbacks?: Pick<
+    ToolLoopCallbacks,
+    "onToolDeclared" | "onTurnSnapshot"
+  >,
+): void {
+  switch (event.type) {
+    case "segment_start":
+      builder.startSegment({
+        segmentId: event.segmentId,
+        providerMessageId: event.providerMessageId,
+      });
+      break;
+    case "prose_delta":
+      builder.appendProseDelta(event.segmentId, event.delta);
+      break;
+    case "tool_call_start":
+      builder.startToolCall(event.segmentId, {
+        declarationKey: event.declarationKey,
+        toolName: event.toolName,
+        round,
+      });
+      if (
+        event.toolName !== undefined &&
+        ALL_LOOP_TOOL_NAMES.has(event.toolName)
+      ) {
+        callbacks?.onToolDeclared?.(event.toolName);
+      }
+      break;
+    case "tool_call_delta":
+      if (event.nameDelta !== undefined) {
+        builder.appendToolNameDelta(event.declarationKey, event.nameDelta);
+      }
+      if (event.argumentsDelta !== undefined) {
+        builder.appendToolArgumentsDelta(
+          event.declarationKey,
+          event.argumentsDelta,
+        );
+      }
+      break;
+    case "tool_call_identity":
+      builder.bindToolCallId(
+        event.declarationKey,
+        event.toolCallId,
+        event.correlation,
+      );
+      break;
+    case "segment_end":
+      builder.finishSegment(event.segmentId);
+      break;
+    case "turn_end":
+      break;
+  }
+  callbacks?.onTurnSnapshot?.(builder.snapshot());
+}
+
+/** Derive executable calls from the same frozen declaration facts the builder owns. */
+export function executableCallsForSegments(
+  snapshot: AssistantTurnSnapshot,
+  segmentIds: readonly string[],
+): ToolCall[] | null {
+  const included = new Set(segmentIds);
+  const calls = snapshot.items
+    .filter(
+      (item) =>
+        item.type === "tool_call" &&
+        included.has(item.segmentId) &&
+        typeof item.toolCallId === "string" &&
+        item.toolCallId.length > 0,
+    )
+    .map((item) => {
+      if (item.type !== "tool_call" || item.toolCallId === undefined) {
+        throw new Error("Executable tool filtering lost tool identity.");
+      }
+      return {
+        id: item.toolCallId,
+        name: item.toolName,
+        arguments: item.toolArgs ?? {},
+      };
+    });
+  return calls.length > 0 ? calls : null;
+}
+
+function recordToolResult(
+  builder: AssistantTurnBuilder,
+  toolCall: ToolCall,
+  result: ToolResult,
+  _round: number,
+): void {
+  const capture = captureStepFields(
+    toolCall.name,
+    toolCall.arguments,
+    result,
+  );
+  builder.updateToolLifecycle(toolCall.id, {
+    state: result.isError ? "failed" : "completed",
+    ...(capture.resultRecord === undefined
+      ? {}
+      : { resultRecord: capture.resultRecord }),
+    ...(capture.resultDigest === undefined
+      ? {}
+      : { resultDigest: capture.resultDigest }),
+    ...(capture.askGuidance === undefined
+      ? {}
+      : {
+          askGuidance: capture.askGuidance,
+          askStatus: "completed" as const,
+        }),
+    ...(result.isError
+      ? { isError: true, errorContent: result.content }
+      : {}),
+  });
+}
+
+function recordCapResults(
+  builder: AssistantTurnBuilder,
+  toolCalls: ToolCall[],
+  round: number,
+): void {
+  for (const toolCall of toolCalls) {
+    recordToolResult(
+      builder,
+      toolCall,
+      {
+        content:
+          "Retrieval limit reached. Synthesize an answer from the information gathered so far.",
+        isError: true,
+        isReadOnly: true,
+      },
+      round,
+    );
+  }
+}
+
+function recordPendingCapResults(
+  builder: AssistantTurnBuilder,
+  pending: PendingProviderEmission | null,
+  fallbackCalls: ToolCall[],
+  round: number,
+): void {
+  const toolCalls = pending?.toolCalls ?? fallbackCalls;
+  for (const toolCall of toolCalls) {
+    if (pending?.results.has(toolCall.id)) continue;
+    const result: ToolResult = {
+      content:
+        "Retrieval limit reached. Synthesize an answer from the information gathered so far.",
+      isError: true,
+      isReadOnly: true,
+    };
+    recordToolResult(builder, toolCall, result, round);
+    pending?.results.set(toolCall.id, result);
+  }
+}
+
+function flushPendingEmission(
+  turns: ChatTurn[],
+  pending: PendingProviderEmission | null,
+): null {
+  if (!pending) return null;
+  turns.push(pending.assistantTurn);
+  for (const toolCall of pending.toolCalls) {
+    const result = pending.results.get(toolCall.id);
+    if (!result) {
+      throw new Error(
+        `Tool call "${toolCall.id}" has no result before the next provider round.`,
+      );
+    }
+    turns.push({
+      role: "tool",
+      content: result.content,
+      toolCallId: toolCall.id,
+    });
+  }
+  return null;
+}
+
+function lowerReplayEvidence(
+  current: AssistantReplayEvidence | null,
+  incoming: AssistantReplayEvidence,
+): AssistantReplayEvidence {
+  if (!current) return structuredClone(incoming);
+  const captureOrder = lowerCapability(
+    current.capabilities.captureOrder,
+    incoming.capabilities.captureOrder,
+    ["text_only", "segment", "exact"],
+  );
+  const toolCorrelation = lowerCapability(
+    current.capabilities.toolCorrelation,
+    incoming.capabilities.toolCorrelation,
+    ["none", "plugin_id", "provider_id"],
+  );
+  const coldReplay =
+    current.capabilities.coldReplay === "textual" ||
+    incoming.capabilities.coldReplay === "textual"
+      ? "textual"
+      : "structural";
+  const tier =
+    current.tier === "textual" || incoming.tier === "textual"
+      ? "textual"
+      : current.tier === "structural" || incoming.tier === "structural"
+        ? "structural"
+        : "native";
+  const reasons = [current.loweredReason, incoming.loweredReason]
+    .filter((reason): reason is string => reason !== undefined);
+  return {
+    tier,
+    capabilities: {
+      captureOrder,
+      toolCorrelation,
+      coldReplay,
+      nativeResume:
+        current.capabilities.nativeResume &&
+        incoming.capabilities.nativeResume,
+    },
+    ...(reasons.length === 0
+      ? {}
+      : { loweredReason: [...new Set(reasons)].join(",") }),
+  };
+}
+
+function lowerCapability<Value extends string>(
+  left: Value,
+  right: Value,
+  ascending: readonly Value[],
+): Value {
+  return ascending.indexOf(left) <= ascending.indexOf(right) ? left : right;
+}
+
+function textualFallbackEvidence(
+  loweredReason: string,
+): AssistantReplayEvidence {
+  return {
+    tier: "textual",
+    capabilities: {
+      captureOrder: "text_only",
+      toolCorrelation: "none",
+      coldReplay: "textual",
+      nativeResume: false,
+    },
+    loweredReason,
+  };
+}
+
+function isActionTool(toolName: string): boolean {
+  return (
+    EDIT_TOOL_NAMES.has(toolName) ||
+    VAULT_OPS_TOOL_NAMES.has(toolName) ||
+    MEMORY_MUTATION_TOOL_NAMES.has(toolName) ||
+    ASK_TOOL_NAMES.has(toolName)
+  );
 }
 
 /** A round's tool calls partitioned by how the loop routes each kind. */

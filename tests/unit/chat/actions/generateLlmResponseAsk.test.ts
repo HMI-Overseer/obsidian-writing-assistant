@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { AssistantStreamEvent } from "../../../../src/api/usageTypes";
 
 vi.mock("../../../../src/chat/finalization/prepareApiMessages", () => ({
   prepareApiMessages: vi.fn(),
@@ -104,6 +105,9 @@ vi.mock("../../../../src/chat/actions/liveVaultReview", () => ({
     getEditAppliedRecords(): never[] {
       return [];
     }
+    getMemoryProposals(): never[] {
+      return [];
+    }
   },
 }));
 
@@ -124,6 +128,7 @@ import type WritingAssistantChat from "../../../../src/main";
 import type { ChatRequest } from "../../../../src/shared/chatRequest";
 import type {
   AgenticStep,
+  AssistantMessageRevision,
   CompletionModel,
   ConversationMessage,
 } from "../../../../src/shared/types";
@@ -220,20 +225,41 @@ function makeClient(rounds: RoundScript[]): ChatClient & {
       _model: string,
       _params: unknown,
       signal: AbortSignal,
-      onToolCall?: (index: number, name: string) => void,
     ): StreamResult => {
       const roundIndex = index++;
       startedRounds.add(roundIndex);
       roundResolvers.get(roundIndex)?.();
       const script = rounds[roundIndex];
-      if (script.toolCalls) {
-        for (const [toolIndex, toolCall] of script.toolCalls.entries()) {
-          onToolCall?.(toolIndex, toolCall.name);
+      const segmentId = `segment-${roundIndex}`;
+      const events = (async function* (): AsyncGenerator<AssistantStreamEvent> {
+        yield { type: "segment_start", segmentId };
+        for (const delta of script.deltas ?? []) {
+          yield { type: "prose_delta", segmentId, delta };
         }
-      }
-      const deltas = (async function* () {
-        for (const delta of script.deltas ?? []) yield delta;
+        for (let toolIndex = 0; toolIndex < (script.toolCalls?.length ?? 0); toolIndex += 1) {
+          const toolCall = script.toolCalls?.[toolIndex];
+          if (!toolCall) continue;
+          const declarationKey = `${segmentId}-tool-${toolIndex}`;
+          yield {
+            type: "tool_call_start",
+            segmentId,
+            declarationKey,
+            toolName: toolCall.name,
+          };
+          yield {
+            type: "tool_call_delta",
+            declarationKey,
+            argumentsDelta: JSON.stringify(toolCall.arguments),
+          };
+          yield {
+            type: "tool_call_identity",
+            declarationKey,
+            toolCallId: toolCall.id,
+            correlation: "provider_id",
+          };
+        }
         if (script.waitForAbort) {
+          if (signal.aborted) throw createAbortError();
           await new Promise<void>((_resolve, reject) => {
             signal.addEventListener("abort", () => reject(createAbortError()), {
               once: true,
@@ -241,15 +267,29 @@ function makeClient(rounds: RoundScript[]): ChatClient & {
           });
         }
         if (script.error) throw script.error;
+        yield { type: "segment_end", segmentId };
+        yield {
+          type: "turn_end",
+          stopReason: script.toolCalls ? "tool_use" : "end_turn",
+        };
       })();
       return {
-        deltas,
+        events,
         usage: Promise.resolve(null),
-        toolCalls: Promise.resolve(script.toolCalls ?? null),
         stopReason: Promise.resolve(
           script.toolCalls ? "tool_use" : "end_turn",
         ),
-      } as unknown as StreamResult;
+        replayCapsule: Promise.resolve(null),
+        replayEvidence: Promise.resolve({
+          tier: "structural",
+          capabilities: {
+            captureOrder: "exact",
+            toolCorrelation: "provider_id",
+            coldReplay: "structural",
+            nativeResume: false,
+          },
+        }),
+      };
     },
   );
   return {
@@ -324,12 +364,7 @@ function makeClaudeCodeClient(
           }
           if (options.responseText) yield options.responseText;
         })();
-        return {
-          deltas,
-          usage: Promise.resolve(null),
-          toolCalls: Promise.resolve(null),
-          stopReason: Promise.resolve("end_turn"),
-        };
+        return textStreamResult(deltas, "claude-code-ask");
       },
     ),
   } as ChatClient;
@@ -377,12 +412,7 @@ function makeCleanInterruptClaudeCodeClient(
             });
           }
         })();
-        return {
-          deltas,
-          usage: Promise.resolve(null),
-          toolCalls: Promise.resolve(null),
-          stopReason: Promise.resolve("end_turn"),
-        };
+        return textStreamResult(deltas, "claude-code-interrupt");
       },
     ),
   } as ChatClient;
@@ -422,15 +452,39 @@ function makeEarlySettlingClaudeCodeClient(
             );
           });
         })();
-        return {
-          deltas,
-          usage: Promise.resolve(null),
-          toolCalls: Promise.resolve(null),
-          stopReason: Promise.resolve("end_turn"),
-        };
+        return textStreamResult(deltas, "claude-code-early");
       },
     ),
   } as ChatClient;
+}
+
+function textStreamResult(
+  deltas: AsyncGenerator<string>,
+  segmentId: string,
+): StreamResult {
+  const events = (async function* (): AsyncGenerator<AssistantStreamEvent> {
+    yield { type: "segment_start", segmentId };
+    for await (const delta of deltas) {
+      yield { type: "prose_delta", segmentId, delta };
+    }
+    yield { type: "segment_end", segmentId };
+    yield { type: "turn_end", stopReason: "end_turn" };
+  })();
+  return {
+    events,
+    usage: Promise.resolve(null),
+    stopReason: Promise.resolve("end_turn"),
+    replayCapsule: Promise.resolve(null),
+    replayEvidence: Promise.resolve({
+      tier: "textual",
+      capabilities: {
+        captureOrder: "text_only",
+        toolCorrelation: "none",
+        coldReplay: "textual",
+        nativeResume: false,
+      },
+    }),
+  };
 }
 
 function harness(
@@ -444,6 +498,32 @@ function harness(
     setLastAssistantResponse: vi.fn(),
     finalizeRegeneration: vi.fn(),
     restoreRegeneration: vi.fn(),
+    commitRevisionReplacement: vi.fn(
+      (
+        messageId: string,
+        revision: AssistantMessageRevision,
+        _identity: unknown,
+        actionLedger: ConversationMessage["actionLedger"],
+      ) => {
+        messages.push({
+          id: messageId,
+          role: "assistant",
+          content:
+            revision && "turn" in revision
+              ? revision.turn.items
+                  .filter((item) => item.type === "prose")
+                  .map((item) => item.type === "prose" ? item.text : "")
+                  .join("\n\n")
+              : "",
+          revisions: revision ? [revision] : [],
+          activeRevisionId: revision?.revisionId,
+          actionLedger,
+          ...(revision.isError ? { isError: true } : {}),
+          ...(revision.interrupted ? { interrupted: true } : {}),
+        });
+        return true;
+      },
+    ),
   } as unknown as ChatSessionStore;
   const bubble = {
     bodyEl: {
@@ -557,7 +637,29 @@ function harness(
   };
 }
 
-function completedAskStep(message: ConversationMessage): AgenticStep | undefined {
+function completedAskStep(
+  message: ConversationMessage,
+): AgenticStep | undefined {
+  const revision = message.revisions?.find(
+    (entry) => entry.revisionId === message.activeRevisionId,
+  );
+  if (revision?.kind === "turn") {
+    const item = revision.turn.items.find(
+      (entry) =>
+        entry.type === "tool_call" &&
+        entry.toolName === "ask_user",
+    );
+    if (item?.type === "tool_call") {
+      return {
+        type: "tool_call",
+        round: item.round ?? 0,
+        toolName: item.toolName,
+        toolCallId: item.toolCallId,
+        askGuidance: item.askGuidance,
+        askStatus: item.askStatus,
+      };
+    }
+  }
   return message.agenticSteps?.find((step) => step.toolName === "ask_user");
 }
 
@@ -679,17 +781,23 @@ describe("generateLlmResponse ask_user integration", () => {
     state.interactionHost.submit({ [question]: "Detailed" });
     await pending;
 
-    expect(state.store.finalizeRegeneration).toHaveBeenCalledWith(
-      expect.objectContaining({ id: "old" }),
-      "Replacement.",
+    expect(state.store.commitRevisionReplacement).toHaveBeenCalledWith(
+      "old",
       expect.objectContaining({
-        agenticSteps: expect.arrayContaining([
-          expect.objectContaining({
-            toolName: "ask_user",
-            askStatus: "completed",
-          }),
-        ]),
+        kind: "turn",
+        origin: "regenerated",
+        turn: expect.objectContaining({
+          items: expect.arrayContaining([
+            expect.objectContaining({
+              type: "tool_call",
+              toolName: "ask_user",
+              askStatus: "completed",
+            }),
+          ]),
+        }),
       }),
+      expect.any(Function),
+      expect.any(Array),
     );
   });
 
@@ -708,7 +816,9 @@ describe("generateLlmResponse ask_user integration", () => {
 
     expect(state.interactionHost.interaction).toBeNull();
     expect(state.interactionHost.clearIfOwner).toHaveBeenCalledTimes(1);
-    expect(state.messages).toHaveLength(0);
+    expect(state.messages).toHaveLength(1);
+    expect(state.messages[0].interrupted).toBe(true);
+    expect(completedAskStep(state.messages[0])?.askGuidance).toBeUndefined();
     expect(state.activeControllers.at(-1)).toBeNull();
   });
 

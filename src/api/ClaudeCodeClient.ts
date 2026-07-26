@@ -2,7 +2,6 @@ import type { SamplingParams } from "../shared/types";
 import type { ChatRequest, ChatTurn } from "../shared/chatRequest";
 import type { ChatClient } from "./chatClient";
 import { formatNoteAttachment } from "./contextFormatting";
-import type { ToolCall } from "../tools/types";
 import type { CompletionResult, StreamResult, StopReason, UsageResult } from "./usageTypes";
 import {
   streamClaudeCode,
@@ -18,6 +17,7 @@ import { isEffortLevel } from "../shared/reasoning";
 import type { ClaudeCodeResumeCursor } from "../shared/types";
 import type { McpSdkServerConfigWithInstance } from "./sdk/claudeAgentSdk";
 import type { SessionRecovery, SessionTurn } from "./harnessSession";
+import { generateId } from "../utils";
 
 /**
  * One turn's input to the persistent-session path. The client builds both prompt
@@ -145,18 +145,24 @@ export class ClaudeCodeClient implements ChatClient {
     model: string,
     params: SamplingParams,
     signal?: AbortSignal,
-    _onToolCallStreaming?: (index: number, name: string) => void,
   ): StreamResult {
     let captured: ClaudeCodeResultUsage | null = null;
     let decision: SessionRecovery | undefined;
     let bankedCursor: ClaudeCodeResumeCursor | undefined;
     let resolveUsage!: (value: UsageResult | null) => void;
-    let resolveToolCalls!: (value: ToolCall[] | null) => void;
     let resolveStopReason!: (value: StopReason) => void;
+    let resolveReplayEvidence!: (
+      value: Awaited<StreamResult["replayEvidence"]>,
+    ) => void;
 
     const usage = new Promise<UsageResult | null>((r) => { resolveUsage = r; });
-    const toolCalls = new Promise<ToolCall[] | null>((r) => { resolveToolCalls = r; });
     const stopReason = new Promise<StopReason>((r) => { resolveStopReason = r; });
+    const replayEvidence = new Promise<
+      Awaited<StreamResult["replayEvidence"]>
+    >((resolve) => {
+      resolveReplayEvidence = resolve;
+    });
+    const segmentId = `segment-${generateId()}`;
 
     const rawDeltas = this.runTurn(
       request,
@@ -168,21 +174,43 @@ export class ClaudeCodeClient implements ChatClient {
       (cursor) => { bankedCursor = cursor; },
     );
 
-    // Mirror the AnthropicClient contract: deferred promises resolve only after
-    // the delta generator is fully consumed (completed, thrown, or returned).
-    async function* wrappedDeltas(): AsyncGenerator<string> {
+    async function* events(): StreamResult["events"] {
       try {
-        yield* rawDeltas;
+        yield { type: "segment_start", segmentId };
+        for await (const delta of rawDeltas) {
+          if (delta.length > 0) {
+            yield { type: "prose_delta", segmentId, delta };
+          }
+        }
+        yield { type: "segment_end", segmentId };
+        yield { type: "turn_end", status: "completed" };
       } finally {
         resolveUsage(applyRecoveryDecision(toUsageResult(captured), decision, bankedCursor));
-        // Claude Code runs its own tools internally via MCP, it never returns
-        // plugin tool calls through the stream.
-        resolveToolCalls(null);
         resolveStopReason("end_turn");
+        resolveReplayEvidence({
+          tier:
+            decision?.outcome === "reused" || decision?.outcome === "resumed"
+              ? "native"
+              : "textual",
+          capabilities: {
+            captureOrder: "text_only",
+            toolCorrelation: "none",
+            coldReplay: "textual",
+            nativeResume:
+              decision?.outcome === "reused" || decision?.outcome === "resumed",
+          },
+          loweredReason: "claude_code_structured_translation_deferred",
+        });
       }
     }
 
-    return { deltas: wrappedDeltas(), usage, toolCalls, stopReason };
+    return {
+      events: events(),
+      usage,
+      stopReason,
+      replayCapsule: Promise.resolve(null),
+      replayEvidence,
+    };
   }
 
   /**

@@ -2,7 +2,10 @@ import { describe, expect, it, vi } from "vitest";
 import type { App } from "obsidian";
 import type { ChatClient } from "../../../../src/api/chatClient";
 import { createAbortError } from "../../../../src/api/httpTransport";
-import type { StreamResult } from "../../../../src/api/usageTypes";
+import type {
+  AssistantStreamEvent,
+  StreamResult,
+} from "../../../../src/api/usageTypes";
 import {
   planAskBarrierBatch,
   runToolLoop,
@@ -44,16 +47,57 @@ function call(id: string, name: string, arguments_: Record<string, unknown> = {}
 function client(rounds: RoundScript[]): ChatClient & { stream: ReturnType<typeof vi.fn> } {
   let index = 0;
   const stream = vi.fn((request: ChatRequest): StreamResult => {
-    const round = rounds[index++];
-    const deltas = (async function* () {
-      for (const delta of round.deltas) yield delta;
+    const roundIndex = index++;
+    const round = rounds[roundIndex];
+    const segmentId = `segment-${roundIndex}`;
+    const events = (async function* (): AsyncGenerator<AssistantStreamEvent> {
+      yield { type: "segment_start", segmentId };
+      for (const delta of round.deltas) {
+        yield { type: "prose_delta", segmentId, delta };
+      }
+      for (let toolIndex = 0; toolIndex < (round.toolCalls?.length ?? 0); toolIndex += 1) {
+        const toolCall = round.toolCalls?.[toolIndex];
+        if (!toolCall) continue;
+        const declarationKey = `${segmentId}-tool-${toolIndex}`;
+        yield {
+          type: "tool_call_start",
+          segmentId,
+          declarationKey,
+          toolName: toolCall.name,
+        };
+        yield {
+          type: "tool_call_delta",
+          declarationKey,
+          argumentsDelta: JSON.stringify(toolCall.arguments),
+        };
+        yield {
+          type: "tool_call_identity",
+          declarationKey,
+          toolCallId: toolCall.id,
+          correlation: "provider_id",
+        };
+      }
+      yield { type: "segment_end", segmentId };
+      yield {
+        type: "turn_end",
+        stopReason: round.stopReason as never,
+      };
     })();
     return {
-      deltas,
+      events,
       usage: Promise.resolve(null),
-      toolCalls: Promise.resolve(round.toolCalls),
-      stopReason: Promise.resolve(round.stopReason),
-    } as unknown as StreamResult;
+      stopReason: Promise.resolve(round.stopReason as never),
+      replayCapsule: Promise.resolve(null),
+      replayEvidence: Promise.resolve({
+        tier: "structural",
+        capabilities: {
+          captureOrder: "exact",
+          toolCorrelation: "provider_id",
+          coldReplay: "structural",
+          nativeResume: false,
+        },
+      }),
+    };
   });
   return { complete: vi.fn(), stream } as unknown as ChatClient & {
     stream: ReturnType<typeof vi.fn>;
@@ -67,7 +111,6 @@ function callbacks(): ToolLoopCallbacks & {
     onDelta: vi.fn(),
     onToolStatus: vi.fn(),
     onStepRecorded: vi.fn(),
-    onReasoningRoundFinished: vi.fn(),
     onNewRound: vi.fn(),
   };
 }

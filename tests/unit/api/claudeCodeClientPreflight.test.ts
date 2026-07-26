@@ -15,6 +15,7 @@ import { ClaudeCodeClient, type ClaudeCodeRuntime } from "../../../src/api/Claud
 import { ClaudeCodeContextOverflowError } from "../../../src/api/claudeCodeContextPreflight";
 import type { ChatRequest } from "../../../src/shared/chatRequest";
 import type { SamplingParams } from "../../../src/shared/types";
+import type { AssistantStreamEvent } from "../../../src/api/usageTypes";
 
 const params: SamplingParams = {
   temperature: 0,
@@ -41,9 +42,13 @@ function okGen(): AsyncGenerator<string> {
   })();
 }
 
-async function drain(gen: AsyncGenerator<string>): Promise<string[]> {
+async function drain(
+  gen: AsyncGenerator<AssistantStreamEvent>,
+): Promise<string[]> {
   const out: string[] = [];
-  for await (const d of gen) out.push(d);
+  for await (const event of gen) {
+    if (event.type === "prose_delta") out.push(event.delta);
+  }
   return out;
 }
 
@@ -62,8 +67,8 @@ describe("ClaudeCodeClient send-path preflight", () => {
     };
     const client = new ClaudeCodeClient("claude", runtime);
 
-    const { deltas } = client.stream(request(OVERSIZED), "haiku", params);
-    await expect(drain(deltas)).rejects.toBeInstanceOf(ClaudeCodeContextOverflowError);
+    const { events } = client.stream(request(OVERSIZED), "haiku", params);
+    await expect(drain(events)).rejects.toBeInstanceOf(ClaudeCodeContextOverflowError);
     // Nothing was dispatched: the session's `run` (which spawns / resumes the
     // process) was never invoked.
     expect(run).not.toHaveBeenCalled();
@@ -78,8 +83,8 @@ describe("ClaudeCodeClient send-path preflight", () => {
     };
     const client = new ClaudeCodeClient("claude", runtime);
 
-    const { deltas } = client.stream(request("hello"), "haiku", params);
-    expect(await drain(deltas)).toEqual(["ok"]);
+    const { events } = client.stream(request("hello"), "haiku", params);
+    expect(await drain(events)).toEqual(["ok"]);
     expect(run).toHaveBeenCalledTimes(1);
   });
 
@@ -92,8 +97,8 @@ describe("ClaudeCodeClient send-path preflight", () => {
     const client = new ClaudeCodeClient("claude", runtime);
 
     // The same oversized blob dispatches, because there is no window to judge it.
-    const { deltas } = client.stream(request(OVERSIZED), "haiku", params);
-    expect(await drain(deltas)).toEqual(["ok"]);
+    const { events } = client.stream(request(OVERSIZED), "haiku", params);
+    expect(await drain(events)).toEqual(["ok"]);
     expect(run).toHaveBeenCalledTimes(1);
   });
 
@@ -108,8 +113,8 @@ describe("ClaudeCodeClient send-path preflight", () => {
 
     const req = request(OVERSIZED);
     const before = JSON.parse(JSON.stringify(req.messages));
-    const { deltas } = client.stream(req, "haiku", params);
-    await expect(drain(deltas)).rejects.toBeInstanceOf(ClaudeCodeContextOverflowError);
+    const { events } = client.stream(req, "haiku", params);
+    await expect(drain(events)).rejects.toBeInstanceOf(ClaudeCodeContextOverflowError);
     expect(req.messages).toEqual(before);
   });
 
@@ -118,7 +123,7 @@ describe("ClaudeCodeClient send-path preflight", () => {
     // Legacy path: no session, SDK unusable, no MCP → pure-analyst subprocess.
     const client = new ClaudeCodeClient("claude", { useSdk: false });
 
-    await drain(client.stream(request("hello"), "haiku", params).deltas);
+    await drain(client.stream(request("hello"), "haiku", params).events);
 
     expect(streamClaudeCodeMock).toHaveBeenCalledTimes(1);
     const opts = streamClaudeCodeMock.mock.calls[0][0] as { env: Record<string, string> };

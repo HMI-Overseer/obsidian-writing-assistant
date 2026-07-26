@@ -223,6 +223,32 @@ export async function finalizeEditResponse(options: FinalizeEditOptions): Promis
   });
 }
 
+/** Resolve regex edit blocks for chain-backed action-ledger capture. */
+export async function buildRegexEditProposals(
+  app: App,
+  plugin: WritingAssistantChat,
+  response: string,
+): Promise<EditProposal[]> {
+  const parsed = parseEditBlocks(response);
+  if (parsed.blocks.length === 0) return [];
+  const proposals: EditProposal[] = [];
+  const groups = groupBlocksByTarget(
+    parsed.blocks,
+    app.workspace.getActiveFile()?.path,
+  );
+  for (const [path, blocks] of groups) {
+    const proposal = await buildEditProposal(
+      app,
+      plugin,
+      path,
+      blocks,
+      proposals.length === 0 ? parsed.prose : "",
+    );
+    if (proposal) proposals.push(proposal);
+  }
+  return proposals;
+}
+
 /**
  * Group edit blocks by the file they target, preserving first-seen order (ADR-0010:
  * a turn may edit N files). Tool-call edits carry an explicit `targetPath`; regex-parsed

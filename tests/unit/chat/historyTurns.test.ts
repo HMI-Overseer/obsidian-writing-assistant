@@ -334,4 +334,46 @@ describe("toHistoryTurn, Claude Code replay annotation", () => {
     expect(turn.content.split(guidance)).toHaveLength(2);
     expect(turn.rawContent).toBe("Continuing.");
   });
+
+  it("keeps the raw-prose watermark byte-exact across every current replay annotation", () => {
+    const raw = "  First line.\r\n\r\nFinal line with trailing spaces.  ";
+    const message: ConversationMessage = {
+      id: "m-characterization-watermark",
+      role: "assistant",
+      content: raw,
+      provider: "claudecode",
+      interrupted: true,
+      agenticSteps: [
+        {
+          type: "tool_call",
+          round: 0,
+          toolName: "read_file",
+          toolCallId: "read-characterization",
+          resultRecord: "synthetic result",
+        },
+        {
+          type: "tool_call",
+          round: 1,
+          toolName: "ask_user",
+          toolCallId: "ask-characterization",
+          askGuidance: {
+            questions: [
+              {
+                question: "Continue?",
+                header: "Next",
+                answer: "Yes",
+              },
+            ],
+          },
+        },
+      ],
+    };
+
+    const turn = toHistoryTurn(message, false, true);
+
+    expect(turn.content).toContain("[read_file");
+    expect(turn.content).toContain("[ask_user guidance:");
+    expect(turn.content).toContain("[response interrupted by user]");
+    expect(turn.rawContent).toBe(raw);
+  });
 });

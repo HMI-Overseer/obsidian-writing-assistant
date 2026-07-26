@@ -1,0 +1,58 @@
+{
+  "fixtureVersion": 1,
+  "runtime": "claude-code-agent-sdk",
+  "description": "A correlated mutation produces a consequential effect, but no structured declaration arrives.",
+  "toolCallId": "toolu_fixture_unplaced_1",
+  "sequence": [
+    {
+      "source": "handler",
+      "event": {
+        "type": "action_reserved",
+        "revisionId": "rev_fixture_unplaced_1",
+        "actionRef": "action_fixture_unplaced_1",
+        "toolCallId": "toolu_fixture_unplaced_1",
+        "correlation": "provider_id"
+      }
+    },
+    {
+      "source": "review",
+      "event": {
+        "type": "approved",
+        "eventId": "event_fixture_approved_1",
+        "targetId": "target_fixture_directory_1"
+      }
+    },
+    {
+      "source": "executor",
+      "event": {
+        "type": "apply_succeeded",
+        "eventId": "event_fixture_applied_1",
+        "targetId": "target_fixture_directory_1",
+        "effect": {
+          "family": "vault_op",
+          "operation": {
+            "kind": "createDir",
+            "path": "Fixtures/Created"
+          }
+        }
+      }
+    },
+    {
+      "source": "sdk",
+      "message": {
+        "type": "result",
+        "subtype": "error_during_execution",
+        "is_error": true,
+        "errors": [
+          "synthetic provider failure before declaration"
+        ]
+      }
+    }
+  ],
+  "expectedFinalPlacement": {
+    "state": "unplaced",
+    "reason": "declaration_missing",
+    "includedInStructuralReplay": false,
+    "visibleInSafetyAudit": true
+  }
+}

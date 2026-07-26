@@ -1,0 +1,147 @@
+{
+  "fixtureVersion": 1,
+  "provider": "anthropic",
+  "description": "One assistant emission with thinking, text, tool, text, and tool blocks.",
+  "events": [
+    {
+      "type": "message_start",
+      "message": {
+        "id": "msg_fixture_anthropic_1",
+        "type": "message",
+        "role": "assistant",
+        "content": [],
+        "model": "claude-fixture",
+        "stop_reason": null,
+        "usage": {
+          "input_tokens": 12,
+          "output_tokens": 0
+        }
+      }
+    },
+    {
+      "type": "content_block_start",
+      "index": 0,
+      "content_block": {
+        "type": "thinking",
+        "thinking": ""
+      }
+    },
+    {
+      "type": "content_block_delta",
+      "index": 0,
+      "delta": {
+        "type": "thinking_delta",
+        "thinking": "Inspect the synthetic note first."
+      }
+    },
+    {
+      "type": "content_block_delta",
+      "index": 0,
+      "delta": {
+        "type": "signature_delta",
+        "signature": "sig_fixture_anthropic_1"
+      }
+    },
+    {
+      "type": "content_block_stop",
+      "index": 0
+    },
+    {
+      "type": "content_block_start",
+      "index": 1,
+      "content_block": {
+        "type": "text",
+        "text": ""
+      }
+    },
+    {
+      "type": "content_block_delta",
+      "index": 1,
+      "delta": {
+        "type": "text_delta",
+        "text": "I will inspect the fixture note."
+      }
+    },
+    {
+      "type": "content_block_stop",
+      "index": 1
+    },
+    {
+      "type": "content_block_start",
+      "index": 2,
+      "content_block": {
+        "type": "tool_use",
+        "id": "toolu_fixture_read_1",
+        "name": "read_file",
+        "input": {}
+      }
+    },
+    {
+      "type": "content_block_delta",
+      "index": 2,
+      "delta": {
+        "type": "input_json_delta",
+        "partial_json": "{\"path\":\"Fixtures/alpha.md\"}"
+      }
+    },
+    {
+      "type": "content_block_stop",
+      "index": 2
+    },
+    {
+      "type": "content_block_start",
+      "index": 3,
+      "content_block": {
+        "type": "text",
+        "text": ""
+      }
+    },
+    {
+      "type": "content_block_delta",
+      "index": 3,
+      "delta": {
+        "type": "text_delta",
+        "text": "The fixture needs one small change."
+      }
+    },
+    {
+      "type": "content_block_stop",
+      "index": 3
+    },
+    {
+      "type": "content_block_start",
+      "index": 4,
+      "content_block": {
+        "type": "tool_use",
+        "id": "toolu_fixture_edit_1",
+        "name": "propose_edit",
+        "input": {}
+      }
+    },
+    {
+      "type": "content_block_delta",
+      "index": 4,
+      "delta": {
+        "type": "input_json_delta",
+        "partial_json": "{\"path\":\"Fixtures/alpha.md\",\"search\":\"old\",\"replace\":\"new\"}"
+      }
+    },
+    {
+      "type": "content_block_stop",
+      "index": 4
+    },
+    {
+      "type": "message_delta",
+      "delta": {
+        "stop_reason": "tool_use",
+        "stop_sequence": null
+      },
+      "usage": {
+        "output_tokens": 31
+      }
+    },
+    {
+      "type": "message_stop"
+    }
+  ]
+}

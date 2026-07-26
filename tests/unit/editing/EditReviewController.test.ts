@@ -349,6 +349,39 @@ describe("EditReviewController", () => {
     expect(state.content).toBe("The quick red dog jumps.");
   });
 
+  it("keeps sibling effects applied while one hunk is undone and retried", async () => {
+    const doc = "alpha beta gamma delta";
+    const { app, state } = makeApp(doc);
+    const proposal = makeProposal(doc, [
+      { search: "alpha", replace: "ALPHA" },
+      { search: "gamma", replace: "GAMMA" },
+    ]);
+    const cb = makeCallbacks();
+    const controller = new EditReviewController(app, proposal, cb);
+    const [first, second] = proposal.hunks;
+
+    await controller.accept(first.id);
+    await controller.accept(second.id);
+    await controller.undo(first.id);
+
+    expect(state.content).toBe("alpha beta GAMMA delta");
+    expect(controller.getStatus(first.id)).toBe("pending");
+    expect(controller.getStatus(second.id)).toBe("accepted");
+    expect(cb.undone).not.toHaveBeenCalled();
+    expect(cb.applied).toHaveBeenLastCalledWith(
+      expect.objectContaining({ appliedHunkIds: [second.id] }),
+    );
+
+    await controller.accept(first.id);
+
+    expect(state.content).toBe("ALPHA beta GAMMA delta");
+    expect(controller.getStatus(first.id)).toBe("accepted");
+    expect(controller.getStatus(second.id)).toBe("accepted");
+    expect(cb.applied).toHaveBeenLastCalledWith(
+      expect.objectContaining({ appliedHunkIds: [second.id, first.id] }),
+    );
+  });
+
   /**
    * Resolve one edit against `doc` (the document as it stands at that round) and return a
    * hunk stamped with that round's baseline, the way the tool loop builds hunks (ADR-0013).

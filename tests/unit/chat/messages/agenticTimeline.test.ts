@@ -56,6 +56,14 @@ describe("selectClaimIndex", () => {
   test("skips untagged placeholders to reach the id-matched one", () => {
     expect(selectClaimIndex([undefined, "x", undefined], "x")).toBe(1);
   });
+
+  test("characterizes review binding as exact identity first and FIFO only when uncorrelated", () => {
+    const pending = ["tool-read-1", "tool-read-2", "tool-read-3"];
+
+    expect(selectClaimIndex(pending, "tool-read-3")).toBe(2);
+    expect(selectClaimIndex(pending, "unknown-tool-id")).toBe(0);
+    expect(selectClaimIndex(pending, undefined)).toBe(0);
+  });
 });
 
 describe("ask_user timeline presentation", () => {

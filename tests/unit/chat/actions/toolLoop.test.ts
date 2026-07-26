@@ -364,6 +364,9 @@ describe("runToolLoop deferred-mutation drain", () => {
       "vo-b",
       "vo-c",
     ]);
+    // Current behavior creates one synthetic loop round per drained mutation. Phase 3
+    // intentionally replaces this scheduling artifact while retaining declaration order.
+    expect(cb.onNewRound).toHaveBeenCalledTimes(3);
     // Every op recorded a timeline step, none silently lost.
     const recorded = (cb.onStepRecorded as ReturnType<typeof vi.fn>).mock.calls.map(
       (cc) => cc[0].toolCallId,

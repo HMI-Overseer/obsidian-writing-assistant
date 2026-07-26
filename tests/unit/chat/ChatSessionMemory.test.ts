@@ -104,6 +104,62 @@ describe("ChatSessionMemory.finalizeRegeneration", () => {
     ]);
     expect(result.activeVersionIndex).toBe(2);
   });
+
+  test("keeps historical version metadata separate from the active regeneration metadata", () => {
+    const memory = new ChatSessionMemory();
+    memory.hydrateFromConversation({
+      ...makeConversation(),
+      messages: [
+        {
+          id: "assistant-1",
+          role: "assistant",
+          content: "Second version",
+          versions: [
+            {
+              content: "First version",
+              createdAt: 1000,
+              usage: { inputTokens: 1, outputTokens: 2 },
+              ragSources: [
+                { filePath: "Fixtures/first.md", headingPath: "", score: 0.7 },
+              ],
+            },
+            {
+              content: "Second version",
+              createdAt: 2000,
+              usage: { inputTokens: 3, outputTokens: 4 },
+              ragSources: [
+                { filePath: "Fixtures/second.md", headingPath: "", score: 0.8 },
+              ],
+            },
+          ],
+          activeVersionIndex: 1,
+        },
+      ],
+    });
+
+    const old = memory.removeLastMessage();
+    const result = memory.finalizeRegeneration(old!, "Third version", {
+      provider: "anthropic",
+      modelId: "claude-fixture",
+      usage: { inputTokens: 5, outputTokens: 6 },
+      ragSources: [
+        { filePath: "Fixtures/third.md", headingPath: "", score: 0.9 },
+      ],
+      rewrittenQuery: "synthetic rewritten query",
+      interrupted: true,
+    });
+
+    expect(result.versions?.map((version) => version.usage?.inputTokens)).toEqual([1, 3, 5]);
+    expect(result.versions?.map((version) => version.ragSources?.[0]?.filePath)).toEqual([
+      "Fixtures/first.md",
+      "Fixtures/second.md",
+      "Fixtures/third.md",
+    ]);
+    expect(result.provider).toBe("anthropic");
+    expect(result.modelId).toBe("claude-fixture");
+    expect(result.rewrittenQuery).toBe("synthetic rewritten query");
+    expect(result.interrupted).toBe(true);
+  });
 });
 
 describe("ChatSessionMemory.switchMessageVersion", () => {

@@ -1,0 +1,147 @@
+{
+  "fixtureVersion": 1,
+  "description": "Legacy assistant-message shapes used by conservative normalization tests.",
+  "cases": [
+    {
+      "name": "content_only",
+      "message": {
+        "id": "legacy_content_only",
+        "role": "assistant",
+        "content": "A plain legacy response."
+      }
+    },
+    {
+      "name": "steps_then_content",
+      "message": {
+        "id": "legacy_steps_content",
+        "role": "assistant",
+        "content": "The stored final prose.",
+        "agenticSteps": [
+          {
+            "type": "reasoning",
+            "round": 0,
+            "text": "I will inspect the fixture."
+          },
+          {
+            "type": "tool_call",
+            "round": 0,
+            "toolName": "read_file",
+            "toolCallId": "legacy_tool_fixture_1",
+            "toolInput": "Fixtures/legacy.md",
+            "resultRecord": "synthetic result"
+          }
+        ]
+      }
+    },
+    {
+      "name": "content_only_versions",
+      "message": {
+        "id": "legacy_versions_only",
+        "role": "assistant",
+        "content": "Second version.",
+        "versions": [
+          {
+            "content": "First version.",
+            "createdAt": 1000
+          },
+          {
+            "content": "Second version.",
+            "createdAt": 2000
+          }
+        ],
+        "activeVersionIndex": 1
+      }
+    },
+    {
+      "name": "provable_active_version_step_owner",
+      "message": {
+        "id": "legacy_proven_owner",
+        "role": "assistant",
+        "content": "Active generated version.",
+        "versions": [
+          {
+            "content": "Earlier version.",
+            "createdAt": 1000
+          },
+          {
+            "content": "Active generated version.",
+            "createdAt": 2000
+          }
+        ],
+        "activeVersionIndex": 1,
+        "agenticSteps": [
+          {
+            "type": "tool_call",
+            "round": 0,
+            "toolName": "read_file",
+            "toolCallId": "legacy_tool_fixture_owner",
+            "resultRecord": "synthetic result"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ambiguous_top_level_step_snapshot",
+      "message": {
+        "id": "legacy_ambiguous_owner",
+        "role": "assistant",
+        "content": "A top-level snapshot not equal to either stored version.",
+        "versions": [
+          {
+            "content": "Stored version one.",
+            "createdAt": 1000
+          },
+          {
+            "content": "Stored version two.",
+            "createdAt": 2000
+          }
+        ],
+        "activeVersionIndex": 1,
+        "agenticSteps": [
+          {
+            "type": "tool_call",
+            "round": 0,
+            "toolName": "semantic_search",
+            "toolCallId": "legacy_tool_fixture_ambiguous",
+            "resultDigest": "[semantic_search: synthetic]"
+          }
+        ]
+      }
+    },
+    {
+      "name": "active_only_attribution_and_terminal_metadata",
+      "message": {
+        "id": "legacy_active_metadata",
+        "role": "assistant",
+        "content": "Interrupted active version.",
+        "versions": [
+          {
+            "content": "Inactive version with unknown attribution.",
+            "createdAt": 1000
+          },
+          {
+            "content": "Interrupted active version.",
+            "createdAt": 2000,
+            "usage": {
+              "inputTokens": 14,
+              "outputTokens": 5
+            },
+            "ragSources": [
+              {
+                "filePath": "Fixtures/source.md",
+                "headingPath": "Fixture",
+                "score": 0.8
+              }
+            ]
+          }
+        ],
+        "activeVersionIndex": 1,
+        "provider": "claudecode",
+        "modelId": "claude-fixture",
+        "rewrittenQuery": "synthetic rewritten query",
+        "isError": true,
+        "interrupted": true
+      }
+    }
+  ]
+}

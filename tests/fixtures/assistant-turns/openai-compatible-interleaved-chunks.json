@@ -1,0 +1,218 @@
+{
+  "fixtureVersion": 1,
+  "providerFamily": "openai-compatible",
+  "description": "Synthetic stream chunks covering indexed declarations, delayed and absent IDs, malformed arguments, and prose after a declaration.",
+  "scenarios": [
+    {
+      "name": "several_indices_with_provider_ids",
+      "chunks": [
+        {
+          "id": "chatcmpl_fixture_multi",
+          "choices": [
+            {
+              "index": 0,
+              "delta": {
+                "content": "I will inspect two fixtures."
+              },
+              "finish_reason": null
+            }
+          ]
+        },
+        {
+          "id": "chatcmpl_fixture_multi",
+          "choices": [
+            {
+              "index": 0,
+              "delta": {
+                "tool_calls": [
+                  {
+                    "index": 0,
+                    "id": "call_fixture_read_a",
+                    "type": "function",
+                    "function": {
+                      "name": "read_file",
+                      "arguments": "{\"path\":\"Fixtures/a.md\"}"
+                    }
+                  },
+                  {
+                    "index": 1,
+                    "id": "call_fixture_read_b",
+                    "type": "function",
+                    "function": {
+                      "name": "read_file",
+                      "arguments": "{\"path\":\"Fixtures/b.md\"}"
+                    }
+                  }
+                ]
+              },
+              "finish_reason": null
+            }
+          ]
+        },
+        {
+          "id": "chatcmpl_fixture_multi",
+          "choices": [
+            {
+              "index": 0,
+              "delta": {
+                "content": "Both declarations belong to this observed emission."
+              },
+              "finish_reason": null
+            }
+          ]
+        },
+        {
+          "id": "chatcmpl_fixture_multi",
+          "choices": [
+            {
+              "index": 0,
+              "delta": {},
+              "finish_reason": "tool_calls"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "provider_id_arrives_after_declaration_start",
+      "chunks": [
+        {
+          "id": "chatcmpl_fixture_delayed",
+          "choices": [
+            {
+              "index": 0,
+              "delta": {
+                "tool_calls": [
+                  {
+                    "index": 0,
+                    "type": "function",
+                    "function": {
+                      "name": "write_file",
+                      "arguments": "{\"path\":\"Fixtures/new.md\","
+                    }
+                  }
+                ]
+              },
+              "finish_reason": null
+            }
+          ]
+        },
+        {
+          "id": "chatcmpl_fixture_delayed",
+          "choices": [
+            {
+              "index": 0,
+              "delta": {
+                "tool_calls": [
+                  {
+                    "index": 0,
+                    "id": "call_fixture_delayed",
+                    "function": {
+                      "arguments": "\"content\":\"synthetic\"}"
+                    }
+                  }
+                ]
+              },
+              "finish_reason": null
+            }
+          ]
+        },
+        {
+          "id": "chatcmpl_fixture_delayed",
+          "choices": [
+            {
+              "index": 0,
+              "delta": {
+                "content": "The provider ID arrived without changing declaration position."
+              },
+              "finish_reason": null
+            }
+          ]
+        },
+        {
+          "id": "chatcmpl_fixture_delayed",
+          "choices": [
+            {
+              "index": 0,
+              "delta": {},
+              "finish_reason": "tool_calls"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "provider_id_missing_for_entire_segment",
+      "chunks": [
+        {
+          "id": "chatcmpl_fixture_missing",
+          "choices": [
+            {
+              "index": 0,
+              "delta": {
+                "tool_calls": [
+                  {
+                    "index": 0,
+                    "type": "function",
+                    "function": {
+                      "name": "read_file",
+                      "arguments": "{\"path\":\"Fixtures/missing-id.md\"}"
+                    }
+                  }
+                ]
+              },
+              "finish_reason": null
+            }
+          ]
+        },
+        {
+          "id": "chatcmpl_fixture_missing",
+          "choices": [
+            {
+              "index": 0,
+              "delta": {},
+              "finish_reason": "tool_calls"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "malformed_arguments",
+      "chunks": [
+        {
+          "id": "chatcmpl_fixture_bad_args",
+          "choices": [
+            {
+              "index": 0,
+              "delta": {
+                "tool_calls": [
+                  {
+                    "index": 0,
+                    "id": "call_fixture_bad_args",
+                    "type": "function",
+                    "function": {
+                      "name": "propose_edit",
+                      "arguments": "{\"path\":\"Fixtures/a.md\",\"search\":"
+                    }
+                  }
+                ]
+              },
+              "finish_reason": null
+            }
+          ]
+        },
+        {
+          "id": "chatcmpl_fixture_bad_args",
+          "choices": [
+            {
+              "index": 0,
+              "delta": {},
+              "finish_reason": "tool_calls"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

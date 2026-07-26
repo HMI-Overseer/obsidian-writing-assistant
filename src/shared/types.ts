@@ -320,6 +320,94 @@ export interface CompletedAskGuidanceQuestion {
   answer: string | string[];
 }
 
+// ---------------------------------------------------------------------------
+// Ordered assistant turns, ADR-0030
+// ---------------------------------------------------------------------------
+
+export type AssistantTurnStatus =
+  | "streaming"
+  | "completed"
+  | "interrupted"
+  | "failed";
+
+export interface AssistantTurnRecord {
+  schemaVersion: 1;
+  id: string;
+  status: AssistantTurnStatus;
+  segments: AssistantTurnSegment[];
+  items: AssistantTurnItem[];
+}
+
+export interface AssistantTurnSegment {
+  id: string;
+  providerMessageId?: string;
+  replayCapsule?: ProviderReplayCapsule;
+}
+
+export type AssistantTurnItem = AssistantProseItem | AssistantToolCallItem;
+
+export interface AssistantProseItem {
+  type: "prose";
+  id: string;
+  segmentId: string;
+  sourceItemId?: string;
+  text: string;
+  actionRef?: string;
+  actionAnchor?: "parsed_edit";
+}
+
+export type AssistantToolLifecycleState =
+  | "declared"
+  | "running"
+  | "completed"
+  | "interrupted"
+  | "failed";
+
+export interface AssistantToolCallItem {
+  type: "tool_call";
+  id: string;
+  segmentId: string;
+  sourceItemId?: string;
+  toolCallId: string;
+  toolName: string;
+  toolArguments: string;
+  toolArgs?: Record<string, unknown>;
+  toolInput?: string;
+  state: AssistantToolLifecycleState;
+  resultRecord?: string;
+  resultDigest?: string;
+  isError?: boolean;
+  errorContent?: string;
+  actionRef?: string;
+  askGuidance?: CompletedAskGuidanceRecord;
+  askStatus?: "completed" | "cancelled" | "skipped";
+  round?: number;
+}
+
+export type ProviderReplayCapsule = {
+  provider: "anthropic";
+  version: 1;
+  thinkingBlocks: Array<
+    | { type: "thinking"; thinking: string; signature: string }
+    | { type: "redacted_thinking"; data: string }
+  >;
+};
+
+export interface ProviderTurnCapabilities {
+  captureOrder: "exact" | "segment" | "text_only";
+  toolCorrelation: "provider_id" | "plugin_id" | "none";
+  coldReplay: "structural" | "textual";
+  nativeResume: boolean;
+}
+
+export type AssistantReplayTier = "native" | "structural" | "textual";
+
+export interface AssistantReplayEvidence {
+  tier: AssistantReplayTier;
+  capabilities: ProviderTurnCapabilities;
+  loweredReason?: string;
+}
+
 /**
  * A single step recorded during agentic tool-call execution. Stored with the
  * message. Still never sent to the API *verbatim*, but as of phase 2 it carries the

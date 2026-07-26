@@ -1805,7 +1805,7 @@ export const SURFACES = {
           <section class="lmsa-assistant-turn-audit lmsa-assistant-turn-action-section" aria-label="Action history without a correlated provider declaration">
             <div class="lmsa-assistant-turn-action-section-heading">Unplaced action audit</div>
             <div class="lmsa-assistant-turn-action-summary">
-              <div class="lmsa-assistant-turn-action-heading"><span class="lmsa-assistant-turn-action-family">Edit review</span><span class="lmsa-assistant-turn-action-state">declined</span></div>
+              <div class="lmsa-assistant-turn-action-heading"><span class="lmsa-assistant-turn-action-family">Vault operation</span><span class="lmsa-assistant-turn-action-state">declined</span></div>
               <div class="lmsa-assistant-turn-action-placement is-warning">The action has effect history, but no provider declaration could be placed.</div>
             </div>
           </section>`,
@@ -1990,6 +1990,53 @@ export const SURFACES = {
             <button class="lmsa-ui-compact-btn lmsa-ui-compact-btn-secondary lmsa-edit-bulk-btn">Reject all</button>
             <button class="lmsa-ui-compact-btn lmsa-ui-compact-btn-secondary lmsa-edit-bulk-btn">Accept all this session</button>
           </div>`,
+        ),
+      ),
+      620,
+    ),
+  },
+
+  // Denied edit regression: one inline terminal state and one sibling diff.
+  editReviewDeclined: {
+    w: 620,
+    shot: ".lmsa-chat-window-message--assistant",
+    html: view(
+      assistantBubble(
+        assistantTurn(
+          turnItem(
+            "edit-declined",
+            "tool_call",
+            "tool",
+            toolTurnBody(
+              "Proposed edit",
+              "The Lighthouse Keeper.md",
+              "Completed",
+            ),
+            {
+              after: false,
+              state: "completed",
+              reviewState: "edit-skipped",
+              mutating: true,
+              action: `<div class="lmsa-edit-step-controls">
+                <span class="lmsa-edit-step-state">Skipped</span>
+              </div>`,
+              presentation:
+                `<div class="lmsa-edit-timeline-hunk">` +
+                splitHunk("rejected", {
+                  location: "Line 9",
+                  fileName: "The Lighthouse Keeper.md",
+                  contextLine: "8",
+                  contextText:
+                    "Mara lit the lamp anyway, hands steady from years of practice.",
+                  changeLine: "9",
+                  removedText:
+                    "Near midnight, she saw it, a single light bobbing far out on the water.",
+                  addedText:
+                    "Near midnight, she saw it, a small boat lost in the swell.",
+                }) +
+                "</div>",
+            },
+          ),
         ),
       ),
       620,

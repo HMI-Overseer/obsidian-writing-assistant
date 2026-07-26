@@ -30,10 +30,10 @@ import {
 } from "./assistantTurnRenderModel";
 import type { RegexEditPreview } from "./regexEditPreview";
 import {
+  actionLedgerSummaryEntries,
   buildActionLedgerReviewModel,
   type ActionReviewControl,
 } from "./actionLedgerReview";
-import { DiffHunkView } from "./DiffHunkView";
 
 export interface AssistantTurnViewRefreshOptions {
   actionLedger?: readonly ToolActionLedgerEntry[];
@@ -260,7 +260,9 @@ export class AssistantTurnView {
   ): void {
     this.getActionEligibility = getEligibility;
     this.onActionControl = onControl;
-    this.actionCoordinator.reconcile(this.actionLedger);
+    this.actionCoordinator.reconcile(
+      actionLedgerSummaryEntries(this.actionLedger),
+    );
     this.updateActionSectionVisibility();
   }
 
@@ -347,7 +349,9 @@ export class AssistantTurnView {
     this.updateNotice(model);
     this.updateRegexEditPreview(regexEditPreview);
     this.actionLedger = actionLedger;
-    this.actionCoordinator.reconcile(actionLedger);
+    this.actionCoordinator.reconcile(
+      actionLedgerSummaryEntries(actionLedger),
+    );
     this.updateActionSectionVisibility();
     await Promise.all(proseRenders);
     this.onContentChanged();
@@ -856,6 +860,11 @@ export class AssistantTurnView {
   }
 }
 
+type SummaryLedgerEntry = Exclude<
+  ToolActionLedgerEntry,
+  { family: "edit" }
+>;
+
 class ActionLedgerSummaryView implements AssistantActionView {
   readonly element: HTMLElement;
 
@@ -879,6 +888,9 @@ class ActionLedgerSummaryView implements AssistantActionView {
   }
 
   refresh(entry: ToolActionLedgerEntry): void {
+    if (entry.family === "edit") {
+      throw new Error("Edit entries require the inline edit action view.");
+    }
     this.element.empty();
     this.element.dataset.actionRef = entry.actionRef;
     const state = deriveActionLedgerState(entry);
@@ -922,7 +934,6 @@ class ActionLedgerSummaryView implements AssistantActionView {
         cls: `lmsa-assistant-turn-action-target-state is-${target.state}`,
         text: target.state.replace(/_/g, " "),
       });
-      this.renderTargetDetail(targetEl, entry, target);
       if (target.error) {
         targetEl.createDiv({
           cls: "lmsa-assistant-turn-action-error",
@@ -957,58 +968,11 @@ class ActionLedgerSummaryView implements AssistantActionView {
     }
   }
 
-  private renderTargetDetail(
-    targetEl: HTMLElement,
-    entry: ToolActionLedgerEntry,
-    target: ReturnType<
-      typeof buildActionLedgerReviewModel
-    >["targets"][number],
-  ): void {
-    if (entry.family !== "edit") return;
-    const editTarget = entry.payload.targets.find(
-      (candidate) => candidate.targetId === target.targetId,
-    );
-    if (!editTarget) return;
-    const detailEl = targetEl.createDiv({
-      cls: "lmsa-assistant-turn-action-detail",
-    });
-    const diffView = new DiffHunkView(
-      detailEl,
-      {
-        id: editTarget.targetId,
-        resolvedEdit: structuredClone(editTarget.resolvedEdit),
-        status:
-          target.state === "declined" ||
-          target.state === "superseded"
-            ? "rejected"
-            : "pending",
-      },
-      {
-        onAccept: () => undefined,
-        onReject: () => undefined,
-        onUndo: () => undefined,
-        onModeChange: () => undefined,
-        onOpenFile: () => undefined,
-      },
-      {
-        fileName:
-          editTarget.targetFilePath.split("/").at(-1) ??
-          editTarget.targetFilePath,
-      },
-      "split",
-      { showReviewControls: false, showHeader: false },
-    );
-    if (target.state === "applied") diffView.setApplied(true);
-    if (target.state === "undone") diffView.resetToPending();
-  }
-
   destroy(): void {}
 }
 
-function actionFamilyLabel(entry: ToolActionLedgerEntry): string {
+function actionFamilyLabel(entry: SummaryLedgerEntry): string {
   switch (entry.family) {
-    case "edit":
-      return "Edit review";
     case "vault_op":
       return "Vault operation";
     case "memory":

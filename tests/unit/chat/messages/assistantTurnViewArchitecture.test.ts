@@ -147,4 +147,12 @@ describe("AssistantTurnView architecture", () => {
     expect(handler).toContain("editAssistantProseItem");
     expect(handler).toContain("executeMessageAction");
   });
+
+  it("leaves the original edit hunk in place without a generic summary", () => {
+    const view = source("src/chat/messages/AssistantTurnView.ts");
+
+    expect(view).toContain("actionLedgerSummaryEntries");
+    expect(view).not.toContain("EditActionLedgerView");
+    expect(view).not.toContain('return "Edit review"');
+  });
 });

@@ -191,6 +191,8 @@ const splitHunk = (status = "pending") =>
     </div>
   </div>`;
 
+const TOOL_ACTION_SLOT = "<!--lmsa-tool-action-slot-->";
+
 const turnItem = (
   id,
   type,
@@ -204,8 +206,14 @@ const turnItem = (
     segment = "segment-1",
     action = "",
   } = {},
-) =>
-  `<li class="lmsa-assistant-turn-item lmsa-assistant-turn-item--${type} has-connector-before${after ? " has-connector-after" : ""}${state ? ` is-${state}` : ""}${mutating ? " is-mutating" : ""}${fade ? " has-fading-endpoint" : ""}"
+) => {
+  const actionHost =
+    `<div class="lmsa-assistant-turn-action-host">${action}</div>`;
+  const renderedBody =
+    type === "tool_call"
+      ? body.replace(TOOL_ACTION_SLOT, actionHost)
+      : `${body}${actionHost}`;
+  return `<li class="lmsa-assistant-turn-item lmsa-assistant-turn-item--${type} has-connector-before${after ? " has-connector-after" : ""}${state ? ` is-${state}` : ""}${mutating ? " is-mutating" : ""}${fade ? " has-fading-endpoint" : ""}"
     data-item-id="${id}" data-segment-id="${segment}">
     <div class="lmsa-assistant-turn-marker is-${marker}" aria-hidden="true">${
       marker === "thinking"
@@ -218,15 +226,16 @@ const turnItem = (
     }</div>
     <div class="lmsa-assistant-turn-item-body${type === "prose"
       ? " lmsa-assistant-turn-prose lmsa-chat-window-message-content lmsa-chat-window-message-content--markdown"
-      : " lmsa-agentic-timeline-step-body"}">${body}<div class="lmsa-assistant-turn-action-host">${action}</div></div>
+      : " lmsa-agentic-timeline-step-body"}">${renderedBody}</div>
   </li>`;
+};
 
 const toolTurnBody = (name, detail, state, diagnostics = "") =>
-  `<span class="lmsa-assistant-turn-tool-summary is-expandable" role="button" tabindex="0" aria-expanded="${diagnostics ? "true" : "false"}">
+  `<span class="lmsa-assistant-turn-tool-summary is-expandable" role="button" tabindex="0" aria-label="${name}, ${detail}, ${state}" aria-expanded="${diagnostics ? "true" : "false"}">
      <span class="lmsa-agentic-timeline-step-name">${name}</span>
      <span class="lmsa-agentic-timeline-step-detail">${detail}</span>
-     <span class="lmsa-assistant-turn-tool-state">${state}</span>
    </span>
+   ${TOOL_ACTION_SLOT}
    ${diagnostics ? `<div class="lmsa-agentic-timeline-step-expand">${diagnostics}</div>` : ""}`;
 
 const assistantTurn = (items, status = "completed", tail = "") =>

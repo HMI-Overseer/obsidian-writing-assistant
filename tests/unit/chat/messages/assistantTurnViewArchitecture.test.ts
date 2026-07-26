@@ -22,22 +22,33 @@ describe("AssistantTurnView architecture", () => {
 
   it("uses the tool text as the disclosure trigger without a detached chevron button", () => {
     const view = source("src/chat/messages/AssistantTurnView.ts");
+    const styles = source("src/chat/messages/AssistantTurnView.css");
 
     expect(view).toContain("toolSummaryEl");
+    expect(view).toContain("toolSummaryEl.after(state.actionEl)");
     expect(view).toContain('"role", "button"');
     expect(view).toContain('"keydown"');
     expect(view).toContain('"aria-expanded"');
     expect(view).not.toContain("disclosureButtonEl");
     expect(view).not.toContain('"chevron-down"');
     expect(view).not.toContain('"chevron-up"');
+    expect(styles).toContain(
+      ".lmsa-assistant-turn-item--tool_call",
+    );
+    expect(styles).toContain("flex: 0 0 auto;");
+    expect(styles).toContain("gap: 0.2rem 0.45rem;");
   });
 
   it("keeps terminal state accessible without a hover tooltip on the turn", () => {
     const view = source("src/chat/messages/AssistantTurnView.ts");
+    const styles = source("src/chat/messages/AssistantTurnView.css");
 
     expect(view).toContain("item.accessibleState");
+    expect(view).toContain('"aria-label"');
     expect(view).toContain('markerEl.setAttribute("aria-hidden", "true")');
     expect(view).toContain("emptyState.announce");
+    expect(view).not.toContain("stateEl");
+    expect(styles).not.toContain(".lmsa-assistant-turn-tool-state");
     expect(view).not.toContain('"aria-label": "Assistant response"');
   });
 

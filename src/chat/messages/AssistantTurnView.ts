@@ -49,7 +49,6 @@ interface ToolItemRefs {
   toolSummaryEl: HTMLElement;
   nameEl: HTMLElement;
   detailEl: HTMLElement;
-  stateEl: HTMLElement;
   diagnosticsEl: HTMLElement;
   expanded: boolean;
   hasDisclosure: boolean;
@@ -324,14 +323,11 @@ export class AssistantTurnView {
     const detailEl = toolSummaryEl.createSpan({
       cls: "lmsa-agentic-timeline-step-detail",
     });
-    const stateEl = toolSummaryEl.createSpan({
-      cls: "lmsa-assistant-turn-tool-state",
-    });
     const diagnosticsEl = state.contentEl.createDiv({
       cls: "lmsa-agentic-timeline-step-expand lmsa-hidden",
       attr: { "aria-hidden": "true" },
     });
-    state.contentEl.appendChild(state.actionEl);
+    toolSummaryEl.after(state.actionEl);
     const toggleDisclosure = () => {
       const tool = state.tool;
       if (!tool?.hasDisclosure) return;
@@ -358,7 +354,6 @@ export class AssistantTurnView {
       toolSummaryEl,
       nameEl,
       detailEl,
-      stateEl,
       diagnosticsEl,
       expanded: false,
       hasDisclosure: false,
@@ -499,10 +494,11 @@ export class AssistantTurnView {
     refs.nameEl.setText(item.label);
     refs.detailEl.setText(item.toolInput ?? "");
     refs.detailEl.toggleClass("lmsa-hidden", !item.toolInput);
-    refs.stateEl.setText(item.accessibleState);
-    refs.stateEl.toggleClass(
-      "is-error",
-      item.state === "failed" || item.isError === true,
+    refs.toolSummaryEl.setAttribute(
+      "aria-label",
+      [item.label, item.toolInput, item.accessibleState]
+        .filter((part): part is string => Boolean(part))
+        .join(", "),
     );
     refs.hasDisclosure = item.hasDisclosure;
     refs.toolSummaryEl.toggleClass("is-expandable", item.hasDisclosure);

@@ -152,6 +152,14 @@ export function normalizeConversation(raw: unknown): Conversation | null {
     messages,
     draft,
     approvalPosture: normalizePosture(record.approvalPosture),
+    ...(typeof record.parentConversationId === "string" &&
+    record.parentConversationId
+      ? { parentConversationId: record.parentConversationId }
+      : {}),
+    ...(typeof record.branchFromMessageId === "string" &&
+    record.branchFromMessageId
+      ? { branchFromMessageId: record.branchFromMessageId }
+      : {}),
   };
 }
 

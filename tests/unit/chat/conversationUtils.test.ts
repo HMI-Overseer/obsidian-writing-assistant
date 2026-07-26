@@ -556,6 +556,17 @@ describe("approval posture, per conversation", () => {
     expect(branch.parentConversationId).toBe("conv-1");
   });
 
+  test("normalization preserves branch origin metadata", () => {
+    const source = makeConversation([]);
+    source.parentConversationId = "source-conversation";
+    source.branchFromMessageId = "assistant-1";
+
+    expect(normalizeConversation(source)).toMatchObject({
+      parentConversationId: "source-conversation",
+      branchFromMessageId: "assistant-1",
+    });
+  });
+
   test("a branch preserves completed ask guidance as an independent audit record", () => {
     const source: ConversationMeta = {
       id: "conv-1",

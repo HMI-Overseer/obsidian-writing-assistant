@@ -124,6 +124,10 @@ export interface LiveVaultReviewOptions {
   timelineEl: HTMLElement;
   /** Resolve a review host from one exact provider or plugin tool-call ID. */
   findActionHostByToolCallId?: (toolCallId: string) => HTMLElement | null;
+  /** Message-local host used while an exact declaration has not arrived yet. */
+  getProvisionalActionHost?: () => HTMLElement;
+  /** Recompute provisional and audit section visibility after a live remount. */
+  onReviewPlacementChanged?: () => void;
   policy: VaultOpPolicy;
   /** Session approval posture; `auto` overrules the per-class policy to auto-apply (section 6.3). */
   posture: ApprovalPosture;
@@ -156,6 +160,8 @@ export class LiveVaultReview implements VaultOpReviewer {
   private readonly findActionHostByToolCallId?: (
     toolCallId: string,
   ) => HTMLElement | null;
+  private readonly getProvisionalActionHost?: () => HTMLElement;
+  private readonly onReviewPlacementChanged?: () => void;
   private readonly policy: VaultOpPolicy;
   private readonly posture: ApprovalPosture;
 
@@ -206,6 +212,8 @@ export class LiveVaultReview implements VaultOpReviewer {
     this.app = opts.app;
     this.timelineEl = opts.timelineEl;
     this.findActionHostByToolCallId = opts.findActionHostByToolCallId;
+    this.getProvisionalActionHost = opts.getProvisionalActionHost;
+    this.onReviewPlacementChanged = opts.onReviewPlacementChanged;
     this.policy = opts.policy;
     this.posture = opts.posture;
     this.editDeps = opts.edit;
@@ -562,6 +570,40 @@ export class LiveVaultReview implements VaultOpReviewer {
   }
 
   /**
+   * Remove loop-time compatibility controls before the canonical ledger view
+   * renders the durable action state.
+   */
+  detachPanels(): void {
+    this.detachEditPanel();
+    this.timelineEl
+      .querySelectorAll(
+        ".lmsa-memory-step-controls, " +
+          ".lmsa-memory-review-preview, " +
+          ".lmsa-vault-review-footer, " +
+          ".lmsa-vault-review-fallback, " +
+          ".lmsa-vault-step-controls, " +
+          ".lmsa-vault-timeline-preview",
+      )
+      .forEach((element) => element.remove());
+    this.timelineEl
+      .querySelectorAll(".lmsa-assistant-turn-item")
+      .forEach((element) => {
+        element.classList.remove(
+          "is-vault-awaiting",
+          "is-vault-applied",
+          "is-vault-failed",
+          "is-vault-rejected",
+          "is-vault-cancelled",
+          "is-vault-satisfied",
+          "is-edit-pending",
+          "is-edit-applied",
+          "is-edit-skipped",
+          "is-edit-nomatch",
+        );
+      });
+  }
+
+  /**
    * Resolve every outstanding `ask` op as `cancelled` (abort / new user turn), so a
    * parked turn can't leak a hung await. Ops are left `pending` so the user can still
    * decide later via the finalized review surface, graceful fallback to async review.
@@ -721,7 +763,8 @@ export class LiveVaultReview implements VaultOpReviewer {
     new MemoryReviewTimelineView({
       timelineEl: this.timelineEl,
       ...(this.findActionHostByToolCallId && {
-        findActionHostByToolCallId: this.findActionHostByToolCallId,
+        findActionHostByToolCallId: (toolCallId) =>
+          this.resolveReviewHost(toolCallId),
       }),
       proposals: this.memoryProposals,
       callbacks: {
@@ -729,6 +772,7 @@ export class LiveVaultReview implements VaultOpReviewer {
         onDecline: (proposalId) => this.declineMemory(proposalId),
       },
     });
+    this.onReviewPlacementChanged?.();
   }
 
   /** Convert + gate a batch, append reviewable ops, and park `ask` resolutions. */
@@ -1003,13 +1047,15 @@ export class LiveVaultReview implements VaultOpReviewer {
     this.editTimelineView = new EditReviewTimelineView({
       timelineEl: this.timelineEl,
       ...(this.findActionHostByToolCallId && {
-        findActionHostByToolCallId: this.findActionHostByToolCallId,
+        findActionHostByToolCallId: (toolCallId) =>
+          this.resolveReviewHost(toolCallId),
       }),
       app: this.app,
       controllers,
       live: true,
       ...(deps.onEnterAutoApply && { onEnterAutoApply: deps.onEnterAutoApply }),
     });
+    this.onReviewPlacementChanged?.();
     for (const controller of controllers) deps.inlineDiff.attach(controller);
   }
 
@@ -1044,7 +1090,8 @@ export class LiveVaultReview implements VaultOpReviewer {
     new VaultReviewTimelineView({
       timelineEl: this.timelineEl,
       ...(this.findActionHostByToolCallId && {
-        findActionHostByToolCallId: this.findActionHostByToolCallId,
+        findActionHostByToolCallId: (toolCallId) =>
+          this.resolveReviewHost(toolCallId),
       }),
       app: this.app,
       proposal: this.proposal,
@@ -1056,6 +1103,15 @@ export class LiveVaultReview implements VaultOpReviewer {
       // proposal then sees the real disposition).
       serial: true,
     });
+    this.onReviewPlacementChanged?.();
+  }
+
+  private resolveReviewHost(toolCallId: string): HTMLElement | null {
+    return (
+      this.findActionHostByToolCallId?.(toolCallId) ??
+      this.getProvisionalActionHost?.() ??
+      null
+    );
   }
 
   private mergeRecord(applied: Array<{ opId: string; inverse: VaultOperation }>): void {

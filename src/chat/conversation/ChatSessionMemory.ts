@@ -5,6 +5,7 @@ import type {
   ConversationMeta,
   ConversationMessage,
   RagSourceRef,
+  ToolActionEvent,
   ToolActionLedgerEntry,
 } from "../../shared/types";
 import { generateId } from "../../utils";
@@ -18,7 +19,10 @@ import {
   syncAssistantCompatibilityProjection,
 } from "./assistantRevisions";
 import {
+  appendActionEvent,
+  deriveActionControlEligibility,
   supersedeUnresolvedActions,
+  type ActionControlEligibility,
   type SupersessionEventIdentity,
 } from "./actionLedger";
 
@@ -37,6 +41,9 @@ export class ChatSessionMemory {
   private activeModelId = "";
   private activeModelName = "";
   private activeCreatedAt = 0;
+  private activeParentConversationId: string | undefined;
+  private activeBranchFromMessageId: string | undefined;
+  private inheritedBranchRevisionIds = new Set<string>();
 
   getSnapshot(): ChatSessionSnapshot {
     return {
@@ -63,6 +70,26 @@ export class ChatSessionMemory {
     return this.activeCreatedAt;
   }
 
+  getActiveBranchOrigin(): Pick<
+    Conversation,
+    "parentConversationId" | "branchFromMessageId"
+  > {
+    return {
+      ...(this.activeParentConversationId === undefined
+        ? {}
+        : {
+            parentConversationId:
+              this.activeParentConversationId,
+          }),
+      ...(this.activeBranchFromMessageId === undefined
+        ? {}
+        : {
+            branchFromMessageId:
+              this.activeBranchFromMessageId,
+          }),
+    };
+  }
+
   /**
    * The conversation's current Claude Code resume cursor (Model A′): the cursor
    * banked by the most recent claudecode assistant turn that carries one. Read at the
@@ -71,13 +98,25 @@ export class ChatSessionMemory {
    * fresh conversation, an older transcript, or a non-claudecode thread).
    */
   getClaudeCodeResumeCursor(): ClaudeCodeResumeCursor | undefined {
+    const latestEditAt = this.messageHistory.reduce((latest, message) => {
+      const revision = getActiveAssistantRevision(message);
+      if (
+        revision?.kind !== "turn" ||
+        revision.origin !== "edited"
+      ) {
+        return latest;
+      }
+      return Math.max(latest, revision.createdAt);
+    }, -1);
     for (let i = this.messageHistory.length - 1; i >= 0; i--) {
       const message = this.messageHistory[i];
       const activeRevision = getActiveAssistantRevision(message);
       if (
         message.role === "assistant" &&
         (activeRevision?.provider ?? message.provider) === "claudecode" &&
-        (activeRevision?.usage ?? message.usage)?.resumeCursor
+        (activeRevision?.usage ?? message.usage)?.resumeCursor &&
+        (latestEditAt < 0 ||
+          (activeRevision?.createdAt ?? -1) > latestEditAt)
       ) {
         return (activeRevision?.usage ?? message.usage)?.resumeCursor;
       }
@@ -132,15 +171,11 @@ export class ChatSessionMemory {
         (item) => item.type === "prose",
       );
       if (proseItems.length !== 1) return false;
-      revision = createEditedRevision({
-        sourceRevision: active,
-        revisionId: generateId(),
-        turnId: generateId(),
-        createdAt: Date.now(),
-        targetProseItemId: proseItems[0].id,
-        text: newContent,
-        itemId: () => generateId(),
-      });
+      return this.editAssistantProseItem(
+        messageId,
+        proseItems[0].id,
+        newContent,
+      );
     }
     this.messageHistory[index] = appendAssistantRevision(
       revisionBacked,
@@ -266,6 +301,122 @@ export class ChatSessionMemory {
     return true;
   }
 
+  editAssistantProseItem(
+    messageId: string,
+    proseItemId: string,
+    text: string,
+  ): boolean {
+    const message = this.messageHistory.find((entry) => entry.id === messageId);
+    if (!message || message.role !== "assistant") return false;
+    const current = ensureRevisionBackedMessage(message);
+    const source = getActiveAssistantRevision(current);
+    if (source?.kind !== "turn") return false;
+    const target = source.turn.items.find((item) => item.id === proseItemId);
+    if (target?.type !== "prose" || text.length === 0) return false;
+
+    const createdAt = Date.now();
+    const revision = createEditedRevision({
+      sourceRevision: source,
+      revisionId: generateId(),
+      turnId: generateId(),
+      createdAt,
+      targetProseItemId: proseItemId,
+      text,
+      itemId: () => generateId(),
+    });
+    const supersessionCreatedAt = Math.max(
+      createdAt,
+      ...(current.actionLedger ?? []).flatMap((entry) =>
+        entry.events.map((event) => event.createdAt),
+      ),
+    );
+    return this.commitRevisionReplacement(
+      messageId,
+      revision,
+      (_actionRef, _targetId, eventIndex) => ({
+        eventId: generateId(),
+        createdAt: supersessionCreatedAt + eventIndex,
+      }),
+    );
+  }
+
+  getActionControlEligibility(
+    messageId: string,
+    actionRef: string,
+    targetId: string,
+    driftGuardAllowsUndo = true,
+  ): ActionControlEligibility {
+    const messageIndex = this.messageHistory.findIndex(
+      (message) => message.id === messageId,
+    );
+    const unavailable: ActionControlEligibility = {
+      canApprove: false,
+      canDecline: false,
+      canApply: false,
+      canRetry: false,
+      canUndo: false,
+    };
+    if (messageIndex === -1) return unavailable;
+    const message = this.messageHistory[messageIndex];
+    const revision = getActiveAssistantRevision(message);
+    const entry = message.actionLedger?.find(
+      (candidate) => candidate.actionRef === actionRef,
+    );
+    if (!revision || !entry) return unavailable;
+
+    return deriveActionControlEligibility(entry, targetId, {
+      activeRevisionId: revision.revisionId,
+      isActiveConversationHead:
+        messageIndex === this.messageHistory.length - 1 &&
+        !this.inheritedBranchRevisionIds.has(entry.revisionId),
+      visibleRevisionReferencesAction:
+        revision.kind === "turn" &&
+        revision.turn.items.some((item) => item.actionRef === actionRef),
+      driftGuardAllowsUndo,
+    });
+  }
+
+  appendEligibleActionEvent(
+    messageId: string,
+    actionRef: string,
+    event: ToolActionEvent,
+    driftGuardAllowsUndo = true,
+  ): boolean {
+    const messageIndex = this.messageHistory.findIndex(
+      (message) => message.id === messageId,
+    );
+    if (messageIndex === -1) return false;
+    const message = this.messageHistory[messageIndex];
+    const entryIndex =
+      message.actionLedger?.findIndex(
+        (entry) => entry.actionRef === actionRef,
+      ) ?? -1;
+    if (entryIndex === -1 || !message.actionLedger) return false;
+    const entry = message.actionLedger[entryIndex];
+    const duplicate = entry.events.find(
+      (candidate) => candidate.eventId === event.eventId,
+    );
+    if (duplicate) {
+      return appendActionEvent(entry, event) === entry;
+    }
+
+    const eligibility = this.getActionControlEligibility(
+      messageId,
+      actionRef,
+      event.targetId,
+      driftGuardAllowsUndo,
+    );
+    if (!eventIsEligible(event, eligibility)) return false;
+
+    const actionLedger = [...message.actionLedger];
+    actionLedger[entryIndex] = appendActionEvent(entry, event);
+    this.messageHistory[messageIndex] = {
+      ...message,
+      actionLedger,
+    };
+    return true;
+  }
+
   /**
    * Deprecated index adapter for Phase 2 callers. Revision identity remains the
    * mutation seam and legacy version fields are not rewritten.
@@ -345,6 +496,10 @@ export class ChatSessionMemory {
     this.activeModelId = conversation.modelId;
     this.activeModelName = conversation.modelName;
     this.activeCreatedAt = conversation.createdAt;
+    this.activeParentConversationId = conversation.parentConversationId;
+    this.activeBranchFromMessageId = conversation.branchFromMessageId;
+    this.inheritedBranchRevisionIds =
+      collectInheritedBranchRevisionIds(conversation);
   }
 
   /**
@@ -365,6 +520,7 @@ export class ChatSessionMemory {
       messages: [...this.messageHistory],
       draft: this.draft,
       approvalPosture: meta.approvalPosture ?? "ask",
+      ...this.getActiveBranchOrigin(),
     };
   }
 
@@ -387,6 +543,56 @@ export class ChatSessionMemory {
     this.lastAssistantResponse = lastAssistant
       ? assistantDisplayText(lastAssistant)
       : "";
+  }
+}
+
+function collectInheritedBranchRevisionIds(
+  conversation: Conversation,
+): Set<string> {
+  if (
+    !conversation.parentConversationId ||
+    !conversation.branchFromMessageId
+  ) {
+    return new Set();
+  }
+  const cutoffIndex = conversation.messages.findIndex(
+    (message) => message.id === conversation.branchFromMessageId,
+  );
+  if (cutoffIndex === -1) return new Set();
+  const inherited = new Set<string>();
+  for (const message of conversation.messages.slice(0, cutoffIndex + 1)) {
+    for (const revision of message.revisions ?? []) {
+      if (
+        revision.createdAt === undefined ||
+        revision.createdAt <= conversation.createdAt
+      ) {
+        inherited.add(revision.revisionId);
+      }
+    }
+  }
+  return inherited;
+}
+
+function eventIsEligible(
+  event: ToolActionEvent,
+  eligibility: ActionControlEligibility,
+): boolean {
+  switch (event.type) {
+    case "approved":
+      return eligibility.canApprove;
+    case "declined":
+      return eligibility.canDecline;
+    case "apply_succeeded":
+    case "apply_failed":
+      return eligibility.canApply;
+    case "retry_requested":
+      return eligibility.canRetry;
+    case "undo_succeeded":
+    case "undo_refused":
+      return eligibility.canUndo;
+    case "proposed":
+    case "superseded":
+      return false;
   }
 }
 

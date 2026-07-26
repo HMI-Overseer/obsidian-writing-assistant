@@ -1,16 +1,24 @@
 import { Notice } from "obsidian";
 import { reportIfRejected, voidAsync } from "../asyncCallbacks";
+import type WritingAssistantChat from "../main";
 import type { ChatGenerationOrchestrator } from "./ChatGenerationOrchestrator";
 import type { ContextCapacityUpdater } from "./ContextCapacityUpdater";
 import type { ContextInputs } from "./ContextCapacityUpdater";
 import { branchConversation } from "./actions/branchConversation";
-import { assistantDisplayText } from "./conversation/assistantRevisions";
+import {
+  assistantDisplayText,
+  getActiveAssistantRevision,
+} from "./conversation/assistantRevisions";
 import type { ChatSessionStore } from "./conversation/ChatSessionStore";
 import type { BubbleActionCallbacks } from "./messages/ChatTranscript";
 import type { ChatTranscript } from "./messages/ChatTranscript";
 import { InlineMessageEditor } from "./messages/InlineMessageEditor";
+import type { ActionReviewControl } from "./messages/actionLedgerReview";
+import { generateId } from "../utils";
+import { executeMessageAction } from "./actions/messageActionExecutor";
 
 export type BubbleActionDeps = {
+  plugin: WritingAssistantChat;
   getStore: () => ChatSessionStore | null;
   getTranscript: () => ChatTranscript | null;
   getOrchestrator: () => ChatGenerationOrchestrator;
@@ -41,7 +49,8 @@ export class ChatBubbleActionHandler {
   createCallbacks(): BubbleActionCallbacks {
     return {
       onCopy: (messageId) => this.handleCopy(messageId),
-      onEdit: (messageId) => this.handleEdit(messageId),
+      onEdit: (messageId, proseItemId) =>
+        this.handleEdit(messageId, proseItemId),
       onDelete: (messageId) =>
         reportIfRejected(this.handleDelete(messageId), "Failed to delete the message."),
       onBranch: (messageId) =>
@@ -56,7 +65,73 @@ export class ChatBubbleActionHandler {
           this.handleVersionChange(messageId, newIndex),
           "Failed to switch the message version.",
         ),
+      getActionEligibility: (messageId, actionRef, targetId) =>
+        this.deps.getStore()?.getActionControlEligibility(
+          messageId,
+          actionRef,
+          targetId,
+        ) ?? {
+          canApprove: false,
+          canDecline: false,
+          canApply: false,
+          canRetry: false,
+          canUndo: false,
+        },
+      onActionControl: (messageId, actionRef, targetId, control) =>
+        reportIfRejected(
+          this.handleActionControl(
+            messageId,
+            actionRef,
+            targetId,
+            control,
+          ),
+          "Failed to update the action.",
+        ),
     };
+  }
+
+  private async handleActionControl(
+    messageId: string,
+    actionRef: string,
+    targetId: string,
+    control: ActionReviewControl,
+  ): Promise<void> {
+    if (this.blockedDuringGeneration()) return;
+    const store = this.deps.getStore();
+    if (!store) return;
+    if (control === "apply" || control === "undo") {
+      const changed = await executeMessageAction({
+        plugin: this.deps.plugin,
+        store,
+        messageId,
+        actionRef,
+        targetId,
+        control,
+      });
+      if (!changed) return;
+      await store.persistActiveConversation();
+      await this.deps.syncConversationUi();
+      return;
+    }
+    const type =
+      control === "approve"
+        ? "approved"
+        : control === "decline"
+          ? "declined"
+          : "retry_requested";
+    const appended = store.appendEligibleActionEvent(
+      messageId,
+      actionRef,
+      {
+        eventId: `event-${generateId()}`,
+        type,
+        targetId,
+        createdAt: Date.now(),
+      },
+    );
+    if (!appended) return;
+    await store.persistActiveConversation();
+    await this.deps.syncConversationUi();
   }
 
   handleCopy(messageId: string): void {
@@ -69,7 +144,7 @@ export class ChatBubbleActionHandler {
     });
   }
 
-  handleEdit(messageId: string): void {
+  handleEdit(messageId: string, proseItemId?: string): void {
     if (this.blockedDuringGeneration()) return;
 
     const store = this.deps.getStore();
@@ -80,20 +155,52 @@ export class ChatBubbleActionHandler {
     const snapshot = store.getSnapshot();
     const message = snapshot.messageHistory.find((m) => m.id === messageId);
     if (!bubble || !message) return;
+    const activeRevision = getActiveAssistantRevision(message);
+    const proseItem =
+      activeRevision?.kind === "turn" && proseItemId
+        ? activeRevision.turn.items.find(
+            (item) => item.id === proseItemId,
+          )
+        : null;
+    if (
+      activeRevision?.kind === "turn" &&
+      proseItem?.type !== "prose"
+    ) {
+      return;
+    }
+    const originalContent =
+      proseItem?.type === "prose"
+        ? proseItem.text
+        : message.role === "assistant"
+          ? assistantDisplayText(message)
+          : message.content;
 
-    const editor = new InlineMessageEditor(bubble, message.content, {
+    const editor = new InlineMessageEditor(bubble, originalContent, {
       onSave: voidAsync(async (newContent: string) => {
         // Re-check at commit time: the editor can outlive the start of a new
         // generation, and committing then would race the in-flight persist.
         if (this.blockedDuringGeneration()) return;
         const currentStore = this.deps.getStore();
         if (!currentStore) return;
-        currentStore.updateMessageContent(messageId, newContent);
+        const saved =
+          message.role === "assistant" &&
+          activeRevision?.kind === "turn" &&
+          proseItemId
+            ? currentStore.editAssistantProseItem(
+                messageId,
+                proseItemId,
+                newContent,
+              )
+            : currentStore.updateMessageContent(
+                messageId,
+                newContent,
+              );
+        if (!saved) return;
         await currentStore.persistActiveConversation();
         await this.deps.syncConversationUi();
       }, "Failed to save your edit."),
       onCancel: () => {},
-    });
+    }, proseItemId);
     editor.activate();
   }
 

@@ -7,7 +7,10 @@ import type {
   AssistantTurnSnapshot,
 } from "../turns/AssistantTurnBuilder";
 import type { MarkdownBubbleRenderer } from "../rendering/MarkdownBubbleRenderer";
-import { deriveActionLedgerState } from "../conversation/actionLedger";
+import {
+  deriveActionLedgerState,
+  type ActionControlEligibility,
+} from "../conversation/actionLedger";
 import { TOOL_ICONS, isMutatingTool } from "../../tools/metadata";
 import {
   AssistantActionHostCoordinator,
@@ -26,6 +29,11 @@ import {
   type LegacyAssistantRenderSource,
 } from "./assistantTurnRenderModel";
 import type { RegexEditPreview } from "./regexEditPreview";
+import {
+  buildActionLedgerReviewModel,
+  type ActionReviewControl,
+} from "./actionLedgerReview";
+import { DiffHunkView } from "./DiffHunkView";
 
 export interface AssistantTurnViewRefreshOptions {
   actionLedger?: readonly ToolActionLedgerEntry[];
@@ -42,6 +50,8 @@ interface ItemViewState {
   renderedText?: string;
   requestedText?: string;
   tool?: ToolItemRefs;
+  editButtonEl?: HTMLButtonElement;
+  editButtonListener?: () => void;
   destroy(): void;
 }
 
@@ -88,6 +98,17 @@ export class AssistantTurnView {
   private readonly itemStates = new Map<string, ItemViewState>();
   private readonly pendingRenders = new Set<Promise<void>>();
   private itemOrder: string[] = [];
+  private actionLedger: readonly ToolActionLedgerEntry[] = [];
+  private getActionEligibility: (
+    entry: ToolActionLedgerEntry,
+    targetId: string,
+  ) => ActionControlEligibility = () => NO_ACTION_ELIGIBILITY;
+  private onActionControl: (
+    entry: ToolActionLedgerEntry,
+    targetId: string,
+    control: ActionReviewControl,
+  ) => void = () => undefined;
+  private proseEditHandler: ((proseItemId: string) => void) | null = null;
   private destroyed = false;
 
   constructor(
@@ -141,6 +162,10 @@ export class AssistantTurnView {
         new ActionLedgerSummaryView(
           entry,
           this.rootEl,
+          (currentEntry, targetId) =>
+            this.getActionEligibility(currentEntry, targetId),
+          (currentEntry, targetId, control) =>
+            this.onActionControl(currentEntry, targetId, control),
         ),
     );
   }
@@ -188,6 +213,15 @@ export class AssistantTurnView {
     return this.registry.getByToolCallId(toolCallId)?.actionEl ?? null;
   }
 
+  getProvisionalReviewHost(): HTMLElement {
+    this.provisionalSectionEl.removeClass("lmsa-hidden");
+    return this.provisionalHostEl;
+  }
+
+  refreshActionSectionVisibility(): void {
+    this.updateActionSectionVisibility();
+  }
+
   getPrimaryProseHost(): HTMLElement | null {
     const proseStates = this.itemOrder
       .map((id) => this.itemStates.get(id))
@@ -196,6 +230,37 @@ export class AssistantTurnView {
           state?.type === "prose",
       );
     return proseStates.length === 1 ? proseStates[0].contentEl : null;
+  }
+
+  getProseHost(proseItemId: string): HTMLElement | null {
+    const state = this.itemStates.get(proseItemId);
+    return state?.type === "prose" ? state.contentEl : null;
+  }
+
+  setProseEditHandler(
+    handler: ((proseItemId: string) => void) | null,
+  ): void {
+    this.proseEditHandler = handler;
+    for (const state of this.itemStates.values()) {
+      this.updateProseEditButton(state);
+    }
+  }
+
+  setActionReviewContext(
+    getEligibility: (
+      entry: ToolActionLedgerEntry,
+      targetId: string,
+    ) => ActionControlEligibility,
+    onControl: (
+      entry: ToolActionLedgerEntry,
+      targetId: string,
+      control: ActionReviewControl,
+    ) => void,
+  ): void {
+    this.getActionEligibility = getEligibility;
+    this.onActionControl = onControl;
+    this.actionCoordinator.reconcile(this.actionLedger);
+    this.updateActionSectionVisibility();
   }
 
   async flush(): Promise<void> {
@@ -268,6 +333,7 @@ export class AssistantTurnView {
     this.updateEmptyState(model);
     this.updateNotice(model);
     this.updateRegexEditPreview(regexEditPreview);
+    this.actionLedger = actionLedger;
     this.actionCoordinator.reconcile(actionLedger);
     this.updateActionSectionVisibility();
     await Promise.all(proseRenders);
@@ -309,8 +375,63 @@ export class AssistantTurnView {
     };
     if (item.type === "tool_call") {
       this.initializeTool(state);
+    } else {
+      this.initializeProse(state);
     }
     return state;
+  }
+
+  private initializeProse(state: ItemViewState): void {
+    const onEdit = () => {
+      const itemId = state.itemEl.dataset.itemId;
+      if (itemId) this.proseEditHandler?.(itemId);
+    };
+    state.destroy = () => {
+      if (state.editButtonListener) {
+        state.editButtonEl?.removeEventListener(
+          "click",
+          state.editButtonListener,
+        );
+      }
+    };
+    this.updateProseEditButton(state, onEdit);
+  }
+
+  private updateProseEditButton(
+    state: ItemViewState,
+    onEdit?: () => void,
+  ): void {
+    if (state.type !== "prose") return;
+    if (!this.proseEditHandler) {
+      if (state.editButtonListener) {
+        state.editButtonEl?.removeEventListener(
+          "click",
+          state.editButtonListener,
+        );
+      }
+      state.editButtonEl?.remove();
+      state.editButtonEl = undefined;
+      state.editButtonListener = undefined;
+      return;
+    }
+    if (state.editButtonEl) return;
+    const editButtonEl = state.actionEl.createEl("button", {
+      cls: "lmsa-assistant-turn-prose-edit",
+      attr: {
+        type: "button",
+        "aria-label": "Edit this prose block",
+      },
+    });
+    setIcon(editButtonEl, "pencil");
+    const listener =
+      onEdit ??
+      (() => {
+        const itemId = state.itemEl.dataset.itemId;
+        if (itemId) this.proseEditHandler?.(itemId);
+      });
+    editButtonEl.addEventListener("click", listener);
+    state.editButtonEl = editButtonEl;
+    state.editButtonListener = listener;
   }
 
   private initializeTool(state: ItemViewState): void {
@@ -725,7 +846,19 @@ export class AssistantTurnView {
 class ActionLedgerSummaryView implements AssistantActionView {
   readonly element: HTMLElement;
 
-  constructor(entry: ToolActionLedgerEntry, containerEl: HTMLElement) {
+  constructor(
+    entry: ToolActionLedgerEntry,
+    containerEl: HTMLElement,
+    private readonly getEligibility: (
+      entry: ToolActionLedgerEntry,
+      targetId: string,
+    ) => ActionControlEligibility,
+    private readonly onControl: (
+      entry: ToolActionLedgerEntry,
+      targetId: string,
+      control: ActionReviewControl,
+    ) => void,
+  ) {
     this.element = containerEl.createDiv();
     this.element.remove();
     this.element.addClass("lmsa-assistant-turn-action-summary");
@@ -762,9 +895,98 @@ class ActionLedgerSummaryView implements AssistantActionView {
     const targetsEl = this.element.createEl("ul", {
       cls: "lmsa-assistant-turn-action-targets",
     });
-    for (const target of actionTargetLabels(entry)) {
-      targetsEl.createEl("li", { text: target });
+    const model = buildActionLedgerReviewModel(
+      entry,
+      (targetId) => this.getEligibility(entry, targetId),
+    );
+    for (const target of model.targets) {
+      const targetEl = targetsEl.createEl("li");
+      targetEl.createSpan({
+        cls: "lmsa-assistant-turn-action-target-label",
+        text: target.label,
+      });
+      targetEl.createSpan({
+        cls: `lmsa-assistant-turn-action-target-state is-${target.state}`,
+        text: target.state.replace(/_/g, " "),
+      });
+      this.renderTargetDetail(targetEl, entry, target);
+      if (target.error) {
+        targetEl.createDiv({
+          cls: "lmsa-assistant-turn-action-error",
+          text: target.error,
+        });
+      }
+      if (target.undoRefusal) {
+        targetEl.createDiv({
+          cls: "lmsa-assistant-turn-action-error",
+          text: target.undoRefusal,
+        });
+      }
+      if (target.controls.length > 0) {
+        const controlsEl = targetEl.createDiv({
+          cls: "lmsa-assistant-turn-action-controls",
+        });
+        for (const control of target.controls) {
+          const label = actionControlLabel(control);
+          const buttonEl = controlsEl.createEl("button", {
+            cls: `lmsa-assistant-turn-action-control is-${control}`,
+            text: label,
+            attr: {
+              type: "button",
+              "aria-label": `${label} ${target.label}`,
+            },
+          });
+          buttonEl.addEventListener("click", () => {
+            this.onControl(entry, target.targetId, control);
+          });
+        }
+      }
     }
+  }
+
+  private renderTargetDetail(
+    targetEl: HTMLElement,
+    entry: ToolActionLedgerEntry,
+    target: ReturnType<
+      typeof buildActionLedgerReviewModel
+    >["targets"][number],
+  ): void {
+    if (entry.family !== "edit") return;
+    const editTarget = entry.payload.targets.find(
+      (candidate) => candidate.targetId === target.targetId,
+    );
+    if (!editTarget) return;
+    const detailEl = targetEl.createDiv({
+      cls: "lmsa-assistant-turn-action-detail",
+    });
+    const diffView = new DiffHunkView(
+      detailEl,
+      {
+        id: editTarget.targetId,
+        resolvedEdit: structuredClone(editTarget.resolvedEdit),
+        status:
+          target.state === "declined" ||
+          target.state === "superseded"
+            ? "rejected"
+            : "pending",
+      },
+      {
+        onAccept: () => undefined,
+        onReject: () => undefined,
+        onUndo: () => undefined,
+        onModeChange: () => undefined,
+        onOpenFile: () => undefined,
+      },
+      {
+        fileName:
+          editTarget.targetFilePath.split("/").at(-1) ??
+          editTarget.targetFilePath,
+      },
+      "split",
+      { showReviewControls: false, showHeader: false },
+    );
+    if (target.state === "applied") diffView.setApplied(true);
+    if (target.state === "undone") diffView.resetToPending();
   }
 
   destroy(): void {}
@@ -789,7 +1011,9 @@ function actionStateLabel(
   return state.replace(/_/g, " ");
 }
 
-function actionTargetLabels(entry: ToolActionLedgerEntry): string[] {
+export function actionTargetLabels(
+  entry: ToolActionLedgerEntry,
+): string[] {
   switch (entry.family) {
     case "edit":
       return entry.payload.targets.map(
@@ -811,3 +1035,26 @@ function actionTargetLabels(entry: ToolActionLedgerEntry): string[] {
       );
   }
 }
+
+function actionControlLabel(control: ActionReviewControl): string {
+  switch (control) {
+    case "approve":
+      return "Approve";
+    case "decline":
+      return "Decline";
+    case "apply":
+      return "Apply";
+    case "retry":
+      return "Retry";
+    case "undo":
+      return "Undo";
+  }
+}
+
+const NO_ACTION_ELIGIBILITY: ActionControlEligibility = {
+  canApprove: false,
+  canDecline: false,
+  canApply: false,
+  canRetry: false,
+  canUndo: false,
+};

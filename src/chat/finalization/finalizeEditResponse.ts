@@ -395,6 +395,8 @@ export function renderProposalPanels(
   inlineDiff: InlineDiffManager,
   opts?: { autoApplyVaultOps?: boolean; onEnterAutoApply?: () => void },
 ): void {
+  if (message.actionLedger?.length) return;
+  const readOnly = hasAmbiguousLegacyReviewOwnership(message);
   const editProposals = editProposalsOf(message);
   if (editProposals.length > 0) {
     // One controller per edited file owns that file's review; a single composite
@@ -424,9 +426,12 @@ export function renderProposalPanels(
       }),
       app,
       controllers,
+      ...(readOnly ? { readOnly: true } : {}),
       ...(opts?.onEnterAutoApply && { onEnterAutoApply: opts.onEnterAutoApply }),
     });
-    for (const controller of controllers) inlineDiff.attach(controller);
+    if (!readOnly) {
+      for (const controller of controllers) inlineDiff.attach(controller);
+    }
   }
 
   // --- Timeline: fold the vault review onto the tool-call steps in place. ---
@@ -445,12 +450,24 @@ export function renderProposalPanels(
           bubble.turnView.getReviewHostForToolCallId(toolCallId),
       }),
       app,
-      proposal: message.vaultOpProposal,
+      proposal: readOnly
+        ? { ...structuredClone(message.vaultOpProposal), historical: true }
+        : message.vaultOpProposal,
       callbacks: makeVaultOpCallbacks(store, message.vaultOpProposal),
       existingRecord: message.appliedVaultOps,
       autoApply: opts?.autoApplyVaultOps ?? false,
     });
   }
+}
+
+export function hasAmbiguousLegacyReviewOwnership(
+  message: ConversationMessage,
+): boolean {
+  if (message.actionLedger?.length) return false;
+  return (
+    (message.revisions?.length ?? 0) > 1 ||
+    (message.versions?.length ?? 0) > 1
+  );
 }
 
 function makeEditCallbacks(store: ChatSessionStore, proposal: EditProposal): EditReviewCallbacks {

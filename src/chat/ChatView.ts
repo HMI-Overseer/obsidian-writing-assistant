@@ -122,6 +122,7 @@ export class ChatView extends ItemView {
     this.contextUpdater = new ContextCapacityUpdater(this.layout.contextCapacityEl);
 
     this.bubbleActions = new ChatBubbleActionHandler({
+      plugin: this.plugin,
       getStore: () => this.sessionStore,
       getTranscript: () => this.transcript,
       getOrchestrator: () => this.orchestrator,

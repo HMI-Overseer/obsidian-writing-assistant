@@ -6,6 +6,7 @@ import type {
   Conversation,
   ConversationMeta,
   ConversationMessage,
+  ToolActionEvent,
   ToolActionLedgerEntry,
 } from "../../shared/types";
 import type WritingAssistantChat from "../../main";
@@ -20,7 +21,10 @@ import type { ConversationStorage } from "./ConversationStorage";
 import type { ChatSessionSnapshot } from "../types";
 import { ChatSessionMemory } from "./ChatSessionMemory";
 import { ConversationSearch, type ConversationSearchHit } from "./ConversationSearch";
-import type { SupersessionEventIdentity } from "./actionLedger";
+import type {
+  ActionControlEligibility,
+  SupersessionEventIdentity,
+} from "./actionLedger";
 
 const CHAT_DRAFT_SAVE_DELAY_MS = 300;
 
@@ -135,6 +139,46 @@ export class ChatSessionStore {
 
   updateMessageContent(messageId: string, newContent: string): boolean {
     return this.memory.updateMessageContent(messageId, newContent);
+  }
+
+  editAssistantProseItem(
+    messageId: string,
+    proseItemId: string,
+    text: string,
+  ): boolean {
+    return this.memory.editAssistantProseItem(
+      messageId,
+      proseItemId,
+      text,
+    );
+  }
+
+  getActionControlEligibility(
+    messageId: string,
+    actionRef: string,
+    targetId: string,
+    driftGuardAllowsUndo = true,
+  ): ActionControlEligibility {
+    return this.memory.getActionControlEligibility(
+      messageId,
+      actionRef,
+      targetId,
+      driftGuardAllowsUndo,
+    );
+  }
+
+  appendEligibleActionEvent(
+    messageId: string,
+    actionRef: string,
+    event: ToolActionEvent,
+    driftGuardAllowsUndo = true,
+  ): boolean {
+    return this.memory.appendEligibleActionEvent(
+      messageId,
+      actionRef,
+      event,
+      driftGuardAllowsUndo,
+    );
   }
 
   removeMessage(messageId: string): ConversationMessage | null {
@@ -379,6 +423,7 @@ export class ChatSessionStore {
       messages: cleanMessages,
       draft: snapshot.draft,
       approvalPosture: meta.approvalPosture ?? "ask",
+      ...this.memory.getActiveBranchOrigin(),
     };
     await this.storage.save(conversation);
     // The active thread is served live during search, but once it is switched away

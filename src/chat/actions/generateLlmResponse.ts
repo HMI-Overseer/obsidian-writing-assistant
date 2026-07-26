@@ -46,7 +46,10 @@ import {
   createAssistantTurnRevision,
 } from "../finalization/assistantTurnFinalization";
 import { buildDirectProviderActionLedger } from "../finalization/directProviderActionLedger";
-import { getActiveAssistantRevision } from "../conversation/assistantRevisions";
+import {
+  getActiveAssistantRevision,
+  isMeaningfulAssistantReplacement,
+} from "../conversation/assistantRevisions";
 import {
   allVisibleProse,
   lastNonEmptyProse,
@@ -299,6 +302,10 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
     timelineEl: assistantBubble.turnView.rootEl,
     findActionHostByToolCallId: (toolCallId) =>
       assistantBubble.turnView.getReviewHostForToolCallId(toolCallId),
+    getProvisionalActionHost: () =>
+      assistantBubble.turnView.getProvisionalReviewHost(),
+    onReviewPlacementChanged: () =>
+      assistantBubble.turnView.refreshActionSectionVisibility(),
     policy: plugin.settings.vaultOpPolicy,
     posture,
     ...(editsActive && {
@@ -353,6 +360,9 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
       finalization.kind === "replace"
         ? getActiveAssistantRevision(finalization.oldMessage)
         : null;
+    const messageUsage = input.usage
+      ? buildMessageUsage(activeModel.modelId, input.usage)
+      : undefined;
     const revision = createAssistantTurnRevision({
       revisionId: draftIdentity.revisionId,
       origin:
@@ -367,9 +377,7 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
       modelId: activeModel.modelId,
       turn: input.turn,
       replayEvidence: input.replayEvidence,
-      ...(input.usage
-        ? { usage: buildMessageUsage(activeModel.modelId, input.usage) }
-        : {}),
+      ...(messageUsage ? { usage: messageUsage } : {}),
       ...(ragSources ? { ragSources } : {}),
       ...(rewrittenQuery ? { rewrittenQuery } : {}),
       ...(input.isError ? { isError: true } : {}),
@@ -380,7 +388,18 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
     });
     const response = allVisibleProse(input.turn);
     if (finalization.kind === "replace") {
-      if (input.turn.items.length === 0) return false;
+      if (
+        !isMeaningfulAssistantReplacement({
+          provider: activeModel.provider,
+          turn: input.turn,
+          replayEvidence: input.replayEvidence,
+          usage: messageUsage,
+        })
+      ) {
+        assistantBubble.turnView.destroy();
+        assistantBubble.rowEl.remove();
+        return false;
+      }
       const committed = store.commitRevisionReplacement(
         finalization.oldMessage.id,
         revision,
@@ -404,6 +423,7 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
       transcript.registerBubble(assistantMessage.id, assistantBubble);
     }
     store.setLastAssistantResponse(response);
+    liveReview.detachPanels?.();
     await assistantBubble.turnView.refresh(input.turn, {
       actionLedger,
       ...(input.errorMessage === undefined

@@ -1,0 +1,242 @@
+import { describe, expect, it } from "vitest";
+import {
+  buildActionLedgerReviewModel,
+} from "../../../../src/chat/messages/actionLedgerReview";
+import type {
+  ToolActionLedgerEntry,
+} from "../../../../src/shared/types";
+
+function entry(
+  family: ToolActionLedgerEntry["family"],
+): ToolActionLedgerEntry {
+  const common = {
+    actionRef: `action-${family}`,
+    revisionId: "revision-1",
+    placement: {
+      state: "placed" as const,
+      anchor: "tool_call" as const,
+      itemId: `item-${family}`,
+      correlation: {
+        kind: "provider_id" as const,
+        toolCallId: `call-${family}`,
+      },
+    },
+    events: [
+      {
+        eventId: `event-${family}`,
+        type: "proposed" as const,
+        targetId: `target-${family}`,
+        createdAt: 1,
+      },
+    ],
+  };
+  switch (family) {
+    case "edit":
+      return {
+        ...common,
+        family,
+        payload: {
+          proposalId: "proposal-edit",
+          targets: [
+            {
+              targetId: "target-edit",
+              targetFilePath: "Fixture.md",
+              documentSnapshot: "before",
+              snapshotTimestamp: 1,
+              resolvedEdit: {
+                id: "resolved-edit",
+                editBlock: {
+                  id: "call-edit",
+                  searchText: "before",
+                  replaceText: "after",
+                  rawBlock: "",
+                },
+                matchOffset: 0,
+                matchLength: 6,
+                matchedText: "before",
+                startLine: 1,
+                endLine: 1,
+                contextBefore: [],
+                contextAfter: [],
+                confidence: 1,
+                matchType: "exact",
+              },
+            },
+          ],
+        },
+      };
+    case "vault_op":
+      return {
+        ...common,
+        family,
+        payload: {
+          proposalId: "proposal-vault",
+          createdAt: 1,
+          targets: [
+            {
+              targetId: "target-vault_op",
+              operation: {
+                kind: "create",
+                path: "Fixture.md",
+                content: "Fixture.",
+              },
+              gate: "ask",
+              summary: "Create Fixture.md",
+            },
+          ],
+        },
+      };
+    case "memory":
+      return {
+        ...common,
+        family,
+        payload: {
+          targets: [
+            {
+              targetId: "target-memory",
+              mutation: {
+                kind: "forget",
+                name: "fixture-memory",
+              },
+            },
+          ],
+        },
+      };
+    case "interaction":
+      return {
+        ...common,
+        family,
+        payload: {
+          kind: "ask_user",
+          targets: [
+            {
+              targetId: "target-interaction",
+              question: "Continue?",
+              header: "Choice",
+              options: ["Yes", "No"],
+              multiSelect: false,
+            },
+          ],
+        },
+      };
+  }
+}
+
+const activeEligibility = {
+  canApprove: true,
+  canDecline: true,
+  canApply: false,
+  canRetry: false,
+  canUndo: false,
+};
+
+describe("ledger-backed review models", () => {
+  it.each([
+    ["edit", "Fixture.md"],
+    ["vault_op", "Create Fixture.md"],
+    ["memory", "fixture-memory"],
+    ["interaction", "Choice: Continue?"],
+  ] as const)("binds %s review by itemId and actionRef", (family, label) => {
+    const model = buildActionLedgerReviewModel(
+      entry(family),
+      () => activeEligibility,
+    );
+
+    expect(model.binding).toEqual({
+      actionRef: `action-${family}`,
+      placement: "placed",
+      itemId: `item-${family}`,
+    });
+    expect(model.targets).toEqual([
+      expect.objectContaining({
+        targetId: `target-${family}`,
+        label: expect.stringContaining(label),
+        controls: ["approve", "decline"],
+      }),
+    ]);
+  });
+
+  it("keeps provisional and unplaced entries out of ordered item binding", () => {
+    const provisional = entry("memory");
+    provisional.placement = {
+      state: "provisional",
+      correlation: {
+        kind: "provider_id",
+        toolCallId: "call-memory",
+      },
+    };
+    const unplaced = structuredClone(provisional);
+    unplaced.placement = {
+      state: "unplaced",
+      correlation: {
+        kind: "provider_id",
+        toolCallId: "call-memory",
+      },
+      reason: "declaration_missing",
+    };
+
+    expect(
+      buildActionLedgerReviewModel(provisional, () => activeEligibility).binding,
+    ).toEqual({
+      actionRef: "action-memory",
+      placement: "provisional",
+    });
+    expect(
+      buildActionLedgerReviewModel(unplaced, () => activeEligibility).binding,
+    ).toEqual({
+      actionRef: "action-memory",
+      placement: "unplaced",
+    });
+  });
+
+  it("shows one derived applied or undone state without repeating effect events", () => {
+    const applied = entry("memory");
+    applied.events.push({
+      eventId: "applied-memory",
+      type: "apply_succeeded",
+      targetId: "target-memory",
+      createdAt: 2,
+      effect: {
+        family: "memory",
+        before: null,
+        after: null,
+        appliedAt: 2,
+      },
+    });
+    const undone = structuredClone(applied);
+    undone.events.push({
+      eventId: "undone-memory",
+      type: "undo_succeeded",
+      targetId: "target-memory",
+      createdAt: 3,
+      undo: {
+        family: "memory",
+        restored: null,
+        undoneAt: 3,
+      },
+    });
+
+    expect(
+      buildActionLedgerReviewModel(applied, () => ({
+        ...activeEligibility,
+        canApprove: false,
+        canDecline: false,
+        canUndo: true,
+      })).targets[0],
+    ).toMatchObject({
+      state: "applied",
+      controls: ["undo"],
+    });
+    expect(
+      buildActionLedgerReviewModel(undone, () => ({
+        ...activeEligibility,
+        canApprove: false,
+        canDecline: false,
+        canRetry: true,
+      })).targets[0],
+    ).toMatchObject({
+      state: "undone",
+      controls: ["retry"],
+    });
+  });
+});

@@ -280,6 +280,7 @@ describe("action control eligibility and supersession", () => {
       deriveActionControlEligibility(proposed, "target-1", activeHead),
     ).toEqual({
       canApprove: true,
+      canDecline: true,
       canApply: false,
       canRetry: false,
       canUndo: false,
@@ -305,6 +306,7 @@ describe("action control eligibility and supersession", () => {
       }),
     ).toEqual({
       canApprove: false,
+      canDecline: false,
       canApply: false,
       canRetry: false,
       canUndo: true,

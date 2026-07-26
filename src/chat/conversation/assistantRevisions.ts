@@ -46,6 +46,28 @@ export interface CreateEditedRevisionInput {
   itemId: (sourceItemId: string, index: number) => string;
 }
 
+export interface MeaningfulAssistantReplacementInput {
+  provider: ProviderOption;
+  turn: AssistantTurnRecord;
+  replayEvidence?: AssistantReplayEvidence;
+  usage?: MessageUsage;
+}
+
+/**
+ * Decide whether an ephemeral generation draft contains history that must be
+ * committed as a replacement revision.
+ */
+export function isMeaningfulAssistantReplacement(
+  input: MeaningfulAssistantReplacementInput,
+): boolean {
+  if (input.turn.items.length > 0) return true;
+  return (
+    input.provider === "claudecode" &&
+    input.replayEvidence?.capabilities.nativeResume === true &&
+    input.usage?.resumeCursor !== undefined
+  );
+}
+
 /** Return the selected revision only when the message's stable pointer resolves. */
 export function getActiveAssistantRevision(
   message: ConversationMessage,
@@ -188,14 +210,35 @@ export function createEditedRevision(
     provider: source.provider,
     modelId: source.modelId,
     turn: editedTurn,
-    replayEvidence: source.replayEvidence,
-    usage: source.usage,
+    replayEvidence:
+      source.provider === "claudecode" && source.replayEvidence
+        ? {
+            ...structuredClone(source.replayEvidence),
+            tier: "textual",
+            loweredReason: "history-edited",
+          }
+        : source.replayEvidence,
+    usage:
+      source.provider === "claudecode"
+        ? invalidateEditedResumeUsage(source.usage)
+        : source.usage,
     ragSources: source.ragSources,
     rewrittenQuery: source.rewrittenQuery,
     isError: source.isError,
     interrupted: source.interrupted,
     errorMessage: source.errorMessage,
   });
+}
+
+function invalidateEditedResumeUsage(
+  usage: MessageUsage | undefined,
+): MessageUsage | undefined {
+  if (!usage) return undefined;
+  const edited = structuredClone(usage);
+  delete edited.resumeCursor;
+  delete edited.sessionReused;
+  delete edited.sessionResumed;
+  return edited;
 }
 
 /** Append a detached revision, select it, and derive compatibility fields once. */

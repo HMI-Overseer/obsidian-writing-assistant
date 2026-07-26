@@ -119,4 +119,25 @@ describe("AssistantTurnView architecture", () => {
     expect(registry).not.toContain("toolName");
     expect(registry).not.toContain("FIFO");
   });
+
+  it("places edit controls on prose hosts and derives review controls from the ledger", () => {
+    const view = source("src/chat/messages/AssistantTurnView.ts");
+    const toolbar = source(
+      "src/chat/messages/BubbleActionToolbar.ts",
+    );
+    const handler = source("src/chat/ChatBubbleActionHandler.ts");
+    const assistantActions =
+      toolbar.match(
+        /const ASSISTANT_ACTIONS: ActionDef\[\] = \[([\s\S]*?)\];/u,
+      )?.[1] ?? "";
+
+    expect(view).toContain("setProseEditHandler");
+    expect(view).toContain("getProseHost");
+    expect(view).toContain('"Edit this prose block"');
+    expect(view).toContain("buildActionLedgerReviewModel");
+    expect(view).toContain("setActionReviewContext");
+    expect(assistantActions).not.toContain('action: "edit"');
+    expect(handler).toContain("editAssistantProseItem");
+    expect(handler).toContain("executeMessageAction");
+  });
 });

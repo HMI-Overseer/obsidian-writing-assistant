@@ -40,6 +40,8 @@ export interface EditReviewTimelineOptions {
   controllers: EditReviewController[];
   /** Live in-loop mount renders by hunk status; durable/history honors the applied record. */
   live?: boolean;
+  /** Ambiguous legacy ownership renders status and diff without mutation controls. */
+  readOnly?: boolean;
   /**
    * Flip the session into auto-apply ("Edit automatically"). When provided, the bulk bar
    * offers an "Accept all this session" action that accepts the current pending hunks and
@@ -149,6 +151,11 @@ export class EditReviewTimelineView {
    * also flips the session to auto-apply.
    */
   private renderBulkBar(): void {
+    if (this.opts.readOnly) {
+      this.bulkBarEl?.remove();
+      this.bulkBarEl = null;
+      return;
+    }
     const pendingCount = this.allPendingCount();
     if (pendingCount < 2) {
       this.bulkBarEl?.remove();
@@ -310,6 +317,21 @@ export class EditReviewTimelineView {
   private renderControls(entry: HunkEntry, view: InitialHunkView): void {
     const { controlsEl, hunk, noMatch, controller } = entry;
     controlsEl.empty();
+
+    if (this.opts.readOnly) {
+      controlsEl.createSpan({
+        cls: "lmsa-edit-step-state",
+        text:
+          view === "applied"
+            ? "Applied"
+            : view === "skipped"
+              ? "Skipped"
+              : noMatch
+                ? "No match"
+                : "Historical review",
+      });
+      return;
+    }
 
     if (view === "applied") {
       controlsEl.createSpan({ cls: "lmsa-edit-step-state", text: "Applied" });

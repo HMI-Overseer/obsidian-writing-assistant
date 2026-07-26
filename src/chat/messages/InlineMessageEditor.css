@@ -23,6 +23,10 @@
   appearance: none;
 }
 
+.lmsa-chat-window-inline-editor-textarea.lmsa-assistant-turn-item-body {
+  grid-column: 2;
+}
+
 /* A slim accent bar on each side marks edit mode without enclosing the text. The
    paired reset strips the form-field chrome Obsidian adds on hover/focus, that ring
    is the "box" that otherwise appeared, while keeping the bars. Body-scoped so it

@@ -115,6 +115,7 @@ export interface ActionControlContext {
 
 export interface ActionControlEligibility {
   canApprove: boolean;
+  canDecline: boolean;
   canApply: boolean;
   canRetry: boolean;
   canUndo: boolean;
@@ -246,6 +247,7 @@ export function deriveActionControlEligibility(
   if (!state) {
     return {
       canApprove: false,
+      canDecline: false,
       canApply: false,
       canRetry: false,
       canUndo: false,
@@ -270,8 +272,15 @@ export function deriveActionControlEligibility(
       state.approval === "pending" &&
       state.effect === "none" &&
       !state.superseded,
+    canDecline:
+      ownsActiveHead &&
+      (state.approval === "pending" ||
+        state.approval === "approved") &&
+      state.effect === "none" &&
+      !state.superseded,
     canApply:
       ownsActiveHead &&
+      entry.family !== "interaction" &&
       !state.superseded &&
       ((state.approval === "approved" && state.effect === "none") ||
         state.retry === "requested"),

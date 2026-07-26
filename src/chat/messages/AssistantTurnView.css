@@ -265,6 +265,44 @@
   min-width: 0;
 }
 
+.lmsa-assistant-turn-item--prose
+  > .lmsa-assistant-turn-item-body
+  > .lmsa-assistant-turn-action-host {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.lmsa-assistant-turn-prose-edit {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-muted);
+  opacity: 0;
+  box-shadow: none;
+}
+
+.lmsa-assistant-turn-item--prose:hover
+  .lmsa-assistant-turn-prose-edit,
+.lmsa-assistant-turn-prose-edit:focus-visible {
+  opacity: 1;
+}
+
+.lmsa-assistant-turn-prose-edit:hover {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+
+.lmsa-assistant-turn-prose-edit svg {
+  width: 14px;
+  height: 14px;
+}
+
 .lmsa-assistant-turn-item--tool_call
   > .lmsa-agentic-timeline-step-body
   > .lmsa-assistant-turn-action-host {
@@ -402,6 +440,51 @@
   padding-left: 1.2rem;
   color: var(--text-muted);
   font-size: var(--font-ui-small);
+}
+
+.lmsa-assistant-turn-action-targets > li {
+  margin-top: 0.25rem;
+}
+
+.lmsa-assistant-turn-action-target-state {
+  margin-left: 0.5rem;
+  color: var(--text-faint);
+  font-size: var(--font-ui-smaller);
+}
+
+.lmsa-assistant-turn-action-error {
+  margin-top: 0.2rem;
+  color: var(--text-error);
+  font-size: var(--font-ui-smaller);
+}
+
+.lmsa-assistant-turn-action-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-top: 0.35rem;
+}
+
+.lmsa-assistant-turn-action-control {
+  min-height: 28px;
+  padding: 0.2rem 0.65rem;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 6px;
+  background: var(--interactive-normal);
+  color: var(--text-normal);
+  box-shadow: none;
+}
+
+.lmsa-assistant-turn-action-control:hover {
+  background: var(--interactive-hover);
+}
+
+.lmsa-assistant-turn-action-control:is(.is-approve, .is-apply) {
+  border-color: var(--interactive-accent);
+}
+
+.lmsa-assistant-turn-action-control.is-decline {
+  color: var(--text-error);
 }
 
 @media (max-width: 700px) {

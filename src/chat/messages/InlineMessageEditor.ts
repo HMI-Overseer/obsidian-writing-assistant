@@ -12,13 +12,16 @@ export class InlineMessageEditor {
     private readonly callbacks: {
       onSave: (newContent: string) => void;
       onCancel: () => void;
-    }
+    },
+    private readonly assistantProseItemId?: string,
   ) {}
 
   activate(): void {
     const contentEl =
       this.bubble.role === "assistant"
-        ? this.bubble.turnView.getPrimaryProseHost()
+        ? this.assistantProseItemId
+          ? this.bubble.turnView.getProseHost(this.assistantProseItemId)
+          : this.bubble.turnView.getPrimaryProseHost()
         : this.bubble.contentEl;
     if (!contentEl) {
       this.callbacks.onCancel();
@@ -26,8 +29,12 @@ export class InlineMessageEditor {
     }
     const editorHostEl =
       this.bubble.role === "assistant"
-        ? this.bubble.turnView.rootEl
+        ? contentEl.parentElement
         : this.bubble.bodyEl;
+    if (!editorHostEl) {
+      this.callbacks.onCancel();
+      return;
+    }
 
     this.bubble.rowEl.addClass("is-editing");
     contentEl.addClass("lmsa-hidden");
@@ -39,6 +46,10 @@ export class InlineMessageEditor {
       cls: "lmsa-chat-window-inline-editor-textarea",
       attr: { rows: "1" },
     });
+    if (this.bubble.role === "assistant") {
+      textareaEl.addClass("lmsa-assistant-turn-item-body");
+      contentEl.before(textareaEl);
+    }
     this.textareaEl = textareaEl;
     textareaEl.value = this.originalContent;
 

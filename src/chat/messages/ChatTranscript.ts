@@ -18,14 +18,27 @@ import { ImagePreviewModal } from "./ImagePreviewModal";
 import { AssistantTurnView } from "./AssistantTurnView";
 import { selectAssistantMessageRenderSource } from "./assistantTurnRenderModel";
 import { getActiveAssistantRevision } from "../conversation/assistantRevisions";
+import type { ActionControlEligibility } from "../conversation/actionLedger";
+import type { ActionReviewControl } from "./actionLedgerReview";
 
 export type BubbleActionCallbacks = {
   onCopy: (messageId: string) => void;
-  onEdit: (messageId: string) => void;
+  onEdit: (messageId: string, proseItemId?: string) => void;
   onDelete: (messageId: string) => void;
   onBranch: (messageId: string) => void;
   onRegenerate: (messageId: string) => void;
   onVersionChange: (messageId: string, newIndex: number) => void;
+  getActionEligibility: (
+    messageId: string,
+    actionRef: string,
+    targetId: string,
+  ) => ActionControlEligibility;
+  onActionControl: (
+    messageId: string,
+    actionRef: string,
+    targetId: string,
+    control: ActionReviewControl,
+  ) => void;
 };
 
 const AUTO_SCROLL_BOTTOM_THRESHOLD_PX = 10;
@@ -192,6 +205,14 @@ export class ChatTranscript {
    * attribute and adds to the lookup map for later adoption.
    */
   registerBubble(messageId: string, bubble: BubbleRefs): void {
+    const existing = this.bubblesByMessageId.get(messageId);
+    if (existing && existing.rowEl !== bubble.rowEl) {
+      if (existing.role === "assistant") existing.turnView.destroy();
+      existing.rowEl.remove();
+      this.renderedMessageIds = this.renderedMessageIds.filter(
+        (renderedId) => renderedId !== messageId,
+      );
+    }
     bubble.rowEl.dataset.messageId = messageId;
     this.bubblesByMessageId.set(messageId, bubble);
   }
@@ -468,6 +489,29 @@ export class ChatTranscript {
     // Usage badge, shown below assistant bubbles before the toolbar.
     if (message.role === "assistant") {
       const activeRevision = getActiveAssistantRevision(message);
+      if (bubble.role === "assistant") {
+        bubble.turnView.setProseEditHandler(
+          activeRevision?.kind === "turn"
+            ? (proseItemId) =>
+                callbacks.onEdit(message.id, proseItemId)
+            : null,
+        );
+        bubble.turnView.setActionReviewContext(
+          (entry, targetId) =>
+            callbacks.getActionEligibility(
+              message.id,
+              entry.actionRef,
+              targetId,
+            ),
+          (entry, targetId, control) =>
+            callbacks.onActionControl(
+              message.id,
+              entry.actionRef,
+              targetId,
+              control,
+            ),
+        );
+      }
       renderUsageBadge(
         bubble.rowEl,
         activeRevision?.usage ?? message.usage,

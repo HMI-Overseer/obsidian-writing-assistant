@@ -14,6 +14,8 @@
   font: inherit;
   line-height: 1.68;
   max-height: 360px;
+  min-height: 2.6em;
+  field-sizing: content;
   overflow-y: auto;
   white-space: pre-wrap;
   outline: none;
@@ -27,7 +29,10 @@
    clears Obsidian's core input focus rule without !important. */
 .lmsa-chat-window-message-body .lmsa-chat-window-inline-editor-textarea:hover,
 .lmsa-chat-window-message-body .lmsa-chat-window-inline-editor-textarea:focus,
-.lmsa-chat-window-message-body .lmsa-chat-window-inline-editor-textarea:focus-visible {
+.lmsa-chat-window-message-body .lmsa-chat-window-inline-editor-textarea:focus-visible,
+.lmsa-assistant-turn .lmsa-chat-window-inline-editor-textarea:hover,
+.lmsa-assistant-turn .lmsa-chat-window-inline-editor-textarea:focus,
+.lmsa-assistant-turn .lmsa-chat-window-inline-editor-textarea:focus-visible {
   border: none;
   border-inline: var(--lmsa-edit-bar);
   background: transparent;

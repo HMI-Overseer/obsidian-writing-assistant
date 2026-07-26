@@ -580,7 +580,7 @@ export class ChatView extends ItemView {
     for (const message of snapshot.messageHistory) {
       if (message.editProposals?.length || message.vaultOpProposal) {
         const bubble = this.transcript.getBubbleForMessage(message.id);
-        if (bubble) {
+        if (bubble?.role === "assistant") {
           renderProposalPanels(
             this.app,
             this,

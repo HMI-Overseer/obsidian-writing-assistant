@@ -1,20 +1,22 @@
 import { setIcon } from "obsidian";
 import type { App, Component } from "obsidian";
 import type { Attachment, ConversationMessage } from "../../shared/types";
-import type { BubbleRefs, BubbleRenderOptions, ChatLayoutRefs } from "../types";
-import { GENERATION_STOPPED_LABEL } from "../types";
+import type {
+  AssistantBubbleRefs,
+  BubbleRefs,
+  BubbleRenderOptions,
+  ChatLayoutRefs,
+  UserBubbleRefs,
+} from "../types";
 import type { MarkdownBubbleRenderer } from "../rendering/MarkdownBubbleRenderer";
 import { MarkdownItBubbleRenderer } from "../rendering/MarkdownItBubbleRenderer";
 import { BubbleActionToolbar } from "./BubbleActionToolbar";
 import { BubbleVersionNav } from "./BubbleVersionNav";
 import { renderUsageBadge } from "./UsageBadge";
 import { renderRagSources } from "./RagSourcesList";
-import { AgenticTimeline } from "./AgenticTimeline";
 import { ImagePreviewModal } from "./ImagePreviewModal";
-import {
-  assistantRevisionErrorMessage,
-  assistantToolStepProjection,
-} from "../conversation/assistantRevisions";
+import { AssistantTurnView } from "./AssistantTurnView";
+import { selectAssistantMessageRenderSource } from "./assistantTurnRenderModel";
 
 export type BubbleActionCallbacks = {
   onCopy: (messageId: string) => void;
@@ -137,32 +139,23 @@ export class ChatTranscript {
     }
   }
 
-  /**
-   * Renders a persisted message's timeline and body into its bubble. A persisted
-   * empty assistant turn is a stopped (aborted) claudecode generation
-   * (`GENERATION_STOPPED_LABEL` persist-always, ADR-0016): render
-   * the same muted face `finalizeAbortedResponse` shows live, not a blank bubble.
-   */
   private async renderMessageBody(bubble: BubbleRefs, message: ConversationMessage): Promise<void> {
-    const projectedSteps =
-      message.role === "assistant"
-        ? message.agenticSteps ?? assistantToolStepProjection(message)
-        : [];
-    if (projectedSteps.length > 0) {
-      AgenticTimeline.render(bubble.timelineEl, projectedSteps);
+    if (message.role === "assistant" && bubble.role === "assistant") {
+      const source = selectAssistantMessageRenderSource(message);
+      if (source.kind === "turn") {
+        await bubble.turnView.refresh(source.turn, {
+          actionLedger: source.actionLedger,
+          errorMessage: source.errorMessage,
+        });
+      } else {
+        await bubble.turnView.refreshLegacy(source.source);
+      }
+      return;
     }
-
-    if (message.isError) {
-      bubble.bodyEl.addClass("is-error");
-      this.renderPlainTextContent(
-        bubble,
-        assistantRevisionErrorMessage(message) ?? message.content,
-      );
-    } else if (message.role === "assistant" && message.content === "") {
-      this.renderPlainTextContent(bubble, GENERATION_STOPPED_LABEL);
-      bubble.bodyEl.addClass("is-muted");
-    } else {
-      await this.renderBubbleContent(bubble, message.content, { attachments: message.attachments });
+    if (message.role === "user" && bubble.role === "user") {
+      await this.renderBubbleContent(bubble, message.content, {
+        attachments: message.attachments,
+      });
     }
   }
 
@@ -251,13 +244,16 @@ export class ChatTranscript {
     );
     const anchorY = oldToolbarEl?.getBoundingClientRect().top ?? null;
 
-    // In-place content swap
-    await this.renderBubbleContent(bubble, message.content);
+    await this.renderMessageBody(bubble, message);
 
     // Replace toolbar, usage badge, and rag sources with updated state
     oldToolbarEl?.remove();
     bubble.rowEl.querySelector(".lmsa-chat-window-usage-badge")?.remove();
-    bubble.bodyEl.querySelector(".lmsa-chat-window-rag-sources")?.remove();
+    if (bubble.role === "assistant") {
+      bubble.turnView.rootEl
+        .querySelector(".lmsa-chat-window-rag-sources")
+        ?.remove();
+    }
     this.attachBubbleActions(bubble, message, isLastAssistant, callbacks);
 
     // Restore scroll anchor so version nav stays at the same screen position
@@ -272,6 +268,9 @@ export class ChatTranscript {
     }
   }
 
+  createBubble(role: "user", messageId?: string): UserBubbleRefs;
+  createBubble(role: "assistant", messageId?: string): AssistantBubbleRefs;
+  createBubble(role: "user" | "assistant", messageId?: string): BubbleRefs;
   createBubble(role: "user" | "assistant", messageId?: string): BubbleRefs {
     const rowEl = this.refs.messagesEl.createDiv({
       cls: `lmsa-chat-window-message lmsa-chat-window-message--${role}`,
@@ -290,11 +289,10 @@ export class ChatTranscript {
       text: role === "user" ? "You" : "Assistant",
     });
 
-    const timelineEl = columnEl.createDiv({ cls: "lmsa-chat-window-message-timeline" });
-    const bodyEl = columnEl.createDiv({ cls: "lmsa-chat-window-message-body lmsa-ui-card" });
-    const contentEl = bodyEl.createDiv({ cls: "lmsa-chat-window-message-content" });
-
-    const refs: BubbleRefs = { role, rowEl, columnEl, chromeEl, timelineEl, bodyEl, contentEl };
+    const refs: BubbleRefs =
+      role === "assistant"
+        ? this.createAssistantBubbleRefs(rowEl, columnEl, chromeEl)
+        : this.createUserBubbleRefs(rowEl, columnEl, chromeEl);
 
     if (messageId) {
       this.bubblesByMessageId.set(messageId, refs);
@@ -317,6 +315,9 @@ export class ChatTranscript {
   }
 
   clear(): void {
+    for (const bubble of this.bubblesByMessageId.values()) {
+      if (bubble.role === "assistant") bubble.turnView.destroy();
+    }
     this.markdownRenderer.clearAll();
     this.bubblesByMessageId.clear();
     this.renderedMessageIds = [];
@@ -326,10 +327,21 @@ export class ChatTranscript {
   }
 
   destroy(): void {
+    for (const bubble of this.bubblesByMessageId.values()) {
+      if (bubble.role === "assistant") bubble.turnView.destroy();
+    }
     this.markdownRenderer.clearAll();
   }
 
   renderPlainTextContent(bubble: BubbleRefs, text: string): void {
+    if (bubble.role === "assistant") {
+      void bubble.turnView.refreshLegacy({
+        key: bubble.rowEl.dataset.messageId ?? "live-assistant",
+        status: "completed",
+        content: text,
+      });
+      return;
+    }
     this.markdownRenderer.clear(bubble.contentEl);
     bubble.contentEl.empty();
     bubble.contentEl.removeClass("lmsa-chat-window-message-content--markdown");
@@ -342,6 +354,14 @@ export class ChatTranscript {
     text: string,
     options: BubbleRenderOptions = {}
   ): Promise<void> {
+    if (bubble.role === "assistant") {
+      await bubble.turnView.refreshLegacy({
+        key: bubble.rowEl.dataset.messageId ?? "live-assistant",
+        status: "completed",
+        content: text,
+      });
+      return;
+    }
     bubble.bodyEl.removeClass("is-error", "is-muted");
     if (!options.preserveStreaming) {
       bubble.bodyEl.removeClass("is-streaming");
@@ -412,7 +432,7 @@ export class ChatTranscript {
   }
 
   private prepareBubbleContentWithAttachments(
-    bubble: BubbleRefs,
+    bubble: UserBubbleRefs,
     attachments: Attachment[]
   ): HTMLElement {
     this.markdownRenderer.clear(bubble.contentEl);
@@ -447,8 +467,13 @@ export class ChatTranscript {
     // Usage badge, shown below assistant bubbles before the toolbar.
     if (message.role === "assistant") {
       renderUsageBadge(bubble.rowEl, message.usage, message.modelId, message.provider);
-      if (message.ragSources?.length) {
-        renderRagSources(bubble.bodyEl, message.ragSources, this.app, message.rewrittenQuery);
+      if (message.ragSources?.length && bubble.role === "assistant") {
+        renderRagSources(
+          bubble.turnView.rootEl,
+          message.ragSources,
+          this.app,
+          message.rewrittenQuery,
+        );
       }
     }
 
@@ -462,5 +487,49 @@ export class ChatTranscript {
       isLastAssistant,
       callbacks,
     });
+  }
+
+  private createUserBubbleRefs(
+    rowEl: HTMLElement,
+    columnEl: HTMLElement,
+    chromeEl: HTMLElement,
+  ): UserBubbleRefs {
+    const bodyEl = columnEl.createDiv({
+      cls: "lmsa-chat-window-message-body lmsa-ui-card",
+    });
+    const contentEl = bodyEl.createDiv({
+      cls: "lmsa-chat-window-message-content",
+    });
+    return {
+      role: "user",
+      rowEl,
+      columnEl,
+      chromeEl,
+      bodyEl,
+      contentEl,
+    };
+  }
+
+  private createAssistantBubbleRefs(
+    rowEl: HTMLElement,
+    columnEl: HTMLElement,
+    chromeEl: HTMLElement,
+  ): AssistantBubbleRefs {
+    const turnHostEl = rowEl.createDiv({
+      cls: "lmsa-chat-window-assistant-turn-host",
+    });
+    const turnView = new AssistantTurnView(
+      turnHostEl,
+      this.markdownRenderer,
+      () => this.scrollToBottom(),
+    );
+    return {
+      role: "assistant",
+      rowEl,
+      columnEl,
+      chromeEl,
+      turnHostEl,
+      turnView,
+    };
   }
 }

@@ -2,12 +2,10 @@ import { Notice } from "obsidian";
 import type WritingAssistantChat from "../../main";
 import type { AgenticStep, ProviderOption, RagSourceRef } from "../../shared/types";
 import type { UsageResult } from "../../api/usageTypes";
-import type { BubbleRefs } from "../types";
-import { GENERATION_STOPPED_LABEL } from "../types";
+import type { AssistantBubbleRefs } from "../types";
 import { makeMessage } from "../conversation/conversationUtils";
 import type { ChatSessionStore } from "../conversation/ChatSessionStore";
 import type { ChatTranscript } from "../messages/ChatTranscript";
-import type { StreamingRenderer } from "../streaming/StreamingRenderer";
 import { estimateCost } from "../../api/pricing";
 import { hasCompletedAskGuidance } from "../../tools/resultDigest";
 
@@ -42,8 +40,8 @@ export function attachUsageToMessage(
 export async function finalizeResponse(
   store: ChatSessionStore,
   transcript: ChatTranscript,
-  bubble: BubbleRefs,
-  renderer: StreamingRenderer,
+  bubble: AssistantBubbleRefs,
+  response: string,
   autoInsertAfterResponse: boolean,
   plugin: WritingAssistantChat,
   modelId?: string,
@@ -53,11 +51,6 @@ export async function finalizeResponse(
   rewrittenQuery?: string,
   agenticSteps?: AgenticStep[]
 ): Promise<void> {
-  // In agentic multi-round sessions the bubble only shows the final round.
-  // getCurrentRoundResponse() returns that slice; for single-round sessions it
-  // equals getFullResponse().
-  const response = renderer.getCurrentRoundResponse();
-
   if (response || hasCompletedAskGuidance(agenticSteps)) {
     const assistantMessage = makeMessage("assistant", response);
     attachUsageToMessage(assistantMessage, modelId, provider, usage);
@@ -67,42 +60,36 @@ export async function finalizeResponse(
     store.appendMessage(assistantMessage);
     store.setLastAssistantResponse(response);
     transcript.registerBubble(assistantMessage.id, bubble);
-
-    if (
-      response &&
-      (
-        !renderer.hasStreamRenderedMarkdown() ||
-        renderer.getLastRenderedText() !== response
-      )
-    ) {
-      await transcript.renderBubbleContent(bubble, response);
-    }
-
-    if (!response) {
-      transcript.renderPlainTextContent(bubble, "(no response)");
-    }
+    await bubble.turnView.refreshLegacy({
+      key: assistantMessage.id,
+      status: "completed",
+      content: response,
+      steps: agenticSteps,
+    });
 
     if (autoInsertAfterResponse && response) {
       await insertLastResponse(plugin, response);
     }
   } else {
-    transcript.renderPlainTextContent(bubble, "(no response)");
+    await bubble.turnView.refreshLegacy({
+      key: "empty-assistant-response",
+      status: "completed",
+      content: "",
+    });
   }
 }
 
 export async function finalizeAbortedResponse(
   store: ChatSessionStore,
   transcript: ChatTranscript,
-  bubble: BubbleRefs,
-  renderer: StreamingRenderer,
+  bubble: AssistantBubbleRefs,
+  response: string,
   modelId?: string,
   provider?: ProviderOption,
   ragSources?: RagSourceRef[],
   rewrittenQuery?: string,
   agenticSteps?: AgenticStep[]
 ): Promise<void> {
-  const response = renderer.getCurrentRoundResponse();
-
   if (response) {
     const assistantMessage = makeMessage("assistant", response);
     attachUsageToMessage(assistantMessage, modelId, provider);
@@ -115,13 +102,12 @@ export async function finalizeAbortedResponse(
     store.appendMessage(assistantMessage);
     store.setLastAssistantResponse(response);
     transcript.registerBubble(assistantMessage.id, bubble);
-
-    if (
-      !renderer.hasStreamRenderedMarkdown() ||
-      renderer.getLastRenderedText() !== response
-    ) {
-      await transcript.renderBubbleContent(bubble, response);
-    }
+    await bubble.turnView.refreshLegacy({
+      key: assistantMessage.id,
+      status: "interrupted",
+      content: response,
+      steps: agenticSteps,
+    });
   } else {
     // A claudecode turn ALWAYS persists its aborted assistant message, even with
     // zero text: the live session banked an empty assistant turn in its watermark,
@@ -141,8 +127,12 @@ export async function finalizeAbortedResponse(
       store.appendMessage(assistantMessage);
       transcript.registerBubble(assistantMessage.id, bubble);
     }
-    transcript.renderPlainTextContent(bubble, GENERATION_STOPPED_LABEL);
-    bubble.bodyEl.addClass("is-muted");
+    await bubble.turnView.refreshLegacy({
+      key: "empty-interrupted-assistant-response",
+      status: "interrupted",
+      content: "",
+      steps: agenticSteps,
+    });
   }
 }
 

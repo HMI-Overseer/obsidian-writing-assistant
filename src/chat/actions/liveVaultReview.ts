@@ -122,6 +122,8 @@ export interface LiveVaultReviewOptions {
   app: App;
   /** The streaming bubble's timeline element, where the review decorates steps. */
   timelineEl: HTMLElement;
+  /** Resolve a review host from one exact provider or plugin tool-call ID. */
+  findActionHostByToolCallId?: (toolCallId: string) => HTMLElement | null;
   policy: VaultOpPolicy;
   /** Session approval posture; `auto` overrules the per-class policy to auto-apply (section 6.3). */
   posture: ApprovalPosture;
@@ -151,6 +153,9 @@ export interface LiveVaultReviewOptions {
 export class LiveVaultReview implements VaultOpReviewer {
   private readonly app: App;
   private readonly timelineEl: HTMLElement;
+  private readonly findActionHostByToolCallId?: (
+    toolCallId: string,
+  ) => HTMLElement | null;
   private readonly policy: VaultOpPolicy;
   private readonly posture: ApprovalPosture;
 
@@ -200,6 +205,7 @@ export class LiveVaultReview implements VaultOpReviewer {
   constructor(opts: LiveVaultReviewOptions) {
     this.app = opts.app;
     this.timelineEl = opts.timelineEl;
+    this.findActionHostByToolCallId = opts.findActionHostByToolCallId;
     this.policy = opts.policy;
     this.posture = opts.posture;
     this.editDeps = opts.edit;
@@ -714,6 +720,9 @@ export class LiveVaultReview implements VaultOpReviewer {
     if (!this.memoryDeps) return;
     new MemoryReviewTimelineView({
       timelineEl: this.timelineEl,
+      ...(this.findActionHostByToolCallId && {
+        findActionHostByToolCallId: this.findActionHostByToolCallId,
+      }),
       proposals: this.memoryProposals,
       callbacks: {
         onApprove: (proposalId) => this.approveMemory(proposalId),
@@ -993,6 +1002,9 @@ export class LiveVaultReview implements VaultOpReviewer {
     this.editTimelineView?.destroy();
     this.editTimelineView = new EditReviewTimelineView({
       timelineEl: this.timelineEl,
+      ...(this.findActionHostByToolCallId && {
+        findActionHostByToolCallId: this.findActionHostByToolCallId,
+      }),
       app: this.app,
       controllers,
       live: true,
@@ -1031,6 +1043,9 @@ export class LiveVaultReview implements VaultOpReviewer {
     };
     new VaultReviewTimelineView({
       timelineEl: this.timelineEl,
+      ...(this.findActionHostByToolCallId && {
+        findActionHostByToolCallId: this.findActionHostByToolCallId,
+      }),
       app: this.app,
       proposal: this.proposal,
       callbacks,

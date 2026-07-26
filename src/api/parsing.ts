@@ -35,7 +35,7 @@ export function readStringArray(value: unknown): string[] | undefined {
  * non-object), rather than throwing or dropping the call. Surfacing the call with
  * empty args lets the tool loop run its normal schema validation and return a
  * self-correcting "invalid arguments" result, which the agentic timeline shows on
- * the step's expandable row (see {@link ../chat/messages/AgenticTimeline}'s
+ * the step's expandable row (see {@link ../chat/messages/AssistantTurnView}'s
  * `decorateError`). A dropped call would instead vanish silently from the turn,
  * with the only trace left in the developer console, a channel neither the user
  * nor the model can act on.

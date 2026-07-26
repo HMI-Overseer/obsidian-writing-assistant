@@ -355,6 +355,7 @@ export async function runToolLoop(
           : {}),
       });
     }
+    callbacks.onTurnSnapshot?.(turnBuilder.snapshot());
 
     // A fresh provider batch containing ask_user is owned by the barrier branch
     // before mutation capping, allow-list checks, spin counting, accumulation, or
@@ -363,6 +364,7 @@ export async function runToolLoop(
     if (askBarrierPlan) {
       if (capHit) {
         recordCapResults(turnBuilder, toolCalls, round);
+        callbacks.onTurnSnapshot?.(turnBuilder.snapshot());
         break;
       }
 
@@ -393,6 +395,7 @@ export async function runToolLoop(
           toolCallId: tc.id,
         });
       }
+      callbacks.onTurnSnapshot?.(turnBuilder.snapshot());
 
       callbacks.onNewRound?.();
       if (streamedThisRound) modelRounds++;
@@ -493,6 +496,7 @@ export async function runToolLoop(
           toolLoopTurns,
           pendingEmission,
         );
+        callbacks.onTurnSnapshot?.(turnBuilder.snapshot());
         break;
       }
       capHit = true;
@@ -509,6 +513,7 @@ export async function runToolLoop(
         toolLoopTurns,
         pendingEmission,
       );
+      callbacks.onTurnSnapshot?.(turnBuilder.snapshot());
       callbacks.onNewRound?.();
       continue;
     }
@@ -617,6 +622,7 @@ export async function runToolLoop(
         disposition: result.disposition,
       });
     }
+    callbacks.onTurnSnapshot?.(turnBuilder.snapshot());
 
     if (deferredCalls.length === 0) {
       pendingEmission = flushPendingEmission(
@@ -630,6 +636,7 @@ export async function runToolLoop(
   }
 
   const turn = turnBuilder.finishTurn("completed");
+  callbacks.onTurnSnapshot?.(turn);
   return {
     writeToolCalls: allWriteToolCalls.length > 0 ? allWriteToolCalls : null,
     usage: finalUsage,

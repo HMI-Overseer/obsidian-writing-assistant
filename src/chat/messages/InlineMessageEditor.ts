@@ -3,6 +3,7 @@ import type { BubbleRefs } from "../types";
 
 export class InlineMessageEditor {
   private textareaEl: HTMLTextAreaElement | null = null;
+  private editingContentEl: HTMLElement | null = null;
   private injectedEls: HTMLElement[] = [];
 
   constructor(
@@ -15,30 +16,39 @@ export class InlineMessageEditor {
   ) {}
 
   activate(): void {
-    const contentHeight = this.bubble.contentEl.offsetHeight;
+    const contentEl =
+      this.bubble.role === "assistant"
+        ? this.bubble.turnView.getPrimaryProseHost()
+        : this.bubble.contentEl;
+    if (!contentEl) {
+      this.callbacks.onCancel();
+      return;
+    }
+    const editorHostEl =
+      this.bubble.role === "assistant"
+        ? this.bubble.turnView.rootEl
+        : this.bubble.bodyEl;
 
     this.bubble.rowEl.addClass("is-editing");
-    this.bubble.contentEl.addClass("lmsa-hidden");
+    contentEl.addClass("lmsa-hidden");
+    this.editingContentEl = contentEl;
 
     // Edit in place: the textarea takes the content's exact spot in the bubble
     // body, transparent and borderless, so no extra box appears around the text.
-    this.textareaEl = this.bubble.bodyEl.createEl("textarea", {
+    const textareaEl = editorHostEl.createEl("textarea", {
       cls: "lmsa-chat-window-inline-editor-textarea",
       attr: { rows: "1" },
     });
-    this.textareaEl.value = this.originalContent;
-    this.textareaEl.setCssStyles({ minHeight: `${contentHeight}px` });
+    this.textareaEl = textareaEl;
+    textareaEl.value = this.originalContent;
 
     this.renderActions();
 
     window.requestAnimationFrame(() => {
-      this.autoResize();
       this.textareaEl?.focus();
     });
 
-    this.textareaEl.addEventListener("input", () => this.autoResize());
-
-    this.textareaEl.addEventListener("keydown", (e) => {
+    textareaEl.addEventListener("keydown", (e) => {
       if (e.key === "Escape") {
         e.preventDefault();
         this.cancel();
@@ -87,11 +97,12 @@ export class InlineMessageEditor {
 
   destroy(): void {
     this.bubble.rowEl.removeClass("is-editing");
-    this.bubble.contentEl.removeClass("lmsa-hidden");
+    this.editingContentEl?.removeClass("lmsa-hidden");
     this.textareaEl?.remove();
     for (const el of this.injectedEls) el.remove();
     this.injectedEls = [];
     this.textareaEl = null;
+    this.editingContentEl = null;
   }
 
   private save(): void {
@@ -110,11 +121,5 @@ export class InlineMessageEditor {
   private cancel(): void {
     this.callbacks.onCancel();
     this.destroy();
-  }
-
-  private autoResize(): void {
-    if (!this.textareaEl) return;
-    this.textareaEl.setCssStyles({ height: "auto" });
-    this.textareaEl.setCssStyles({ height: `${this.textareaEl.scrollHeight}px` });
   }
 }

@@ -8,6 +8,7 @@ import { createAbortError } from "../../api/httpTransport";
 import type { ChatSessionStore } from "../conversation/ChatSessionStore";
 import type { ChatTranscript } from "../messages/ChatTranscript";
 import type {
+  AgenticStep,
   ApprovalPosture,
   AssistantReplayEvidence,
   AssistantTurnRecord,
@@ -19,8 +20,6 @@ import { getActiveProfile } from "../../shared/profileUtils";
 import { makeMessage } from "../conversation/conversationUtils";
 import { prepareApiMessages } from "../finalization/prepareApiMessages";
 import { estimateTokenCount } from "../../shared/tokenEstimation";
-import { StreamingRenderer } from "../streaming/StreamingRenderer";
-import { EditStreamingRenderer } from "../streaming/EditStreamingRenderer";
 import {
   finalizeResponse,
   finalizeAbortedResponse,
@@ -41,7 +40,6 @@ import type {
   VaultToolContext,
 } from "./toolLoop";
 import { LiveVaultReview } from "./liveVaultReview";
-import { AgenticTimeline } from "../messages/AgenticTimeline";
 import { extractToolInput } from "../../tools/metadata";
 import {
   captureStepFields,
@@ -51,7 +49,10 @@ import { CONTEXT_DANGER_THRESHOLD } from "../../constants";
 import type { ComposerInteractionHostPort } from "../interactions/ComposerInteractionHost";
 import { AskInteractionCoordinator } from "../interactions/AskInteractionCoordinator";
 import { generateId } from "../../utils";
-import { AssistantTurnBuilder } from "../turns/AssistantTurnBuilder";
+import {
+  AssistantTurnBuilder,
+  type AssistantTurnSnapshot,
+} from "../turns/AssistantTurnBuilder";
 import {
   createAssistantTurnMessage,
   createAssistantTurnRevision,
@@ -62,7 +63,7 @@ import {
   allVisibleProse,
   rawConcatenatedProse,
 } from "../turns/assistantTurnProjections";
-import { GENERATION_STOPPED_LABEL } from "../types";
+import { projectRegexEditPreview } from "../messages/regexEditPreview";
 
 /**
  * How to commit the completed generation to the store.
@@ -253,32 +254,42 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
   }
 
   const assistantBubble = transcript.createBubble("assistant");
-  assistantBubble.bodyEl.addClass("is-streaming");
-
-  // useToolMode: the edit renderer shows a tool-call UI overlay (not for vault-only tool use)
-  const useToolMode = editsActive && !!apiMessages.tools?.length;
-  const renderer = editsActive
-    ? new EditStreamingRenderer(assistantBubble, transcript, { useToolMode })
-    : new StreamingRenderer(assistantBubble, transcript);
 
   // Two distinct agentic shapes feed the timeline:
   //  - pluginAgentic: the plugin runs its own tool loop (tools attached to the
-  //    request). Deltas are buffered per round and only the final round reaches
-  //    the bubble; the timeline is driven by the loop's callbacks, created eagerly.
+  //    request). Its ordered provider events already update the canonical builder.
   //  - claudeCodeAgentic: Claude Code runs its loop internally over MCP. Its text
-  //    streams straight to the bubble (no buffering) and the timeline is driven by
-  //    the service's tool-lifecycle events, created lazily on the first tool call
-  //    so tool-less turns (the common case) don't render an empty timeline.
+  //    streams through the legacy compatibility projection until Phase 5 adds
+  //    structural subprocess capture.
   const pluginAgentic = !!apiMessages.tools?.length;
   const claudeCodeAgentic =
     activeModel.provider === "claudecode" && plugin.settings.agenticMode;
-  // pluginTimeline (const, so callbacks narrow cleanly) is the eager instance the
-  // tool-loop writes to. `timeline` is whatever exists at finalization: starts as
-  // pluginTimeline, filled lazily on the Claude Code path at its first MCP tool call.
-  const pluginTimeline = pluginAgentic
-    ? new AgenticTimeline(assistantBubble.timelineEl)
-    : null;
-  let timeline: AgenticTimeline | null = pluginTimeline;
+  const legacySteps: AgenticStep[] = [];
+  const runningLegacyToolIds = new Set<string>();
+  let latestSnapshot = turnBuilder.snapshot();
+  const refreshLiveTurn = (snapshot: AssistantTurnSnapshot): void => {
+    latestSnapshot = snapshot;
+    if (directProvider) {
+      void assistantBubble.turnView.refresh(snapshot, {
+        regexEditPreview:
+          editsActive && !pluginAgentic
+            ? projectRegexEditPreview(snapshot)
+            : null,
+      });
+      return;
+    }
+    void assistantBubble.turnView.refreshLegacy({
+      key: draftIdentity.turnId,
+      status: snapshot.status,
+      content: allVisibleProse(snapshot),
+      steps: legacySteps,
+      runningToolCallIds: runningLegacyToolIds,
+    });
+  };
+  const refreshLegacyTurn = (): void => {
+    refreshLiveTurn(latestSnapshot);
+  };
+  refreshLiveTurn(latestSnapshot);
 
   const vaultToolContext: VaultToolContext = {
     app: plugin.app,
@@ -308,7 +319,9 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
   // the timeline step like vault ops (ADR-0018).
   const liveReview = new LiveVaultReview({
     app: plugin.app,
-    timelineEl: assistantBubble.timelineEl,
+    timelineEl: assistantBubble.turnView.rootEl,
+    findActionHostByToolCallId: (toolCallId) =>
+      assistantBubble.turnView.getReviewHostForToolCallId(toolCallId),
     policy: plugin.settings.vaultOpPolicy,
     posture,
     ...(editsActive && {
@@ -333,8 +346,6 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
   // controller itself was armed before prepareApiMessages so Stop also cancels prep.
   abortController.signal.addEventListener("abort", () => liveReview.cancelPending());
 
-  const editRenderer = renderer instanceof EditStreamingRenderer ? renderer : null;
-  const chatRenderer = renderer instanceof StreamingRenderer ? renderer : null;
   const persistDirectTurn = async (input: {
     turn: AssistantTurnRecord;
     replayEvidence: AssistantReplayEvidence;
@@ -415,11 +426,13 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
       transcript.registerBubble(assistantMessage.id, assistantBubble);
     }
     store.setLastAssistantResponse(response);
-    if (response) {
-      await transcript.renderBubbleContent(assistantBubble, response);
-    } else {
-      transcript.renderPlainTextContent(assistantBubble, "(no response)");
-    }
+    await assistantBubble.turnView.refresh(input.turn, {
+      actionLedger,
+      ...(input.errorMessage === undefined
+        ? {}
+        : { errorMessage: input.errorMessage }),
+    });
+    await assistantBubble.turnView.flush();
     if (
       finalization.kind === "append" &&
       finalization.autoInsert &&
@@ -440,9 +453,9 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
     // Only the plugin-owned tool loop buffers deltas; Claude Code streams live.
     const agenticMode = pluginAgentic;
 
-    // Claude Code's tools fire inside its subprocess over MCP, not through the
-    // tool loop, route those lifecycle events into the same timeline, created on
-    // first use so tool-less turns stay clean.
+    // Claude Code's tools fire inside its subprocess over MCP. Phase 4 keeps the
+    // existing conservative legacy evidence and projects it through the unified
+    // view. Phase 5 owns structural subprocess correlation.
     if (claudeCodeAgentic) {
       plugin.services.claudeCode.setAskUserResponder(
         askCoordinator,
@@ -450,13 +463,23 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
       );
       plugin.services.claudeCode.setLiveReview(liveReview);
       plugin.services.claudeCode.setToolListener((event) => {
-        const tl = timeline ?? (timeline = new AgenticTimeline(assistantBubble.timelineEl));
         if (event.phase === "start") {
-          // Pass the id so the in-loop vault review binds to this step while it is
-          // still pending (avoids a stray synthetic row, see addPendingToolCall).
-          tl.addPendingToolCall(event.toolName, event.toolCallId);
+          runningLegacyToolIds.add(event.toolCallId);
+          if (
+            !legacySteps.some(
+              (step) => step.toolCallId === event.toolCallId,
+            )
+          ) {
+            legacySteps.push({
+              type: "tool_call",
+              round: 0,
+              toolName: event.toolName,
+              toolCallId: event.toolCallId,
+            });
+          }
         } else {
-          tl.addStep({
+          runningLegacyToolIds.delete(event.toolCallId);
+          const completedStep: AgenticStep = {
             type: "tool_call",
             round: 0,
             toolName: event.toolName,
@@ -477,8 +500,17 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
               isError: event.isError,
               disposition: event.disposition,
             }),
-          });
+          };
+          const stepIndex = legacySteps.findIndex(
+            (step) => step.toolCallId === event.toolCallId,
+          );
+          if (stepIndex === -1) {
+            legacySteps.push(completedStep);
+          } else {
+            legacySteps[stepIndex] = completedStep;
+          }
         }
+        refreshLegacyTurn();
       });
     }
 
@@ -497,24 +529,8 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
       ),
       abortController.signal,
       {
-        onDelta: (delta) => renderer.appendDelta(delta),
-        onToolStatus: (name) => {
-          if (editRenderer) editRenderer.showToolStatus(name);
-          else chatRenderer?.showToolStatus(name);
-        },
-        onNewRound: () => {
-          if (editRenderer) editRenderer.beginNewRound();
-          else chatRenderer?.beginNewRound();
-        },
-        // These callbacks fire from the plugin's own tool loop only. For Claude
-        // Code the loop runs a single pass with no tool calls, and the timeline is
-        // driven by the MCP listener below, so they stay unset there to avoid
-        // mirroring the streamed answer text into the timeline as reasoning.
-        onToolDeclared: pluginTimeline
-          ? (name) => pluginTimeline.addPendingToolCall(name)
-          : undefined,
-        onStepRecorded: pluginTimeline ? (step) => pluginTimeline.addStep(step) : undefined,
-        onStepResult: pluginTimeline ? (id, result) => pluginTimeline.setStepResult(id, result) : undefined,
+        onDelta: () => undefined,
+        onTurnSnapshot: refreshLiveTurn,
         onCalibrate: onCalibrate
           ? (request, usage) => {
               // A provider that reports its context size directly (Claude Code)
@@ -551,9 +567,18 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
     capturedToolCorrelations = toolCorrelations;
     if (abortController.signal.aborted) throw createAbortError();
 
-    await renderer.flush();
-    assistantBubble.bodyEl.removeClass("is-streaming");
-    timeline?.finalize();
+    if (directProvider) {
+      await assistantBubble.turnView.refresh(turn);
+    } else {
+      latestSnapshot = turn;
+      await assistantBubble.turnView.refreshLegacy({
+        key: draftIdentity.turnId,
+        status: turn.status,
+        content: allVisibleProse(turn),
+        steps: legacySteps,
+      });
+    }
+    await assistantBubble.turnView.flush();
 
     // Claude Code reports its own context window per turn (its catalog aliases
     // carry no static size); record it so the capacity ring's fallback lookup
@@ -565,7 +590,8 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
       );
     }
 
-    const agenticSteps = timeline?.getSteps();
+    const agenticSteps =
+      legacySteps.length > 0 ? structuredClone(legacySteps) : undefined;
 
     // Claude Code runs its tools internally, so its write proposals (edits and
     // vault ops) arrive via the MCP server (collected on the service) rather than
@@ -613,7 +639,7 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
         editProposals: regexEditProposals,
         parsedEditPlacement,
       });
-    } else if (editsActive && renderer instanceof EditStreamingRenderer) {
+    } else if (editsActive) {
       // Drop the transient in-loop edit panel so it can't double up with the
       // durable one finalize renders into the message body.
       liveReview.detachEditPanel();
@@ -623,7 +649,7 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
         store,
         transcript,
         bubble: assistantBubble,
-        renderer,
+        response: allVisibleProse(turn),
         plugin,
         modelId: activeModel.modelId,
         provider: activeModel.provider,
@@ -639,7 +665,7 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
         ...(onEnterAutoApply && { onEnterAutoApply }),
       });
     } else if (finalization.kind === "replace") {
-      const response = chatRenderer?.getCurrentRoundResponse() ?? "";
+      const response = allVisibleProse(turn);
       if (response || hasCompletedAskGuidance(agenticSteps)) {
         store.finalizeRegeneration(finalization.oldMessage, response, {
           modelId: activeModel.modelId,
@@ -658,7 +684,7 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
         store,
         transcript,
         assistantBubble,
-        renderer as StreamingRenderer,
+        allVisibleProse(turn),
         finalization.autoInsert ?? false,
         plugin,
         activeModel.modelId,
@@ -670,12 +696,9 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
       );
     }
   } catch (error) {
-    await renderer.flush();
-    assistantBubble.bodyEl.removeClass("is-streaming");
-    timeline?.finalize();
-
     if (isAbortError(error) || abortController.signal.aborted) {
-      const partialSteps = timeline?.getSteps();
+      const partialSteps =
+        legacySteps.length > 0 ? structuredClone(legacySteps) : undefined;
       if (directProvider) {
         const interruptedTurn =
           capturedTurn ??
@@ -691,14 +714,7 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
               : inferDirectToolCorrelations(interruptedTurn),
           interrupted: interruptedTurn.status === "interrupted",
         });
-        if (interruptedTurn.items.length === 0) {
-          transcript.renderPlainTextContent(
-            assistantBubble,
-            GENERATION_STOPPED_LABEL,
-          );
-          assistantBubble.bodyEl.addClass("is-muted");
-        }
-      } else if (editsActive && renderer instanceof EditStreamingRenderer) {
+      } else if (editsActive) {
         liveReview.detachEditPanel();
         await finalizeEditResponse({
           app: plugin.app,
@@ -706,7 +722,7 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
           store,
           transcript,
           bubble: assistantBubble,
-          renderer,
+          response: allVisibleProse(latestSnapshot),
           plugin,
           modelId: activeModel.modelId,
           provider: activeModel.provider,
@@ -720,7 +736,7 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
           ...(onEnterAutoApply && { onEnterAutoApply }),
         });
       } else if (finalization.kind === "replace") {
-        const response = chatRenderer?.getCurrentRoundResponse() ?? "";
+        const response = allVisibleProse(latestSnapshot);
         if (response || hasCompletedAskGuidance(partialSteps)) {
           store.finalizeRegeneration(finalization.oldMessage, response, {
             modelId: activeModel.modelId,
@@ -745,7 +761,7 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
           store,
           transcript,
           assistantBubble,
-          renderer as StreamingRenderer,
+          allVisibleProse(latestSnapshot),
           activeModel.modelId,
           activeModel.provider,
           ragSources,
@@ -775,8 +791,6 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
           isError: true,
           errorMessage: getErrorMessage(error),
         });
-        assistantBubble.bodyEl.addClass("is-error");
-        transcript.renderPlainTextContent(assistantBubble, errorText);
       } else {
         if (finalization.kind === "replace") {
           store.finalizeRegeneration(finalization.oldMessage, finalization.oldMessage.content);
@@ -785,14 +799,20 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
         errorMessage.isError = true;
         errorMessage.modelId = activeModel.modelId;
         errorMessage.provider = activeModel.provider;
-        const partialSteps = timeline?.getSteps();
+        const partialSteps =
+          legacySteps.length > 0 ? structuredClone(legacySteps) : undefined;
         if (hasCompletedAskGuidance(partialSteps)) {
           errorMessage.agenticSteps = partialSteps;
         }
         store.appendMessage(errorMessage);
         transcript.registerBubble(errorMessage.id, assistantBubble);
-        assistantBubble.bodyEl.addClass("is-error");
-        transcript.renderPlainTextContent(assistantBubble, errorText);
+        await assistantBubble.turnView.refreshLegacy({
+          key: errorMessage.id,
+          status: "failed",
+          content: "",
+          steps: partialSteps,
+          errorMessage: getErrorMessage(error),
+        });
       }
     }
   } finally {
@@ -807,7 +827,6 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
     setActiveAbortController(null);
     await store.persistActiveConversation();
     setIsGenerating(false);
-    renderer.destroy();
   }
 }
 

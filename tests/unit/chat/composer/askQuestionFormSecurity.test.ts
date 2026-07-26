@@ -9,7 +9,7 @@ function source(path: string): string {
 describe("ask question rendering security", () => {
   it("keeps the form and completed audit renderer on text-only DOM paths", () => {
     const form = source("src/chat/composer/AskQuestionForm.ts");
-    const timeline = source("src/chat/messages/AgenticTimeline.ts");
+    const timeline = source("src/chat/messages/AssistantTurnView.ts");
     const rendering = `${form}\n${timeline}`;
 
     expect(rendering).not.toMatch(/\b(?:innerHTML|outerHTML|insertAdjacentHTML)\b/u);
@@ -21,7 +21,9 @@ describe("ask question rendering security", () => {
     expect(form).toContain("text: option.label");
     expect(form).toContain("text: option.description");
     expect(form).toContain("maxlength: String(ASK_USER_LIMITS.otherText)");
-    expect(timeline).toContain("text: `${row.question}\\n${row.answers.join(\"\\n\")}`");
+    expect(timeline).toContain(
+      "`${question.question}\\n${answers.join(\"\\n\")}`",
+    );
     expect(timeline).not.toContain("AskQuestionForm");
   });
 

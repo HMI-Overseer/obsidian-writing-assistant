@@ -3,7 +3,6 @@ import type {
   AssistantReplayEvidence,
   AssistantTurnRecord,
   AssistantTurnRevision,
-  AgenticStep,
   ConversationMessage,
   MessageUsage,
   ProviderOption,
@@ -269,40 +268,6 @@ export function assistantRevisionErrorMessage(
   message: ConversationMessage,
 ): string | null {
   return getActiveAssistantRevision(message)?.errorMessage ?? null;
-}
-
-/** Temporary Phase 3 tool-only timeline projection over the canonical turn. */
-export function assistantToolStepProjection(
-  message: ConversationMessage,
-): AgenticStep[] {
-  const revision = getActiveAssistantRevision(message);
-  if (!revision || revision.kind !== "turn") return [];
-  return revision.turn.items
-    .filter((item) => item.type === "tool_call")
-    .map((item) => ({
-      type: "tool_call" as const,
-      round: item.round ?? 0,
-      toolName: item.toolName,
-      toolCallId: item.toolCallId,
-      toolInput: item.toolInput,
-      toolArgs: item.toolArgs,
-      ...(item.isError ? { isError: true } : {}),
-      ...(item.errorContent === undefined
-        ? {}
-        : { errorContent: item.errorContent }),
-      ...(item.resultDigest === undefined
-        ? {}
-        : { resultDigest: item.resultDigest }),
-      ...(item.resultRecord === undefined
-        ? {}
-        : { resultRecord: item.resultRecord }),
-      ...(item.askGuidance === undefined
-        ? {}
-        : { askGuidance: structuredClone(item.askGuidance) }),
-      ...(item.askStatus === undefined
-        ? {}
-        : { askStatus: item.askStatus }),
-    }));
 }
 
 /**

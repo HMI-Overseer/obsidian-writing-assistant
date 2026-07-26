@@ -65,7 +65,7 @@ export function parseEditBlocks(text: string): ParseResult {
 /**
  * Streaming-friendly parser. Identifies complete blocks parsed so far
  * and whether an incomplete block is currently being written.
- * Used by EditStreamingRenderer to show progress indicators.
+ * Used by the narrow regex-edit compatibility preview.
  */
 export function findPartialBlock(text: string): PartialParseResult {
   const completeBlocks: EditBlock[] = [];

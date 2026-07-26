@@ -2,8 +2,8 @@
  * Centralized display metadata for all tools.
  *
  * Provides icon names, human-readable labels, streaming status text, and
- * input extraction for the AgenticTimeline, StreamingRenderer, and
- * EditStreamingRenderer. Keeping these in one place ensures every tool
+ * input extraction for AssistantTurnView and review projections. Keeping these
+ * in one place ensures every tool
  * added to the definitions is also represented in the UI.
  */
 
@@ -11,7 +11,7 @@ import { VAULT_OPS_TOOL_NAMES } from "./vault-ops/definition";
 import { EDIT_TOOL_NAMES } from "./editing/definition";
 import { MEMORY_MUTATION_TOOL_NAMES } from "./memory/definition";
 
-/** Obsidian icon name for each tool (used in AgenticTimeline). */
+/** Obsidian icon name for each tool in the assistant turn rail. */
 export const TOOL_ICONS: Record<string, string> = {
   semantic_search: "search",
   read_file: "file-text",
@@ -42,7 +42,7 @@ export const TOOL_ICONS: Record<string, string> = {
   ask_user: "circle-help",
 };
 
-/** Past-tense label for completed tool calls (used in AgenticTimeline). */
+/** Past-tense label for completed tool calls. */
 export const TOOL_LABELS: Record<string, string> = {
   semantic_search: "Searched vault",
   read_file: "Read note",
@@ -138,7 +138,8 @@ export const TOOL_STATUS_LABELS: Record<string, string> = {
  * newly added vault-op / edit tool is classified as mutating automatically (no drift,
  * the one place this used to break on a new tool). Mirrors the `destructiveHint` /
  * `idempotentHint` annotations; drives the orange "mutating" dot in the
- * {@link AgenticTimeline}, every other (read-only) tool keeps the default cyan.
+ * {@link ../chat/messages/AssistantTurnView.AssistantTurnView}, every other
+ * read-only tool keeps the default accent.
  */
 export const MUTATING_TOOL_NAMES: ReadonlySet<string> = new Set<string>([
   ...VAULT_OPS_TOOL_NAMES,

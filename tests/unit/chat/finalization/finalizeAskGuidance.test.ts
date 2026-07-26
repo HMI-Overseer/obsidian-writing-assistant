@@ -1,11 +1,10 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   finalizeResponse,
 } from "../../../../src/chat/finalization/finalizeResponse";
 import type { ChatSessionStore } from "../../../../src/chat/conversation/ChatSessionStore";
 import type { ChatTranscript } from "../../../../src/chat/messages/ChatTranscript";
-import { StreamingRenderer } from "../../../../src/chat/streaming/StreamingRenderer";
-import type { BubbleRefs } from "../../../../src/chat/types";
+import type { AssistantBubbleRefs } from "../../../../src/chat/types";
 import type WritingAssistantChat from "../../../../src/main";
 import type { AgenticStep, ConversationMessage } from "../../../../src/shared/types";
 
@@ -41,35 +40,27 @@ function harness() {
     renderBubbleContent: vi.fn(() => Promise.resolve()),
   } as unknown as ChatTranscript;
   const bubble = {
-    bodyEl: { addClass: vi.fn(), removeClass: vi.fn() },
-    contentEl: { isConnected: false },
-  } as unknown as BubbleRefs;
+    role: "assistant",
+    turnView: {
+      refreshLegacy: vi.fn(() => Promise.resolve()),
+    },
+  } as unknown as AssistantBubbleRefs;
   return {
     messages,
     store,
     transcript,
     bubble,
-    renderer: new StreamingRenderer(bubble, transcript),
   };
 }
 
 describe("ask guidance finalization", () => {
-  beforeEach(() => {
-    vi.stubGlobal("window", {
-      setTimeout: () => 0,
-      clearTimeout: () => undefined,
-    });
-  });
-
-  afterEach(() => vi.unstubAllGlobals());
-
   it("persists a zero-text normal response only when completed guidance exists", async () => {
     const withGuidance = harness();
     await finalizeResponse(
       withGuidance.store,
       withGuidance.transcript,
       withGuidance.bubble,
-      withGuidance.renderer,
+      "",
       false,
       {} as WritingAssistantChat,
       "gpt-5",
@@ -91,7 +82,7 @@ describe("ask guidance finalization", () => {
       ordinary.store,
       ordinary.transcript,
       ordinary.bubble,
-      ordinary.renderer,
+      "",
       false,
       {} as WritingAssistantChat,
       "gpt-5",

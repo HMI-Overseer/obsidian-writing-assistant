@@ -74,6 +74,8 @@ export type VaultReviewCallbacks = {
 
 export interface VaultReviewTimelineOptions {
   timelineEl: HTMLElement;
+  /** Canonical Phase 4 placement by exact declaration identity. */
+  findActionHostByToolCallId?: (toolCallId: string) => HTMLElement | null;
   app: App;
   proposal: VaultOperationProposal;
   callbacks: VaultReviewCallbacks;
@@ -197,6 +199,16 @@ export class VaultReviewTimelineView {
 
     const id = op.sourceToolCallId;
     if (id) {
+      if (this.opts.findActionHostByToolCallId) {
+        const host = this.opts.findActionHostByToolCallId(id);
+        if (!host) {
+          throw new Error(
+            `No assistant turn action host exists for vault call "${id}".`,
+          );
+        }
+        used.add(host);
+        return host;
+      }
       const el = this.opts.timelineEl.querySelector<HTMLElement>(
         `[data-tool-call-id="${CSS.escape(id)}"]`,
       );

@@ -29,6 +29,8 @@ import type { DiffMode } from "./DiffHunkView";
 
 export interface EditReviewTimelineOptions {
   timelineEl: HTMLElement;
+  /** Canonical Phase 4 placement by exact declaration identity. */
+  findActionHostByToolCallId?: (toolCallId: string) => HTMLElement | null;
   app: App;
   /**
    * One controller per edited file (ADR-0010). Hunks map to steps by tool-call id
@@ -195,6 +197,16 @@ export class EditReviewTimelineView {
    * is the next unclaimed edit-tool step in document order.
    */
   private locateStep(hunk: DiffHunk, used: Set<HTMLElement>): HTMLElement {
+    if (this.opts.findActionHostByToolCallId) {
+      const host = this.opts.findActionHostByToolCallId(hunk.id);
+      if (!host) {
+        throw new Error(
+          `No assistant turn action host exists for edit call "${hunk.id}".`,
+        );
+      }
+      used.add(host);
+      return host;
+    }
     const byId = this.opts.timelineEl.querySelector<HTMLElement>(
       `[data-tool-call-id="${CSS.escape(hunk.id)}"]`,
     );

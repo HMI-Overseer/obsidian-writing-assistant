@@ -24,10 +24,9 @@ import {
   type SessionTurn,
 } from "../../src/api/harnessSession";
 import { finalizeAbortedResponse } from "../../src/chat/finalization/finalizeResponse";
-import { StreamingRenderer } from "../../src/chat/streaming/StreamingRenderer";
 import type { ChatSessionStore } from "../../src/chat/conversation/ChatSessionStore";
 import type { ChatTranscript } from "../../src/chat/messages/ChatTranscript";
-import type { BubbleRefs } from "../../src/chat/types";
+import type { AssistantBubbleRefs } from "../../src/chat/types";
 import type { Options } from "../../src/api/sdk/claudeAgentSdk";
 import type { ConversationMessage } from "../../src/shared/types";
 
@@ -73,11 +72,13 @@ function makeTranscript(): ChatTranscript {
   } as unknown as ChatTranscript;
 }
 
-function makeBubble(): BubbleRefs {
+function makeBubble(): AssistantBubbleRefs {
   return {
-    bodyEl: { addClass: () => undefined, removeClass: () => undefined },
-    contentEl: { isConnected: false },
-  } as unknown as BubbleRefs;
+    role: "assistant",
+    turnView: {
+      refreshLegacy: () => Promise.resolve(),
+    },
+  } as unknown as AssistantBubbleRefs;
 }
 
 describe("claudecode zero-text interrupt → next-turn reuse", () => {
@@ -127,8 +128,7 @@ describe("claudecode zero-text interrupt → next-turn reuse", () => {
     const { store, messages } = makeStore();
     const transcript = makeTranscript();
     const bubble = makeBubble();
-    const renderer = new StreamingRenderer(bubble, transcript);
-    await finalizeAbortedResponse(store, transcript, bubble, renderer, cfg().model, "claudecode");
+    await finalizeAbortedResponse(store, transcript, bubble, "", cfg().model, "claudecode");
 
     // Build the next turn's transcript exactly as the store now holds it, then a
     // new user message. With persist-always this is [user, assistant(""), user].

@@ -170,6 +170,58 @@ const splitHunk = (status = "pending") =>
     </div>
   </div>`;
 
+const turnItem = (
+  id,
+  type,
+  marker,
+  body,
+  {
+    after = true,
+    state = "",
+    mutating = false,
+    segment = "segment-1",
+    action = "",
+  } = {},
+) =>
+  `<li class="lmsa-assistant-turn-item lmsa-assistant-turn-item--${type} has-connector-before${after ? " has-connector-after" : ""}${state ? ` is-${state}` : ""}${mutating ? " is-mutating" : ""}"
+    data-item-id="${id}" data-segment-id="${segment}">
+    <div class="lmsa-assistant-turn-marker is-${marker}" aria-hidden="true">${
+      marker === "thinking"
+        ? I.brain
+        : marker === "tool"
+          ? I.wrench
+          : marker === "streaming"
+            ? I.more
+            : ""
+    }</div>
+    <div class="lmsa-assistant-turn-item-body${type === "prose"
+      ? " lmsa-assistant-turn-prose lmsa-chat-window-message-content lmsa-chat-window-message-content--markdown"
+      : " lmsa-agentic-timeline-step-body"}">${body}<div class="lmsa-assistant-turn-action-host">${action}</div></div>
+  </li>`;
+
+const toolTurnBody = (name, detail, state, diagnostics = "") =>
+  `<span class="lmsa-agentic-timeline-step-name">${name}</span>
+   <span class="lmsa-agentic-timeline-step-detail">${detail}</span>
+   <span class="lmsa-assistant-turn-tool-state">${state}</span>
+   <button class="lmsa-assistant-turn-disclosure" type="button" aria-expanded="${diagnostics ? "true" : "false"}" aria-label="Show details for ${name}">${I.chevronDown}</button>
+   ${diagnostics ? `<div class="lmsa-agentic-timeline-step-expand">${diagnostics}</div>` : ""}`;
+
+const assistantTurn = (items, status = "completed", tail = "") =>
+  `<div class="lmsa-chat-window-assistant-turn-host">
+    <div class="lmsa-assistant-turn is-${status}" aria-label="Assistant response">
+      <ol class="lmsa-assistant-turn-list">${items}</ol>${tail}
+    </div>
+  </div>`;
+
+const assistantBubble = (turn) =>
+  `<div class="lmsa-chat-window-message lmsa-chat-window-message--assistant">
+    <div class="lmsa-chat-window-message-avatar">${I.bot}</div>
+    <div class="lmsa-chat-window-message-column">
+      <div class="lmsa-chat-window-message-chrome"><div class="lmsa-chat-window-message-role">Assistant</div></div>
+    </div>
+    ${turn}
+  </div>`;
+
 // Shared footer menu item used by the reasoning / posture / overflow menus (menuItem.ts).
 const menuItem = (label, { icon, selected } = {}) =>
   `<div class="lmsa-footer-menu-item${selected ? " is-selected" : ""}">
@@ -795,7 +847,6 @@ export const SURFACES = {
           <div class="lmsa-chat-window-message-avatar">${I.userRound}</div>
           <div class="lmsa-chat-window-message-column">
             <div class="lmsa-chat-window-message-chrome"><div class="lmsa-chat-window-message-role">You</div></div>
-            <div class="lmsa-chat-window-message-timeline"></div>
             <div class="lmsa-chat-window-message-body lmsa-ui-card">
               <div class="lmsa-chat-window-message-content lmsa-chat-window-message-content--markdown">
                 <p>Show me a Python hello world.</p>
@@ -803,25 +854,24 @@ export const SURFACES = {
             </div>
           </div>
         </div>
-        <div class="lmsa-chat-window-message lmsa-chat-window-message--assistant">
-          <div class="lmsa-chat-window-message-avatar">${I.bot}</div>
-          <div class="lmsa-chat-window-message-column">
-            <div class="lmsa-chat-window-message-chrome"><div class="lmsa-chat-window-message-role">Assistant</div></div>
-            <div class="lmsa-chat-window-message-timeline"></div>
-            <div class="lmsa-chat-window-message-body lmsa-ui-card">
-              <div class="lmsa-chat-window-message-content lmsa-chat-window-message-content--markdown">
-                <p>Here you go:</p>
-                <div class="lmsa-md-codeblock">
-                  <div class="lmsa-md-codeblock-header">
-                    <span class="lmsa-md-codeblock-language">python</span>
-                    <button type="button" class="lmsa-md-codeblock-copy">Copy</button>
-                  </div>
-                  <pre class="lmsa-md-codeblock-pre"><code class="language-python">print("hello world")</code></pre>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
+        ${assistantBubble(
+          assistantTurn(
+            turnItem(
+              "prose-1",
+              "prose",
+              "iconless",
+              `<p>Here you go:</p>
+               <div class="lmsa-md-codeblock">
+                 <div class="lmsa-md-codeblock-header">
+                   <span class="lmsa-md-codeblock-language">python</span>
+                   <button type="button" class="lmsa-md-codeblock-copy">Copy</button>
+                 </div>
+                 <pre class="lmsa-md-codeblock-pre"><code class="language-python">print("hello world")</code></pre>
+               </div>`,
+              { after: false },
+            ),
+          ),
+        )}
       </div></div>`,
       620,
     ),
@@ -1513,42 +1563,277 @@ export const SURFACES = {
     ),
   },
 
-  // S22: diff timeline (edit proposal folded onto agentic-timeline steps, split diff, approve/decline).
+  // Phase 4: exact prose and tool interleaving with same-segment tools, separate
+  // silent segments, full markdown, a pending write review, and iconless final prose.
+  assistantTurnInterleaved: {
+    w: 680,
+    shot: ".lmsa-chat-window-message--assistant",
+    html: view(
+      assistantBubble(
+        assistantTurn(
+          turnItem(
+            "prose-1",
+            "prose",
+            "thinking",
+            "<p>I will inspect the opening before changing it.</p>",
+          ) +
+            turnItem(
+              "tool-1",
+              "tool_call",
+              "tool",
+              toolTurnBody(
+                "Read file",
+                "Drafts/Opening.md",
+                "Completed",
+                `<div class="lmsa-agentic-timeline-arg-entry"><span class="lmsa-agentic-timeline-arg-key">Result</span><pre class="lmsa-agentic-timeline-arg-value">The room was quiet.</pre></div>`,
+              ),
+              { state: "completed" },
+            ) +
+            turnItem(
+              "prose-2",
+              "prose",
+              "thinking",
+              `<p>The image is clear, but the verb can carry more tension.</p>
+               <ul><li>Keep the room quiet.</li><li>Sharpen the character movement.</li></ul>`,
+            ) +
+            turnItem(
+              "tool-2",
+              "tool_call",
+              "tool",
+              toolTurnBody("Propose edit", "Drafts/Opening.md", "Running"),
+              {
+                state: "running",
+                mutating: true,
+                segment: "segment-2",
+                action: `<div class="lmsa-edit-step-controls">
+                  <span class="lmsa-edit-step-pending">pending review</span>
+                  <button class="lmsa-edit-step-btn lmsa-edit-step-btn--approve" aria-label="Accept">${I.check}</button>
+                  <button class="lmsa-edit-step-btn lmsa-edit-step-btn--decline" aria-label="Reject">${I.x}</button>
+                </div>`,
+              },
+            ) +
+            turnItem(
+              "tool-3",
+              "tool_call",
+              "tool",
+              toolTurnBody("Update frontmatter", "Drafts/Opening.md", "Completed"),
+              {
+                state: "completed",
+                mutating: true,
+                segment: "segment-2",
+              },
+            ) +
+            turnItem(
+              "tool-4",
+              "tool_call",
+              "tool",
+              toolTurnBody("Read file", "Style guide.md", "Completed"),
+              { state: "completed", segment: "segment-3" },
+            ) +
+            turnItem(
+              "prose-3",
+              "prose",
+              "iconless",
+              `<p>The opening is tighter now. The revised line keeps the silence while giving the movement more urgency.</p>`,
+              { after: false, segment: "segment-4" },
+            ),
+        ),
+      ),
+      680,
+    ),
+  },
+
+  // Phase 4 lifecycle gallery: live empty placeholder, tool-only completion,
+  // interruption after prose, failed empty turn, and honest completed empty turn.
+  assistantTurnStates: {
+    w: 620,
+    shot: ".lmsa-chat-window-messages",
+    html: view(
+      `<div class="lmsa-messages-pane"><div class="lmsa-chat-window-messages">
+        ${assistantBubble(
+          assistantTurn(
+            "",
+            "streaming",
+            `<div class="lmsa-assistant-turn-empty is-streaming" aria-hidden="true">
+              <span class="lmsa-assistant-turn-empty-marker">${I.more}</span>
+              <span class="lmsa-assistant-turn-empty-label">Assistant is responding.</span>
+            </div>`,
+          ),
+        )}
+        ${assistantBubble(
+          assistantTurn(
+            turnItem(
+              "tool-only",
+              "tool_call",
+              "tool",
+              toolTurnBody("Searched vault", "character arc", "Completed"),
+              { after: false, state: "completed" },
+            ),
+          ),
+        )}
+        ${assistantBubble(
+          assistantTurn(
+            turnItem(
+              "partial-prose",
+              "prose",
+              "iconless",
+              "<p>I found the relevant scene, but generation stopped before the summary completed.</p>",
+              { after: false },
+            ),
+            "interrupted",
+            `<div class="lmsa-assistant-turn-notice" role="status">Generation stopped.</div>`,
+          ),
+        )}
+        ${assistantBubble(
+          assistantTurn(
+            "",
+            "failed",
+            `<div class="lmsa-assistant-turn-empty is-failed" role="status">
+              <span class="lmsa-assistant-turn-empty-marker">${I.x}</span>
+              <span class="lmsa-assistant-turn-empty-label">Error: Connection closed.</span>
+            </div>`,
+          ),
+        )}
+        ${assistantBubble(
+          assistantTurn(
+            "",
+            "completed",
+            `<div class="lmsa-assistant-turn-empty is-completed">
+              <span class="lmsa-assistant-turn-empty-marker">${I.more}</span>
+              <span class="lmsa-assistant-turn-empty-label">No response.</span>
+            </div>`,
+          ),
+        )}
+      </div></div>`,
+      620,
+    ),
+  },
+
+  // Phase 4 out-of-band action placement and ordered memory and ask details.
+  assistantTurnActionPlacement: {
+    w: 650,
+    shot: ".lmsa-chat-window-message--assistant",
+    html: view(
+      assistantBubble(
+        assistantTurn(
+          turnItem(
+            "memory-1",
+            "tool_call",
+            "tool",
+            toolTurnBody("Add memory", "Narration: restrained", "Running"),
+            {
+              state: "running",
+              mutating: true,
+              action: `<div class="lmsa-memory-step-controls lmsa-vault-step-controls">
+                <span class="lmsa-vault-step-pending">pending approval</span>
+                <button class="lmsa-vault-step-btn lmsa-vault-step-btn--approve" aria-label="Approve">${I.check}</button>
+                <button class="lmsa-vault-step-btn lmsa-vault-step-btn--decline" aria-label="Decline">${I.x}</button>
+              </div>
+              <div class="lmsa-vault-timeline-preview lmsa-memory-review-preview"><pre class="lmsa-agentic-timeline-arg-value">Prefer restrained narration with concrete images.</pre></div>`,
+            },
+          ) +
+            turnItem(
+              "ask-1",
+              "tool_call",
+              "tool",
+              toolTurnBody(
+                "Asked a question",
+                "Output format",
+                "Completed",
+                `<div class="lmsa-agentic-timeline-arg-entry">
+                  <span class="lmsa-agentic-timeline-arg-key">Output</span>
+                  <pre class="lmsa-agentic-timeline-arg-value">Which format should I use?\nDetailed</pre>
+                </div>`,
+              ),
+              { after: false, state: "completed", segment: "segment-2" },
+            ),
+          "completed",
+          `<section class="lmsa-assistant-turn-provisional lmsa-assistant-turn-action-section" aria-label="Pending review that has not received an ordered provider declaration">
+            <div class="lmsa-assistant-turn-action-section-heading">Review awaiting declaration</div>
+            <div class="lmsa-assistant-turn-action-summary">
+              <div class="lmsa-assistant-turn-action-heading"><span class="lmsa-assistant-turn-action-family">Vault operation</span><span class="lmsa-assistant-turn-action-state">pending review</span></div>
+              <div class="lmsa-assistant-turn-action-placement">Waiting for the provider declaration.</div>
+            </div>
+          </section>
+          <section class="lmsa-assistant-turn-audit lmsa-assistant-turn-action-section" aria-label="Action history without a correlated provider declaration">
+            <div class="lmsa-assistant-turn-action-section-heading">Unplaced action audit</div>
+            <div class="lmsa-assistant-turn-action-summary">
+              <div class="lmsa-assistant-turn-action-heading"><span class="lmsa-assistant-turn-action-family">Edit review</span><span class="lmsa-assistant-turn-action-state">declined</span></div>
+              <div class="lmsa-assistant-turn-action-placement is-warning">The action has effect history, but no provider declaration could be placed.</div>
+            </div>
+          </section>`,
+        ),
+      ),
+      650,
+    ),
+  },
+
+  // Phase 4 narrow-pane pressure test with long markdown, code, and consecutive tools.
+  assistantTurnNarrow: {
+    w: 330,
+    shot: ".lmsa-chat-window-message--assistant",
+    html: view(
+      assistantBubble(
+        assistantTurn(
+          turnItem(
+            "narrow-prose-1",
+            "prose",
+            "thinking",
+            `<p>This deliberately long paragraph verifies that prose wraps inside a narrow sidebar without moving the text edge or forcing the rail outside the pane.</p>
+             <div class="lmsa-md-codeblock"><div class="lmsa-md-codeblock-header"><span class="lmsa-md-codeblock-language">typescript</span><button class="lmsa-md-codeblock-copy">Copy</button></div><pre class="lmsa-md-codeblock-pre"><code>const sentence = "A long line remains horizontally scrollable inside its own code block.";</code></pre></div>`,
+          ) +
+            turnItem(
+              "narrow-tool-1",
+              "tool_call",
+              "tool",
+              toolTurnBody("Read file", "Drafts/A very long note name.md", "Completed"),
+              { state: "completed" },
+            ) +
+            turnItem(
+              "narrow-tool-2",
+              "tool_call",
+              "tool",
+              toolTurnBody("Searched vault", "motif continuity", "Completed"),
+              { after: false, state: "completed" },
+            ),
+        ),
+      ),
+      330,
+    ),
+  },
+
+  // S22: edit review attached to the exact ordered assistant item.
   diffTimeline: {
     w: 620,
-    shot: ".lmsa-chat-window-message-timeline",
+    shot: ".lmsa-chat-window-message--assistant",
     html: view(
-      `<div class="lmsa-chat-window-message lmsa-chat-window-message--assistant"><div class="lmsa-chat-window-message-column">
-        <div class="lmsa-chat-window-message-timeline">
-          <details class="lmsa-agentic-timeline" open>
-            <summary class="lmsa-agentic-timeline-summary">
-              <span class="lmsa-agentic-timeline-summary-icon">${I.wrench}</span>
-              <span class="lmsa-agentic-timeline-summary-label">Used 1 tool</span>
-            </summary>
-            <div class="lmsa-agentic-timeline-list">
-              <div class="lmsa-agentic-timeline-step lmsa-agentic-timeline-step--reasoning">
-                <div class="lmsa-agentic-timeline-dot">${I.brain}</div>
-                <div class="lmsa-agentic-timeline-step-body">
-                  <span class="lmsa-agentic-timeline-step-name">I'll tighten the opening line.</span>
+      assistantBubble(
+        assistantTurn(
+          turnItem(
+            "edit-prose",
+            "prose",
+            "thinking",
+            "<p>I will tighten the opening line.</p>",
+          ) +
+            turnItem(
+              "edit-tool",
+              "tool_call",
+              "tool",
+              toolTurnBody("Propose edit", "Chapter 1.md", "Running"),
+              {
+                after: false,
+                state: "running",
+                mutating: true,
+                action: `<div class="lmsa-edit-step-controls">
+                  <span class="lmsa-edit-step-pending">pending review</span>
+                  <button class="lmsa-edit-step-btn lmsa-edit-step-btn--approve" aria-label="Accept">${I.check}</button>
+                  <button class="lmsa-edit-step-btn lmsa-edit-step-btn--decline" aria-label="Reject">${I.x}</button>
                 </div>
-              </div>
-              <div class="lmsa-agentic-timeline-step lmsa-agentic-timeline-step--tool_call lmsa-agentic-timeline-step--mutating is-edit-pending" data-tool-name="propose_edit">
-                <div class="lmsa-agentic-timeline-dot">${I.pencil}</div>
-                <div class="lmsa-agentic-timeline-step-body">
-                  <span class="lmsa-agentic-timeline-step-name">Propose edit</span>
-                  <span class="lmsa-agentic-timeline-step-detail">Chapter 1.md</span>
-                  <div class="lmsa-edit-step-controls">
-                    <span class="lmsa-edit-step-pending">pending review</span>
-                    <button class="lmsa-edit-step-btn lmsa-edit-step-btn--approve" aria-label="Accept">${I.check}</button>
-                    <button class="lmsa-edit-step-btn lmsa-edit-step-btn--decline" aria-label="Reject">${I.x}</button>
-                  </div>
-                  <div class="lmsa-edit-timeline-hunk">${splitHunk("pending")}</div>
-                </div>
-              </div>
-            </div>
-          </details>
-        </div>
-      </div></div>`,
+                <div class="lmsa-edit-timeline-hunk">${splitHunk("pending")}</div>`,
+              },
+            ),
+        ),
+      ),
       620,
     ),
   },
@@ -1558,50 +1843,46 @@ export const SURFACES = {
   // component emits it inside the timeline, per source).
   vaultReviewTimeline: {
     w: 620,
-    shot: ".lmsa-chat-window-message-timeline",
+    shot: ".lmsa-chat-window-message--assistant",
     html: view(
-      `<div class="lmsa-chat-window-message lmsa-chat-window-message--assistant"><div class="lmsa-chat-window-message-column">
-        <div class="lmsa-chat-window-message-timeline">
-          <details class="lmsa-agentic-timeline" open>
-            <summary class="lmsa-agentic-timeline-summary">
-              <span class="lmsa-agentic-timeline-summary-icon">${I.wrench}</span>
-              <span class="lmsa-agentic-timeline-summary-label">Used 1 tool</span>
-            </summary>
-            <div class="lmsa-agentic-timeline-list">
-              <div class="lmsa-agentic-timeline-step lmsa-agentic-timeline-step--tool_call lmsa-agentic-timeline-step--mutating is-vault-awaiting" data-tool-name="write_file">
-                <div class="lmsa-agentic-timeline-dot">${I.pencil}</div>
-                <div class="lmsa-agentic-timeline-step-body">
-                  <span class="lmsa-agentic-timeline-step-name">Write file</span>
-                  <span class="lmsa-agentic-timeline-step-detail">Notes/New Scene.md</span>
-                  <div class="lmsa-vault-step-controls">
-                    <span class="lmsa-vault-step-pending">pending approval</span>
-                    <button class="lmsa-vault-step-btn lmsa-vault-step-btn--approve" aria-label="Approve">${I.check}</button>
-                    <button class="lmsa-vault-step-btn lmsa-vault-step-btn--decline" aria-label="Decline">${I.x}</button>
-                  </div>
-                  <div class="lmsa-vault-timeline-preview">
-                    <div class="lmsa-chat-window-diff-hunk" data-status="pending">
-                      <div class="lmsa-chat-window-diff-hunk-body lmsa-chat-window-diff-hunk-body--split">
-                        <div class="lmsa-chat-window-diff-row">
-                          <div class="lmsa-chat-window-diff-side lmsa-chat-window-diff-side--left lmsa-chat-window-diff-side--empty"></div>
-                          <div class="lmsa-chat-window-diff-side lmsa-chat-window-diff-side--right lmsa-chat-window-diff-line--added">
-                            <span class="lmsa-chat-window-diff-gutter"></span>
-                            <span class="lmsa-chat-window-diff-text"># New Scene</span>
-                          </div>
-                        </div>
+      assistantBubble(
+        assistantTurn(
+          turnItem(
+            "vault-tool",
+            "tool_call",
+            "tool",
+            toolTurnBody("Write file", "Notes/New Scene.md", "Running"),
+            {
+              after: false,
+              state: "running",
+              mutating: true,
+              action: `<div class="lmsa-vault-step-controls">
+                <span class="lmsa-vault-step-pending">pending approval</span>
+                <button class="lmsa-vault-step-btn lmsa-vault-step-btn--approve" aria-label="Approve">${I.check}</button>
+                <button class="lmsa-vault-step-btn lmsa-vault-step-btn--decline" aria-label="Decline">${I.x}</button>
+              </div>
+              <div class="lmsa-vault-timeline-preview">
+                <div class="lmsa-chat-window-diff-hunk" data-status="pending">
+                  <div class="lmsa-chat-window-diff-hunk-body lmsa-chat-window-diff-hunk-body--split">
+                    <div class="lmsa-chat-window-diff-row">
+                      <div class="lmsa-chat-window-diff-side lmsa-chat-window-diff-side--left lmsa-chat-window-diff-side--empty"></div>
+                      <div class="lmsa-chat-window-diff-side lmsa-chat-window-diff-side--right lmsa-chat-window-diff-line--added">
+                        <span class="lmsa-chat-window-diff-gutter"></span>
+                        <span class="lmsa-chat-window-diff-text"># New Scene</span>
                       </div>
                     </div>
                   </div>
                 </div>
-              </div>
-            </div>
-          </details>
-          <div class="lmsa-vault-review-footer">
+              </div>`,
+            },
+          ),
+          "streaming",
+          `<div class="lmsa-vault-review-footer">
             <button class="lmsa-vault-review-footer-btn lmsa-vault-review-footer-btn--approve"><span class="lmsa-vault-review-footer-btn-icon">${I.check}</span>Approve all remaining</button>
             <button class="lmsa-vault-review-footer-btn"><span class="lmsa-vault-review-footer-btn-icon">${I.refresh}</span>Undo</button>
-          </div>
-          <span class="lmsa-ui-chip"><span>Reverted</span><button class="lmsa-ui-chip-dismiss" aria-label="Dismiss">${I.x}</button></span>
-        </div>
-      </div></div>`,
+          </div>`,
+        ),
+      ),
       620,
     ),
   },
@@ -1609,50 +1890,50 @@ export const SURFACES = {
   // S24: edit-review timeline, multi-hunk populated state (one applied + undo, one pending) + bulk bar.
   editReviewTimeline: {
     w: 620,
-    shot: ".lmsa-chat-window-message-timeline",
+    shot: ".lmsa-chat-window-message--assistant",
     html: view(
-      `<div class="lmsa-chat-window-message lmsa-chat-window-message--assistant"><div class="lmsa-chat-window-message-column">
-        <div class="lmsa-chat-window-message-timeline">
-          <details class="lmsa-agentic-timeline" open>
-            <summary class="lmsa-agentic-timeline-summary">
-              <span class="lmsa-agentic-timeline-summary-icon">${I.wrench}</span>
-              <span class="lmsa-agentic-timeline-summary-label">Used 2 tools</span>
-            </summary>
-            <div class="lmsa-agentic-timeline-list">
-              <div class="lmsa-agentic-timeline-step lmsa-agentic-timeline-step--tool_call lmsa-agentic-timeline-step--mutating is-edit-applied" data-tool-name="propose_edit">
-                <div class="lmsa-agentic-timeline-dot">${I.pencil}</div>
-                <div class="lmsa-agentic-timeline-step-body">
-                  <span class="lmsa-agentic-timeline-step-name">Propose edit</span>
-                  <span class="lmsa-agentic-timeline-step-detail">Chapter 1.md</span>
-                  <div class="lmsa-edit-step-controls">
-                    <span class="lmsa-edit-step-state">Applied</span>
-                    <button class="lmsa-edit-step-btn lmsa-edit-step-btn--undo" aria-label="Undo">${I.refresh}</button>
-                  </div>
-                  <div class="lmsa-edit-timeline-hunk">${splitHunk("applied")}</div>
-                </div>
+      assistantBubble(
+        assistantTurn(
+          turnItem(
+            "edit-applied",
+            "tool_call",
+            "tool",
+            toolTurnBody("Proposed edit", "Chapter 1.md", "Completed"),
+            {
+              state: "completed",
+              mutating: true,
+              action: `<div class="lmsa-edit-step-controls">
+                <span class="lmsa-edit-step-state">Applied</span>
+                <button class="lmsa-edit-step-btn lmsa-edit-step-btn--undo" aria-label="Undo">${I.refresh}</button>
               </div>
-              <div class="lmsa-agentic-timeline-step lmsa-agentic-timeline-step--tool_call lmsa-agentic-timeline-step--mutating is-edit-pending" data-tool-name="propose_edit">
-                <div class="lmsa-agentic-timeline-dot">${I.pencil}</div>
-                <div class="lmsa-agentic-timeline-step-body">
-                  <span class="lmsa-agentic-timeline-step-name">Propose edit</span>
-                  <span class="lmsa-agentic-timeline-step-detail">Chapter 2.md</span>
-                  <div class="lmsa-edit-step-controls">
-                    <span class="lmsa-edit-step-pending">pending review</span>
-                    <button class="lmsa-edit-step-btn lmsa-edit-step-btn--approve" aria-label="Accept">${I.check}</button>
-                    <button class="lmsa-edit-step-btn lmsa-edit-step-btn--decline" aria-label="Reject">${I.x}</button>
-                  </div>
-                  <div class="lmsa-edit-timeline-hunk">${splitHunk("pending")}</div>
+              <div class="lmsa-edit-timeline-hunk">${splitHunk("applied")}</div>`,
+            },
+          ) +
+            turnItem(
+              "edit-pending",
+              "tool_call",
+              "tool",
+              toolTurnBody("Propose edit", "Chapter 2.md", "Running"),
+              {
+                after: false,
+                state: "running",
+                mutating: true,
+                action: `<div class="lmsa-edit-step-controls">
+                  <span class="lmsa-edit-step-pending">pending review</span>
+                  <button class="lmsa-edit-step-btn lmsa-edit-step-btn--approve" aria-label="Accept">${I.check}</button>
+                  <button class="lmsa-edit-step-btn lmsa-edit-step-btn--decline" aria-label="Reject">${I.x}</button>
                 </div>
-              </div>
-            </div>
-          </details>
-          <div class="lmsa-edit-review-bulk">
+                <div class="lmsa-edit-timeline-hunk">${splitHunk("pending")}</div>`,
+              },
+            ),
+          "streaming",
+          `<div class="lmsa-edit-review-bulk">
             <button class="lmsa-ui-compact-btn lmsa-edit-bulk-btn lmsa-edit-bulk-btn--accept">Accept all (2)</button>
             <button class="lmsa-ui-compact-btn lmsa-ui-compact-btn-secondary lmsa-edit-bulk-btn">Reject all</button>
             <button class="lmsa-ui-compact-btn lmsa-ui-compact-btn-secondary lmsa-edit-bulk-btn">Accept all this session</button>
-          </div>
-        </div>
-      </div></div>`,
+          </div>`,
+        ),
+      ),
       620,
     ),
   },

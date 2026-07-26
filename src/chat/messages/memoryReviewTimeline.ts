@@ -22,6 +22,8 @@ export interface ReviewableMemoryProposal {
 
 export interface MemoryReviewTimelineOptions {
   timelineEl: HTMLElement;
+  /** Canonical Phase 4 placement by exact declaration identity. */
+  findActionHostByToolCallId?: (toolCallId: string) => HTMLElement | null;
   proposals: ReviewableMemoryProposal[];
   callbacks: {
     onApprove: (proposalId: string) => Promise<void>;
@@ -69,6 +71,18 @@ export class MemoryReviewTimelineView {
   private locateStep(
     proposal: ReviewableMemoryProposal,
   ): HTMLElement | null {
+    if (this.opts.findActionHostByToolCallId) {
+      const host = this.opts.findActionHostByToolCallId(
+        proposal.sourceToolCallId,
+      );
+      if (!host) {
+        throw new Error(
+          "No assistant turn action host exists for memory call " +
+            `"${proposal.sourceToolCallId}".`,
+        );
+      }
+      return host;
+    }
     return this.opts.timelineEl.querySelector<HTMLElement>(
       `[data-tool-call-id="${CSS.escape(proposal.sourceToolCallId)}"]`,
     );

@@ -25,7 +25,6 @@ import { appliedEditsOf, editProposalsOf, makeMessage } from "../conversation/co
 import type { ChatSessionStore } from "../conversation/ChatSessionStore";
 import type { ChatTranscript } from "../messages/ChatTranscript";
 import { EditReviewTimelineView } from "../messages/editReviewTimeline";
-import { MarkdownItBubbleRenderer } from "../rendering/MarkdownItBubbleRenderer";
 import {
   EditReviewController,
   type EditReviewCallbacks,
@@ -35,8 +34,7 @@ import {
   VaultReviewTimelineView,
   type VaultReviewCallbacks,
 } from "../messages/vaultReviewTimeline";
-import type { BubbleRefs } from "../types";
-import type { EditStreamingRenderer } from "../streaming/EditStreamingRenderer";
+import type { AssistantBubbleRefs } from "../types";
 import type WritingAssistantChat from "../../main";
 import type { AgenticStep, ApprovalPosture, ConversationMessage, ProviderOption } from "../../shared/types";
 import { hasCompletedAskGuidance } from "../../tools/resultDigest";
@@ -49,8 +47,8 @@ export interface FinalizeEditOptions {
   owner: Component;
   store: ChatSessionStore;
   transcript: ChatTranscript;
-  bubble: BubbleRefs;
-  renderer: EditStreamingRenderer;
+  bubble: AssistantBubbleRefs;
+  response: string;
   plugin: WritingAssistantChat;
   modelId?: string;
   provider?: ProviderOption;
@@ -103,19 +101,24 @@ export interface FinalizeEditOptions {
  */
 export async function finalizeEditResponse(options: FinalizeEditOptions): Promise<void> {
   const {
-    app, owner, store, transcript, bubble, renderer, plugin, modelId, provider, usage,
+    app, owner, store, transcript, bubble, response, plugin, modelId, provider, usage,
     toolCalls, agenticSteps, stoppedForMaxTokens,
     prebuiltVaultOpProposal, prebuiltVaultOpRecord,
     prebuiltEditProposals, prebuiltEditRecords, onEnterAutoApply, interrupted,
   } = options;
 
-  const fullResponse = renderer.getFullResponse();
+  const fullResponse = response;
   if (
     !fullResponse &&
     (!toolCalls || toolCalls.length === 0) &&
     !hasCompletedAskGuidance(agenticSteps)
   ) {
-    transcript.renderPlainTextContent(bubble, "(no response)");
+    await bubble.turnView.refreshLegacy({
+      key: "empty-edit-response",
+      status: interrupted ? "interrupted" : "completed",
+      content: "",
+      steps: agenticSteps,
+    });
     return;
   }
 
@@ -213,6 +216,12 @@ export async function finalizeEditResponse(options: FinalizeEditOptions): Promis
   store.appendMessage(assistantMessage);
   store.setLastAssistantResponse(fullResponse);
   transcript.registerBubble(assistantMessage.id, bubble);
+  await bubble.turnView.refreshLegacy({
+    key: assistantMessage.id,
+    status: interrupted ? "interrupted" : "completed",
+    content: fullResponse,
+    steps: agenticSteps,
+  });
 
   // Render the review panel(s). A prebuilt (in-loop) proposal is already resolved
   // and applied, so don't auto-apply again; a freshly-derived proposal auto-applies
@@ -381,27 +390,13 @@ export function renderProposalPanels(
   app: App,
   owner: Component,
   store: ChatSessionStore,
-  bubble: BubbleRefs,
+  bubble: AssistantBubbleRefs,
   message: ConversationMessage,
   inlineDiff: InlineDiffManager,
   opts?: { autoApplyVaultOps?: boolean; onEnterAutoApply?: () => void },
 ): void {
-  bubble.contentEl.empty();
-  bubble.contentEl.removeClass("lmsa-message-content--plain", "lmsa-message-content--markdown");
-
-  // --- Body card: the turn's prose only. Both review channels now live on the
-  // timeline (edits via EditReviewTimelineView, vault ops via VaultReviewTimelineView),
-  // so the body holds the explanatory text and the rails hold the interactive steps.
-  // Prose belongs to whichever channel carries it; when both fire only the edit
-  // channel does (finalize assigns prose to the edit proposal first). ---
   const editProposals = editProposalsOf(message);
   if (editProposals.length > 0) {
-    // Prose belongs to one card so it shows once (finalize assigns it to the first
-    // proposal that carries it).
-    const proseProposal = editProposals.find((p) => p.prose);
-    if (proseProposal?.prose) {
-      renderProseInto(app, bubble.contentEl, proseProposal.prose);
-    }
     // One controller per edited file owns that file's review; a single composite
     // timeline view spans them (one card per file, ADR-0010), and the in-note overlay
     // attaches each so whichever file is open shows its diff.
@@ -415,21 +410,40 @@ export function renderProposalPanels(
           appliedEdits.find((r) => r.proposalId === proposal.id),
         ),
     );
+    const usesExactEditPlacement = editProposals.every((proposal) =>
+      proposal.hunks.every(
+        (hunk) =>
+          bubble.turnView.getReviewHostForToolCallId(hunk.id) !== null,
+      ),
+    );
     new EditReviewTimelineView({
-      timelineEl: bubble.timelineEl,
+      timelineEl: bubble.turnView.rootEl,
+      ...(usesExactEditPlacement && {
+        findActionHostByToolCallId: (toolCallId: string) =>
+          bubble.turnView.getReviewHostForToolCallId(toolCallId),
+      }),
       app,
       controllers,
       ...(opts?.onEnterAutoApply && { onEnterAutoApply: opts.onEnterAutoApply }),
     });
     for (const controller of controllers) inlineDiff.attach(controller);
-  } else if (message.vaultOpProposal?.prose) {
-    renderProseInto(app, bubble.contentEl, message.vaultOpProposal.prose);
   }
 
   // --- Timeline: fold the vault review onto the tool-call steps in place. ---
   if (message.vaultOpProposal) {
+    const usesExactVaultPlacement = message.vaultOpProposal.ops.every(
+      (op) =>
+        !!op.sourceToolCallId &&
+        bubble.turnView.getReviewHostForToolCallId(
+          op.sourceToolCallId,
+        ) !== null,
+    );
     new VaultReviewTimelineView({
-      timelineEl: bubble.timelineEl,
+      timelineEl: bubble.turnView.rootEl,
+      ...(usesExactVaultPlacement && {
+        findActionHostByToolCallId: (toolCallId: string) =>
+          bubble.turnView.getReviewHostForToolCallId(toolCallId),
+      }),
       app,
       proposal: message.vaultOpProposal,
       callbacks: makeVaultOpCallbacks(store, message.vaultOpProposal),
@@ -437,16 +451,6 @@ export function renderProposalPanels(
       autoApply: opts?.autoApplyVaultOps ?? false,
     });
   }
-}
-
-/**
- * Render assistant prose through the same markdown-it pipeline as chat bubbles, so
- * code blocks, links, and copy buttons render identically here, rather than via
- * Obsidian's MarkdownRenderer, which produced inconsistent fenced-code output.
- */
-function renderProseInto(app: App, el: HTMLElement, prose: string): void {
-  const proseEl = el.createDiv({ cls: "lmsa-chat-window-message-content--markdown" });
-  void new MarkdownItBubbleRenderer(app).render(proseEl, prose);
 }
 
 function makeEditCallbacks(store: ChatSessionStore, proposal: EditProposal): EditReviewCallbacks {
@@ -519,7 +523,7 @@ function makeVaultOpCallbacks(
 async function renderAsNormalMessage(
   store: ChatSessionStore,
   transcript: ChatTranscript,
-  bubble: BubbleRefs,
+  bubble: AssistantBubbleRefs,
   fullResponse: string,
   modelId?: string,
   provider?: ProviderOption,
@@ -534,9 +538,10 @@ async function renderAsNormalMessage(
   store.appendMessage(assistantMessage);
   store.setLastAssistantResponse(fullResponse);
   transcript.registerBubble(assistantMessage.id, bubble);
-  if (fullResponse) {
-    await transcript.renderBubbleContent(bubble, fullResponse);
-  } else {
-    transcript.renderPlainTextContent(bubble, "(no response)");
-  }
+  await bubble.turnView.refreshLegacy({
+    key: assistantMessage.id,
+    status: interrupted ? "interrupted" : "completed",
+    content: fullResponse,
+    steps: agenticSteps,
+  });
 }

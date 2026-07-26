@@ -2,6 +2,11 @@ import type {
   AssistantToolCallItem,
   AssistantTurnRecord,
 } from "../../shared/types";
+import type { AssistantTurnSnapshot } from "./AssistantTurnBuilder";
+
+type AssistantTurnProseSource =
+  | AssistantTurnRecord
+  | AssistantTurnSnapshot;
 
 export const INTERRUPTED_TOOL_RESULT_TEXT =
   "Tool execution was interrupted before a result was produced.";
@@ -13,18 +18,16 @@ export interface InterruptedAssistantToolResult {
 }
 
 /** Every visible prose item in declaration order, separated for display. */
-export function allVisibleProse(turn: AssistantTurnRecord): string {
+export function allVisibleProse(turn: AssistantTurnProseSource): string {
   return turn.items
-    .filter((item) => item.type === "prose")
-    .map((item) => item.text)
+    .flatMap((item) => (item.type === "prose" ? [item.text] : []))
     .join("\n\n");
 }
 
 /** Exact prose bytes in declaration order, with no display separator added. */
-export function rawConcatenatedProse(turn: AssistantTurnRecord): string {
+export function rawConcatenatedProse(turn: AssistantTurnProseSource): string {
   return turn.items
-    .filter((item) => item.type === "prose")
-    .map((item) => item.text)
+    .flatMap((item) => (item.type === "prose" ? [item.text] : []))
     .join("");
 }
 

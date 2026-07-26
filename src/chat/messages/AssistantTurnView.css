@@ -1,0 +1,413 @@
+/* The assistant row owns a two-column avatar rail. The unified turn host spans
+   both columns, while every item body returns to the existing assistant text edge. */
+.lmsa-chat-window-message--assistant {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 780px);
+  justify-content: start;
+  column-gap: 0.75rem;
+  row-gap: 0.25rem;
+}
+
+.lmsa-chat-window-message--assistant > .lmsa-chat-window-message-avatar {
+  grid-column: 1;
+  grid-row: 1;
+}
+
+.lmsa-chat-window-message--assistant > .lmsa-chat-window-message-column {
+  grid-column: 2;
+  grid-row: 1;
+  width: 100%;
+  max-width: none;
+}
+
+.lmsa-chat-window-message--assistant
+  > :is(
+    .lmsa-chat-window-bubble-toolbar,
+    .lmsa-chat-window-usage-badge
+  ) {
+  grid-column: 2;
+}
+
+.lmsa-chat-window-assistant-turn-host {
+  grid-column: 1 / -1;
+  grid-row: 2;
+  min-width: 0;
+  width: 100%;
+}
+
+.lmsa-assistant-turn {
+  --lmsa-turn-rail-width: 34px;
+  --lmsa-turn-rail-gap: 0.75rem;
+  --lmsa-turn-marker-size: 18px;
+  --lmsa-turn-marker-center: 14px;
+  min-width: 0;
+  color: var(--text-normal);
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+.lmsa-assistant-turn-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.lmsa-assistant-turn-item {
+  position: relative;
+  display: grid;
+  grid-template-columns: var(--lmsa-turn-rail-width) minmax(0, 1fr);
+  column-gap: var(--lmsa-turn-rail-gap);
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+}
+
+.lmsa-assistant-turn-item::before,
+.lmsa-assistant-turn-item::after {
+  content: "";
+  position: absolute;
+  z-index: 0;
+  left: calc((var(--lmsa-turn-rail-width) - 2px) / 2);
+  width: 2px;
+  border-radius: 999px;
+  background: var(--background-modifier-border);
+}
+
+.lmsa-assistant-turn-item::before {
+  top: -0.75rem;
+  bottom: calc(100% - var(--lmsa-turn-marker-center));
+}
+
+.lmsa-assistant-turn-item:first-child::before {
+  top: calc(-1 * (34px + 0.25rem - var(--lmsa-turn-marker-center)));
+}
+
+.lmsa-assistant-turn-item::after {
+  top: var(--lmsa-turn-marker-center);
+  bottom: -0.75rem;
+}
+
+.lmsa-assistant-turn-item:not(.has-connector-before)::before,
+.lmsa-assistant-turn-item:not(.has-connector-after)::after {
+  display: none;
+}
+
+.lmsa-assistant-turn-marker {
+  position: relative;
+  z-index: 1;
+  grid-column: 1;
+  align-self: start;
+  justify-self: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--lmsa-turn-marker-size);
+  height: var(--lmsa-turn-marker-size);
+  margin-top: calc(var(--lmsa-turn-marker-center) - var(--lmsa-turn-marker-size) / 2);
+  border: 2px solid var(--background-modifier-border);
+  border-radius: 999px;
+  box-sizing: border-box;
+  color: var(--text-muted);
+  background: var(--background-primary);
+}
+
+.lmsa-assistant-turn-marker svg {
+  width: 10px;
+  height: 10px;
+}
+
+.lmsa-assistant-turn-marker.is-streaming {
+  color: var(--text-faint);
+  animation: lmsa-timeline-dot-pulse 1.2s ease-in-out infinite;
+}
+
+.lmsa-assistant-turn-marker.is-thinking {
+  color: var(--text-muted);
+  border-color: color-mix(
+    in srgb,
+    var(--text-muted) 52%,
+    var(--background-modifier-border)
+  );
+}
+
+.lmsa-assistant-turn-marker.is-tool {
+  color: var(--text-accent);
+  border-color: color-mix(
+    in srgb,
+    var(--text-accent) 50%,
+    var(--background-modifier-border)
+  );
+  background: color-mix(
+    in srgb,
+    var(--text-accent) 8%,
+    var(--background-primary)
+  );
+}
+
+.lmsa-assistant-turn-item.is-mutating
+  > .lmsa-assistant-turn-marker {
+  color: var(--lmsa-mode-accent);
+  border-color: color-mix(
+    in srgb,
+    var(--lmsa-mode-accent) 52%,
+    var(--background-modifier-border)
+  );
+}
+
+.lmsa-assistant-turn-item:is(.is-failed, .is-interrupted)
+  > .lmsa-assistant-turn-marker {
+  color: var(--text-error);
+  border-color: color-mix(
+    in srgb,
+    var(--text-error) 52%,
+    var(--background-modifier-border)
+  );
+}
+
+/* Final prose has no invented icon. The incoming connector simply terminates at
+   the first-line center, preserving the rail endpoint without another symbol. */
+.lmsa-assistant-turn-marker.is-iconless {
+  visibility: hidden;
+}
+
+.lmsa-assistant-turn-item-body {
+  grid-column: 2;
+  min-width: 0;
+  width: 100%;
+}
+
+.lmsa-assistant-turn-prose {
+  overflow-wrap: anywhere;
+}
+
+.lmsa-assistant-turn-prose
+  :is(pre, table, .lmsa-md-codeblock, .lmsa-md-table-wrap) {
+  max-width: 100%;
+}
+
+.lmsa-assistant-turn-item--tool_call
+  > .lmsa-assistant-turn-item-body {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0.2rem 0.45rem;
+  min-height: 1.7rem;
+  color: var(--text-muted);
+  font-size: var(--font-ui-small);
+  line-height: 1.5;
+}
+
+.lmsa-assistant-turn-tool-state {
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+}
+
+.lmsa-assistant-turn-tool-state.is-error,
+.lmsa-assistant-turn-diagnostic-error
+  .lmsa-agentic-timeline-arg-key {
+  color: var(--text-error);
+}
+
+.lmsa-assistant-turn-disclosure {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 0;
+  width: 22px;
+  height: 22px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-muted);
+  box-shadow: none;
+  appearance: none;
+  cursor: pointer;
+}
+
+.lmsa-assistant-turn-disclosure:hover,
+.lmsa-assistant-turn-disclosure:focus-visible {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+
+.lmsa-assistant-turn-disclosure:focus-visible {
+  outline: 2px solid var(--background-modifier-border-focus);
+  outline-offset: 1px;
+}
+
+.lmsa-assistant-turn
+  .lmsa-agentic-timeline-step-expand:not(.lmsa-hidden) {
+  display: block;
+}
+
+.lmsa-assistant-turn-action-host,
+.lmsa-assistant-turn
+  .lmsa-agentic-timeline-step-expand {
+  flex-basis: 100%;
+  min-width: 0;
+}
+
+.lmsa-assistant-turn-empty {
+  position: relative;
+  display: grid;
+  grid-template-columns: var(--lmsa-turn-rail-width) minmax(0, 1fr);
+  column-gap: var(--lmsa-turn-rail-gap);
+  min-width: 0;
+  color: var(--text-muted);
+}
+
+.lmsa-assistant-turn-empty::before {
+  content: "";
+  position: absolute;
+  left: calc((var(--lmsa-turn-rail-width) - 2px) / 2);
+  top: calc(-1 * (34px + 0.25rem - var(--lmsa-turn-marker-center)));
+  bottom: calc(100% - var(--lmsa-turn-marker-center));
+  width: 2px;
+  border-radius: 999px;
+  background: var(--background-modifier-border);
+}
+
+.lmsa-assistant-turn-empty-marker {
+  grid-column: 1;
+  justify-self: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--lmsa-turn-marker-size);
+  height: var(--lmsa-turn-marker-size);
+  margin-top: calc(var(--lmsa-turn-marker-center) - var(--lmsa-turn-marker-size) / 2);
+  border: 2px solid var(--background-modifier-border);
+  border-radius: 999px;
+  color: var(--text-muted);
+  background: var(--background-primary);
+}
+
+.lmsa-assistant-turn-empty.is-streaming
+  .lmsa-assistant-turn-empty-marker {
+  animation: lmsa-timeline-dot-pulse 1.2s ease-in-out infinite;
+}
+
+.lmsa-assistant-turn-empty.is-failed {
+  color: var(--text-error);
+}
+
+.lmsa-assistant-turn-empty-label {
+  grid-column: 2;
+  align-self: start;
+  line-height: 1.68;
+}
+
+.lmsa-assistant-turn-notice,
+.lmsa-assistant-turn-regex-preview,
+.lmsa-assistant-turn-action-section {
+  margin-top: 0.75rem;
+  margin-left: calc(var(--lmsa-turn-rail-width) + var(--lmsa-turn-rail-gap));
+  min-width: 0;
+}
+
+.lmsa-assistant-turn-notice {
+  color: var(--text-muted);
+  font-size: var(--font-ui-small);
+}
+
+.lmsa-assistant-turn-regex-preview {
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+}
+
+.lmsa-assistant-turn-notice.is-error {
+  color: var(--text-error);
+}
+
+.lmsa-assistant-turn-action-section {
+  padding: 0.7rem 0.8rem;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 10px;
+  background: var(--background-secondary);
+}
+
+.lmsa-assistant-turn-audit {
+  border-color: color-mix(
+    in srgb,
+    var(--text-warning) 50%,
+    var(--background-modifier-border)
+  );
+}
+
+.lmsa-assistant-turn-action-section-heading {
+  margin-bottom: 0.45rem;
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+  font-weight: 600;
+}
+
+.lmsa-assistant-turn-action-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  min-width: 0;
+  padding-top: 0.35rem;
+}
+
+.lmsa-assistant-turn-action-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.35rem 0.75rem;
+}
+
+.lmsa-assistant-turn-action-family {
+  font-weight: 600;
+}
+
+.lmsa-assistant-turn-action-state,
+.lmsa-assistant-turn-action-placement {
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+}
+
+.lmsa-assistant-turn-action-placement.is-warning {
+  color: var(--text-warning);
+}
+
+.lmsa-assistant-turn-action-targets {
+  margin: 0;
+  padding-left: 1.2rem;
+  color: var(--text-muted);
+  font-size: var(--font-ui-small);
+}
+
+@media (max-width: 700px) {
+  .lmsa-chat-window-message--assistant {
+    grid-template-columns: 30px minmax(0, 1fr);
+    column-gap: 0.625rem;
+  }
+
+  .lmsa-assistant-turn {
+    --lmsa-turn-rail-width: 30px;
+    --lmsa-turn-rail-gap: 0.625rem;
+  }
+
+  .lmsa-assistant-turn-item:first-child::before {
+    top: calc(-1 * (30px + 0.25rem - var(--lmsa-turn-marker-center)));
+  }
+
+  .lmsa-assistant-turn-empty::before {
+    top: calc(-1 * (30px + 0.25rem - var(--lmsa-turn-marker-center)));
+  }
+
+  .lmsa-assistant-turn-notice,
+  .lmsa-assistant-turn-regex-preview,
+  .lmsa-assistant-turn-action-section {
+    margin-left: calc(
+      var(--lmsa-turn-rail-width) + var(--lmsa-turn-rail-gap)
+    );
+  }
+}

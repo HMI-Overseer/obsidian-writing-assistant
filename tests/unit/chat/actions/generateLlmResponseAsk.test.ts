@@ -21,74 +21,6 @@ vi.mock("../../../../src/providers/reasoningLevels", () => ({
   resolveModelReasoning: () => null,
 }));
 
-vi.mock("../../../../src/chat/streaming/StreamingRenderer", () => ({
-  StreamingRenderer: class {
-    private response = "";
-
-    appendDelta(delta: string): void {
-      this.response += delta;
-    }
-
-    showToolStatus(): void {}
-    beginNewRound(): void {}
-    flush(): Promise<void> {
-      return Promise.resolve();
-    }
-    getCurrentRoundResponse(): string {
-      return this.response;
-    }
-    getFullResponse(): string {
-      return this.response;
-    }
-    hasStreamRenderedMarkdown(): boolean {
-      return false;
-    }
-    getLastRenderedText(): string {
-      return "";
-    }
-    destroy(): void {}
-  },
-}));
-
-vi.mock("../../../../src/chat/streaming/EditStreamingRenderer", () => ({
-  EditStreamingRenderer: class {
-    private response = "";
-
-    appendDelta(delta: string): void {
-      this.response += delta;
-    }
-
-    showToolStatus(): void {}
-    beginNewRound(): void {}
-    flush(): Promise<void> {
-      return Promise.resolve();
-    }
-    getFullResponse(): string {
-      return this.response;
-    }
-    destroy(): void {}
-  },
-}));
-
-vi.mock("../../../../src/chat/messages/AgenticTimeline", () => ({
-  AgenticTimeline: class {
-    private readonly steps: unknown[] = [];
-
-    addPendingToolCall(): void {}
-    addStep(step: unknown): void {
-      this.steps.push(step);
-    }
-    setStepResult(): void {}
-    addReasoningDelta(): void {}
-    commitLiveReasoning(): void {}
-    discardLiveReasoning(): void {}
-    finalize(): void {}
-    getSteps(): unknown[] {
-      return [...this.steps];
-    }
-  },
-}));
-
 vi.mock("../../../../src/chat/actions/liveVaultReview", () => ({
   LiveVaultReview: class {
     cancelPending(): void {}
@@ -525,13 +457,20 @@ function harness(
       },
     ),
   } as unknown as ChatSessionStore;
+  const turnView = {
+    rootEl: {},
+    refresh: vi.fn(() => Promise.resolve()),
+    refreshLegacy: vi.fn(() => Promise.resolve()),
+    flush: vi.fn(() => Promise.resolve()),
+    getReviewHostForToolCallId: vi.fn(() => null),
+  };
   const bubble = {
-    bodyEl: {
-      addClass: vi.fn(),
-      removeClass: vi.fn(),
-    },
-    timelineEl: {},
-    contentEl: { isConnected: false },
+    role: "assistant" as const,
+    rowEl: {},
+    columnEl: {},
+    chromeEl: {},
+    turnHostEl: {},
+    turnView,
   };
   const transcript = {
     createBubble: vi.fn(() => bubble),

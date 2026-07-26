@@ -1,4 +1,5 @@
 import type { Attachment, ConversationMessage } from "../shared/types";
+import type { AssistantTurnView } from "./messages/AssistantTurnView";
 
 export type BubbleRole = "user" | "assistant";
 
@@ -15,16 +16,25 @@ export type BubbleRenderOptions = {
   attachments?: Attachment[];
 };
 
-export type BubbleRefs = {
-  role: BubbleRole;
+type BubbleRefsBase = {
   rowEl: HTMLElement;
   columnEl: HTMLElement;
   chromeEl: HTMLElement;
-  /** Container for the agentic step timeline. Sits between the role label and the bubble body. Empty for non-agentic messages. */
-  timelineEl: HTMLElement;
+};
+
+export type UserBubbleRefs = BubbleRefsBase & {
+  role: "user";
   bodyEl: HTMLElement;
   contentEl: HTMLElement;
 };
+
+export type AssistantBubbleRefs = BubbleRefsBase & {
+  role: "assistant";
+  turnHostEl: HTMLElement;
+  turnView: AssistantTurnView;
+};
+
+export type BubbleRefs = UserBubbleRefs | AssistantBubbleRefs;
 
 export type ChatLayoutRefs = {
   rootEl: HTMLElement;

@@ -12,7 +12,11 @@ vi.mock("obsidian", async (importOriginal) => {
   return { ...actual, Notice: vi.fn() };
 });
 
-function makeHandler(opts: { isGenerating: boolean; persist?: () => Promise<void> }) {
+function makeHandler(opts: {
+  isGenerating: boolean;
+  persist?: () => Promise<void>;
+  messages?: Array<{ id: string; role: "user" | "assistant"; content: string }>;
+}) {
   const removeMessage = vi.fn();
   const switchMessageVersion = vi.fn();
   const persistActiveConversation = vi.fn(opts.persist ?? (() => Promise.resolve()));
@@ -22,10 +26,12 @@ function makeHandler(opts: { isGenerating: boolean; persist?: () => Promise<void
   const syncConversationUi = vi.fn().mockResolvedValue(undefined);
 
   const snapshot = {
-    messageHistory: [
-      { id: "m1", role: "user", content: "hello" },
-      { id: "m2", role: "assistant", content: "hi there" },
-    ],
+    messageHistory:
+      opts.messages ??
+      [
+        { id: "m1", role: "user" as const, content: "hello" },
+        { id: "m2", role: "assistant" as const, content: "hi there" },
+      ],
   };
 
   const store = {
@@ -129,5 +135,58 @@ describe("ChatBubbleActionHandler, generation gate (P1-12)", () => {
       expect(getBubbleForMessage).toHaveBeenCalledWith("m1");
       expect(vi.mocked(Notice)).not.toHaveBeenCalled();
     });
+  });
+
+  it("copies all visible prose from the selected assistant revision", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    vi.stubGlobal("navigator", { clipboard: { writeText } });
+    const message = {
+      id: "m2",
+      role: "assistant" as const,
+      content: "stale compatibility text",
+      revisions: [
+        {
+          revisionId: "revision-1",
+          kind: "turn" as const,
+          origin: "generated" as const,
+          createdAt: 1,
+          provider: "openai" as const,
+          modelId: "gpt-test",
+          turn: {
+            schemaVersion: 1 as const,
+            id: "turn-1",
+            status: "completed" as const,
+            segments: [{ id: "s1" }],
+            items: [
+              {
+                type: "prose" as const,
+                id: "p1",
+                segmentId: "s1",
+                text: "First visible block.",
+              },
+              {
+                type: "prose" as const,
+                id: "p2",
+                segmentId: "s1",
+                text: "Second visible block.",
+              },
+            ],
+          },
+        },
+      ],
+      activeRevisionId: "revision-1",
+    };
+    const { handler } = makeHandler({
+      isGenerating: false,
+      messages: [message],
+    });
+
+    handler.handleCopy("m2");
+    await Promise.resolve();
+
+    expect(writeText).toHaveBeenCalledWith(
+      "First visible block.\n\nSecond visible block.",
+    );
+    vi.unstubAllGlobals();
   });
 });

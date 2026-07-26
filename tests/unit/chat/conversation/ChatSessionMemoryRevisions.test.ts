@@ -108,6 +108,52 @@ describe("ChatSessionMemory revision ownership", () => {
     expect(memory.getSnapshot().lastAssistantResponse).toBe("Second.");
   });
 
+  it("uses all visible prose for the last-assistant-response state", () => {
+    const message: ConversationMessage = {
+      id: "assistant-turn",
+      role: "assistant",
+      content: "stale",
+      revisions: [
+        {
+          revisionId: "turn-revision",
+          kind: "turn",
+          origin: "generated",
+          createdAt: 1,
+          provider: "openai",
+          modelId: "gpt-test",
+          turn: {
+            schemaVersion: 1,
+            id: "turn-1",
+            status: "completed",
+            segments: [{ id: "s1" }],
+            items: [
+              {
+                type: "prose",
+                id: "p1",
+                segmentId: "s1",
+                text: "Before.",
+              },
+              {
+                type: "prose",
+                id: "p2",
+                segmentId: "s1",
+                text: "After.",
+              },
+            ],
+          },
+        },
+      ],
+      activeRevisionId: "turn-revision",
+    };
+    const memory = new ChatSessionMemory();
+
+    memory.hydrateFromConversation(conversation(message));
+
+    expect(memory.getSnapshot().lastAssistantResponse).toBe(
+      "Before.\n\nAfter.",
+    );
+  });
+
   it("switches by revision ID with complete compatibility metadata and no ledger event", () => {
     const memory = new ChatSessionMemory();
     memory.hydrateFromConversation(conversation());

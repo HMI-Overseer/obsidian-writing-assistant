@@ -1,6 +1,10 @@
 import type { App } from "obsidian";
 import type { ChatClient } from "../../api/chatClient";
-import type { ChatRequest, ChatTurn } from "../../shared/chatRequest";
+import type {
+  ChatAssistantContentItem,
+  ChatRequest,
+  ChatTurn,
+} from "../../shared/chatRequest";
 import type {
   AgenticStep,
   AssistantReplayEvidence,
@@ -178,7 +182,10 @@ export async function runToolLoop(
   const toolLoopTurns: ChatTurn[] = [];
   let allWriteToolCalls: ToolCall[] = [];
   let finalUsage: UsageResult | null = null;
-  let replayEvidence: AssistantReplayEvidence | null = null;
+  let replayEvidence: AssistantReplayEvidence | null =
+    provider === "claudecode"
+      ? null
+      : structuredClone(baseRequest.replayEvidence ?? null);
   const toolCorrelations = new Map<
     string,
     "provider_id" | "plugin_id"
@@ -285,19 +292,44 @@ export async function runToolLoop(
         ? planAskBarrierBatch(normalizedCalls)
         : null;
       if (normalizedCalls && !askBarrierPlan) {
+        const snapshot = turnBuilder.snapshot();
+        const assistantContent = assistantContentForSegments(
+          snapshot,
+          streamedSegmentIds,
+        );
+        const replayCapsule = snapshot.segments.find(
+          (segment) => streamedSegmentIds.includes(segment.id),
+        )?.replayCapsule;
+        const canReplayStructurally = assistantContent.every(
+          (item) =>
+            item.type === "prose" ||
+            item.toolArgs !== undefined,
+        );
         pendingEmission = {
-          assistantTurn: {
-            role: "assistant",
-            content: roundText || null,
-            toolCalls: normalizedCalls.map((tc) => ({
-              id: tc.id,
-              name: tc.name,
-              arguments: tc.arguments,
-            })),
-            ...(roundThinkingBlocks
-              ? { anthropicThinkingBlocks: roundThinkingBlocks }
-              : {}),
-          },
+          assistantTurn: canReplayStructurally
+            ? {
+                role: "assistant",
+                content: null,
+                assistantContent,
+                ...(replayCapsule
+                  ? {
+                      providerReplayCapsule:
+                        structuredClone(replayCapsule),
+                    }
+                  : {}),
+              }
+            : {
+                role: "assistant",
+                content: roundText || null,
+                toolCalls: normalizedCalls.map((toolCall) => ({
+                  id: toolCall.id,
+                  name: toolCall.name,
+                  arguments: toolCall.arguments,
+                })),
+                ...(roundThinkingBlocks
+                  ? { anthropicThinkingBlocks: roundThinkingBlocks }
+                  : {}),
+              },
           toolCalls: normalizedCalls,
           results: new Map(),
         };
@@ -761,6 +793,33 @@ export function applyAssistantStreamEvent(
       break;
   }
   callbacks?.onTurnSnapshot?.(builder.snapshot());
+}
+
+function assistantContentForSegments(
+  snapshot: AssistantTurnSnapshot,
+  segmentIds: readonly string[],
+): ChatAssistantContentItem[] {
+  const included = new Set(segmentIds);
+  const content: ChatAssistantContentItem[] = [];
+  for (const item of snapshot.items) {
+    if (!included.has(item.segmentId)) continue;
+    if (item.type === "prose") {
+      content.push({ type: "prose", text: item.text });
+      continue;
+    }
+    if (item.toolCallId !== undefined) {
+      content.push({
+        type: "tool_call" as const,
+        toolCallId: item.toolCallId,
+        toolName: item.toolName,
+        toolArguments: item.toolArguments,
+        ...(item.toolArgs === undefined
+          ? {}
+          : { toolArgs: structuredClone(item.toolArgs) }),
+      });
+    }
+  }
+  return content;
 }
 
 /** Derive executable calls from the same frozen declaration facts the builder owns. */

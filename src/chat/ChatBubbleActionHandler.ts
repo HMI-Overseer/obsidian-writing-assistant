@@ -4,6 +4,7 @@ import type { ChatGenerationOrchestrator } from "./ChatGenerationOrchestrator";
 import type { ContextCapacityUpdater } from "./ContextCapacityUpdater";
 import type { ContextInputs } from "./ContextCapacityUpdater";
 import { branchConversation } from "./actions/branchConversation";
+import { assistantDisplayText } from "./conversation/assistantRevisions";
 import type { ChatSessionStore } from "./conversation/ChatSessionStore";
 import type { BubbleActionCallbacks } from "./messages/ChatTranscript";
 import type { ChatTranscript } from "./messages/ChatTranscript";
@@ -63,7 +64,7 @@ export class ChatBubbleActionHandler {
     const message = snapshot?.messageHistory.find((m) => m.id === messageId);
     if (!message) return;
 
-    void navigator.clipboard.writeText(message.content).then(() => {
+    void navigator.clipboard.writeText(assistantDisplayText(message)).then(() => {
       new Notice("Copied to clipboard");
     });
   }

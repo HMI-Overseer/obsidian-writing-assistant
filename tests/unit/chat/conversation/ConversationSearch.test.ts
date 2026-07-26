@@ -110,6 +110,57 @@ describe("ConversationSearch.search", () => {
     expect(hits[0].snippet).toContain("crimson");
   });
 
+  it("searches all visible prose from the selected assistant revision", async () => {
+    const assistant: ConversationMessage = {
+      id: "assistant-1",
+      role: "assistant",
+      content: "stale compatibility text",
+      revisions: [
+        {
+          revisionId: "revision-1",
+          kind: "turn",
+          origin: "generated",
+          createdAt: 1,
+          provider: "openai",
+          modelId: "gpt-test",
+          turn: {
+            schemaVersion: 1,
+            id: "turn-1",
+            status: "completed",
+            segments: [{ id: "s1" }],
+            items: [
+              {
+                type: "prose",
+                id: "p1",
+                segmentId: "s1",
+                text: "The first visible thought.",
+              },
+              {
+                type: "prose",
+                id: "p2",
+                segmentId: "s1",
+                text: "The closing lantern answer.",
+              },
+            ],
+          },
+        },
+      ],
+      activeRevisionId: "revision-1",
+    };
+    const store = {
+      c1: conversation("c1", [assistant]),
+    };
+    const { search } = makeSearch({ store });
+
+    const hits = await search.search("lantern", [
+      meta({ id: "c1", title: "no match", modelName: "no" }),
+    ]);
+
+    expect(hits).toHaveLength(1);
+    expect(hits[0].snippet).toContain("lantern");
+    expect(hits[0].snippet).not.toContain("stale compatibility");
+  });
+
   it("clips a long body on both sides with an ellipsis", async () => {
     const filler = "word ".repeat(20);
     const store = {

@@ -1,4 +1,12 @@
-import type { AnthropicCacheSettings, Attachment, ImageMimeType } from "./types";
+import type {
+  AnthropicCacheSettings,
+  AssistantProseItem,
+  AssistantReplayEvidence,
+  AssistantToolCallItem,
+  Attachment,
+  ImageMimeType,
+  ProviderReplayCapsule,
+} from "./types";
 import type { CanonicalToolDefinition } from "../tools/types";
 
 /** A context item manually attached by the user via the context picker or drag-and-drop. */
@@ -49,10 +57,31 @@ export interface DocumentContext {
  * A conversation turn in the chat history.
  * Excludes "system", system instructions are top-level in ChatRequest.
  */
+export type ChatAssistantContentItem =
+  | Pick<AssistantProseItem, "type" | "text">
+  | Pick<
+      AssistantToolCallItem,
+      | "type"
+      | "toolCallId"
+      | "toolName"
+      | "toolArguments"
+      | "toolArgs"
+    >;
+
 export interface ChatTurn {
   role: "user" | "assistant" | "tool";
   /** Message content. null for assistant-only-tool-calls turns (OpenAI spec). */
   content: string | null;
+  /**
+   * Canonical ordered content for one structural assistant emission.
+   *
+   * One history turn represents one provider segment. Provider serializers
+   * project only the subset their wire format supports, without reconstructing
+   * order from `content` or `toolCalls`.
+   */
+  assistantContent?: ChatAssistantContentItem[];
+  /** Validated provider-private wire evidence for this assistant emission. */
+  providerReplayCapsule?: ProviderReplayCapsule;
   /**
    * The persisted, annotation-free content, set only when `content` was rewritten
    * for presentation (edit-outcome annotations on tool-call edit turns) AND the model
@@ -66,6 +95,8 @@ export interface ChatTurn {
   rawContent?: string;
   /** For tool result turns: the ID of the tool call this responds to. */
   toolCallId?: string;
+  /** For tool result turns: whether the matched call failed or was interrupted. */
+  toolResultIsError?: boolean;
   /** For assistant turns that contain tool calls: the tool calls made. */
   toolCalls?: Array<{ id: string; name: string; arguments: Record<string, unknown> }>;
   /**
@@ -130,6 +161,8 @@ export interface ChatRequest {
   rewrittenQuery?: string;
   /** Conversation turns in chronological order. */
   messages: ChatTurn[];
+  /** Actual fidelity selected while projecting the persisted request history. */
+  replayEvidence?: AssistantReplayEvidence;
   /** Anthropic prompt caching settings. Attached when the active model has caching enabled. */
   anthropicCacheSettings?: AnthropicCacheSettings;
   /** Tool definitions to include in the request. null/undefined = no tools. */

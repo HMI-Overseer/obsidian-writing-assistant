@@ -1,4 +1,13 @@
-import type { ConversationMessage, PluginSettings, ProviderOption, ApprovalPosture } from "../../shared/types";
+import type {
+  ApprovalPosture,
+  AssistantReplayEvidence,
+  AssistantToolCallItem,
+  AssistantTurnRecord,
+  ConversationMessage,
+  PluginSettings,
+  ProviderOption,
+  ProviderTurnCapabilities,
+} from "../../shared/types";
 import type { ChatRequest, ChatTurn, RagContextBlock, ToolSearchConfig } from "../../shared/chatRequest";
 import { shouldUseToolCall } from "../../tools/registry";
 import { EDIT_TOOL_NAMES } from "../../tools/editing/definition";
@@ -29,6 +38,7 @@ import {
   formatAskGuidanceReplayLines,
   INTERRUPTED_REPLAY_MARKER,
 } from "../../tools/resultDigest";
+import { formatAskGuidanceDigest } from "../../tools/ask/result";
 import type { CanonicalToolDefinition } from "../../tools/types";
 import type { App } from "obsidian";
 import type { ChatSessionStore } from "../conversation/ChatSessionStore";
@@ -38,6 +48,20 @@ import type { MemoryService } from "../../memory/MemoryService";
 import type { ChatClient } from "../../api/chatClient";
 import { rewriteQueryForRetrieval } from "../../rag/queryRewriter";
 import type { EditProposal } from "../../editing/editTypes";
+import {
+  assistantDisplayText,
+  assistantRawReplayText,
+  getActiveAssistantRevision,
+} from "../conversation/assistantRevisions";
+import {
+  INTERRUPTED_TOOL_RESULT_TEXT,
+  toolFactText,
+} from "../turns/assistantTurnProjections";
+import {
+  validateAssistantTurn,
+  validateProviderReplayCapsule,
+} from "../turns/assistantTurnValidation";
+import { PROVIDER_DESCRIPTORS } from "../../providers/descriptors";
 
 /**
  * Layer-2 tail note (ADR-0009): on the direct anthropic path with tool search, the read
@@ -141,14 +165,15 @@ export async function prepareApiMessages(
   // (the section 10/section 13 cache-coupling anti-pattern is gone).
   const activeFilePath = app.workspace.getActiveFile()?.path;
 
-  const messages = toRequestHistoryTurns(
+  const historyProjection = projectRequestHistoryTurns(
     store
       .getSnapshot()
       .messageHistory
       .filter((message) => message.id !== excludeMessageId),
     supportsVision,
-    isClaudeCode,
+    activeProvider,
   );
+  const messages = historyProjection.turns;
 
   // Retrieve RAG context based on the latest user message. Skipped when vault tools are
   // active: in agentic mode the model controls retrieval itself via semantic_search, and
@@ -353,6 +378,7 @@ export async function prepareApiMessages(
     ragContext,
     rewrittenQuery,
     messages,
+    replayEvidence: historyProjection.replayEvidence,
     tools,
     ...(allowedToolNames ? { allowedToolNames } : {}),
     ...(toolSearch ? { toolSearch } : {}),
@@ -385,106 +411,427 @@ export function splitSystemForTail(opts: {
   };
 }
 
-/**
- * Maps one persisted message onto its request {@link ChatTurn}.
- *
- * Note snapshots always travel with the turn; image attachments only go to
- * vision-capable models. Edit turns get their content rewritten with accept/reject
- * annotations ({@link formatEditMessageContent}); when that rewrite is
- * presentation-only, tool-call edits, whose real dispositions already reached the
- * model in-band as each call's tool result (LiveVaultReview), the raw persisted
- * text rides along as `rawContent` so the Claude Code session linearity check
- * hashes the same bytes its watermark covered. Regex-parsed edit turns had no
- * in-band channel, so they stay content-only and deliberately invalidate the live
- * session: the annotated cold-rebuild replay is how the model learns the outcomes.
- * (ADR-0014)
- *
- * `isClaudeCode` turns on the cold-rebuild replay shaping (section 4.A / section 4.C): an assistant
- * turn's persisted tool activity ({@link ConversationMessage.agenticSteps}) and any
- * interruption ({@link ConversationMessage.interrupted}) are appended as digest lines,
- * which the flat prose transcript never held. Claude Code routes through
- * `finalizeResponse` (never the edit finalizer), so it carries no `editProposals` and
- * its edit outcomes arrive as step dispositions instead; this is therefore its sole
- * annotation path, and it rides the same `content`/`rawContent` seam as edit turns.
- */
-export function toHistoryTurn(
-  message: ConversationMessage,
-  supportsVision: boolean,
-  isClaudeCode = false,
-): ChatTurn {
-  const attachments = message.attachments?.filter((a) => a.type !== "image" || supportsVision);
+export interface RequestHistoryProjection {
+  turns: ChatTurn[];
+  replayEvidence: AssistantReplayEvidence;
+}
 
-  if (isClaudeCode && message.role === "assistant") {
-    const replayed = annotateClaudeCodeReplay(message);
-    if (replayed !== message.content) {
-      return {
-        role: message.role,
-        content: replayed,
-        // The digest and marker ride `content`; the raw streamed bytes stay in
-        // `rawContent` so the live-session linearity hash is byte-for-byte untouched.
-        rawContent: message.content,
-        ...(attachments?.length ? { attachments } : {}),
-      };
-    }
-    // No steps and not interrupted: fall through to the byte-identical default.
-  }
-
-  const annotated = editProposalsOf(message).length > 0;
-  const baseContent = annotated ? formatEditMessageContent(message) : message.content;
-  const askGuidanceLines =
-    message.role === "assistant"
-      ? formatAskGuidanceReplayLines(message.agenticSteps ?? [])
-      : [];
-  const content = appendReplayLines(baseContent, askGuidanceLines);
-  return {
-    role: message.role,
-    content,
-    ...(annotated && message.toolCalls?.length ? { rawContent: message.content } : {}),
-    ...(attachments?.length ? { attachments } : {}),
-  };
+interface MessageHistoryProjection {
+  turns: ChatTurn[];
+  tier: "structural" | "textual";
+  loweredReason?: string;
+  capabilities?: Partial<ProviderTurnCapabilities>;
 }
 
 /**
- * Shapes persisted messages for a provider request. Ordinary error prose stays
- * filtered, but a completed ask on an error message emits a guidance-only turn.
+ * Maps one persisted message onto one or more request turns.
+ *
+ * User and legacy messages remain one-to-one. A selected chain-backed assistant
+ * revision expands by provider segment, followed by one result turn per declared
+ * call. A structural projection is accepted only when every declaration and
+ * required result can be serialized without guessing.
  */
+export function toHistoryTurns(
+  message: ConversationMessage,
+  supportsVision: boolean,
+  provider?: ProviderOption,
+): ChatTurn[] {
+  return projectHistoryMessage(message, supportsVision, provider).turns;
+}
+
+/**
+ * Project a complete persisted history and report the actual cold-replay tier.
+ *
+ * Provider descriptors are maxima. One legacy assistant or one invalid structural
+ * record lowers the complete request to textual, even though other messages may
+ * still retain their safe structural form internally.
+ */
+export function projectRequestHistoryTurns(
+  messages: ConversationMessage[],
+  supportsVision: boolean,
+  provider?: ProviderOption,
+): RequestHistoryProjection {
+  const turns: ChatTurn[] = [];
+  const projections: MessageHistoryProjection[] = [];
+
+  for (const message of messages) {
+    if (messageIsError(message)) {
+      const guidanceLines = selectedAskGuidanceLines(message);
+      if (guidanceLines.length > 0) {
+        const projection: MessageHistoryProjection = {
+          turns: [
+            {
+              role: "assistant",
+              content: guidanceLines.join("\n\n"),
+            },
+          ],
+          tier: "textual",
+          loweredReason: "error_ask_guidance_textual_replay",
+        };
+        projections.push(projection);
+        turns.push(...projection.turns);
+      }
+      continue;
+    }
+    const projection = projectHistoryMessage(
+      message,
+      supportsVision,
+      provider,
+    );
+    projections.push(projection);
+    turns.push(...projection.turns);
+  }
+
+  return {
+    turns,
+    replayEvidence: requestReplayEvidence(provider, projections),
+  };
+}
+
+/** Array-only compatibility surface for callers that do not need diagnostics. */
 export function toRequestHistoryTurns(
   messages: ConversationMessage[],
   supportsVision: boolean,
-  isClaudeCode = false,
+  provider?: ProviderOption,
+): ChatTurn[] {
+  return projectRequestHistoryTurns(messages, supportsVision, provider).turns;
+}
+
+function projectHistoryMessage(
+  message: ConversationMessage,
+  supportsVision: boolean,
+  provider?: ProviderOption,
+): MessageHistoryProjection {
+  const attachments = message.attachments?.filter(
+    (attachment) => attachment.type !== "image" || supportsVision,
+  );
+  if (message.role === "user") {
+    return {
+      turns: [
+        {
+          role: "user",
+          content: message.content,
+          ...(attachments?.length ? { attachments } : {}),
+        },
+      ],
+      tier: provider === "claudecode" ? "textual" : "structural",
+    };
+  }
+
+  const revision = getActiveAssistantRevision(message);
+  if (revision?.kind === "turn") {
+    if (provider === "claudecode") {
+      return {
+        turns: textualTurnRevision(message, revision.turn, true),
+        tier: "textual",
+        loweredReason: "claude_code_textual_cold_replay",
+      };
+    }
+    const structuralFailure = structuralReplayFailure(revision.turn);
+    if (structuralFailure === null) {
+      return {
+        turns: structuralTurnRevision(revision.turn, provider),
+        tier: "structural",
+      };
+    }
+    return {
+      turns: textualTurnRevision(message, revision.turn, false),
+      tier: "textual",
+      loweredReason: structuralFailure,
+      ...(structuralFailure === "tool_call_id_invalid"
+        ? { capabilities: { toolCorrelation: "none" } }
+        : {}),
+    };
+  }
+
+  return {
+    turns: [legacyTextualHistoryTurn(message, attachments, provider)],
+    tier: "textual",
+    loweredReason: "legacy_assistant_textual_replay",
+    capabilities: {
+      captureOrder: "text_only",
+      toolCorrelation: "none",
+      coldReplay: "textual",
+    },
+  };
+}
+
+function structuralReplayFailure(turn: AssistantTurnRecord): string | null {
+  const validated = validateAssistantTurn(turn);
+  if (!validated.ok) {
+    if (validated.reason.code === "tool_call_id_invalid") {
+      return "tool_call_id_invalid";
+    }
+    if (validated.reason.code === "replay_capsule_invalid") {
+      return "replay_capsule_invalid";
+    }
+    return validated.reason.code;
+  }
+  for (const segment of turn.segments) {
+    if (
+      segment.replayCapsule !== undefined &&
+      !validateProviderReplayCapsule(segment.replayCapsule).ok
+    ) {
+      return "replay_capsule_invalid";
+    }
+  }
+  for (const item of turn.items) {
+    if (item.type !== "tool_call") continue;
+    if (item.toolCallId.trim().length === 0) return "tool_call_id_invalid";
+    if (item.toolArgs === undefined) return "tool_arguments_invalid";
+    if (
+      (item.state === "completed" || item.state === "failed") &&
+      item.resultRecord === undefined &&
+      item.resultDigest === undefined
+    ) {
+      return "tool_result_evidence_missing";
+    }
+  }
+  return null;
+}
+
+function structuralTurnRevision(
+  turn: AssistantTurnRecord,
+  provider: ProviderOption | undefined,
 ): ChatTurn[] {
   const turns: ChatTurn[] = [];
-  for (const message of messages) {
-    if (!message.isError) {
-      turns.push(toHistoryTurn(message, supportsVision, isClaudeCode));
-      continue;
-    }
-    const guidanceLines =
-      message.role === "assistant"
-        ? formatAskGuidanceReplayLines(message.agenticSteps ?? [])
-        : [];
-    if (guidanceLines.length > 0) {
-      turns.push({
-        role: "assistant",
-        content: guidanceLines.join("\n\n"),
-      });
+  for (const segment of turn.segments) {
+    const items = turn.items.filter((item) => item.segmentId === segment.id);
+    if (items.length === 0) continue;
+    turns.push({
+      role: "assistant",
+      content: null,
+      assistantContent: items.map((item) =>
+        item.type === "prose"
+          ? { type: "prose", text: item.text }
+          : {
+              type: "tool_call",
+              toolCallId: item.toolCallId,
+              toolName: item.toolName,
+              toolArguments: item.toolArguments,
+              ...(item.toolArgs === undefined
+                ? {}
+                : { toolArgs: structuredClone(item.toolArgs) }),
+            },
+      ),
+      ...(provider !== "anthropic" ||
+      segment.replayCapsule === undefined
+        ? {}
+        : {
+            providerReplayCapsule: structuredClone(
+              segment.replayCapsule,
+            ),
+          }),
+    });
+    for (const item of items) {
+      if (item.type !== "tool_call") continue;
+      turns.push(structuralToolResult(item));
     }
   }
   return turns;
 }
 
-/**
- * Builds a claudecode assistant turn's replayed content: its raw prose, then one
- * bracketed digest line per persisted tool call (section 4.A), then the interruption marker
- * for a stopped turn (section 4.C). Returns the raw content unchanged when there is nothing
- * to add, so an ordinary completed turn replays exactly as before.
- */
-function annotateClaudeCodeReplay(message: ConversationMessage): string {
+function structuralToolResult(item: AssistantToolCallItem): ChatTurn {
+  if (
+    item.state === "declared" ||
+    item.state === "running" ||
+    item.state === "interrupted"
+  ) {
+    return {
+      role: "tool",
+      content: INTERRUPTED_TOOL_RESULT_TEXT,
+      toolCallId: item.toolCallId,
+      toolResultIsError: true,
+    };
+  }
+  const content = item.resultRecord ?? item.resultDigest;
+  if (content === undefined) {
+    throw new Error(
+      `Tool call "${item.toolCallId}" has no bounded replay result.`,
+    );
+  }
+  const isError = item.state === "failed" || item.isError === true;
+  return {
+    role: "tool",
+    content,
+    toolCallId: item.toolCallId,
+    ...(isError ? { toolResultIsError: true } : {}),
+  };
+}
+
+function textualTurnRevision(
+  message: ConversationMessage,
+  turn: AssistantTurnRecord,
+  isClaudeCode: boolean,
+): ChatTurn[] {
+  const parts = turn.items.flatMap((item) => {
+    if (item.type === "prose") return [item.text];
+    if (item.askGuidance) return [formatAskGuidanceDigest(item.askGuidance)];
+    return [toolFactText(item)];
+  });
+  if (
+    isClaudeCode &&
+    (turn.status === "interrupted" ||
+      getActiveAssistantRevision(message)?.interrupted === true)
+  ) {
+    parts.push(INTERRUPTED_REPLAY_MARKER);
+  }
+  const content = parts.join("\n\n");
+  const rawContent = assistantRawReplayText(message);
+  return content || isClaudeCode
+    ? [
+        {
+          role: "assistant",
+          content,
+          ...(isClaudeCode && content !== rawContent
+            ? { rawContent }
+            : {}),
+        },
+      ]
+    : [];
+}
+
+function legacyTextualHistoryTurn(
+  message: ConversationMessage,
+  attachments: ConversationMessage["attachments"] | undefined,
+  provider?: ProviderOption,
+): ChatTurn {
+  const rawContent = assistantRawReplayText(message);
+  if (provider === "claudecode") {
+    const replayed = annotateLegacyClaudeCodeReplay(message, rawContent);
+    if (replayed !== rawContent) {
+      return {
+        role: "assistant",
+        content: replayed,
+        rawContent,
+        ...(attachments?.length ? { attachments } : {}),
+      };
+    }
+  }
+
+  const annotated = editProposalsOf(message).length > 0;
+  const baseContent = annotated
+    ? formatEditMessageContent(message, assistantDisplayText(message))
+    : assistantDisplayText(message);
+  const content = appendReplayLines(
+    baseContent,
+    selectedAskGuidanceLines(message),
+  );
+  return {
+    role: "assistant",
+    content,
+    ...(annotated && message.toolCalls?.length
+      ? { rawContent }
+      : {}),
+    ...(attachments?.length ? { attachments } : {}),
+  };
+}
+
+function annotateLegacyClaudeCodeReplay(
+  message: ConversationMessage,
+  rawContent: string,
+): string {
   const parts: string[] = [];
-  if (message.content) parts.push(message.content);
-  if (message.agenticSteps?.length) parts.push(...formatAgenticReplayLines(message.agenticSteps));
-  if (message.interrupted) parts.push(INTERRUPTED_REPLAY_MARKER);
+  if (rawContent) parts.push(rawContent);
+  const revision = getActiveAssistantRevision(message);
+  const legacySteps =
+    revision?.kind === "legacy"
+      ? revision.legacySteps
+      : message.agenticSteps;
+  if (legacySteps?.length) {
+    parts.push(...formatAgenticReplayLines(legacySteps));
+  }
+  if (revision?.interrupted ?? message.interrupted) {
+    parts.push(INTERRUPTED_REPLAY_MARKER);
+  }
   return parts.join("\n\n");
+}
+
+function selectedAskGuidanceLines(
+  message: ConversationMessage,
+): string[] {
+  const revision = getActiveAssistantRevision(message);
+  if (revision?.kind === "turn") {
+    return revision.turn.items.flatMap((item) =>
+      item.type === "tool_call" && item.askGuidance
+        ? [formatAskGuidanceDigest(item.askGuidance)]
+        : [],
+    );
+  }
+  const steps =
+    revision?.kind === "legacy"
+      ? revision.legacySteps
+      : message.agenticSteps;
+  return formatAskGuidanceReplayLines(steps ?? []);
+}
+
+function messageIsError(message: ConversationMessage): boolean {
+  if (message.role !== "assistant") return message.isError === true;
+  return getActiveAssistantRevision(message)?.isError ?? message.isError ?? false;
+}
+
+function requestReplayEvidence(
+  provider: ProviderOption | undefined,
+  projections: MessageHistoryProjection[],
+): AssistantReplayEvidence {
+  if (!provider) {
+    return {
+      tier: "textual",
+      capabilities: {
+        captureOrder: "text_only",
+        toolCorrelation: "none",
+        coldReplay: "textual",
+        nativeResume: false,
+      },
+      loweredReason: "provider_replay_capabilities_unavailable",
+    };
+  }
+  const maximum = structuredClone(
+    PROVIDER_DESCRIPTORS[provider].turnCapabilities,
+  );
+  const lowered = projections.filter(
+    (projection) => projection.tier === "textual",
+  );
+  if (provider === "claudecode") {
+    return {
+      tier: "textual",
+      capabilities: {
+        ...maximum,
+        coldReplay: "textual",
+      },
+      loweredReason: uniqueReasons(lowered) ||
+        "claude_code_textual_cold_replay",
+    };
+  }
+  if (lowered.length === 0) {
+    return {
+      tier: maximum.coldReplay,
+      capabilities: maximum,
+    };
+  }
+  const capabilities = lowered.reduce(
+    (current, projection) => ({
+      ...current,
+      ...projection.capabilities,
+      coldReplay: "textual" as const,
+    }),
+    { ...maximum, coldReplay: "textual" as const },
+  );
+  return {
+    tier: "textual",
+    capabilities,
+    loweredReason: uniqueReasons(lowered),
+  };
+}
+
+function uniqueReasons(projections: MessageHistoryProjection[]): string {
+  return [
+    ...new Set(
+      projections.flatMap((projection) =>
+        projection.loweredReason ? [projection.loweredReason] : [],
+      ),
+    ),
+  ].join(",");
 }
 
 function appendReplayLines(content: string, lines: string[]): string {
@@ -500,20 +847,23 @@ function appendReplayLines(content: string, lines: string[]): string {
  * annotated inline. For tool-call messages: a summary is appended since the
  * content is pure prose with no embedded blocks.
  */
-function formatEditMessageContent(message: ConversationMessage): string {
+function formatEditMessageContent(
+  message: ConversationMessage,
+  selectedContent: string,
+): string {
   const proposals = editProposalsOf(message);
-  if (proposals.length === 0) return message.content;
+  if (proposals.length === 0) return selectedContent;
 
   // Tool-call messages: content is pure prose, annotate with a per-file summary
   // across every edited file (ADR-0010).
   if (message.toolCalls && message.toolCalls.length > 0) {
-    return formatToolCallEditHistory(message.content, proposals);
+    return formatToolCallEditHistory(selectedContent, proposals);
   }
 
   // Regex-parsed messages are single-file (the active document): annotate inline
   // SEARCH/REPLACE rawBlocks on the sole proposal.
   const editProposal = proposals[0];
-  let content = message.content;
+  let content = selectedContent;
   let acceptedCount = 0;
   let rejectedCount = 0;
 

@@ -1,10 +1,11 @@
 import type { ConversationMessage, ProviderOption } from "../shared/types";
-import type { DocumentContext } from "../shared/chatRequest";
+import type { ChatTurn, DocumentContext } from "../shared/chatRequest";
 import { estimateTokenCount, anchoredContextEstimate, formatTokens } from "../shared/tokenEstimation";
 import { sumConversationUsage } from "./usageSummary";
 import type { UsageTotals } from "./usageSummary";
 import { isMeteredProvider } from "../providers/descriptors";
 import { CONTEXT_WARNING_THRESHOLD, CONTEXT_DANGER_THRESHOLD } from "../constants";
+import { toRequestHistoryTurns } from "./finalization/prepareApiMessages";
 
 const DEBOUNCE_MS = 150;
 
@@ -51,6 +52,74 @@ export interface ContextInputs {
   contextWindowSize: number | undefined;
   /** Active provider; provider-reported context anchors from another provider are ignored. */
   activeProvider: ProviderOption | undefined;
+}
+
+/** The same provider-aware history projection the real request builder uses. */
+export function projectContextHistoryTurns(
+  inputs: Pick<ContextInputs, "messages" | "activeProvider">,
+): ChatTurn[] {
+  return toRequestHistoryTurns(
+    inputs.messages,
+    true,
+    inputs.activeProvider,
+  );
+}
+
+/** Pure capacity estimate over the actual projected request history. */
+export function estimateContextCapacityTokens(
+  inputs: ContextInputs,
+  correctionRatio = 1,
+): number {
+  const projectedHistory = projectContextHistoryTurns(inputs);
+  const anchorIndex = contextAnchorIndex(
+    inputs.messages,
+    inputs.activeProvider,
+  );
+  const projectedTail =
+    anchorIndex < 0
+      ? undefined
+      : toRequestHistoryTurns(
+          inputs.messages.slice(anchorIndex),
+          true,
+          inputs.activeProvider,
+        );
+  const anchored = anchoredContextEstimate(
+    inputs.messages,
+    inputs.draft,
+    inputs.activeProvider,
+    projectedTail,
+  );
+  return (
+    anchored ??
+    Math.round(
+      estimateTokenCount(
+        {
+          systemPrompt: inputs.systemPrompt,
+          documentContext: inputs.documentContext,
+          ragContext: null,
+          messages: projectedHistory,
+        },
+        inputs.draft,
+      ) * correctionRatio,
+    )
+  );
+}
+
+function contextAnchorIndex(
+  messages: readonly ConversationMessage[],
+  provider: ProviderOption | undefined,
+): number {
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const message = messages[index];
+    if (
+      !message.isError &&
+      message.usage?.contextTokens !== undefined &&
+      message.provider === provider
+    ) {
+      return index;
+    }
+  }
+  return -1;
 }
 
 const RING_CIRCUMFERENCE = 2 * Math.PI * 12;
@@ -153,35 +222,21 @@ export class ContextCapacityUpdater {
   }
 
   private recalculate(inputs: ContextInputs): void {
-    const { systemPrompt, documentContext, messages, draft, contextWindowSize, activeProvider } =
-      inputs;
+    const { messages, contextWindowSize, activeProvider } = inputs;
 
     if (!contextWindowSize) {
       this.capacityEl.addClass("lmsa-hidden");
       return;
     }
 
-    const chatTurns = messages
-      .filter((m) => !m.isError)
-      .map((m) => ({
-        role: m.role,
-        content: m.content,
-        ...(m.attachments?.length ? { attachments: m.attachments } : {}),
-      }));
-
     // A provider-reported context size (Claude Code) anchors the estimate: the
     // real occupancy plus a char estimate of only what came after it. Fixed
     // harness overhead must be added once, not scaled by the correction ratio,
     // a ratio learned on a short transcript multiplies it into absurdity.
-    const anchored = anchoredContextEstimate(messages, draft, activeProvider);
-    const correctedEstimate =
-      anchored ??
-      Math.round(
-        estimateTokenCount(
-          { systemPrompt, documentContext, ragContext: null, messages: chatTurns },
-          draft
-        ) * this.correctionRatio
-      );
+    const correctedEstimate = estimateContextCapacityTokens(
+      inputs,
+      this.correctionRatio,
+    );
 
     const ratio = correctedEstimate / contextWindowSize;
     const percent = Math.min(Math.round(ratio * 100), 100);

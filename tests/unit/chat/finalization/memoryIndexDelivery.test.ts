@@ -73,7 +73,10 @@ describe("memory index delivery", () => {
 
     expect(JSON.stringify(request)).toBe(
       '{"systemPrompt":"Profile prompt.","modeTail":"Base prefix.",' +
-        '"documentContext":null,"ragContext":null,"messages":[]}',
+        '"documentContext":null,"ragContext":null,"messages":[],' +
+        '"replayEvidence":{"tier":"structural","capabilities":' +
+        '{"captureOrder":"exact","toolCorrelation":"provider_id",' +
+        '"coldReplay":"structural","nativeResume":false}}}',
     );
   });
 

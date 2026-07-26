@@ -8,6 +8,7 @@ import {
   formatNoteAttachment,
   noteImageLabel,
 } from "./contextFormatting";
+import { validateProviderReplayCapsule } from "../chat/turns/assistantTurnValidation";
 
 const DEFAULT_MAX_TOKENS = 4096;
 
@@ -145,7 +146,13 @@ export type AnthropicContentBlock =
       input: Record<string, unknown>;
       cache_control?: AnthropicCacheControl;
     }
-  | { type: "tool_result"; tool_use_id: string; content: string; cache_control?: AnthropicCacheControl }
+  | {
+      type: "tool_result";
+      tool_use_id: string;
+      content: string;
+      is_error?: boolean;
+      cache_control?: AnthropicCacheControl;
+    }
   // Echoed verbatim from a prior response (thinking + tool use round trip).
   // cache_control exists only for type uniformity: the breakpoint placer marks a
   // turn's LAST block, and echoed thinking always precedes the tool_use block,
@@ -188,7 +195,34 @@ export function buildAnthropicMessages(
 
   const messages: AnthropicMessage[] = [];
   for (const turn of request.messages) {
-    if (turn.role === "assistant" && turn.toolCalls && turn.toolCalls.length > 0) {
+    if (turn.role === "assistant" && turn.assistantContent) {
+      const blocks: AnthropicContentBlock[] = [];
+      const capsule =
+        turn.providerReplayCapsule === undefined
+          ? null
+          : validateProviderReplayCapsule(turn.providerReplayCapsule);
+      if (capsule?.ok) {
+        blocks.push(...structuredClone(capsule.value.thinkingBlocks));
+      }
+      for (const item of turn.assistantContent) {
+        if (item.type === "prose") {
+          blocks.push({ type: "text", text: item.text });
+        } else {
+          if (item.toolArgs === undefined) {
+            throw new Error(
+              `Tool call "${item.toolCallId}" has no parsed arguments for Anthropic replay.`,
+            );
+          }
+          blocks.push({
+            type: "tool_use",
+            id: item.toolCallId,
+            name: item.toolName,
+            input: structuredClone(item.toolArgs),
+          });
+        }
+      }
+      messages.push({ role: "assistant", content: blocks });
+    } else if (turn.role === "assistant" && turn.toolCalls && turn.toolCalls.length > 0) {
       // Assistant turn with tool calls: use content block array. Captured
       // thinking blocks come FIRST and unmodified, with thinking enabled on a
       // tool-use turn, Anthropic requires them echoed back exactly as received
@@ -211,6 +245,7 @@ export function buildAnthropicMessages(
         type: "tool_result",
         tool_use_id: turn.toolCallId ?? "",
         content: turn.content ?? "",
+        ...(turn.toolResultIsError ? { is_error: true } : {}),
       };
       const prev = messages[messages.length - 1];
       if (prev?.role === "user" && Array.isArray(prev.content)) {

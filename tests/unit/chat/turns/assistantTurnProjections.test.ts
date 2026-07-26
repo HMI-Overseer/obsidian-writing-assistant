@@ -60,7 +60,7 @@ describe("assistant prose projections", () => {
     expect(rawConcatenatedProse(turn)).toBe("\r\nAB\n\n C ");
   });
 
-  it("returns the last non-empty prose bytes and null when none exist", () => {
+  it("uses the last non-empty prose bytes for insert-after-response", () => {
     const turn = turnWithProse(["Earlier.", " \r\n ", "\nClosing.\n"]);
 
     expect(lastNonEmptyProse(turn)).toBe("\nClosing.\n");

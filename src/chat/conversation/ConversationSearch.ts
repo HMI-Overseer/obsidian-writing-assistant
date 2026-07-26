@@ -1,4 +1,5 @@
 import type { Conversation, ConversationMessage, ConversationMeta } from "../../shared/types";
+import { assistantDisplayText } from "./assistantRevisions";
 import { conversationDisplayTitle } from "./conversationUtils";
 
 /** A conversation that matched a history search, with an optional body snippet. */
@@ -117,7 +118,11 @@ export function normalizeForSearch(text: string): string {
 function bodyTextOf(messages: ConversationMessage[]): string {
   return messages
     .filter((message) => !message.isError)
-    .map((message) => message.content)
+    .map((message) =>
+      message.role === "assistant"
+        ? assistantDisplayText(message)
+        : message.content,
+    )
     .join("\n");
 }
 

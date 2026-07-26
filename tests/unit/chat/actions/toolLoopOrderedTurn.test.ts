@@ -116,10 +116,11 @@ const baseRequest = {
 async function run(
   rounds: AssistantStreamEvent[][],
   seenRequests: ChatRequest[] = [],
+  request: ChatRequest = baseRequest,
 ) {
   return runToolLoop(
     makeClient(rounds, seenRequests),
-    baseRequest,
+    request,
     "test-model",
     "openai",
     {} as SamplingParams,
@@ -217,11 +218,11 @@ describe("runToolLoop ordered turn capture", () => {
       (turn) => turn.role === "assistant",
     );
     expect(replayedAssistants).toHaveLength(1);
-    expect(replayedAssistants[0].toolCalls?.map((call) => call.id)).toEqual([
-      "call-a",
-      "call-b",
-      "call-c",
-    ]);
+    expect(
+      replayedAssistants[0].assistantContent?.flatMap((item) =>
+        item.type === "tool_call" ? [item.toolCallId] : [],
+      ),
+    ).toEqual(["call-a", "call-b", "call-c"]);
     const replayedResults = seenRequests[1].messages.filter(
       (turn) => turn.role === "tool",
     );
@@ -230,5 +231,36 @@ describe("runToolLoop ordered turn capture", () => {
       "call-b",
       "call-c",
     ]);
+  });
+
+  it("persists the request history's actual textual tier in diagnostics", async () => {
+    const request: ChatRequest = {
+      ...baseRequest,
+      replayEvidence: {
+        tier: "textual",
+        capabilities: {
+          captureOrder: "text_only",
+          toolCorrelation: "none",
+          coldReplay: "textual",
+          nativeResume: false,
+        },
+        loweredReason: "legacy_assistant_textual_replay",
+      },
+    };
+    const result = await run(
+      [
+        segment("segment-final", [
+          {
+            type: "prose_delta",
+            segmentId: "segment-final",
+            delta: "Done.",
+          },
+        ]),
+      ],
+      [],
+      request,
+    );
+
+    expect(result.replayEvidence).toEqual(request.replayEvidence);
   });
 });

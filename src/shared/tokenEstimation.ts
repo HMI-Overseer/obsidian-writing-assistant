@@ -1,4 +1,4 @@
-import type { ChatRequest } from "./chatRequest";
+import type { ChatRequest, ChatTurn } from "./chatRequest";
 import type { ConversationMessage, ProviderOption } from "./types";
 
 /**
@@ -65,7 +65,34 @@ export function estimateTokenCount(request: ChatRequest, draft?: string): number
   }
 
   for (const turn of request.messages) {
-    totalChars += (turn.content ?? "").length;
+    if (turn.assistantContent) {
+      for (const item of turn.assistantContent) {
+        if (item.type === "prose") {
+          totalChars += item.text.length;
+        } else {
+          totalChars +=
+            item.toolCallId.length +
+            item.toolName.length +
+            item.toolArguments.length +
+            32;
+        }
+      }
+      if (turn.providerReplayCapsule) {
+        totalChars += JSON.stringify(turn.providerReplayCapsule).length;
+      }
+    } else {
+      totalChars += (turn.content ?? "").length;
+      for (const toolCall of turn.toolCalls ?? []) {
+        totalChars +=
+          toolCall.id.length +
+          toolCall.name.length +
+          JSON.stringify(toolCall.arguments).length +
+          32;
+      }
+    }
+    if (turn.role === "tool") {
+      totalChars += (turn.toolCallId?.length ?? 0) + 20;
+    }
     // Note snapshots live in the conversation now, count their text. Image
     // attachments are excluded (their token cost is tile-based, not char-based).
     for (const attachment of turn.attachments ?? []) {
@@ -133,6 +160,7 @@ export function anchoredContextEstimate(
   messages: readonly ConversationMessage[],
   draft?: string,
   activeProvider?: ProviderOption,
+  projectedTailTurns?: readonly ChatTurn[],
 ): number | null {
   let anchorIndex = -1;
   for (let i = messages.length - 1; i >= 0; i--) {
@@ -149,6 +177,20 @@ export function anchoredContextEstimate(
   if (anchorIndex === -1) return null;
 
   const anchor = messages[anchorIndex].usage?.contextTokens ?? 0;
+  if (projectedTailTurns) {
+    return (
+      anchor +
+      estimateTokenCount(
+        {
+          systemPrompt: "",
+          documentContext: null,
+          ragContext: null,
+          messages: [...projectedTailTurns],
+        },
+        draft,
+      )
+    );
+  }
   let tailChars = 0;
   for (let i = anchorIndex; i < messages.length; i++) {
     const message = messages[i];

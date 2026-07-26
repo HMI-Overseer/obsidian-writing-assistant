@@ -8,9 +8,14 @@ import {
   type SessionConfig,
   type SessionTurn,
 } from "../../../src/api/harnessSession";
-import { toHistoryTurn } from "../../../src/chat/finalization/prepareApiMessages";
+import { toHistoryTurns } from "../../../src/chat/finalization/prepareApiMessages";
 import type { ChatRequest, ChatTurn } from "../../../src/shared/chatRequest";
-import type { AgenticStep, ConversationMessage, SamplingParams } from "../../../src/shared/types";
+import type {
+  AgenticStep,
+  AssistantTurnRevision,
+  ConversationMessage,
+  SamplingParams,
+} from "../../../src/shared/types";
 
 /**
  * Session linearity across annotated edit turns.
@@ -55,6 +60,78 @@ function watermarkMeta(config: SessionConfig): HarnessSession {
     prefixHash: hashPrefix(covered, covered.length),
     configFingerprint: fingerprint(config),
     config,
+  };
+}
+
+function watermarkFor(config: SessionConfig, assistantText: string): HarnessSession {
+  const covered: SessionTurn[] = [
+    { role: "user", content: RAW_USER },
+    { role: "assistant", content: assistantText },
+  ];
+  return {
+    provider: "claudecode",
+    model: config.model,
+    coveredCount: covered.length,
+    prefixHash: hashPrefix(covered, covered.length),
+    configFingerprint: fingerprint(config),
+    config,
+  };
+}
+
+function chainMessage(
+  origin: AssistantTurnRevision["origin"] = "generated",
+  closingText = "After.",
+): ConversationMessage {
+  return {
+    id: "chain-assistant",
+    role: "assistant",
+    content: "stale display text",
+    revisions: [
+      {
+        revisionId: "chain-revision",
+        kind: "turn",
+        origin,
+        ...(origin === "edited"
+          ? { parentRevisionId: "source-revision" }
+          : {}),
+        createdAt: 1,
+        provider: "claudecode",
+        modelId: cfg().model,
+        turn: {
+          schemaVersion: 1,
+          id: "chain-turn",
+          status: "completed",
+          segments: [{ id: "s1" }, { id: "s2" }],
+          items: [
+            {
+              type: "prose",
+              id: "p1",
+              segmentId: "s1",
+              text: "Before.",
+            },
+            {
+              type: "tool_call",
+              id: "t1",
+              segmentId: "s1",
+              toolCallId: "call-1",
+              toolName: "read_file",
+              toolArguments: '{"path":"chapter.md"}',
+              toolArgs: { path: "chapter.md" },
+              toolInput: "chapter.md",
+              state: "completed",
+              resultRecord: "bounded result",
+            },
+            {
+              type: "prose",
+              id: "p2",
+              segmentId: "s2",
+              text: closingText,
+            },
+          ],
+        },
+      },
+    ],
+    activeRevisionId: "chain-revision",
   };
 }
 
@@ -140,7 +217,7 @@ describe("Claude Code session linearity across edit annotations", () => {
       provider: "claudecode",
       agenticSteps: steps,
     };
-    const annotated = toHistoryTurn(message, false, true);
+    const [annotated] = toHistoryTurns(message, false, "claudecode");
     expect(annotated.content).not.toBe(RAW_REPLY); // the digest was appended
     expect(annotated.rawContent).toBe(RAW_REPLY); // raw bytes preserved for the hash
 
@@ -161,5 +238,53 @@ describe("Claude Code session linearity across edit annotations", () => {
     // A genuinely cold rebuild has no in-band tool results to know outcomes from,
     // so the replayed transcript must keep the annotations.
     expect(input.fullPrompt).toContain("[Edit outcome: 1 accepted, 0 rejected");
+  });
+
+  it("hashes exact assistantRawReplayText bytes for a chain-backed Claude turn", async () => {
+    const [annotated] = toHistoryTurns(
+      chainMessage(),
+      false,
+      "claudecode",
+    );
+
+    expect(annotated.content).toContain("[read_file: chapter.md");
+    expect(annotated.rawContent).toBe("Before.After.");
+
+    const input = await captureTurnInput([
+      { role: "user", content: RAW_USER },
+      annotated,
+      { role: "user", content: "Continue." },
+    ]);
+    expect(
+      diagnoseSessionReuse(
+        watermarkFor(cfg(), "Before.After."),
+        input.turns,
+        cfg(),
+      ),
+    ).toEqual({ reuse: true });
+  });
+
+  it("invalidates native continuation at an edited chain revision", async () => {
+    const [edited] = toHistoryTurns(
+      chainMessage("edited", "Changed by the user."),
+      false,
+      "claudecode",
+    );
+    const input = await captureTurnInput([
+      { role: "user", content: RAW_USER },
+      edited,
+      { role: "user", content: "Continue." },
+    ]);
+
+    expect(
+      diagnoseSessionReuse(
+        watermarkFor(cfg(), "Before.After."),
+        input.turns,
+        cfg(),
+      ),
+    ).toEqual({
+      reuse: false,
+      reason: "history-edited",
+    });
   });
 });

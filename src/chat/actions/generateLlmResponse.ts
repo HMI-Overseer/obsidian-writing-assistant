@@ -49,6 +49,7 @@ import { buildDirectProviderActionLedger } from "../finalization/directProviderA
 import { getActiveAssistantRevision } from "../conversation/assistantRevisions";
 import {
   allVisibleProse,
+  lastNonEmptyProse,
   rawConcatenatedProse,
 } from "../turns/assistantTurnProjections";
 import { projectRegexEditPreview } from "../messages/regexEditPreview";
@@ -412,10 +413,12 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
     await assistantBubble.turnView.flush();
     if (
       finalization.kind === "append" &&
-      finalization.autoInsert &&
-      response
+      finalization.autoInsert
     ) {
-      await insertLastResponse(plugin, response);
+      const insertion = lastNonEmptyProse(input.turn);
+      if (insertion) {
+        await insertLastResponse(plugin, insertion);
+      }
     }
     return true;
   };

@@ -189,7 +189,11 @@ describe("runToolLoop anthropic thinking round trip", () => {
 
     const round2Messages = seenRequests[1].messages;
     const assistantTurn = round2Messages.find((t) => t.role === "assistant");
-    expect(assistantTurn?.anthropicThinkingBlocks).toEqual(thinking);
+    expect(assistantTurn?.providerReplayCapsule).toEqual({
+      provider: "anthropic",
+      version: 1,
+      thinkingBlocks: thinking,
+    });
   });
 
   it("attaches nothing when the client captured no thinking (other providers)", async () => {

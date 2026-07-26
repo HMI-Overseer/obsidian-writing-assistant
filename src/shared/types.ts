@@ -1,5 +1,13 @@
-import type { EditProposal, AppliedEditRecord } from "../editing/editTypes";
-import type { VaultOperationProposal, AppliedVaultOpRecord } from "../vault-ops/types";
+import type {
+  AppliedEditRecord,
+  EditProposal,
+  ResolvedEdit,
+} from "../editing/editTypes";
+import type {
+  AppliedVaultOpRecord,
+  VaultOperation,
+  VaultOperationProposal,
+} from "../vault-ops/types";
 import type { VaultOpPolicy } from "../vault-ops/gateway";
 import type { VaultOpDisposition } from "../vault-ops/disposition";
 import type { ToolCall } from "../tools/types";
@@ -408,6 +416,210 @@ export interface AssistantReplayEvidence {
   loweredReason?: string;
 }
 
+// ---------------------------------------------------------------------------
+// Assistant revisions and action ledger, ADR-0030
+// ---------------------------------------------------------------------------
+
+export interface AssistantRevisionBase {
+  revisionId: string;
+  createdAt?: number;
+  provider?: ProviderOption;
+  modelId?: string;
+  usage?: MessageUsage;
+  ragSources?: RagSourceRef[];
+  rewrittenQuery?: string;
+  isError?: boolean;
+  interrupted?: boolean;
+  errorMessage?: string;
+}
+
+export interface AssistantTurnRevision extends AssistantRevisionBase {
+  kind: "turn";
+  origin: "generated" | "regenerated" | "edited";
+  parentRevisionId?: string;
+  createdAt: number;
+  provider: ProviderOption;
+  modelId: string;
+  turn: AssistantTurnRecord;
+  replayEvidence?: AssistantReplayEvidence;
+}
+
+export interface LegacyAssistantRevision extends AssistantRevisionBase {
+  kind: "legacy";
+  content: string;
+  legacySteps?: AgenticStep[];
+}
+
+export type AssistantMessageRevision =
+  | AssistantTurnRevision
+  | LegacyAssistantRevision;
+
+export type ToolActionCorrelationEvidence =
+  | { kind: "provider_id"; toolCallId: string }
+  | { kind: "plugin_id"; toolCallId: string }
+  | { kind: "none"; transport: string; reason: string };
+
+export type ToolActionPlacement =
+  | {
+      state: "provisional";
+      correlation:
+        | { kind: "provider_id"; toolCallId: string }
+        | { kind: "plugin_id"; toolCallId: string };
+    }
+  | {
+      state: "placed";
+      anchor: "tool_call";
+      itemId: string;
+      correlation:
+        | { kind: "provider_id"; toolCallId: string }
+        | { kind: "plugin_id"; toolCallId: string };
+    }
+  | {
+      state: "placed";
+      anchor: "parsed_edit";
+      itemId: string;
+    }
+  | {
+      state: "unplaced";
+      correlation: ToolActionCorrelationEvidence;
+      reason: "declaration_missing" | "correlation_unavailable";
+    };
+
+export type ToolActionFamily =
+  | "edit"
+  | "vault_op"
+  | "memory"
+  | "interaction";
+
+export interface ToolActionLedgerBase<
+  Family extends ToolActionFamily,
+  Payload,
+> {
+  actionRef: string;
+  revisionId: string;
+  family: Family;
+  placement: ToolActionPlacement;
+  payload: Payload;
+  events: ToolActionEvent[];
+}
+
+export type ToolActionLedgerEntry =
+  | ToolActionLedgerBase<"edit", EditActionPayload>
+  | ToolActionLedgerBase<"vault_op", VaultOpActionPayload>
+  | ToolActionLedgerBase<"memory", MemoryActionPayload>
+  | ToolActionLedgerBase<"interaction", InteractionActionPayload>;
+
+export interface EditActionPayload {
+  proposalId: string;
+  targets: Array<{
+    targetId: string;
+    targetFilePath: string;
+    documentSnapshot: string;
+    snapshotTimestamp: number;
+    resolvedEdit: ResolvedEdit;
+  }>;
+}
+
+export interface VaultOpActionPayload {
+  proposalId: string;
+  createdAt: number;
+  targets: Array<{
+    targetId: string;
+    operation: VaultOperation;
+    gate: "auto" | "ask";
+    summary: string;
+    linkImpact?: number;
+  }>;
+}
+
+export interface MemoryActionPayload {
+  targets: Array<{
+    targetId: string;
+    mutation:
+      | { kind: "add"; memory: Memory }
+      | { kind: "forget"; name: string };
+  }>;
+}
+
+export interface InteractionActionPayload {
+  kind: "ask_user";
+  targets: Array<{
+    targetId: string;
+    question: string;
+    header: string;
+    options: string[];
+    multiSelect: boolean;
+  }>;
+}
+
+export type ToolActionEvent =
+  | ToolActionEventBase<"proposed">
+  | ToolActionEventBase<"approved">
+  | (ToolActionEventBase<"declined"> & { reason?: string })
+  | (ToolActionEventBase<"apply_succeeded"> & {
+      effect: ToolActionEffectRecord;
+    })
+  | (ToolActionEventBase<"apply_failed"> & { error: string })
+  | (ToolActionEventBase<"undo_succeeded"> & {
+      undo: ToolActionUndoRecord;
+    })
+  | (ToolActionEventBase<"undo_refused"> & { reason: string })
+  | ToolActionEventBase<"retry_requested">
+  | (ToolActionEventBase<"superseded"> & {
+      replacementRevisionId: string;
+    });
+
+export interface ToolActionEventBase<Type extends string> {
+  eventId: string;
+  type: Type;
+  targetId: string;
+  createdAt: number;
+}
+
+export type ToolActionEffectRecord =
+  | {
+      family: "edit";
+      targetFilePath: string;
+      preApplySnapshot: string;
+      postApplySnapshot: string;
+      appliedAt: number;
+    }
+  | {
+      family: "vault_op";
+      operation: VaultOperation;
+      inverse: VaultOperation | null;
+      appliedAt: number;
+    }
+  | {
+      family: "memory";
+      before: Memory | null;
+      after: Memory | null;
+      appliedAt: number;
+    }
+  | {
+      family: "interaction";
+      guidance: CompletedAskGuidanceRecord;
+      completedAt: number;
+    };
+
+export type ToolActionUndoRecord =
+  | {
+      family: "edit";
+      targetFilePath: string;
+      restoredSnapshot: string;
+      undoneAt: number;
+    }
+  | {
+      family: "vault_op";
+      inverse: VaultOperation | null;
+      undoneAt: number;
+    }
+  | {
+      family: "memory";
+      restored: Memory | null;
+      undoneAt: number;
+    };
+
 /**
  * A single step recorded during agentic tool-call execution. Stored with the
  * message. Still never sent to the API *verbatim*, but as of phase 2 it carries the
@@ -489,6 +701,12 @@ export interface ConversationMessage {
   id: string;
   role: "user" | "assistant";
   content: string;
+  /** Immutable generated-content history for an assistant message. */
+  revisions?: AssistantMessageRevision[];
+  /** Stable identity of the selected assistant revision. */
+  activeRevisionId?: string;
+  /** Message-local append-only review and external-effect history. */
+  actionLedger?: ToolActionLedgerEntry[];
   /** Only present on assistant messages that have been regenerated. Stores ALL versions chronologically. */
   versions?: MessageVersion[];
   /** Index into `versions` for the active version. Defaults to last when undefined. */

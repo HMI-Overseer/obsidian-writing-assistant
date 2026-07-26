@@ -1,5 +1,6 @@
 import type {
   ApprovalPosture,
+  AssistantMessageRevision,
   ClaudeCodeResumeCursor,
   CompletionModel,
   Conversation,
@@ -18,6 +19,7 @@ import type { ConversationStorage } from "./ConversationStorage";
 import type { ChatSessionSnapshot } from "../types";
 import { ChatSessionMemory } from "./ChatSessionMemory";
 import { ConversationSearch, type ConversationSearchHit } from "./ConversationSearch";
+import type { SupersessionEventIdentity } from "./actionLedger";
 
 const CHAT_DRAFT_SAVE_DELAY_MS = 300;
 
@@ -169,6 +171,26 @@ export class ChatSessionStore {
 
   switchMessageVersion(messageId: string, newIndex: number): boolean {
     return this.memory.switchMessageVersion(messageId, newIndex);
+  }
+
+  switchMessageRevision(messageId: string, revisionId: string): boolean {
+    return this.memory.switchMessageRevision(messageId, revisionId);
+  }
+
+  commitRevisionReplacement(
+    messageId: string,
+    revision: AssistantMessageRevision,
+    identity: (
+      actionRef: string,
+      targetId: string,
+      index: number,
+    ) => SupersessionEventIdentity,
+  ): boolean {
+    return this.memory.commitRevisionReplacement(
+      messageId,
+      revision,
+      identity,
+    );
   }
 
   ensureConversationTitleFromFirstUserMessage(text: string): boolean {

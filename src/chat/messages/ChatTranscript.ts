@@ -443,7 +443,7 @@ export class ChatTranscript {
 
     const toolbarEl = bubble.rowEl.createDiv({ cls: "lmsa-chat-window-bubble-toolbar" });
 
-    if (message.role === "assistant" && message.versions && message.versions.length > 1) {
+    if (message.role === "assistant") {
       BubbleVersionNav.render(toolbarEl, message, callbacks.onVersionChange);
     }
 

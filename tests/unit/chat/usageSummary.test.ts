@@ -91,6 +91,50 @@ describe("sumConversationUsage", () => {
     expect(result.totalCost).toBeCloseTo(0.001 + 0.002 + 0.0015);
   });
 
+  test("sums immutable revisions before legacy versions without double counting", () => {
+    const messages = [
+      makeMsg("assistant", {
+        revisions: [
+          {
+            revisionId: "revision-1",
+            kind: "legacy",
+            content: "One.",
+            usage: makeUsage({
+              inputTokens: 100,
+              outputTokens: 50,
+              estimatedCostUsd: 0.001,
+            }),
+          },
+          {
+            revisionId: "revision-2",
+            kind: "legacy",
+            content: "Two.",
+            usage: makeUsage({
+              inputTokens: 120,
+              outputTokens: 60,
+              estimatedCostUsd: 0.002,
+            }),
+          },
+        ],
+        activeRevisionId: "revision-2",
+        actionLedger: [],
+        versions: [
+          {
+            content: "stale duplicate",
+            createdAt: 1,
+            usage: makeUsage({ inputTokens: 999, outputTokens: 999 }),
+          },
+        ],
+      }),
+    ];
+
+    const result = sumConversationUsage(messages);
+
+    expect(result.totalInputTokens).toBe(220);
+    expect(result.totalOutputTokens).toBe(110);
+    expect(result.totalCost).toBeCloseTo(0.003);
+  });
+
   test("handles versions where some lack usage", () => {
     const messages = [
       makeMsg("assistant", {

@@ -75,6 +75,34 @@ describe("ConversationStorage", () => {
     expect(loaded?.title).toBe("Chapter one");
   });
 
+  it("normalizes legacy revisions during load without eagerly rewriting the file", async () => {
+    const { storage, files, adapter } = makeStorage();
+    files.set(
+      MAIN,
+      JSON.stringify(
+        makeConversation({
+          messages: [
+            {
+              id: "assistant-1",
+              role: "assistant",
+              content: "Legacy response.",
+            },
+          ],
+        }),
+      ),
+    );
+
+    const loaded = await storage.load("c1");
+
+    expect(loaded?.messages[0].revisions?.[0]).toMatchObject({
+      kind: "legacy",
+      content: "Legacy response.",
+    });
+    expect(adapter.write).not.toHaveBeenCalled();
+    expect(adapter.rename).not.toHaveBeenCalled();
+    expect(files.get(MAIN)).not.toContain("\"revisions\"");
+  });
+
   it("overwrites cleanly on re-save, leaving no temp behind", async () => {
     const { storage, files } = makeStorage();
     await storage.save(makeConversation({ title: "v1" }));

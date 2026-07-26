@@ -18,8 +18,8 @@ function addUsage(totals: UsageTotals, usage: MessageUsage): void {
 
 /**
  * Sum token counts and costs across all messages in a conversation.
- * For messages with versions (regenerated), sums ALL version costs
- * since each regeneration is a real API call.
+ * Revision-backed messages sum every immutable revision because each generation
+ * is a real API call. Legacy versions remain the compatibility fallback.
  */
 export function sumConversationUsage(messages: ConversationMessage[]): UsageTotals {
   const totals: UsageTotals = {
@@ -30,7 +30,13 @@ export function sumConversationUsage(messages: ConversationMessage[]): UsageTota
   };
 
   for (const msg of messages) {
-    if (msg.versions) {
+    if (msg.revisions) {
+      for (const revision of msg.revisions) {
+        if (revision.usage) {
+          addUsage(totals, revision.usage);
+        }
+      }
+    } else if (msg.versions) {
       for (const version of msg.versions) {
         if (version.usage) {
           addUsage(totals, version.usage);

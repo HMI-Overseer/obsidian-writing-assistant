@@ -1,12 +1,25 @@
 import type {
+  AssistantMessageRevision,
   ClaudeCodeResumeCursor,
   Conversation,
   ConversationMeta,
   ConversationMessage,
-  MessageVersion,
   RagSourceRef,
 } from "../../shared/types";
+import { generateId } from "../../utils";
 import type { ChatSessionSnapshot } from "../types";
+import {
+  appendAssistantRevision,
+  assistantDisplayText,
+  createEditedRevision,
+  getActiveAssistantRevision,
+  selectAssistantRevision,
+  syncAssistantCompatibilityProjection,
+} from "./assistantRevisions";
+import {
+  supersedeUnresolvedActions,
+  type SupersessionEventIdentity,
+} from "./actionLedger";
 
 /**
  * Pure in-memory conversation state, no async, no disk I/O, no plugin dependency.
@@ -59,12 +72,13 @@ export class ChatSessionMemory {
   getClaudeCodeResumeCursor(): ClaudeCodeResumeCursor | undefined {
     for (let i = this.messageHistory.length - 1; i >= 0; i--) {
       const message = this.messageHistory[i];
+      const activeRevision = getActiveAssistantRevision(message);
       if (
         message.role === "assistant" &&
-        message.provider === "claudecode" &&
-        message.usage?.resumeCursor
+        (activeRevision?.provider ?? message.provider) === "claudecode" &&
+        (activeRevision?.usage ?? message.usage)?.resumeCursor
       ) {
-        return message.usage.resumeCursor;
+        return (activeRevision?.usage ?? message.usage)?.resumeCursor;
       }
     }
     return undefined;
@@ -80,7 +94,11 @@ export class ChatSessionMemory {
   }
 
   appendMessage(message: ConversationMessage): void {
-    this.messageHistory.push(message);
+    this.messageHistory.push(
+      message.role === "assistant" && message.revisions
+        ? syncAssistantCompatibilityProjection(message)
+        : message,
+    );
   }
 
   setLastAssistantResponse(text: string): void {
@@ -88,26 +106,46 @@ export class ChatSessionMemory {
   }
 
   updateMessageContent(messageId: string, newContent: string): boolean {
-    const message = this.messageHistory.find((m) => m.id === messageId);
-    if (!message) return false;
-
-    message.content = newContent;
-
-    if (message.versions?.length) {
-      const activeVersionIndex = message.activeVersionIndex ?? message.versions.length - 1;
-      const activeVersion = message.versions[activeVersionIndex];
-      if (activeVersion) {
-        activeVersion.content = newContent;
-      }
+    const index = this.messageHistory.findIndex((message) => message.id === messageId);
+    if (index === -1) return false;
+    const message = this.messageHistory[index];
+    if (message.role !== "assistant") {
+      this.messageHistory[index] = { ...message, content: newContent };
+      return true;
     }
 
-    if (message.role === "assistant") {
-      const lastAssistant = [...this.messageHistory].reverse().find((m) => m.role === "assistant");
-      if (lastAssistant?.id === messageId) {
-        this.lastAssistantResponse = newContent;
-      }
+    const revisionBacked = ensureRevisionBackedMessage(message);
+    const active = getActiveAssistantRevision(revisionBacked);
+    if (!active) return false;
+    let revision: AssistantMessageRevision;
+    if (active.kind === "legacy") {
+      revision = {
+        ...structuredClone(active),
+        revisionId: generateId(),
+        createdAt: Date.now(),
+        content: newContent,
+        legacySteps: undefined,
+      };
+    } else {
+      const proseItems = active.turn.items.filter(
+        (item) => item.type === "prose",
+      );
+      if (proseItems.length !== 1) return false;
+      revision = createEditedRevision({
+        sourceRevision: active,
+        revisionId: generateId(),
+        turnId: generateId(),
+        createdAt: Date.now(),
+        targetProseItemId: proseItems[0].id,
+        text: newContent,
+        itemId: () => generateId(),
+      });
     }
-
+    this.messageHistory[index] = appendAssistantRevision(
+      revisionBacked,
+      revision,
+    );
+    this.recalcLastAssistantResponse();
     return true;
   }
 
@@ -134,7 +172,7 @@ export class ChatSessionMemory {
     const index = this.messageHistory.findIndex((m) => m.id === messageId);
     if (index === -1) return [];
 
-    return this.messageHistory.slice(0, index + 1);
+    return structuredClone(this.messageHistory.slice(0, index + 1));
   }
 
   finalizeRegeneration(
@@ -152,26 +190,52 @@ export class ChatSessionMemory {
     >,
   ): ConversationMessage {
     const now = Date.now();
-
-    let versions: MessageVersion[];
-    if (oldMessage.versions && oldMessage.versions.length > 0) {
-      versions = [...oldMessage.versions];
-    } else {
-      versions = [{ content: oldMessage.content, createdAt: now, usage: oldMessage.usage, ragSources: oldMessage.ragSources }];
-    }
-    versions.push({ content: newContent, createdAt: now, usage: metadata?.usage, ragSources: metadata?.ragSources });
-
-    const newMessage: ConversationMessage = {
-      id: oldMessage.id,
-      role: "assistant",
+    const revisionBacked = ensureRevisionBackedMessage(oldMessage);
+    const replacedRevisionId = revisionBacked.activeRevisionId;
+    const revision: AssistantMessageRevision = {
+      revisionId: generateId(),
+      kind: "legacy",
       content: newContent,
-      versions,
-      activeVersionIndex: versions.length - 1,
-      ...metadata,
+      createdAt: now,
+      ...(metadata?.provider === undefined
+        ? {}
+        : { provider: metadata.provider }),
+      ...(metadata?.modelId === undefined
+        ? {}
+        : { modelId: metadata.modelId }),
+      ...(metadata?.usage === undefined
+        ? {}
+        : { usage: structuredClone(metadata.usage) }),
+      ...(metadata?.ragSources === undefined
+        ? {}
+        : { ragSources: structuredClone(metadata.ragSources) }),
+      ...(metadata?.rewrittenQuery === undefined
+        ? {}
+        : { rewrittenQuery: metadata.rewrittenQuery }),
+      ...(metadata?.interrupted === undefined
+        ? {}
+        : { interrupted: metadata.interrupted }),
+      ...(metadata?.agenticSteps === undefined
+        ? {}
+        : { legacySteps: structuredClone(metadata.agenticSteps) }),
     };
-
+    let newMessage = appendAssistantRevision(revisionBacked, revision);
+    if (replacedRevisionId && newMessage.actionLedger) {
+      newMessage = {
+        ...newMessage,
+        actionLedger: supersedeUnresolvedActions(
+          newMessage.actionLedger,
+          replacedRevisionId,
+          revision.revisionId,
+          (_actionRef, _targetId, index) => ({
+            eventId: generateId(),
+            createdAt: now + index,
+          }),
+        ),
+      };
+    }
     this.messageHistory.push(newMessage);
-    this.lastAssistantResponse = newContent;
+    this.lastAssistantResponse = assistantDisplayText(newMessage);
     return newMessage;
   }
 
@@ -188,22 +252,62 @@ export class ChatSessionMemory {
     this.recalcLastAssistantResponse();
   }
 
+  switchMessageRevision(messageId: string, revisionId: string): boolean {
+    const index = this.messageHistory.findIndex((message) => message.id === messageId);
+    if (index === -1) return false;
+    const selected = selectAssistantRevision(
+      ensureRevisionBackedMessage(this.messageHistory[index]),
+      revisionId,
+    );
+    if (!selected) return false;
+    this.messageHistory[index] = selected;
+    this.recalcLastAssistantResponse();
+    return true;
+  }
+
+  /**
+   * Deprecated index adapter for Phase 2 callers. Revision identity remains the
+   * mutation seam and legacy version fields are not rewritten.
+   */
   switchMessageVersion(messageId: string, newIndex: number): boolean {
-    const message = this.messageHistory.find((m) => m.id === messageId);
-    if (!message || !message.versions) return false;
-    if (newIndex < 0 || newIndex >= message.versions.length) return false;
-
-    message.content = message.versions[newIndex].content;
-    message.ragSources = message.versions[newIndex].ragSources;
-    message.activeVersionIndex = newIndex;
-
-    if (message.role === "assistant") {
-      const lastAssistant = [...this.messageHistory].reverse().find((m) => m.role === "assistant");
-      if (lastAssistant?.id === messageId) {
-        this.lastAssistantResponse = message.content;
-      }
+    const message = this.messageHistory.find((entry) => entry.id === messageId);
+    if (!message) return false;
+    const revisionBacked = ensureRevisionBackedMessage(message);
+    const revision = revisionBacked.revisions?.[newIndex];
+    if (!revision) return false;
+    const switched = this.switchMessageRevision(messageId, revision.revisionId);
+    if (switched && this.messageHistory.find((entry) => entry.id === messageId)?.versions) {
+      const selected = this.messageHistory.find((entry) => entry.id === messageId);
+      if (selected) selected.activeVersionIndex = newIndex;
     }
+    return switched;
+  }
 
+  commitRevisionReplacement(
+    messageId: string,
+    revision: AssistantMessageRevision,
+    identity: (
+      actionRef: string,
+      targetId: string,
+      index: number,
+    ) => SupersessionEventIdentity,
+  ): boolean {
+    const index = this.messageHistory.findIndex((message) => message.id === messageId);
+    if (index === -1) return false;
+    const current = ensureRevisionBackedMessage(this.messageHistory[index]);
+    const replacedRevisionId = current.activeRevisionId;
+    if (!replacedRevisionId) return false;
+    const appended = appendAssistantRevision(current, revision);
+    this.messageHistory[index] = {
+      ...appended,
+      actionLedger: supersedeUnresolvedActions(
+        appended.actionLedger ?? [],
+        replacedRevisionId,
+        revision.revisionId,
+        identity,
+      ),
+    };
+    this.recalcLastAssistantResponse();
     return true;
   }
 
@@ -213,10 +317,21 @@ export class ChatSessionMemory {
    */
   hydrateFromConversation(conversation: Conversation): void {
     this.activeConversationId = conversation.id;
-    this.messageHistory = [...conversation.messages];
+    this.messageHistory = conversation.messages.map((message) =>
+      message.role === "assistant" && message.revisions
+        ? syncAssistantCompatibilityProjection(message)
+        : message,
+    );
     this.lastAssistantResponse =
-      [...conversation.messages].reverse().find((message) => message.role === "assistant")
-        ?.content ?? "";
+      assistantDisplayText(
+        [...this.messageHistory]
+          .reverse()
+          .find((message) => message.role === "assistant") ?? {
+          id: "",
+          role: "assistant",
+          content: "",
+        },
+      );
     this.draft = conversation.draft;
     this.activeModelId = conversation.modelId;
     this.activeModelName = conversation.modelName;
@@ -248,12 +363,21 @@ export class ChatSessionMemory {
    * Build a clean messages array for persistence (error messages stripped, RAG chunk content stripped).
    */
   getCleanMessagesForPersistence(): ConversationMessage[] {
-    return this.messageHistory.filter((m) => !m.isError).map(stripRagChunkContent);
+    return this.messageHistory
+      .map((message) =>
+        message.role === "assistant" && message.revisions
+          ? syncAssistantCompatibilityProjection(message)
+          : message,
+      )
+      .filter((message) => !message.isError)
+      .map(stripRagChunkContent);
   }
 
   private recalcLastAssistantResponse(): void {
     const lastAssistant = [...this.messageHistory].reverse().find((m) => m.role === "assistant");
-    this.lastAssistantResponse = lastAssistant?.content ?? "";
+    this.lastAssistantResponse = lastAssistant
+      ? assistantDisplayText(lastAssistant)
+      : "";
   }
 }
 
@@ -265,12 +389,92 @@ function stripRagSources(sources?: RagSourceRef[]): RagSourceRef[] | undefined {
 
 /** Return a shallow copy of the message with chunk content stripped from ragSources (top-level and per-version). */
 function stripRagChunkContent(message: ConversationMessage): ConversationMessage {
-  if (!message.ragSources && !message.versions?.some((v) => v.ragSources)) return message;
+  if (
+    !message.ragSources &&
+    !message.versions?.some((version) => version.ragSources) &&
+    !message.revisions?.some((revision) => revision.ragSources)
+  ) {
+    return message;
+  }
   return {
     ...message,
     ragSources: stripRagSources(message.ragSources),
-    versions: message.versions?.map((v) =>
-      v.ragSources ? { ...v, ragSources: stripRagSources(v.ragSources) } : v,
+    versions: message.versions?.map((version) =>
+      version.ragSources
+        ? { ...version, ragSources: stripRagSources(version.ragSources) }
+        : version,
+    ),
+    revisions: message.revisions?.map((revision) =>
+      revision.ragSources
+        ? { ...revision, ragSources: stripRagSources(revision.ragSources) }
+        : revision,
     ),
   };
+}
+
+function ensureRevisionBackedMessage(
+  message: ConversationMessage,
+): ConversationMessage {
+  if (message.role !== "assistant" || message.revisions?.length) {
+    return message;
+  }
+  const versions = message.versions ?? [];
+  const revisions: AssistantMessageRevision[] =
+    versions.length > 0
+      ? versions.map((version, index) => ({
+          revisionId: `${message.id}:compat-version:${index}`,
+          kind: "legacy",
+          content: version.content,
+          createdAt: version.createdAt,
+          ...(version.usage === undefined
+            ? {}
+            : { usage: structuredClone(version.usage) }),
+          ...(version.ragSources === undefined
+            ? {}
+            : { ragSources: structuredClone(version.ragSources) }),
+        }))
+      : [
+          {
+            revisionId: `${message.id}:compat-snapshot`,
+            kind: "legacy",
+            content: message.content,
+            ...(message.agenticSteps === undefined
+              ? {}
+              : { legacySteps: structuredClone(message.agenticSteps) }),
+          },
+        ];
+  const activeIndex =
+    versions.length > 0
+      ? Math.min(
+          Math.max(message.activeVersionIndex ?? versions.length - 1, 0),
+          versions.length - 1,
+        )
+      : 0;
+  revisions[activeIndex] = {
+    ...revisions[activeIndex],
+    ...(message.provider === undefined ? {} : { provider: message.provider }),
+    ...(message.modelId === undefined ? {} : { modelId: message.modelId }),
+    ...(message.usage === undefined
+      ? {}
+      : { usage: structuredClone(message.usage) }),
+    ...(message.ragSources === undefined
+      ? {}
+      : { ragSources: structuredClone(message.ragSources) }),
+    ...(message.rewrittenQuery === undefined
+      ? {}
+      : { rewrittenQuery: message.rewrittenQuery }),
+    ...(message.isError === undefined ? {} : { isError: message.isError }),
+    ...(message.interrupted === undefined
+      ? {}
+      : { interrupted: message.interrupted }),
+    ...(message.agenticSteps === undefined
+      ? {}
+      : { legacySteps: structuredClone(message.agenticSteps) }),
+  };
+  return syncAssistantCompatibilityProjection({
+    ...message,
+    revisions,
+    activeRevisionId: revisions[activeIndex].revisionId,
+    actionLedger: message.actionLedger ?? [],
+  });
 }

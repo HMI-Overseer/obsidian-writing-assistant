@@ -1,17 +1,29 @@
 import { MAX_CONVERSATIONS } from "../../constants";
 import type {
   ApprovalPosture,
+  AgenticStep,
+  AssistantMessageRevision,
   Attachment,
   ChatHistory,
   Conversation,
   ConversationMeta,
   ConversationMessage,
+  LegacyAssistantRevision,
   MessageVersion,
+  MessageUsage,
+  ProviderOption,
+  RagSourceRef,
 } from "../../shared/types";
 import type { AppliedEditRecord, EditProposal } from "../../editing/editTypes";
 import { normalizeCompletedAskGuidance } from "../../tools/ask/result";
 import { ASK_USER_TOOL_NAME } from "../../tools/ask/definition";
 import { generateId } from "../../utils";
+import {
+  syncAssistantCompatibilityProjection,
+} from "./assistantRevisions";
+import {
+  validateAssistantMessageState,
+} from "./assistantMessageValidation";
 
 /** Coerce a raw persisted value to a known posture, defaulting to `ask`. */
 export function normalizePosture(raw: unknown): ApprovalPosture {
@@ -122,108 +134,13 @@ export function normalizeConversation(raw: unknown): Conversation | null {
   const modelName = typeof record.modelName === "string" ? record.modelName : "Unknown";
   const draft = typeof record.draft === "string" ? record.draft : "";
 
-  const messages: ConversationMessage[] = Array.isArray(record.messages)
-    ? record.messages
-        .filter((message: unknown): message is Record<string, unknown> => {
-          if (typeof message !== "object" || message === null) return false;
-          const m = message as Record<string, unknown>;
-          return (
-            (m.role === "user" || m.role === "assistant") &&
-            typeof m.content === "string"
-          );
-        })
-        .map((message) => {
-          const base: ConversationMessage = {
-            id: typeof message.id === "string" && message.id ? message.id : generateId(),
-            role: message.role as "user" | "assistant",
-            content: message.content as string,
-          };
-
-          if (Array.isArray(message.versions)) {
-            const validVersions = message.versions.filter(
-              (v): v is MessageVersion =>
-                !!v &&
-                typeof v === "object" &&
-                typeof (v as Record<string, unknown>).content === "string" &&
-                typeof (v as Record<string, unknown>).createdAt === "number"
-            );
-            if (validVersions.length > 0) {
-              base.versions = validVersions;
-              const rawIndex = message.activeVersionIndex;
-              base.activeVersionIndex =
-                typeof rawIndex === "number" && rawIndex >= 0 && rawIndex < validVersions.length
-                  ? rawIndex
-                  : validVersions.length - 1;
-            }
-          }
-
-          // Preserve edit proposals + applied records, migrating the legacy single-file
-          // fields into the ADR-0010 arrays so the in-memory model is always plural
-          // (read sites need not know which format a conversation was saved in).
-          const editProposals = migrateEditProposals(message);
-          if (editProposals.length > 0) base.editProposals = editProposals;
-          const appliedEdits = migrateAppliedEdits(message);
-          if (appliedEdits.length > 0) base.appliedEdits = appliedEdits;
-
-          // Preserve vault-op proposal and applied records if present and valid
-          if (isValidVaultOpProposal(message.vaultOpProposal)) {
-            base.vaultOpProposal = message.vaultOpProposal as ConversationMessage["vaultOpProposal"];
-          }
-          if (isValidAppliedVaultOpRecord(message.appliedVaultOps)) {
-            base.appliedVaultOps = message.appliedVaultOps as ConversationMessage["appliedVaultOps"];
-          }
-
-          // Preserve per-message model identity and usage
-          if (typeof message.modelId === "string") base.modelId = message.modelId;
-          if (typeof message.provider === "string") base.provider = message.provider as ConversationMessage["provider"];
-          if (message.usage && typeof message.usage === "object") {
-            base.usage = message.usage as ConversationMessage["usage"];
-          }
-          if (message.isError === true) base.isError = true;
-          // A stopped turn's marker must survive reload so a later cold rebuild still
-          // replays it as interrupted (section 4.C). Only ever `true`; never backfilled, so an
-          // uninterrupted or pre-phase-3 message stays `undefined`.
-          if (message.interrupted === true) base.interrupted = true;
-          if (Array.isArray(message.ragSources)) {
-            base.ragSources = message.ragSources as ConversationMessage["ragSources"];
-          }
-          if (typeof message.rewrittenQuery === "string") {
-            base.rewrittenQuery = message.rewrittenQuery;
-          }
-          if (Array.isArray(message.agenticSteps)) {
-            base.agenticSteps = (message.agenticSteps as unknown[])
-              .filter(
-                (step): step is Record<string, unknown> =>
-                  typeof step === "object" && step !== null && !Array.isArray(step),
-              )
-              .map((step) => {
-                const normalizedStep = { ...step };
-                if (Object.prototype.hasOwnProperty.call(normalizedStep, "askGuidance")) {
-                  const guidance = normalizeCompletedAskGuidance(normalizedStep.askGuidance);
-                  if (guidance) normalizedStep.askGuidance = guidance;
-                  else delete normalizedStep.askGuidance;
-                }
-                if (
-                  normalizedStep.toolName !== ASK_USER_TOOL_NAME ||
-                  (
-                    normalizedStep.askStatus !== "completed" &&
-                    normalizedStep.askStatus !== "cancelled" &&
-                    normalizedStep.askStatus !== "skipped"
-                  )
-                ) {
-                  delete normalizedStep.askStatus;
-                }
-                return normalizedStep;
-              }) as unknown as ConversationMessage["agenticSteps"];
-          }
-          if (Array.isArray(message.attachments)) {
-            const valid = (message.attachments as unknown[]).filter(isValidAttachment);
-            if (valid.length > 0) base.attachments = valid;
-          }
-
-          return base;
-        })
-    : [];
+  const messages: ConversationMessage[] = [];
+  if (Array.isArray(record.messages)) {
+    for (const message of record.messages) {
+      const normalized = normalizeConversationMessage(message);
+      if (normalized) messages.push(normalized);
+    }
+  }
 
   return {
     id,
@@ -236,6 +153,394 @@ export function normalizeConversation(raw: unknown): Conversation | null {
     draft,
     approvalPosture: normalizePosture(record.approvalPosture),
   };
+}
+
+function normalizeConversationMessage(
+  value: unknown,
+): ConversationMessage | null {
+  if (!isRecord(value) || (value.role !== "user" && value.role !== "assistant")) {
+    return null;
+  }
+  if (value.role === "user") return normalizeUserMessage(value);
+  return normalizeAssistantMessage(value);
+}
+
+function normalizeUserMessage(
+  value: Record<string, unknown>,
+): ConversationMessage | null {
+  if (typeof value.content !== "string") return null;
+  const message: ConversationMessage = {
+    id: messageIdOf(value),
+    role: "user",
+    content: value.content,
+  };
+  const attachments = normalizeAttachments(value.attachments);
+  if (attachments.length > 0) message.attachments = attachments;
+  return message;
+}
+
+function normalizeAssistantMessage(
+  value: Record<string, unknown>,
+): ConversationMessage | null {
+  if (Array.isArray(value.revisions)) {
+    const normalized = normalizeNewAssistantMessage(value);
+    if (normalized) return normalized;
+    if (!hasUsableLegacyAssistantContent(value)) return null;
+  }
+  return normalizeLegacyAssistantMessage(value);
+}
+
+function normalizeNewAssistantMessage(
+  value: Record<string, unknown>,
+): ConversationMessage | null {
+  if (
+    !isNonEmptyString(value.id) ||
+    !Array.isArray(value.actionLedger)
+  ) {
+    return null;
+  }
+  const validation = validateAssistantMessageState({
+    revisions: value.revisions,
+    activeRevisionId: value.activeRevisionId,
+    actionLedger: value.actionLedger,
+  });
+  if (!validation.ok) return null;
+
+  return syncAssistantCompatibilityProjection({
+    id: value.id,
+    role: "assistant",
+    content: typeof value.content === "string" ? value.content : "",
+    revisions: validation.value.revisions,
+    activeRevisionId: validation.value.activeRevisionId,
+    actionLedger: validation.value.actionLedger,
+  });
+}
+
+interface LegacyVersionCandidate {
+  rawIndex: number;
+  version: MessageVersion;
+  revision: LegacyAssistantRevision;
+}
+
+function normalizeLegacyAssistantMessage(
+  value: Record<string, unknown>,
+): ConversationMessage | null {
+  if (typeof value.content !== "string") return null;
+  const steps = normalizeLegacySteps(value.agenticSteps);
+  if (value.content.length === 0 && !steps) return null;
+
+  const messageId = messageIdOf(value);
+  const candidates = normalizeLegacyVersions(value.versions, messageId);
+  const provenCandidate = findProvenActiveCandidate(
+    candidates,
+    value.activeVersionIndex,
+    value.content,
+  );
+  const topMetadata = normalizeLegacyTopMetadata(value);
+  let revisions: AssistantMessageRevision[] = candidates.map(
+    (candidate) => candidate.revision,
+  );
+  let activeRevisionId: string;
+
+  if (provenCandidate) {
+    const activeIndex = candidates.indexOf(provenCandidate);
+    revisions[activeIndex] = {
+      ...revisions[activeIndex],
+      ...topMetadata,
+      ...(steps ? { legacySteps: steps } : {}),
+    };
+    activeRevisionId = revisions[activeIndex].revisionId;
+  } else {
+    const snapshot: LegacyAssistantRevision = {
+      revisionId: legacySnapshotRevisionId(messageId),
+      kind: "legacy",
+      content: value.content,
+      ...topMetadata,
+      ...(steps ? { legacySteps: steps } : {}),
+    };
+    revisions = [...revisions, snapshot];
+    activeRevisionId = snapshot.revisionId;
+  }
+
+  const validation = validateAssistantMessageState({
+    revisions,
+    activeRevisionId,
+    actionLedger: [],
+  });
+  if (!validation.ok) {
+    const fallback: LegacyAssistantRevision = {
+      revisionId: legacySnapshotRevisionId(messageId),
+      kind: "legacy",
+      content: value.content,
+      ...topMetadata,
+    };
+    const fallbackValidation = validateAssistantMessageState({
+      revisions: [fallback],
+      activeRevisionId: fallback.revisionId,
+      actionLedger: [],
+    });
+    if (!fallbackValidation.ok) return null;
+    revisions = fallbackValidation.value.revisions;
+    activeRevisionId = fallbackValidation.value.activeRevisionId;
+  } else {
+    revisions = validation.value.revisions;
+    activeRevisionId = validation.value.activeRevisionId;
+  }
+
+  const message = syncAssistantCompatibilityProjection({
+    id: messageId,
+    role: "assistant",
+    content: value.content,
+    revisions,
+    activeRevisionId,
+    actionLedger: [],
+  });
+  preserveLegacyVersionFields(message, candidates, value.activeVersionIndex);
+  preserveLegacyReviewFields(message, value);
+  const active = message.revisions?.find(
+    (revision) => revision.revisionId === message.activeRevisionId,
+  );
+  if (active?.kind === "legacy" && active.legacySteps) {
+    message.agenticSteps = structuredClone(active.legacySteps);
+  }
+  return message;
+}
+
+function normalizeLegacyVersions(
+  value: unknown,
+  messageId: string,
+): LegacyVersionCandidate[] {
+  const rawVersions = asUnknownArray(value);
+  if (!rawVersions) return [];
+  const candidates: LegacyVersionCandidate[] = [];
+  for (let rawIndex = 0; rawIndex < rawVersions.length; rawIndex += 1) {
+    const rawVersion = rawVersions[rawIndex];
+    if (
+      !isRecord(rawVersion) ||
+      typeof rawVersion.content !== "string" ||
+      !isTimestamp(rawVersion.createdAt)
+    ) {
+      continue;
+    }
+    const version: MessageVersion = {
+      content: rawVersion.content,
+      createdAt: rawVersion.createdAt,
+    };
+    const usage = normalizeUsage(rawVersion.usage);
+    if (usage) version.usage = usage;
+    const ragSources = normalizeRagSources(rawVersion.ragSources);
+    if (ragSources) version.ragSources = ragSources;
+    candidates.push({
+      rawIndex,
+      version,
+      revision: {
+        revisionId: legacyVersionRevisionId(messageId, rawIndex),
+        kind: "legacy",
+        content: version.content,
+        createdAt: version.createdAt,
+        ...(usage ? { usage } : {}),
+        ...(ragSources ? { ragSources } : {}),
+      },
+    });
+  }
+  return candidates;
+}
+
+function findProvenActiveCandidate(
+  candidates: LegacyVersionCandidate[],
+  activeVersionIndex: unknown,
+  topContent: string,
+): LegacyVersionCandidate | null {
+  if (!Number.isSafeInteger(activeVersionIndex)) return null;
+  const candidate =
+    candidates.find(
+      (entry) => entry.rawIndex === activeVersionIndex,
+    ) ?? null;
+  return candidate?.version.content === topContent ? candidate : null;
+}
+
+function normalizeLegacyTopMetadata(
+  value: Record<string, unknown>,
+): Omit<LegacyAssistantRevision, "revisionId" | "kind" | "content"> {
+  const metadata: Omit<
+    LegacyAssistantRevision,
+    "revisionId" | "kind" | "content"
+  > = {};
+  if (isProvider(value.provider)) metadata.provider = value.provider;
+  if (isNonEmptyString(value.modelId)) metadata.modelId = value.modelId;
+  const usage = normalizeUsage(value.usage);
+  if (usage) metadata.usage = usage;
+  const ragSources = normalizeRagSources(value.ragSources);
+  if (ragSources) metadata.ragSources = ragSources;
+  if (typeof value.rewrittenQuery === "string") {
+    metadata.rewrittenQuery = value.rewrittenQuery;
+  }
+  if (value.isError === true) metadata.isError = true;
+  if (value.interrupted === true) metadata.interrupted = true;
+  if (typeof value.errorMessage === "string") {
+    metadata.errorMessage = value.errorMessage;
+  }
+  return metadata;
+}
+
+function normalizeLegacySteps(value: unknown): AgenticStep[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const steps: AgenticStep[] = [];
+  for (const rawStep of value) {
+    if (
+      !isRecord(rawStep) ||
+      (rawStep.type !== "tool_call" && rawStep.type !== "reasoning") ||
+      !Number.isSafeInteger(rawStep.round) ||
+      (rawStep.round as number) < 0
+    ) {
+      continue;
+    }
+    const normalizedStep = { ...rawStep };
+    if (Object.prototype.hasOwnProperty.call(normalizedStep, "askGuidance")) {
+      const guidance = normalizeCompletedAskGuidance(
+        normalizedStep.askGuidance,
+      );
+      if (guidance) normalizedStep.askGuidance = guidance;
+      else delete normalizedStep.askGuidance;
+    }
+    if (
+      normalizedStep.toolName !== ASK_USER_TOOL_NAME ||
+      (normalizedStep.askStatus !== "completed" &&
+        normalizedStep.askStatus !== "cancelled" &&
+        normalizedStep.askStatus !== "skipped")
+    ) {
+      delete normalizedStep.askStatus;
+    }
+    steps.push(normalizedStep as unknown as AgenticStep);
+  }
+  return steps.length > 0 ? steps : undefined;
+}
+
+function preserveLegacyVersionFields(
+  message: ConversationMessage,
+  candidates: LegacyVersionCandidate[],
+  activeVersionIndex: unknown,
+): void {
+  if (candidates.length === 0) return;
+  message.versions = candidates.map((candidate) =>
+    structuredClone(candidate.version),
+  );
+  const mappedActiveIndex = Number.isSafeInteger(activeVersionIndex)
+    ? candidates.findIndex(
+        (candidate) => candidate.rawIndex === activeVersionIndex,
+      )
+    : -1;
+  message.activeVersionIndex =
+    mappedActiveIndex >= 0 ? mappedActiveIndex : candidates.length - 1;
+}
+
+function preserveLegacyReviewFields(
+  message: ConversationMessage,
+  value: Record<string, unknown>,
+): void {
+  const editProposals = migrateEditProposals(value);
+  if (editProposals.length > 0) {
+    message.editProposals = structuredClone(editProposals);
+  }
+  const appliedEdits = migrateAppliedEdits(value);
+  if (appliedEdits.length > 0) {
+    message.appliedEdits = structuredClone(appliedEdits);
+  }
+  if (isValidVaultOpProposal(value.vaultOpProposal)) {
+    message.vaultOpProposal = structuredClone(
+      value.vaultOpProposal as NonNullable<
+        ConversationMessage["vaultOpProposal"]
+      >,
+    );
+  }
+  if (isValidAppliedVaultOpRecord(value.appliedVaultOps)) {
+    message.appliedVaultOps = structuredClone(
+      value.appliedVaultOps as NonNullable<
+        ConversationMessage["appliedVaultOps"]
+      >,
+    );
+  }
+}
+
+function normalizeUsage(value: unknown): MessageUsage | undefined {
+  if (
+    !isRecord(value) ||
+    typeof value.inputTokens !== "number" ||
+    !Number.isFinite(value.inputTokens) ||
+    typeof value.outputTokens !== "number" ||
+    !Number.isFinite(value.outputTokens)
+  ) {
+    return undefined;
+  }
+  return structuredClone(value) as unknown as MessageUsage;
+}
+
+function normalizeRagSources(value: unknown): RagSourceRef[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const sources = value.filter(
+    (source): source is RagSourceRef =>
+      isRecord(source) &&
+      typeof source.filePath === "string" &&
+      typeof source.headingPath === "string" &&
+      typeof source.score === "number" &&
+      Number.isFinite(source.score),
+  );
+  return sources.length > 0 ? structuredClone(sources) : undefined;
+}
+
+function normalizeAttachments(value: unknown): Attachment[] {
+  return Array.isArray(value)
+    ? (value as unknown[]).filter(isValidAttachment)
+    : [];
+}
+
+function hasUsableLegacyAssistantContent(
+  value: Record<string, unknown>,
+): boolean {
+  return (
+    (typeof value.content === "string" && value.content.length > 0) ||
+    normalizeLegacySteps(value.agenticSteps) !== undefined
+  );
+}
+
+function messageIdOf(value: Record<string, unknown>): string {
+  return isNonEmptyString(value.id) ? value.id : generateId();
+}
+
+function legacyVersionRevisionId(
+  messageId: string,
+  rawIndex: number,
+): string {
+  return `${messageId}:legacy-version:${rawIndex}`;
+}
+
+function legacySnapshotRevisionId(messageId: string): string {
+  return `${messageId}:legacy-snapshot`;
+}
+
+function isProvider(value: unknown): value is ProviderOption {
+  return (
+    value === "lmstudio" ||
+    value === "openai" ||
+    value === "anthropic" ||
+    value === "claudecode"
+  );
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function asUnknownArray(value: unknown): unknown[] | null {
+  return Array.isArray(value) ? (value as unknown[]) : null;
+}
+
+function isNonEmptyString(value: unknown): value is string {
+  return typeof value === "string" && value.trim().length > 0;
+}
+
+function isTimestamp(value: unknown): value is number {
+  return Number.isSafeInteger(value) && (value as number) >= 0;
 }
 
 /** Prune oldest conversations beyond the cap. Returns IDs of removed entries. */

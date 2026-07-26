@@ -27,7 +27,7 @@ function makeConversation(): Conversation {
 }
 
 describe("ChatSessionMemory.updateMessageContent", () => {
-  test("updates the active version content for versioned assistant messages", () => {
+  test("appends an immutable compatibility revision without rewriting legacy versions", () => {
     const memory = new ChatSessionMemory();
     memory.hydrateFromConversation(makeConversation());
 
@@ -37,7 +37,11 @@ describe("ChatSessionMemory.updateMessageContent", () => {
 
     expect(updated).toBe(true);
     expect(message.content).toBe("Edited assistant text");
-    expect(message.versions?.[1]?.content).toBe("Edited assistant text");
+    expect(message.versions?.[1]?.content).toBe("Second version");
+    expect(message.revisions?.map((revision) =>
+      revision.kind === "legacy" ? revision.content : null,
+    )).toEqual(["First version", "Second version", "Edited assistant text"]);
+    expect(message.activeRevisionId).toBe(message.revisions?.[2]?.revisionId);
     expect(snapshot.lastAssistantResponse).toBe("Edited assistant text");
   });
 });
@@ -74,7 +78,7 @@ describe("ChatSessionMemory.restoreRegeneration", () => {
 });
 
 describe("ChatSessionMemory.finalizeRegeneration", () => {
-  test("seeds a base version from a version-less original, then appends the new content", () => {
+  test("seeds a base revision from a version-less original, then appends the new content", () => {
     const memory = new ChatSessionMemory();
     memory.hydrateFromConversation({
       ...makeConversation(),
@@ -85,24 +89,33 @@ describe("ChatSessionMemory.finalizeRegeneration", () => {
     const result = memory.finalizeRegeneration(old!, "Regenerated");
 
     expect(result.content).toBe("Regenerated");
-    expect(result.versions?.map((v) => v.content)).toEqual(["Original", "Regenerated"]);
-    expect(result.activeVersionIndex).toBe(1);
+    expect(result.versions).toBeUndefined();
+    expect(result.revisions?.map((revision) =>
+      revision.kind === "legacy" ? revision.content : null,
+    )).toEqual(["Original", "Regenerated"]);
+    expect(result.activeRevisionId).toBe(result.revisions?.[1]?.revisionId);
     expect(memory.getSnapshot().lastAssistantResponse).toBe("Regenerated");
   });
 
-  test("preserves the existing version history when regenerating an already-versioned message", () => {
+  test("preserves legacy version evidence and appends a new revision when regenerating", () => {
     const memory = new ChatSessionMemory();
     memory.hydrateFromConversation(makeConversation());
 
     const old = memory.removeLastMessage();
     const result = memory.finalizeRegeneration(old!, "Third version");
 
-    expect(result.versions?.map((v) => v.content)).toEqual([
+    expect(result.versions?.map((version) => version.content)).toEqual([
+      "First version",
+      "Second version",
+    ]);
+    expect(result.revisions?.map((revision) =>
+      revision.kind === "legacy" ? revision.content : null,
+    )).toEqual([
       "First version",
       "Second version",
       "Third version",
     ]);
-    expect(result.activeVersionIndex).toBe(2);
+    expect(result.activeRevisionId).toBe(result.revisions?.[2]?.revisionId);
   });
 
   test("keeps historical version metadata separate from the active regeneration metadata", () => {
@@ -149,8 +162,12 @@ describe("ChatSessionMemory.finalizeRegeneration", () => {
       interrupted: true,
     });
 
-    expect(result.versions?.map((version) => version.usage?.inputTokens)).toEqual([1, 3, 5]);
-    expect(result.versions?.map((version) => version.ragSources?.[0]?.filePath)).toEqual([
+    expect(result.revisions?.map((revision) => revision.usage?.inputTokens)).toEqual([
+      1,
+      3,
+      5,
+    ]);
+    expect(result.revisions?.map((revision) => revision.ragSources?.[0]?.filePath)).toEqual([
       "Fixtures/first.md",
       "Fixtures/second.md",
       "Fixtures/third.md",

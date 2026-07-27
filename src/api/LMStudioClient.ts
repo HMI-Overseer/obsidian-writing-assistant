@@ -4,10 +4,14 @@ import type { ChatClient } from "./chatClient";
 import type {
   AssistantStreamEvent,
   CompletionResult,
-  StreamResult,
   UsageResult,
   StopReason,
 } from "./usageTypes";
+import type {
+  AssistantStreamAttemptContext,
+  AssistantStreamRun,
+} from "./assistantStreamRun";
+import { createLinkedAbort } from "./assistantStreamRuntime";
 import type { ToolCall } from "../tools/types";
 import type { LMStudioModel, LMStudioModelListResult } from "./types";
 import { formatOpenAITools } from "../tools/formatters/openai";
@@ -171,8 +175,8 @@ export class LMStudioClient implements ChatClient {
     request: ChatRequest,
     model: string,
     params: SamplingParams,
-    signal?: AbortSignal,
-  ): StreamResult {
+    attempt: AssistantStreamAttemptContext,
+  ): AssistantStreamRun<AssistantStreamEvent> {
     const messages = this.buildMessages(request);
     const openAITools = request.tools?.length
       ? formatOpenAITools(request.tools)
@@ -188,16 +192,21 @@ export class LMStudioClient implements ChatClient {
     const onEvent = (event: unknown): void => {
       pendingEvents.push(...translator.translate(event));
     };
+    const transport = createLinkedAbort(attempt);
     const rawStream = this.bypassCors
-      ? streamNode(url, body, signal, undefined, undefined, onEvent)
-      : streamFetch(url, body, signal, undefined, undefined, onEvent);
+      ? streamNode(url, body, transport.signal, undefined, undefined, onEvent)
+      : streamFetch(url, body, transport.signal, undefined, undefined, onEvent);
 
-    return createAssistantEventStream(
-      rawStream,
-      pendingEvents,
-      translator,
-      (error) => decorateJinjaTemplateError(error, openAITools !== undefined),
-    );
+    return createAssistantEventStream(rawStream, pendingEvents, translator, {
+      attempt,
+      provider: "lmstudio",
+      abort: () => {
+        transport.abort();
+        transport.release();
+      },
+      decorateError: (error) =>
+        decorateJinjaTemplateError(error, openAITools !== undefined),
+    });
   }
 
   private buildMessages(request: ChatRequest): Message[] {

@@ -2,10 +2,9 @@ import { describe, expect, it, vi } from "vitest";
 import type { App } from "obsidian";
 import type { ChatClient } from "../../../../src/api/chatClient";
 import { createAbortError } from "../../../../src/api/httpTransport";
-import type {
-  AssistantStreamEvent,
-  StreamResult,
-} from "../../../../src/api/usageTypes";
+import type { AssistantStreamEvent } from "../../../../src/api/usageTypes";
+import type { AssistantStreamRun } from "../../../../src/api/assistantStreamRun";
+import { ownedRunFromLegacy } from "../../../helpers/ownedRun";
 import {
   planAskBarrierBatch,
   runToolLoop,
@@ -46,7 +45,8 @@ function call(id: string, name: string, arguments_: Record<string, unknown> = {}
 
 function client(rounds: RoundScript[]): ChatClient & { stream: ReturnType<typeof vi.fn> } {
   let index = 0;
-  const stream = vi.fn((request: ChatRequest): StreamResult => {
+  const stream = vi.fn(
+    (request: ChatRequest): AssistantStreamRun<AssistantStreamEvent> => {
     const roundIndex = index++;
     const round = rounds[roundIndex];
     const segmentId = `segment-${roundIndex}`;
@@ -83,7 +83,7 @@ function client(rounds: RoundScript[]): ChatClient & { stream: ReturnType<typeof
         stopReason: round.stopReason as never,
       };
     })();
-    return {
+    return ownedRunFromLegacy({
       events,
       usage: Promise.resolve(null),
       stopReason: Promise.resolve(round.stopReason as never),
@@ -97,7 +97,7 @@ function client(rounds: RoundScript[]): ChatClient & { stream: ReturnType<typeof
           nativeResume: false,
         },
       }),
-    };
+    });
   });
   return { complete: vi.fn(), stream } as unknown as ChatClient & {
     stream: ReturnType<typeof vi.fn>;

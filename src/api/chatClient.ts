@@ -1,6 +1,10 @@
 import type { ChatRequest } from "../shared/chatRequest";
 import type { SamplingParams } from "../shared/types";
-import type { CompletionResult, StreamResult } from "./usageTypes";
+import type {
+  AssistantStreamAttemptContext,
+  AssistantStreamRun,
+} from "./assistantStreamRun";
+import type { AssistantStreamEvent, CompletionResult } from "./usageTypes";
 
 /** Provider-agnostic chat completion client. */
 export interface ChatClient {
@@ -12,11 +16,18 @@ export interface ChatClient {
     signal?: AbortSignal
   ): Promise<CompletionResult>;
 
-  /** Streaming completion. Returns text deltas and a usage promise. */
+  /**
+   * Streaming completion, as one owned attempt.
+   *
+   * Takes the attempt context rather than a bare signal (RFC-0011 settled decision
+   * 13): the lease identity and its cancellation authority are the caller's to
+   * allocate, so a provider cannot mint an unrelated identity of its own, and the
+   * returned run can be stopped and awaited by whoever owns the turn.
+   */
   stream(
     request: ChatRequest,
     model: string,
     params: SamplingParams,
-    signal?: AbortSignal,
-  ): StreamResult;
+    attempt: AssistantStreamAttemptContext,
+  ): AssistantStreamRun<AssistantStreamEvent>;
 }

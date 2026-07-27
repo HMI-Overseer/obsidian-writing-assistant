@@ -1,9 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 import type { ChatClient } from "../../../../src/api/chatClient";
-import type {
-  AssistantStreamEvent,
-  StreamResult,
-} from "../../../../src/api/usageTypes";
+import type { AssistantStreamEvent } from "../../../../src/api/usageTypes";
+import type { AssistantStreamRun } from "../../../../src/api/assistantStreamRun";
+import { ownedRunFromLegacy } from "../../../helpers/ownedRun";
 import type { ChatRequest } from "../../../../src/shared/chatRequest";
 import type {
   AssistantReplayEvidence,
@@ -24,8 +23,10 @@ const EVIDENCE: AssistantReplayEvidence = {
   },
 };
 
-function streamResult(events: AssistantStreamEvent[]): StreamResult {
-  return {
+function streamResult(
+  events: AssistantStreamEvent[],
+): AssistantStreamRun<AssistantStreamEvent> {
+  return ownedRunFromLegacy({
     events: (async function* () {
       yield* events;
     })(),
@@ -37,7 +38,7 @@ function streamResult(events: AssistantStreamEvent[]): StreamResult {
     ),
     replayCapsule: Promise.resolve(null),
     replayEvidence: Promise.resolve(EVIDENCE),
-  };
+  });
 }
 
 function segment(

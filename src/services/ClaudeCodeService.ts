@@ -16,6 +16,7 @@ import { isSdkAvailable } from "../api/sdk/claudeAgentSdk";
 import type { Options } from "../api/sdk/claudeAgentSdk";
 import { createVaultSdkMcpServer } from "../api/sdk/sdkMcpServer";
 import { buildSdkOptions } from "../api/sdk/sdkQueryEngine";
+import type { ClaudeCodeProcessOwner } from "../api/sdk/claudeCodeSpawn";
 import { harvestEffortLevels } from "../api/sdk/effortHarvest";
 import { SdkSessionRegistry } from "../api/sdk/sdkSession";
 import type { SessionConfig } from "../api/harnessSession";
@@ -283,6 +284,11 @@ export class ClaudeCodeService {
         sdkSession: {
           conversationId,
           run: (input) => this.runSessionTurn(conversationId, input, agentic, resumeCursor),
+          // The persistent path's hard dispose. The session owns the CLI child it
+          // spawned, so this is the same 25 ms `kill()` the legacy path has always
+          // had; it is reached only when the graceful tier overran its measured
+          // deadline, or when capture failure means the session must not survive.
+          hardDispose: () => this.sessionRegistry.disposeConversation(conversationId),
         },
         getToolCorrelation: () => this.runToolCorrelation,
       };
@@ -356,7 +362,11 @@ export class ClaudeCodeService {
 
     const command = this.command;
     const vaultRoot = this.vaultRoot;
-    const buildOptions = (abortController: AbortController, resumeSessionId?: string): Options => {
+    const buildOptions = (
+      abortController: AbortController,
+      resumeSessionId?: string,
+      processOwner?: ClaudeCodeProcessOwner,
+    ): Options => {
       const sdkMcp = agentic
         ? {
             server: createVaultSdkMcpServer(MCP_SERVER_NAME, this.createToolProvider()),
@@ -374,6 +384,8 @@ export class ClaudeCodeService {
           // Present only on a disk resume (Model A′): loads the session history from
           // ~/.claude so only the delta turn need be sent.
           ...(resumeSessionId ? { resume: resumeSessionId } : {}),
+          // The session's own spawn owner, so its disposal has a bounded hard tier.
+          ...(processOwner ? { processOwner } : {}),
         },
         abortController,
       );
@@ -700,8 +712,10 @@ export class ClaudeCodeService {
     this.toolListener = null;
     this.liveReview = null;
     this.runAllowedTools.clear();
-    // Kill every live SDK process, the "don't leak processes" rule.
-    this.sessionRegistry.disposeAll();
+    // Kill every live SDK process, the "don't leak processes" rule. Each
+    // disposal issues its kill synchronously, so the children die even though
+    // `onunload` cannot await; the returned exit proof has no caller here.
+    void this.sessionRegistry.disposeAll();
     this.mcpServer?.stop();
     this.mcpServer = null;
   }

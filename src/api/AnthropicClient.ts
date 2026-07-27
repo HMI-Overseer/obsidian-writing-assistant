@@ -5,9 +5,13 @@ import type {
   AssistantStreamEvent,
   CompletionResult,
   StopReason,
-  StreamResult,
   UsageResult,
 } from "./usageTypes";
+import type {
+  AssistantStreamAttemptContext,
+  AssistantStreamRun,
+} from "./assistantStreamRun";
+import { createLinkedAbort } from "./assistantStreamRuntime";
 import type { ToolCall } from "../tools/types";
 import { formatAnthropicTools, formatAnthropicToolsWithSearch } from "../tools/formatters/anthropic";
 import type { AnthropicToolEntry } from "../tools/formatters/anthropic";
@@ -151,8 +155,8 @@ export class AnthropicClient implements ChatClient {
     request: ChatRequest,
     model: string,
     params: SamplingParams,
-    signal?: AbortSignal,
-  ): StreamResult {
+    attempt: AssistantStreamAttemptContext,
+  ): AssistantStreamRun<AssistantStreamEvent> {
     const cacheSettings = request.anthropicCacheSettings;
     const { system, messages } = buildAnthropicMessages(request, cacheSettings, model);
     const anthropicTools = formatRequestTools(request);
@@ -162,15 +166,26 @@ export class AnthropicClient implements ChatClient {
       segmentId: `segment-${generateId()}`,
     });
     const pendingEvents: AssistantStreamEvent[] = [];
+    // The transport gets a controller this attempt owns, linked to the lease
+    // signal rather than replacing it, so cancelling one attempt cannot reach
+    // another and the lease keeps the cancel reason.
+    const transport = createLinkedAbort(attempt);
     const rawGenerator = streamNode(
       url,
       payload,
-      signal,
+      transport.signal,
       buildAnthropicHeaders(this.apiKey, ANTHROPIC_VERSION),
       anthropicDeltaExtractor,
       (event) => pendingEvents.push(...translator.translate(event)),
     );
-    return createAssistantEventStream(rawGenerator, pendingEvents, translator);
+    return createAssistantEventStream(rawGenerator, pendingEvents, translator, {
+      attempt,
+      provider: "anthropic",
+      abort: () => {
+        transport.abort();
+        transport.release();
+      },
+    });
   }
 
 }

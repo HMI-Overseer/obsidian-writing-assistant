@@ -27,6 +27,8 @@ import type {
   SdkMcpToolDefinition,
   SDKMessage,
   SDKUserMessage,
+  SpawnedProcess,
+  SpawnOptions,
 } from "@anthropic-ai/claude-agent-sdk";
 import { patchRendererAbortSignal } from "./rendererCompat";
 
@@ -44,6 +46,8 @@ export type {
   SdkMcpToolDefinition,
   SDKMessage,
   SDKUserMessage,
+  SpawnedProcess,
+  SpawnOptions,
 };
 
 /**

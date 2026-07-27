@@ -55,6 +55,7 @@ import {
 import { extractToolInput } from "../../tools/metadata";
 import { normalizeVaultToolCall } from "../../tools/paths";
 import { streamWithRetry } from "../../api/retry";
+import { TurnRunOwner } from "../streaming/TurnRunOwner";
 import type { LiveVaultReview } from "./liveVaultReview";
 import {
   AskInteractionPreconditionError,
@@ -218,6 +219,29 @@ export async function runToolLoop(
   const app =
     vaultOpToolContext?.app ?? editToolContext?.app ?? vaultToolContext?.app;
 
+  // Built from the pre-minted turn ID before retry can reach a provider (RFC-0011
+  // settled decision 12), so every attempt of every round has a lease from before
+  // its construction, and a user Stop cancels through one named path rather than
+  // being inferred from whichever `AbortError` surfaces first.
+  const runOwner = new TurnRunOwner<AssistantStreamEvent>(
+    turnBuilder.snapshot().id,
+    signal,
+  );
+
+  try {
+    return await runRounds();
+  } catch (error) {
+    await runOwner.cancelAll("downstream_failed");
+    throw error;
+  } finally {
+    // Nothing is returned and nothing is rethrown until every attempt this turn
+    // opened is quiet, so the caller can never persist a turn while its provider
+    // is still running.
+    await runOwner.awaitQuiescence();
+    runOwner.release();
+  }
+
+  async function runRounds(): Promise<ToolLoopResult> {
   for (let round = 0; ; round++) {
     // A round's tool calls come from one of two sources: a fresh model stream, or the
     // buffer of mutations a prior round's cap deferred. The buffer is drained first, so
@@ -245,26 +269,40 @@ export async function runToolLoop(
       const requestMessages = [...baseRequest.messages, ...toolLoopTurns];
       const roundRequest = { ...baseRequest, messages: requestMessages };
 
+      // No round opens while a prior attempt is still capable of producing work
+      // or callbacks (RFC-0011 criterion 16).
+      await runOwner.awaitQuiescence();
       const streamResult = streamWithRetry(
-        () => client.stream(roundRequest, model, params, signal),
+        (attempt) => client.stream(roundRequest, model, params, attempt),
+        runOwner,
         { signal },
       );
       const segmentIds: string[] = [];
       streamedSegmentIds = segmentIds;
       roundText = "";
       for await (const event of streamResult.events) {
-        if (event.type === "segment_start") segmentIds.push(event.segmentId);
-        if (
-          event.type === "tool_call_identity" &&
-          event.correlation !== "none"
-        ) {
-          toolCorrelations.set(event.toolCallId, event.correlation);
+        try {
+          if (event.type === "segment_start") segmentIds.push(event.segmentId);
+          if (
+            event.type === "tool_call_identity" &&
+            event.correlation !== "none"
+          ) {
+            toolCorrelations.set(event.toolCallId, event.correlation);
+          }
+          if (event.type === "prose_delta") {
+            roundText += event.delta;
+            callbacks.onDelta(event.delta);
+          }
+          applyAssistantStreamEvent(turnBuilder, event, modelRounds, callbacks);
+        } catch (error) {
+          // A builder rejection, an `onDelta` subscriber, or a snapshot callback
+          // throwing is a downstream failure, and it must stop the provider rather
+          // than merely surface (RFC-0011 invariant 11). Cancelling here, before
+          // unwinding, is what makes the reason honest: the `consumer_returned`
+          // that the unwind itself produces would otherwise claim it first.
+          await runOwner.cancelAll("downstream_failed");
+          throw error;
         }
-        if (event.type === "prose_delta") {
-          roundText += event.delta;
-          callbacks.onDelta(event.delta);
-        }
-        applyAssistantStreamEvent(turnBuilder, event, modelRounds, callbacks);
       }
       usage = await streamResult.usage;
       const replayCapsule = await streamResult.replayCapsule;
@@ -691,6 +729,7 @@ export async function runToolLoop(
     ),
     toolCorrelations: Object.fromEntries(toolCorrelations),
   };
+  }
 }
 
 /** Apply one ordered declaration event to the canonical turn builder. */

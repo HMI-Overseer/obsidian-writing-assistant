@@ -37,6 +37,61 @@ export const CAPTURE_FINGERPRINT_LENGTH = 32;
  */
 export const CAPTURE_DIAGNOSTIC_MESSAGE_CHARS = 240;
 
+// ---------------------------------------------------------------------------
+// Provider termination deadlines, RFC-0011
+// ---------------------------------------------------------------------------
+
+/**
+ * The one place a provider termination deadline is written.
+ *
+ * Every value below is selected from the measurements in the phase 0 termination
+ * report, `docs/work/plans/notes/2026-07-27-provider-frame-phase0-termination-report.md`.
+ * These are the only admissible kind of limit under RFC-0010 and settled plan
+ * decision 29: "the provider stopped answering within its measured deadline"
+ * names a failure, so it may gate. A count never does, so nothing here counts
+ * frames, facts, rounds, or attempts.
+ *
+ * Direct HTTP providers deliberately have no entry. Their stop is
+ * `AbortController.abort()` plus `closeIterator()`, both local operations that
+ * never wait on the remote, so there is no "provider stopped answering" failure
+ * for a deadline to name. Inventing one would be a guess wearing a constant's
+ * clothes, which is exactly what decision 26 forbids.
+ */
+
+/**
+ * Legacy `claude --print` subprocess. There is no graceful tier on win32: Node
+ * maps every signal to `TerminateProcess`, so this window only covers a final
+ * stdout flush before the kill that follows it.
+ */
+export const CLAUDE_LEGACY_GRACEFUL_STOP_MS = 500;
+
+/**
+ * Agent SDK, full abort-and-drain. Measured at 7004 ms, n=1, and the SDK's own
+ * transport explains the shape exactly: a 2000 ms stdin-close delay then a
+ * further 5000 ms before the win32 force kill. Set well above the measurement
+ * rather than at a tight margin, because a single sample of a two-stage timer
+ * chain that lands slightly slow would force-dispose a session that was about to
+ * settle cleanly, and forced settlement costs the user their session reuse.
+ * Phase 7's provider audit re-measures at n>=3.
+ */
+export const CLAUDE_SDK_GRACEFUL_STOP_MS = 10_000;
+
+/**
+ * Agent SDK persistent session under a user Stop, which takes `query.interrupt()`
+ * rather than the drain. Measured: acknowledged in 1 ms, terminal `result`
+ * delivered in 5 ms, session reusable afterwards.
+ */
+export const CLAUDE_SDK_INTERRUPT_STOP_MS = 2_000;
+
+/**
+ * Hard disposal, once the graceful deadline has expired. `child.kill()` is
+ * measured at 25 ms on win32 with no surviving descendants and no bytes after,
+ * for both the legacy subprocess and the SDK child the plugin now spawns itself
+ * ({@link ../api/sdk/claudeCodeSpawn}). The window is the proof-of-exit wait, not
+ * the kill.
+ */
+export const CLAUDE_HARD_DISPOSE_MS = 500;
+
 export const CONTEXT_WARNING_THRESHOLD = 0.80;
 export const CONTEXT_DANGER_THRESHOLD = 0.95;
 

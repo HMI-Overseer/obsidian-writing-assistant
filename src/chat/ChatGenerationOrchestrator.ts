@@ -3,6 +3,7 @@ import { Notice } from "obsidian";
 import type { ConversationMessage } from "../shared/types";
 import type WritingAssistantChat from "../main";
 import { createChatClient } from "../providers/registry";
+import { PLUGIN_UNLOAD_ABORT_REASON } from "../api/assistantStreamRun";
 import type { ChatComposer } from "./composer/ChatComposer";
 import type { ComposerInteractionHost } from "./interactions/ComposerInteractionHost";
 import type { ChatSessionStore } from "./conversation/ChatSessionStore";
@@ -49,9 +50,17 @@ export class ChatGenerationOrchestrator {
     );
   }
 
-  stopGeneration(): void {
+  /**
+   * @param cause `"unload"` when the plugin or view is being torn down. It rides
+   *   the abort itself so the provider-run owner cancels with `plugin_unload`
+   *   rather than `user_stop`: only a user Stop may preserve a Claude session for
+   *   reuse, and a session being torn down is not one to preserve (RFC-0011).
+   */
+  stopGeneration(cause: "user" | "unload" = "user"): void {
     if (!this.activeAbortController) return;
-    this.activeAbortController.abort();
+    this.activeAbortController.abort(
+      cause === "unload" ? PLUGIN_UNLOAD_ABORT_REASON : undefined,
+    );
     this.activeAbortController = null;
   }
 

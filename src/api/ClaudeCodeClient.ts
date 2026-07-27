@@ -5,10 +5,22 @@ import { formatNoteAttachment } from "./contextFormatting";
 import type {
   AssistantStreamEvent,
   CompletionResult,
-  StreamResult,
-  StopReason,
   UsageResult,
 } from "./usageTypes";
+import type {
+  AssistantStreamAttemptContext,
+  AssistantStreamRun,
+  ProviderDisposalHooks,
+} from "./assistantStreamRun";
+import { createStreamMetadataGate } from "./assistantStreamRun";
+import { createLinkedAbort, createOwnedStreamRun } from "./assistantStreamRuntime";
+import { ClaudeCodeProcessOwner } from "./sdk/claudeCodeSpawn";
+import {
+  CLAUDE_HARD_DISPOSE_MS,
+  CLAUDE_LEGACY_GRACEFUL_STOP_MS,
+  CLAUDE_SDK_GRACEFUL_STOP_MS,
+  CLAUDE_SDK_INTERRUPT_STOP_MS,
+} from "../constants";
 import {
   streamClaudeCodeMessages,
   claudeCodeHarnessEnv,
@@ -81,6 +93,13 @@ export interface ClaudeCodeRuntime {
   sdkSession?: {
     conversationId: string;
     run: (input: SdkSessionTurnInput) => AsyncGenerator<AssistantStreamEvent>;
+    /**
+     * Disposes the conversation's live session and resolves once its CLI child is
+     * provably gone. This is the persistent path's bounded hard-dispose operation
+     * (RFC-0011 phase 2, maintainer decision 15.2); without it the SDK path would
+     * have no termination the plugin can bound.
+     */
+    hardDispose: () => Promise<void>;
   };
   /**
    * In-process SDK MCP server bridging the plugin's toolstack. Present on the
@@ -174,48 +193,47 @@ export class ClaudeCodeClient implements ChatClient {
     request: ChatRequest,
     model: string,
     params: SamplingParams,
-    signal?: AbortSignal,
-  ): StreamResult {
+    attempt: AssistantStreamAttemptContext,
+  ): AssistantStreamRun<AssistantStreamEvent> {
     let captured: ClaudeCodeResultUsage | null = null;
     let decision: SessionRecovery | undefined;
     let bankedCursor: ClaudeCodeResumeCursor | undefined;
-    let resolveUsage!: (value: UsageResult | null) => void;
-    let resolveStopReason!: (value: StopReason) => void;
-    let resolveReplayEvidence!: (
-      value: Awaited<StreamResult["replayEvidence"]>,
-    ) => void;
+    const metadata = createStreamMetadataGate();
+    const runtime = this.runtime;
+    // The turn's own abort controller, linked to the lease. Aborting it is what
+    // the persistent session reads as a user Stop, which takes its clean
+    // `interrupt()` and preserves the session; the disposal hooks below cover the
+    // reasons that must not.
+    const transport = createLinkedAbort(attempt);
+    const processOwner = new ClaudeCodeProcessOwner();
 
-    const usage = new Promise<UsageResult | null>((r) => { resolveUsage = r; });
-    const stopReason = new Promise<StopReason>((r) => { resolveStopReason = r; });
-    const replayEvidence = new Promise<
-      Awaited<StreamResult["replayEvidence"]>
-    >((resolve) => {
-      resolveReplayEvidence = resolve;
-    });
     const rawEvents = this.runTurn(
       request,
       model,
       params,
-      signal,
+      transport.signal,
       (result) => { captured = result; },
       (d) => { decision = d; },
       (cursor) => { bankedCursor = cursor; },
+      processOwner,
     );
-    const runtime = this.runtime;
 
-    async function* events(): StreamResult["events"] {
+    async function* source(): AsyncGenerator<AssistantStreamEvent> {
       try {
         yield* rawEvents;
       } finally {
-        resolveUsage(applyRecoveryDecision(toUsageResult(captured), decision, bankedCursor));
-        resolveStopReason("end_turn");
+        metadata.usage.settle(
+          applyRecoveryDecision(toUsageResult(captured), decision, bankedCursor),
+        );
+        metadata.stopReason.settle("end_turn");
+        metadata.replayCapsule.settle(null);
         const nativeContinuation =
           decision?.outcome === "reused" || decision?.outcome === "resumed";
         const sdkCapture = runtime.useSdk || runtime.sdkSession !== undefined;
         const correlation = sdkCapture
           ? runtime.getToolCorrelation?.() ?? "provider_id"
           : "none";
-        resolveReplayEvidence({
+        metadata.replayEvidence.settle({
           tier: nativeContinuation ? "native" : "textual",
           capabilities: {
             captureOrder: sdkCapture ? "exact" : "segment",
@@ -234,12 +252,61 @@ export class ClaudeCodeClient implements ChatClient {
       }
     }
 
+    return createOwnedStreamRun({
+      attempt,
+      provider: "claudecode",
+      open: source,
+      metadata,
+      abort: () => {
+        transport.abort();
+        transport.release();
+      },
+      disposal: this.disposalHooks(processOwner),
+    });
+  }
+
+  /**
+   * The two-deadline termination contract for whichever Claude path this client is
+   * driving. Every number comes from the phase 0 termination report; none is
+   * guessed here.
+   *
+   * The graceful step is deliberately just the abort plus the provider's own
+   * settling, because the *measured* graceful behavior differs per path and per
+   * reason: a persistent session under user Stop acknowledges `interrupt()` in
+   * 1 ms and stays reusable, while a full SDK abort-and-drain took about seven
+   * seconds. A deadline shorter than that would force-dispose every ordinary Stop,
+   * which is why the constant is what it is.
+   */
+  private disposalHooks(processOwner: ClaudeCodeProcessOwner): ProviderDisposalHooks {
+    const session = this.runtime.sdkSession;
+    const usesSdk = this.runtime.useSdk || session !== undefined;
     return {
-      events: events(),
-      usage,
-      stopReason,
-      replayCapsule: Promise.resolve(null),
-      replayEvidence,
+      requestGracefulStop: (reason) => {
+        // The cancel already went out through the run's `abort` hook, and returning
+        // the iterator (the rest of the graceful step) is what lets the provider's
+        // own termination run: the session's clean `interrupt()`, the legacy
+        // subprocess's `kill()`, the SDK query's transport close.
+        //
+        // Capture failure is the exception. It means the transcript is no longer
+        // authoritative, so the session must not survive to be reused. Refusing the
+        // graceful tier here is how that reaches disposal, rather than reporting a
+        // proven quiescence the evidence does not support.
+        if (reason === "capture_failed") {
+          return Promise.reject(
+            new Error("capture failure disposes the Claude session"),
+          );
+        }
+        return Promise.resolve();
+      },
+      // The persistent session owns its own child, so its disposal goes through the
+      // registry; a one-shot or legacy run is owned by this call's own spawn owner.
+      hardDispose: session ? session.hardDispose : () => processOwner.hardDispose(),
+      gracefulDeadlineMs: usesSdk
+        ? session
+          ? CLAUDE_SDK_INTERRUPT_STOP_MS
+          : CLAUDE_SDK_GRACEFUL_STOP_MS
+        : CLAUDE_LEGACY_GRACEFUL_STOP_MS,
+      hardDisposeDeadlineMs: CLAUDE_HARD_DISPOSE_MS,
     };
   }
 
@@ -261,6 +328,7 @@ export class ClaudeCodeClient implements ChatClient {
     onResult: (result: ClaudeCodeResultUsage) => void,
     onRecoveryDecision?: (decision: SessionRecovery) => void,
     onSessionBanked?: (cursor: ClaudeCodeResumeCursor) => void,
+    processOwner?: ClaudeCodeProcessOwner,
   ): AsyncGenerator<AssistantStreamEvent> {
     const prompt = buildClaudeCodePrompt(request);
     // Passive preflight: refuse a mint blob that would overflow the discovered
@@ -326,6 +394,7 @@ export class ClaudeCodeClient implements ChatClient {
         sdkMcp: this.runtime.sdkMcp,
         signal,
         onResult,
+        ...(processOwner ? { processOwner } : {}),
       });
       return;
     }

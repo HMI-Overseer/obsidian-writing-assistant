@@ -3,7 +3,9 @@ import {
   ClaudeCodeClient,
   type SdkSessionTurnInput,
 } from "../../../src/api/ClaudeCodeClient";
-import type { StreamResult } from "../../../src/api/usageTypes";
+import type { AssistantStreamEvent } from "../../../src/api/usageTypes";
+import type { AssistantStreamRun } from "../../../src/api/assistantStreamRun";
+import { detachedAttemptContext } from "../../../src/api/assistantStreamRuntime";
 import type {
   ClaudeCodeResumeCursor,
   SamplingParams,
@@ -28,6 +30,7 @@ function clientFor(decision: SessionRecovery): ClaudeCodeClient {
           input.onRecoveryDecision?.(decision);
           yield "Done.";
         })(),
+      hardDispose: () => Promise.resolve(),
     },
   });
 }
@@ -56,12 +59,13 @@ async function evidenceFor(decision: SessionRecovery) {
     request(),
     "claude-test",
     { reasoning: "high" } as SamplingParams,
+    detachedAttemptContext("t"),
   );
   await drain(result);
   return result.replayEvidence;
 }
 
-async function drain(result: StreamResult): Promise<void> {
+async function drain(result: AssistantStreamRun<AssistantStreamEvent>): Promise<void> {
   for await (const _event of result.events) {
     // Drain the stream so terminal fidelity resolves.
   }

@@ -103,23 +103,8 @@ async function consumeThenBail(live: SdkSession, take: number): Promise<void> {
 }
 
 describe("persistent Claude session ownership", () => {
-  it("leaves the query alive when the turn consumer returns early", async () => {
-    const { state, interrupt } = installLongQuery();
-    const live = session();
-
-    await consumeThenBail(live, 3);
-
-    // Invariant 10 and criterion 18: provider execution is owned until it is
-    // terminal or explicitly stopped and quiescent. Ceasing iteration only
-    // released the busy flag.
-    expect(live.isBusy).toBe(false);
-    expect(live.isDisposed).toBe(false);
-    expect(interrupt).not.toHaveBeenCalled();
-    expect(state.closed).toBe(false);
-  });
-
-  // Criterion 18, fixed in phase 2.
-  it.fails("stops the query when the turn consumer returns early", async () => {
+  // Criterion 18, fixed in phase 2. Promoted from `it.fails` when the defect closed.
+  it("stops the query when the turn consumer returns early", async () => {
     const { state } = installLongQuery();
     const live = session();
 
@@ -128,30 +113,50 @@ describe("persistent Claude session ownership", () => {
     expect(state.closed).toBe(true);
   });
 
-  it("lets a later turn resume the same unfinished query", async () => {
-    const { state } = installLongQuery();
+  it("refuses a later turn on the session the abandoned one disposed", async () => {
+    installLongQuery();
     const live = session();
 
     await consumeThenBail(live, 3);
-    const producedAfterFirst = state.produced;
-    await consumeThenBail(live, 2);
 
-    // The abandoned turn's remaining messages are handed to the next turn's
-    // consumer, so an old attempt's provider output reaches a newer attempt.
-    expect(state.produced).toBeGreaterThan(producedAfterFirst);
+    // Criterion 27: an abandoned turn leaves the session's tail indeterminate, so
+    // it cannot be reused. Previously the remaining messages of the abandoned turn
+    // were handed to the next turn's consumer, which is one attempt's provider
+    // output reaching a newer attempt.
+    expect(live.isDisposed).toBe(true);
+    await expect(consumeThenBail(live, 2)).rejects.toThrow("disposed");
   });
 
-  it("disposes without a settlement handle a caller could await", () => {
+  it("interrupts rather than disposing when the turn reaches its own terminal", async () => {
+    const { state, interrupt } = installLongQuery();
+    const live = session();
+
+    // A turn that ends on the provider's own `result` pauses the query for reuse,
+    // which is the whole point of the persistent session. Only abandonment
+    // disposes.
+    expect(state.closed).toBe(false);
+    expect(interrupt).not.toHaveBeenCalled();
+    expect(live.isDisposed).toBe(false);
+  });
+
+  it("disposes with a settlement handle a caller can await", async () => {
     const { state } = installLongQuery();
     const live = session();
+    // Start the query so there is a running generator to close: a generator that
+    // was never started runs no `finally` when returned.
+    const events = live.runTurnEvents("hello", { turns: [] });
+    await events.next();
 
     const disposed: unknown = live.dispose();
 
-    // Criterion 20 and 21: settlement must account for provider termination
-    // and every metadata promise. `dispose()` returns void, so there is nothing
-    // to await and no deadline can be enforced on it.
-    expect(disposed).toBeUndefined();
+    // Criterion 20 and 21: settlement must account for provider termination.
+    // `dispose()` now returns a promise that resolves once the CLI child is
+    // provably gone, so a deadline can be enforced on it. The old body returned
+    // void, so there was nothing to await, and phase 0 measured that it left the
+    // process running.
+    expect(disposed).toBeInstanceOf(Promise);
+    await disposed;
     expect(live.isDisposed).toBe(true);
-    expect(state.closed).toBe(false);
+    expect(state.closed).toBe(true);
   });
 });

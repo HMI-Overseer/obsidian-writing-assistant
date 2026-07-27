@@ -17,8 +17,8 @@ import type { StopReason, UsageResult } from "./usageTypes";
  * settles exactly once with an honest account of whether quiescence was proven
  * or forced.
  *
- * Latent in phase 1. `StreamResult` remains the live contract until phase 2
- * completes the ownership cutover.
+ * Live since phase 2: {@link AssistantStreamRun} is what `ChatClient.stream()`
+ * returns, and the old `StreamResult` is gone rather than aliased.
  */
 
 /**
@@ -61,6 +61,22 @@ export interface AssistantStreamAttemptContext {
 /** Builds the canonical lease ID for an attempt. */
 export function leaseIdFor(turnId: string, attemptOrdinal: number): string {
   return `${turnId}#${attemptOrdinal}`;
+}
+
+/**
+ * The abort reason plugin teardown passes to `AbortController.abort()`.
+ *
+ * Both a user Stop and a plugin unload reach a generation as a bare abort, but
+ * they must not settle the same way: `user_stop` is the only reason that may
+ * preserve a Claude session for reuse, and a session the plugin is about to
+ * dispose is not one to preserve. Carrying the distinction on the signal itself
+ * is what stops it from being guessed downstream.
+ */
+export const PLUGIN_UNLOAD_ABORT_REASON = "lmsa-plugin-unload";
+
+/** Reads an abort back as its bounded cancel reason. */
+export function cancelReasonForAbort(signal: AbortSignal): StreamCancelReason {
+  return signal.reason === PLUGIN_UNLOAD_ABORT_REASON ? "plugin_unload" : "user_stop";
 }
 
 /** The terminal account of one attempt. Resolves exactly once, on every path. */

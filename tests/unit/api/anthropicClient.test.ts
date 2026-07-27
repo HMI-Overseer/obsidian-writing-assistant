@@ -20,6 +20,7 @@ import type {
   AssistantStreamEvent,
   StreamResult,
 } from "../../../src/api/usageTypes";
+import { detachedAttemptContext } from "../../../src/api/assistantStreamRuntime";
 
 const mockRequest = vi.mocked(nodeRequestWithHeaders);
 const mockStreamNode = vi.mocked(streamNode);
@@ -131,7 +132,7 @@ describe("AnthropicClient.stream tool-call parsing", () => {
   async function collectToolCalls(events: unknown[]) {
     mockStreamNode.mockImplementation(streamNodeImpl(events));
     const client = new AnthropicClient("test-key");
-    const result = client.stream(makeRequest(), "claude-opus-4-8", makeParams());
+    const result = client.stream(makeRequest(), "claude-opus-4-8", makeParams(), detachedAttemptContext("t"));
     const ordered = await collectEvents(result);
     return toolCallsOf(ordered);
   }
@@ -158,7 +159,7 @@ describe("AnthropicClient.stream thinking-block capture (tool round trip)", () =
   async function collectThinkingBlocks(events: unknown[]) {
     mockStreamNode.mockImplementation(streamNodeImpl(events));
     const client = new AnthropicClient("test-key");
-    const result = client.stream(makeRequest(), "claude-opus-4-8", makeParams());
+    const result = client.stream(makeRequest(), "claude-opus-4-8", makeParams(), detachedAttemptContext("t"));
     await collectEvents(result);
     return (await result.replayCapsule)?.thinkingBlocks ?? null;
   }

@@ -3,6 +3,7 @@ import type { AssistantStreamEvent } from "../usageTypes";
 import { generateId } from "../../utils";
 import { isEffortLevel } from "../../shared/reasoning";
 import { createAbortError } from "../httpTransport";
+import { closeIterator } from "../assistantStreamRun";
 import {
   claudeCodeHarnessEnv,
   extractClaudeCodeContextTokens,
@@ -11,6 +12,7 @@ import {
 } from "../claudeCodeProcess";
 import { AbortError, query } from "./claudeAgentSdk";
 import type { McpSdkServerConfigWithInstance, Options, SDKMessage } from "./claudeAgentSdk";
+import type { ClaudeCodeProcessOwner } from "./claudeCodeSpawn";
 import { ClaudeCodeSdkMessageTranslator } from "./claudeCodeSdkMessageTranslator";
 
 /**
@@ -69,12 +71,23 @@ export interface SdkTurnOptions {
   signal?: AbortSignal;
   /** Receives the terminal usage/cost once the turn completes cleanly. */
   onResult?: (usage: ClaudeCodeResultUsage) => void;
+  /**
+   * Takes ownership of the spawned CLI child so the one-shot run has a bounded
+   * hard dispose (RFC-0011 phase 2, maintainer decision 15.2).
+   */
+  processOwner?: ClaudeCodeProcessOwner;
 }
 
 /**
  * Streams one SDK-driven turn as text deltas, forwarding terminal usage via
  * `onResult`. Aborts surface as an `AbortError`-named error so the chat layer's
  * abort handling recognizes them; SDK/CLI errors surface as plain `Error`s.
+ *
+ * The query handle is retained outside the loop and returned in `finally` when the
+ * turn did not run to exhaustion (RFC-0011 criterion 19). Phase 0 measured that
+ * this alone does not dispose the CLI process, which is what
+ * {@link SdkTurnOptions.processOwner} is for; returning the query is still
+ * required so the SDK's own transport begins its shutdown at all.
  */
 export async function* streamSdkTurn(
   opts: SdkTurnOptions,
@@ -84,16 +97,22 @@ export async function* streamSdkTurn(
   const abortController = new AbortController();
   const onAbort = () => abortController.abort();
   opts.signal?.addEventListener("abort", onAbort, { once: true });
+  let queryIterator: AsyncIterator<SDKMessage> | null = null;
+  let exhausted = false;
 
   try {
     const session = query({ prompt: opts.prompt, options: buildSdkOptions(opts, abortController) });
+    queryIterator = session[Symbol.asyncIterator]();
     const segmentPrefix = `claude-segment-${generateId()}`;
     const translator = new ClaudeCodeSdkMessageTranslator({
       createSegmentId: (index) => `${segmentPrefix}-${index}`,
       toolCorrelation: "provider_id",
     });
     let contextTokens: number | null = null;
-    for await (const message of session) {
+    for (;;) {
+      const next = await queryIterator.next();
+      if (next.done) break;
+      const message = next.value;
       for (const event of translator.translate(message)) yield event;
 
       contextTokens = extractClaudeCodeContextTokens(message) ?? contextTokens;
@@ -109,11 +128,16 @@ export async function* streamSdkTurn(
         opts.onResult?.(resultUsage(message, contextTokens));
       }
     }
+    exhausted = true;
   } catch (error) {
     if (opts.signal?.aborted || error instanceof AbortError) throw createAbortError();
     throw error;
   } finally {
     opts.signal?.removeEventListener("abort", onAbort);
+    if (!exhausted) {
+      abortController.abort();
+      await closeIterator(queryIterator);
+    }
   }
 }
 
@@ -149,6 +173,13 @@ export interface SdkOptionsConfig {
    * need be sent. Absent ⇒ a fresh session (cold mint or one-shot).
    */
   resume?: string;
+  /**
+   * Takes ownership of the CLI child the SDK would otherwise spawn itself, so the
+   * run has a bounded hard dispose ({@link ./claudeCodeSpawn.ClaudeCodeProcessOwner}).
+   * Absent only where no owner is available, in which case the run's disposal
+   * falls back to the measured abort-and-drain and cannot prove disposal.
+   */
+  processOwner?: ClaudeCodeProcessOwner;
 }
 
 /**
@@ -164,6 +195,9 @@ export function buildSdkOptions(
 
   const options: Options = {
     abortController,
+    ...(opts.processOwner
+      ? { spawnClaudeCodeProcess: opts.processOwner.spawnProcess }
+      : {}),
     cwd: opts.vaultRoot,
     pathToClaudeCodeExecutable: opts.claudePath,
     model: opts.model,

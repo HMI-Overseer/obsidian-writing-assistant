@@ -46,7 +46,11 @@ vi.mock("../../../../src/chat/actions/liveVaultReview", () => ({
 import type { Component } from "obsidian";
 import type { ChatClient } from "../../../../src/api/chatClient";
 import { createAbortError } from "../../../../src/api/httpTransport";
-import type { StreamResult } from "../../../../src/api/usageTypes";
+import type {
+  AssistantStreamAttemptContext,
+  AssistantStreamRun,
+} from "../../../../src/api/assistantStreamRun";
+import { ownedRunFromLegacy } from "../../../helpers/ownedRun";
 import { generateLlmResponse } from "../../../../src/chat/actions/generateLlmResponse";
 import type { ChatSessionStore } from "../../../../src/chat/conversation/ChatSessionStore";
 import type {
@@ -155,8 +159,9 @@ function makeClient(rounds: RoundScript[]): ChatClient & {
       _request: ChatRequest,
       _model: string,
       _params: unknown,
-      signal: AbortSignal,
-    ): StreamResult => {
+      attempt: AssistantStreamAttemptContext,
+    ): AssistantStreamRun<AssistantStreamEvent> => {
+      const signal = attempt.signal;
       const roundIndex = index++;
       startedRounds.add(roundIndex);
       roundResolvers.get(roundIndex)?.();
@@ -204,7 +209,7 @@ function makeClient(rounds: RoundScript[]): ChatClient & {
           stopReason: script.toolCalls ? "tool_use" : "end_turn",
         };
       })();
-      return {
+      return ownedRunFromLegacy({
         events,
         usage: Promise.resolve(null),
         stopReason: Promise.resolve(
@@ -220,7 +225,7 @@ function makeClient(rounds: RoundScript[]): ChatClient & {
             nativeResume: false,
           },
         }),
-      };
+      });
     },
   );
   return {
@@ -254,8 +259,9 @@ function makeClaudeCodeClient(
         _request: ChatRequest,
         _model: string,
         _params: unknown,
-        signal?: AbortSignal,
-      ): StreamResult => {
+        attempt: AssistantStreamAttemptContext,
+      ): AssistantStreamRun<AssistantStreamEvent> => {
+        const signal = attempt.signal;
         const deltas = (async function* () {
           const responder = bridge.getAskUserResponder();
           if (!responder || !signal) {
@@ -311,8 +317,9 @@ function makeCleanInterruptClaudeCodeClient(
         _request: ChatRequest,
         _model: string,
         _params: unknown,
-        signal?: AbortSignal,
-      ): StreamResult => {
+        attempt: AssistantStreamAttemptContext,
+      ): AssistantStreamRun<AssistantStreamEvent> => {
+        const signal = attempt.signal;
         const deltas = (async function* () {
           const responder = bridge.getAskUserResponder();
           if (!responder || !signal) {
@@ -360,8 +367,9 @@ function makeEarlySettlingClaudeCodeClient(
         _request: ChatRequest,
         _model: string,
         _params: unknown,
-        signal?: AbortSignal,
-      ): StreamResult => {
+        attempt: AssistantStreamAttemptContext,
+      ): AssistantStreamRun<AssistantStreamEvent> => {
+        const signal = attempt.signal;
         const deltas = (async function* () {
           const responder = bridge.getAskUserResponder();
           if (!responder || !signal) {
@@ -393,7 +401,7 @@ function textStreamResult(
   deltas: AsyncGenerator<string>,
   segmentId: string,
   toolCall?: ToolCall,
-): StreamResult {
+): AssistantStreamRun<AssistantStreamEvent> {
   const events = (async function* (): AsyncGenerator<AssistantStreamEvent> {
     yield { type: "segment_start", segmentId };
     if (toolCall) {
@@ -422,7 +430,7 @@ function textStreamResult(
     yield { type: "segment_end", segmentId };
     yield { type: "turn_end", status: "completed" };
   })();
-  return {
+  return ownedRunFromLegacy({
     events,
     usage: Promise.resolve(null),
     stopReason: Promise.resolve("end_turn"),
@@ -436,7 +444,7 @@ function textStreamResult(
         nativeResume: false,
       },
     }),
-  };
+  });
 }
 
 function harness(

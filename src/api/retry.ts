@@ -1,10 +1,15 @@
-import type { AssistantReplayEvidence, ProviderReplayCapsule } from "../shared/types";
+import type { TurnRunOwner } from "../chat/streaming/TurnRunOwner";
 import type {
-  AssistantStreamEvent,
-  StopReason,
-  StreamResult,
-  UsageResult,
-} from "./usageTypes";
+  AssistantStreamAttemptContext,
+  AssistantStreamRun,
+  AssistantStreamSettlement,
+} from "./assistantStreamRun";
+import {
+  closeIterator,
+  createSettleOnce,
+  createStreamMetadataGate,
+} from "./assistantStreamRun";
+import type { AssistantStreamEvent } from "./usageTypes";
 
 export interface RetryOptions {
   /** Maximum number of attempts (including the initial one). Default: 3. */
@@ -129,11 +134,26 @@ export async function withRetry<T>(
  * as `withRetry`, then forwards the committed attempt's usage / toolCalls /
  * stopReason. A retryable failure AFTER the first delta, or any non-retryable
  * failure (incl. AbortError), propagates unchanged.
+ *
+ * Ownership (RFC-0011 phase 2). The factory now receives an attempt context that
+ * the turn-run owner allocates *before* it is invoked, so there is no instant at
+ * which a provider is running and unowned, and a factory that throws still has a
+ * lease to settle. Three further rules the old wrapper had no way to honor:
+ *
+ * - an abandoned attempt is cancelled and proven quiet before the next one starts,
+ *   rather than left running while the backoff sleeps;
+ * - the committed attempt is transferred to the turn-run owner, and this
+ *   generator's `finally` cancels it through that owner when its own consumer
+ *   returns early, instead of walking away from a live provider;
+ * - a retry is refused outright once a consequential callback has entered, because
+ *   re-issuing the request could repeat irreversible work the first attempt
+ *   already did. That is lease evidence, not "did the UI see a delta".
  */
 export function streamWithRetry(
-  makeStream: () => StreamResult,
+  makeStream: (attempt: AssistantStreamAttemptContext) => AssistantStreamRun<AssistantStreamEvent>,
+  owner: TurnRunOwner<AssistantStreamEvent>,
   options?: RetryOptions,
-): StreamResult {
+): AssistantStreamRun<AssistantStreamEvent> {
   const maxAttempts = options?.maxAttempts ?? DEFAULT_MAX_ATTEMPTS;
   const initialDelayMs = options?.initialDelayMs ?? DEFAULT_INITIAL_DELAY_MS;
   const maxDelayMs = options?.maxDelayMs ?? DEFAULT_MAX_DELAY_MS;
@@ -141,92 +161,131 @@ export function streamWithRetry(
 
   // Deferred fields are forwarded only from the committed attempt. Rejected
   // attempts keep their translator state private and never reach the turn builder.
-  let resolveUsage!: (value: UsageResult | null) => void;
-  let resolveStopReason!: (value: StopReason) => void;
-  let resolveReplayCapsule!: (value: ProviderReplayCapsule | null) => void;
-  let resolveReplayEvidence!: (value: AssistantReplayEvidence) => void;
-  const usage = new Promise<UsageResult | null>((r) => { resolveUsage = r; });
-  const stopReason = new Promise<StopReason>((r) => { resolveStopReason = r; });
-  const replayCapsule = new Promise<ProviderReplayCapsule | null>((r) => {
-    resolveReplayCapsule = r;
-  });
-  const replayEvidence = new Promise<AssistantReplayEvidence>((r) => {
-    resolveReplayEvidence = r;
+  const metadata = createStreamMetadataGate();
+  const settlement = createSettleOnce<AssistantStreamSettlement>({
+    quiescence: "proven",
+    reason: "retry_abandoned",
+    hardDisposed: false,
+    diagnostics: [],
   });
 
-  // A failed attempt's generator resolves its own discarded promises in finally.
-  const forward = (chosen: StreamResult): void => {
-    void chosen.usage.then(resolveUsage, () => resolveUsage(null));
-    void chosen.stopReason.then(resolveStopReason, () => resolveStopReason("unknown"));
+  const forward = (chosen: AssistantStreamRun<AssistantStreamEvent>): void => {
+    void chosen.usage.then(
+      (value) => metadata.usage.settle(value),
+      () => metadata.usage.settleWithFallback(),
+    );
+    void chosen.stopReason.then(
+      (value) => metadata.stopReason.settle(value),
+      () => metadata.stopReason.settleWithFallback(),
+    );
     void chosen.replayCapsule.then(
-      resolveReplayCapsule,
-      () => resolveReplayCapsule(null),
+      (value) => metadata.replayCapsule.settle(value),
+      () => metadata.replayCapsule.settleWithFallback(),
     );
     void chosen.replayEvidence.then(
-      resolveReplayEvidence,
-      () => resolveReplayEvidence(failedAttemptEvidence()),
+      (value) => metadata.replayEvidence.settle(value),
+      () => metadata.replayEvidence.settleWithFallback(),
+    );
+    void chosen.settled.then(
+      (value) => settlement.settle(value),
+      () => settlement.settleWithFallback(),
     );
   };
 
   async function* events(): AsyncGenerator<AssistantStreamEvent> {
     let lastError: unknown;
+    let committed = false;
+    let drained = false;
+    // Retained outside the attempt loop so the `finally` can return the iterator
+    // this wrapper acquired by hand (RFC-0011 criterion 19).
+    let activeIterator: AsyncIterator<AssistantStreamEvent> | null = null;
     try {
       for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-        const result = makeStream();
-        const iterator = result.events[Symbol.asyncIterator]();
+        // The lease exists before the factory runs, so construction failure is an
+        // owned failure rather than an orphan.
+        const lease = owner.openAttempt();
+        let run: AssistantStreamRun<AssistantStreamEvent>;
+        try {
+          run = makeStream(lease.context);
+        } catch (error) {
+          lease.failConstruction(error);
+          lastError = error;
+          if (attempt === maxAttempts || !isRetryable(error)) throw error;
+          if (owner.retryRefusal()) throw error;
+          const delayMs = Math.min(initialDelayMs * Math.pow(2, attempt - 1), maxDelayMs);
+          await delay(delayMs, signal);
+          continue;
+        }
+        lease.attach(run);
+
+        const iterator = run.events[Symbol.asyncIterator]();
+        activeIterator = iterator;
         let first: IteratorResult<AssistantStreamEvent>;
         try {
           first = await iterator.next();
         } catch (error) {
           lastError = error;
+          // Close this attempt's iterator and prove the provider stopped before
+          // the next one opens. Previously the failed attempt was simply dropped.
+          await closeIterator(iterator);
+          activeIterator = null;
+          await lease.cancel("retry_abandoned");
           if (attempt === maxAttempts || !isRetryable(error)) throw error;
+          if (owner.retryRefusal()) throw error;
           const delayMs = Math.min(initialDelayMs * Math.pow(2, attempt - 1), maxDelayMs);
           await delay(delayMs, signal);
           continue;
         }
-        // Committed to this attempt: forward its deferred fields, then drain it.
-        forward(result);
+
+        // Committed to this attempt: transfer it to the turn-run owner, forward its
+        // deferred fields, then drain it.
+        owner.commitAttempt(lease);
+        committed = true;
+        forward(run);
         if (!first.done) {
           yield first.value;
-          while (true) {
+          for (;;) {
             const next = await iterator.next();
             if (next.done) break;
             yield next.value;
           }
         }
+        drained = true;
         return;
       }
       throw lastError;
     } catch (error) {
-      // Every attempt failed before committing (or the committed stream errored
-      // mid-flight). Resolve our promises so awaiters never hang; if a stream was
-      // committed these are already resolved via forward() and these are no-ops.
-      resolveUsage(null);
-      resolveStopReason("unknown");
-      resolveReplayCapsule(null);
-      resolveReplayEvidence(failedAttemptEvidence());
+      metadata.settleRemaining();
+      settlement.settleWithFallback();
       throw error;
+    } finally {
+      // After commitment this wrapper is an iterator-cleanup custodian, not a
+      // second owner: it returns the iterator it acquired, and cancellation goes
+      // through the finalizer the turn-run owner registered when the attempt was
+      // transferred. A fully drained attempt has nothing left to close or cancel.
+      if (committed && !drained) {
+        await closeIterator(activeIterator);
+        await owner.finalizeCommitted("consumer_returned");
+      }
+      metadata.settleRemaining();
+      settlement.settleWithFallback();
     }
   }
 
   return {
     events: events(),
-    usage,
-    stopReason,
-    replayCapsule,
-    replayEvidence,
-  };
-}
-
-function failedAttemptEvidence(): AssistantReplayEvidence {
-  return {
-    tier: "textual",
-    capabilities: {
-      captureOrder: "text_only",
-      toolCorrelation: "none",
-      coldReplay: "textual",
-      nativeResume: false,
+    cancel: async (reason) => {
+      await owner.cancelAll(reason);
+      // Cancelling a wrapper nobody ever iterated must still settle it, otherwise
+      // an owner that stops before the first read waits forever on a run that
+      // never started.
+      metadata.settleRemaining();
+      settlement.settleWithFallback();
     },
-    loweredReason: "stream_attempt_failed_before_commit",
+    settled: settlement.promise,
+    usage: metadata.usage.promise,
+    stopReason: metadata.stopReason.promise,
+    replayCapsule: metadata.replayCapsule.promise,
+    replayEvidence: metadata.replayEvidence.promise,
   };
 }

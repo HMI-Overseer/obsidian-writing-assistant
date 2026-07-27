@@ -22,6 +22,7 @@ import { ClaudeCodeContextOverflowError } from "../../../src/api/claudeCodeConte
 import type { ChatRequest } from "../../../src/shared/chatRequest";
 import type { SamplingParams } from "../../../src/shared/types";
 import type { AssistantStreamEvent } from "../../../src/api/usageTypes";
+import { detachedAttemptContext } from "../../../src/api/assistantStreamRuntime";
 
 const params: SamplingParams = {
   temperature: 0,
@@ -73,7 +74,7 @@ describe("ClaudeCodeClient send-path preflight", () => {
     };
     const client = new ClaudeCodeClient("claude", runtime);
 
-    const { events } = client.stream(request(OVERSIZED), "haiku", params);
+    const { events } = client.stream(request(OVERSIZED), "haiku", params, detachedAttemptContext("t"));
     await expect(drain(events)).rejects.toBeInstanceOf(ClaudeCodeContextOverflowError);
     // Nothing was dispatched: the session's `run` (which spawns / resumes the
     // process) was never invoked.
@@ -89,7 +90,7 @@ describe("ClaudeCodeClient send-path preflight", () => {
     };
     const client = new ClaudeCodeClient("claude", runtime);
 
-    const { events } = client.stream(request("hello"), "haiku", params);
+    const { events } = client.stream(request("hello"), "haiku", params, detachedAttemptContext("t"));
     expect(await drain(events)).toEqual(["ok"]);
     expect(run).toHaveBeenCalledTimes(1);
   });
@@ -103,7 +104,7 @@ describe("ClaudeCodeClient send-path preflight", () => {
     const client = new ClaudeCodeClient("claude", runtime);
 
     // The same oversized blob dispatches, because there is no window to judge it.
-    const { events } = client.stream(request(OVERSIZED), "haiku", params);
+    const { events } = client.stream(request(OVERSIZED), "haiku", params, detachedAttemptContext("t"));
     expect(await drain(events)).toEqual(["ok"]);
     expect(run).toHaveBeenCalledTimes(1);
   });
@@ -119,7 +120,7 @@ describe("ClaudeCodeClient send-path preflight", () => {
 
     const req = request(OVERSIZED);
     const before = JSON.parse(JSON.stringify(req.messages));
-    const { events } = client.stream(req, "haiku", params);
+    const { events } = client.stream(req, "haiku", params, detachedAttemptContext("t"));
     await expect(drain(events)).rejects.toBeInstanceOf(ClaudeCodeContextOverflowError);
     expect(req.messages).toEqual(before);
   });
@@ -146,7 +147,7 @@ describe("ClaudeCodeClient send-path preflight", () => {
     // Legacy path: no session, SDK unusable, no MCP → pure-analyst subprocess.
     const client = new ClaudeCodeClient("claude", { useSdk: false });
 
-    await drain(client.stream(request("hello"), "haiku", params).events);
+    await drain(client.stream(request("hello"), "haiku", params, detachedAttemptContext("t")).events);
 
     expect(streamClaudeCodeMessagesMock).toHaveBeenCalledTimes(1);
     const opts = streamClaudeCodeMessagesMock.mock.calls[0][0] as {

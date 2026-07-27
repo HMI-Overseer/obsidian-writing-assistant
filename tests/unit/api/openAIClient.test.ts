@@ -14,6 +14,7 @@ import type {
   AssistantStreamEvent,
   StreamResult,
 } from "../../../src/api/usageTypes";
+import { detachedAttemptContext } from "../../../src/api/assistantStreamRuntime";
 
 const mockStreamFetch = vi.mocked(streamFetch);
 
@@ -125,7 +126,7 @@ describe("OpenAIClient.stream usage accounting", () => {
     mockStreamFetch.mockImplementation(streamImpl([]));
     const client = new OpenAIClient("key", "https://api.openai.com/v1");
 
-    const result = client.stream(makeRequest(), "gpt-4o", makeParams());
+    const result = client.stream(makeRequest(), "gpt-4o", makeParams(), detachedAttemptContext("t"));
     await drain(result);
 
     const body = JSON.parse(mockStreamFetch.mock.calls[0][1] as string);
@@ -141,7 +142,7 @@ describe("OpenAIClient.stream usage accounting", () => {
     ]));
     const client = new OpenAIClient("key", "https://api.openai.com/v1");
 
-    const result = client.stream(makeRequest(), "gpt-4o", makeParams());
+    const result = client.stream(makeRequest(), "gpt-4o", makeParams(), detachedAttemptContext("t"));
     const events = await drain(result);
 
     expect(proseOf(events)).toBe("Hi");
@@ -158,7 +159,7 @@ describe("OpenAIClient.stream usage accounting", () => {
     ]));
     const client = new OpenAIClient("key", "https://api.openai.com/v1");
 
-    const result = client.stream(makeRequest(), "gpt-4o", makeParams());
+    const result = client.stream(makeRequest(), "gpt-4o", makeParams(), detachedAttemptContext("t"));
     await drain(result);
 
     expect(await result.usage).toBeNull();
@@ -180,7 +181,7 @@ describe("OpenAIClient.stream usage accounting", () => {
       }],
     });
 
-    const result = client.stream(request, "gpt-4o", makeParams());
+    const result = client.stream(request, "gpt-4o", makeParams(), detachedAttemptContext("t"));
     const events = await drain(result);
 
     expect(toolCallsOf(events)).toEqual([
@@ -207,7 +208,7 @@ describe("OpenAIClient.stream usage accounting", () => {
       }],
     });
 
-    const result = client.stream(request, "gpt-4o", makeParams());
+    const result = client.stream(request, "gpt-4o", makeParams(), detachedAttemptContext("t"));
     const events = await drain(result);
 
     expect(toolCallsOf(events)).toEqual([

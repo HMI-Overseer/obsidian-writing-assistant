@@ -539,7 +539,7 @@ export class ChatView extends ItemView {
    * plugin services are torn down. This does not detach the leaf.
    */
   prepareForPluginUnload(): void {
-    this.orchestrator?.stopGeneration();
+    this.orchestrator?.stopGeneration("unload");
     this.interactionHost?.destroy();
   }
 

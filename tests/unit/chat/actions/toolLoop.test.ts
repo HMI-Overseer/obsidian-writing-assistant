@@ -12,10 +12,10 @@ import {
 } from "../../../../src/chat/actions/toolLoop";
 import type { ToolLoopCallbacks } from "../../../../src/chat/actions/toolLoop";
 import type { ChatClient } from "../../../../src/api/chatClient";
-import type {
-  AssistantStreamEvent,
-  StreamResult,
-} from "../../../../src/api/usageTypes";
+import type { AssistantStreamEvent } from "../../../../src/api/usageTypes";
+import type { AssistantStreamRun } from "../../../../src/api/assistantStreamRun";
+import { ownedRunFromLegacy } from "../../../helpers/ownedRun";
+import type { LegacyStreamShape } from "../../../helpers/ownedRun";
 import type { ChatRequest } from "../../../../src/shared/chatRequest";
 import type { ToolCall } from "../../../../src/tools/types";
 import { THINK_TOOL_NAME } from "../../../../src/tools/think/definition";
@@ -45,7 +45,7 @@ function makeClient(rounds: RoundScript[]): ChatClient {
   let i = 0;
   return {
     complete: vi.fn(),
-    stream: (): StreamResult => {
+    stream: (): AssistantStreamRun<AssistantStreamEvent> => {
       const roundIndex = i++;
       return makeRoundStream(rounds[roundIndex], roundIndex);
     },
@@ -88,7 +88,7 @@ function flushedAnswer(cb: ReturnType<typeof makeCallbacks>): string {
 function makeRoundStream(
   round: RoundScript,
   roundIndex: number,
-): StreamResult {
+): AssistantStreamRun<AssistantStreamEvent> {
   const segmentId = `segment-${roundIndex}`;
   const events = (async function* (): AsyncGenerator<AssistantStreamEvent> {
     yield { type: "segment_start", segmentId };
@@ -130,7 +130,7 @@ function makeRoundStream(
         thinkingBlocks: round.thinkingBlocks as never,
       }
     : null;
-  return {
+  return ownedRunFromLegacy({
     events,
     usage: Promise.resolve(null),
     stopReason: Promise.resolve(round.stopReason as never),
@@ -144,13 +144,13 @@ function makeRoundStream(
         nativeResume: false,
       },
     }),
-  };
+  });
 }
 
 describe("runToolLoop anthropic thinking round trip", () => {
   // With adaptive thinking + tool use, Anthropic requires the response's
   // thinking blocks echoed back on the assistant tool-call turn. The loop
-  // attaches whatever the client's StreamResult captured; the next round's
+  // attaches whatever the client's attempt captured; the next round's
   // request must carry them on that turn (buildAnthropicMessages then emits
   // them first in the content array).
   it("attaches captured thinking blocks to the round's assistant turn", async () => {
@@ -168,7 +168,7 @@ describe("runToolLoop anthropic thinking round trip", () => {
     let i = 0;
     const client = {
       complete: vi.fn(),
-      stream: (request: ChatRequest): StreamResult => {
+      stream: (request: ChatRequest): AssistantStreamRun<AssistantStreamEvent> => {
         seenRequests.push(request);
         const roundIndex = i++;
         return makeRoundStream(rounds[roundIndex], roundIndex);
@@ -205,7 +205,7 @@ describe("runToolLoop anthropic thinking round trip", () => {
     let i = 0;
     const client = {
       complete: vi.fn(),
-      stream: (request: ChatRequest): StreamResult => {
+      stream: (request: ChatRequest): AssistantStreamRun<AssistantStreamEvent> => {
         seenRequests.push(request);
         const roundIndex = i++;
         return makeRoundStream(rounds[roundIndex], roundIndex);
@@ -276,7 +276,7 @@ describe("runToolLoop answer-track prose", () => {
 /** A client that records how many times the model was streamed. */
 function countingClient(rounds: RoundScript[]): ChatClient & { stream: ReturnType<typeof vi.fn> } {
   let i = 0;
-  const stream = vi.fn((): StreamResult => {
+  const stream = vi.fn((): AssistantStreamRun<AssistantStreamEvent> => {
     const roundIndex = i++;
     return makeRoundStream(rounds[roundIndex], roundIndex);
   });
@@ -415,7 +415,7 @@ describe("runToolLoop abort handling", () => {
     const client = {
       complete: vi.fn(),
       stream: () =>
-        ({
+        ownedRunFromLegacy({
           events: (async function* (): AsyncGenerator<AssistantStreamEvent> {
             yield { type: "segment_start", segmentId: "segment-abort" };
             yield {
@@ -437,7 +437,7 @@ describe("runToolLoop abort handling", () => {
               nativeResume: false,
             },
           }),
-        }) as unknown as StreamResult,
+        } as unknown as LegacyStreamShape),
     } as unknown as ChatClient;
 
     await expect(

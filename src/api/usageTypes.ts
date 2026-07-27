@@ -143,19 +143,11 @@ export interface AssistantStreamMetadata {
   replayEvidence: AssistantReplayEvidence;
 }
 
-/** Wrapper returned by ChatClient.stream(). */
-export interface StreamResult {
-  /** Async generator yielding ordered assistant declarations. */
-  events: AsyncGenerator<AssistantStreamEvent>;
-  /** Resolves when the stream ends. null if the provider does not report usage. */
-  usage: Promise<UsageResult | null>;
-  /** Resolves when the stream ends with the reason the model stopped. */
-  stopReason: Promise<StopReason>;
-  /** Resolves with a validated provider-private capsule, when one is required. */
-  replayCapsule: Promise<ProviderReplayCapsule | null>;
-  /** Resolves with the actual capture and replay fidelity of this attempt. */
-  replayEvidence: Promise<AssistantReplayEvidence>;
-}
+// `StreamResult`, the old wrapper `ChatClient.stream()` returned, is gone. Its
+// replacement is `AssistantStreamRun` in ./assistantStreamRun: same events and
+// metadata, plus the `cancel()` and `settled` that RFC-0011 phase 2 made
+// mandatory. Nothing aliases the old name, because an alias would let a provider
+// keep implementing a contract with no way to be stopped.
 
 /** Wrapper returned by ChatClient.complete(). */
 export interface CompletionResult {

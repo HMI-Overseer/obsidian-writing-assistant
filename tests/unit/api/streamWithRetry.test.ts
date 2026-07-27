@@ -1,9 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 import { streamWithRetry } from "../../../src/api/retry";
+import type { AssistantStreamRun } from "../../../src/api/assistantStreamRun";
+import { TurnRunOwner } from "../../../src/chat/streaming/TurnRunOwner";
+import { ownedRunFromLegacy } from "../../helpers/ownedRun";
 import type {
   AssistantStreamEvent,
   StopReason,
-  StreamResult,
   UsageResult,
 } from "../../../src/api/usageTypes";
 import type {
@@ -32,10 +34,10 @@ type StreamShape = {
 };
 
 /**
- * Build a StreamResult honoring the runtime contract: terminal facts resolve only
- * once the event generator is fully consumed.
+ * Build one owned attempt honoring the runtime contract: terminal facts resolve
+ * only once the event generator is fully consumed.
  */
-function makeStream(shape: StreamShape): StreamResult {
+function makeStream(shape: StreamShape): AssistantStreamRun<AssistantStreamEvent> {
   let resolveUsage!: (value: UsageResult | null) => void;
   let resolveStopReason!: (value: StopReason) => void;
   let resolveReplayCapsule!: (value: ProviderReplayCapsule | null) => void;
@@ -65,16 +67,23 @@ function makeStream(shape: StreamShape): StreamResult {
     }
   }
 
-  return {
+  return ownedRunFromLegacy({
     events: events(),
     usage,
     stopReason,
     replayCapsule,
     replayEvidence,
-  };
+  });
 }
 
-async function collect(result: StreamResult): Promise<AssistantStreamEvent[]> {
+/** A fresh turn-run owner; every attempt now needs a lease before construction. */
+function owner(): TurnRunOwner<AssistantStreamEvent> {
+  return new TurnRunOwner<AssistantStreamEvent>("turn-retry-test");
+}
+
+async function collect(
+  result: AssistantStreamRun<AssistantStreamEvent>,
+): Promise<AssistantStreamEvent[]> {
   const output: AssistantStreamEvent[] = [];
   for await (const event of result.events) output.push(event);
   return output;
@@ -99,7 +108,7 @@ describe("streamWithRetry", () => {
       }),
     );
 
-    const result = streamWithRetry(factory, { initialDelayMs: 1 });
+    const result = streamWithRetry(factory, owner(), { initialDelayMs: 1 });
     expect(await collect(result)).toEqual([start, end]);
     expect(await result.usage).toEqual({ inputTokens: 1, outputTokens: 2 });
     expect(await result.stopReason).toBe("end_turn");
@@ -109,7 +118,7 @@ describe("streamWithRetry", () => {
 
   it("retries an error before the attempt publishes any ordered event", async () => {
     const factory = vi
-      .fn<() => StreamResult>()
+      .fn<() => AssistantStreamRun<AssistantStreamEvent>>()
       .mockReturnValueOnce(
         makeStream({ throwAfter: new Error("HTTP 529: overloaded") }),
       )
@@ -120,7 +129,7 @@ describe("streamWithRetry", () => {
         }),
       );
 
-    const result = streamWithRetry(factory, { initialDelayMs: 1 });
+    const result = streamWithRetry(factory, owner(), { initialDelayMs: 1 });
     expect(await collect(result)).toEqual([start]);
     expect(await result.usage).toEqual({ inputTokens: 3, outputTokens: 4 });
     expect(factory).toHaveBeenCalledTimes(2);
@@ -131,7 +140,7 @@ describe("streamWithRetry", () => {
       makeStream({ throwAfter: new Error("HTTP 400: bad request") }),
     );
 
-    const result = streamWithRetry(factory, { initialDelayMs: 1 });
+    const result = streamWithRetry(factory, owner(), { initialDelayMs: 1 });
     await expect(collect(result)).rejects.toThrow("HTTP 400");
     expect(factory).toHaveBeenCalledTimes(1);
   });
@@ -144,7 +153,7 @@ describe("streamWithRetry", () => {
       }),
     );
 
-    const result = streamWithRetry(factory, { initialDelayMs: 1 });
+    const result = streamWithRetry(factory, owner(), { initialDelayMs: 1 });
     const output: AssistantStreamEvent[] = [];
     await expect(
       (async () => {
@@ -160,7 +169,7 @@ describe("streamWithRetry", () => {
       makeStream({ throwAfter: new Error("HTTP 503: unavailable") }),
     );
 
-    const result = streamWithRetry(factory, {
+    const result = streamWithRetry(factory, owner(), {
       maxAttempts: 3,
       initialDelayMs: 1,
     });
@@ -186,7 +195,7 @@ describe("streamWithRetry", () => {
     abort.name = "AbortError";
     const factory = vi.fn(() => makeStream({ throwAfter: abort }));
 
-    const result = streamWithRetry(factory, { initialDelayMs: 1 });
+    const result = streamWithRetry(factory, owner(), { initialDelayMs: 1 });
     await expect(collect(result)).rejects.toThrow("Aborted");
     expect(factory).toHaveBeenCalledTimes(1);
   });

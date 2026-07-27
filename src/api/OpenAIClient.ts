@@ -4,10 +4,14 @@ import type { ChatClient } from "./chatClient";
 import type {
   AssistantStreamEvent,
   CompletionResult,
-  StreamResult,
   UsageResult,
   StopReason,
 } from "./usageTypes";
+import type {
+  AssistantStreamAttemptContext,
+  AssistantStreamRun,
+} from "./assistantStreamRun";
+import { createLinkedAbort } from "./assistantStreamRuntime";
 import type { ToolCall } from "../tools/types";
 import { formatOpenAITools } from "../tools/formatters/openai";
 import { normalizeModelList } from "./modelNormalization";
@@ -81,8 +85,8 @@ export class OpenAIClient implements ChatClient {
     request: ChatRequest,
     model: string,
     params: SamplingParams,
-    signal?: AbortSignal,
-  ): StreamResult {
+    attempt: AssistantStreamAttemptContext,
+  ): AssistantStreamRun<AssistantStreamEvent> {
     const messages = this.buildMessages(request);
     const openAITools = request.tools?.length
       ? formatOpenAITools(request.tools)
@@ -95,16 +99,24 @@ export class OpenAIClient implements ChatClient {
       provider: "openai",
     });
     const pendingEvents: AssistantStreamEvent[] = [];
+    const transport = createLinkedAbort(attempt);
     const rawStream = streamFetch(
       url,
       body,
-      signal,
+      transport.signal,
       this.headers,
       undefined,
       (event) => pendingEvents.push(...translator.translate(event)),
     );
 
-    return createAssistantEventStream(rawStream, pendingEvents, translator);
+    return createAssistantEventStream(rawStream, pendingEvents, translator, {
+      attempt,
+      provider: "openai",
+      abort: () => {
+        transport.abort();
+        transport.release();
+      },
+    });
   }
 
   private buildMessages(request: ChatRequest): Message[] {

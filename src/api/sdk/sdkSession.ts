@@ -7,6 +7,7 @@ import type { AssistantStreamEvent } from "../usageTypes";
 import { generateId } from "../../utils";
 import type { FlagSettableEffort } from "../../shared/reasoning";
 import { createAbortError } from "../httpTransport";
+import { closeIterator } from "../assistantStreamRun";
 import { extractClaudeCodeContextTokens, type ClaudeCodeResultUsage } from "../claudeCodeProcess";
 import {
   canFlipEffortMidSession,
@@ -22,6 +23,7 @@ import { resultErrorMessage, resultUsage } from "./sdkQueryEngine";
 import { ClaudeCodeSdkMessageTranslator } from "./claudeCodeSdkMessageTranslator";
 import { AbortError, query } from "./claudeAgentSdk";
 import type { ModelInfo, Options, Query, SDKMessage, SDKUserMessage } from "./claudeAgentSdk";
+import { ClaudeCodeProcessOwner } from "./claudeCodeSpawn";
 
 /**
  * The persistent Claude Code session and its recovery ladder (Model A′).
@@ -144,7 +146,14 @@ export class SdkSession {
   private readonly query: Query;
   private readonly iterator: AsyncIterator<SDKMessage>;
   private readonly abortController = new AbortController();
+  /**
+   * Owns the CLI child the SDK spawns for this session, so disposal has a bounded
+   * hard tier ({@link ./claudeCodeSpawn.ClaudeCodeProcessOwner}, maintainer
+   * decision 15.2).
+   */
+  private readonly processOwner = new ClaudeCodeProcessOwner();
   private disposed = false;
+  private disposal: Promise<void> | null = null;
   private busy = false;
   /** Set when the last turn ended on a clean `interrupt()`, the session survives. */
   private interruptedCleanly = false;
@@ -161,12 +170,18 @@ export class SdkSession {
    * @param buildOptions builds the SDK `Options` given the session's abort
    *   controller (and, on a disk resume, the session id to load); called once at
    *   construction so model / system prompt / MCP server are baked for the session's
-   *   lifetime (config drift → new session).
+   *   lifetime (config drift → new session). The third argument is the session's
+   *   process owner, which the builder passes to the SDK as
+   *   `spawnClaudeCodeProcess` so disposal has a bounded hard tier.
    * @param resumeSessionId when set, the session is `resume`d from that id on disk
    *   (Model A′) rather than minted fresh, so the caller sends only the delta turn.
    */
   constructor(
-    buildOptions: (abortController: AbortController, resumeSessionId?: string) => Options,
+    buildOptions: (
+      abortController: AbortController,
+      resumeSessionId?: string,
+      processOwner?: ClaudeCodeProcessOwner,
+    ) => Options,
     meta: HarnessSession,
     effort: ReasoningLevel | null = null,
     resumeSessionId?: string,
@@ -177,7 +192,7 @@ export class SdkSession {
     this.sessionId = resumeSessionId;
     this.query = query({
       prompt: this.input,
-      options: buildOptions(this.abortController, resumeSessionId),
+      options: buildOptions(this.abortController, resumeSessionId, this.processOwner),
     });
     this.iterator = this.query[Symbol.asyncIterator]();
   }
@@ -268,6 +283,12 @@ export class SdkSession {
       toolCorrelation: "provider_id",
     });
     let contextTokens: number | null = null;
+    // A turn ends one of three ways, and only the third is a leak. `reachedTerminal`
+    // marks the provider's own `result`, `threw` marks a failure propagating to the
+    // caller, and neither being set means the consumer stopped reading while the
+    // query was still producing (RFC-0011 criterion 18).
+    let reachedTerminal = false;
+    let threw = false;
     try {
       this.input.push(userMessage(prompt));
       // Manual iteration (not `for await`): a `for await` that `break`s on the
@@ -310,6 +331,7 @@ export class SdkSession {
             this.advanceWatermark(ctx.turns, translator.rawText());
             this.interruptedCleanly = true;
             this.lastUsedAt = Date.now();
+            reachedTerminal = true;
             throw createAbortError();
           }
           if (message.subtype !== "success" || message.is_error) {
@@ -320,15 +342,25 @@ export class SdkSession {
           ctx.onResult?.(usage);
           this.advanceWatermark(ctx.turns, translator.rawText());
           this.lastUsedAt = Date.now();
+          reachedTerminal = true;
           return;
         }
       }
     } catch (error) {
+      threw = true;
       if (ctx.signal?.aborted || error instanceof AbortError) throw createAbortError();
       throw error;
     } finally {
       ctx.signal?.removeEventListener("abort", onAbort);
       this.busy = false;
+      if (!reachedTerminal && !threw) {
+        // The consumer walked away mid-turn. Clearing `busy` was all this used to
+        // do, which left the query producing into nothing and its MCP callbacks
+        // still routable. The session's tail is now indeterminate, so it cannot be
+        // reused either: dispose it rather than hand a half-read turn to the next
+        // one.
+        await this.dispose();
+      }
     }
   }
 
@@ -364,15 +396,42 @@ export class SdkSession {
   }
 
   /**
-   * Disposes the session: closes the input stream, signals abort, and returns the
-   * Query generator (which terminates the SDK process). Idempotent.
+   * Disposes the session and resolves once the CLI child is provably gone.
+   *
+   * Phase 0 measured that the old body, `input.close()` + `abort()` +
+   * `iterator.return()`, returns in about two seconds and leaves the `claude`
+   * process running, because the SDK's kill chain is 2000 ms then a further
+   * 5000 ms and every one of its timers is `unref()`ed. Idle eviction and unload
+   * both ran that body, so both could leak a live process whose MCP callbacks
+   * still routed.
+   *
+   * Disposal is discard, not a graceful stop, so it goes straight to the hard
+   * tier: a session being disposed is never reused, and the only graceful path
+   * that matters, a user Stop that preserves the session, takes `interrupt()`
+   * instead and never arrives here. Idempotent; concurrent callers await the same
+   * disposal.
    */
-  dispose(): void {
-    if (this.disposed) return;
+  dispose(): Promise<void> {
+    if (this.disposal) return this.disposal;
     this.disposed = true;
     this.input.close();
     this.abortController.abort();
-    void this.iterator.return?.(undefined);
+    // Issued synchronously, before any await: `hardDispose()` runs `kill()` inside
+    // its promise executor, so the child dies even when the caller cannot await,
+    // which is exactly the plugin-unload case. Returning the iterator afterwards is
+    // then cleanup that no longer races the process.
+    const killed = this.processOwner.hardDispose();
+    this.disposal = (async () => {
+      await closeIterator(this.iterator);
+      try {
+        await killed;
+      } catch {
+        // Exit could not be proven within the deadline. The kill was still issued;
+        // swallowing here keeps disposal from becoming the failure a caller sees,
+        // and the run's settlement is what records the unproven quiescence.
+      }
+    })();
+    return this.disposal;
   }
 
   /**
@@ -412,7 +471,11 @@ export interface SessionTurnRequest {
    * second argument is the session id to `resume` from disk (Model A′); absent on a
    * fresh mint.
    */
-  buildOptions: (abortController: AbortController, resumeSessionId?: string) => Options;
+  buildOptions: (
+    abortController: AbortController,
+    resumeSessionId?: string,
+    processOwner?: ClaudeCodeProcessOwner,
+  ) => Options;
   /**
    * The persisted resume cursor for this conversation (Model A′), read from the last
    * banked turn. When no live session is held, the registry re-checks it against this
@@ -558,7 +621,7 @@ export class SdkSessionRegistry {
       prompt = req.deltaPrompt;
       this.ensureSweeping();
     } else {
-      existing?.dispose();
+      if (existing) void existing.dispose();
       session = this.mintSession(conversationId, req, effort);
       prompt = req.fullPrompt;
     }
@@ -568,8 +631,36 @@ export class SdkSessionRegistry {
     } catch (error) {
       this.afterTurnError(conversationId, session);
       throw error;
+    } finally {
+      // A turn the consumer abandoned disposes itself (RFC-0011 criterion 18), so
+      // the registry must not keep offering the corpse to the next turn.
+      this.dropIfDisposed(conversationId, session);
     }
     this.afterTurnSuccess(conversationId, session, req);
+  }
+
+  /**
+   * Hard-disposes whatever session a conversation currently holds and resolves once
+   * its CLI child is provably gone. This is the persistent path's `hardDispose`
+   * hook: it runs when the graceful tier overran its measured deadline, or when a
+   * capture failure means the session's transcript is no longer authoritative and
+   * it must not survive to be reused.
+   */
+  disposeConversation(conversationId: string): Promise<void> {
+    const session = this.sessions.get(conversationId);
+    if (!session) return Promise.resolve();
+    this.sessions.delete(conversationId);
+    this.tombstones.set(conversationId, "session-disposed");
+    return session.dispose();
+  }
+
+  /** Drops a self-disposed session from the live map so no later turn reuses it. */
+  private dropIfDisposed(conversationId: string, session: SdkSession): void {
+    if (!session.isDisposed) return;
+    if (this.sessions.get(conversationId) === session) {
+      this.sessions.delete(conversationId);
+      this.tombstones.set(conversationId, "session-disposed");
+    }
   }
 
   /** Text-only compatibility projection for registry diagnostics and tests. */
@@ -685,19 +776,25 @@ export class SdkSessionRegistry {
     session: SdkSession,
     reason?: SessionRebuildReason,
   ): void {
-    session.dispose();
+    void session.dispose();
     if (this.sessions.get(conversationId) === session) {
       this.sessions.delete(conversationId);
       if (reason) this.tombstones.set(conversationId, reason);
     }
   }
 
-  /** Disposes every live session and stops the sweep timer (call on plugin unload). */
-  disposeAll(): void {
-    for (const session of this.sessions.values()) session.dispose();
+  /**
+   * Disposes every live session and stops the sweep timer (call on plugin unload).
+   * Each `dispose()` issues its kill synchronously, so the children die even though
+   * Obsidian's `onunload` cannot await; the returned promise is exit proof for
+   * callers that can.
+   */
+  disposeAll(): Promise<void> {
+    const disposals = [...this.sessions.values()].map((session) => session.dispose());
     this.sessions.clear();
     this.tombstones.clear();
     this.stopSweeping();
+    return Promise.all(disposals).then(() => undefined);
   }
 
   /**
@@ -709,7 +806,7 @@ export class SdkSessionRegistry {
   evictIdle(now: number = Date.now()): void {
     for (const [id, session] of this.sessions) {
       if (!session.isBusy && now - session.lastUsedAt > this.idleMs) {
-        session.dispose();
+        void session.dispose();
         this.sessions.delete(id);
         // Tombstone the eviction. The persisted resume cursor usually restores the
         // session next turn ("session resumed", Model A′); the tombstone is the

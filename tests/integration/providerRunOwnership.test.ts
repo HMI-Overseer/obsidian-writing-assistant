@@ -1,19 +1,24 @@
 import { describe, it, expect, vi } from "vitest";
 import { createAssistantEventStream } from "../../src/api/assistantEventStream";
+import {
+  createOwnedStreamRun,
+  detachedAttemptContext,
+} from "../../src/api/assistantStreamRuntime";
+import { createStreamMetadataGate } from "../../src/api/assistantStreamRun";
+import type { AssistantStreamRun } from "../../src/api/assistantStreamRun";
 import { streamWithRetry } from "../../src/api/retry";
+import { TurnRunOwner } from "../../src/chat/streaming/TurnRunOwner";
 import type {
   AssistantStreamEvent,
   AssistantStreamMetadata,
-  StreamResult,
 } from "../../src/api/usageTypes";
 
 /**
- * RFC-0011 phase 0: ownership and termination characterization.
+ * RFC-0011 ownership and termination.
  *
- * Each `it` records what the current tree actually does. Each `it.fails` states
- * the invariant RFC-0011 requires; it passes while the defect stands and turns
- * red the moment the defect is fixed, which is the signal to promote it in the
- * phase named in its comment. See
+ * Phase 0 wrote each of these twice: a plain `it` recording what the tree did, and
+ * an `it.fails` stating what RFC-0011 requires. Phase 2 closed the defects, so the
+ * "what it did" halves are gone and the required halves are plain `it` now. See
  * docs/work/plans/notes/2026-07-27-provider-frame-phase0-protocol-characterization.md.
  */
 
@@ -58,36 +63,15 @@ function instrumentedRawStream(chunks: string[]): {
 }
 
 describe("createAssistantEventStream ownership", () => {
-  it("leaves its manually acquired raw iterator open when the consumer returns early", async () => {
+  // Criterion 19, fixed in phase 2. Promoted from `it.fails` when the defect closed.
+  it("closes the raw transport iterator on early consumer return", async () => {
     const { stream, state } = instrumentedRawStream(["a", "b", "c"]);
     const pending: AssistantStreamEvent[] = [];
     const result = createAssistantEventStream(
       stream,
       pending,
       { finishEvents: () => [], metadata },
-      undefined,
-    );
-
-    pending.push({ type: "segment_start", segmentId: "s1" });
-    const iterator = result.events[Symbol.asyncIterator]();
-    await iterator.next();
-    await iterator.return?.(undefined);
-
-    // Invariant 19 and criterion 19: every manually acquired iterator is closed
-    // on early return. `events()` obtains the raw iterator inside its `try` and
-    // never returns it, so the transport generator stays suspended.
-    expect(state.closed).toBe(false);
-  });
-
-  // Criterion 19, fixed in phase 2.
-  it.fails("closes the raw transport iterator on early consumer return", async () => {
-    const { stream, state } = instrumentedRawStream(["a", "b", "c"]);
-    const pending: AssistantStreamEvent[] = [];
-    const result = createAssistantEventStream(
-      stream,
-      pending,
-      { finishEvents: () => [], metadata },
-      undefined,
+      { attempt: detachedAttemptContext("t"), provider: "anthropic", abort: () => {} },
     );
 
     pending.push({ type: "segment_start", segmentId: "s1" });
@@ -98,6 +82,25 @@ describe("createAssistantEventStream ownership", () => {
     expect(state.closed).toBe(true);
   });
 
+  it("aborts the transport when the consumer returns early", async () => {
+    const { stream } = instrumentedRawStream(["a", "b", "c"]);
+    const pending: AssistantStreamEvent[] = [];
+    const abort = vi.fn();
+    const result = createAssistantEventStream(
+      stream,
+      pending,
+      { finishEvents: () => [], metadata },
+      { attempt: detachedAttemptContext("t"), provider: "anthropic", abort },
+    );
+
+    pending.push({ type: "segment_start", segmentId: "s1" });
+    const iterator = result.events[Symbol.asyncIterator]();
+    await iterator.next();
+    await iterator.return?.(undefined);
+
+    expect(abort).toHaveBeenCalled();
+  });
+
   it("still resolves every metadata promise on early consumer return", async () => {
     const { stream } = instrumentedRawStream(["a"]);
     const pending: AssistantStreamEvent[] = [];
@@ -105,7 +108,7 @@ describe("createAssistantEventStream ownership", () => {
       stream,
       pending,
       { finishEvents: () => [], metadata },
-      undefined,
+      { attempt: detachedAttemptContext("t"), provider: "anthropic", abort: () => {} },
     );
 
     pending.push({ type: "segment_start", segmentId: "s1" });
@@ -122,60 +125,65 @@ describe("createAssistantEventStream ownership", () => {
       ]),
     ).resolves.toBeDefined();
   });
+
+  it("settles once with the consumer_returned reason", async () => {
+    const { stream } = instrumentedRawStream(["a", "b"]);
+    const pending: AssistantStreamEvent[] = [];
+    const result = createAssistantEventStream(
+      stream,
+      pending,
+      { finishEvents: () => [], metadata },
+      { attempt: detachedAttemptContext("t"), provider: "anthropic", abort: () => {} },
+    );
+
+    pending.push({ type: "segment_start", segmentId: "s1" });
+    const iterator = result.events[Symbol.asyncIterator]();
+    await iterator.next();
+    await iterator.return?.(undefined);
+
+    const settlement = await result.settled;
+    expect(settlement.reason).toBe("consumer_returned");
+    expect(settlement.quiescence).toBe("proven");
+    expect(settlement.hardDisposed).toBe(false);
+  });
 });
 
-/** A stream whose generator records closure and whose cancellation is observable. */
-function instrumentedStreamResult(events: AssistantStreamEvent[]): {
-  result: StreamResult;
-  state: { closed: boolean; aborted: boolean };
+/** An owned run over a fixed event list whose closure is observable. */
+function instrumentedRun(events: AssistantStreamEvent[], label = "attempt"): {
+  run: AssistantStreamRun<AssistantStreamEvent>;
+  state: { closed: boolean };
 } {
-  const state = { closed: false, aborted: false };
+  const state = { closed: false };
+  const gate = createStreamMetadataGate();
   async function* generator(): AsyncGenerator<AssistantStreamEvent> {
     try {
       for (const event of events) yield event;
     } finally {
       state.closed = true;
+      gate.settleRemaining();
     }
   }
   return {
-    result: {
-      events: generator(),
-      usage: Promise.resolve(null),
-      stopReason: Promise.resolve("end_turn"),
-      replayCapsule: Promise.resolve(null),
-      replayEvidence: Promise.resolve(metadata().replayEvidence),
-    },
+    run: createOwnedStreamRun({
+      attempt: detachedAttemptContext(label),
+      provider: "anthropic",
+      open: generator,
+      metadata: gate,
+    }),
     state,
   };
 }
 
 describe("streamWithRetry ownership", () => {
-  it("leaves the committed attempt open when its consumer returns early", async () => {
-    const { result, state } = instrumentedStreamResult([
+  // Criterion 19, fixed in phase 2. Promoted from `it.fails` when the defect closed.
+  it("closes the committed attempt when its consumer returns early", async () => {
+    const { run, state } = instrumentedRun([
       { type: "segment_start", segmentId: "s1" },
       { type: "prose_delta", segmentId: "s1", delta: "hello" },
       { type: "prose_delta", segmentId: "s1", delta: " world" },
     ]);
-    const wrapped = streamWithRetry(() => result);
-
-    const iterator = wrapped.events[Symbol.asyncIterator]();
-    await iterator.next();
-    await iterator.return?.(undefined);
-
-    // Criterion 16 and 19: an abandoned or early-returned committed attempt must
-    // be cancelled, settled, and closed. `events()` drains the committed
-    // iterator inside its loop with no `finally` that returns it.
-    expect(state.closed).toBe(false);
-  });
-
-  // Criterion 19, fixed in phase 2.
-  it.fails("closes the committed attempt when its consumer returns early", async () => {
-    const { result, state } = instrumentedStreamResult([
-      { type: "segment_start", segmentId: "s1" },
-      { type: "prose_delta", segmentId: "s1", delta: "hello" },
-      { type: "prose_delta", segmentId: "s1", delta: " world" },
-    ]);
-    const wrapped = streamWithRetry(() => result);
+    const owner = new TurnRunOwner<AssistantStreamEvent>("turn-1");
+    const wrapped = streamWithRetry(() => run, owner);
 
     const iterator = wrapped.events[Symbol.asyncIterator]();
     await iterator.next();
@@ -184,74 +192,181 @@ describe("streamWithRetry ownership", () => {
     expect(state.closed).toBe(true);
   });
 
-  it("leaves an abandoned pre-commit attempt open before retrying", async () => {
+  it("cancels and settles the committed attempt on early consumer return", async () => {
+    const { run } = instrumentedRun([
+      { type: "segment_start", segmentId: "s1" },
+      { type: "prose_delta", segmentId: "s1", delta: "hello" },
+    ]);
+    const owner = new TurnRunOwner<AssistantStreamEvent>("turn-1");
+    const wrapped = streamWithRetry(() => run, owner);
+
+    const iterator = wrapped.events[Symbol.asyncIterator]();
+    await iterator.next();
+    await iterator.return?.(undefined);
+
+    // Criterion 16: an abandoned committed attempt is cancelled, settled, and
+    // closed rather than left producing into nothing.
+    expect(owner.committedAttempt?.isQuiet).toBe(true);
+    const settlement = await run.settled;
+    expect(settlement.reason).toBe("consumer_returned");
+  });
+
+  it("proves the abandoned pre-commit attempt quiet before the next one opens", async () => {
     const closed: boolean[] = [];
+    const priorClosedAtConstruction: Array<boolean | null> = [];
+    const owner = new TurnRunOwner<AssistantStreamEvent>("turn-1");
     let attempt = 0;
-    const makeStream = (): StreamResult => {
+
+    const makeStream = (): AssistantStreamRun<AssistantStreamEvent> => {
       const index = attempt++;
       closed.push(false);
+      // The prior attempt must already be closed and settled at the instant this
+      // one is constructed. Previously the failed attempt was simply dropped and
+      // the backoff slept while it was potentially still running (criterion 16).
+      priorClosedAtConstruction.push(index === 0 ? null : closed[index - 1]);
+      const gate = createStreamMetadataGate();
       async function* generator(): AsyncGenerator<AssistantStreamEvent> {
         try {
           if (index === 0) throw new Error("HTTP 503 upstream");
           yield { type: "segment_start", segmentId: "s1" };
         } finally {
           closed[index] = true;
+          gate.settleRemaining();
         }
       }
-      return {
-        events: generator(),
-        usage: Promise.resolve(null),
-        stopReason: Promise.resolve("end_turn"),
-        replayCapsule: Promise.resolve(null),
-        replayEvidence: Promise.resolve(metadata().replayEvidence),
-      };
+      return createOwnedStreamRun({
+        attempt: detachedAttemptContext(`a${index}`),
+        provider: "anthropic",
+        open: generator,
+        metadata: gate,
+      });
     };
 
-    const wrapped = streamWithRetry(makeStream, { initialDelayMs: 0 });
+    const wrapped = streamWithRetry(makeStream, owner, { initialDelayMs: 0 });
     const seen: AssistantStreamEvent[] = [];
     for await (const event of wrapped.events) seen.push(event);
 
     expect(seen).toHaveLength(1);
-    // A generator that throws before its first yield does run its `finally`, so
-    // the first attempt is closed by the throw, not by an owner. Nothing in the
-    // wrapper proves quiescence before the next attempt starts (criterion 16).
     expect(closed[0]).toBe(true);
     expect(attempt).toBe(2);
+    expect(priorClosedAtConstruction).toEqual([null, true]);
   });
 
-  it("has no cancellation or settlement surface at all", () => {
-    const { result } = instrumentedStreamResult([]);
-    const wrapped = streamWithRetry(() => result);
+  it("exposes cancellation and settlement", async () => {
+    const { run } = instrumentedRun([]);
+    const owner = new TurnRunOwner<AssistantStreamEvent>("turn-1");
+    const wrapped = streamWithRetry(() => run, owner);
 
-    // Criterion 15 and 20. `StreamResult` exposes events and metadata only, so
-    // no owner can ask an attempt to stop or wait for it to settle.
-    expect("cancel" in wrapped).toBe(false);
-    expect("settled" in wrapped).toBe(false);
+    // Criterion 15 and 20: an owner can ask an attempt to stop and can wait for
+    // it to settle. `StreamResult` exposed events and metadata only.
+    expect(typeof wrapped.cancel).toBe("function");
+    expect(wrapped.settled).toBeInstanceOf(Promise);
+    await wrapped.cancel("user_stop");
+    await expect(wrapped.settled).resolves.toBeDefined();
+  });
+
+  it("settles a factory throw without leaving an unowned lease", async () => {
+    const owner = new TurnRunOwner<AssistantStreamEvent>("turn-1");
+    const wrapped = streamWithRetry(() => {
+      throw new Error("could not construct the provider stream");
+    }, owner);
+
+    await expect(
+      (async () => {
+        for await (const _event of wrapped.events) void _event;
+      })(),
+    ).rejects.toThrow("could not construct");
+
+    // Criterion 15: the lease exists before construction, so a throw settles it.
+    expect(owner.isQuiet).toBe(true);
+    await expect(wrapped.settled).resolves.toBeDefined();
+  });
+
+  it("refuses to retry once a consequential callback entered", async () => {
+    const owner = new TurnRunOwner<AssistantStreamEvent>("turn-1");
+    let attempts = 0;
+    const makeStream = (): AssistantStreamRun<AssistantStreamEvent> => {
+      attempts += 1;
+      const gate = createStreamMetadataGate();
+      async function* generator(): AsyncGenerator<AssistantStreamEvent> {
+        try {
+          throw new Error("HTTP 503 upstream");
+        } finally {
+          gate.settleRemaining();
+        }
+      }
+      return createOwnedStreamRun({
+        attempt: detachedAttemptContext(`a${attempts}`),
+        provider: "anthropic",
+        open: generator,
+        metadata: gate,
+      });
+    };
+
+    // Phase 5 wires the Claude callback surfaces that set this; phase 2 owns the
+    // flag and the refusal it drives (criterion 16).
+    owner.noteConsequentialCallback();
+    const wrapped = streamWithRetry(makeStream, owner, { initialDelayMs: 0 });
+    await expect(
+      (async () => {
+        for await (const _event of wrapped.events) void _event;
+      })(),
+    ).rejects.toThrow("HTTP 503");
+
+    expect(attempts).toBe(1);
+  });
+
+  it("resolves wrapper metadata on a zero-event attempt", async () => {
+    const { run } = instrumentedRun([]);
+    const owner = new TurnRunOwner<AssistantStreamEvent>("turn-1");
+    const wrapped = streamWithRetry(() => run, owner);
+
+    for await (const _event of wrapped.events) void _event;
+
+    await expect(
+      Promise.all([
+        wrapped.usage,
+        wrapped.stopReason,
+        wrapped.replayCapsule,
+        wrapped.replayEvidence,
+        wrapped.settled,
+      ]),
+    ).resolves.toBeDefined();
   });
 });
 
-describe("downstream failure does not stop the provider", () => {
-  it("keeps the provider stream alive when the reducer throws", async () => {
-    const { result, state } = instrumentedStreamResult([
+describe("downstream failure stops the provider", () => {
+  it("cancels the run with downstream_failed when the reducer throws", async () => {
+    const { run, state } = instrumentedRun([
       { type: "segment_start", segmentId: "s1" },
       { type: "prose_delta", segmentId: "s1", delta: "hello" },
     ]);
+    const owner = new TurnRunOwner<AssistantStreamEvent>("turn-1");
+    const wrapped = streamWithRetry(() => run, owner);
     const applyEvent = vi.fn((event: AssistantStreamEvent) => {
       if (event.type === "prose_delta") throw new Error("builder rejected the batch");
     });
 
     let thrown: unknown = null;
     try {
-      for await (const event of result.events) applyEvent(event);
+      for await (const event of wrapped.events) {
+        try {
+          applyEvent(event);
+        } catch (error) {
+          // What runToolLoop does: name the reason before unwinding, so the
+          // `consumer_returned` the unwind produces cannot claim it first
+          // (invariant 11, criterion 18).
+          await owner.cancelAll("downstream_failed");
+          throw error;
+        }
+      }
     } catch (error) {
       thrown = error;
     }
 
     expect(thrown).toBeInstanceOf(Error);
-    // Invariant 11 and criterion 18: a downstream failure must trigger explicit
-    // provider cancellation. `for await` does return the generator, but nothing
-    // cancels the upstream provider run, and no owner awaits its settlement.
     expect(state.closed).toBe(true);
-    expect(state.aborted).toBe(false);
+    const settlement = await run.settled;
+    expect(settlement.reason).toBe("downstream_failed");
   });
 });

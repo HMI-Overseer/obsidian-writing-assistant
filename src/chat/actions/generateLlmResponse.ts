@@ -496,6 +496,11 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
       });
     }
 
+    // Persistence below, and the owner teardown in `finally`, both depend on
+    // `runToolLoop()` having settled its provider run before it returns or
+    // rethrows (RFC-0011 phase 2, section 5.3). It owns that guarantee in its own
+    // `finally`, so review and ask owners stay attached until the provider is
+    // quiet and no turn is written while a provider can still produce work.
     const loopResult = await runToolLoop(
       client,
       apiMessages,

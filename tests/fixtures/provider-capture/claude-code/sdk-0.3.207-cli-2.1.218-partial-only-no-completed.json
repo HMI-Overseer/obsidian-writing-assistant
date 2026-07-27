@@ -1,0 +1,140 @@
+{
+  "fixtureVersion": 1,
+  "case": "partial-only-no-completed",
+  "transport": "sdk",
+  "sdkVersion": "0.3.207",
+  "cliVersion": "2.1.218",
+  "provenance": "synthetic",
+  "description": "Partial stream events declare a tool and close the provider message with no completed assistant frame for the tool block.",
+  "frames": [
+    {
+      "type": "stream_event",
+      "uuid": "frame_start_msg_1",
+      "session_id": "sess_1",
+      "parent_tool_use_id": null,
+      "event": {
+        "type": "message_start",
+        "message": {
+          "id": "msg_1",
+          "role": "assistant",
+          "model": "fixture-model",
+          "stop_reason": null,
+          "content": []
+        }
+      }
+    },
+    {
+      "type": "stream_event",
+      "uuid": "frame_bs_msg_1_0",
+      "session_id": "sess_1",
+      "parent_tool_use_id": null,
+      "event": {
+        "type": "content_block_start",
+        "index": 0,
+        "content_block": {
+          "type": "text",
+          "text": "prose fixture text 1"
+        }
+      }
+    },
+    {
+      "type": "stream_event",
+      "uuid": "frame_bd_msg_1_0_0",
+      "session_id": "sess_1",
+      "parent_tool_use_id": null,
+      "event": {
+        "type": "content_block_delta",
+        "index": 0,
+        "delta": {
+          "type": "text_delta",
+          "text": "prose fixture text 1"
+        }
+      }
+    },
+    {
+      "type": "stream_event",
+      "uuid": "frame_be_msg_1_0",
+      "session_id": "sess_1",
+      "parent_tool_use_id": null,
+      "event": {
+        "type": "content_block_stop",
+        "index": 0
+      }
+    },
+    {
+      "type": "stream_event",
+      "uuid": "frame_bs_msg_1_1",
+      "session_id": "sess_1",
+      "parent_tool_use_id": null,
+      "event": {
+        "type": "content_block_start",
+        "index": 1,
+        "content_block": {
+          "type": "tool_use",
+          "id": "toolu_1",
+          "name": "Glob",
+          "input": {
+            "path": "fixture-path"
+          }
+        }
+      }
+    },
+    {
+      "type": "stream_event",
+      "uuid": "frame_bd_msg_1_1_0",
+      "session_id": "sess_1",
+      "parent_tool_use_id": null,
+      "event": {
+        "type": "content_block_delta",
+        "index": 1,
+        "delta": {
+          "type": "input_json_delta",
+          "partial_json": "{\"fixture\":1}"
+        }
+      }
+    },
+    {
+      "type": "stream_event",
+      "uuid": "frame_be_msg_1_1",
+      "session_id": "sess_1",
+      "parent_tool_use_id": null,
+      "event": {
+        "type": "content_block_stop",
+        "index": 1
+      }
+    },
+    {
+      "type": "stream_event",
+      "uuid": "frame_stop_msg_1",
+      "session_id": "sess_1",
+      "parent_tool_use_id": null,
+      "event": {
+        "type": "message_stop"
+      }
+    },
+    {
+      "type": "user",
+      "uuid": "frame_1",
+      "session_id": "sess_1",
+      "parent_tool_use_id": null,
+      "message": {
+        "role": "user",
+        "content": [
+          {
+            "type": "tool_result",
+            "tool_use_id": "toolu_1",
+            "content": "result fixture text 1",
+            "is_error": false
+          }
+        ]
+      }
+    },
+    {
+      "type": "result",
+      "uuid": "frame_result",
+      "session_id": "sess_1",
+      "subtype": "success",
+      "is_error": false
+    }
+  ]
+}

@@ -9,6 +9,7 @@ import type {
   ProviderTurnCapabilities,
 } from "../../shared/types";
 import type { ChatRequest, ChatTurn, RagContextBlock, ToolSearchConfig } from "../../shared/chatRequest";
+import { isReplayableItem } from "../../shared/captureEvidence";
 import { shouldUseToolCall } from "../../tools/registry";
 import { EDIT_TOOL_NAMES } from "../../tools/editing/definition";
 import { buildEditToolSystemPrompt } from "../../tools/editing/systemPrompt";
@@ -573,6 +574,19 @@ function structuralReplayFailure(turn: AssistantTurnRecord): string | null {
       !validateProviderReplayCapsule(segment.replayCapsule).ok
     ) {
       return "replay_capsule_invalid";
+    }
+  }
+  // Runtime capture evidence gates replay before any per-item field does
+  // (RFC-0011 invariants 7c and 17). A capture-invalid declaration is known to
+  // sit at the wrong provider position, and an unplaced item makes no ordering
+  // claim at all, so neither can be reproduced as provider output. Forced
+  // quiescence means the transcript was never proven complete.
+  if (turn.quiescence === "forced") return "forced_quiescence";
+  for (const item of turn.items) {
+    if (!isReplayableItem(item)) {
+      return item.captureEvidence?.validity === "capture_invalid"
+        ? "capture_invalid_declaration"
+        : "provider_item_unplaced";
     }
   }
   for (const item of turn.items) {

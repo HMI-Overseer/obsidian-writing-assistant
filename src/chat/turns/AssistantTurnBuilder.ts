@@ -3,9 +3,12 @@ import type {
   AssistantToolCallItem,
   AssistantToolLifecycleState,
   AssistantTurnRecord,
+  AssistantTurnSchemaVersion,
   AssistantTurnSegment,
   AssistantTurnStatus,
   CompletedAskGuidanceRecord,
+  ProviderCaptureDiagnostic,
+  ProviderQuiescence,
   ProviderReplayCapsule,
 } from "../../shared/types";
 import { generateId } from "../../utils";
@@ -99,11 +102,13 @@ export type AssistantTurnSnapshotItem =
   | AssistantTurnSnapshotToolCallItem;
 
 export interface AssistantTurnSnapshot {
-  schemaVersion: 1;
+  schemaVersion: AssistantTurnSchemaVersion;
   id: string;
   status: AssistantTurnStatus;
   segments: AssistantTurnSegment[];
   items: AssistantTurnSnapshotItem[];
+  quiescence?: ProviderQuiescence;
+  captureDiagnostics?: ProviderCaptureDiagnostic[];
 }
 
 type TerminalAssistantTurnStatus = Exclude<AssistantTurnStatus, "streaming">;

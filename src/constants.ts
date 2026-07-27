@@ -12,6 +12,31 @@ export const DEFAULT_COMPLETION_MAX_TOKENS = 2000;
 
 export const MAX_CONVERSATIONS = 50;
 
+// ---------------------------------------------------------------------------
+// Provider capture bounds, RFC-0011
+// ---------------------------------------------------------------------------
+
+/**
+ * Hex characters retained from a capture digest. 32 hex characters is 128 bits,
+ * far past the collision headroom one turn's frames need, while staying short
+ * enough to persist and to read in a diagnostic.
+ */
+export const CAPTURE_FINGERPRINT_LENGTH = 32;
+
+/**
+ * How long a plugin-authored capture diagnostic may be before it is clamped at
+ * the point it is written.
+ *
+ * This is a formatting rule for the plugin's own text, not a cap on anything a
+ * provider or a model produced. Its job is the no-raw-payload requirement: a
+ * diagnostic names the invariant that broke, so if one is long enough to need
+ * clamping it is carrying something it should not. Nothing is ever rejected for
+ * exceeding it, and no counted-object ceiling accompanies it: per RFC-0010, a
+ * guard whose trigger is "you have done N things" names no failure and has no
+ * place here.
+ */
+export const CAPTURE_DIAGNOSTIC_MESSAGE_CHARS = 240;
+
 export const CONTEXT_WARNING_THRESHOLD = 0.80;
 export const CONTEXT_DANGER_THRESHOLD = 0.95;
 

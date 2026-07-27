@@ -3,6 +3,7 @@ import type {
   AssistantMessageRevision,
   AssistantReplayEvidence,
   AssistantTurnItem,
+  AssistantTurnRecord,
   AssistantTurnRevision,
   CompletedAskGuidanceRecord,
   EditActionPayload,
@@ -23,6 +24,7 @@ import type { ResolvedEdit } from "../../editing/editTypes";
 import type { VaultOperation } from "../../vault-ops/types";
 import { appendActionEvent } from "./actionLedger";
 import { validateAssistantTurn } from "../turns/assistantTurnValidation";
+import { lowerEvidenceFromCapture } from "../../shared/captureEvidence";
 
 export const ASSISTANT_MESSAGE_MAX_REVISIONS = 128;
 export const ASSISTANT_MESSAGE_MAX_LEDGER_ENTRIES = 1_024;
@@ -259,10 +261,52 @@ function validateTurnRevision(
   ) {
     return invalid("revision_metadata_invalid", `${path}.replayEvidence`);
   }
+  const evidenceFailure = crossCheckCaptureEvidence(value, turn.value, path);
+  if (evidenceFailure) return { ok: false, reason: evidenceFailure };
   return {
     ok: true,
     value: structuredClone(value) as unknown as AssistantMessageRevision,
   };
+}
+
+/**
+ * Replay evidence and per-item capture evidence were previously validated in
+ * isolation, so a turn could claim exact capture while carrying an unplaced or
+ * capture-invalid item. RFC-0011 makes runtime evidence authoritative: a
+ * descriptor is a ceiling and a turn's own items can only lower it.
+ *
+ * Checked here rather than in the turn validator because the claim being
+ * cross-checked lives on the revision, alongside the resume cursor it gates.
+ */
+function crossCheckCaptureEvidence(
+  value: Record<string, unknown>,
+  turn: AssistantTurnRecord,
+  path: string,
+): AssistantMessageInvalidReason | null {
+  // Version-1 turns predate runtime placement entirely. Migration, not the
+  // validator, is the funnel that gives them conservative evidence, so
+  // cross-checking one here would reject every unmigrated conversation.
+  if (turn.schemaVersion !== 2) return null;
+  const claimed = value.replayEvidence as AssistantReplayEvidence | undefined;
+  const forced = turn.quiescence === "forced";
+  if (forced) {
+    const usage = value.usage as MessageUsage | undefined;
+    if (usage?.resumeCursor !== undefined) {
+      return reason("revision_metadata_invalid", `${path}.usage.resumeCursor`);
+    }
+  }
+  if (!claimed) return null;
+
+  const supported = lowerEvidenceFromCapture(claimed, turn);
+  if (
+    supported.capabilities.captureOrder !== claimed.capabilities.captureOrder ||
+    supported.capabilities.coldReplay !== claimed.capabilities.coldReplay ||
+    supported.capabilities.nativeResume !== claimed.capabilities.nativeResume ||
+    supported.tier !== claimed.tier
+  ) {
+    return reason("revision_metadata_invalid", `${path}.replayEvidence`);
+  }
+  return null;
 }
 
 function validateLegacyRevision(
@@ -896,6 +940,21 @@ function isValidEvent(
   if (value.type === "undo_refused") {
     return (
       unexpectedField(value, new Set([...base, "reason"])) === null &&
+      isBoundedString(value.reason, ASSISTANT_ACTION_MAX_TEXT_CHARS)
+    );
+  }
+  // Write-ahead audit evidence (RFC-0011). Both carry the intent identity that
+  // links the persisted pre-effect record to this ledger entry.
+  if (value.type === "intent_recorded") {
+    return (
+      unexpectedField(value, new Set([...base, "intentId"])) === null &&
+      isBoundedNonEmptyString(value.intentId, MAX_ID_CHARS)
+    );
+  }
+  if (value.type === "outcome_unknown") {
+    return (
+      unexpectedField(value, new Set([...base, "intentId", "reason"])) === null &&
+      isBoundedNonEmptyString(value.intentId, MAX_ID_CHARS) &&
       isBoundedString(value.reason, ASSISTANT_ACTION_MAX_TEXT_CHARS)
     );
   }

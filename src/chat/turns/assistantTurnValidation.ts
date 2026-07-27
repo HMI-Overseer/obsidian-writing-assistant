@@ -1,6 +1,8 @@
 import type {
   AssistantTurnRecord,
+  AssistantTurnSchemaVersion,
   AssistantTurnStatus,
+  ProviderCaptureStage,
   ProviderReplayCapsule,
 } from "../../shared/types";
 import {
@@ -82,7 +84,13 @@ export type AssistantTurnInvalidReasonCode =
   | "error_content_too_long"
   | "ask_status_invalid"
   | "ask_guidance_invalid"
-  | "round_invalid";
+  | "round_invalid"
+  | "quiescence_invalid"
+  | "capture_diagnostics_invalid"
+  | "capture_diagnostic_invalid"
+  | "capture_evidence_invalid"
+  | "capture_evidence_missing"
+  | "capture_placement_invalid";
 
 export interface AssistantTurnInvalidReason {
   code: AssistantTurnInvalidReasonCode;
@@ -117,26 +125,38 @@ interface ValidationContext {
   domainIds: Set<string>;
   segmentIndices: Map<string, number>;
   toolCallIds: Set<string>;
+  /** Version 2 requires capture evidence on every item; version 1 forbids it. */
+  schemaVersion: AssistantTurnSchemaVersion;
 }
 
 /**
- * Strictly validate one persisted schema-1 assistant turn.
+ * Strictly validate one persisted assistant turn, schema version 1 or 2.
  *
  * The validator returns the original value only after the whole chain passes.
  * It never repairs IDs, drops malformed items, or strips a bad replay capsule.
+ *
+ * Version 2 adds per-item capture evidence, turn-level quiescence, and bounded
+ * capture diagnostics (RFC-0011). The two versions are validated exclusively:
+ * a version-1 turn carrying version-2 fields is rejected rather than silently
+ * upgraded, so migration stays the one funnel that produces version-2 shapes.
  */
 export function validateAssistantTurn(
   value: unknown,
 ): AssistantTurnValidationResult {
   if (!isRecord(value)) return invalid("record_invalid", "$");
-  const unexpected = unexpectedField(
-    value,
-    new Set(["schemaVersion", "id", "status", "segments", "items"]),
-  );
-  if (unexpected) return invalid("field_unexpected", unexpected);
-  if (value.schemaVersion !== 1) {
+  if (value.schemaVersion !== 1 && value.schemaVersion !== 2) {
     return invalid("schema_version_unsupported", "schemaVersion");
   }
+  const schemaVersion: AssistantTurnSchemaVersion = value.schemaVersion;
+  const unexpected = unexpectedField(
+    value,
+    schemaVersion === 2 ? TURN_FIELDS_V2 : TURN_FIELDS_V1,
+  );
+  if (unexpected) return invalid("field_unexpected", unexpected);
+  const quiescenceFailure = validateQuiescence(value, schemaVersion);
+  if (quiescenceFailure) return { ok: false, reason: quiescenceFailure };
+  const diagnosticsFailure = validateCaptureDiagnostics(value);
+  if (diagnosticsFailure) return { ok: false, reason: diagnosticsFailure };
   if (!isOneOf(value.status, TURN_STATUSES)) {
     return invalid("status_invalid", "status");
   }
@@ -160,6 +180,7 @@ export function validateAssistantTurn(
     domainIds: new Set([value.id]),
     segmentIndices: new Map<string, number>(),
     toolCallIds: new Set<string>(),
+    schemaVersion,
   };
   const segmentFailure = validateSegments(value.segments, context);
   if (segmentFailure) return { ok: false, reason: segmentFailure };
@@ -338,6 +359,142 @@ function validateItems(
   return null;
 }
 
+const TURN_FIELDS_V1 = new Set(["schemaVersion", "id", "status", "segments", "items"]);
+const TURN_FIELDS_V2 = new Set([
+  ...TURN_FIELDS_V1,
+  "quiescence",
+  "captureDiagnostics",
+]);
+const QUIESCENCE_MODES = ["proven", "forced"] as const;
+const CAPTURE_STAGES: readonly ProviderCaptureStage[] = [
+  "construction",
+  "capture",
+  "publication",
+  "callback",
+  "settlement",
+  "finalization",
+];
+const CAPTURE_EVIDENCE_FIELDS = new Set(["originBatchId", "placement", "validity"]);
+const CAPTURE_VALIDITIES = ["valid", "capture_invalid"] as const;
+const CAPTURE_DIAGNOSTIC_FIELDS = new Set(["code", "provider", "stage", "message"]);
+
+function validateQuiescence(
+  value: Record<string, unknown>,
+  schemaVersion: AssistantTurnSchemaVersion,
+): AssistantTurnInvalidReason | null {
+  if (value.quiescence === undefined) return null;
+  if (schemaVersion !== 2 || !isOneOf(value.quiescence, QUIESCENCE_MODES)) {
+    return reason("quiescence_invalid", "quiescence");
+  }
+  return null;
+}
+
+function validateCaptureDiagnostics(
+  value: Record<string, unknown>,
+): AssistantTurnInvalidReason | null {
+  const diagnostics = value.captureDiagnostics;
+  if (diagnostics === undefined) return null;
+  // Shape only. How many diagnostics a failed turn produced is not a failure
+  // mode, so there is no count at which a whole turn is refused (RFC-0010).
+  if (!Array.isArray(diagnostics)) {
+    return reason("capture_diagnostics_invalid", "captureDiagnostics");
+  }
+  for (const [index, entry] of diagnostics.entries()) {
+    const path = `captureDiagnostics[${index}]`;
+    if (!isRecord(entry)) return reason("capture_diagnostic_invalid", path);
+    const unexpected = unexpectedField(entry, CAPTURE_DIAGNOSTIC_FIELDS, path);
+    if (unexpected) return reason("field_unexpected", unexpected);
+    if (
+      !isBoundedNonEmptyString(entry.code, ASSISTANT_TURN_MAX_ID_CHARS) ||
+      !isBoundedNonEmptyString(entry.provider, ASSISTANT_TURN_MAX_ID_CHARS) ||
+      !isOneOf(entry.stage, CAPTURE_STAGES) ||
+      !isBoundedNonEmptyString(
+        entry.message,
+        ASSISTANT_TURN_MAX_ERROR_CONTENT_CHARS,
+      )
+    ) {
+      return reason("capture_diagnostic_invalid", path);
+    }
+  }
+  return null;
+}
+
+/**
+ * Placement and validity rules from RFC-0011 invariant 7. `exact` needs both a
+ * provider-message key and a provider block identity; `segment` needs the key
+ * alone; `unplaced` carries neither. Nothing here infers a missing field.
+ */
+function validateCaptureEvidence(
+  item: Record<string, unknown>,
+  path: string,
+  context: ValidationContext,
+): AssistantTurnInvalidReason | null {
+  const evidence = item.captureEvidence;
+  if (context.schemaVersion !== 2) {
+    return evidence === undefined
+      ? null
+      : reason("capture_evidence_invalid", `${path}.captureEvidence`);
+  }
+  if (evidence === undefined) {
+    return reason("capture_evidence_missing", `${path}.captureEvidence`);
+  }
+  if (!isRecord(evidence)) {
+    return reason("capture_evidence_invalid", `${path}.captureEvidence`);
+  }
+  const unexpected = unexpectedField(
+    evidence,
+    CAPTURE_EVIDENCE_FIELDS,
+    `${path}.captureEvidence`,
+  );
+  if (unexpected) return reason("field_unexpected", unexpected);
+  if (
+    !isBoundedNonEmptyString(evidence.originBatchId, ASSISTANT_TURN_MAX_ID_CHARS) ||
+    !isOneOf(evidence.validity, CAPTURE_VALIDITIES)
+  ) {
+    return reason("capture_evidence_invalid", `${path}.captureEvidence`);
+  }
+  return validatePlacement(
+    evidence.placement,
+    `${path}.captureEvidence.placement`,
+  );
+}
+
+function validatePlacement(
+  placement: unknown,
+  path: string,
+): AssistantTurnInvalidReason | null {
+  if (!isRecord(placement)) return reason("capture_placement_invalid", path);
+  const key = placement.providerMessageKey;
+  const block = placement.providerBlockId;
+  const hasKey = isBoundedNonEmptyString(key, ASSISTANT_TURN_MAX_ID_CHARS);
+  const hasBlock = isBoundedNonEmptyString(block, ASSISTANT_TURN_MAX_ID_CHARS);
+
+  if (placement.kind === "exact") {
+    const unexpected = unexpectedField(
+      placement,
+      new Set(["kind", "providerMessageKey", "providerBlockId"]),
+      path,
+    );
+    if (unexpected) return reason("field_unexpected", unexpected);
+    return hasKey && hasBlock ? null : reason("capture_placement_invalid", path);
+  }
+  if (placement.kind === "segment") {
+    const unexpected = unexpectedField(
+      placement,
+      new Set(["kind", "providerMessageKey"]),
+      path,
+    );
+    if (unexpected) return reason("field_unexpected", unexpected);
+    return hasKey ? null : reason("capture_placement_invalid", path);
+  }
+  if (placement.kind === "unplaced") {
+    const unexpected = unexpectedField(placement, new Set(["kind"]), path);
+    if (unexpected) return reason("field_unexpected", unexpected);
+    return null;
+  }
+  return reason("capture_placement_invalid", path);
+}
+
 function validateItemCommon(
   item: Record<string, unknown>,
   path: string,
@@ -362,7 +519,7 @@ function validateItemCommon(
   ) {
     return reason("source_item_id_invalid", `${path}.sourceItemId`);
   }
-  return null;
+  return validateCaptureEvidence(item, path, context);
 }
 
 function validateProseItem(
@@ -379,6 +536,7 @@ function validateProseItem(
       "text",
       "actionRef",
       "actionAnchor",
+      "captureEvidence",
     ]),
     path,
   );
@@ -440,6 +598,7 @@ const TOOL_ITEM_FIELDS = new Set([
   "askGuidance",
   "askStatus",
   "round",
+  "captureEvidence",
 ]);
 
 function validateToolDeclaration(

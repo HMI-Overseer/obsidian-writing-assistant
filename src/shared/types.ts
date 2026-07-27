@@ -338,12 +338,86 @@ export type AssistantTurnStatus =
   | "interrupted"
   | "failed";
 
+/**
+ * Persisted turn schema version.
+ *
+ * Version 1 has no placement or capture validity. Version 2 adds
+ * {@link ProviderItemCaptureEvidence} on every provider-authored item plus the
+ * turn-level quiescence mode and bounded capture diagnostics (RFC-0011). The
+ * loader accepts both and normalizes version 1 in memory without rewriting it.
+ */
+export type AssistantTurnSchemaVersion = 1 | 2;
+
 export interface AssistantTurnRecord {
-  schemaVersion: 1;
+  schemaVersion: AssistantTurnSchemaVersion;
   id: string;
   status: AssistantTurnStatus;
   segments: AssistantTurnSegment[];
   items: AssistantTurnItem[];
+  /**
+   * Version 2 only. Whether the provider run was proven quiet or forcibly
+   * disposed. Forced quiescence forbids native resume and a persisted resume
+   * cursor, and is never presented as proof of exact capture.
+   */
+  quiescence?: ProviderQuiescence;
+  /** Version 2 only. Bounded terminal capture evidence; see {@link ProviderCaptureDiagnostic}. */
+  captureDiagnostics?: ProviderCaptureDiagnostic[];
+}
+
+/**
+ * Per-item evidence about declaration order.
+ *
+ * `exact` is an original provider block index under an exact provider-message
+ * key. `segment` is coarse relative arrival order inside one provider message.
+ * `unplaced` makes no ordering claim at all, so the item's list position is a
+ * display projection rather than replay evidence.
+ */
+export type ProviderItemPlacement =
+  | { kind: "exact"; providerMessageKey: string; providerBlockId: string }
+  | { kind: "segment"; providerMessageKey: string }
+  | { kind: "unplaced" };
+
+/**
+ * A declaration retained for terminal honesty after later evidence conflicted
+ * with its provider position. It cannot authorize new work or enter replay.
+ */
+export type ProviderItemCaptureValidity = "valid" | "capture_invalid";
+
+export interface ProviderItemCaptureEvidence {
+  /** The capture batch that first committed this item, `${leaseId}:${frameKey}`. */
+  originBatchId: string;
+  placement: ProviderItemPlacement;
+  validity: ProviderItemCaptureValidity;
+}
+
+/**
+ * `proven` means the provider reached a terminal state or acknowledged
+ * cancellation and every entered callback settled. `forced` means the mandatory
+ * hard-dispose path ran; it does not claim late provider calls are impossible,
+ * only that the tombstoned lease rejects them.
+ */
+export type ProviderQuiescence = "proven" | "forced";
+
+/** Where in the capture path a diagnostic was raised. */
+export type ProviderCaptureStage =
+  | "construction"
+  | "capture"
+  | "publication"
+  | "callback"
+  | "settlement"
+  | "finalization";
+
+/**
+ * Bounded terminal capture evidence. The message identifies the invariant that
+ * broke and may carry a one-way bounded fingerprint. It never stores raw
+ * provider payloads, prompts, arguments, tool results, or user text. The message
+ * is clamped where it is written; nothing is rejected for its length.
+ */
+export interface ProviderCaptureDiagnostic {
+  code: string;
+  provider: ProviderOption | "unknown";
+  stage: ProviderCaptureStage;
+  message: string;
 }
 
 export interface AssistantTurnSegment {
@@ -362,6 +436,8 @@ export interface AssistantProseItem {
   text: string;
   actionRef?: string;
   actionAnchor?: "parsed_edit";
+  /** Required on every item of a version-2 turn (RFC-0011). */
+  captureEvidence?: ProviderItemCaptureEvidence;
 }
 
 export type AssistantToolLifecycleState =
@@ -390,6 +466,8 @@ export interface AssistantToolCallItem {
   askGuidance?: CompletedAskGuidanceRecord;
   askStatus?: "completed" | "cancelled" | "skipped";
   round?: number;
+  /** Required on every item of a version-2 turn (RFC-0011). */
+  captureEvidence?: ProviderItemCaptureEvidence;
 }
 
 export type ProviderReplayCapsule = {
@@ -567,6 +645,22 @@ export type ToolActionEvent =
   | ToolActionEventBase<"retry_requested">
   | (ToolActionEventBase<"superseded"> & {
       replacementRevisionId: string;
+    })
+  /**
+   * Write-ahead evidence (RFC-0011): a consequential callback is about to cross
+   * its effect boundary. Written and persisted before the effect, and reconciled
+   * to a real outcome event afterwards. A merely proposed or declared action
+   * never produces one.
+   */
+  | (ToolActionEventBase<"intent_recorded"> & { intentId: string })
+  /**
+   * The owning attempt was hard-disposed after its intent persisted but before
+   * an outcome was recorded, so the real result is unknown and cannot be
+   * invented. Terminal: it is never rewritten by a later attempt.
+   */
+  | (ToolActionEventBase<"outcome_unknown"> & {
+      intentId: string;
+      reason: string;
     });
 
 export interface ToolActionEventBase<Type extends string> {
@@ -574,6 +668,56 @@ export interface ToolActionEventBase<Type extends string> {
   type: Type;
   targetId: string;
   createdAt: number;
+}
+
+// ---------------------------------------------------------------------------
+// In-flight generation audit, RFC-0011
+// ---------------------------------------------------------------------------
+
+/**
+ * One consequential callback's write-ahead record.
+ *
+ * A callback cannot be trusted to report evidence after an irreversible effect,
+ * so it appends this and awaits persistence *before* crossing its effect
+ * boundary. Normal completion reconciles it to the real outcome. Forced
+ * termination, or a reload finding it orphaned, reconciles it to
+ * `outcome_unknown`.
+ *
+ * It carries bounded identity and a safe summary only. It never duplicates
+ * provider arguments, tool results, file contents, or raw diffs.
+ */
+export interface GenerationAuditIntent {
+  intentId: string;
+  /** The action-ledger entry this intent resolves into. */
+  actionRef: string;
+  family: ToolActionFamily;
+  targetId: string;
+  correlation: ToolActionCorrelationEvidence;
+  /** Bounded, human-readable statement of the operation about to happen. */
+  summary: string;
+  recordedAt: number;
+  /** `pending` until the owning callback reconciles it. */
+  outcome: "pending" | "resolved" | "unknown";
+}
+
+/**
+ * Conversation-scoped durable evidence for one in-flight generation.
+ *
+ * Temporary state by design: it exists only between the first consequential
+ * intent and the terminal fold, and a clean turn clears it atomically with
+ * revision persistence. An audit still present at load time means the generation
+ * that owned it never finished, so it is finalized fail-closed rather than
+ * resumed.
+ */
+export interface InFlightGenerationAudit {
+  /** The assistant message this generation was producing. */
+  messageId: string;
+  /** Lease identity, `${turnId}#${attemptOrdinal}`. */
+  leaseId: string;
+  turnId: string;
+  attemptOrdinal: number;
+  openedAt: number;
+  intents: GenerationAuditIntent[];
 }
 
 export type ToolActionEffectRecord =
@@ -787,6 +931,12 @@ export interface Conversation {
   parentConversationId?: string;
   /** Message id in the source conversation the branch was forked at. */
   branchFromMessageId?: string;
+  /**
+   * Durable write-ahead evidence for a generation still in flight (RFC-0011).
+   * Present only between a consequential callback's first intent and the
+   * terminal fold. Finding one on load means that generation never finished.
+   */
+  inFlightGenerationAudit?: InFlightGenerationAudit;
 }
 
 /** Lightweight metadata stored in the settings index (no message content). */

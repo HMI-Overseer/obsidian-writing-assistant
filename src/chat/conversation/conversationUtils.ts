@@ -1,4 +1,8 @@
 import { MAX_CONVERSATIONS } from "../../constants";
+import {
+  migrateRevisions,
+  normalizeInFlightGenerationAudit,
+} from "./assistantTurnMigration";
 import type {
   ApprovalPosture,
   AgenticStep,
@@ -142,6 +146,9 @@ export function normalizeConversation(raw: unknown): Conversation | null {
       if (normalized) messages.push(normalized);
     }
   }
+  const inFlightAudit = normalizeInFlightGenerationAudit(
+    record.inFlightGenerationAudit,
+  );
 
   return {
     id,
@@ -153,6 +160,9 @@ export function normalizeConversation(raw: unknown): Conversation | null {
     messages,
     draft,
     approvalPosture: normalizePosture(record.approvalPosture),
+    // An audit still on disk means the generation that owned it never finished.
+    // It is preserved for phase 6 recovery, never silently dropped (RFC-0011).
+    ...(inFlightAudit ? { inFlightGenerationAudit: inFlightAudit } : {}),
     ...(typeof record.parentConversationId === "string" &&
     record.parentConversationId
       ? { parentConversationId: record.parentConversationId }
@@ -214,12 +224,16 @@ function normalizeNewAssistantMessage(
     actionLedger: value.actionLedger,
   });
   if (!validation.ok) return null;
+  // Conservative version-1 to version-2 upgrade, in memory only (RFC-0011).
+  // It runs after validation so a corrupt persisted turn is still rejected on
+  // its own terms rather than being repaired by the migration.
+  const revisions = migrateRevisions(validation.value.revisions);
 
   return syncAssistantCompatibilityProjection({
     id: value.id,
     role: "assistant",
     content: typeof value.content === "string" ? value.content : "",
-    revisions: validation.value.revisions,
+    revisions,
     activeRevisionId: validation.value.activeRevisionId,
     actionLedger: validation.value.actionLedger,
   });

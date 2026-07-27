@@ -86,6 +86,14 @@ export interface DerivedActionTargetState {
   latestUndo?: ToolActionUndoRecord;
   lastApplyError?: string;
   lastUndoRefusal?: string;
+  /**
+   * Write-ahead evidence (RFC-0011). A consequential callback records an intent
+   * before crossing its effect boundary; `outcomeUnknown` means its owning
+   * attempt was hard-disposed before any real outcome was reported, so the
+   * target is terminal without being applied, failed, or declined.
+   */
+  writeAheadIntentId?: string;
+  outcomeUnknown: boolean;
 }
 
 export type ActionAggregateState =
@@ -517,6 +525,31 @@ function validateTransition(
     }
     return;
   }
+  if (event.type === "intent_recorded") {
+    if (
+      (state.approval !== "pending" && state.approval !== "approved") ||
+      state.effect !== "none" ||
+      state.superseded ||
+      state.writeAheadIntentId !== undefined
+    ) {
+      throw new Error(
+        "A write-ahead intent is allowed once, before its effect boundary.",
+      );
+    }
+    return;
+  }
+  if (event.type === "outcome_unknown") {
+    if (
+      state.writeAheadIntentId !== event.intentId ||
+      state.effect !== "none" ||
+      state.outcomeUnknown
+    ) {
+      throw new Error(
+        "An unknown outcome must reconcile exactly one open write-ahead intent.",
+      );
+    }
+    return;
+  }
   if (event.type === "superseded" && !state.unresolved) {
     throw new Error("Supersession is allowed only for unresolved work.");
   }
@@ -530,6 +563,7 @@ function initialTargetState(targetId: string): DerivedActionTargetState {
     retry: "none",
     unresolved: false,
     superseded: false,
+    outcomeUnknown: false,
   };
 }
 
@@ -577,6 +611,13 @@ function foldEvent(
       target.superseded = true;
       target.approval = "superseded";
       target.retry = "superseded";
+      return;
+    case "intent_recorded":
+      target.writeAheadIntentId = event.intentId;
+      return;
+    case "outcome_unknown":
+      target.outcomeUnknown = true;
+      target.retry = "none";
   }
 }
 
@@ -587,7 +628,10 @@ function deriveUnresolved(
   if (
     target.superseded ||
     target.approval === "declined" ||
-    target.effect === "applied"
+    target.effect === "applied" ||
+    // A lost outcome is terminal: nobody can act on it, and nothing may retry
+    // or supersede it into a different answer (RFC-0011 criterion 28).
+    target.outcomeUnknown
   ) {
     return false;
   }

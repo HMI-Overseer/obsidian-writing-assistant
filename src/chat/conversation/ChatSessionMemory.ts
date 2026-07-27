@@ -541,8 +541,13 @@ function eventIsEligible(
     case "undo_succeeded":
     case "undo_refused":
       return eligibility.canUndo;
+    // Write-ahead audit evidence (`intent_recorded`, `outcome_unknown`) is
+    // history, never an actionable control: both describe work that already
+    // left the plugin's hands (RFC-0011).
     case "proposed":
     case "superseded":
+    case "intent_recorded":
+    case "outcome_unknown":
       return false;
   }
 }

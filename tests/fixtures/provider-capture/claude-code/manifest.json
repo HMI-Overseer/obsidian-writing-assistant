@@ -1,0 +1,61 @@
+{
+  "manifestVersion": 1,
+  "provider": "claudecode",
+  "sdkVersion": "0.3.207",
+  "cliVersion": "2.1.218",
+  "captureDate": "2026-07-27",
+  "capturePlatform": "win32",
+  "captureCommand": "claude --print --output-format stream-json --verbose --include-partial-messages",
+  "transports": {
+    "sdk": "@anthropic-ai/claude-agent-sdk query(), includePartialMessages: true",
+    "legacy-stream-json": "claude --print --output-format stream-json --verbose --include-partial-messages"
+  },
+  "retainedFields": [
+    "type",
+    "uuid",
+    "session_id",
+    "request_id",
+    "parent_tool_use_id",
+    "subagent_type",
+    "supersedes",
+    "subtype",
+    "is_error",
+    "message.id",
+    "message.role",
+    "message.stop_reason",
+    "message.content[].type",
+    "message.content[].id",
+    "message.content[].name",
+    "message.content[].server_name",
+    "message.content[].tool_use_id",
+    "message.content[].is_error",
+    "event.type",
+    "event.index",
+    "event.message.id",
+    "event.content_block.type",
+    "event.content_block.id",
+    "event.content_block.name",
+    "event.content_block.server_name",
+    "event.delta.type"
+  ],
+  "replacedFields": [
+    "uuid, session_id, request_id, message.id, and every tool-use ID were rewritten to deterministic synthetic aliases in first-appearance order",
+    "message.model was replaced with the constant \"fixture-model\"",
+    "every text, thinking, signature, and tool-result string was replaced with bounded synthetic text",
+    "every tool input value was replaced with a per-key placeholder; only the key shape is retained",
+    "partial_json argument bytes were replaced with a bounded synthetic JSON fragment"
+  ],
+  "droppedFrameTypes": [
+    "system (init, status, thinking_tokens)",
+    "rate_limit_event",
+    "every other SDK message kind the capture path does not translate"
+  ],
+  "provenance": {
+    "captured": "Converted from a live local capture by scripts/captureFixtures.mjs. The raw capture never enters the repository.",
+    "synthetic": "Hand-authored from a shape the live capture did not produce. Verified against the installed SDK type declarations for BetaRawMessageStreamEvent and SDKAssistantMessage."
+  },
+  "notes": [
+    "The SDK and legacy stream-json transports read the same CLI output, so the split-thinking-toolsearch fixture is byte-identical under both transports.",
+    "Regenerate every captured fixture when the SDK or CLI version changes; exact-capture claims are pinned to the versions above."
+  ]
+}

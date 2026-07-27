@@ -133,8 +133,9 @@ describe("validateAssistantTurn", () => {
   it("rejects non-records, unsupported schema versions, and invalid statuses by name", () => {
     expect(reasonCode(null)).toBe("record_invalid");
 
+    // Version 2 is accepted since RFC-0011; version 3 does not exist.
     const schema = mutableTurn();
-    schema.schemaVersion = 2;
+    schema.schemaVersion = 3;
     expect(reasonCode(schema)).toBe("schema_version_unsupported");
 
     const status = mutableTurn();

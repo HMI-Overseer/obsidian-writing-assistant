@@ -166,29 +166,7 @@ export class ClaudeCodeService {
     // Forwarded onto every runtime shape below for the send-path preflight (section 6.4).
     const contextWindow = options.contextWindow ? { contextWindow: options.contextWindow } : {};
 
-    // Per-run allow-list, the same canonical resolver the API providers use: reads
-    // unrestricted, writes follow the posture + policy. Held OFF the session
-    // fingerprint (it is not baked into SessionConfig), so a posture flip reuses the
-    // live session instead of cold-rebuilding (prompt-cache design section 6.1.4/section 6.3); the
-    // gate in the callback surface enforces it per turn. Empty when not agentic (no
-    // tools run).
-    const scope: ClaudeCodeRuntimeScope = {
-      leaseId: `claude-generation-${generateId()}`,
-      conversationId: options.conversationId ?? null,
-      posture: options.posture ?? "ask",
-      allowedTools: agentic
-        ? new Set(
-            cloudAllowedToolSet({
-              posture: options.posture ?? "ask",
-              policy: settings.vaultOpPolicy,
-              useThinkTool: false,
-              memoriesEnabled: settings.memoriesEnabled,
-            }).map((tool) => tool.name),
-          )
-        : new Set<string>(),
-      activeFilePath: options.activeFilePath ?? "",
-      correlationPosture: useSdk ? "provider_id" : "none",
-    };
+    const scope = buildRuntimeScope(settings, options, useSdk);
 
     // The legacy path owns its loopback server for exactly one generation, so
     // teardown rides the handle rather than a service field.
@@ -492,6 +470,41 @@ export class ClaudeCodeService {
     // `onunload` cannot await; the returned exit proof has no caller here.
     void this.sessionRegistry.disposeAll();
   }
+}
+
+/**
+ * Everything one generation fixes before its owners exist.
+ *
+ * The allow-list uses the same canonical resolver the API providers use: reads
+ * unrestricted, writes follow the posture and the vault-op policy. It is held OFF
+ * the session fingerprint (it is not baked into `SessionConfig`), so a posture flip
+ * reuses the live session instead of cold-rebuilding (prompt-cache design section
+ * 6.1.4 / section 6.3); the gate in the callback surface enforces it per turn.
+ * Empty when the run is not agentic, because then no tool can run at all.
+ */
+function buildRuntimeScope(
+  settings: PluginSettings,
+  options: ClaudeCodeRunOptions,
+  useSdk: boolean,
+): ClaudeCodeRuntimeScope {
+  const posture = options.posture ?? "ask";
+  return {
+    leaseId: `claude-generation-${generateId()}`,
+    conversationId: options.conversationId ?? null,
+    posture,
+    allowedTools: settings.agenticMode
+      ? new Set(
+          cloudAllowedToolSet({
+            posture,
+            policy: settings.vaultOpPolicy,
+            useThinkTool: false,
+            memoriesEnabled: settings.memoriesEnabled,
+          }).map((tool) => tool.name),
+        )
+      : new Set<string>(),
+    activeFilePath: options.activeFilePath ?? "",
+    correlationPosture: useSdk ? "provider_id" : "none",
+  };
 }
 
 /** Builds the `--mcp-config` JSON describing the loopback HTTP MCP server. */

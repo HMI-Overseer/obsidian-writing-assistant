@@ -1919,6 +1919,85 @@ export const SURFACES = {
     ),
   },
 
+  // Terminal capture failure and orphan recovery (RFC-0011). Two shapes, because the
+  // render model branches on item count: a turn that committed facts before capture
+  // failed carries the `is-error` notice, while a recovered orphan has no items at
+  // all and carries the empty state instead. Both strings are the ones the tree
+  // actually authors, so this checks the real wrap length rather than a short stand-in.
+  assistantTurnCaptureFailure: {
+    w: 620,
+    shot: ".lmsa-chat-window-messages",
+    html: view(
+      `<div class="lmsa-messages-pane"><div class="lmsa-chat-window-messages">
+        ${assistantBubble(
+          assistantTurn(
+            turnItem(
+              "capture-fail-prose",
+              "prose",
+              "thinking",
+              "<p>Let me search the vault for the character's earlier appearances.</p>",
+            ) +
+              turnItem(
+                "capture-fail-tool",
+                "tool_call",
+                "tool",
+                toolTurnBody("Searched vault", "character arc", "Failed"),
+                { after: false, state: "failed" },
+              ),
+            "failed",
+            `<div class="lmsa-assistant-turn-notice is-error" role="status">Error: A redelivered capture batch carried different protocol bytes.</div>`,
+          ),
+        )}
+        ${assistantBubble(
+          assistantTurn(
+            "",
+            "failed",
+            `<div class="lmsa-assistant-turn-empty is-failed" role="status">
+              <span class="lmsa-assistant-turn-empty-marker">${I.x}</span>
+              <span class="lmsa-assistant-turn-empty-label">Error: This turn ended without finishing. One action had already been authorized, and its outcome could not be confirmed.</span>
+            </div>`,
+          ),
+        )}
+      </div></div>`,
+      620,
+    ),
+  },
+
+  // The same two shapes in a narrow sidebar, where the bounded text is longest
+  // relative to the pane and most likely to break the rail alignment.
+  assistantTurnCaptureFailureNarrow: {
+    w: 330,
+    shot: ".lmsa-chat-window-messages",
+    html: view(
+      `<div class="lmsa-messages-pane"><div class="lmsa-chat-window-messages">
+        ${assistantBubble(
+          assistantTurn(
+            turnItem(
+              "narrow-capture-fail-tool",
+              "tool_call",
+              "tool",
+              toolTurnBody("Searched vault", "character arc", "Failed"),
+              { after: false, state: "failed" },
+            ),
+            "failed",
+            `<div class="lmsa-assistant-turn-notice is-error" role="status">Error: A redelivered capture batch carried different protocol bytes.</div>`,
+          ),
+        )}
+        ${assistantBubble(
+          assistantTurn(
+            "",
+            "failed",
+            `<div class="lmsa-assistant-turn-empty is-failed" role="status">
+              <span class="lmsa-assistant-turn-empty-marker">${I.x}</span>
+              <span class="lmsa-assistant-turn-empty-label">Error: This turn ended without finishing. 3 actions had already been authorized, and its outcome could not be confirmed.</span>
+            </div>`,
+          ),
+        )}
+      </div></div>`,
+      330,
+    ),
+  },
+
   // S22: historical edit-review reference, attached to the exact ordered assistant item.
   diffTimeline: {
     w: 700,

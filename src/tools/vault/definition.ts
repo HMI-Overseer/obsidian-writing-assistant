@@ -353,11 +353,11 @@ export const CORE_VAULT_TOOLS: CanonicalToolDefinition[] = [
 ];
 
 /**
- * Full vault tool suite, for chat and plan modes with cloud providers.
+ * Full vault tool suite for cloud providers.
  * Adds recursive tree, filename search, Obsidian-native tools (backlinks,
  * outgoing links, tags, frontmatter), and the get_outline / read_section structure
  * pair on top of the core set. The pair is cloud-only for now; CORE (local)
- * inclusion is deferred to the tool benchmark rather than assumed (tool-set-review D6).
+ * inclusion is deferred to the tool benchmark rather than assumed (ADR-0009).
  */
 export const ALL_VAULT_TOOLS: CanonicalToolDefinition[] = [
   LIST_DIRECTORY_TOOL,

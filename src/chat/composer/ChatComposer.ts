@@ -186,7 +186,7 @@ export class ChatComposer {
       return;
     }
     // Create the throwaway file input in the view's own document so a popped-out
-    // view opens the native picker against its own window (ADR-0024, Phase 7).
+    // view opens the native picker against its own window (ADR-0024).
     // Raw createElement, not createEl: the helper cannot build a detached element
     // on a non-main document (ADR-0026).
     const input = this.refs.textareaEl.ownerDocument.createElement("input");
@@ -284,8 +284,8 @@ export class ChatComposer {
   }
 
   /**
-   * Clear the attached notes after a send. Chat/plan mode freezes a point-in-time
-   * snapshot into the sent message (see snapshotNoteAttachments), so the live
+   * Clear the attached notes after a send. Sending freezes a point-in-time snapshot
+   * into the sent message (see snapshotNoteAttachments), so the live
    * attachment is consumed once per send, re-attach via the context picker to
    * send an updated snapshot. Does not touch staged images (handled separately).
    */

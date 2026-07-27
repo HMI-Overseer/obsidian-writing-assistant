@@ -52,7 +52,7 @@ export function resolveReasoningMenuState(context: ReasoningMenuContext): Reason
  * Builds the level rows for a reasoning menu, one shared shape for the pill's
  * own menu and the overflow menu's reasoning section. Null first: defaults are
  * displayed, never fabricated, the model's own default is not assumed to be
- * any particular level (section 3.3).
+ * any particular level (ADR-0017).
  */
 export function buildReasoningItemSpecs(
   state: ReasoningMenuState,
@@ -144,7 +144,7 @@ export class ReasoningPill {
     );
     // Defaults are displayed, never fabricated: where discovery reports one
     // (LM Studio) the null state names it ("On · default"); otherwise plain
-    // "Default" (section 3.3).
+    // "Default" (ADR-0017).
     const label =
       state.current !== null
         ? REASONING_LEVEL_LABELS[state.current]

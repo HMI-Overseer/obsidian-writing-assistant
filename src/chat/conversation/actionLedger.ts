@@ -87,7 +87,7 @@ export interface DerivedActionTargetState {
   lastApplyError?: string;
   lastUndoRefusal?: string;
   /**
-   * Write-ahead evidence (RFC-0011). A consequential callback records an intent
+   * Write-ahead evidence (ADR-0033). A consequential callback records an intent
    * before crossing its effect boundary; `outcomeUnknown` means its owning
    * attempt was hard-disposed before any real outcome was reported, so the
    * target is terminal without being applied, failed, or declined.
@@ -274,8 +274,8 @@ export function deriveActionControlEligibility(
     UNDO_FAMILIES.has(entry.family) &&
     isEffectUndoable(state.latestEffect);
 
-  // A target whose write-ahead intent never resolved is terminal (RFC-0011
-  // criterion 28). Its approval state still reads `pending`, because the only
+  // A target whose write-ahead intent never resolved is terminal (ADR-0033). Its
+  // approval state still reads `pending`, because the only
   // events it carries are the proposal and its own audit trail, so without this
   // the row would offer Approve and Apply for work that may already have
   // happened. Undo needs an applied effect and is excluded by that alone.
@@ -637,7 +637,7 @@ function deriveUnresolved(
     target.approval === "declined" ||
     target.effect === "applied" ||
     // A lost outcome is terminal: nobody can act on it, and nothing may retry
-    // or supersede it into a different answer (RFC-0011 criterion 28).
+    // or supersede it into a different answer (ADR-0033).
     target.outcomeUnknown
   ) {
     return false;

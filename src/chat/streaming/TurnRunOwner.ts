@@ -12,8 +12,7 @@ import {
 } from "../../api/assistantStreamRun";
 
 /**
- * Turn-level ownership of every provider attempt (RFC-0011 phase 2, settled plan
- * decision 12).
+ * Turn-level ownership of every provider attempt (ADR-0032).
  *
  * The owner is constructed from the pre-minted turn ID *before* retry can call a
  * provider, which closes the gap the incident exposed: a run that fails during
@@ -217,8 +216,8 @@ export class TurnRunOwner {
   }
 
   /**
-   * Which attempt is in flight, as evidence for a write-ahead intent (RFC-0011
-   * phase 6). Ordinal 0 with no attempt open is a real state, not a placeholder:
+   * Which attempt is in flight, as evidence for a write-ahead intent (ADR-0033).
+   * Ordinal 0 with no attempt open is a real state, not a placeholder:
    * an effect can be authorized between rounds, when no provider is streaming.
    */
   get currentAttempt(): { leaseId: string; attemptOrdinal: number } {
@@ -235,8 +234,8 @@ export class TurnRunOwner {
    * True once a callback with an irreversible outcome was admitted under any of
    * this turn's attempts.
    *
-   * Phase 2 owns the flag and the retry refusal it drives; phase 5 wires the
-   * Claude callback surfaces that set it. Retry permission depends on this rather
+   * The owner holds the flag and the retry refusal it drives; the Claude callback
+   * surfaces set it. Retry permission depends on this rather
    * than on whether the UI happened to receive a first event, because a retried
    * request can repeat consequential work that the first attempt already did.
    */
@@ -249,10 +248,10 @@ export class TurnRunOwner {
   }
 
   /**
-   * Binds a provider's own callback lease to this turn (RFC-0011 phase 5). The
+   * Binds a provider's own callback lease to this turn (ADR-0032). The
    * lease reports a callback that crossed an effect boundary, which is what
-   * finally gives {@link noteConsequentialCallback} the production writer phase 2
-   * named; in return the owner stamps each attempt's ordinal onto the lease as
+   * gives {@link noteConsequentialCallback} its production writer; in return the
+   * owner stamps each attempt's ordinal onto the lease as
    * evidence, so a consequential outcome can be attributed to the attempt that
    * produced it without the lease taking its identity from that attempt.
    */

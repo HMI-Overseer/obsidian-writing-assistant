@@ -239,7 +239,7 @@ export function describeReplayFidelity(
 /**
  * Maps a turn's session recovery fields to a label + visual state, or null when the
  * provider doesn't report session reuse (everything but Claude Code). The three-rung
- * recovery ladder (Model A′) is mirrored truthfully: `reused` is a win (warm
+ * recovery ladder (ADR-0016) is mirrored truthfully: `reused` is a win (warm
  * process), `resumed` is the middle rung (the process was gone but the session was
  * restored from disk with its working context intact, only API cache warmth lost),
  * a first-turn `no-session` is a neutral cold mint, and any other rebuild is the
@@ -256,7 +256,7 @@ export function describeSession(
 ): { text: string; state: "reused" | "resumed" | "started" | "rebuilt" } | null {
   if (usage.sessionReused === undefined) return null;
   if (usage.sessionReused) return { text: "session reused", state: "reused" };
-  // Middle rung (Model A′): restored from disk, not a warm reuse and not a rebuild.
+  // Middle rung (ADR-0016): restored from disk, not a warm reuse and not a rebuild.
   if (usage.sessionResumed) return { text: "session resumed", state: "resumed" };
   const reason = usage.sessionRebuildReason;
   if (reason === "no-session") return { text: "session started", state: "started" };

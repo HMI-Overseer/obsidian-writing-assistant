@@ -10,7 +10,7 @@ export type DeltaExtractor = (json: unknown) => string | null;
  *
  * The raw form is what a capture frame key is derived from, hashed before any
  * JSON parsing so that whitespace and key order the parser would erase stay
- * visible (RFC-0011 settled decision 6).
+ * visible (ADR-0031).
  */
 export type SSEPayloadListener = (json: unknown, raw: string) => void;
 

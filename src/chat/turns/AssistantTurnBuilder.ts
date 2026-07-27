@@ -169,7 +169,7 @@ type ReconciledPart = ReconciledProseRun | CompletedAssistantToolCallBlock;
  * Grouping it is what makes {@link AssistantTurnBuilder.applyCaptureBatch}
  * atomic: a transaction clones this whole object, applies and validates the
  * batch on the clone, and swaps one reference on success. Rollback mutation and
- * a second hand-written planning reducer were both rejected (settled decision 7)
+ * a second hand-written planning reducer were both rejected
  * because either would have to stay in step with the granular methods by hand,
  * and a drift between them is exactly the class of bug this is fixing.
  *
@@ -195,9 +195,9 @@ interface AssistantTurnBuilderState {
    *
    * Only batches whose frame key is the provider's own wire identity are
    * indexed, because only there does a repeated key prove redelivery. This is
-   * not the lease-local batch journal of settled decision 10: it records no
-   * applied effects, no dependent batches, and no effect boundaries, and
-   * decision 15.3 defers those until a real `supersedes` frame is observed.
+   * not a lease-local batch journal: it records no applied effects, dependent
+   * batches, or effect boundaries. Those require a real `supersedes` frame
+   * (ADR-0031).
    */
   committedBatches: Map<CaptureBatchId, CaptureFactsFingerprint>;
   captureDiagnostics: ProviderCaptureDiagnostic[];
@@ -234,7 +234,7 @@ function createBuilderState(turnId: string): AssistantTurnBuilderState {
  *
  * Post-commit notifications are derived from this rather than from the facts the
  * batch carried, so a subscriber is told only about work that actually landed
- * (settled decision 9).
+ * (ADR-0031).
  */
 export interface CaptureBatchChanges {
   /** Segments this batch opened, in arrival order. */
@@ -306,7 +306,7 @@ export class AssistantTurnBuilder {
    * incident broke, and it is not reachable by fixing identity alone.
    *
    * No callback runs during application. The commit result carries what the batch
-   * changed so the caller can notify after the swap (settled decision 9), which is
+   * changed so the caller can notify after the swap (ADR-0031), which is
    * what keeps a subscriber from ever observing the draft.
    */
   applyCaptureBatch(
@@ -421,7 +421,7 @@ export class AssistantTurnBuilder {
       );
     }
     // Skipped through the committed index rather than reapplied, so redelivery
-    // preserves the original committed item IDs (settled decision 8).
+    // preserves the original committed item IDs (ADR-0031).
     return {
       batchId: batch.batchId,
       duplicate: true,
@@ -1478,7 +1478,7 @@ export class AssistantTurnBuilder {
   }
 
   /**
-   * Version 2 is what the capture path writes now (RFC-0011 phase 4): every item
+   * Version 2 is what the capture path writes now (ADR-0031): every item
    * carries the evidence of how it was placed, so a consumer never has to infer
    * an ordering claim from a list position. Load-time migration is the only other
    * writer of version 2 and stays as it is.

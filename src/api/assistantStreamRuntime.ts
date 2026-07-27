@@ -19,10 +19,9 @@ import {
 } from "./assistantStreamRun";
 
 /**
- * The one implementation of {@link AssistantStreamRun} every provider uses (RFC-0011
- * phase 2).
+ * The one implementation of {@link AssistantStreamRun} every provider uses (ADR-0032).
  *
- * Phase 0 measured that a generator a consumer stops reading is not a stopped
+ * Measurements confirmed that a generator a consumer stops reading is not a stopped
  * provider, so ownership cannot be left to each client to remember. This factory
  * owns the parts that were previously forgotten in four separate places: it
  * retains the raw iterator outside the consumption loop and returns it on every

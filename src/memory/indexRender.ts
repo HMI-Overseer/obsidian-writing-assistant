@@ -1,7 +1,7 @@
 /**
- * The always-on memory index (RFC-0007 L1): one JSON line per enabled memory
+ * The always-on memory index (RFC-0007): one JSON line per enabled memory
  * under a governing header. Deterministic bytes are the contract: the session
- * pin (Phase 2) and the Claude Code config fingerprint both hash these exact
+ * pin and the Claude Code config fingerprint both hash these exact
  * bytes, so rendering must be a pure function of the enabled records with a
  * locale-independent order. `JSON.stringify` per line is also the injection
  * guard: a hostile description stays one escaped string and cannot forge a

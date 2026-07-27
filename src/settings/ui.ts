@@ -312,7 +312,7 @@ export function createModelSelector(
   //
   // Bind to the container's own document, not the bare global: this selector is
   // reused inside the chat composer (KnowledgePopover), whose leaf can be popped
-  // into a separate window (ADR-0024, Phase 7). Capturing it once also guarantees
+  // into a separate window (ADR-0024). Capturing it once also guarantees
   // the add and the two removes target the identical Document reference, so the
   // click-away listener can never be stranded on a different document than it was
   // added to.

@@ -5,11 +5,11 @@
  *
  * Two contracts hold everywhere in this file:
  *
- * 1. **Persist first, invalidate second** (plan decision 16). A pin is dropped
+ * 1. **Persist first, invalidate second** (RFC-0007). A pin is dropped
  *    only after `saveSettings()` resolves; a rejected save restores the
  *    pre-change value and invalidates nothing, so a failed write can never leave
  *    a live session governed by an index that was never stored.
- * 2. **Targeted versus global invalidation** (plan decision 18). A retraction
+ * 2. **Targeted versus global invalidation** (RFC-0007). A retraction
  *    (edit, disable, delete) drops only pins whose bytes carried that name, so a
  *    session pinned before the memory existed keeps its pin. The explicit
  *    whole-feature events (add, enable, master toggle) drop every pin, because
@@ -31,7 +31,7 @@ import {
 /* ── Modal validation ─────────────────────────────────────────────────────── */
 
 /**
- * Validate a Memories-tab submission with the Phase 1 validators. Identity is the
+ * Validate a Memories-tab submission with the shared validators. Identity is the
  * normalized name, so a rename must not collide with another stored record; the
  * record being edited is excluded from the collision set, which is what lets a
  * user re-save an entry with its own name unchanged.
@@ -84,7 +84,7 @@ export type MemoryMutation =
 
 export type MemoryInvalidation = { scope: "all" } | { scope: "containing"; name: string };
 
-/** Which pins a mutation retires once it has been persisted (decision 18). */
+/** Which pins a mutation retires once it has been persisted (RFC-0007). */
 export function memoryInvalidationFor(mutation: MemoryMutation): MemoryInvalidation {
   switch (mutation.kind) {
     case "add":
@@ -173,7 +173,7 @@ export interface MemoryStoreAccess {
   invalidatePinsContaining: (name: string) => void;
 }
 
-/** Run one tab mutation end to end: apply, persist, then invalidate per decision 18. */
+/** Run one tab mutation end to end: apply, persist, then invalidate (RFC-0007). */
 export async function commitMemoryMutation(
   store: MemoryStoreAccess,
   mutation: MemoryMutation,
@@ -230,8 +230,8 @@ export interface MemoryGateAccess {
  * The memory approval gate, the one surfacing of `policy.memory`. All three
  * positions are reachable, so `deny` no longer needs a hand-edit of `data.json`.
  * No pin is touched: the gate changes who approves a mutation, not what the index
- * says, and a policy change must stay fingerprint-neutral for Claude Code (plan
- * decision 6).
+ * says, and a policy change must stay fingerprint-neutral for Claude Code
+ * (RFC-0007).
  */
 export async function commitMemoryGate(access: MemoryGateAccess, gate: Gate): Promise<void> {
   const previous = access.getGate();

@@ -54,7 +54,7 @@ export class ChatGenerationOrchestrator {
    * @param cause `"unload"` when the plugin or view is being torn down. It rides
    *   the abort itself so the provider-run owner cancels with `plugin_unload`
    *   rather than `user_stop`: only a user Stop may preserve a Claude session for
-   *   reuse, and a session being torn down is not one to preserve (RFC-0011).
+   *   reuse, and a session being torn down is not one to preserve (ADR-0032).
    */
   stopGeneration(cause: "user" | "unload" = "user"): void {
     if (!this.activeAbortController) return;

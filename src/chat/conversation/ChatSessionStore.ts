@@ -87,7 +87,7 @@ export class ChatSessionStore {
   }
 
   /**
-   * The active conversation's Claude Code resume cursor (Model A′), read at the start
+   * The active conversation's Claude Code resume cursor (ADR-0016), read at the start
    * of a turn so the session registry can attempt a disk `resume` before a synthetic
    * rebuild. Undefined when no claudecode turn has banked one.
    */
@@ -198,17 +198,16 @@ export class ChatSessionStore {
     );
   }
 
-  // ── In-flight generation audit (RFC-0011 phase 6, section 9.1) ──
+  // ── In-flight generation audit (ADR-0033) ──────────────────────
 
   /**
    * Opens one generation's durable write-ahead audit and hands back the recorder
    * its effect boundaries write through.
    *
    * The audit is keyed by the draft identity the generation already owns, and the
-   * lease rides on the record as evidence (settled question: plan section 4.2 says
-   * "keyed by lease identity" while decision 21 says `(turnId, attemptOrdinal)`,
-   * and against the tree those are different namespaces, because the Claude
-   * generation lease's ID is minted in `getRuntime()` before a turn ID exists).
+   * lease rides on the record as evidence. The Claude generation lease ID and the
+   * attempt identity are different namespaces because `getRuntime()` mints the
+   * generation lease before a turn ID exists (ADR-0033).
    *
    * `recordIntent` resolves only after the conversation is on disk, so awaiting it
    * is what makes the evidence write-ahead rather than merely intended. It refuses
@@ -243,7 +242,7 @@ export class ChatSessionStore {
   }
 
   /**
-   * Finalizes an audit found on disk (section 9.3, migration rule 5).
+   * Finalizes an audit found on disk (ADR-0033).
    *
    * An audit that survived a load belongs to a generation that never reached its
    * terminal transaction, so it becomes one failed revision carrying every
@@ -526,7 +525,7 @@ export class ChatSessionStore {
       ...this.memory.getActiveBranchOrigin(),
       // Durable write-ahead evidence for a generation still in flight. This is
       // the write half of the round trip: the loader has preserved an orphaned
-      // audit since phase 1, but nothing ever wrote one (RFC-0011 phase 6).
+      // audit through loading, but nothing ever wrote one (ADR-0033).
       ...(this.memory.getGenerationAudit()
         ? { inFlightGenerationAudit: this.memory.getGenerationAudit() as InFlightGenerationAudit }
         : {}),

@@ -78,7 +78,7 @@ export interface PrepareMessagesOptions {
   app: App;
   store: ChatSessionStore;
   settings: PluginSettings;
-  /** Session approval posture, the cloud surface's replacement for the plan/chat/edit mode (section 6.3). */
+  /** Session approval posture, the cloud surface's replacement for the plan/chat/edit mode. */
   posture: ApprovalPosture;
   ragService?: RagService;
   memoryService: MemoryService;
@@ -145,7 +145,7 @@ export async function prepareApiMessages(
   const useVaultTools = settings.agenticMode && usePluginTools;
   const claudeCodeRetrievesViaMcp = isClaudeCode && settings.agenticMode;
 
-  // Ambient editing (prompt-cache design section 6.3): with the plan/chat/edit modes gone, one
+  // Ambient editing: with the plan/chat/edit modes gone, one
   // unified system prefix frames every turn. A non-agentic turn (no tools) still edits,
   // via SEARCH/REPLACE blocks the diff engine parses, so it carries the regex-edit format
   // guidance whenever editing is permitted but no tools carry it.
@@ -162,8 +162,8 @@ export async function prepareApiMessages(
   // The active note + extra notes (and their embedded images) are frozen into a
   // point-in-time snapshot bound to the user turn at send time (snapshotNoteAttachments),
   // so they ride message.attachments and stay cache-stable. There is no live re-read of
-  // the active document here, the model reads current content via tools when it edits
-  // (the section 10/section 13 cache-coupling anti-pattern is gone).
+  // the active document here, the model reads current content via tools when it
+  // edits, avoiding cache coupling.
   const activeFilePath = app.workspace.getActiveFile()?.path;
 
   const historyProjection = projectRequestHistoryTurns(
@@ -229,7 +229,7 @@ export async function prepareApiMessages(
   // Build the tool surface. The only posture/policy-varying decision is the write gate
   // (which mutating tools the session permits); reads are unrestricted on the cloud
   // paths. The canonical resolver lives in src/tools/toolSurface.ts so every path reads
-  // one source (prompt-cache design section 6.1.1/section 6.1.4/section 6.1.5).
+  // one source.
   //
   // think is a meta-reasoning tool that benefits large cloud models. LM Studio (local
   // models) already struggle with multi-tool schemas, and Magistral-family reasoning
@@ -346,7 +346,7 @@ export async function prepareApiMessages(
       toolSearchNote +
       regexEditGuidance;
 
-  // Layer 1 (prompt-cache design section 6.1.2): on the billed paths that have a tail
+  // Layer 1: on the billed paths that have a tail
   // mechanism, hold the cached `system` block invariant (profile prompt plus pinned
   // memory index) and
   // carry the per-turn wording + tool guidance in the message tail. Local providers
@@ -388,7 +388,7 @@ export async function prepareApiMessages(
 
 /**
  * Layer 1 decomposition of the system prompt into an invariant cached block and a
- * per-turn tail (prompt-cache design section 6.1.2).
+ * per-turn tail.
  *
  * When `useModeTail` is false (local providers, or built-in prompts disabled),
  * returns the full system prompt unchanged with no tail. When true, the supplied
@@ -577,7 +577,7 @@ function structuralReplayFailure(turn: AssistantTurnRecord): string | null {
     }
   }
   // Runtime capture evidence gates replay before any per-item field does
-  // (RFC-0011 invariants 7c and 17). A capture-invalid declaration is known to
+  // (ADR-0031). A capture-invalid declaration is known to
   // sit at the wrong provider position, and an unplaced item makes no ordering
   // claim at all, so neither can be reproduced as provider output. Forced
   // quiescence means the transcript was never proven complete.

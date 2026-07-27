@@ -54,7 +54,7 @@ export interface ClaudeCodeDetection {
 
 /** Options for a single Claude Code run, set just before the subprocess is spawned. */
 export interface ClaudeCodeRunOptions {
-  /** Session approval posture; gates which writes the per-run allow-list permits (section 6.3). */
+  /** Session approval posture; gates which writes the per-run allow-list permits. */
   posture?: ApprovalPosture;
   /** Vault-relative path of the active note (edit target + search relevance). */
   activeFilePath?: string;
@@ -65,7 +65,7 @@ export interface ClaudeCodeRunOptions {
    */
   conversationId?: string;
   /**
-   * The conversation's persisted resume cursor (Model A′), read from the last banked
+   * The conversation's persisted resume cursor (ADR-0016), read from the last banked
    * turn. When the live process is gone, the registry re-checks it against this turn's
    * transcript and, if it passes, `resume`s the session from disk instead of
    * rebuilding. Absent ⇒ resume is not attempted.
@@ -73,7 +73,7 @@ export interface ClaudeCodeRunOptions {
   resumeCursor?: ClaudeCodeResumeCursor;
   /**
    * The model's discovered context window, forwarded onto the runtime for the
-   * send-path preflight (section 6.4, phase 5). Absent (first turn, none reported yet) ⇒
+   * send-path preflight. Absent (first turn, none reported yet) ⇒
    * the preflight is a passive no-op.
    */
   contextWindow?: number;
@@ -92,23 +92,23 @@ const MCP_SERVER_NAME = "writing_assistant";
  * in-process {@link createVaultSdkMcpServer} instance; on the legacy fallback path
  * (incompatible CLI) it is the loopback-HTTP {@link VaultMcpServer}.
  *
- * Callback ownership (RFC-0011 phase 5). The service holds no current-run state.
+ * Callback ownership (ADR-0032). The service holds no current-run state.
  * Each generation gets a {@link ClaudeCodeGenerationHandle} from {@link getRuntime},
  * and every callback surface the generation can reach owns a
  * {@link ClaudeCodeRunSlot} that the handle installs its lease into. A callback
  * therefore resolves to the generation that authorized it or to nothing, rather
  * than to whatever a mutable field happens to hold when it lands. Surfaces are per
- * provider session or per one-shot run (settled decision 17): the legacy loopback
+ * provider session or per one-shot run: the legacy loopback
  * server is no longer one shared service-wide provider for successive generations.
  */
 export class ClaudeCodeService {
-  /** Per-conversation registry of live SDK sessions (Model B). Disposed on unload. */
+  /** Per-conversation registry of live SDK sessions (ADR-0016). Disposed on unload. */
   private readonly sessionRegistry = new SdkSessionRegistry();
   /**
    * The callback slot of each conversation's live persistent session, so a new
    * generation can take over the surface its `claude` process already talks to. A
    * fresh mint replaces the entry and tombstones the one it displaces, which is
-   * how a tombstone dies with the session it guards (settled decision 15.4).
+   * how a tombstone dies with the session it guards (ADR-0032).
    */
   private readonly sessionSlots = new Map<string, ClaudeCodeRunSlot>();
   /** Generations that have not released yet, so unload can retire their surfaces. */
@@ -124,7 +124,7 @@ export class ClaudeCodeService {
     private readonly persistSettings: () => Promise<void>,
     /**
      * Receives the normalized effort-level harvest whenever a fresh SDK session
-     * mints (section 3.1 layer 2). The container merges it into the availability
+     * mints (ADR-0017). The container merges it into the availability
      * service and the persisted last-seen cache; absent in tests.
      */
     private readonly onEffortLevelsDiscovered?: (
@@ -163,7 +163,7 @@ export class ClaudeCodeService {
     const settings = this.getSettings();
     const useSdk = await this.isSdkUsable();
     const agentic = settings.agenticMode;
-    // Forwarded onto every runtime shape below for the send-path preflight (section 6.4).
+    // Forwarded onto every runtime shape below for the send-path preflight.
     const contextWindow = options.contextWindow ? { contextWindow: options.contextWindow } : {};
 
     const scope = buildRuntimeScope(settings, options, useSdk);
@@ -180,13 +180,13 @@ export class ClaudeCodeService {
       handle.activeLease?.toolCorrelation ?? scope.correlationPosture;
 
     // SDK path with a conversation id → persistent per-conversation session
-    // (Model B): one live `claude` process reused across turns for context
+    // (ADR-0016): one live `claude` process reused across turns for context
     // retention + incremental caching. The session bakes model / systemPrompt /
     // agentic / toolNames; config drift cold-rebuilds it (see
     // harnessSession.isSessionUsable). Mode is no longer baked, so posture
     // switches reuse the session, the per-run allow-list gates writes instead.
     // Effort is compared outside the fingerprint: a low..xhigh change flips the
-    // live session via applyFlagSettings instead of rebuilding (section 3.2).
+    // live session via applyFlagSettings instead of rebuilding (ADR-0017).
     if (useSdk && options.conversationId) {
       const conversationId = options.conversationId;
       const resumeCursor = options.resumeCursor;
@@ -205,7 +205,7 @@ export class ClaudeCodeService {
           // had; it is reached only when the graceful tier overran its measured
           // deadline, or when capture failure means the session must not survive.
           // Its callback surface is tombstoned with it: a disposed session is never
-          // reused, and neither is the slot it answered through (decisions 18, 15.4).
+          // reused, and neither is the slot it answered through (ADR-0032).
           hardDispose: () => {
             this.sessionSlots.get(conversationId)?.tombstone();
             this.sessionSlots.delete(conversationId);
@@ -253,7 +253,7 @@ export class ClaudeCodeService {
 
     // Fallback path (incompatible/missing CLI): the legacy loopback-HTTP bridge,
     // scoped to this generation. A new generation never reuses the old server as a
-    // callback target (settled decision 17).
+    // callback target (ADR-0032).
     legacyServer = new VaultMcpServer(
       MCP_SERVER_NAME,
       this.createCallbackProvider(handle),
@@ -322,7 +322,7 @@ export class ClaudeCodeService {
           claudePath: command,
           vaultRoot,
           sdkMcp,
-          // Present only on a disk resume (Model A′): loads the session history from
+          // Present only on a disk resume (ADR-0016): loads the session history from
           // ~/.claude so only the delta turn need be sent.
           ...(resumeSessionId ? { resume: resumeSessionId } : {}),
           // The session's own spawn owner, so its disposal has a bounded hard tier.
@@ -356,7 +356,7 @@ export class ClaudeCodeService {
   /**
    * The advertised tool NAMES, read from the same catalogue function the callback
    * surface advertises, so the `SessionConfig.toolNames` fingerprint cannot drift
-   * from it (prompt-cache design section 6.1.1).
+   * from it.
    */
   private stableToolNames(): string[] {
     return claudeCodeStableToolSet(this.getSettings().memoriesEnabled).map(
@@ -389,7 +389,7 @@ export class ClaudeCodeService {
    * Opens the callback surface a freshly minted session will answer through,
    * retiring the one it displaces. The old slot is tombstoned rather than dropped
    * silently, because its `claude` process may still be unwinding and must be
-   * refused rather than answered (settled decision 18).
+   * refused rather than answered (ADR-0032).
    */
   private openSessionSlot(conversationId: string): ClaudeCodeRunSlot {
     this.sessionSlots.get(conversationId)?.tombstone();
@@ -403,7 +403,7 @@ export class ClaudeCodeService {
    * surface that is tombstoned, or that a prior generation never released, is not
    * taken over: it is retired and its session disposed, so this turn cold-rebuilds
    * onto a clean surface rather than sharing one whose ownership cannot be proven
-   * (plan section 8.2).
+   * (ADR-0032).
    */
   private adoptSessionSlot(
     conversationId: string,
@@ -478,8 +478,8 @@ export class ClaudeCodeService {
  * The allow-list uses the same canonical resolver the API providers use: reads
  * unrestricted, writes follow the posture and the vault-op policy. It is held OFF
  * the session fingerprint (it is not baked into `SessionConfig`), so a posture flip
- * reuses the live session instead of cold-rebuilding (prompt-cache design section
- * 6.1.4 / section 6.3); the gate in the callback surface enforces it per turn.
+ * reuses the live session instead of cold-rebuilding; the gate in the callback
+ * surface enforces it per turn.
  * Empty when the run is not agentic, because then no tool can run at all.
  */
 function buildRuntimeScope(

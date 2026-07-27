@@ -6,7 +6,7 @@ export type BubbleRole = "user" | "assistant";
 /**
  * Muted placeholder shown for a stopped (aborted) generation that produced no
  * text. Shared by the live finalizer and the persisted-history renderer so a
- * claudecode turn persisted with empty content (section 6.1 persist-always) shows the
+ * claudecode turn persisted with empty content shows the
  * same face whether it just aborted or was reloaded from disk.
  */
 export const GENERATION_STOPPED_LABEL = "Generation stopped.";

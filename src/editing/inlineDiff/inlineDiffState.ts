@@ -80,7 +80,7 @@ class InlineReplacementWidget extends WidgetType {
     // Build against the editor's own document, not the bare global. A CodeMirror
     // editor can live in a popped-out markdown window independent of our chat view,
     // so the widget's document is the editor's, reached via the view CM6 passes in
-    // (ADR-0024, Phase 7). Raw createElement, not createEl: CM6 mounts this root, so
+    // (ADR-0024). Raw createElement, not createEl: CM6 mounts this root, so
     // it is detached at creation, and createEl cannot target a non-main document
     // (ADR-0026).
     const block = view.dom.ownerDocument.createElement("div");

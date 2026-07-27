@@ -29,7 +29,7 @@ export interface ReasoningDiscovery {
  * sending a level to a model without the capability can break the request
  * (the gemma4 jinja-template failure, 2026-07-06), so an undiscovered model
  * offers nothing rather than a guess. The Claude Code init-handshake harvest
- * (section 3.1 layer 2) slots in here the same way when it lands.
+ * slots in here the same way within ADR-0017's model-aware capability boundary.
  */
 export function resolveReasoningLevels(
   model: CompletionModel,
@@ -42,7 +42,7 @@ export function resolveReasoningLevels(
 }
 
 /**
- * The provider-specific per-model layer for Anthropic (section 3.1 layer 2 equivalent, keyed off the same
+ * The provider-specific per-model layer for Anthropic (ADR-0017), keyed off the same
  * capability gates the payload builder enforces, so the offered set and the
  * emitted request can never disagree): adaptive-capable models take effort
  * tiers up to `max`, with `xhigh` only where the API honors it (Opus 4.7+;

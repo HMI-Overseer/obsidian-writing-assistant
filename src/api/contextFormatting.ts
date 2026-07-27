@@ -8,12 +8,12 @@ import type { AdditionalContextItem, DocumentContext } from "../shared/chatReque
  * Shared across all provider clients so placement and labels stay consistent.
  */
 
-/** A frozen note snapshot attached to a user turn (chat/plan mode). */
+/** A frozen note snapshot attached to a user turn. */
 export function formatNoteAttachment(note: NoteAttachment): string {
   return `---\nAttached note (${note.filePath}):\n${note.content}`;
 }
 
-/** The live document under edit (edit mode), re-sent each turn. */
+/** The live document under edit, re-sent each turn. */
 export function formatDocumentContext(doc: DocumentContext): string {
   const label = doc.isFull
     ? `Document to edit (${doc.filePath})`

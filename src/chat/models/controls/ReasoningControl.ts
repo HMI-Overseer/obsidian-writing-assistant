@@ -3,7 +3,7 @@ import { REASONING_LEVEL_LABELS } from "../../../shared/reasoning";
 
 export interface ReasoningControlOptions {
   value: ReasoningLevel | null;
-  /** The levels the active model actually offers (resolved set, section 3.1). */
+  /** The levels the active model actually offers (resolved set, ADR-0017). */
   levels: ReasoningLevel[];
   onChange: (value: ReasoningLevel | null) => void;
 }

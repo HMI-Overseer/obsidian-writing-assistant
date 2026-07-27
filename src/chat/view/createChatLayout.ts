@@ -9,7 +9,7 @@ function ensureGlassFilter(root: HTMLElement): void {
 
   // Build against the view's own document (root.ownerDocument), not the bare global
   // `document`: if the leaf is dragged into a popout window the filter must be created
-  // in that window's document, not the main window's. See ADR-0024 and Phase 7.
+  // in that window's document, not the main window's. See ADR-0024.
   const doc = root.ownerDocument;
 
   const svg = doc.createElementNS(SVG_NS, "svg");

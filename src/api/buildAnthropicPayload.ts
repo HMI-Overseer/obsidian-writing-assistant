@@ -17,9 +17,9 @@ const DEFAULT_MAX_TOKENS = 4096;
  * tools + system breakpoint, so at most 3 land on the conversation. Each
  * breakpoint's cache lookup walks back at most 20 content blocks, so intermediate
  * breakpoints are spaced ~15 blocks apart to keep a long agentic turn (many
- * tool_use / tool_result blocks emitted in one turn) inside that window
- * (prompt-cache design section 5 / section 10, verified against the bundled claude-api
- * reference's 20-block-lookback and 4-breakpoint rules).
+ * tool_use / tool_result blocks emitted in one turn) inside that window. The
+ * bundled claude-api reference confirms the 20-block lookback and 4-breakpoint
+ * rules.
  */
 const MAX_CONVERSATION_BREAKPOINTS = 3;
 const CONVERSATION_BREAKPOINT_BLOCK_STRIDE = 15;
@@ -316,7 +316,7 @@ export function buildAnthropicMessages(
   }
 
   // Per-mode wording rides the message tail so the cached `system` block stays
-  // mode-invariant (Layer 1, prompt-cache design section 6.1.3). On Opus 4.8+ it's a
+  // mode-invariant. On Opus 4.8+ it's a
   // non-spoofable {role:"system"} message appended after the cached history (it
   // must follow a user turn and be the last entry, both hold here); older
   // models 400 on a system message, so it falls back to a <system-reminder>
@@ -347,10 +347,10 @@ export function buildAnthropicMessages(
     cacheSettings.ttl === "1h" ? { type: "ephemeral", ttl: "1h" } : { type: "ephemeral" };
 
   // Conversation breakpoint(s): cache the growing history incrementally, not just
-  // tools + system (prompt-cache design section 6.1.6, goal G3). Anchored on the last
+  // tools + system. Anchored on the last
   // stable turn so the per-turn volatile tail (note/doc/RAG context + the modeTail
   // system/<system-reminder>) stays after the breakpoint and never voids the
-  // cached prefix (section 3.4 / section 10).
+  // cached prefix.
   placeConversationBreakpoints(messages, cacheControl);
 
   // System breakpoint: a content block carrying cache_control caches tools +
@@ -496,7 +496,7 @@ function ensureAnthropicUserBlocks(message: AnthropicMessage): AnthropicContentB
 
 /**
  * Places up to {@link MAX_CONVERSATION_BREAKPOINTS} cache breakpoints on the
- * stable conversation history so it caches incrementally turn over turn (goal G3),
+ * stable conversation history so it caches incrementally turn over turn,
  * not just tools + system.
  *
  * The newest breakpoint lands on the last *stable* turn (everything before the

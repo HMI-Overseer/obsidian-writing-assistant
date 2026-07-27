@@ -13,7 +13,7 @@ export const DEFAULT_COMPLETION_MAX_TOKENS = 2000;
 export const MAX_CONVERSATIONS = 50;
 
 // ---------------------------------------------------------------------------
-// Provider capture bounds, RFC-0011
+// Provider capture bounds, ADR-0031
 // ---------------------------------------------------------------------------
 
 /**
@@ -45,30 +45,30 @@ export const CAPTURE_DIAGNOSTIC_MESSAGE_CHARS = 240;
  * path or a name and a one-line statement of the operation, so a long one is
  * carrying content that has no business in an audit record. It clamps our own
  * text at authorship and never gates a read, and the number of intents a
- * generation may record is deliberately unbounded (RFC-0010, settled decision 29:
- * no bound may discard evidence).
+ * generation may record is deliberately unbounded (RFC-0010: no bound may discard
+ * evidence).
  */
 export const GENERATION_AUDIT_SUMMARY_CHARS = 240;
 
 // ---------------------------------------------------------------------------
-// Provider termination deadlines, RFC-0011
+// Provider termination deadlines, ADR-0032
 // ---------------------------------------------------------------------------
 
 /**
  * The one place a provider termination deadline is written.
  *
- * Every value below is selected from the measurements in the phase 0 termination
- * report, `docs/work/plans/notes/2026-07-27-provider-frame-phase0-termination-report.md`.
- * These are the only admissible kind of limit under RFC-0010 and settled plan
- * decision 29: "the provider stopped answering within its measured deadline"
- * names a failure, so it may gate. A count never does, so nothing here counts
- * frames, facts, rounds, or attempts.
+ * Every value below is selected from measured provider termination behavior
+ * (ADR-0032).
+ * These are the only admissible kind of limit under RFC-0010: "the provider
+ * stopped answering within its measured deadline" names a failure, so it may
+ * gate. A count never does, so nothing here counts frames, facts, rounds, or
+ * attempts.
  *
  * Direct HTTP providers deliberately have no entry. Their stop is
  * `AbortController.abort()` plus `closeIterator()`, both local operations that
  * never wait on the remote, so there is no "provider stopped answering" failure
  * for a deadline to name. Inventing one would be a guess wearing a constant's
- * clothes, which is exactly what decision 26 forbids.
+ * clothes, which is why only measured deadlines belong here (ADR-0032).
  */
 
 /**
@@ -85,7 +85,7 @@ export const CLAUDE_LEGACY_GRACEFUL_STOP_MS = 500;
  * rather than at a tight margin, because a single sample of a two-stage timer
  * chain that lands slightly slow would force-dispose a session that was about to
  * settle cleanly, and forced settlement costs the user their session reuse.
- * Phase 7's provider audit re-measures at n>=3.
+ * Re-measure at n>=3 before changing this value (ADR-0032).
  */
 export const CLAUDE_SDK_GRACEFUL_STOP_MS = 10_000;
 
@@ -178,7 +178,7 @@ export const DEFAULT_MEMORIES: readonly Memory[] = [
   },
 ];
 
-// The unified system prompt prefix (the plan/chat/edit modes are gone, section 6.3). Edit
+// The unified system prompt prefix is shared now that the plan/chat/edit modes are gone. Edit
 // capability rides the dynamic tool/regex guidance, so the prefix stays general.
 export const DEFAULT_SYSTEM_PROMPT_PREFIX =
   "When asked to research, explore, or find information, search exhaustively before answering. " +

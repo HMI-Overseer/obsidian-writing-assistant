@@ -117,7 +117,7 @@ export interface ToolLoopCallbacks {
    * Called once a vault-op / edit step resolves (it was recorded before the user
    * decided). Carries the tool result so the timeline can flag failures / declines /
    * policy-denials and surface the model-facing error text, plus the real
-   * `disposition` the timeline persists for the cold-rebuild replay digest (phase 2).
+   * `disposition` the timeline persists for the cold-rebuild replay digest (ADR-0016).
    */
   onStepResult?: (
     toolCallId: string,
@@ -129,7 +129,7 @@ export interface ToolLoopCallbacks {
   onCalibrate?: (request: ChatRequest, usage: UsageResult) => void;
   /**
    * The settlement evidence of every attempt this turn opened, reported once the
-   * loop has proven quiescence (RFC-0011 phase 6, section 9.2).
+   * loop has proven quiescence (ADR-0031, ADR-0032).
    *
    * The turn record is frozen by `finishTurn()` before that proof exists, and on
    * a failure path the loop throws rather than returning, so this is how the
@@ -212,11 +212,11 @@ export async function runToolLoop(
    */
   callbackLease?: GenerationCallbackLease,
   /**
-   * The generation's durable audit (RFC-0011 phase 6). The loop builds its own
+   * The generation's durable audit (ADR-0033). The loop builds its own
    * effect-boundary guard from this, because only it knows which attempt is in
    * flight when a mutation is about to happen. Absent for a non-agentic turn or a
    * caller with no conversation to write to, in which case a mutation crosses on
-   * liveness alone, exactly as it did before this phase.
+   * liveness alone, as it does without an audit.
    */
   audit?: GenerationAuditRecorder,
 ): Promise<ToolLoopResult> {
@@ -259,14 +259,14 @@ export async function runToolLoop(
   const app =
     vaultOpToolContext?.app ?? editToolContext?.app ?? vaultToolContext?.app;
 
-  // Built from the pre-minted turn ID before retry can reach a provider (RFC-0011
-  // settled decision 12), so every attempt of every round has a lease from before
+  // Built from the pre-minted turn ID before retry can reach a provider (ADR-0032),
+  // so every attempt of every round has a lease from before
   // its construction, and a user Stop cancels through one named path rather than
   // being inferred from whichever `AbortError` surfaces first.
   const runOwner = new TurnRunOwner(turnBuilder.snapshot().id, signal);
   runOwner.bindCallbackLease(callbackLease);
 
-  // This loop's own effect boundary (RFC-0011 phase 6). Its liveness is the turn
+  // This loop's own effect boundary (ADR-0033). Its liveness is the turn
   // signal: the loop awaits each effect inline, so no separate owner can vanish
   // underneath one. It deliberately does not report to
   // `runOwner.noteConsequentialCallback()`, because a loop effect runs between
@@ -290,7 +290,7 @@ export async function runToolLoop(
     const settlements = await runOwner.awaitQuiescence();
     callbacks.onSettlement?.({
       // One forced attempt makes the turn's capture forced: a hard dispose is
-      // never proof that nothing else was in flight (settled decision 24).
+      // never proof that nothing else was in flight (ADR-0032).
       quiescence: settlements.some((one) => one.quiescence === "forced")
         ? "forced"
         : "proven",
@@ -328,7 +328,7 @@ export async function runToolLoop(
       const roundRequest = { ...baseRequest, messages: requestMessages };
 
       // No round opens while a prior attempt is still capable of producing work
-      // or callbacks (RFC-0011 criterion 16).
+      // or callbacks (ADR-0032).
       await runOwner.awaitQuiescence();
       const streamResult = streamWithRetry(
         (attempt) => client.stream(roundRequest, model, params, attempt),
@@ -363,8 +363,8 @@ export async function runToolLoop(
           throw error;
         }
         try {
-          // Post-commit, and only from what committed (RFC-0011 settled decision
-          // 9). One committed batch produces at most one snapshot callback.
+          // Post-commit, and only from what committed (ADR-0031). One committed
+          // batch produces at most one snapshot callback.
           segmentIds.push(...commit.startedSegments);
           for (const correlated of commit.toolCorrelations) {
             if (correlated.correlation === "none") continue;
@@ -383,7 +383,7 @@ export async function runToolLoop(
         } catch (error) {
           // An `onDelta` subscriber or a snapshot callback throwing is a
           // downstream failure, and it must stop the provider rather than merely
-          // surface (RFC-0011 invariant 11). Cancelling here, before unwinding, is
+          // surface (ADR-0032). Cancelling here, before unwinding, is
           // what makes the reason honest: the `consumer_returned` that the unwind
           // itself produces would otherwise claim it first. The batch stays
           // committed; a callback cannot expose a half-applied one.
@@ -774,14 +774,14 @@ export async function runToolLoop(
         // The result is in hand here, so a failed read-only tool flags its step
         // immediately (no separate onStepResult round-trip).
         ...(result.isError && { isError: true, errorContent: result.content }),
-        // Phase-2 replay capture (discovery digest + bounded record); the sibling
+        // Replay capture: discovery digest and bounded record (ADR-0016); the sibling
         // choke point is Claude Code's callTool end event.
         ...captureStepFields(tc.name, tc.arguments, result),
       });
     }
     // Vault-op and edit steps were already recorded before resolution, push results,
     // and report the outcome so the timeline can flag failures / declines / denials
-    // and capture the disposition + bounded record for replay (phase 2).
+    // and capture the disposition + bounded record for replay (ADR-0016).
     for (const { tc, result } of [
       ...vaultOpResults,
       ...editResults,
@@ -1391,7 +1391,7 @@ export function applyIdenticalCallGuard(
 }
 
 /**
- * Tool allow-list guard (prompt-cache design section 6.1.4/section 6.3). The stable cloud surface
+ * Tool allow-list guard. The stable cloud surface
  * advertises the full tool superset for cache stability, so the model can *see* a tool
  * the session does not permit (a deny-classed write under the `ask` posture); this
  * refuses any such call with a recovery-shaped
@@ -1419,7 +1419,7 @@ export function applyToolAllowGuard(
 
 /**
  * Cross one round's mutating calls over their named effect boundary, before any
- * of them reaches its review (RFC-0011 phase 6, settled decision 20).
+ * of them reaches its review (ADR-0033).
  *
  * A call that cannot cross is refused here and never handed to the review, which
  * is the same shape the Claude callback path uses: the executor gets one boolean
@@ -1457,7 +1457,7 @@ export interface ResolveVaultOpsDeps {
   stopReason: StopReason;
   context: VaultOpToolContext | undefined;
   callbacks: ToolLoopCallbacks;
-  /** This turn's effect boundary. Absent leaves the pre-phase-6 behaviour. */
+  /** This turn's effect boundary. Absent preserves behavior without an audit (ADR-0033). */
   guard?: EffectBoundaryGuard;
 }
 
@@ -1525,7 +1525,7 @@ export interface ResolveEditsDeps {
   editContext: ToolExecutionContext | undefined;
   round: number;
   callbacks: ToolLoopCallbacks;
-  /** This turn's effect boundary. Absent leaves the pre-phase-6 behaviour. */
+  /** This turn's effect boundary. Absent preserves behavior without an audit (ADR-0033). */
   guard?: EffectBoundaryGuard;
 }
 
@@ -1588,7 +1588,7 @@ export interface ResolveMemoriesDeps {
   liveReview?: LiveVaultReview;
   round: number;
   callbacks: ToolLoopCallbacks;
-  /** This turn's effect boundary. Absent leaves the pre-phase-6 behaviour. */
+  /** This turn's effect boundary. Absent preserves behavior without an audit (ADR-0033). */
   guard?: EffectBoundaryGuard;
 }
 

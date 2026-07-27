@@ -58,7 +58,7 @@ export class ChatSessionMemory {
    * generation has not recorded anything yet" from "this generation's audit was
    * already folded and closed". The second must refuse: once the terminal
    * transaction has run, a late crossing can no longer be recorded, so it must
-   * not be allowed to act (RFC-0011 phase 6).
+   * not be allowed to act (ADR-0033).
    */
   private openGenerationAuditIdentity: GenerationAuditIdentity | null = null;
   private generationAudit: InFlightGenerationAudit | null = null;
@@ -109,7 +109,7 @@ export class ChatSessionMemory {
   }
 
   /**
-   * The conversation's current Claude Code resume cursor (Model A′): the cursor
+   * The conversation's current Claude Code resume cursor (ADR-0016): the cursor
    * banked by the most recent claudecode assistant turn that carries one. Read at the
    * start of a turn so the session registry can `resume` from disk once the live
    * process is gone. Undefined when no claudecode turn has banked a cursor yet (a
@@ -142,7 +142,7 @@ export class ChatSessionMemory {
     return undefined;
   }
 
-  // ── In-flight generation audit (RFC-0011 phase 6) ────────────────
+  // ── In-flight generation audit (ADR-0033) ───────────────────────
 
   /** Opens the window in which this generation may append intents. */
   openGenerationAudit(identity: GenerationAuditIdentity): void {
@@ -217,7 +217,7 @@ export class ChatSessionMemory {
   /**
    * Converts every still-pending intent to an unknown outcome. Called once, at
    * the terminal transaction: an intent nobody reconciled belongs to an effect
-   * whose result cannot be invented (settled decision 21).
+   * whose result cannot be invented (ADR-0033).
    */
   markGenerationIntentsUnknown(): InFlightGenerationAudit | null {
     const audit = this.generationAudit;
@@ -605,13 +605,13 @@ export class ChatSessionMemory {
    * stripped, RAG chunk content stripped).
    *
    * A chain-backed assistant message is generated history and is kept even when
-   * its revision is an error (RFC-0011 phase 6). It was not: the compatibility
+   * its revision is an error (ADR-0033). It was not: the compatibility
    * projection copies `revision.isError` onto the message, and this filter then
    * dropped it, so a failed turn never reached disk and took its whole action
    * ledger with it. A vault operation applied before the failure lost its undo
-   * record on save, which is exactly the invisible consequential action RFC-0011
-   * exists to prevent, and it also made "reload reproduces the same failed turn"
-   * (section 9.3) unreachable. Only a legacy content-only error bubble, which
+   * record on save, which is exactly the invisible consequential action ADR-0033
+   * exists to prevent, and it also made reload unable to reproduce the same failed
+   * turn. Only a legacy content-only error bubble, which
    * carries no revision chain and no ledger, is still transient.
    */
   getCleanMessagesForPersistence(): ConversationMessage[] {
@@ -679,7 +679,7 @@ function eventIsEligible(
       return eligibility.canUndo;
     // Write-ahead audit evidence (`intent_recorded`, `outcome_unknown`) is
     // history, never an actionable control: both describe work that already
-    // left the plugin's hands (RFC-0011).
+    // left the plugin's hands (ADR-0033).
     case "proposed":
     case "superseded":
     case "intent_recorded":

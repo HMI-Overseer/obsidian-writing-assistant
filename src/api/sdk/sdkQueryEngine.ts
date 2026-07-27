@@ -25,7 +25,7 @@ import { ClaudeCodeSdkMessageTranslator } from "./claudeCodeSdkMessageTranslator
  * symmetrically. This one-shot engine retains no in-memory session (every turn sends
  * the full transcript); session persistence to disk is left on (the SDK default), so
  * a turn that carries a session id can later be `resume`d by the persistent-session
- * path (Model A′, {@link ./sdkSession.SdkSession}).
+ * path (ADR-0016, {@link ./sdkSession.SdkSession}).
  */
 
 /**
@@ -73,7 +73,7 @@ export interface SdkTurnOptions {
   onResult?: (usage: ClaudeCodeResultUsage) => void;
   /**
    * Takes ownership of the spawned CLI child so the one-shot run has a bounded
-   * hard dispose (RFC-0011 phase 2, maintainer decision 15.2).
+   * hard dispose (ADR-0032).
    */
   processOwner?: ClaudeCodeProcessOwner;
 }
@@ -84,7 +84,7 @@ export interface SdkTurnOptions {
  * abort handling recognizes them; SDK/CLI errors surface as plain `Error`s.
  *
  * The query handle is retained outside the loop and returned in `finally` when the
- * turn did not run to exhaustion (RFC-0011 criterion 19). Phase 0 measured that
+ * turn did not run to exhaustion (ADR-0032). Measurements confirmed that
  * this alone does not dispose the CLI process, which is what
  * {@link SdkTurnOptions.processOwner} is for; returning the query is still
  * required so the SDK's own transport begins its shutdown at all.
@@ -173,7 +173,7 @@ export interface SdkOptionsConfig {
   /** In-process MCP bridge; absent ⇒ the model runs as a pure analyst (no tools). */
   sdkMcp?: { server: McpSdkServerConfigWithInstance; serverName: string };
   /**
-   * A CLI session id to resume from disk (Model A′). When present the SDK loads that
+   * A CLI session id to resume from disk (ADR-0016). When present the SDK loads that
    * session's conversation history instead of starting fresh, so only the delta turn
    * need be sent. Absent ⇒ a fresh session (cold mint or one-shot).
    */
@@ -207,7 +207,7 @@ export function buildSdkOptions(
     pathToClaudeCodeExecutable: opts.claudePath,
     model: opts.model,
     // Session persistence is left on (the SDK default) so a turn's session id can be
-    // resumed later (Model A′). Resume the session id when one was supplied.
+    // resumed later (ADR-0016). Resume the session id when one was supplied.
     ...(opts.resume ? { resume: opts.resume } : {}),
     // Controlled harness: ignore the user's global/project settings, hooks, and
     // other MCP servers, the plugin owns the entire tool + prompt surface.

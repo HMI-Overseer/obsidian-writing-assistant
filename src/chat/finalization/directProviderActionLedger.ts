@@ -38,7 +38,7 @@ export interface DirectProviderActionLedgerInput {
   parsedEditPlacement?: { itemId: string; actionRef: string };
   /**
    * This generation's durable write-ahead intents, with their outcomes already
-   * settled (RFC-0011 phase 6). Each one folds into the entry that shares its
+   * settled (ADR-0033). Each one folds into the entry that shares its
    * action reference, behind the proposal and ahead of whatever the review
    * decided, because `intent_recorded` is only valid before an effect.
    */
@@ -84,8 +84,8 @@ export function buildDirectProviderActionLedger(
 /**
  * The intents that could not be folded into any entry.
  *
- * Section 9.2 asks for these to be persisted as unplaced `outcome_unknown` ledger
- * events, and against the tree that is impossible: an entry needs a family
+ * These cannot be persisted as unplaced `outcome_unknown` ledger events against
+ * the current tree: an entry needs a family
  * payload, and every one of those requires evidence an intent deliberately does
  * not carry. The caller records them as bounded turn diagnostics instead. A
  * reconciled intent with no entry needs no record at all: its review refused
@@ -110,8 +110,8 @@ export function unmatchedAuditIntents(
  * instance, therefore left an item pointing at nothing, and
  * `validateAssistantMessageState()` refuses that whole revision on load
  * (`action_reference_invalid`), so the entire turn degraded to a legacy snapshot.
- * That predates RFC-0011 phase 6 and was found by it, because a stranded
- * write-ahead intent is exactly that case.
+ * A stranded write-ahead intent exposes exactly that invalid reference
+ * (ADR-0033).
  *
  * A dangling reference is a broken link rather than evidence: the tool row, its
  * failed state, and its error text all stay, and the audit keeps its own record.

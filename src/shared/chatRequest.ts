@@ -30,7 +30,7 @@ export interface AdditionalContextItem {
 }
 
 /**
- * Layer-2 tool-search configuration (ADR-0009 / prompt-cache design section 6.2). Present only on
+ * Layer-2 tool-search configuration (ADR-0009). Present only on
  * the direct `anthropic` agentic path when caching is on: it tells the Anthropic formatter
  * to prepend the native tool-search entry and mark every emitted tool whose name is not in
  * `nonDeferredToolNames` with `defer_loading`, so the long tail loads on demand and stays
@@ -146,7 +146,7 @@ export interface ChatRequest {
   /**
    * Per-mode wording (mode-specific framing + tool guidance) carried in the
    * message tail rather than the cached `system` block, so the cached prefix
-   * stays mode-invariant (Layer 1, prompt-cache design section 6.1.2). Set only for the
+   * stays mode-invariant. Set only for the
    * billed paths that have a tail mechanism (`anthropic`, `claudecode`); absent
    * for local providers, which keep the wording in `systemPrompt`. Each client
    * places it in its own tail (a `{role:"system"}` / `<system-reminder>` block on
@@ -169,7 +169,7 @@ export interface ChatRequest {
   tools?: CanonicalToolDefinition[] | null;
   /**
    * Runtime allow-list: the tool names the current mode actually permits the model
-   * to call (prompt-cache design section 6.1.4). Set only when `tools` is the stable cloud
+   * to call. Set only when `tools` is the stable cloud
    * superset (the direct Anthropic path), which advertises more than the mode allows
    * so the cached prefix stays warm; the tool loop refuses any call whose name is not
    * here. Absent when the emitted set already equals the allowed set (local providers)

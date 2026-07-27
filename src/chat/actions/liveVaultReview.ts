@@ -129,7 +129,7 @@ export interface LiveVaultReviewOptions {
   /** Recompute provisional and audit section visibility after a live remount. */
   onReviewPlacementChanged?: () => void;
   policy: VaultOpPolicy;
-  /** Session approval posture; `auto` overrules the per-class policy to auto-apply (section 6.3). */
+  /** Session approval posture; `auto` overrules the per-class policy to auto-apply. */
   posture: ApprovalPosture;
   /** Edit-channel dependencies. Absent when no writes are permitted (read-only). */
   edit?: LiveEditReviewDeps;
@@ -508,7 +508,7 @@ export class LiveVaultReview implements VaultOpReviewer {
           isReadOnly: false,
           isError: !applied,
           failure: applied ? undefined : { kind: "failed", recovery: reason },
-          // Auto-applied / failed edit outcome, captured for replay (section 6 q6).
+          // Auto-applied or failed edit outcome, captured for replay (ADR-0016).
           disposition,
         });
       }
@@ -530,7 +530,7 @@ export class LiveVaultReview implements VaultOpReviewer {
           isReadOnly: false,
           isError: disposition === "failed",
           failure: disposition === "failed" ? { kind: "failed", recovery: reason } : undefined,
-          // The edit-channel sibling of dispoResult's disposition capture (section 6 q6).
+          // The edit-channel sibling of dispoResult's disposition capture (ADR-0016).
           disposition,
         });
       }),
@@ -847,7 +847,7 @@ export class LiveVaultReview implements VaultOpReviewer {
       const { op, satisfied: isSatisfied } = found;
       const { gate, autoConsumed } = gateConvertedOp(op, isSatisfied, this.policy, this.autoSoFar, this.posture);
       if (gate === "deny") {
-        // Denied tools are filtered upstream (Phase 4); guard anyway.
+        // Denied tools are filtered upstream; guard anyway.
         const recovery = defaultRecovery("denied");
         entries.push({
           call,

@@ -77,11 +77,11 @@ function extractExeFromShim(shimPath: string): string | null {
  *
  * - `*_NONESSENTIAL_*`: mute the CLI's boot-time update checks, telemetry, and
  *   background model calls (the dominant cold-start tax).
- * - `DISABLE_COMPACT`: turn CLI compaction off entirely (cold-rebuild fidelity
- *   section 6.4). The plugin transcript is the sole context authority, so the harness must
+ * - `DISABLE_COMPACT`: turn CLI compaction off entirely. The plugin transcript is
+ *   the sole context authority, so the harness must
  *   never silently summarize a too-large context mid-turn and answer from its own
  *   summary. `DISABLE_COMPACT` (not the weaker `DISABLE_AUTO_COMPACT`) is the
- *   binary-verified switch (section 6.4 flag correction); with it set the `compact_boundary`
+ *   binary-verified switch; with it set the `compact_boundary`
  *   handler becomes a dead-man guard (should never fire) and the send-path preflight
  *   ({@link claudeCodeContextPreflight}) enforces the ceiling before spend instead.
  */

@@ -9,8 +9,7 @@ import type {
 import { syncAssistantCompatibilityProjection } from "./assistantRevisions";
 
 /**
- * Fail-closed recovery of an orphaned in-flight generation audit (RFC-0011 phase
- * 6, plan section 9.3, migration rule 5).
+ * Fail-closed recovery of an orphaned in-flight generation audit (ADR-0033).
  *
  * An audit on disk means the generation that owned it never reached its terminal
  * transaction. What is knowable is exactly what the audit says: some consequential
@@ -38,7 +37,7 @@ export function buildOrphanRecoveryMessage(
       status: "failed",
       segments: [],
       // No capture survived, and inventing an item would be inventing a
-      // provider declaration (section 9.2 forbids exactly that).
+      // provider declaration (ADR-0031).
       items: [],
       // The hard-stop path is the only honest reading of a generation that never
       // settled: forced quiescence forbids native resume and a resume cursor.

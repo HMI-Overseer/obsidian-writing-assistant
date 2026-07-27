@@ -17,8 +17,7 @@ import { VAULT_OPS_TOOL_NAMES } from "../tools/vault-ops/definition";
 import type { VaultOpDisposition } from "../vault-ops/disposition";
 
 /**
- * Generation-scoped ownership of Claude Code's callback surface (RFC-0011 phase 5,
- * plan section 8.1).
+ * Generation-scoped ownership of Claude Code's callback surface (ADR-0032).
  *
  * Claude Code runs its agent loop inside its own process, so its tool calls arrive
  * as MCP callbacks rather than through the plugin's tool loop. Before this module
@@ -27,9 +26,9 @@ import type { VaultOpDisposition } from "../vault-ops/disposition";
  * installed. The lease replaces that: one generation's review owner, ask responder,
  * allow-list, active-file context, lifecycle sink, and cancellation signal are fixed
  * at activation and never replaced, and a callback captures the whole set in one
- * synchronous step before its first `await` (settled decision 19).
+ * synchronous step before its first `await` (ADR-0032).
  *
- * The lease is per **generation**, not per provider attempt. The phase 2
+ * The lease is per **generation**, not per provider attempt. The
  * {@link ../chat/streaming/TurnRunOwner.AttemptLease} still owns attempt lifetime and
  * capture identity; those two lifetimes are genuinely different. Review hosts, the
  * ask coordinator, and the allow-list are installed once per generation and are the
@@ -56,14 +55,14 @@ export type ClaudeCodeToolEvent =
        * The tool result text returned to Claude Code. Surfaced on the timeline step's
        * error block when `isError`, so a failed call (e.g. an edit's no-match) shows
        * what the model saw, Claude Code's loop is otherwise opaque to the UI. Also the
-       * source the step's replay digest + bounded record are computed from (phase 2).
+       * source from which the step's replay digest and bounded record are computed.
        */
       content: string;
       toolCallId: string;
       /**
        * The reviewed op's real disposition, when this call went through the live
        * review, so the step persists the outcome for the cold-rebuild replay digest
-       * (a decline resolves `isError: false`; section 6 question 6). Absent on read tools.
+       * (a decline resolves `isError: false`; ADR-0016). Absent on read tools.
        */
       disposition?: VaultOpDisposition;
       /** Structured terminal ask state for transcript persistence and reload. */
@@ -82,7 +81,7 @@ export type ClaudeCodeLeaseState =
  *
  * Closed and bounded: a refused callback learns only that this surface is not
  * answering. It cannot inspect review, authorization, interaction, correlation, or
- * collection state belonging to another generation (settled decision 19).
+ * collection state belonging to another generation (ADR-0032).
  */
 export type CallbackRefusal =
   | "no_active_generation"
@@ -91,11 +90,10 @@ export type CallbackRefusal =
   | "generation_tombstoned";
 
 /**
- * The four named effect boundaries, now provider-neutral (RFC-0011 phase 6).
+ * The four named effect boundaries, now provider-neutral (ADR-0033).
  *
- * Phase 5 declared them here because Claude Code's callback path was the only one
- * that had them. The plugin's own tool loop crosses the same boundaries through
- * the same review owner, and criterion 29 is not provider-scoped, so the type
+ * Claude Code's callback path originally owned these boundaries. The plugin's own
+ * tool loop crosses the same boundaries through the same review owner, so the type
  * moved to {@link ../shared/types.EffectBoundary} and this name is kept as its
  * alias for the Claude-side call sites.
  */
@@ -133,7 +131,7 @@ export interface ClaudeCodeGenerationContext {
   readonly signal: AbortSignal | null;
   /**
    * The conversation-scoped durable audit this generation writes its write-ahead
-   * intents to (RFC-0011 phase 6). Null when the caller has no conversation to
+   * intents to (ADR-0033). Null when the caller has no conversation to
    * write to, in which case a boundary crosses on liveness alone.
    */
   readonly audit: GenerationAuditRecorder | null;
@@ -193,7 +191,7 @@ export class ClaudeCodeGenerationLease implements EffectBoundaryGuard {
    * How many admitted callbacks have not released yet.
    *
    * Introspection for settlement and for tests. It is deliberately never compared
-   * against a ceiling: RFC-0010 and settled decision 29 forbid a guard whose
+   * against a ceiling: RFC-0010 forbids a guard whose
    * trigger is "you have done N things".
    */
   get inFlightCount(): number {
@@ -205,7 +203,7 @@ export class ClaudeCodeGenerationLease implements EffectBoundaryGuard {
     return this.observedCorrelation;
   }
 
-  /** The provider attempt in flight, recorded as evidence for the phase 6 audit. */
+  /** The provider attempt in flight, recorded as evidence for the durable audit (ADR-0033). */
   get attemptOrdinal(): number {
     return this.attempt;
   }
@@ -226,7 +224,7 @@ export class ClaudeCodeGenerationLease implements EffectBoundaryGuard {
   }
 
   /**
-   * Synchronous admission (settled decision 19). Checks the state and increments
+   * Synchronous admission (ADR-0032). Checks the state and increments
    * the in-flight count in one step, before the caller's first `await`, so a lease
    * that begins stopping between the check and the work cannot be entered.
    */
@@ -261,8 +259,8 @@ export class ClaudeCodeGenerationLease implements EffectBoundaryGuard {
 
   /**
    * Registers the turn-run owner's notifier, so a callback that crosses an effect
-   * boundary refuses the turn's next retry (settled decision 16). Phase 2 built
-   * the flag and its refusal; this is the production writer it named.
+   * boundary refuses the turn's next retry. This is the production writer for
+   * that refusal (ADR-0032, ADR-0033).
    */
   onConsequentialCallback(sink: () => void): void {
     this.consequentialSink = sink;
@@ -274,8 +272,8 @@ export class ClaudeCodeGenerationLease implements EffectBoundaryGuard {
    *
    * False means refuse *before* crossing, for either of two reasons the handler
    * does not have to distinguish: the generation is signalled or no longer active,
-   * or its write-ahead intent could not be made durable (RFC-0011 phase 6,
-   * settled decision 21). The ordering, and the re-check that closes the window
+   * or its write-ahead intent could not be made durable (ADR-0033). The ordering,
+   * and the re-check that closes the window
    * awaiting the persist opens, live in
    * {@link ../shared/generationAudit.crossWithDurableIntent}.
    */
@@ -297,7 +295,7 @@ export class ClaudeCodeGenerationLease implements EffectBoundaryGuard {
 
   /**
    * Records the outcome the executor observed, under the lease that admitted it
-   * (plan section 8.3 step 7). Never refuses: by here the effect has happened, so
+   * under the lease that admitted it. Never refuses: by here the effect has happened, so
    * there is nothing left to gate.
    */
   reconcileEffect(intent: EffectIntentRequest): Promise<void> {
@@ -349,7 +347,7 @@ export class ClaudeCodeGenerationLease implements EffectBoundaryGuard {
   /**
    * Retires the lease permanently. Reached by capture failure, hard disposal, and
    * forced settlement, none of which may leave a surface that answers again
-   * (settled decision 18). The pending ask is cancelled here because a tombstoned
+   * (ADR-0032). The pending ask is cancelled here because a tombstoned
    * generation can no longer deliver an answer to it.
    */
   tombstone(): void {
@@ -385,7 +383,7 @@ function refusalFor(state: ClaudeCodeLeaseState): CallbackRefusal {
  *
  * A slot belongs to exactly one callback surface: one persistent SDK session, one
  * one-shot run, or one legacy loopback run. Tombstoning it therefore dies with the
- * session it guards rather than being retained by anything (settled decision 15.4).
+ * session it guards rather than being retained by anything (ADR-0032).
  */
 export class ClaudeCodeRunSlot {
   private lease: ClaudeCodeGenerationLease | null = null;
@@ -407,7 +405,7 @@ export class ClaudeCodeRunSlot {
   /**
    * Installs one generation's lease. Refuses a tombstoned slot, and refuses one
    * still holding a prior lease: a new generation may take a surface over only
-   * after the previous one proved quiescent (plan section 8.2).
+   * after the previous one proved quiescent (ADR-0032).
    */
   install(lease: ClaudeCodeGenerationLease): boolean {
     if (this.tombstoned || this.lease !== null) return false;
@@ -427,7 +425,7 @@ export class ClaudeCodeRunSlot {
   }
 
   /**
-   * The admission point (settled decision 19). Synchronous end to end: it resolves
+   * The admission point (ADR-0032). Synchronous end to end: it resolves
    * the lease and increments its in-flight count with no `await` in between, so a
    * generation that begins stopping cannot be entered by a callback that already
    * passed the check.

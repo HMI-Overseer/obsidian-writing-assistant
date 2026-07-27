@@ -1,7 +1,7 @@
 import type { CanonicalToolDefinition } from "../types";
 
 /**
- * Static edit-tool framing prompt. With the plan/chat/edit modes gone (section 6.3) this is
+ * Static edit-tool framing prompt. With the plan/chat/edit modes gone, this is
  * no longer a settings default; it is retained as a benchmark fixture
  * ({@link ../../settings/benchmark/toolTestCases}). The live edit guidance the model
  * sees is built dynamically by `buildEditToolSystemPrompt()` from the active edit tools.

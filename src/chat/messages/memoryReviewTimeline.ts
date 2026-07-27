@@ -22,7 +22,7 @@ export interface ReviewableMemoryProposal {
 
 export interface MemoryReviewTimelineOptions {
   timelineEl: HTMLElement;
-  /** Canonical Phase 4 placement by exact declaration identity. */
+  /** Canonical placement by exact declaration identity (ADR-0031). */
   findActionHostByToolCallId?: (toolCallId: string) => HTMLElement | null;
   proposals: ReviewableMemoryProposal[];
   callbacks: {

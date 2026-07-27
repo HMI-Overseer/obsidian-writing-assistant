@@ -35,7 +35,8 @@ const READ_ONLY_VAULT_CALLBACKS: VaultReviewCallbacks = {
  * Render load-only legacy review evidence.
  *
  * Legacy proposals have no canonical action ledger. They remain visible for
- * historical audit, but Phase 8 never exposes controls or writes their fields.
+ * historical audit, but the current renderer never exposes controls or writes
+ * their fields.
  */
 export function renderLegacyReviewPanels(
   app: App,

@@ -88,10 +88,10 @@ export interface LlmGenerationOptions {
   activeModel: CompletionModel;
   client: ChatClient;
   interactionHost: ComposerInteractionHostPort;
-  /** Session approval posture, the replacement for the plan/chat/edit mode (section 6.3). */
+  /** Session approval posture, the replacement for the plan/chat/edit mode. */
   posture: ApprovalPosture;
   /**
-   * This generation's grip on Claude Code's callback surfaces (RFC-0011 phase 5),
+   * This generation's grip on Claude Code's callback surfaces (ADR-0032),
    * taken from the runtime the caller resolved. Present only for `claudecode`.
    * Activated with the owners below before any provider call and released in this
    * function's `finally`, which is what makes "one callback, one generation" a
@@ -181,7 +181,7 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
   /** One action reference formula, shared by the audit and the ledger it folds into. */
   const actionRefFor = (toolCallId: string): string =>
     `action-${draftIdentity.revisionId}-${toolCallId}`;
-  // The generation's durable write-ahead audit (RFC-0011 phase 6). Keyed by the
+  // The generation's durable write-ahead audit (ADR-0033). Keyed by the
   // draft identity, which this generation owns before any lease or attempt exists;
   // the lease that admits a callback rides on the record as evidence. Every
   // consequential executor on either path, Claude Code's MCP callbacks and the
@@ -212,7 +212,7 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
   // loop can bind it to the turn-run owner. Null on every other provider.
   let claudeLease: ClaudeCodeGenerationLease | undefined;
 
-  // Ambient editing (prompt-cache design section 6.3): the edit pipeline (edit renderer, edit
+  // Ambient editing: the edit pipeline (edit renderer, edit
   // review channel is active whenever the session permits any
   // write. A read-only session is exactly a deny-all policy under the `ask` posture.
   const editsActive = writesPermitted(plugin.settings.vaultOpPolicy, posture);
@@ -392,7 +392,7 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
   }): Promise<boolean> => {
     // Everything unreconciled becomes an unknown outcome before the fold: an
     // intent nobody closed belongs to an effect whose result cannot be invented
-    // (settled decision 21).
+    // (ADR-0033).
     const audit = store.markGenerationIntentsUnknown();
     const intents = audit?.intents ?? [];
     const actionLedger = buildDirectProviderActionLedger({
@@ -437,13 +437,13 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
         )
       : undefined;
     // A descriptor is a ceiling; the turn's own items decide what it may claim
-    // (RFC-0011 settled decision 24). Phase 4 is the first writer of version-2
-    // capture evidence, so this is where the claim has to come back down: without
+    // (ADR-0031). This runtime path writes version-2 capture evidence, so this is
+    // where the claim has to come back down: without
     // it `crossCheckCaptureEvidence()` refuses the revision on reload with
     // `revision_metadata_invalid`, because no runtime placement supports an exact
     // ordering claim once no translator records an exact provider block identity.
-    // Phase 6 adds quiescence to that turn, so forced settlement lowers native
-    // resume through the same one call.
+    // Quiescence belongs to the same turn, so forced settlement lowers native
+    // resume through the same call (ADR-0032).
     const supportedEvidence = lowerEvidenceFromCapture(
       input.replayEvidence,
       turn,
@@ -510,7 +510,7 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
     store.setLastAssistantResponse(response);
     // The revision now carries every intent's terminal evidence, so the in-flight
     // record is redundant and is cleared in the same persisted transition
-    // (settled decision 21). A write that does not land puts the audit back: the
+    // (ADR-0033). A write that does not land puts the audit back: the
     // evidence has to survive for the one bounded retry the `finally` performs.
     const cleared = store.clearGenerationAudit();
     try {
@@ -556,8 +556,8 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
     // identity and state by exact ID, while SDK events remain the only positioner.
     //
     // Activation is the one place this generation's owners are installed, and the
-    // lease has no setter that replaces them afterwards (RFC-0011 settled decision
-    // 19). Every callback admitted from here on reads these objects or none.
+    // lease has no setter that replaces them afterwards (ADR-0032). Every callback
+    // admitted from here on reads these objects or none.
     if (claudeCodeAgentic) {
       claudeLease = claudeGeneration?.activate({
         review: liveReview,
@@ -565,7 +565,7 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
         askSignal: abortController.signal,
         signal: abortController.signal,
         // The same recorder the plugin loop uses: one conversation-scoped audit
-        // per generation, whichever executor crosses a boundary (RFC-0011 phase 6).
+        // per generation, whichever executor crosses a boundary (ADR-0033).
         audit: auditRecorder,
         lifecycle: (event) => {
           claudeToolCorrelations[event.toolCallId] = "provider_id";
@@ -605,7 +605,7 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
 
     // Persistence below, and the owner teardown in `finally`, both depend on
     // `runToolLoop()` having settled its provider run before it returns or
-    // rethrows (RFC-0011 phase 2, section 5.3). It owns that guarantee in its own
+    // rethrows (ADR-0032). It owns that guarantee in its own
     // `finally`, so review and ask owners stay attached until the provider is
     // quiet and no turn is written while a provider can still produce work.
     const loopResult = await runToolLoop(
@@ -627,7 +627,7 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
         onTurnSnapshot: refreshLiveTurn,
         // The turn record is frozen before the provider is proven quiet, so the
         // quiescence mode and the settlement diagnostics arrive here and are
-        // stamped on at persistence (section 9.2).
+        // stamped on at persistence (ADR-0032).
         onSettlement: (evidence) => {
           settlementEvidence = evidence;
         },
@@ -802,7 +802,7 @@ function finishDirectTurn(
     return builder.finishTurn(status);
   } catch {
     // Version 2 with no items, so it carries no capture claim to be checked
-    // against. Every runtime writer emits version 2 after the phase 4 cutover.
+    // against. Every runtime writer emits version 2 (ADR-0031).
     return {
       schemaVersion: 2,
       id: builder.snapshot().id,
@@ -856,7 +856,7 @@ function correlationsForIncompleteTurn(
 }
 
 /**
- * Forced quiescence forbids a persisted resume cursor (settled decision 24), and
+ * Forced quiescence forbids a persisted resume cursor (ADR-0032), and
  * `crossCheckCaptureEvidence()` refuses the whole revision on reload if one
  * survives. The provider may still have reported one, so it is dropped here
  * rather than trusted.

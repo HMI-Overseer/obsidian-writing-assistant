@@ -3,8 +3,8 @@
 @import "tailwindcss/utilities.css" layer(utilities) prefix(lmsa);
 
 /*
- * Theme tokens, ported from the former tailwind.config.cjs `theme.extend` (Appendix B of
- * the Tailwind 3 to 4 migration plan). v4's native `@theme` block replaces the JS `@config`
+ * Theme tokens, ported from the former tailwind.config.cjs `theme.extend`.
+ * v4's native `@theme` block replaces the JS `@config`
  * bridge, so this is the whole theme surface now. Per the v4 prefix convention, declare the
  * variables without the prefix.
  *
@@ -57,9 +57,9 @@
  * Irreducible keep (`!important` load-bearing): this is a generic hide utility slapped on arbitrary
  * elements from TS, so it has no scoping selector to raise. Many of its targets set their own
  * `display: flex` (0,1,0) in a file imported after base.css, so a NORMAL `.lmsa-hidden` (0,1,0) loses the
- * source-order tie and the element stays visible. A Phase 6 probe measured 7 such elements un-hiding
+ * source-order tie and the element stays visible. A probe measured 7 such elements un-hiding
  * (model dropdown, profile/context popovers, profile menu, generate button, reasoning pill, capacity ring).
- * `!important` beats them all regardless of specificity or order. See the Phase 6 close-out note.
+ * `!important` beats them all regardless of specificity or order.
  */
 .lmsa-hidden {
   display: none !important;
@@ -140,7 +140,7 @@
  * The `box-shadow: none` sits at 0,1,1, below the chat-header `:focus-visible` accent ring
  * (createChatLayout.css `.lmsa-chat-header-actions .lmsa-ui-icon-btn:focus-visible`, 0,3,0), so
  * that ring now paints on keyboard focus as intended (it was previously masked by an `!important`
- * here; ring activation approved 2026-07-18, see the Phase 6 close-out note).
+ * here; ring activation approved 2026-07-18).
  */
 button.lmsa-ui-icon-btn {
   background: var(--background-primary);

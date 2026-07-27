@@ -5,7 +5,7 @@ import type { ModelInfo } from "./claudeAgentSdk";
 /**
  * Normalizes a Claude Code handshake model list (`Query.supportedModels()` /
  * `initializationResult().models`) into per-model effort-level lists, the
- * section 3.1 layer-2 harvest of the effort-selector design. After one session the
+ * model-aware capability harvest described by ADR-0017. After one session the
  * offered levels are the harness's own report, never our belief, and it
  * self-heals across model renames (a renamed model is just a new entry).
  *

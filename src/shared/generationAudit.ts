@@ -13,7 +13,7 @@ import type {
 } from "./types";
 
 /**
- * Write-ahead effect boundaries (RFC-0011 phase 6, plan section 9.1).
+ * Write-ahead effect boundaries (ADR-0033).
  *
  * A callback cannot be trusted to report evidence after an irreversible effect,
  * so the boundary is: state the intent, wait for that statement to be durable,
@@ -39,7 +39,7 @@ export function intentIdFor(actionRef: string, targetId: string): string {
 
 /**
  * Clamp for text this plugin authors about an action, applied where it is
- * written (settled decision 23). Nothing is ever refused on read for its length:
+ * written. Nothing is ever refused on read for its length:
  * a read-time gate would turn our own formatting preference into a reason to
  * refuse the user's saved evidence.
  */
@@ -98,14 +98,14 @@ export interface EffectBoundaryDeps {
 /**
  * Check, persist, re-check, cross.
  *
- * The re-check is not tidiness. Before phase 6 the path from callback admission
+ * The re-check is not tidiness. The path from callback admission
  * through the boundary to the review's own registration ran in one synchronous
  * block, so a Stop could not land inside it. Awaiting the intent persist opens
- * that window for the first time, and a Stop landing in it would otherwise
+ * that window, and a Stop landing in it would otherwise
  * register a review after the pending ones were already cancelled, which the
  * deadline-free in-flight drain would then wait on forever. A refusal at the
  * re-check reconciles the intent immediately: nothing happened, and recording
- * that as an unknown outcome would overstate what we do not know.
+ * that as an unknown outcome would overstate what we do not know (ADR-0033).
  */
 export async function crossWithDurableIntent(
   boundary: EffectBoundary,
@@ -163,8 +163,8 @@ const TARGET_ARG_KEYS = ["path", "from", "to", "name", "title"] as const;
 /**
  * The bounded target identity and summary an intent carries.
  *
- * Paths and names only: they are the target identity section 4.2 asks for, and
- * they are already visible on the timeline row. Content, diffs, and results are
+ * Paths and names only: they identify the target and are already visible on the
+ * timeline row. Content, diffs, and results are
  * never read here. When a call names nothing, the tool call itself is the target,
  * which is honest rather than a guess.
  */
@@ -192,15 +192,15 @@ export function directCorrelationFor(
 /**
  * The terminal evidence for an intent whose action never reached its review.
  *
- * Section 9.2 asks for such an intent to be persisted as an unplaced
- * `outcome_unknown` ledger event, and against the tree that is impossible: every
+ * Such an intent cannot be persisted as an unplaced `outcome_unknown` ledger
+ * event against the current tree: every
  * `ToolActionLedgerEntry` payload requires evidence the intent deliberately does
  * not carry (a document snapshot and resolved edit, a real `VaultOperation`, a
- * `Memory`, an interaction's question set), and section 4.2 forbids duplicating
- * exactly those. Synthesizing one would mean inventing the record. So the
- * evidence lands as one bounded diagnostic on the terminal turn instead, which is
- * a surface the renderer already projects (settled decision 27), while intents
- * whose action did reach its review keep the real ledger events.
+ * `Memory`, an interaction's question set), while the intent deliberately avoids
+ * duplicating them. Synthesizing one would mean inventing the record. So the
+ * evidence lands as one bounded diagnostic on the terminal turn instead, a
+ * surface the renderer already projects, while intents whose action did reach
+ * their review keep the real ledger events (ADR-0033).
  */
 export function unknownOutcomeDiagnostic(
   provider: ProviderOption,

@@ -56,7 +56,7 @@ export class ClaudeCodeSdkMessageTranslator {
    * One SDK frame's facts and identity, as the batch the capture path commits.
    *
    * The frame boundary is exactly here, where one top-level message is
-   * translated. Phase 0 measured that the CLI splits one provider message into
+   * translated. Measurements confirmed that the CLI splits one provider message into
    * several one-element frames, so a frame is not a provider message and the two
    * identities stay separate: `uuid` names the delivery, `${session_id}:${message.id}`
    * names the message the facts belong to. A frame that translates to nothing is
@@ -80,8 +80,8 @@ export class ClaudeCodeSdkMessageTranslator {
   }
 
   /**
-   * The provider message currently open, qualified by session scope (settled
-   * decision 4, and the phase 0 key). Undefined between `message_stop` and the
+   * The provider message currently open, qualified by session scope (ADR-0031).
+   * Undefined between `message_stop` and the
    * next `message_start`, where no provider message is open to place anything in.
    */
   providerMessageKey(): string | undefined {
@@ -101,7 +101,7 @@ export class ClaudeCodeSdkMessageTranslator {
     const event = asRecord(message.event);
     if (!event) return [];
     // `message_start` opens a provider message and `message_stop` closes it, the
-    // only reliable boundary phase 0 found. A completed `assistant` frame is not
+    // reliable provider-message boundary. A completed `assistant` frame is not
     // one: three of them appeared inside a single start/stop window.
     if (event.type === "message_start") {
       this.providerMessageId =

@@ -9,7 +9,7 @@ import type { AssistantCaptureBatch } from "./assistantCapture";
 import type { StopReason, UsageResult } from "./usageTypes";
 
 /**
- * Explicit provider-run ownership (RFC-0011).
+ * Explicit provider-run ownership (ADR-0032).
  *
  * A generator that a consumer stops reading is not a stopped provider. This
  * module names the contract that makes stopping explicit: every attempt is
@@ -17,9 +17,10 @@ import type { StopReason, UsageResult } from "./usageTypes";
  * settles exactly once with an honest account of whether quiescence was proven
  * or forced.
  *
- * Live since phase 2: {@link AssistantStreamRun} is what `ChatClient.stream()`
- * returns, and the old `StreamResult` is gone rather than aliased. Since phase 4
- * it carries {@link AssistantCaptureBatch} rather than individual events.
+ * {@link AssistantStreamRun} is what `ChatClient.stream()` returns, and the old
+ * `StreamResult` is gone rather than aliased, so a provider cannot implement a
+ * contract with no way to be stopped. It carries {@link AssistantCaptureBatch}
+ * rather than individual events (ADR-0031, ADR-0032).
  */
 
 /**
@@ -102,11 +103,11 @@ export interface AssistantStreamSettlement {
 /**
  * One owned provider attempt.
  *
- * The stream unit is the capture batch, not the individual event (settled
- * decision 1, landed in phase 4). Keeping batches behind an adapter would have
- * preserved the event-by-event publication seam the RFC exists to remove: a
+ * The stream unit is the capture batch, not the individual event. Keeping
+ * batches behind an adapter would preserve the event-by-event publication seam: a
  * transaction needs to know where one frame's facts end, and flattening erases
- * that boundary at the stream seam where no consumer can honestly recover it.
+ * that boundary at the stream seam where no consumer can honestly recover it
+ * (ADR-0031).
  */
 export interface AssistantStreamRun {
   events: AsyncIterable<AssistantCaptureBatch>;
@@ -125,7 +126,7 @@ export interface AssistantStreamRun {
  *
  * Cancel and wait for the graceful deadline. When it expires, invoke
  * {@link hardDispose} unconditionally and wait for its shorter deadline. A
- * provider with no verifiable hard-dispose operation cannot ship under RFC-0011,
+ * provider with no verifiable hard-dispose operation cannot ship under ADR-0032,
  * which is why this is a required member rather than an optional hook.
  */
 export interface ProviderDisposalHooks {

@@ -203,8 +203,7 @@ export interface Memory {
 
 /**
  * Why the Claude Code live session cold-rebuilt instead of reusing the held
- * process for a turn (Phase 0 cache instrumentation, 2026-06-27 prompt-cache
- * design). Attributed to a single change so a baseline plan→chat→edit session
+ * process for a turn. Attributed to a single change so a baseline plan→chat→edit session
  * shows which lever drove each rebuild. `reused` is the absence of a reason; the
  * first turn of a conversation is `no-session`, an expected cold mint, not a
  * regression.
@@ -224,7 +223,7 @@ export type SessionRebuildReason =
   | "turn-count";
 
 /**
- * The persisted resume cursor for a Claude Code conversation (Model A′). Written
+ * The persisted resume cursor for a Claude Code conversation (ADR-0016). Written
  * onto the turn's usage the moment its live session banks the watermark; the most
  * recent claudecode assistant turn carrying one is the conversation's resume point.
  * Read next turn, when no live process is held, to attempt an on-disk `resume`
@@ -235,7 +234,7 @@ export type SessionRebuildReason =
  * live-reuse path runs are re-checked against this cursor (our own transcript hash,
  * never Claude Code's file) before a resume is attempted
  * (ADR-0016). Static
- * per conversation: the CLI does not rotate the session id across a resume (section 6.7.1).
+ * per conversation: the CLI does not rotate the session id across a resume.
  */
 export interface ClaudeCodeResumeCursor {
   /** The CLI session id to resume, from the turn's `result` usage. */
@@ -261,7 +260,7 @@ export interface MessageUsage {
    */
   sessionReused?: boolean;
   /**
-   * Claude Code only: whether this turn restored the session from disk (Model A′)
+   * Claude Code only: whether this turn restored the session from disk (ADR-0016)
    * rather than reusing a warm process or rebuilding. The middle recovery rung: the
    * working context survived, only API cache warmth was lost. Mutually exclusive
    * with {@link sessionReused}.
@@ -343,7 +342,7 @@ export type AssistantTurnStatus =
  *
  * Version 1 has no placement or capture validity. Version 2 adds
  * {@link ProviderItemCaptureEvidence} on every provider-authored item plus the
- * turn-level quiescence mode and bounded capture diagnostics (RFC-0011). The
+ * turn-level quiescence mode and bounded capture diagnostics (ADR-0031, ADR-0032). The
  * loader accepts both and normalizes version 1 in memory without rewriting it.
  */
 export type AssistantTurnSchemaVersion = 1 | 2;
@@ -436,7 +435,7 @@ export interface AssistantProseItem {
   text: string;
   actionRef?: string;
   actionAnchor?: "parsed_edit";
-  /** Required on every item of a version-2 turn (RFC-0011). */
+  /** Required on every item of a version-2 turn (ADR-0031). */
   captureEvidence?: ProviderItemCaptureEvidence;
 }
 
@@ -466,7 +465,7 @@ export interface AssistantToolCallItem {
   askGuidance?: CompletedAskGuidanceRecord;
   askStatus?: "completed" | "cancelled" | "skipped";
   round?: number;
-  /** Required on every item of a version-2 turn (RFC-0011). */
+  /** Required on every item of a version-2 turn (ADR-0031). */
   captureEvidence?: ProviderItemCaptureEvidence;
 }
 
@@ -647,7 +646,7 @@ export type ToolActionEvent =
       replacementRevisionId: string;
     })
   /**
-   * Write-ahead evidence (RFC-0011): a consequential callback is about to cross
+   * Write-ahead evidence (ADR-0033): a consequential callback is about to cross
    * its effect boundary. Written and persisted before the effect, and reconciled
    * to a real outcome event afterwards. A merely proposed or declared action
    * never produces one.
@@ -671,7 +670,7 @@ export interface ToolActionEventBase<Type extends string> {
 }
 
 // ---------------------------------------------------------------------------
-// In-flight generation audit, RFC-0011
+// In-flight generation audit, ADR-0033
 // ---------------------------------------------------------------------------
 
 /**
@@ -732,11 +731,11 @@ export interface InFlightGenerationAudit {
 /**
  * The point after which cancelling can no longer prove that no consequential
  * outcome happened, named per executor rather than centralized as one vague
- * "executor started" flag (RFC-0011 settled decision 20).
+ * "executor started" flag (ADR-0033).
  *
  * Provider-neutral: Claude Code's MCP callbacks and the plugin's own tool loop
- * cross the same four boundaries through the same review owner, and criterion 29
- * is not provider-scoped. Read-only vault work and `recall_memory` have no entry,
+ * cross the same four boundaries through the same review owner. Read-only vault
+ * work and `recall_memory` have no entry,
  * and that absence is the statement that they have no irreversible boundary.
  */
 export type EffectBoundary =
@@ -749,8 +748,8 @@ export type EffectBoundary =
  * What an executor states about the effect it is about to cause, before it
  * causes it.
  *
- * Bounded identity only, per section 4.2: a family, the target being acted on,
- * the exact correlation, and a safe summary. It never carries provider
+ * Bounded identity only: a family, the target being acted on, the exact
+ * correlation, and a safe summary. It never carries provider
  * arguments, tool results, file contents, or diffs, which is also why an intent
  * cannot be turned back into a ledger payload.
  */
@@ -855,13 +854,12 @@ export type ToolActionUndoRecord =
 
 /**
  * A single step recorded during agentic tool-call execution. Stored with the
- * message. Still never sent to the API *verbatim*, but as of phase 2 it carries the
+ * message. Still never sent to the API *verbatim*, but it carries the
  * replay-capture fields ({@link disposition}, {@link resultDigest},
  * {@link resultRecord}) that the claudecode cold rebuild reads at replay time
- * (phase 3), where it derives a compact digest from them (see
- * ADR-0016). All three are
- * optional forever: conversations written before phase 2 lack them and replay must
- * degrade to today's behavior when they are absent.
+ * during cold rebuild, where it derives a compact digest from them (see
+ * ADR-0016). All three are optional forever: older conversations may lack them,
+ * and replay must degrade to today's behavior when they are absent.
  */
 export interface AgenticStep {
   type: "tool_call" | "reasoning";
@@ -895,22 +893,22 @@ export interface AgenticStep {
    * For tool_call: the real disposition of a reviewed vault-op / edit call
    * (applied / declined / failed / ...), captured where {@link ../chat/actions/liveVaultReview.LiveVaultReview}
    * returns the outcome to the model. A declined op resolves `isError: false`, so
-   * this is the only field that tells a decline from an applied op; the phase-3
-   * replay digest reads it to reconstruct the user's steering (issue section 6 question 6).
+   * this is the only field that tells a decline from an applied op; the replay
+   * digest reads it to reconstruct the user's steering (ADR-0016).
    */
   disposition?: VaultOpDisposition;
   /**
    * For tool_call: a compact, pointers-only digest of a discovery-tool result (e.g.
    * `[semantic_search: "q", surfaced: path > heading; ...]`), computed at capture
    * time ({@link ../tools/resultDigest.formatResultDigest}). Discovery-class tools
-   * only; absent otherwise. No scores, no chunk content (issue section A.1).
+   * only; absent otherwise. No scores, no chunk content (ADR-0016).
    */
   resultDigest?: string;
   /**
    * For tool_call: the tool result text returned to the model, bounded to
    * {@link ../tools/resultDigest.TOOL_RESULT_CHAR_LIMIT} chars. The richer source the
-   * replay digest is computed from and a future debugging record (issue section 6
-   * questions 9/10); bounded so vault content in the conversation JSON stays small.
+   * replay digest is computed from and a future debugging record; bounded so vault
+   * content in the conversation JSON stays small (ADR-0016).
    */
   resultRecord?: string;
   /**
@@ -981,8 +979,8 @@ export interface ConversationMessage {
    * Set on an assistant message the user stopped mid-generation (partial or empty
    * reply). The claudecode cold-rebuild replay reads it to append
    * `[response interrupted by user]` so a rebuilt session does not treat a truncated
-   * turn as complete (issue section 4.C / section 6.1). Optional forever: absent on messages
-   * written before phase 3 and on any turn that finished on its own.
+   * turn as complete. Optional forever: absent on older messages and on any turn
+   * that finished on its own (ADR-0016).
    */
   interrupted?: boolean;
   /** File attachments on user messages (images and note snapshots). */
@@ -1021,7 +1019,7 @@ export interface Conversation {
   /** Message id in the source conversation the branch was forked at. */
   branchFromMessageId?: string;
   /**
-   * Durable write-ahead evidence for a generation still in flight (RFC-0011).
+   * Durable write-ahead evidence for a generation still in flight (ADR-0033).
    * Present only between a consequential callback's first intent and the
    * terminal fold. Finding one on load means that generation never finished.
    */
@@ -1193,7 +1191,7 @@ export interface BenchmarkSettings {
 
 /**
  * Session-scoped approval posture, the cloud chat surface's replacement for the
- * plan/chat/edit mode selector (prompt-cache design section 6.3). It routes the
+ * plan/chat/edit mode selector. It routes the
  * apply-vs-ask decision at the vault-op gate and is cache-neutral: it changes
  * only the runtime allow-list / per-run gate, never the cached prefix or the
  * Claude Code fingerprint, so it can flip mid-session for free.
@@ -1247,7 +1245,7 @@ export interface PluginSettings {
   memories: Memory[];
   /**
    * The unified system prompt prefix, prepended before the profile's custom prompt on
-   * every turn (the plan/chat/edit modes are gone, section 6.3). Edit-format guidance
+    * every turn now that the plan/chat/edit modes are gone. Edit-format guidance
    * (tool-edit or non-agentic SEARCH/REPLACE) is appended dynamically, not stored here.
    */
   systemPromptPrefix: string;

@@ -50,7 +50,7 @@ import {
 
 /**
  * The Claude Code callback surface: one MCP tool provider bound to one
- * {@link ClaudeCodeRunSlot} (RFC-0011 phase 5, plan section 8.3).
+ * {@link ClaudeCodeRunSlot} (ADR-0032).
  *
  * An MCP server captures its provider for the lifetime of the transport it serves,
  * and on the persistent path that transport outlives many generations. So the
@@ -59,7 +59,7 @@ import {
  * ask responder, the active-file context, the lifecycle sink, comes from the lease
  * it captured at entry; nothing is read from a mutable service field.
  *
- * There is deliberately no fallback executor here. The pre-phase-5 provider fell
+ * There is deliberately no fallback executor here. The previous provider fell
  * back to a collect-for-later path when no review owner was installed, which is
  * exactly how a callback from a finished generation reached an executor at all. A
  * mutation with no owner is refused now.
@@ -77,8 +77,8 @@ export interface ClaudeCodeCallbackDeps {
 /**
  * Builds the provider one callback surface advertises and executes. The advertised
  * catalogue is the constant stable superset in every mode, so `toolNames` never
- * drifts and a live session survives a posture switch (prompt-cache design
- * section 6.1.1); the lease's allow-list decides what may actually run.
+ * drifts and a live session survives a posture switch; the lease's allow-list
+ * decides what may actually run.
  */
 export function createClaudeCodeCallbackProvider(
   deps: ClaudeCodeCallbackDeps,
@@ -91,7 +91,7 @@ export function createClaudeCodeCallbackProvider(
       rawCall: ToolCall,
       context?: McpToolCallContext,
     ): Promise<ToolResult> => {
-      // Admission first, and with no `await` before it (settled decision 19). A
+      // Admission first, and with no `await` before it (ADR-0032). A
       // callback that gets past here owns a lease for as long as it runs; one that
       // does not learns only that this surface stopped answering.
       const admission = slot.admit();
@@ -110,7 +110,7 @@ export function createClaudeCodeCallbackProvider(
 /**
  * Everything after admission, under exactly one lease.
  *
- * Mirrors the pre-phase-5 ordering so the timeline behaviour is unchanged:
+ * Preserves the prior ordering so the timeline behaviour is unchanged:
  * normalize the call's paths, settle correlation, claim or refuse the ask barrier,
  * emit the `start` event, execute, and emit the `end` event from a `finally` so a
  * thrown executor never leaves a stuck pending placeholder.
@@ -184,8 +184,8 @@ async function routeCallback(
 /**
  * Routes one admitted call to its executor under the lease's own context.
  *
- * The allow-list gate runs first and is the primary deny gate (prompt-cache design
- * section 6.1.4): the surface advertises the full superset, so a call this
+ * The allow-list gate runs first and is the primary deny gate: the surface
+ * advertises the full superset, so a call this
  * generation does not permit is refused before it runs.
  */
 function executeUnderLease(
@@ -201,7 +201,7 @@ function executeUnderLease(
     return executeAskUser(lease, call, toolCallId);
   }
   if (VAULT_TOOL_NAMES.has(call.name)) {
-    // Read-only vault work has no irreversible boundary (settled decision 20), so
+    // Read-only vault work has no irreversible boundary (ADR-0033), so
     // it crosses nothing. The active note is the one the generation captured, not
     // whichever pane happens to be focused when the callback lands.
     return Promise.resolve(
@@ -240,9 +240,9 @@ function executeUnderLease(
 }
 
 /**
- * Every mutating family goes through its own named effect boundary (settled
- * decision 20), and none of them has a path that runs without the review owner
- * that authorized it.
+ * Every mutating family goes through its own named effect boundary, and none of
+ * them has a path that runs without the review owner
+ * that authorized it (ADR-0033).
  */
 async function reviewedMutation(
   lease: ClaudeCodeGenerationLease,

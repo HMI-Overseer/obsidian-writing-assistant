@@ -28,11 +28,10 @@ export interface AssistantEventTranslator {
  * Frame-preserving queue between a transport's payload callback and the stream.
  *
  * The transport parses one SSE payload, hands it here, and yields its text token
- * separately, so several payloads can arrive between two yields. Before phase 4
- * this buffer was a flat event array and that grouping was lost: the tool loop
- * saw one event at a time and published a snapshot after each, which is exactly
- * the seam an atomic transaction cannot be built on. One payload is now one
- * frame, and one frame is one batch.
+ * separately, so several payloads can arrive between two yields. A flat event
+ * array loses that grouping: the tool loop sees one event at a time and publishes
+ * a snapshot after each, which is exactly the seam an atomic transaction cannot
+ * be built on. One payload is one frame, and one frame is one batch (ADR-0031).
  *
  * A payload that translates to no facts is not a frame. Publishing an empty
  * batch would produce a snapshot for nothing, which the flat buffer also
@@ -108,7 +107,7 @@ export interface AssistantCaptureStreamOptions {
  * yields its corresponding text token. No batch escapes until the generator
  * commits to that attempt, so a pre-yield transport failure remains retryable.
  *
- * Ownership (RFC-0011 phase 2): the raw iterator is acquired into a variable
+ * Ownership (ADR-0032): the raw iterator is acquired into a variable
  * outside the loop and returned in `finally` on every exit but natural
  * exhaustion. Previously it was acquired inside the `try` and never returned, so
  * a consumer that stopped reading left the transport generator suspended with its

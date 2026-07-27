@@ -27,7 +27,7 @@ import type { DiffMode } from "./DiffHunkView";
 
 export interface EditReviewTimelineOptions {
   timelineEl: HTMLElement;
-  /** Canonical Phase 4 placement by exact declaration identity. */
+  /** Canonical placement by exact declaration identity (ADR-0031). */
   findActionHostByToolCallId?: (toolCallId: string) => HTMLElement | null;
   app: App;
   /**

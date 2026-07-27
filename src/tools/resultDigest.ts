@@ -6,9 +6,9 @@
  * later rebuild needs but the flat prose transcript never held: the real
  * disposition of a reviewed op, a compact pointers-only digest of a discovery
  * result, and a bounded copy of the full result text. Nothing here is sent to the
- * API this phase; phase 3's replay digest reads these fields.
+ * API directly; the cold-rebuild replay digest reads these fields (ADR-0016).
  *
- * Pure: no Obsidian, no disk, so the four-outcome digest contract (section A.1) is
+ * Pure: no Obsidian, no disk, so the four-outcome digest contract is
  * unit-testable string by string.
  */
 
@@ -42,7 +42,7 @@ export interface ResolvedToolResult {
   disposition?: VaultOpDisposition;
 }
 
-/** The phase-2 capture fields merged onto an {@link ../shared/types.AgenticStep}. */
+/** The replay-capture fields merged onto an {@link ../shared/types.AgenticStep} (ADR-0016). */
 export interface StepCaptureFields {
   resultDigest?: string;
   resultRecord?: string;
@@ -61,11 +61,11 @@ export function boundToolResult(content: string): string {
 }
 
 /**
- * Compute every phase-2 capture field for one tool_call step from its resolved
+ * Compute every replay-capture field for one tool_call step from its resolved
  * result. The single source both choke points call, so neither can drift. Returns
  * only the fields that apply: an empty object for a call with no content, no
  * disposition, and no discovery digest (spreading it then adds nothing, preserving
- * pre-phase behavior for such calls).
+ * prior behavior for such calls (ADR-0016).
  */
 export function captureStepFields(
   toolName: string,
@@ -85,7 +85,7 @@ export function captureStepFields(
 
 /**
  * Discovery-class tools whose *results* are pointers the args don't already carry
- * (section A.1): the rebuilt model can re-ground any pointer in one cheap call, so replay
+ * (ADR-0016): the rebuilt model can re-ground any pointer in one cheap call, so replay
  * stays pointers rather than chunk content. Path→content tools (`read_file`,
  * `read_section`) and listing tools (`list_directory`) get no digest, their args
  * are the pointer, or the view is re-derivable.
@@ -98,13 +98,13 @@ const DISCOVERY_DIGEST_TOOLS = new Set([
   "find_notes_by_tag",
 ]);
 
-/** Max pointers a hits digest lists, and its char budget (section A.1). */
+/** Max pointers a hits digest lists, and its char budget (ADR-0016). */
 const MAX_DIGEST_POINTERS = 8;
 const MAX_DIGEST_CHARS = 500;
 
 /**
- * A compact, pointers-only digest of a discovery-tool result for phase-3 replay
- * (section A.1's four-outcome contract), or `undefined` for any non-discovery tool. Never
+ * A compact, pointers-only digest of a discovery-tool result for cold-rebuild
+ * replay (ADR-0016), or `undefined` for any non-discovery tool. Never
  * carries scores or chunk content, both non-reproducible and decision-irrelevant on
  * replay.
  */
@@ -208,18 +208,18 @@ function boundPointers(pointers: string[]): string {
 }
 
 // ---------------------------------------------------------------------------
-// Phase-3 replay (section 4.A / section 4.C): the persisted capture fields above become the
+// Cold-rebuild replay (ADR-0016): the persisted capture fields above become the
 // compact bracketed lines a cold rebuild replays under each assistant turn, and a
 // marker for an interrupted reply. The formatters live here beside the capture
 // contract so the digest string logic stays in one pure, unit-tested place; the
 // claudecode-specific history shaping that consumes them is in prepareApiMessages.
 // ---------------------------------------------------------------------------
 
-/** Resolution C's marker, appended at replay time to a partial or empty aborted turn. */
+/** Interrupted-turn marker appended during cold-rebuild replay (ADR-0016). */
 export const INTERRUPTED_REPLAY_MARKER = "[response interrupted by user]";
 
 /**
- * One replay line per persisted tool_call step (section 4.A), in recorded order. Reasoning
+ * One replay line per persisted tool_call step (ADR-0016), in recorded order. Reasoning
  * steps and any step without a tool name are dropped. The lines are presentation-only
  * (they ride replayed `content`, never `rawContent`), so a rebuilt session learns
  * what already ran and how the user disposed of it without re-executing anything.
@@ -262,16 +262,16 @@ export function hasCompletedAskGuidance(
 /**
  * The replay line for a single step, or `null` when the step contributes none.
  * Discovery tools replay their precomputed pointers-only
- * {@link AgenticStep.resultDigest} verbatim (section A.1); every other captured tool renders
+ * {@link AgenticStep.resultDigest} verbatim (ADR-0016); every other captured tool renders
  * as `[tool: keyArg]` with an always-shown disposition suffix when the call was
- * reviewed (`DECLINED by user` is the steering signal a flat prose transcript loses,
- * section 2).
+ * reviewed. `DECLINED by user` is the steering signal a flat prose transcript
+ * loses.
  *
- * A step earns a line only if it carries at least one phase-2 capture field
+ * A step earns a line only if it carries at least one replay-capture field
  * ({@link AgenticStep.resultDigest}, {@link AgenticStep.resultRecord}, or
- * {@link AgenticStep.disposition}). Steps persisted before phase 2 have none, so a
- * pre-phase-2 conversation replays byte-identically to before (the section 8 degradation
- * invariant); computing lines from `toolName`/`toolInput` alone would silently
+ * {@link AgenticStep.disposition}). Older steps have none, so older conversations
+ * replay byte-identically to before; computing lines from `toolName`/`toolInput`
+ * alone would silently
  * rewrite those old transcripts.
  */
 export function formatStepReplayLine(step: AgenticStep): string | null {

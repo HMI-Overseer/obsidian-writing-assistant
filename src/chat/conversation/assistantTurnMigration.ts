@@ -14,7 +14,7 @@ import {
 import { PROVIDER_OPTIONS } from "../../shared/modelKeys";
 
 /**
- * Version-1 to version-2 turn migration (RFC-0011).
+ * Version-1 to version-2 turn migration (ADR-0031, ADR-0032).
  *
  * Migration is conservative by construction: it never invents a provider block
  * index. A version-1 item inherits `segment` placement only when its persisted
@@ -94,8 +94,8 @@ const AUDIT_OUTCOMES = ["pending", "resolved", "unknown"] as const;
  *
  * An orphaned audit is evidence that a generation never finished, so a
  * malformed one is dropped rather than repaired: inventing a target or an
- * outcome would be worse than losing the record. Phase 6 converts a surviving
- * unresolved intent into one terminal `outcome_unknown` event.
+ * outcome would be worse than losing the record. A surviving unresolved intent
+ * becomes one terminal `outcome_unknown` event (ADR-0033).
  */
 export function normalizeInFlightGenerationAudit(
   value: unknown,
@@ -183,9 +183,9 @@ function isNonEmptyString(value: unknown): value is string {
 
 /**
  * Attempt ordinals are 1-based, but 0 is a real state: no provider attempt was
- * open when the intent was written. Phase 1 required `> 0`, which would have
+ * open when the intent was written. Requiring `> 0` would
  * silently dropped exactly that record, and dropping the only evidence that an
- * irreversible action was authorized is the trade settled decision 29 forbids.
+ * irreversible action was authorized is forbidden by ADR-0033.
  */
 function isOrdinal(value: unknown): value is number {
   return typeof value === "number" && Number.isInteger(value) && value >= 0;

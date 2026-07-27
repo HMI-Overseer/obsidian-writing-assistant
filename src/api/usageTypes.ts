@@ -29,7 +29,7 @@ export interface UsageResult {
    */
   sessionReused?: boolean;
   /**
-   * Claude Code only: whether this turn restored the session from disk (Model A′)
+   * Claude Code only: whether this turn restored the session from disk (ADR-0016)
    * rather than reusing a warm process or rebuilding. Mutually exclusive with
    * {@link sessionReused}.
    */
@@ -145,8 +145,8 @@ export interface AssistantStreamMetadata {
 
 // `StreamResult`, the old wrapper `ChatClient.stream()` returned, is gone. Its
 // replacement is `AssistantStreamRun` in ./assistantStreamRun: same events and
-// metadata, plus the `cancel()` and `settled` that RFC-0011 phase 2 made
-// mandatory. Nothing aliases the old name, because an alias would let a provider
+// metadata, plus the `cancel()` and `settled` required by ADR-0032. Nothing
+// aliases the old name, because an alias would let a provider
 // keep implementing a contract with no way to be stopped.
 
 /** Wrapper returned by ChatClient.complete(). */

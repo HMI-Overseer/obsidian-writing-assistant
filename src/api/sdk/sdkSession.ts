@@ -26,18 +26,18 @@ import type { ModelInfo, Options, Query, SDKMessage, SDKUserMessage } from "./cl
 import { ClaudeCodeProcessOwner } from "./claudeCodeSpawn";
 
 /**
- * The persistent Claude Code session and its recovery ladder (Model A′).
+ * The persistent Claude Code session and its recovery ladder (ADR-0016).
  *
  * One long-lived SDK `query()` per conversation, driven in streaming-input mode so
  * the `claude` process stays alive between turns, retains context in memory, and
  * caches incrementally (the win one-shot processes can't give,
  * `docs/02-architecture/components/providers/claude-code.md`). Session persistence to
- * disk is on (the SDK default; the earlier zero-footprint Model B forced it off), so
+ * disk is on, which is the SDK default. The earlier zero-footprint design forced it off, so
  * when the live process is gone (idle eviction, Obsidian restart, plugin reload) the
  * registry can `resume` the session from `~/.claude` before falling back to a
  * synthetic rebuild. The three-rung recovery ladder is:
  *
- *   live reuse (warm process) → disk resume (Model A′) → synthetic rebuild
+ *   live reuse (warm process) → disk resume → synthetic rebuild (ADR-0016)
  *
  * The plugin transcript stays authoritative throughout: a live session is reused,
  * and a disk session resumed, only when {@link decideRecovery} confirms the live
@@ -138,7 +138,7 @@ export class SdkSession {
    * Effort the live session currently runs at: the mint-time `Options.effort`
    * (null = nothing sent, model default), then whatever the last
    * {@link setEffort} flip applied. Deliberately outside the config fingerprint,
-   * the registry compares it per turn and flips or rebuilds (section 3.2).
+   * the registry compares it per turn and flips or rebuilds (ADR-0017).
    */
   effort: ReasoningLevel | null;
 
@@ -148,8 +148,7 @@ export class SdkSession {
   private readonly abortController = new AbortController();
   /**
    * Owns the CLI child the SDK spawns for this session, so disposal has a bounded
-   * hard tier ({@link ./claudeCodeSpawn.ClaudeCodeProcessOwner}, maintainer
-   * decision 15.2).
+   * hard tier ({@link ./claudeCodeSpawn.ClaudeCodeProcessOwner}, ADR-0032).
    */
   private readonly processOwner = new ClaudeCodeProcessOwner();
   private disposed = false;
@@ -161,8 +160,8 @@ export class SdkSession {
   private compacted = false;
   /**
    * The CLI session id observed on the last `result`, the id the persistent-session
-   * disk `resume` (Model A′) targets. On a resumed session it is the same id that was
-   * resumed (the CLI does not rotate it, section 6.7.1). Undefined until the first result.
+   * disk `resume` targets (ADR-0016). On a resumed session it is the same id that was
+   * resumed, because the CLI does not rotate it (ADR-0016). Undefined until the first result.
    */
   private sessionId: string | undefined;
 
@@ -174,7 +173,7 @@ export class SdkSession {
    *   process owner, which the builder passes to the SDK as
    *   `spawnClaudeCodeProcess` so disposal has a bounded hard tier.
    * @param resumeSessionId when set, the session is `resume`d from that id on disk
-   *   (Model A′) rather than minted fresh, so the caller sends only the delta turn.
+   *   from disk rather than minted fresh, so the caller sends only the delta turn (ADR-0016).
    */
   constructor(
     buildOptions: (
@@ -215,7 +214,7 @@ export class SdkSession {
    * True when the last turn ended on a clean `interrupt()` (abort that preserved the
    * live process). The registry reads this to keep the session for reuse instead of
    * disposing it, any *other* error leaves the session tail indeterminate and
-   * disposes (`docs/work/plans/claude-code-sdk-refactor-plan.md`).
+   * disposes (ADR-0016).
    */
   get wasInterruptedCleanly(): boolean {
     return this.interruptedCleanly;
@@ -234,7 +233,7 @@ export class SdkSession {
    * The CLI session id this session runs under (from its last `result`), or
    * undefined before the first result. The registry banks it into the conversation's
    * resume cursor so a later turn, once the live process is gone, can `resume` it
-   * from disk (Model A′).
+   * from disk (ADR-0016).
    */
   get bankedSessionId(): string | undefined {
     return this.sessionId;
@@ -286,7 +285,7 @@ export class SdkSession {
     // A turn ends one of three ways, and only the third is a leak. `reachedTerminal`
     // marks the provider's own `result`, `threw` marks a failure propagating to the
     // caller, and neither being set means the consumer stopped reading while the
-    // query was still producing (RFC-0011 criterion 18).
+    // query was still producing (ADR-0032).
     let reachedTerminal = false;
     let threw = false;
     try {
@@ -395,7 +394,7 @@ export class SdkSession {
 
   /**
    * The handshake's model list (`supportedModels()` control request), the
-   * section 3.1 layer-2 discovery source: each entry carries `supportedEffortLevels`
+   * model-aware discovery source from ADR-0017: each entry carries `supportedEffortLevels`
    * for the effort-level harvest.
    */
   supportedModels(): Promise<ModelInfo[]> {
@@ -405,7 +404,7 @@ export class SdkSession {
   /**
    * Disposes the session and resolves once the CLI child is provably gone.
    *
-   * Phase 0 measured that the old body, `input.close()` + `abort()` +
+   * Measurements confirmed that the old body, `input.close()` + `abort()` +
    * `iterator.return()`, returns in about two seconds and leaves the `claude`
    * process running, because the SDK's kill chain is 2000 ms then a further
    * 5000 ms and every one of its timers is `unref()`ed. Idle eviction and unload
@@ -475,7 +474,7 @@ export interface SessionTurnRequest {
   deltaPrompt: string;
   /**
    * Builds SDK options for a session (invoked on a cold mint or a disk resume). The
-   * second argument is the session id to `resume` from disk (Model A′); absent on a
+   * second argument is the session id to `resume` from disk (ADR-0016); absent on a
    * fresh mint.
    */
   buildOptions: (
@@ -484,7 +483,7 @@ export interface SessionTurnRequest {
     processOwner?: ClaudeCodeProcessOwner,
   ) => Options;
   /**
-   * The persisted resume cursor for this conversation (Model A′), read from the last
+   * The persisted resume cursor for this conversation (ADR-0016), read from the last
    * banked turn. When no live session is held, the registry re-checks it against this
    * turn's transcript and, if it passes, `resume`s the session from disk instead of
    * rebuilding. Absent ⇒ resume is not attempted.
@@ -493,21 +492,21 @@ export interface SessionTurnRequest {
   signal?: AbortSignal;
   onResult?: (usage: ClaudeCodeResultUsage) => void;
   /**
-   * Reports the recovery decision (reused / resumed / rebuilt) for this turn (Phase 0
-   * cache instrumentation, extended for Model A′). Fires exactly once per turn, with
+   * Reports the recovery decision (reused / resumed / rebuilt) for this turn.
+   * Fires exactly once per turn, with
    * the *final* tier, so a resume that fails to start and drops to a rebuild reports
    * the rebuild, not the abandoned resume.
    */
   onRecoveryDecision?: (decision: SessionRecovery) => void;
   /**
-   * Receives the resume cursor this turn's session banked (Model A′), so the chat
+   * Receives the resume cursor this turn's session banked (ADR-0016), so the chat
    * layer can persist it as the conversation's next resume point. Fires once per
    * turn that banks a watermark (a clean completion), never on error/abort.
    */
   onSessionBanked?: (cursor: ClaudeCodeResumeCursor) => void;
   /**
    * Receives the handshake's model list when a fresh session is minted (never
-   * on reuse), the section 3.1 layer-2 effort-level harvest. Fired fire-and-forget:
+   * on reuse), the model-aware effort-level harvest from ADR-0017. Fired fire-and-forget:
    * the turn streams without waiting, and a failed control request is
    * swallowed (the descriptor fallback keeps covering).
    */
@@ -546,7 +545,7 @@ export class SdkSessionRegistry {
    * Runs one turn for `conversationId` down the recovery ladder: reuse the warm
    * session, else `resume` it from disk, else mint fresh. A resume that cannot even
    * start (its session file was deleted by CLI retention) is a non-event: it drops to
-   * a synthetic rebuild *within the same turn* (section 6.3). Any failure disposes the
+   * a synthetic rebuild *within the same turn*. Any failure disposes the
    * session so the next turn starts clean, the transcript can always rebuild.
    */
   async *runTurnEvents(
@@ -639,7 +638,7 @@ export class SdkSessionRegistry {
       this.afterTurnError(conversationId, session);
       throw error;
     } finally {
-      // A turn the consumer abandoned disposes itself (RFC-0011 criterion 18), so
+      // A turn the consumer abandoned disposes itself (ADR-0032), so
       // the registry must not keep offering the corpse to the next turn.
       this.dropIfDisposed(conversationId, session);
     }
@@ -700,7 +699,7 @@ export class SdkSessionRegistry {
     this.tombstones.delete(conversationId);
     this.ensureSweeping();
 
-    // Mint-time harvest (section 3.1 layer 2): ask the fresh process for its model list in
+    // Mint-time harvest (ADR-0017): ask the fresh process for its model list in
     // the background. Failures are ignored, discovery is an upgrade over the
     // descriptor fallback, never a turn dependency. A resume spawns a fresh process
     // too, so the harvest applies there as well.
@@ -741,7 +740,7 @@ export class SdkSessionRegistry {
    * the live process (its context now covers the partial reply), so keep it for
    * reuse. The exception is a mid-turn compaction, which desynced it and must be
    * disposed on every exit path (the {@link afterTurnSuccess} check is unreachable
-   * when the turn throws, section 6.7.1). Any other error (SDK failure, unexpected end, hard
+   * when the turn throws). Any other error (SDK failure, unexpected end, hard
    * abort) leaves the tail indeterminate, so dispose it and cold-rebuild next turn. No
    * cursor is banked on a surviving interrupt: aborted turns persist no usage, so it
    * would be dropped, and the live session covers the immediate next turn anyway.
@@ -757,7 +756,7 @@ export class SdkSessionRegistry {
   }
 
   /**
-   * Banks the session's watermark into the conversation's resume cursor (Model A′),
+   * Banks the session's watermark into the conversation's resume cursor (ADR-0016),
    * so a later turn can `resume` it once the live process is gone. Needs the session
    * id, observed on the turn's `result`; without it (no result reached) nothing is
    * banked.
@@ -818,9 +817,9 @@ export class SdkSessionRegistry {
         void session.dispose();
         this.sessions.delete(id);
         // Tombstone the eviction. The persisted resume cursor usually restores the
-        // session next turn ("session resumed", Model A′); the tombstone is the
+        // session next turn ("session resumed", ADR-0016); the tombstone is the
         // fallback attribution when there is no cursor to resume (or it fails its
-        // gate): "expired" rather than the neutral "session started" (section 6.2).
+        // gate): "expired" rather than the neutral "session started".
         this.tombstones.set(id, "session-disposed");
       }
     }
@@ -853,7 +852,7 @@ function mintMeta(cfg: SessionConfig): HarnessSession {
 }
 
 /**
- * Seeds session metadata from a resume cursor (Model A′): the disk session already
+ * Seeds session metadata from a resume cursor (ADR-0016): the disk session already
  * covers `coveredCount` turns, so the watermark starts there and this turn's delta
  * extends it exactly as a live-reuse turn would. `decideRecovery` already verified
  * the cursor's fingerprint equals `fingerprint(cfg)`, so the config is aligned.

@@ -9,7 +9,7 @@ import type {
 } from "./types";
 
 /**
- * Pure derivations over per-item capture evidence (RFC-0011).
+ * Pure derivations over per-item capture evidence (ADR-0031).
  *
  * A provider descriptor is a capability ceiling. Runtime evidence is the source
  * of truth for one turn and can only lower that ceiling. Everything here is a
@@ -181,8 +181,7 @@ function loweredReasonFor(
 }
 
 /**
- * Stamps the settlement evidence onto a finished turn (RFC-0011 phase 6, section
- * 9.2).
+ * Stamps the settlement evidence onto a finished turn (ADR-0033).
  *
  * The builder freezes its record in `finishTurn()`, which happens before the
  * provider has been proven quiet, so quiescence and the terminal diagnostics can

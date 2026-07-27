@@ -481,7 +481,7 @@ export class ChatView extends ItemView {
 
     // Bind the click-away to the view's own document, not the bare global. If the
     // leaf is dragged into a popout window the overlays live in that window, so the
-    // outside-click that dismisses them has to be heard there too (ADR-0024, Phase 7).
+    // outside-click that dismisses them has to be heard there too (ADR-0024).
     this.registerDomEvent(this.contentEl.ownerDocument, "click", () => {
       this.dismissAllOverlays();
     });

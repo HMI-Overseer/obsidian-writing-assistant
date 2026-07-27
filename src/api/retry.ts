@@ -135,7 +135,7 @@ export async function withRetry<T>(
  * stopReason. A retryable failure AFTER the first delta, or any non-retryable
  * failure (incl. AbortError), propagates unchanged.
  *
- * Ownership (RFC-0011 phase 2). The factory now receives an attempt context that
+ * Ownership (ADR-0032). The factory receives an attempt context that
  * the turn-run owner allocates *before* it is invoked, so there is no instant at
  * which a provider is running and unowned, and a factory that throws still has a
  * lease to settle. Three further rules the old wrapper had no way to honor:
@@ -197,7 +197,7 @@ export function streamWithRetry(
     let committed = false;
     let drained = false;
     // Retained outside the attempt loop so the `finally` can return the iterator
-    // this wrapper acquired by hand (RFC-0011 criterion 19).
+    // this wrapper acquired by hand (ADR-0032).
     let activeIterator: AsyncIterator<AssistantCaptureBatch> | null = null;
     try {
       for (let attempt = 1; attempt <= maxAttempts; attempt++) {

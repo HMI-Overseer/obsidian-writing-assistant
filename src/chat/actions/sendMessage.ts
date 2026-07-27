@@ -67,7 +67,7 @@ export async function sendMessage(options: SendMessageOptions): Promise<void> {
   // Freeze the attached notes (and their embedded images) into a point-in-time
   // snapshot bound to this user turn, so they stay cache-stable in history instead
   // of being re-read into the prefix every send. There is no live document re-read
-  // anymore (ambient editing, section 6.3/section 10/section 13); the model reads current content via
+  // anymore under ambient editing; the model reads current content via
   // tools when it edits.
   // Unknown vision capability is treated as allow-the-attempt (mirrors the composer attach
   // gate), so an unprobed model's image rides the turn instead of being silently dropped.

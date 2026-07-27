@@ -85,7 +85,7 @@ export default class WritingAssistantChat extends Plugin {
     this.addCommand({
       id: "edit-active-note",
       name: "Edit active note with AI",
-      // Editing is now ambient (prompt-cache design section 6.3): the chat can always
+      // Editing is now ambient: the chat can always
       // propose edits to the active note (reviewed at the default "ask" posture),
       // so the command just opens the chat with the note in context.
       editorCallback: async () => {

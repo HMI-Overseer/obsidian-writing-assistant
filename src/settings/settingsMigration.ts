@@ -524,7 +524,7 @@ function normalizeModelIdAliases(
  */
 /**
  * Migrates the prompt prefix. The plan/chat/edit mode prompts collapsed into one
- * unified prefix (prompt-cache design section 6.3): a new `systemPromptPrefix` wins; otherwise
+ * unified prefix: a new `systemPromptPrefix` wins; otherwise
  * a customized legacy chat (then plan) prefix is carried forward, so a user's prior
  * wording survives. The edit-format prompts are dropped (their guidance is now dynamic).
  */

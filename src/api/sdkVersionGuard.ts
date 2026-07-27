@@ -4,8 +4,7 @@
  * The Agent SDK (pinned in `package.json`) drives the user's *separately
  * installed* `claude` CLI, and the two are version-coupled. The SDK exposes no
  * programmatic CLI version, so the expected CLI version is pinned here and must
- * be re-validated whenever the SDK pin is bumped (see
- * `docs/work/plans/claude-code-sdk-refactor-plan.md`).
+ * be re-validated whenever the SDK pin is bumped.
  *
  * Pure module, no SDK import, no I/O, so it is unit-testable without the CLI.
  */

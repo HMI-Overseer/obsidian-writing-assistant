@@ -5,10 +5,9 @@ import { ClaudeCodeNotFoundError } from "../claudeCodeProcess";
 import type { SpawnedProcess, SpawnOptions } from "./claudeAgentSdk";
 
 /**
- * Plugin ownership of the Agent SDK's CLI child (RFC-0011 phase 2, maintainer
- * decision 15.2).
+ * Plugin ownership of the Agent SDK's CLI child (ADR-0032).
  *
- * Phase 0 measured, at PID level, that the plugin had no bounded way to end an SDK
+ * PID-level measurements showed that the plugin had no bounded way to end an SDK
  * run: `iterator.return()` leaves the `claude` process alive, `abort()` alone
  * leaves it alive, and only `abort()` followed by draining the query to `done`
  * disposes it, at about seven seconds. That last one is the graceful path under a

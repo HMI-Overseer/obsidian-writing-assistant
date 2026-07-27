@@ -6,7 +6,7 @@
  *
  * The composer knowledge indicator dot stays a two-source signal (retrieval and
  * graph). Memories are visible through this section's own toggle and status line,
- * never through the dot (plan decision 11).
+ * never through the dot (RFC-0007).
  */
 
 import type { PluginSettings } from "../../shared/types";

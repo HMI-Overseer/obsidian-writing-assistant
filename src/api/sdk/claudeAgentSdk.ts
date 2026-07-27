@@ -5,9 +5,8 @@
  * Every other module imports the SDK *through here* so the rest of the codebase
  * names one import path, and the SDK↔plugin coupling (version pin, the
  * `import.meta.url`→`createRequire` bundling shim in `esbuild.config.mjs`) is
- * isolated to one place. The session engine that consumes `query()` /
- * `createSdkMcpServer()` lands in later phases of the refactor; this module is
- * the seam they build behind.
+ * isolated to one place. The session engine consumes `query()` and
+ * `createSdkMcpServer()` behind this seam.
  *
  * Distribution note: we never ship the SDK's vendored 245 MB native binary. The
  * engine drives the user's already-installed `claude` CLI via the

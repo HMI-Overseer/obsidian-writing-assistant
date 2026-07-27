@@ -104,7 +104,7 @@ export function makeDiskSnapshot(app: App): DiskSnapshot {
  * and post-apply fingerprints, and fed to the pure `inverseOf`.
  *
  * Throws if the operation cannot proceed (e.g. a target vanished after
- * pre-flight). The caller (Phase 3 batch applier) rolls back applied ops.
+ * pre-flight). The batch applier rolls back applied ops.
  */
 export async function applyOperation(
   app: App,

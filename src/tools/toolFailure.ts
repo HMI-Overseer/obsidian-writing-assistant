@@ -71,8 +71,8 @@ export function defaultRecovery(kind: ErrorKind): string {
 }
 
 /**
- * The refusal for a call that did not cross its effect boundary (RFC-0011 phase
- * 6). Shared by Claude Code's callback surface and the plugin's own tool loop, so
+ * The refusal for a call that did not cross its effect boundary (ADR-0033).
+ * Shared by Claude Code's callback surface and the plugin's own tool loop, so
  * one wording covers both causes: the run was signalled, or its write-ahead
  * intent could not be made durable. It names the outcome the model needs, which
  * is that nothing happened, and leaks no state about why the run stopped.

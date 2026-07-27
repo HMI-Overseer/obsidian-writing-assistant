@@ -22,7 +22,7 @@ const MEMORY_TYPE_OPTIONS: ReadonlyArray<{ value: MemoryType; label: string }> =
  * check excludes it (a re-save with the same name is legal, a rename onto a
  * sibling is not).
  *
- * Validation is the shared Phase 1 validator, the same one the `add_memory` tool
+ * Validation is shared with the `add_memory` tool
  * runs, so a record a user can save is a record the model could have proposed.
  * The `enabled` switch is deliberately absent: it lives on the tab row, where
  * turning an entry off is one click rather than a modal round trip.
@@ -45,7 +45,7 @@ export class MemoryModal extends Modal {
     this.editingName = source?.name ?? null;
     // An edit keeps the entry's own switch (the row's toggle owns `enabled`). A
     // record the user authors here starts on: authoring it is the opt-in, the
-    // same reading Phase 3 applies to an approved model-proposed add. Only the
+    // same reading applies to an approved model-proposed add. Only the
     // bundled defaults ship off.
     this.enabled = source?.enabled ?? true;
     this.name = source?.name ?? "";

@@ -136,7 +136,7 @@ interface ValidationContext {
  * It never repairs IDs, drops malformed items, or strips a bad replay capsule.
  *
  * Version 2 adds per-item capture evidence, turn-level quiescence, and bounded
- * capture diagnostics (RFC-0011). The two versions are validated exclusively:
+ * capture diagnostics (ADR-0031, ADR-0032). The two versions are validated exclusively:
  * a version-1 turn carrying version-2 fields is rejected rather than silently
  * upgraded, so migration stays the one funnel that produces version-2 shapes.
  */
@@ -420,7 +420,7 @@ function validateCaptureDiagnostics(
 }
 
 /**
- * Placement and validity rules from RFC-0011 invariant 7. `exact` needs both a
+ * Placement and validity rules from ADR-0031. `exact` needs both a
  * provider-message key and a provider block identity; `segment` needs the key
  * alone; `unplaced` carries neither. Nothing here infers a missing field.
  */

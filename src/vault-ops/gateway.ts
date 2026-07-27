@@ -154,7 +154,7 @@ function trimSlashes(value: string): string {
 /**
  * Decide one operation's fate. `autoSoFar` is the count of ops already
  * resolved to "auto" this turn. `posture` is the session-level override
- * (prompt-cache design section 6.3): under `"auto"` ("Edit automatically") every op
+ * under `"auto"` ("Edit automatically"): every op
  * auto-applies, overriding the per-class gate (ask AND deny) and the scope
  * restriction, with no per-turn cap, an explicit opt-in to unattended operation.
  * The path-boundary refusal in {@link ../chat/actions/liveVaultReview} is the real
@@ -181,7 +181,7 @@ export function resolveGate(
  * Whether the session permits any vault write at all. A deny-all policy under the
  * default `ask` posture is a read-only session; the `auto` posture overrules the
  * policy, so it always permits writes. Drives the **ambient edit pipeline**
- * (prompt-cache design section 6.3): with the plan/chat/edit modes gone, the edit renderer +
+ * because the plan/chat/edit modes are gone: the edit renderer +
  * diff review run whenever writes are possible (every assistant turn may propose
  * edits), and a read-only session is exactly a deny-all policy.
  */

@@ -272,7 +272,7 @@ function validateTurnRevision(
 /**
  * Replay evidence and per-item capture evidence were previously validated in
  * isolation, so a turn could claim exact capture while carrying an unplaced or
- * capture-invalid item. RFC-0011 makes runtime evidence authoritative: a
+ * capture-invalid item. ADR-0031 makes runtime evidence authoritative: a
  * descriptor is a ceiling and a turn's own items can only lower it.
  *
  * Checked here rather than in the turn validator because the claim being
@@ -943,7 +943,7 @@ function isValidEvent(
       isBoundedString(value.reason, ASSISTANT_ACTION_MAX_TEXT_CHARS)
     );
   }
-  // Write-ahead audit evidence (RFC-0011). Both carry the intent identity that
+  // Write-ahead audit evidence (ADR-0033). Both carry the intent identity that
   // links the persisted pre-effect record to this ledger entry.
   if (value.type === "intent_recorded") {
     return (

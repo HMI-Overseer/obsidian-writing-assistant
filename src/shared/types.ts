@@ -712,12 +712,101 @@ export interface GenerationAuditIntent {
 export interface InFlightGenerationAudit {
   /** The assistant message this generation was producing. */
   messageId: string;
-  /** Lease identity, `${turnId}#${attemptOrdinal}`. */
+  /**
+   * The lease that admitted the callbacks, as evidence rather than as the key.
+   * On Claude Code that is the generation lease (`claude-generation-<id>`), which
+   * is a different namespace from the attempt lease's `${turnId}#${ordinal}`; on
+   * the plugin's own loop it is the attempt lease that was streaming. The key is
+   * the draft identity below, which the generation owns before either exists.
+   */
   leaseId: string;
   turnId: string;
   attemptOrdinal: number;
+  /** Attribution for the failed revision an orphaned audit recovers into. */
+  provider: ProviderOption;
+  modelId: string;
   openedAt: number;
   intents: GenerationAuditIntent[];
+}
+
+/**
+ * The point after which cancelling can no longer prove that no consequential
+ * outcome happened, named per executor rather than centralized as one vague
+ * "executor started" flag (RFC-0011 settled decision 20).
+ *
+ * Provider-neutral: Claude Code's MCP callbacks and the plugin's own tool loop
+ * cross the same four boundaries through the same review owner, and criterion 29
+ * is not provider-scoped. Read-only vault work and `recall_memory` have no entry,
+ * and that absence is the statement that they have no irreversible boundary.
+ */
+export type EffectBoundary =
+  | "edit_review"
+  | "vault_op_review"
+  | "memory_review"
+  | "ask_interaction";
+
+/**
+ * What an executor states about the effect it is about to cause, before it
+ * causes it.
+ *
+ * Bounded identity only, per section 4.2: a family, the target being acted on,
+ * the exact correlation, and a safe summary. It never carries provider
+ * arguments, tool results, file contents, or diffs, which is also why an intent
+ * cannot be turned back into a ledger payload.
+ */
+export interface EffectIntentRequest {
+  boundary: EffectBoundary;
+  family: ToolActionFamily;
+  correlation: ToolActionCorrelationEvidence;
+  /** The thing being acted on: a vault path, a memory name, an interaction. */
+  targetId: string;
+  summary: string;
+}
+
+/** Which run owned the crossing, recorded as evidence on the audit record. */
+export interface EffectRunOwnership {
+  leaseId: string;
+  attemptOrdinal: number;
+}
+
+/** The draft identity one generation's audit belongs to. */
+export interface GenerationAuditIdentity {
+  messageId: string;
+  turnId: string;
+  provider: ProviderOption;
+  modelId: string;
+  /** The generation's own action-reference formula, shared with its ledger. */
+  actionRefFor: (toolCallId: string) => string;
+}
+
+/**
+ * The durable half of a write-ahead intent, as an executor sees it.
+ *
+ * `recordIntent` resolves only once the intent is on disk and rejects otherwise,
+ * which is what lets a boundary refuse an effect it could not first record.
+ * `reconcileIntent` never refuses: by then the effect has happened and there is
+ * nothing left to gate.
+ */
+export interface GenerationAuditRecorder {
+  recordIntent(
+    request: EffectIntentRequest,
+    ownership: EffectRunOwnership,
+  ): Promise<void>;
+  reconcileIntent(request: EffectIntentRequest): Promise<void>;
+}
+
+/**
+ * The one gate every consequential executor passes through, on every provider.
+ *
+ * True means the intent is durable and the run is still allowed to act. False
+ * means refuse without an outcome, whether because the run was signalled or
+ * because its intent could not be made durable.
+ */
+export interface EffectBoundaryGuard {
+  crossEffectBoundary(
+    boundary: EffectBoundary,
+    intent: EffectIntentRequest,
+  ): Promise<boolean>;
 }
 
 export type ToolActionEffectRecord =

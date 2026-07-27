@@ -274,26 +274,33 @@ export function deriveActionControlEligibility(
     UNDO_FAMILIES.has(entry.family) &&
     isEffectUndoable(state.latestEffect);
 
+  // A target whose write-ahead intent never resolved is terminal (RFC-0011
+  // criterion 28). Its approval state still reads `pending`, because the only
+  // events it carries are the proposal and its own audit trail, so without this
+  // the row would offer Approve and Apply for work that may already have
+  // happened. Undo needs an applied effect and is excluded by that alone.
+  const actionable = ownsActiveHead && !state.outcomeUnknown;
+
   return {
     canApprove:
-      ownsActiveHead &&
+      actionable &&
       state.approval === "pending" &&
       state.effect === "none" &&
       !state.superseded,
     canDecline:
-      ownsActiveHead &&
+      actionable &&
       (state.approval === "pending" ||
         state.approval === "approved") &&
       state.effect === "none" &&
       !state.superseded,
     canApply:
-      ownsActiveHead &&
+      actionable &&
       entry.family !== "interaction" &&
       !state.superseded &&
       ((state.approval === "approved" && state.effect === "none") ||
         state.retry === "requested"),
     canRetry:
-      ownsActiveHead &&
+      actionable &&
       !state.superseded &&
       RETRY_FAMILIES.has(entry.family) &&
       state.retry === "eligible",

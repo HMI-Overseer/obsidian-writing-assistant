@@ -68,6 +68,9 @@ import type {
   AssistantMessageRevision,
   CompletionModel,
   ConversationMessage,
+  EffectIntentRequest,
+  GenerationAuditIdentity,
+  GenerationAuditIntent,
 } from "../../../../src/shared/types";
 import { ASK_USER_TOOL } from "../../../../src/tools/ask/definition";
 import {
@@ -485,8 +488,51 @@ function harness(
   posture: "ask" | "auto" = "ask",
 ) {
   const messages: ConversationMessage[] = [];
+  // The in-flight generation audit as this suite needs it (RFC-0011 phase 6):
+  // one recorder per generation, in memory, so the effect boundaries these tests
+  // drive behave the way they do against the real store without this file owning
+  // a conversation file. The durable behaviour itself is asserted in
+  // `generationAuditStore.test.ts` and `generateLlmResponseTerminalAudit.test.ts`.
+  const auditIntents: GenerationAuditIntent[] = [];
   const store = {
     persistActiveConversation: vi.fn(() => Promise.resolve()),
+    openGenerationAudit: vi.fn((identity: GenerationAuditIdentity) => ({
+      recordIntent: (request: EffectIntentRequest) => {
+        const actionRef = identity.actionRefFor(
+          request.correlation.kind === "none"
+            ? request.targetId
+            : request.correlation.toolCallId,
+        );
+        auditIntents.push({
+          intentId: `intent-${actionRef}-${request.targetId}`,
+          actionRef,
+          family: request.family,
+          targetId: request.targetId,
+          correlation: request.correlation,
+          summary: request.summary,
+          recordedAt: 1,
+          outcome: "pending",
+        });
+        return Promise.resolve();
+      },
+      reconcileIntent: (request: EffectIntentRequest) => {
+        const intent = auditIntents.find(
+          (entry) => entry.targetId === request.targetId,
+        );
+        if (intent) intent.outcome = "resolved";
+        return Promise.resolve();
+      },
+    })),
+    markGenerationIntentsUnknown: vi.fn(() => {
+      for (const intent of auditIntents) {
+        if (intent.outcome === "pending") intent.outcome = "unknown";
+      }
+      return auditIntents.length > 0
+        ? { intents: auditIntents }
+        : null;
+    }),
+    clearGenerationAudit: vi.fn(() => null),
+    restoreGenerationAudit: vi.fn(),
     appendMessage: vi.fn((message: ConversationMessage) => messages.push(message)),
     setLastAssistantResponse: vi.fn(),
     commitRevisionReplacement: vi.fn(

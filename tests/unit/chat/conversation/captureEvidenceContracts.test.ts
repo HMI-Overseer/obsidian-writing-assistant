@@ -398,9 +398,14 @@ describe("in-flight generation audit", () => {
   function audit(): InFlightGenerationAudit {
     return {
       messageId: "message-1",
+      // The lease that admitted the callbacks, as evidence rather than as the
+      // key: on Claude Code this is `claude-generation-<id>`, on the plugin's own
+      // loop the attempt lease (RFC-0011 phase 6).
       leaseId: "turn-1#1",
       turnId: "turn-1",
       attemptOrdinal: 1,
+      provider: "claudecode",
+      modelId: "claude-sonnet-4-5",
       openedAt: 1700000000000,
       intents: [
         {
@@ -455,8 +460,13 @@ describe("in-flight generation audit", () => {
     for (const mutate of [
       (value: Record<string, unknown>) => delete value.leaseId,
       (value: Record<string, unknown>) => {
-        value.attemptOrdinal = 0;
+        value.attemptOrdinal = -1;
       },
+      (value: Record<string, unknown>) => delete value.provider,
+      (value: Record<string, unknown>) => {
+        value.provider = "not-a-provider";
+      },
+      (value: Record<string, unknown>) => delete value.modelId,
       (value: Record<string, unknown>) => {
         (value.intents as Record<string, unknown>[])[0].family = "unknown_family";
       },
@@ -474,6 +484,17 @@ describe("in-flight generation audit", () => {
       mutate(raw);
       expect(normalizeInFlightGenerationAudit(raw)).toBeNull();
     }
+  });
+
+  it("keeps a record written before any provider attempt opened", () => {
+    // Phase 1 required `attemptOrdinal > 0`, which would have silently dropped
+    // exactly this record. Ordinal 0 is a real state, no attempt was streaming
+    // when the effect was authorized, and dropping the only evidence that an
+    // irreversible action happened is the trade settled decision 29 forbids.
+    const raw = JSON.parse(JSON.stringify(audit())) as Record<string, unknown>;
+    raw.attemptOrdinal = 0;
+
+    expect(normalizeInFlightGenerationAudit(raw)?.attemptOrdinal).toBe(0);
   });
 
   it("is not inherited by a branch", () => {

@@ -28,6 +28,7 @@ import { isActionTool, runToolLoop } from "./toolLoop";
 import type {
   MemoryToolContext,
   ToolExecutionContext,
+  TurnSettlementEvidence,
   VaultOpToolContext,
   VaultToolContext,
 } from "./toolLoop";
@@ -45,7 +46,6 @@ import {
   createAssistantTurnMessage,
   createAssistantTurnRevision,
 } from "../finalization/assistantTurnFinalization";
-import { buildDirectProviderActionLedger } from "../finalization/directProviderActionLedger";
 import {
   getActiveAssistantRevision,
   isMeaningfulAssistantReplacement,
@@ -56,7 +56,16 @@ import {
   rawConcatenatedProse,
 } from "../turns/assistantTurnProjections";
 import { projectRegexEditPreview } from "../messages/regexEditPreview";
-import { lowerEvidenceFromCapture } from "../../shared/captureEvidence";
+import {
+  lowerEvidenceFromCapture,
+  withTerminalCaptureEvidence,
+} from "../../shared/captureEvidence";
+import { unknownOutcomeDiagnostic } from "../../shared/generationAudit";
+import {
+  buildDirectProviderActionLedger,
+  pruneDanglingActionRefs,
+  unmatchedAuditIntents,
+} from "../finalization/directProviderActionLedger";
 import type {
   ClaudeCodeGenerationHandle,
   ClaudeCodeGenerationLease,
@@ -168,6 +177,25 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
     revisionId: `revision-${generateId()}`,
     turnId: `turn-${generateId()}`,
     createdAt: Date.now(),
+  };
+  /** One action reference formula, shared by the audit and the ledger it folds into. */
+  const actionRefFor = (toolCallId: string): string =>
+    `action-${draftIdentity.revisionId}-${toolCallId}`;
+  // The generation's durable write-ahead audit (RFC-0011 phase 6). Keyed by the
+  // draft identity, which this generation owns before any lease or attempt exists;
+  // the lease that admits a callback rides on the record as evidence. Every
+  // consequential executor on either path, Claude Code's MCP callbacks and the
+  // plugin's own tool loop, records through this one recorder.
+  const auditRecorder = store.openGenerationAudit({
+    messageId: draftIdentity.messageId,
+    turnId: draftIdentity.turnId,
+    provider: activeModel.provider,
+    modelId: activeModel.modelId,
+    actionRefFor,
+  });
+  let settlementEvidence: TurnSettlementEvidence = {
+    quiescence: "proven",
+    diagnostics: [],
   };
   const turnBuilder = new AssistantTurnBuilder({
     turnId: draftIdentity.turnId,
@@ -362,6 +390,11 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
     editProposals?: ReturnType<LiveVaultReview["getEditProposals"]>;
     parsedEditPlacement?: { itemId: string; actionRef: string };
   }): Promise<boolean> => {
+    // Everything unreconciled becomes an unknown outcome before the fold: an
+    // intent nobody closed belongs to an effect whose result cannot be invented
+    // (settled decision 21).
+    const audit = store.markGenerationIntentsUnknown();
+    const intents = audit?.intents ?? [];
     const actionLedger = buildDirectProviderActionLedger({
       revisionId: draftIdentity.revisionId,
       turn: input.turn,
@@ -374,15 +407,34 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
       appliedVaultOpRecord: liveReview.getAppliedRecord() ?? undefined,
       memoryProposals: liveReview.getMemoryProposals(),
       parsedEditPlacement: input.parsedEditPlacement,
+      intents,
       createEventId: () => `event-${generateId()}`,
       createdAt: draftIdentity.createdAt,
     });
+    // An intent whose action never reached its review has no ledger entry it can
+    // become, because every entry payload needs evidence an intent deliberately
+    // does not carry. It is kept as bounded terminal evidence on the turn instead.
+    const turn = withTerminalCaptureEvidence(
+      pruneDanglingActionRefs(input.turn, actionLedger),
+      {
+        quiescence: settlementEvidence.quiescence,
+        diagnostics: [
+          ...settlementEvidence.diagnostics,
+          ...unmatchedAuditIntents(actionLedger, intents).map((intent) =>
+            unknownOutcomeDiagnostic(activeModel.provider, intent),
+          ),
+        ],
+      },
+    );
     const parentRevision =
       finalization.kind === "replace"
         ? getActiveAssistantRevision(finalization.oldMessage)
         : null;
     const messageUsage = input.usage
-      ? buildMessageUsage(activeModel.modelId, input.usage)
+      ? withoutForcedResumeCursor(
+          buildMessageUsage(activeModel.modelId, input.usage),
+          settlementEvidence.quiescence,
+        )
       : undefined;
     // A descriptor is a ceiling; the turn's own items decide what it may claim
     // (RFC-0011 settled decision 24). Phase 4 is the first writer of version-2
@@ -390,9 +442,11 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
     // it `crossCheckCaptureEvidence()` refuses the revision on reload with
     // `revision_metadata_invalid`, because no runtime placement supports an exact
     // ordering claim once no translator records an exact provider block identity.
+    // Phase 6 adds quiescence to that turn, so forced settlement lowers native
+    // resume through the same one call.
     const supportedEvidence = lowerEvidenceFromCapture(
       input.replayEvidence,
-      input.turn,
+      turn,
     );
     const revision = createAssistantTurnRevision({
       revisionId: draftIdentity.revisionId,
@@ -406,7 +460,7 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
       createdAt: draftIdentity.createdAt,
       provider: activeModel.provider,
       modelId: activeModel.modelId,
-      turn: input.turn,
+      turn,
       replayEvidence: supportedEvidence,
       ...(messageUsage ? { usage: messageUsage } : {}),
       ...(ragSources ? { ragSources } : {}),
@@ -417,12 +471,12 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
         ? { errorMessage: input.errorMessage }
         : {}),
     });
-    const response = allVisibleProse(input.turn);
+    const response = allVisibleProse(turn);
     if (finalization.kind === "replace") {
       if (
         !isMeaningfulAssistantReplacement({
           provider: activeModel.provider,
-          turn: input.turn,
+          turn,
           replayEvidence: supportedEvidence,
           usage: messageUsage,
         })
@@ -454,8 +508,22 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
       transcript.registerBubble(assistantMessage.id, assistantBubble);
     }
     store.setLastAssistantResponse(response);
+    // The revision now carries every intent's terminal evidence, so the in-flight
+    // record is redundant and is cleared in the same persisted transition
+    // (settled decision 21). A write that does not land puts the audit back: the
+    // evidence has to survive for the one bounded retry the `finally` performs.
+    const cleared = store.clearGenerationAudit();
+    try {
+      await store.persistActiveConversation();
+    } catch (error) {
+      store.restoreGenerationAudit(cleared);
+      console.error(
+        "[chat] The finished assistant turn could not be persisted.",
+        error,
+      );
+    }
     liveReview.detachPanels?.();
-    await assistantBubble.turnView.refresh(input.turn, {
+    await assistantBubble.turnView.refresh(turn, {
       actionLedger,
       ...(input.errorMessage === undefined
         ? {}
@@ -466,7 +534,7 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
       finalization.kind === "append" &&
       finalization.autoInsert
     ) {
-      const insertion = lastNonEmptyProse(input.turn);
+      const insertion = lastNonEmptyProse(turn);
       if (insertion) {
         await insertLastResponse(plugin, insertion);
       }
@@ -496,6 +564,9 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
         askResponder: askCoordinator,
         askSignal: abortController.signal,
         signal: abortController.signal,
+        // The same recorder the plugin loop uses: one conversation-scoped audit
+        // per generation, whichever executor crosses a boundary (RFC-0011 phase 6).
+        audit: auditRecorder,
         lifecycle: (event) => {
           claudeToolCorrelations[event.toolCallId] = "provider_id";
           if (event.phase === "start") {
@@ -554,6 +625,12 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
       {
         onDelta: () => undefined,
         onTurnSnapshot: refreshLiveTurn,
+        // The turn record is frozen before the provider is proven quiet, so the
+        // quiescence mode and the settlement diagnostics arrive here and are
+        // stamped on at persistence (section 9.2).
+        onSettlement: (evidence) => {
+          settlementEvidence = evidence;
+        },
         onCalibrate: onCalibrate
           ? (request, usage) => {
               // A provider that reports its context size directly (Claude Code)
@@ -574,9 +651,9 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
       memoryToolContext,
       askCoordinator,
       turnBuilder,
-      (toolCallId) =>
-        `action-${draftIdentity.revisionId}-${toolCallId}`,
+      actionRefFor,
       claudeLease,
+      auditRecorder,
     );
     const {
       usage: finalUsage,
@@ -776,6 +853,22 @@ function correlationsForIncompleteTurn(
   return provider === "claudecode"
     ? observed
     : { ...inferDirectToolCorrelations(turn), ...observed };
+}
+
+/**
+ * Forced quiescence forbids a persisted resume cursor (settled decision 24), and
+ * `crossCheckCaptureEvidence()` refuses the whole revision on reload if one
+ * survives. The provider may still have reported one, so it is dropped here
+ * rather than trusted.
+ */
+function withoutForcedResumeCursor(
+  usage: MessageUsage,
+  quiescence: TurnSettlementEvidence["quiescence"],
+): MessageUsage {
+  if (quiescence !== "forced" || usage.resumeCursor === undefined) return usage;
+  const withoutCursor = { ...usage };
+  delete withoutCursor.resumeCursor;
+  return withoutCursor;
 }
 
 function directFallbackReplayEvidence(

@@ -1,4 +1,13 @@
-import type { AgenticStep, ApprovalPosture } from "../shared/types";
+import type {
+  AgenticStep,
+  ApprovalPosture,
+  EffectBoundary,
+  EffectBoundaryGuard,
+  EffectIntentRequest,
+  EffectRunOwnership,
+  GenerationAuditRecorder,
+} from "../shared/types";
+import { crossWithDurableIntent } from "../shared/generationAudit";
 import { ASK_TOOL_NAMES } from "../tools/ask/definition";
 import type { AskUserResponder } from "../tools/ask/types";
 import { EDIT_TOOL_NAMES } from "../tools/editing/definition";
@@ -82,18 +91,15 @@ export type CallbackRefusal =
   | "generation_tombstoned";
 
 /**
- * The point after which cancelling can no longer prove that no consequential
- * outcome happened, named per executor rather than centralized as one vague
- * "executor started" flag (settled decision 20).
+ * The four named effect boundaries, now provider-neutral (RFC-0011 phase 6).
  *
- * Read-only vault work and `recall_memory` have no entry, and that absence is the
- * statement that they have no irreversible boundary to guard.
+ * Phase 5 declared them here because Claude Code's callback path was the only one
+ * that had them. The plugin's own tool loop crosses the same boundaries through
+ * the same review owner, and criterion 29 is not provider-scoped, so the type
+ * moved to {@link ../shared/types.EffectBoundary} and this name is kept as its
+ * alias for the Claude-side call sites.
  */
-export type ClaudeCodeEffectBoundary =
-  | "edit_review"
-  | "vault_op_review"
-  | "memory_review"
-  | "ask_interaction";
+export type ClaudeCodeEffectBoundary = EffectBoundary;
 
 /** The boundary a tool crosses, or null when the tool has none. */
 export function effectBoundaryFor(
@@ -125,12 +131,18 @@ export interface ClaudeCodeGenerationContext {
   readonly lifecycle: ((event: ClaudeCodeToolEvent) => void) | null;
   /** The generation's cancellation signal, checked before every effect boundary. */
   readonly signal: AbortSignal | null;
+  /**
+   * The conversation-scoped durable audit this generation writes its write-ahead
+   * intents to (RFC-0011 phase 6). Null when the caller has no conversation to
+   * write to, in which case a boundary crosses on liveness alone.
+   */
+  readonly audit: GenerationAuditRecorder | null;
 }
 
 /** The owners a generation installs once, at activation. */
 export type ClaudeCodeGenerationOwners = Pick<
   ClaudeCodeGenerationContext,
-  "review" | "askResponder" | "askSignal" | "lifecycle" | "signal"
+  "review" | "askResponder" | "askSignal" | "lifecycle" | "signal" | "audit"
 >;
 
 /** What the runtime knows before the generation's owners exist. */
@@ -155,7 +167,7 @@ export function isCallbackToken(
   return typeof admission !== "string";
 }
 
-export class ClaudeCodeGenerationLease {
+export class ClaudeCodeGenerationLease implements EffectBoundaryGuard {
   readonly context: ClaudeCodeGenerationContext;
 
   private leaseState: ClaudeCodeLeaseState = "active";
@@ -258,15 +270,46 @@ export class ClaudeCodeGenerationLease {
 
   /**
    * The named effect-boundary check every consequential handler makes before it
-   * can no longer prove no outcome. Returns false when the generation has been
-   * signalled or is no longer active, so the handler refuses *before* crossing.
+   * can no longer prove no outcome.
+   *
+   * False means refuse *before* crossing, for either of two reasons the handler
+   * does not have to distinguish: the generation is signalled or no longer active,
+   * or its write-ahead intent could not be made durable (RFC-0011 phase 6,
+   * settled decision 21). The ordering, and the re-check that closes the window
+   * awaiting the persist opens, live in
+   * {@link ../shared/generationAudit.crossWithDurableIntent}.
    */
-  crossEffectBoundary(boundary: ClaudeCodeEffectBoundary): boolean {
-    if (this.leaseState !== "active") return false;
-    if (this.context.signal?.aborted) return false;
-    this.crossed.add(boundary);
-    this.consequentialSink?.();
-    return true;
+  crossEffectBoundary(
+    boundary: ClaudeCodeEffectBoundary,
+    intent: EffectIntentRequest,
+  ): Promise<boolean> {
+    return crossWithDurableIntent(boundary, intent, {
+      isLive: () =>
+        this.leaseState === "active" && !this.context.signal?.aborted,
+      audit: this.context.audit,
+      ownership: () => this.ownership(),
+      onCrossed: (crossed) => {
+        this.crossed.add(crossed);
+        this.consequentialSink?.();
+      },
+    });
+  }
+
+  /**
+   * Records the outcome the executor observed, under the lease that admitted it
+   * (plan section 8.3 step 7). Never refuses: by here the effect has happened, so
+   * there is nothing left to gate.
+   */
+  reconcileEffect(intent: EffectIntentRequest): Promise<void> {
+    return this.context.audit?.reconcileIntent(intent) ?? Promise.resolve();
+  }
+
+  /** Which run owned a crossing, for the audit record's evidence fields. */
+  private ownership(): EffectRunOwnership {
+    return {
+      leaseId: this.context.leaseId,
+      attemptOrdinal: this.attempt,
+    };
   }
 
   /** Claims the ask barrier for one callback. False when another already holds it. */

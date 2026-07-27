@@ -37,6 +37,19 @@ export const CAPTURE_FINGERPRINT_LENGTH = 32;
  */
 export const CAPTURE_DIAGNOSTIC_MESSAGE_CHARS = 240;
 
+/**
+ * How long a write-ahead intent's target identity or summary may be before it is
+ * clamped where it is written.
+ *
+ * The same rule as the diagnostic above, for the same reason: an intent carries a
+ * path or a name and a one-line statement of the operation, so a long one is
+ * carrying content that has no business in an audit record. It clamps our own
+ * text at authorship and never gates a read, and the number of intents a
+ * generation may record is deliberately unbounded (RFC-0010, settled decision 29:
+ * no bound may discard evidence).
+ */
+export const GENERATION_AUDIT_SUMMARY_CHARS = 240;
+
 // ---------------------------------------------------------------------------
 // Provider termination deadlines, RFC-0011
 // ---------------------------------------------------------------------------

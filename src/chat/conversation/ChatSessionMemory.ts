@@ -4,11 +4,16 @@ import type {
   Conversation,
   ConversationMeta,
   ConversationMessage,
+  EffectIntentRequest,
+  EffectRunOwnership,
+  GenerationAuditIdentity,
+  InFlightGenerationAudit,
   ProviderOption,
   RagSourceRef,
   ToolActionEvent,
   ToolActionLedgerEntry,
 } from "../../shared/types";
+import { boundedAuditText, intentIdFor } from "../../shared/generationAudit";
 import { generateId } from "../../utils";
 import type { ChatSessionSnapshot } from "../types";
 import {
@@ -46,6 +51,17 @@ export class ChatSessionMemory {
   private activeParentConversationId: string | undefined;
   private activeBranchFromMessageId: string | undefined;
   private inheritedBranchRevisionIds = new Set<string>();
+  /**
+   * The generation currently allowed to append write-ahead intents, or null.
+   *
+   * Held apart from the audit record itself so a boundary can tell "this
+   * generation has not recorded anything yet" from "this generation's audit was
+   * already folded and closed". The second must refuse: once the terminal
+   * transaction has run, a late crossing can no longer be recorded, so it must
+   * not be allowed to act (RFC-0011 phase 6).
+   */
+  private openGenerationAuditIdentity: GenerationAuditIdentity | null = null;
+  private generationAudit: InFlightGenerationAudit | null = null;
 
   getSnapshot(): ChatSessionSnapshot {
     return {
@@ -124,6 +140,108 @@ export class ChatSessionMemory {
       }
     }
     return undefined;
+  }
+
+  // ── In-flight generation audit (RFC-0011 phase 6) ────────────────
+
+  /** Opens the window in which this generation may append intents. */
+  openGenerationAudit(identity: GenerationAuditIdentity): void {
+    this.openGenerationAuditIdentity = identity;
+    this.generationAudit = null;
+  }
+
+  isGenerationAuditOpen(identity: GenerationAuditIdentity): boolean {
+    return this.openGenerationAuditIdentity === identity;
+  }
+
+  getGenerationAudit(): InFlightGenerationAudit | null {
+    return this.generationAudit;
+  }
+
+  /**
+   * Appends one intent, creating the audit record on the first one. Idempotent by
+   * intent identity, so a re-crossed boundary records the same action once.
+   */
+  appendGenerationIntent(
+    identity: GenerationAuditIdentity,
+    request: EffectIntentRequest,
+    ownership: EffectRunOwnership,
+  ): void {
+    const actionRef = identity.actionRefFor(
+      request.correlation.kind === "none" ? request.targetId : request.correlation.toolCallId,
+    );
+    const intentId = intentIdFor(actionRef, request.targetId);
+    const now = Date.now();
+    const audit: InFlightGenerationAudit = this.generationAudit ?? {
+      messageId: identity.messageId,
+      leaseId: ownership.leaseId,
+      turnId: identity.turnId,
+      attemptOrdinal: ownership.attemptOrdinal,
+      provider: identity.provider,
+      modelId: identity.modelId,
+      openedAt: now,
+      intents: [],
+    };
+    if (audit.intents.some((entry) => entry.intentId === intentId)) {
+      this.generationAudit = audit;
+      return;
+    }
+    audit.intents.push({
+      intentId,
+      actionRef,
+      family: request.family,
+      targetId: boundedAuditText(request.targetId),
+      correlation: structuredClone(request.correlation),
+      summary: boundedAuditText(request.summary),
+      recordedAt: now,
+      outcome: "pending",
+    });
+    this.generationAudit = audit;
+  }
+
+  /** Marks one intent reconciled to the outcome its executor observed. */
+  reconcileGenerationIntent(
+    identity: GenerationAuditIdentity,
+    request: EffectIntentRequest,
+  ): void {
+    const actionRef = identity.actionRefFor(
+      request.correlation.kind === "none" ? request.targetId : request.correlation.toolCallId,
+    );
+    const intentId = intentIdFor(actionRef, request.targetId);
+    const intent = this.generationAudit?.intents.find(
+      (entry) => entry.intentId === intentId,
+    );
+    if (intent && intent.outcome === "pending") intent.outcome = "resolved";
+  }
+
+  /**
+   * Converts every still-pending intent to an unknown outcome. Called once, at
+   * the terminal transaction: an intent nobody reconciled belongs to an effect
+   * whose result cannot be invented (settled decision 21).
+   */
+  markGenerationIntentsUnknown(): InFlightGenerationAudit | null {
+    const audit = this.generationAudit;
+    if (!audit) return null;
+    for (const intent of audit.intents) {
+      if (intent.outcome === "pending") intent.outcome = "unknown";
+    }
+    return audit;
+  }
+
+  /** Closes the audit, returning what it held so a failed persist can restore it. */
+  clearGenerationAudit(): InFlightGenerationAudit | null {
+    const audit = this.generationAudit;
+    this.generationAudit = null;
+    this.openGenerationAuditIdentity = null;
+    return audit;
+  }
+
+  /**
+   * Puts a cleared audit back. The terminal persist is the only caller: evidence
+   * that did not reach disk has to stay available for the retry.
+   */
+  restoreGenerationAudit(audit: InFlightGenerationAudit | null): void {
+    if (audit) this.generationAudit = audit;
   }
 
   setDraft(draft: string): void {
@@ -451,6 +569,10 @@ export class ChatSessionMemory {
     this.activeBranchFromMessageId = conversation.branchFromMessageId;
     this.inheritedBranchRevisionIds =
       collectInheritedBranchRevisionIds(conversation);
+    // An audit on a conversation being hydrated is an orphan: no generation owns
+    // it, so it is held for recovery but nothing may append to it.
+    this.generationAudit = conversation.inFlightGenerationAudit ?? null;
+    this.openGenerationAuditIdentity = null;
   }
 
   /**
@@ -472,11 +594,25 @@ export class ChatSessionMemory {
       draft: this.draft,
       approvalPosture: meta.approvalPosture ?? "ask",
       ...this.getActiveBranchOrigin(),
+      ...(this.generationAudit
+        ? { inFlightGenerationAudit: this.generationAudit }
+        : {}),
     };
   }
 
   /**
-   * Build a clean messages array for persistence (error messages stripped, RAG chunk content stripped).
+   * Build a clean messages array for persistence (transient error bubbles
+   * stripped, RAG chunk content stripped).
+   *
+   * A chain-backed assistant message is generated history and is kept even when
+   * its revision is an error (RFC-0011 phase 6). It was not: the compatibility
+   * projection copies `revision.isError` onto the message, and this filter then
+   * dropped it, so a failed turn never reached disk and took its whole action
+   * ledger with it. A vault operation applied before the failure lost its undo
+   * record on save, which is exactly the invisible consequential action RFC-0011
+   * exists to prevent, and it also made "reload reproduces the same failed turn"
+   * (section 9.3) unreachable. Only a legacy content-only error bubble, which
+   * carries no revision chain and no ledger, is still transient.
    */
   getCleanMessagesForPersistence(): ConversationMessage[] {
     return this.messageHistory
@@ -485,7 +621,7 @@ export class ChatSessionMemory {
           ? syncAssistantCompatibilityProjection(message)
           : message,
       )
-      .filter((message) => !message.isError)
+      .filter((message) => !message.isError || !!message.revisions?.length)
       .map(stripRagChunkContent);
   }
 

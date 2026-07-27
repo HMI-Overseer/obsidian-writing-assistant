@@ -270,8 +270,12 @@ describe("ClaudeCodeService ask_user", () => {
   it("claims the latch synchronously and refuses callbacks that enter later", async () => {
     const { provider, activate } = harness(["ask_user", "create_directory"]);
     const answers = deferred<AskAnswers>();
+    const asked = deferred<void>();
     const responder: AskUserResponder = {
-      ask: vi.fn(() => answers.promise),
+      ask: vi.fn(() => {
+        asked.resolve();
+        return answers.promise;
+      }),
       cancelPending: vi.fn(),
     };
     const resolveOne = vi.fn(async (): Promise<ToolResult> => ({
@@ -289,7 +293,13 @@ describe("ClaudeCodeService ask_user", () => {
 
     const pendingAsk = provider.callTool(call("ask_user", askArguments, "ask-1"));
 
+    // The barrier is still claimed synchronously, which is what makes a sibling
+    // arriving in the same tick a skipped sibling rather than a second question.
     expect(lease.askPending).toBe(true);
+    // The interaction itself now opens one durable-intent write later: since
+    // RFC-0011 phase 6 the ask crosses an effect boundary first, so this awaits
+    // the responder's own signal rather than assuming the same tick.
+    await asked.promise;
     expect(responder.ask).toHaveBeenCalledTimes(1);
 
     const blockedTool = await provider.callTool(

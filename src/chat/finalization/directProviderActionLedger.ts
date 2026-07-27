@@ -5,6 +5,7 @@ import type {
 import type {
   AssistantToolCallItem,
   AssistantTurnRecord,
+  GenerationAuditIntent,
   ToolActionEvent,
   ToolActionLedgerEntry,
   ToolActionPlacement,
@@ -19,6 +20,7 @@ import {
   createProvisionalAction,
   createPlacedParsedEditAction,
   createPlacedToolAction,
+  deriveActionLedgerState,
   finalizeUndeclaredAction,
 } from "../conversation/actionLedger";
 import { validateAskRequest } from "../../tools/ask/validation";
@@ -34,6 +36,13 @@ export interface DirectProviderActionLedgerInput {
   appliedVaultOpRecord?: AppliedVaultOpRecord;
   memoryProposals?: ReviewableMemoryProposal[];
   parsedEditPlacement?: { itemId: string; actionRef: string };
+  /**
+   * This generation's durable write-ahead intents, with their outcomes already
+   * settled (RFC-0011 phase 6). Each one folds into the entry that shares its
+   * action reference, behind the proposal and ahead of whatever the review
+   * decided, because `intent_recorded` is only valid before an effect.
+   */
+  intents?: readonly GenerationAuditIntent[];
   createEventId: () => string;
   createdAt: number;
 }
@@ -64,11 +73,148 @@ export function buildDirectProviderActionLedger(
     ...buildMemoryEntries(context),
     ...buildInteractionEntries(context),
   ];
-  return entries.flatMap((entry) => {
+  return entries.flatMap((built) => {
+    const entry = appendUnknownOutcomes(context, built);
     if (entry.placement.state !== "provisional") return [entry];
     const finalized = finalizeUndeclaredAction(entry);
     return finalized ? [finalized] : [];
   });
+}
+
+/**
+ * The intents that could not be folded into any entry.
+ *
+ * Section 9.2 asks for these to be persisted as unplaced `outcome_unknown` ledger
+ * events, and against the tree that is impossible: an entry needs a family
+ * payload, and every one of those requires evidence an intent deliberately does
+ * not carry. The caller records them as bounded turn diagnostics instead. A
+ * reconciled intent with no entry needs no record at all: its review refused
+ * before registering anything, so nothing happened.
+ */
+export function unmatchedAuditIntents(
+  entries: readonly ToolActionLedgerEntry[],
+  intents: readonly GenerationAuditIntent[],
+): GenerationAuditIntent[] {
+  const folded = new Set(entries.map((entry) => entry.actionRef));
+  return intents.filter(
+    (intent) => intent.outcome === "unknown" && !folded.has(intent.actionRef),
+  );
+}
+
+/**
+ * Drops an item's action reference when the ledger has no placed entry for it.
+ *
+ * The loop stamps `actionRef` on an action tool the moment it starts running, but
+ * the entry it points at only exists once the review registered a proposal. A
+ * review that refused before registering anything, an unconvertible path for
+ * instance, therefore left an item pointing at nothing, and
+ * `validateAssistantMessageState()` refuses that whole revision on load
+ * (`action_reference_invalid`), so the entire turn degraded to a legacy snapshot.
+ * That predates RFC-0011 phase 6 and was found by it, because a stranded
+ * write-ahead intent is exactly that case.
+ *
+ * A dangling reference is a broken link rather than evidence: the tool row, its
+ * failed state, and its error text all stay, and the audit keeps its own record.
+ */
+export function pruneDanglingActionRefs(
+  turn: AssistantTurnRecord,
+  ledger: readonly ToolActionLedgerEntry[],
+): AssistantTurnRecord {
+  const placed = new Set(
+    ledger
+      .filter((entry) => entry.placement.state === "placed")
+      .map((entry) => entry.actionRef),
+  );
+  const dangling = turn.items.some(
+    (item) => item.actionRef !== undefined && !placed.has(item.actionRef),
+  );
+  if (!dangling) return turn;
+  return {
+    ...turn,
+    items: turn.items.map((item) => {
+      if (item.actionRef === undefined || placed.has(item.actionRef)) return item;
+      const pruned = { ...item };
+      delete pruned.actionRef;
+      // A prose anchor exists only to point at an action, so it goes with it.
+      if (pruned.type === "prose") delete pruned.actionAnchor;
+      return pruned;
+    }),
+  };
+}
+
+/** Every intent that belongs to one entry, matched on its action reference. */
+function intentsFor(
+  context: LedgerContext,
+  actionRef: string,
+): readonly GenerationAuditIntent[] {
+  return (context.input.intents ?? []).filter(
+    (intent) => intent.actionRef === actionRef,
+  );
+}
+
+/**
+ * Folds `intent_recorded` in behind the proposal, for every target of the call the
+ * intent covered.
+ *
+ * An intent is per tool call, not per ledger target: the effect boundary is
+ * crossed before the review exists, so the target IDs the review will mint are
+ * not knowable yet. Every target of the matched entry therefore inherits the
+ * intent, which is exactly what it covered.
+ */
+function appendRecordedIntents(
+  context: LedgerContext,
+  entry: ToolActionLedgerEntry,
+): ToolActionLedgerEntry {
+  let next = entry;
+  for (const intent of intentsFor(context, entry.actionRef)) {
+    for (const target of entry.payload.targets) {
+      next = append(context, next, {
+        type: "intent_recorded",
+        targetId: target.targetId,
+        intentId: intent.intentId,
+        createdAt: intent.recordedAt,
+      });
+    }
+  }
+  return next;
+}
+
+/**
+ * Closes an unresolved intent once every real outcome is in place.
+ *
+ * Only a target the review never resolved becomes `outcome_unknown`. When the
+ * ledger holds a real outcome, that outcome is the better evidence and the audit's
+ * last known state does not overwrite it.
+ */
+function appendUnknownOutcomes(
+  context: LedgerContext,
+  entry: ToolActionLedgerEntry,
+): ToolActionLedgerEntry {
+  let next = entry;
+  const state = deriveActionLedgerState(entry).targets;
+  for (const intent of intentsFor(context, entry.actionRef)) {
+    if (intent.outcome !== "unknown") continue;
+    for (const target of entry.payload.targets) {
+      const derived = state[target.targetId];
+      if (
+        !derived ||
+        derived.approval !== "pending" ||
+        derived.effect !== "none" ||
+        derived.superseded ||
+        derived.outcomeUnknown ||
+        derived.writeAheadIntentId !== intent.intentId
+      ) {
+        continue;
+      }
+      next = append(context, next, {
+        type: "outcome_unknown",
+        targetId: target.targetId,
+        intentId: intent.intentId,
+        reason: "the owning generation ended with this outcome unknown",
+      });
+    }
+  }
+  return next;
 }
 
 function buildEditEntries(context: LedgerContext): ToolActionLedgerEntry[] {
@@ -115,27 +261,30 @@ function buildEditEntries(context: LedgerContext): ToolActionLedgerEntry[] {
     );
     const parsedPlacement = context.input.parsedEditPlacement;
     if (parsedHunks.length > 0 && parsedPlacement) {
-      let entry = createPlacedParsedEditAction({
-        actionRef: parsedPlacement.actionRef,
-        revisionId: context.input.revisionId,
-        itemId: parsedPlacement.itemId,
-        payload: {
-          proposalId: proposal.id,
-          targets: parsedHunks.map((hunk) => ({
+      let entry = appendRecordedIntents(
+        context,
+        createPlacedParsedEditAction({
+          actionRef: parsedPlacement.actionRef,
+          revisionId: context.input.revisionId,
+          itemId: parsedPlacement.itemId,
+          payload: {
+            proposalId: proposal.id,
+            targets: parsedHunks.map((hunk) => ({
+              targetId: hunk.id,
+              targetFilePath: proposal.targetFilePath,
+              documentSnapshot: proposal.documentSnapshot,
+              snapshotTimestamp: proposal.snapshotTimestamp,
+              resolvedEdit: structuredClone(hunk.resolvedEdit),
+            })),
+          },
+          proposedEvents: parsedHunks.map((hunk) => ({
+            eventId: context.input.createEventId(),
+            type: "proposed",
             targetId: hunk.id,
-            targetFilePath: proposal.targetFilePath,
-            documentSnapshot: proposal.documentSnapshot,
-            snapshotTimestamp: proposal.snapshotTimestamp,
-            resolvedEdit: structuredClone(hunk.resolvedEdit),
+            createdAt: proposal.snapshotTimestamp,
           })),
-        },
-        proposedEvents: parsedHunks.map((hunk) => ({
-          eventId: context.input.createEventId(),
-          type: "proposed",
-          targetId: hunk.id,
-          createdAt: proposal.snapshotTimestamp,
-        })),
-      });
+        }),
+      );
       entry = appendEditOutcomes(
         context,
         entry,
@@ -475,9 +624,12 @@ function createToolOrProvisionalAction(
   input: Parameters<typeof createProvisionalAction>[0],
 ): ToolActionLedgerEntry {
   const item = context.itemByToolCallId.get(toolCallId);
-  return item
-    ? createPlacedToolAction({ ...input, itemId: item.id })
-    : createProvisionalAction(input);
+  return appendRecordedIntents(
+    context,
+    item
+      ? createPlacedToolAction({ ...input, itemId: item.id })
+      : createProvisionalAction(input),
+  );
 }
 
 type EventWithoutIdentity =

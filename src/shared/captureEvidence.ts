@@ -2,8 +2,10 @@ import type {
   AssistantReplayEvidence,
   AssistantTurnItem,
   AssistantTurnRecord,
+  ProviderCaptureDiagnostic,
   ProviderItemCaptureEvidence,
   ProviderItemPlacement,
+  ProviderQuiescence,
 } from "./types";
 
 /**
@@ -176,6 +178,34 @@ function loweredReasonFor(
   if (floor === "unplaced") return "unplaced_provider_item_present";
   if (floor === "segment") return "segment_placed_provider_item_present";
   return undefined;
+}
+
+/**
+ * Stamps the settlement evidence onto a finished turn (RFC-0011 phase 6, section
+ * 9.2).
+ *
+ * The builder freezes its record in `finishTurn()`, which happens before the
+ * provider has been proven quiet, so quiescence and the terminal diagnostics can
+ * only be written here, on the way to persistence. Diagnostics accumulate rather
+ * than replace: the ones the builder already recorded describe capture, the ones
+ * arriving here describe settlement, and both are evidence.
+ */
+export function withTerminalCaptureEvidence(
+  turn: AssistantTurnRecord,
+  evidence: {
+    quiescence: ProviderQuiescence;
+    diagnostics?: readonly ProviderCaptureDiagnostic[];
+  },
+): AssistantTurnRecord {
+  const diagnostics = [
+    ...(turn.captureDiagnostics ?? []),
+    ...(evidence.diagnostics ?? []),
+  ];
+  return {
+    ...turn,
+    quiescence: evidence.quiescence,
+    ...(diagnostics.length === 0 ? {} : { captureDiagnostics: diagnostics }),
+  };
 }
 
 /**

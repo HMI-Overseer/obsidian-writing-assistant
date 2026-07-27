@@ -873,7 +873,10 @@ describe("resolveVaultOps", () => {
     // The load-bearing arg: stopReason === "max_tokens" tells the review the model
     // was truncated, so it must arrive as `true`.
     expect(liveReview.resolveRound).toHaveBeenCalledWith([op("vo-1")], true);
-    expect(result).toBe(dispositions);
+    // Value, not identity: since RFC-0011 phase 6 the resolver composes the
+    // review's dispositions with any call refused at its effect boundary, so the
+    // array it returns is its own. What must not change is the dispositions.
+    expect(result).toStrictEqual(dispositions);
   });
 
   it("passes max_tokens=false to the live review on a normal stop", async () => {
@@ -955,7 +958,8 @@ describe("resolveEdits", () => {
       expect.objectContaining({ type: "tool_call", round: 1, toolCallId: "ed-1" }),
     );
     expect(liveReview.resolveEdits).toHaveBeenCalledWith([edit("ed-1")]);
-    expect(result).toBe(dispositions);
+    // Value, not identity; see the vault-op resolver's note above.
+    expect(result).toStrictEqual(dispositions);
   });
 
   it("falls back to an unavailable failure when neither a live review nor an edit context exists", async () => {

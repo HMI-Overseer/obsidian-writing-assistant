@@ -1,12 +1,18 @@
 import { describe, expect, it } from "vitest";
 import type { EditProposal } from "../../../../src/editing/editTypes";
-import type { AssistantTurnRecord } from "../../../../src/shared/types";
+import type {
+  AssistantTurnRecord,
+  GenerationAuditIntent,
+} from "../../../../src/shared/types";
 import type { ReviewableMemoryProposal } from "../../../../src/chat/messages/memoryReviewTimeline";
 import type {
   AppliedVaultOpRecord,
   VaultOperationProposal,
 } from "../../../../src/vault-ops/types";
-import { buildDirectProviderActionLedger } from "../../../../src/chat/finalization/directProviderActionLedger";
+import {
+  buildDirectProviderActionLedger,
+  unmatchedAuditIntents,
+} from "../../../../src/chat/finalization/directProviderActionLedger";
 
 const askArguments = {
   questions: [{
@@ -348,5 +354,133 @@ describe("direct provider action ledger", () => {
       anchor: "parsed_edit",
       itemId: "item-prose",
     });
+  });
+});
+
+/**
+ * RFC-0011 phase 6, plan section 9.2: the terminal fold.
+ *
+ * A write-ahead intent is durable evidence in its own structure while the
+ * generation runs. At finalization it has to become part of the append-only
+ * history, and the position matters: `intent_recorded` is only valid before an
+ * effect, so it folds in behind the proposal and ahead of whatever the review
+ * decided.
+ */
+function auditIntent(
+  overrides: Partial<GenerationAuditIntent> = {},
+): GenerationAuditIntent {
+  return {
+    intentId: "intent-action-vault-op-1",
+    actionRef: "action-vault",
+    family: "vault_op",
+    targetId: "op-1",
+    correlation: { kind: "provider_id", toolCallId: "call-vault" },
+    summary: "create_directory Folder",
+    recordedAt: 22,
+    outcome: "resolved",
+    ...overrides,
+  };
+}
+
+describe("write-ahead intents folded into the ledger", () => {
+  const foldInput = (intents: GenerationAuditIntent[]) => ({
+    revisionId: "revision-1",
+    turn,
+    toolCorrelations: { "call-vault": "provider_id" as const },
+    vaultOpProposal: vaultProposal,
+    appliedVaultOpRecord: vaultRecord,
+    intents,
+    createEventId: (() => {
+      let index = 0;
+      return () => `event-fold-${index++}`;
+    })(),
+    createdAt: 25,
+  });
+
+  it("records the intent before the outcome it preceded", () => {
+    const [entry] = buildDirectProviderActionLedger(foldInput([auditIntent()]));
+
+    expect(entry.events.map((event) => event.type)).toEqual([
+      "proposed",
+      "intent_recorded",
+      "approved",
+      "apply_succeeded",
+    ]);
+    expect(entry.events[1]).toMatchObject({
+      intentId: "intent-action-vault-op-1",
+      targetId: "op-1",
+    });
+  });
+
+  it("marks an unreconciled intent whose outcome never arrived unknown", () => {
+    const [entry] = buildDirectProviderActionLedger({
+      ...foldInput([auditIntent({ outcome: "unknown" })]),
+      // The review registered the op and then the generation died, so the
+      // proposal is still pending and no apply event exists.
+      vaultOpProposal: {
+        ...vaultProposal,
+        ops: [{ ...vaultProposal.ops[0], status: "pending" }],
+      },
+      appliedVaultOpRecord: undefined,
+    });
+
+    expect(entry.events.map((event) => event.type)).toEqual([
+      "proposed",
+      "intent_recorded",
+      "outcome_unknown",
+    ]);
+    expect(entry.events.at(-1)).toMatchObject({
+      intentId: "intent-action-vault-op-1",
+      reason: expect.stringContaining("unknown"),
+    });
+  });
+
+  it("keeps a real outcome instead of overwriting it with unknown", () => {
+    // The ledger's own evidence is stronger than the audit's last known state.
+    const [entry] = buildDirectProviderActionLedger(
+      foldInput([auditIntent({ outcome: "unknown" })]),
+    );
+
+    expect(entry.events.map((event) => event.type)).toEqual([
+      "proposed",
+      "intent_recorded",
+      "approved",
+      "apply_succeeded",
+    ]);
+  });
+
+  it("reports an intent whose action never reached its review as unmatched", () => {
+    const stranded = auditIntent({
+      intentId: "intent-action-edit-hunk-9",
+      actionRef: "action-edit",
+      family: "edit",
+      targetId: "Notes/never.md",
+      correlation: { kind: "provider_id", toolCallId: "call-edit" },
+      outcome: "unknown",
+    });
+    // The folded intent is also `unknown`, so "unmatched" has to mean "no entry
+    // took it" rather than merely "its outcome was never reconciled". A mutant
+    // that ignored the fold survived the first version of this case.
+    const intents = [auditIntent({ outcome: "unknown" }), stranded];
+    const entries = buildDirectProviderActionLedger(foldInput(intents));
+
+    // No proposal exists for it, so no ledger payload can be built without
+    // inventing one; the terminal turn carries it as a bounded diagnostic.
+    expect(unmatchedAuditIntents(entries, intents)).toEqual([stranded]);
+  });
+
+  it("leaves a proposed-only action with no intent record", () => {
+    const [entry] = buildDirectProviderActionLedger({
+      ...foldInput([]),
+      vaultOpProposal: {
+        ...vaultProposal,
+        ops: [{ ...vaultProposal.ops[0], status: "pending" }],
+      },
+      appliedVaultOpRecord: undefined,
+    });
+
+    // Settled decision 22: a proposal alone never enters the durable audit, so
+    // it produces no write-ahead evidence at the fold either.
+    expect(entry.events.map((event) => event.type)).toEqual(["proposed"]);
   });
 });

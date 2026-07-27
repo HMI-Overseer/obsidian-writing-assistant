@@ -217,6 +217,21 @@ export class TurnRunOwner {
   }
 
   /**
+   * Which attempt is in flight, as evidence for a write-ahead intent (RFC-0011
+   * phase 6). Ordinal 0 with no attempt open is a real state, not a placeholder:
+   * an effect can be authorized between rounds, when no provider is streaming.
+   */
+  get currentAttempt(): { leaseId: string; attemptOrdinal: number } {
+    const lease = this.leases[this.leases.length - 1];
+    return lease
+      ? {
+          leaseId: lease.context.leaseId,
+          attemptOrdinal: lease.context.attemptOrdinal,
+        }
+      : { leaseId: leaseIdFor(this.turnId, 0), attemptOrdinal: 0 };
+  }
+
+  /**
    * True once a callback with an irreversible outcome was admitted under any of
    * this turn's attempts.
    *

@@ -6,6 +6,11 @@ import type {
   Conversation,
   ConversationMeta,
   ConversationMessage,
+  EffectIntentRequest,
+  EffectRunOwnership,
+  GenerationAuditIdentity,
+  GenerationAuditRecorder,
+  InFlightGenerationAudit,
   ProviderOption,
   ToolActionEvent,
   ToolActionLedgerEntry,
@@ -27,6 +32,7 @@ import type {
   SupersessionEventIdentity,
 } from "./actionLedger";
 import type { ProseItemEdit } from "./assistantRevisions";
+import { buildOrphanRecoveryMessage } from "./generationAuditRecovery";
 
 const CHAT_DRAFT_SAVE_DELAY_MS = 300;
 
@@ -192,6 +198,110 @@ export class ChatSessionStore {
     );
   }
 
+  // ── In-flight generation audit (RFC-0011 phase 6, section 9.1) ──
+
+  /**
+   * Opens one generation's durable write-ahead audit and hands back the recorder
+   * its effect boundaries write through.
+   *
+   * The audit is keyed by the draft identity the generation already owns, and the
+   * lease rides on the record as evidence (settled question: plan section 4.2 says
+   * "keyed by lease identity" while decision 21 says `(turnId, attemptOrdinal)`,
+   * and against the tree those are different namespaces, because the Claude
+   * generation lease's ID is minted in `getRuntime()` before a turn ID exists).
+   *
+   * `recordIntent` resolves only after the conversation is on disk, so awaiting it
+   * is what makes the evidence write-ahead rather than merely intended. It refuses
+   * once the audit is closed: after the terminal fold there is nowhere to record a
+   * crossing, so a late one must not act.
+   */
+  openGenerationAudit(identity: GenerationAuditIdentity): GenerationAuditRecorder {
+    this.memory.openGenerationAudit(identity);
+    return {
+      recordIntent: (request, ownership) =>
+        this.appendGenerationIntent(identity, request, ownership),
+      reconcileIntent: (request) => this.reconcileGenerationIntent(identity, request),
+    };
+  }
+
+  getGenerationAudit(): InFlightGenerationAudit | null {
+    return this.memory.getGenerationAudit();
+  }
+
+  /** Converts every unreconciled intent to `outcome_unknown` before the fold. */
+  markGenerationIntentsUnknown(): InFlightGenerationAudit | null {
+    return this.memory.markGenerationIntentsUnknown();
+  }
+
+  /** Closes the audit, returning what it held. Persisting is the caller's step. */
+  clearGenerationAudit(): InFlightGenerationAudit | null {
+    return this.memory.clearGenerationAudit();
+  }
+
+  restoreGenerationAudit(audit: InFlightGenerationAudit | null): void {
+    this.memory.restoreGenerationAudit(audit);
+  }
+
+  /**
+   * Finalizes an audit found on disk (section 9.3, migration rule 5).
+   *
+   * An audit that survived a load belongs to a generation that never reached its
+   * terminal transaction, so it becomes one failed revision carrying every
+   * intent's evidence and is then cleared. Idempotent: when the message it names
+   * already exists, the terminal record is already there and the audit is just
+   * dropped, which is the crash-between-the-write-and-the-clear case.
+   */
+  private async recoverOrphanedGenerationAudit(): Promise<void> {
+    const audit = this.memory.getGenerationAudit();
+    if (!audit) return;
+    const known = this.memory
+      .getSnapshot()
+      .messageHistory.some((message) => message.id === audit.messageId);
+    if (!known) {
+      this.memory.appendMessage(buildOrphanRecoveryMessage(audit));
+    }
+    this.memory.clearGenerationAudit();
+    await this.persistActiveConversation();
+  }
+
+  private async appendGenerationIntent(
+    identity: GenerationAuditIdentity,
+    request: EffectIntentRequest,
+    ownership: EffectRunOwnership,
+  ): Promise<void> {
+    if (!this.memory.isGenerationAuditOpen(identity)) {
+      throw new Error(
+        "This generation's write-ahead audit is closed, so no further effect may be recorded.",
+      );
+    }
+    const restore = structuredClone(this.memory.getGenerationAudit());
+    this.memory.appendGenerationIntent(identity, request, ownership);
+    try {
+      await this.persistActiveConversation();
+    } catch (error) {
+      // An intent that did not reach disk must not be left in memory looking
+      // durable: the boundary that asked for it is about to refuse.
+      this.memory.clearGenerationAudit();
+      this.memory.openGenerationAudit(identity);
+      this.memory.restoreGenerationAudit(restore);
+      throw error;
+    }
+  }
+
+  private async reconcileGenerationIntent(
+    identity: GenerationAuditIdentity,
+    request: EffectIntentRequest,
+  ): Promise<void> {
+    this.memory.reconcileGenerationIntent(identity, request);
+    try {
+      await this.persistActiveConversation();
+    } catch {
+      // The effect has already happened, so there is nothing left to gate. An
+      // unpersisted reconciliation reads as `outcome_unknown` on reload, which
+      // overstates the uncertainty in the safe direction.
+    }
+  }
+
   removeMessage(messageId: string): ConversationMessage | null {
     return this.memory.removeMessage(messageId);
   }
@@ -246,6 +356,7 @@ export class ChatSessionStore {
       const conversation = await this.storage.load(currentId);
       if (conversation) {
         this.hydrate(conversation);
+        await this.recoverOrphanedGenerationAudit();
         return;
       }
     }
@@ -255,6 +366,7 @@ export class ChatSessionStore {
       const conversation = await this.storage.load(firstId);
       if (conversation) {
         this.hydrate(conversation);
+        await this.recoverOrphanedGenerationAudit();
         return;
       }
     }
@@ -303,6 +415,7 @@ export class ChatSessionStore {
     if (!conversation) return false;
 
     this.hydrate(conversation);
+    await this.recoverOrphanedGenerationAudit();
     await this.plugin.saveSettings();
     return true;
   }
@@ -364,6 +477,7 @@ export class ChatSessionStore {
         const conversation = await this.storage.load(firstId);
         if (conversation) {
           this.hydrate(conversation);
+          await this.recoverOrphanedGenerationAudit();
         } else {
           this.hydrateWithFresh(history);
         }
@@ -410,6 +524,12 @@ export class ChatSessionStore {
       draft: snapshot.draft,
       approvalPosture: meta.approvalPosture ?? "ask",
       ...this.memory.getActiveBranchOrigin(),
+      // Durable write-ahead evidence for a generation still in flight. This is
+      // the write half of the round trip: the loader has preserved an orphaned
+      // audit since phase 1, but nothing ever wrote one (RFC-0011 phase 6).
+      ...(this.memory.getGenerationAudit()
+        ? { inFlightGenerationAudit: this.memory.getGenerationAudit() as InFlightGenerationAudit }
+        : {}),
     };
     await this.storage.save(conversation);
     // The active thread is served live during search, but once it is switched away

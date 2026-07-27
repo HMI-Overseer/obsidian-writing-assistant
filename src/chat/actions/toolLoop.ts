@@ -9,10 +9,19 @@ import type {
   AgenticStep,
   AssistantReplayEvidence,
   AssistantTurnRecord,
+  EffectBoundary,
+  EffectBoundaryGuard,
+  GenerationAuditRecorder,
   ProviderCaptureDiagnostic,
   ProviderOption,
+  ProviderQuiescence,
   SamplingParams,
 } from "../../shared/types";
+import {
+  createDirectEffectGuard,
+  directCorrelationFor,
+  effectIntentFor,
+} from "../../shared/generationAudit";
 import type { ToolCall, ToolResult } from "../../tools/types";
 import type { VaultOpDisposition } from "../../vault-ops/disposition";
 import { captureStepFields } from "../../tools/resultDigest";
@@ -34,7 +43,7 @@ import { boundedFailureMessage } from "../../api/assistantStreamRun";
 import { VAULT_TOOL_NAMES } from "../../tools/vault/definition";
 import { executeVaultTool } from "../../tools/vault/handlers";
 import type { VaultToolContext } from "../../tools/vault/handlers";
-import { toolFailure } from "../../tools/toolFailure";
+import { effectBoundaryRefusal, toolFailure } from "../../tools/toolFailure";
 import { toolNotAllowedFailure } from "../../tools/toolSurface";
 import { EDIT_TOOL_NAMES } from "../../tools/editing/definition";
 import { executeEditTool } from "../../tools/editing/handlers";
@@ -118,6 +127,22 @@ export interface ToolLoopCallbacks {
   onTurnSnapshot?: (snapshot: AssistantTurnSnapshot) => void;
   /** Called with the first round's usage for token estimation calibration. */
   onCalibrate?: (request: ChatRequest, usage: UsageResult) => void;
+  /**
+   * The settlement evidence of every attempt this turn opened, reported once the
+   * loop has proven quiescence (RFC-0011 phase 6, section 9.2).
+   *
+   * The turn record is frozen by `finishTurn()` before that proof exists, and on
+   * a failure path the loop throws rather than returning, so this is how the
+   * terminal transaction learns the quiescence mode and the bounded diagnostics
+   * it has to persist.
+   */
+  onSettlement?: (evidence: TurnSettlementEvidence) => void;
+}
+
+/** What the terminal transaction needs from provider settlement. */
+export interface TurnSettlementEvidence {
+  quiescence: ProviderQuiescence;
+  diagnostics: ProviderCaptureDiagnostic[];
 }
 
 /** Result returned by the tool loop after all rounds complete. */
@@ -186,6 +211,14 @@ export async function runToolLoop(
    * turn's next retry, and so each attempt's ordinal reaches the lease as evidence.
    */
   callbackLease?: GenerationCallbackLease,
+  /**
+   * The generation's durable audit (RFC-0011 phase 6). The loop builds its own
+   * effect-boundary guard from this, because only it knows which attempt is in
+   * flight when a mutation is about to happen. Absent for a non-agentic turn or a
+   * caller with no conversation to write to, in which case a mutation crosses on
+   * liveness alone, exactly as it did before this phase.
+   */
+  audit?: GenerationAuditRecorder,
 ): Promise<ToolLoopResult> {
   const toolLoopTurns: ChatTurn[] = [];
   let allWriteToolCalls: ToolCall[] = [];
@@ -233,6 +266,18 @@ export async function runToolLoop(
   const runOwner = new TurnRunOwner(turnBuilder.snapshot().id, signal);
   runOwner.bindCallbackLease(callbackLease);
 
+  // This loop's own effect boundary (RFC-0011 phase 6). Its liveness is the turn
+  // signal: the loop awaits each effect inline, so no separate owner can vanish
+  // underneath one. It deliberately does not report to
+  // `runOwner.noteConsequentialCallback()`, because a loop effect runs between
+  // rounds rather than during a retryable attempt, so reporting it would only
+  // suppress legitimate retries for the rest of the turn.
+  const effectGuard = createDirectEffectGuard({
+    signal,
+    audit: audit ?? null,
+    ownership: () => runOwner.currentAttempt,
+  });
+
   try {
     return await runRounds();
   } catch (error) {
@@ -242,7 +287,15 @@ export async function runToolLoop(
     // Nothing is returned and nothing is rethrown until every attempt this turn
     // opened is quiet, so the caller can never persist a turn while its provider
     // is still running.
-    await runOwner.awaitQuiescence();
+    const settlements = await runOwner.awaitQuiescence();
+    callbacks.onSettlement?.({
+      // One forced attempt makes the turn's capture forced: a hard dispose is
+      // never proof that nothing else was in flight (settled decision 24).
+      quiescence: settlements.some((one) => one.quiescence === "forced")
+        ? "forced"
+        : "proven",
+      diagnostics: settlements.flatMap((one) => one.diagnostics),
+    });
     runOwner.release();
   }
 
@@ -491,6 +544,7 @@ export async function runToolLoop(
         signal,
         round,
         callbacks,
+        guard: effectGuard,
       });
 
       toolLoopTurns.push({
@@ -681,6 +735,7 @@ export async function runToolLoop(
         stopReason,
         context: vaultOpToolContext,
         callbacks,
+        guard: effectGuard,
       }),
       resolveEdits({
         editCalls: liveEditCalls,
@@ -688,6 +743,7 @@ export async function runToolLoop(
         editContext: editToolContext,
         round,
         callbacks,
+        guard: effectGuard,
       }),
       resolveMemories({
         memoryCalls: liveMemoryMutationCalls,
@@ -695,6 +751,7 @@ export async function runToolLoop(
         liveReview: vaultOpToolContext?.liveReview,
         round,
         callbacks,
+        guard: effectGuard,
       }),
     ]);
 
@@ -1077,6 +1134,8 @@ interface ResolveAskBarrierBatchDeps {
   signal: AbortSignal;
   round: number;
   callbacks: ToolLoopCallbacks;
+  /** This turn's effect boundary; an answered question cannot be un-asked. */
+  guard?: EffectBoundaryGuard;
 }
 
 /**
@@ -1108,8 +1167,17 @@ async function resolveAskBarrierBatch(
 
   let primaryResult: ToolResult;
   let primaryStatus: AgenticStep["askStatus"];
+  const crossed = await crossEffectBoundaries(
+    deps.guard,
+    "ask_interaction",
+    [plan.primaryAsk],
+  );
   try {
-    if (!responder) {
+    if (crossed.allowed.length === 0) {
+      // The interaction never opened, so nothing was asked and nothing answered.
+      primaryResult = askCancellationFailure("stopped");
+      primaryStatus = "cancelled";
+    } else if (!responder) {
       primaryResult = askConcurrentFailure();
       primaryStatus = "skipped";
     } else {
@@ -1349,6 +1417,37 @@ export function applyToolAllowGuard(
   return { blockedResults, blockedIds };
 }
 
+/**
+ * Cross one round's mutating calls over their named effect boundary, before any
+ * of them reaches its review (RFC-0011 phase 6, settled decision 20).
+ *
+ * A call that cannot cross is refused here and never handed to the review, which
+ * is the same shape the Claude callback path uses: the executor gets one boolean
+ * and needs no new branch for "the intent could not be recorded" versus "the run
+ * was stopped".
+ */
+async function crossEffectBoundaries(
+  guard: EffectBoundaryGuard | undefined,
+  boundary: EffectBoundary,
+  calls: ToolCall[],
+): Promise<{
+  allowed: ToolCall[];
+  refused: Array<{ tc: ToolCall; result: ToolResult }>;
+}> {
+  if (!guard) return { allowed: calls, refused: [] };
+  const allowed: ToolCall[] = [];
+  const refused: Array<{ tc: ToolCall; result: ToolResult }> = [];
+  for (const tc of calls) {
+    const crossed = await guard.crossEffectBoundary(
+      boundary,
+      effectIntentFor(boundary, tc, directCorrelationFor(tc.id)),
+    );
+    if (crossed) allowed.push(tc);
+    else refused.push({ tc, result: effectBoundaryRefusal(boundary) });
+  }
+  return { allowed, refused };
+}
+
 /** Per-round inputs the vault-op resolver needs (was closed-over loop state). */
 export interface ResolveVaultOpsDeps {
   vaultOpCalls: ToolCall[];
@@ -1358,6 +1457,8 @@ export interface ResolveVaultOpsDeps {
   stopReason: StopReason;
   context: VaultOpToolContext | undefined;
   callbacks: ToolLoopCallbacks;
+  /** This turn's effect boundary. Absent leaves the pre-phase-6 behaviour. */
+  guard?: EffectBoundaryGuard;
 }
 
 /**
@@ -1384,12 +1485,24 @@ export async function resolveVaultOps(
       toolArgs: tc.arguments,
     });
   }
+  // After the timeline row exists, before the review can decide anything: the row
+  // is evidence, the review is the effect.
+  const { allowed, refused } = await crossEffectBoundaries(
+    deps.guard,
+    "vault_op_review",
+    vaultOpCalls,
+  );
+  if (allowed.length === 0) return refused;
   if (context?.liveReview) {
-    return context.liveReview.resolveRound(vaultOpCalls, stopReason === "max_tokens");
+    const reviewed = await context.liveReview.resolveRound(
+      allowed,
+      stopReason === "max_tokens",
+    );
+    return [...reviewed, ...refused];
   }
   // Fallback: no live review, validate only (overlay seeded from prior rounds).
   const overlay = context ? buildPendingOverlay(context.app, priorVaultOpCalls) : null;
-  return vaultOpCalls.map((tc) => {
+  const validated = allowed.map((tc) => {
     if (!context || !overlay) {
       return {
         tc,
@@ -1402,6 +1515,7 @@ export async function resolveVaultOps(
     }
     return { tc, result: executeVaultOpTool(tc, { app: context.app, overlay }) };
   });
+  return [...validated, ...refused];
 }
 
 /** Per-round inputs the edit resolver needs (was closed-over loop state). */
@@ -1411,6 +1525,8 @@ export interface ResolveEditsDeps {
   editContext: ToolExecutionContext | undefined;
   round: number;
   callbacks: ToolLoopCallbacks;
+  /** This turn's effect boundary. Absent leaves the pre-phase-6 behaviour. */
+  guard?: EffectBoundaryGuard;
 }
 
 /**
@@ -1437,12 +1553,19 @@ export async function resolveEdits(
       toolArgs: tc.arguments,
     });
   }
+  const { allowed, refused } = await crossEffectBoundaries(
+    deps.guard,
+    "edit_review",
+    editCalls,
+  );
+  if (allowed.length === 0) return refused;
   if (vaultOpContext?.liveReview) {
-    return vaultOpContext.liveReview.resolveEdits(editCalls);
+    const reviewed = await vaultOpContext.liveReview.resolveEdits(allowed);
+    return [...reviewed, ...refused];
   }
   // Fallback: no live review, validate-only acknowledge (legacy non-blocking path).
-  return Promise.all(
-    editCalls.map(async (tc) => {
+  const validated = await Promise.all(
+    allowed.map(async (tc) => {
       if (!editContext) {
         return {
           tc,
@@ -1456,6 +1579,7 @@ export async function resolveEdits(
       return { tc, result: await executeEditTool(tc, editContext) };
     }),
   );
+  return [...validated, ...refused];
 }
 
 export interface ResolveMemoriesDeps {
@@ -1464,17 +1588,19 @@ export interface ResolveMemoriesDeps {
   liveReview?: LiveVaultReview;
   round: number;
   callbacks: ToolLoopCallbacks;
+  /** This turn's effect boundary. Absent leaves the pre-phase-6 behaviour. */
+  guard?: EffectBoundaryGuard;
 }
 
 /**
  * Resolve memory mutations through their dedicated review channel. The fallback
  * validates and acknowledges only, it never persists without a reviewer.
  */
-export function resolveMemories(
+export async function resolveMemories(
   deps: ResolveMemoriesDeps,
 ): Promise<Array<{ tc: ToolCall; result: ToolResult }>> {
   const { memoryCalls, context, liveReview, round, callbacks } = deps;
-  if (memoryCalls.length === 0) return Promise.resolve([]);
+  if (memoryCalls.length === 0) return [];
   for (const tc of memoryCalls) {
     callbacks.onToolStatus?.(tc.name);
     callbacks.onStepRecorded?.({
@@ -1486,27 +1612,33 @@ export function resolveMemories(
       toolArgs: tc.arguments,
     });
   }
+  const { allowed, refused } = await crossEffectBoundaries(
+    deps.guard,
+    "memory_review",
+    memoryCalls,
+  );
+  if (allowed.length === 0) return refused;
   if (liveReview) {
-    return liveReview.resolveMemories(memoryCalls);
+    const reviewed = await liveReview.resolveMemories(allowed);
+    return [...reviewed, ...refused];
   }
-  return Promise.resolve(
-    memoryCalls.map((tc) => {
-      if (!context) {
-        return {
-          tc,
-          result: toolFailure({
-            kind: "unavailable",
-            what: "memory tool context unavailable",
-            isReadOnly: false,
-          }),
-        };
-      }
+  const validated = allowed.map((tc) => {
+    if (!context) {
       return {
         tc,
-        result: executeMemoryTool(tc, context),
+        result: toolFailure({
+          kind: "unavailable",
+          what: "memory tool context unavailable",
+          isReadOnly: false,
+        }),
       };
-    }),
-  );
+    }
+    return {
+      tc,
+      result: executeMemoryTool(tc, context),
+    };
+  });
+  return [...validated, ...refused];
 }
 
 export interface FailedRoundContext {

@@ -12,6 +12,7 @@ import {
 } from "../../../src/services/ClaudeCodeGenerationLease";
 import { ClaudeCodeService } from "../../../src/services/ClaudeCodeService";
 import type { PluginSettings } from "../../../src/shared/types";
+import type { GenerationAuditRecorder } from "../../../src/shared/types";
 import type { AskUserResponder } from "../../../src/tools/ask/types";
 import type { ToolCall, ToolResult, VaultOpReviewer } from "../../../src/tools/types";
 import { DEFAULT_VAULT_OP_POLICY } from "../../../src/vault-ops/gateway";
@@ -140,8 +141,31 @@ function owners(
     askSignal: null,
     lifecycle: null,
     signal: null,
+    // No durable audit unless a case installs one: a boundary with no recorder
+    // crosses on liveness alone, which is what every phase 5 case asserts.
+    audit: null,
     ...overrides,
   };
+}
+
+/**
+ * A write-ahead recorder the test drives (RFC-0011 phase 6). `held` keeps the
+ * store write in flight so "the intent is persisting" is a state the test holds.
+ */
+function auditRecorder(behaviour: { fail?: Error; held?: Promise<void> } = {}) {
+  const order: string[] = [];
+  const recorder: GenerationAuditRecorder = {
+    recordIntent: async (request) => {
+      order.push(`intent:${request.family}:${request.targetId}`);
+      if (behaviour.held) await behaviour.held;
+      if (behaviour.fail) throw behaviour.fail;
+    },
+    reconcileIntent: (request) => {
+      order.push(`reconcile:${request.family}:${request.targetId}`);
+      return Promise.resolve();
+    },
+  };
+  return { recorder, order };
 }
 
 function vaultOpCall(id: string): ToolCall {
@@ -431,6 +455,95 @@ describe("Claude Code effect boundaries", () => {
 
     expect(lease.consequentialCallbackEntered).toBe(true);
     expect([...lease.crossedBoundaries]).toEqual(["vault_op_review"]);
+  });
+
+  it("makes the intent durable before the review is reached, and reconciles after", async () => {
+    const { surface } = harness();
+    const seen: string[] = [];
+    const held = gate();
+    const audit = auditRecorder({ held: held.promise });
+    const { handle, provider } = surface();
+    handle.activate(
+      owners({
+        review: {
+          resolveOne: (call: ToolCall) => {
+            audit.order.push(`review:${call.name}`);
+            return Promise.resolve({ content: "approved", isError: false });
+          },
+          resolveEditOne: vi.fn(),
+          resolveMemoryOne: vi.fn(),
+        } as unknown as VaultOpReviewer,
+        audit: audit.recorder,
+      }),
+    );
+
+    const pending = provider.callTool(vaultOpCall("toolu_write"));
+    await Promise.resolve();
+    // The store write is still in flight, so the review has not been reached.
+    expect(audit.order).toEqual(["intent:vault_op:Notes/late.md"]);
+
+    held.open();
+    await pending;
+
+    expect(audit.order).toEqual([
+      "intent:vault_op:Notes/late.md",
+      "review:write_file",
+      "reconcile:vault_op:Notes/late.md",
+    ]);
+    expect(seen).toEqual([]);
+  });
+
+  it("refuses the mutation when its intent cannot be made durable", async () => {
+    const { surface } = harness();
+    const seen: string[] = [];
+    const audit = auditRecorder({ fail: new Error("disk full") });
+    const { handle, provider } = surface();
+    const lease = handle.activate(
+      owners({ review: reviewer("run-a", seen), audit: audit.recorder }),
+    );
+
+    const refused = await provider.callTool(vaultOpCall("toolu_write"));
+
+    // Settled decision 21: the persist must complete before the effect, so a
+    // store failure prevents the effect rather than being reported after it.
+    expect(refused.isError).toBe(true);
+    expect(refused.content).toContain("vault op review");
+    expect(seen).toEqual([]);
+    expect(lease.consequentialCallbackEntered).toBe(false);
+  });
+
+  it("refuses a stop that lands while the intent is persisting", async () => {
+    const { surface } = harness();
+    const seen: string[] = [];
+    const held = gate();
+    const audit = auditRecorder({ held: held.promise });
+    const controller = new AbortController();
+    const { handle, provider } = surface();
+    const lease = handle.activate(
+      owners({
+        review: reviewer("run-a", seen),
+        signal: controller.signal,
+        audit: audit.recorder,
+      }),
+    );
+
+    const pending = provider.callTool(vaultOpCall("toolu_write"));
+    await Promise.resolve();
+    // Before phase 6 there was no await between the boundary check and the
+    // review's own registration, so this window did not exist.
+    controller.abort();
+    held.open();
+    const refused = await pending;
+
+    expect(refused.isError).toBe(true);
+    expect(seen).toEqual([]);
+    expect(lease.consequentialCallbackEntered).toBe(false);
+    // Nothing happened, so the intent is closed rather than left to be read as
+    // an unknown outcome.
+    expect(audit.order).toEqual([
+      "intent:vault_op:Notes/late.md",
+      "reconcile:vault_op:Notes/late.md",
+    ]);
   });
 
   it("refuses a mutation whose review owner is absent instead of executing it", async () => {

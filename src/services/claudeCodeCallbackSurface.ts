@@ -18,7 +18,8 @@ import {
 } from "../tools/memory/definition";
 import { executeMemoryTool, type MemoryToolContext } from "../tools/memory/handlers";
 import { normalizeVaultToolCall } from "../tools/paths";
-import { toolFailure } from "../tools/toolFailure";
+import { effectIntentFor } from "../shared/generationAudit";
+import { effectBoundaryRefusal, toolFailure } from "../tools/toolFailure";
 import {
   claudeCodeStableToolSet,
   toolNotAllowedFailure,
@@ -212,7 +213,7 @@ function executeUnderLease(
     );
   }
   if (MEMORY_MUTATION_TOOL_NAMES.has(call.name)) {
-    return reviewedMutation(lease, "memory_review", (review) =>
+    return reviewedMutation(lease, "memory_review", call, (review) =>
       review.resolveMemoryOne(call, toolCallId),
     );
   }
@@ -220,12 +221,12 @@ function executeUnderLease(
     return Promise.resolve(executeMemoryTool(call, memoryToolContext(deps)));
   }
   if (EDIT_TOOL_NAMES.has(call.name)) {
-    return reviewedMutation(lease, "edit_review", (review) =>
+    return reviewedMutation(lease, "edit_review", call, (review) =>
       review.resolveEditOne(call, toolCallId),
     );
   }
   if (VAULT_OPS_TOOL_NAMES.has(call.name)) {
-    return reviewedMutation(lease, "vault_op_review", (review) =>
+    return reviewedMutation(lease, "vault_op_review", call, (review) =>
       review.resolveOne(call, toolCallId),
     );
   }
@@ -243,26 +244,36 @@ function executeUnderLease(
  * decision 20), and none of them has a path that runs without the review owner
  * that authorized it.
  */
-function reviewedMutation(
+async function reviewedMutation(
   lease: ClaudeCodeGenerationLease,
   boundary: ClaudeCodeEffectBoundary,
+  call: ToolCall,
   resolve: (review: VaultOpReviewer) => Promise<ToolResult>,
 ): Promise<ToolResult> {
   const review = lease.context.review;
   if (!review) {
-    return Promise.resolve(
-      toolFailure({
-        kind: "precondition",
-        what: "this run has no review owner, so the change cannot be proposed",
-        recovery: "do not retry it; the generation that authorized this call has ended",
-        isReadOnly: false,
-      }),
-    );
+    return toolFailure({
+      kind: "precondition",
+      what: "this run has no review owner, so the change cannot be proposed",
+      recovery: "do not retry it; the generation that authorized this call has ended",
+      isReadOnly: false,
+    });
   }
-  if (!lease.crossEffectBoundary(boundary)) {
-    return Promise.resolve(cancelledBeforeEffect(boundary));
+  const intent = effectIntentFor(boundary, call, {
+    kind: "provider_id",
+    toolCallId: call.id,
+  });
+  if (!(await lease.crossEffectBoundary(boundary, intent))) {
+    return effectBoundaryRefusal(boundary);
   }
-  return resolve(review);
+  try {
+    return await resolve(review);
+  } finally {
+    // The outcome reconciles under the same lease that admitted the callback,
+    // before the result reaches the model, so the audit is never behind what the
+    // model has already been told.
+    await lease.reconcileEffect(intent);
+  }
 }
 
 async function executeAskUser(
@@ -272,7 +283,11 @@ async function executeAskUser(
 ): Promise<ToolResult> {
   const responder = lease.context.askResponder;
   if (!responder) return askConcurrentFailure();
-  if (!lease.crossEffectBoundary("ask_interaction")) {
+  const intent = effectIntentFor("ask_interaction", call, {
+    kind: "provider_id",
+    toolCallId: call.id,
+  });
+  if (!(await lease.crossEffectBoundary("ask_interaction", intent))) {
     return askCancellationFailure("stopped");
   }
 
@@ -324,16 +339,6 @@ function refusedCallback(toolName: string, refusal: CallbackRefusal): ToolResult
     what: `this run's tool surface is closed (${refusal})`,
     recovery: "stop calling tools; the generation that authorized this call has ended",
     isReadOnly: effectBoundaryFor(toolName) === null,
-  });
-}
-
-/** The refusal for a call cancelled at its effect boundary, before any outcome. */
-function cancelledBeforeEffect(boundary: ClaudeCodeEffectBoundary): ToolResult {
-  return toolFailure({
-    kind: "precondition",
-    what: `this run was stopped before the ${boundary.replace(/_/g, " ")} could happen`,
-    recovery: "do not retry it; nothing was changed",
-    isReadOnly: false,
   });
 }
 

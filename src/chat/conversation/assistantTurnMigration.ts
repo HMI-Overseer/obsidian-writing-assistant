@@ -11,6 +11,7 @@ import {
   lowerEvidenceFromCapture,
   migratedCaptureEvidence,
 } from "../../shared/captureEvidence";
+import { PROVIDER_OPTIONS } from "../../shared/modelKeys";
 
 /**
  * Version-1 to version-2 turn migration (RFC-0011).
@@ -104,7 +105,9 @@ export function normalizeInFlightGenerationAudit(
     !isNonEmptyString(value.messageId) ||
     !isNonEmptyString(value.leaseId) ||
     !isNonEmptyString(value.turnId) ||
-    !isPositiveInteger(value.attemptOrdinal) ||
+    !isOrdinal(value.attemptOrdinal) ||
+    !isOneOf(value.provider, PROVIDER_OPTIONS) ||
+    !isNonEmptyString(value.modelId) ||
     !isTimestamp(value.openedAt) ||
     !Array.isArray(value.intents)
   ) {
@@ -149,6 +152,8 @@ export function normalizeInFlightGenerationAudit(
     leaseId: value.leaseId,
     turnId: value.turnId,
     attemptOrdinal: value.attemptOrdinal,
+    provider: value.provider,
+    modelId: value.modelId,
     openedAt: value.openedAt,
     intents,
   };
@@ -176,8 +181,14 @@ function isNonEmptyString(value: unknown): value is string {
   return typeof value === "string" && value.length > 0;
 }
 
-function isPositiveInteger(value: unknown): value is number {
-  return typeof value === "number" && Number.isInteger(value) && value > 0;
+/**
+ * Attempt ordinals are 1-based, but 0 is a real state: no provider attempt was
+ * open when the intent was written. Phase 1 required `> 0`, which would have
+ * silently dropped exactly that record, and dropping the only evidence that an
+ * irreversible action was authorized is the trade settled decision 29 forbids.
+ */
+function isOrdinal(value: unknown): value is number {
+  return typeof value === "number" && Number.isInteger(value) && value >= 0;
 }
 
 function isTimestamp(value: unknown): value is number {

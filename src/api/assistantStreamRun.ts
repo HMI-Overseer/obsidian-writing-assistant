@@ -18,7 +18,8 @@ import type { StopReason, UsageResult } from "./usageTypes";
  * or forced.
  *
  * Live since phase 2: {@link AssistantStreamRun} is what `ChatClient.stream()`
- * returns, and the old `StreamResult` is gone rather than aliased.
+ * returns, and the old `StreamResult` is gone rather than aliased. Since phase 4
+ * it carries {@link AssistantCaptureBatch} rather than individual events.
  */
 
 /**
@@ -101,12 +102,14 @@ export interface AssistantStreamSettlement {
 /**
  * One owned provider attempt.
  *
- * `Event` is a parameter only for the phase 2 to phase 4 transition: ownership
- * lands while streams still carry individual events, and the batch cutover flips
- * every implementation to the default.
+ * The stream unit is the capture batch, not the individual event (settled
+ * decision 1, landed in phase 4). Keeping batches behind an adapter would have
+ * preserved the event-by-event publication seam the RFC exists to remove: a
+ * transaction needs to know where one frame's facts end, and flattening erases
+ * that boundary at the stream seam where no consumer can honestly recover it.
  */
-export interface AssistantStreamRun<Event = AssistantCaptureBatch> {
-  events: AsyncIterable<Event>;
+export interface AssistantStreamRun {
+  events: AsyncIterable<AssistantCaptureBatch>;
   /** Idempotent. Safe before the first event, after commitment, and after settlement. */
   cancel(reason: StreamCancelReason): Promise<void>;
   /** Resolves on success, stop, failure, construction failure, zero events, and forced disposal. */

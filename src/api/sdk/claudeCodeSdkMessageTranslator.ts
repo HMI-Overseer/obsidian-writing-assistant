@@ -1,3 +1,6 @@
+import type { AssistantCaptureFrame } from "../assistantCapture";
+import { derivedFrameKey } from "../assistantCapture";
+import { canonicalJson } from "../assistantCapture";
 import type { AssistantStreamEvent } from "../usageTypes";
 
 export interface ClaudeCodeSdkMessageTranslatorOptions {
@@ -23,6 +26,8 @@ export class ClaudeCodeSdkMessageTranslator {
   private readonly blockIdByToolCall = new Map<string, string>();
   private activeSegmentId: string | null = null;
   private segmentIndex = 0;
+  private sessionId: string | null = null;
+  private providerMessageId: string | null = null;
 
   constructor(
     private readonly options: ClaudeCodeSdkMessageTranslatorOptions,
@@ -32,6 +37,7 @@ export class ClaudeCodeSdkMessageTranslator {
     const message = asRecord(value);
     if (!message || this.isDuplicate(message) || !isTopLevel(message)) return [];
 
+    this.sessionId = nonEmptyString(message.session_id) ?? this.sessionId;
     switch (message.type) {
       case "stream_event":
         return this.translateStreamEvent(message);
@@ -46,6 +52,43 @@ export class ClaudeCodeSdkMessageTranslator {
     }
   }
 
+  /**
+   * One SDK frame's facts and identity, as the batch the capture path commits.
+   *
+   * The frame boundary is exactly here, where one top-level message is
+   * translated. Phase 0 measured that the CLI splits one provider message into
+   * several one-element frames, so a frame is not a provider message and the two
+   * identities stay separate: `uuid` names the delivery, `${session_id}:${message.id}`
+   * names the message the facts belong to. A frame that translates to nothing is
+   * not a batch.
+   */
+  translateFrame(value: unknown): AssistantCaptureFrame | null {
+    const message = asRecord(value);
+    const facts = this.translate(value);
+    if (facts.length === 0) return null;
+    const uuid = message === null ? null : nonEmptyString(message.uuid);
+    const providerMessageKey = this.providerMessageKey();
+    return {
+      // A frame the SDK named is identified by that name; only a frame with no
+      // wire identity falls back to a digest of its own bytes, which names its
+      // content and is never read as proof of redelivery.
+      frameKey: uuid ?? derivedFrameKey(canonicalJson(value)),
+      frameKeySource: uuid === null ? "derived" : "provider",
+      ...(providerMessageKey === undefined ? {} : { providerMessageKey }),
+      facts,
+    };
+  }
+
+  /**
+   * The provider message currently open, qualified by session scope (settled
+   * decision 4, and the phase 0 key). Undefined between `message_stop` and the
+   * next `message_start`, where no provider message is open to place anything in.
+   */
+  providerMessageKey(): string | undefined {
+    if (this.sessionId === null || this.providerMessageId === null) return undefined;
+    return `${this.sessionId}:${this.providerMessageId}`;
+  }
+
   /** Authoritative visible prose for session watermarking and text-only callers. */
   rawText(): string {
     if (this.completedTextBySegment.length > 0) {
@@ -57,6 +100,15 @@ export class ClaudeCodeSdkMessageTranslator {
   private translateStreamEvent(message: RecordValue): AssistantStreamEvent[] {
     const event = asRecord(message.event);
     if (!event) return [];
+    // `message_start` opens a provider message and `message_stop` closes it, the
+    // only reliable boundary phase 0 found. A completed `assistant` frame is not
+    // one: three of them appeared inside a single start/stop window.
+    if (event.type === "message_start") {
+      this.providerMessageId =
+        nonEmptyString(asRecord(event.message)?.id) ?? this.providerMessageId;
+    } else if (event.type === "message_stop") {
+      this.providerMessageId = null;
+    }
     const index = integerValue(event.index) ?? 0;
 
     const segmentId = this.ensureSegment();
@@ -154,6 +206,10 @@ export class ClaudeCodeSdkMessageTranslator {
   private translateAssistant(message: RecordValue): AssistantStreamEvent[] {
     const assistant = asRecord(message.message);
     if (!assistant) return [];
+    // A completed fragment names its own provider message, which is how a
+    // completed-only capture (no partial stream at all) still places its items.
+    this.providerMessageId =
+      nonEmptyString(assistant.id) ?? this.providerMessageId;
     const content = Array.isArray(assistant.content) ? assistant.content : [];
     const segmentId = this.ensureSegment();
     const events = this.segmentStartEvent(segmentId);

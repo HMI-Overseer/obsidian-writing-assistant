@@ -16,16 +16,18 @@ import { nodeRequestWithHeaders } from "../../../src/api/httpTransport";
 import { streamNode } from "../../../src/api/streamingTransport";
 import type { ChatRequest } from "../../../src/shared/chatRequest";
 import type { SamplingParams } from "../../../src/shared/types";
-import type {
-  AssistantStreamEvent,
-  StreamResult,
-} from "../../../src/api/usageTypes";
+import type { AssistantStreamEvent } from "../../../src/api/usageTypes";
+import type { AssistantStreamRun } from "../../../src/api/assistantStreamRun";
 import { detachedAttemptContext } from "../../../src/api/assistantStreamRuntime";
 
 const mockRequest = vi.mocked(nodeRequestWithHeaders);
 const mockStreamNode = vi.mocked(streamNode);
 
-/** A streamNode stand-in that fires the given SSE events via onEvent, yields no text. */
+/**
+ * A streamNode stand-in that fires the given SSE events via onEvent, yields no
+ * text. The raw payload rides along exactly as the real transport passes it: it
+ * is what a capture frame key is derived from.
+ */
 function streamNodeImpl(events: unknown[]): typeof streamNode {
   return async function* (
     _url: string,
@@ -33,9 +35,9 @@ function streamNodeImpl(events: unknown[]): typeof streamNode {
     _signal?: AbortSignal,
     _headers?: Record<string, string>,
     _extractDelta?: unknown,
-    onEvent?: (json: unknown) => void,
+    onEvent?: (json: unknown, raw: string) => void,
   ): AsyncGenerator<string> {
-    for (const ev of events) onEvent?.(ev);
+    for (const ev of events) onEvent?.(ev, JSON.stringify(ev));
   } as typeof streamNode;
 }
 
@@ -208,11 +210,12 @@ describe("AnthropicClient.stream thinking-block capture (tool round trip)", () =
   });
 });
 
+/** Flattens the run's capture batches back to facts, in arrival order. */
 async function collectEvents(
-  result: StreamResult,
+  result: AssistantStreamRun,
 ): Promise<AssistantStreamEvent[]> {
   const events: AssistantStreamEvent[] = [];
-  for await (const event of result.events) events.push(event);
+  for await (const batch of result.events) events.push(...batch.facts);
   return events;
 }
 

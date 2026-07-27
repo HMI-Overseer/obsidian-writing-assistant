@@ -10,10 +10,8 @@ import { OpenAIClient } from "../../../src/api/OpenAIClient";
 import { streamFetch } from "../../../src/api/streamingTransport";
 import type { ChatRequest } from "../../../src/shared/chatRequest";
 import type { SamplingParams } from "../../../src/shared/types";
-import type {
-  AssistantStreamEvent,
-  StreamResult,
-} from "../../../src/api/usageTypes";
+import type { AssistantStreamEvent } from "../../../src/api/usageTypes";
+import type { AssistantStreamRun } from "../../../src/api/assistantStreamRun";
 import { detachedAttemptContext } from "../../../src/api/assistantStreamRuntime";
 
 const mockStreamFetch = vi.mocked(streamFetch);
@@ -36,10 +34,14 @@ function streamImpl(chunks: FakeChunk[]): typeof streamFetch {
     _signal?: AbortSignal,
     _headers?: Record<string, string>,
     _extractDelta?: unknown,
-    onEvent?: (json: unknown) => void,
+    onEvent?: (json: unknown, raw: string) => void,
   ): AsyncGenerator<string> {
     for (const chunk of chunks) {
-      if (chunk.event !== undefined) onEvent?.(chunk.event);
+      if (chunk.event !== undefined) {
+        // The raw payload rides along as the real transport passes it: it is
+        // what a capture frame key is derived from.
+        onEvent?.(chunk.event, JSON.stringify(chunk.event));
+      }
       if (chunk.delta !== undefined) yield chunk.delta;
     }
   } as typeof streamFetch;
@@ -68,9 +70,10 @@ function makeParams(): SamplingParams {
 }
 
 /** Drain ordered events so terminal stream metadata resolves. */
-async function drain(result: StreamResult): Promise<AssistantStreamEvent[]> {
+/** Flattens the run's capture batches back to facts, in arrival order. */
+async function drain(result: AssistantStreamRun): Promise<AssistantStreamEvent[]> {
   const events: AssistantStreamEvent[] = [];
-  for await (const event of result.events) events.push(event);
+  for await (const batch of result.events) events.push(...batch.facts);
   return events;
 }
 

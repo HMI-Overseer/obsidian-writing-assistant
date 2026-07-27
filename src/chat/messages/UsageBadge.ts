@@ -209,16 +209,26 @@ export function renderUsageBadge(
  * correlation, and runtime evidence may lower capture order), and an SDK run
  * labelled "legacy" would be a plain lie about which transport served the turn.
  */
+/** Whether any of a turn's lowered reasons starts with `prefix`. */
+function hasReason(evidence: AssistantReplayEvidence, prefix: string): boolean {
+  return (evidence.loweredReason ?? "")
+    .split(",")
+    .some((reason) => reason.startsWith(prefix));
+}
+
 export function describeReplayFidelity(
   evidence: AssistantReplayEvidence,
 ): string {
-  if (evidence.loweredReason === "claude_code_legacy_stream_json_capture") {
+  // Reasons compose once runtime placement lowers a turn, so both of these read
+  // the reason list rather than assuming a single value. A turn that was lowered
+  // for its placement AND served over the legacy transport is still legacy.
+  if (hasReason(evidence, "claude_code_legacy_stream_json_capture")) {
     return "degraded legacy capture";
   }
   if (evidence.tier === "native") return "native Claude continuation";
   if (evidence.tier === "structural") return "structural direct replay";
   if (
-    evidence.loweredReason?.startsWith("claude_code_") ||
+    hasReason(evidence, "claude_code_") ||
     evidence.capabilities.captureOrder === "exact"
   ) {
     return "textual Claude rebuild";

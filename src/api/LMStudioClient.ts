@@ -2,7 +2,6 @@ import type { Message, SamplingParams } from "../shared/types";
 import type { ChatRequest } from "../shared/chatRequest";
 import type { ChatClient } from "./chatClient";
 import type {
-  AssistantStreamEvent,
   CompletionResult,
   UsageResult,
   StopReason,
@@ -23,7 +22,10 @@ import { streamNode, streamFetch } from "./streamingTransport";
 import { buildCompletionPayload } from "./buildPayload";
 import { generateId } from "../utils";
 import { OpenAICompatibleStreamTranslator } from "./openAICompatibleStreamTranslator";
-import { createAssistantEventStream } from "./assistantEventStream";
+import {
+  CaptureFrameQueue,
+  createAssistantCaptureStream,
+} from "./assistantCaptureStream";
 import { buildOpenAICompatibleMessages } from "./buildOpenAICompatibleMessages";
 
 // Re-export for consumers that import from this file
@@ -176,7 +178,7 @@ export class LMStudioClient implements ChatClient {
     model: string,
     params: SamplingParams,
     attempt: AssistantStreamAttemptContext,
-  ): AssistantStreamRun<AssistantStreamEvent> {
+  ): AssistantStreamRun {
     const messages = this.buildMessages(request);
     const openAITools = request.tools?.length
       ? formatOpenAITools(request.tools)
@@ -188,16 +190,16 @@ export class LMStudioClient implements ChatClient {
       segmentId: `segment-${generateId()}`,
       provider: "lmstudio",
     });
-    const pendingEvents: AssistantStreamEvent[] = [];
-    const onEvent = (event: unknown): void => {
-      pendingEvents.push(...translator.translate(event));
-    };
+    // One chunk becomes one capture batch. A malformed chunk lowers this
+    // translator's own fidelity and contributes no facts, so it produces no
+    // batch and therefore cannot half-declare anything.
+    const frames = new CaptureFrameQueue(translator);
     const transport = createLinkedAbort(attempt);
     const rawStream = this.bypassCors
-      ? streamNode(url, body, transport.signal, undefined, undefined, onEvent)
-      : streamFetch(url, body, transport.signal, undefined, undefined, onEvent);
+      ? streamNode(url, body, transport.signal, undefined, undefined, frames.onPayload)
+      : streamFetch(url, body, transport.signal, undefined, undefined, frames.onPayload);
 
-    return createAssistantEventStream(rawStream, pendingEvents, translator, {
+    return createAssistantCaptureStream(rawStream, frames, translator, {
       attempt,
       provider: "lmstudio",
       abort: () => {

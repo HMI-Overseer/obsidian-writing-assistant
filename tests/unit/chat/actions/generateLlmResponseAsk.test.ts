@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { AssistantStreamEvent } from "../../../../src/api/usageTypes";
+import { validateAssistantMessageState } from "../../../../src/chat/conversation/assistantMessageValidation";
 
 vi.mock("../../../../src/chat/finalization/prepareApiMessages", () => ({
   prepareApiMessages: vi.fn(),
@@ -627,6 +628,53 @@ function completedAskStep(
   }
   return message.agenticSteps?.find((step) => step.toolName === "ask_user");
 }
+
+describe("generateLlmResponse version-2 persistence", () => {
+  beforeEach(() => {
+    vi.mocked(prepareApiMessages).mockResolvedValue({
+      systemPrompt: "",
+      documentContext: null,
+      ragContext: null,
+      messages: [],
+      tools: [],
+      allowedToolNames: [],
+    });
+  });
+
+  /**
+   * The phase 4 obligation. Every runtime writer now emits schema version 2 with
+   * per-item capture evidence, and the descriptor-derived claim the provider
+   * reported has to come back down to what that evidence supports before it is
+   * persisted. Without the lowering the revision is refused on reload as
+   * `revision_metadata_invalid`, which is a corrupted conversation rather than a
+   * visible failure, so it is asserted through the real persistence path.
+   */
+  it("persists a turn whose replay claim its own capture evidence supports", async () => {
+    const state = harness("append");
+    const client = makeClient([{ deltas: ["Answer."] }]);
+
+    await generateLlmResponse({ ...state.options, client });
+
+    expect(state.messages).toHaveLength(1);
+    const message = state.messages[0];
+    const revision = message.revisions?.find(
+      (entry) => entry.revisionId === message.activeRevisionId,
+    );
+    if (revision?.kind !== "turn") throw new Error("expected a turn revision");
+
+    expect(revision.turn.schemaVersion).toBe(2);
+    // The provider reported `exact`; nothing in the runtime placement supports
+    // it, so what is stored is what the items back.
+    expect(revision.replayEvidence?.capabilities.captureOrder).not.toBe("exact");
+    expect(
+      validateAssistantMessageState({
+        revisions: message.revisions,
+        activeRevisionId: message.activeRevisionId,
+        actionLedger: message.actionLedger ?? [],
+      }).ok,
+    ).toBe(true);
+  });
+});
 
 describe("generateLlmResponse ask_user integration", () => {
   beforeEach(() => {

@@ -10,6 +10,7 @@ import {
 } from "../../../src/api/harnessSession";
 import { toHistoryTurns } from "../../../src/chat/finalization/prepareApiMessages";
 import { normalizeConversation } from "../../../src/chat/conversation/conversationUtils";
+import { proseTurnFrames } from "../../helpers/captureFrames";
 import type { ChatRequest, ChatTurn } from "../../../src/shared/chatRequest";
 import type {
   AgenticStep,
@@ -149,9 +150,7 @@ async function captureTurnInput(messages: ChatTurn[]): Promise<SdkSessionTurnInp
       conversationId: "c1",
       run: (input) => {
         captured = input;
-        return (async function* () {
-          yield "ok";
-        })();
+        return proseTurnFrames(["ok"]);
       },
     },
   });

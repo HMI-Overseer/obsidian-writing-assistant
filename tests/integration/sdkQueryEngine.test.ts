@@ -20,6 +20,7 @@ vi.mock("../../src/api/sdk/claudeAgentSdk", () => ({
 import { streamSdkTurn, buildSdkOptions, type SdkTurnOptions } from "../../src/api/sdk/sdkQueryEngine";
 import type { ClaudeCodeResultUsage } from "../../src/api/claudeCodeProcess";
 import type { AssistantStreamEvent } from "../../src/api/usageTypes";
+import type { AssistantCaptureFrame } from "../../src/api/assistantCapture";
 
 function textDeltaMessage(text: string) {
   return {
@@ -65,11 +66,12 @@ function baseOptions(overrides: Partial<SdkTurnOptions> = {}): SdkTurnOptions {
   };
 }
 
+/** Flattens the engine's capture frames back to facts, in arrival order. */
 async function drain(
-  gen: AsyncGenerator<AssistantStreamEvent>,
+  frames: AsyncGenerator<AssistantCaptureFrame>,
 ): Promise<AssistantStreamEvent[]> {
   const out: AssistantStreamEvent[] = [];
-  for await (const d of gen) out.push(d);
+  for await (const frame of frames) out.push(...frame.facts);
   return out;
 }
 

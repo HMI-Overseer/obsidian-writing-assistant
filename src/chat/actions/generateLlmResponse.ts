@@ -56,6 +56,7 @@ import {
   rawConcatenatedProse,
 } from "../turns/assistantTurnProjections";
 import { projectRegexEditPreview } from "../messages/regexEditPreview";
+import { lowerEvidenceFromCapture } from "../../shared/captureEvidence";
 
 /**
  * How to commit the completed generation to the store.
@@ -363,6 +364,16 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
     const messageUsage = input.usage
       ? buildMessageUsage(activeModel.modelId, input.usage)
       : undefined;
+    // A descriptor is a ceiling; the turn's own items decide what it may claim
+    // (RFC-0011 settled decision 24). Phase 4 is the first writer of version-2
+    // capture evidence, so this is where the claim has to come back down: without
+    // it `crossCheckCaptureEvidence()` refuses the revision on reload with
+    // `revision_metadata_invalid`, because no runtime placement supports an exact
+    // ordering claim once no translator records an exact provider block identity.
+    const supportedEvidence = lowerEvidenceFromCapture(
+      input.replayEvidence,
+      input.turn,
+    );
     const revision = createAssistantTurnRevision({
       revisionId: draftIdentity.revisionId,
       origin:
@@ -376,7 +387,7 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
       provider: activeModel.provider,
       modelId: activeModel.modelId,
       turn: input.turn,
-      replayEvidence: input.replayEvidence,
+      replayEvidence: supportedEvidence,
       ...(messageUsage ? { usage: messageUsage } : {}),
       ...(ragSources ? { ragSources } : {}),
       ...(rewrittenQuery ? { rewrittenQuery } : {}),
@@ -392,7 +403,7 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
         !isMeaningfulAssistantReplacement({
           provider: activeModel.provider,
           turn: input.turn,
-          replayEvidence: input.replayEvidence,
+          replayEvidence: supportedEvidence,
           usage: messageUsage,
         })
       ) {
@@ -686,8 +697,10 @@ function finishDirectTurn(
   try {
     return builder.finishTurn(status);
   } catch {
+    // Version 2 with no items, so it carries no capture claim to be checked
+    // against. Every runtime writer emits version 2 after the phase 4 cutover.
     return {
-      schemaVersion: 1,
+      schemaVersion: 2,
       id: builder.snapshot().id,
       status,
       segments: [],

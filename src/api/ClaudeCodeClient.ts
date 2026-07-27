@@ -2,11 +2,12 @@ import type { ClaudeCodeResumeCursor, SamplingParams } from "../shared/types";
 import type { ChatRequest, ChatTurn } from "../shared/chatRequest";
 import type { ChatClient } from "./chatClient";
 import { formatNoteAttachment } from "./contextFormatting";
+import type { CompletionResult, UsageResult } from "./usageTypes";
 import type {
-  AssistantStreamEvent,
-  CompletionResult,
-  UsageResult,
-} from "./usageTypes";
+  AssistantCaptureBatch,
+  AssistantCaptureFrame,
+} from "./assistantCapture";
+import { sealCaptureFrame } from "./assistantCapture";
 import type {
   AssistantStreamAttemptContext,
   AssistantStreamRun,
@@ -92,7 +93,7 @@ export interface ClaudeCodeRuntime {
    */
   sdkSession?: {
     conversationId: string;
-    run: (input: SdkSessionTurnInput) => AsyncGenerator<AssistantStreamEvent>;
+    run: (input: SdkSessionTurnInput) => AsyncGenerator<AssistantCaptureFrame>;
     /**
      * Disposes the conversation's live session and resolves once its CLI child is
      * provably gone. This is the persistent path's bounded hard-dispose operation
@@ -161,23 +162,25 @@ export class ClaudeCodeClient implements ChatClient {
       (cursor) => { bankedCursor = cursor; },
     );
 
-    for await (const event of deltas) {
-      if (event.type === "segment_start" && !textBySegment.has(event.segmentId)) {
-        segmentOrder.push(event.segmentId);
-        textBySegment.set(event.segmentId, "");
-      } else if (event.type === "prose_delta") {
-        textBySegment.set(
-          event.segmentId,
-          (textBySegment.get(event.segmentId) ?? "") + event.delta,
-        );
-      } else if (event.type === "segment_reconcile") {
-        textBySegment.set(
-          event.segmentId,
-          event.blocks
-            .filter((block) => block.type === "prose")
-            .map((block) => block.text)
-            .join(""),
-        );
+    for await (const frame of deltas) {
+      for (const event of frame.facts) {
+        if (event.type === "segment_start" && !textBySegment.has(event.segmentId)) {
+          segmentOrder.push(event.segmentId);
+          textBySegment.set(event.segmentId, "");
+        } else if (event.type === "prose_delta") {
+          textBySegment.set(
+            event.segmentId,
+            (textBySegment.get(event.segmentId) ?? "") + event.delta,
+          );
+        } else if (event.type === "segment_reconcile") {
+          textBySegment.set(
+            event.segmentId,
+            event.blocks
+              .filter((block) => block.type === "prose")
+              .map((block) => block.text)
+              .join(""),
+          );
+        }
       }
     }
 
@@ -194,7 +197,7 @@ export class ClaudeCodeClient implements ChatClient {
     model: string,
     params: SamplingParams,
     attempt: AssistantStreamAttemptContext,
-  ): AssistantStreamRun<AssistantStreamEvent> {
+  ): AssistantStreamRun {
     let captured: ClaudeCodeResultUsage | null = null;
     let decision: SessionRecovery | undefined;
     let bankedCursor: ClaudeCodeResumeCursor | undefined;
@@ -207,7 +210,7 @@ export class ClaudeCodeClient implements ChatClient {
     const transport = createLinkedAbort(attempt);
     const processOwner = new ClaudeCodeProcessOwner();
 
-    const rawEvents = this.runTurn(
+    const rawFrames = this.runTurn(
       request,
       model,
       params,
@@ -218,9 +221,14 @@ export class ClaudeCodeClient implements ChatClient {
       processOwner,
     );
 
-    async function* source(): AsyncGenerator<AssistantStreamEvent> {
+    async function* source(): AsyncGenerator<AssistantCaptureBatch> {
       try {
-        yield* rawEvents;
+        // The lease ID enters here and nowhere deeper, so every batch this
+        // attempt publishes is attempt-scoped by construction and a retried
+        // attempt can never collide with the one it replaced.
+        for await (const frame of rawFrames) {
+          yield sealCaptureFrame(attempt.leaseId, frame);
+        }
       } finally {
         metadata.usage.settle(
           applyRecoveryDecision(toUsageResult(captured), decision, bankedCursor),
@@ -329,7 +337,7 @@ export class ClaudeCodeClient implements ChatClient {
     onRecoveryDecision?: (decision: SessionRecovery) => void,
     onSessionBanked?: (cursor: ClaudeCodeResumeCursor) => void,
     processOwner?: ClaudeCodeProcessOwner,
-  ): AsyncGenerator<AssistantStreamEvent> {
+  ): AsyncGenerator<AssistantCaptureFrame> {
     const prompt = buildClaudeCodePrompt(request);
     // Passive preflight: refuse a mint blob that would overflow the discovered
     // window (leaving no room for a reply) rather than let it die opaquely
@@ -356,30 +364,7 @@ export class ClaudeCodeClient implements ChatClient {
         onRecoveryDecision,
         onSessionBanked,
       });
-      let compatibilitySegmentId: string | null = null;
-      for await (const event of sessionEvents as AsyncGenerator<
-        AssistantStreamEvent | string
-      >) {
-        if (typeof event !== "string") {
-          yield event;
-          continue;
-        }
-        if (compatibilitySegmentId === null) {
-          compatibilitySegmentId = `claude-session-segment-${generateId()}`;
-          yield { type: "segment_start", segmentId: compatibilitySegmentId };
-        }
-        if (event.length > 0) {
-          yield {
-            type: "prose_delta",
-            segmentId: compatibilitySegmentId,
-            delta: event,
-          };
-        }
-      }
-      if (compatibilitySegmentId !== null) {
-        yield { type: "segment_end", segmentId: compatibilitySegmentId };
-        yield { type: "turn_end", status: "completed" };
-      }
+      yield* sessionEvents;
       return;
     }
 
@@ -421,7 +406,8 @@ export class ClaudeCodeClient implements ChatClient {
         }
       },
     })) {
-      for (const event of translator.translate(message)) yield event;
+      const frame = translator.translateFrame(message);
+      if (frame) yield frame;
     }
   }
 

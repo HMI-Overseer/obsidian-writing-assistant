@@ -1,5 +1,5 @@
 import type { SamplingParams } from "../../shared/types";
-import type { AssistantStreamEvent } from "../usageTypes";
+import type { AssistantCaptureFrame } from "../assistantCapture";
 import { generateId } from "../../utils";
 import { isEffortLevel } from "../../shared/reasoning";
 import { createAbortError } from "../httpTransport";
@@ -91,7 +91,7 @@ export interface SdkTurnOptions {
  */
 export async function* streamSdkTurn(
   opts: SdkTurnOptions,
-): AsyncGenerator<AssistantStreamEvent> {
+): AsyncGenerator<AssistantCaptureFrame> {
   if (opts.signal?.aborted) throw createAbortError();
 
   const abortController = new AbortController();
@@ -113,7 +113,10 @@ export async function* streamSdkTurn(
       const next = await queryIterator.next();
       if (next.done) break;
       const message = next.value;
-      for (const event of translator.translate(message)) yield event;
+      // One SDK frame is one capture frame. Flattening it to individual events
+      // here is what used to erase the boundary the builder transaction needs.
+      const frame = translator.translateFrame(message);
+      if (frame) yield frame;
 
       contextTokens = extractClaudeCodeContextTokens(message) ?? contextTokens;
 
@@ -145,8 +148,10 @@ export async function* streamSdkTurn(
 export async function* streamSdkTextTurn(
   opts: SdkTurnOptions,
 ): AsyncGenerator<string> {
-  for await (const event of streamSdkTurn(opts)) {
-    if (event.type === "prose_delta") yield event.delta;
+  for await (const frame of streamSdkTurn(opts)) {
+    for (const fact of frame.facts) {
+      if (fact.type === "prose_delta") yield fact.delta;
+    }
   }
 }
 

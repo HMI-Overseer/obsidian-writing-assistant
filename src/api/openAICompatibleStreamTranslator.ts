@@ -127,6 +127,15 @@ export class OpenAICompatibleStreamTranslator {
     return events;
   }
 
+  /**
+   * The completion ID every chunk of one response repeats, unique per request,
+   * so it needs no further scope qualification. A server that omits it leaves
+   * this undefined and its items honestly unplaced.
+   */
+  providerMessageKey(): string | undefined {
+    return this.providerMessageId;
+  }
+
   metadata(): AssistantStreamMetadata {
     const capabilities: ProviderTurnCapabilities = {
       ...OPENAI_COMPATIBLE_CAPABILITIES,

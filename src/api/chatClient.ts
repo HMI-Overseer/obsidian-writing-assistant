@@ -4,7 +4,7 @@ import type {
   AssistantStreamAttemptContext,
   AssistantStreamRun,
 } from "./assistantStreamRun";
-import type { AssistantStreamEvent, CompletionResult } from "./usageTypes";
+import type { CompletionResult } from "./usageTypes";
 
 /** Provider-agnostic chat completion client. */
 export interface ChatClient {
@@ -17,17 +17,22 @@ export interface ChatClient {
   ): Promise<CompletionResult>;
 
   /**
-   * Streaming completion, as one owned attempt.
+   * Streaming completion, as one owned attempt yielding capture batches.
    *
    * Takes the attempt context rather than a bare signal (RFC-0011 settled decision
    * 13): the lease identity and its cancellation authority are the caller's to
    * allocate, so a provider cannot mint an unrelated identity of its own, and the
    * returned run can be stopped and awaited by whoever owns the turn.
+   *
+   * The unit is one transport frame's worth of facts (settled decision 1). A
+   * provider may derive several facts from one frame, but no consumer can observe
+   * them outside their batch, which is what lets the turn builder commit or reject
+   * a frame whole.
    */
   stream(
     request: ChatRequest,
     model: string,
     params: SamplingParams,
     attempt: AssistantStreamAttemptContext,
-  ): AssistantStreamRun<AssistantStreamEvent>;
+  ): AssistantStreamRun;
 }

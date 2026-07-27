@@ -3,7 +3,7 @@ import type {
   ReasoningLevel,
   SessionRebuildReason,
 } from "../../shared/types";
-import type { AssistantStreamEvent } from "../usageTypes";
+import type { AssistantCaptureFrame } from "../assistantCapture";
 import { generateId } from "../../utils";
 import type { FlagSettableEffort } from "../../shared/reasoning";
 import { createAbortError } from "../httpTransport";
@@ -250,7 +250,7 @@ export class SdkSession {
   async *runTurnEvents(
     prompt: string,
     ctx: SessionTurnContext,
-  ): AsyncGenerator<AssistantStreamEvent> {
+  ): AsyncGenerator<AssistantCaptureFrame> {
     if (this.disposed) throw new Error("Claude Code session was disposed");
     // The chat UI serializes generation, but guard against a second turn racing
     // into one session's single message stream.
@@ -299,10 +299,15 @@ export class SdkSession {
         if (next.done) throw new Error("Claude Code session ended unexpectedly");
         const message = next.value;
 
-        const translated = translator.translate(message);
-        for (const event of translated) {
-          if (interruptRequested && event.type === "turn_end") continue;
-          yield event;
+        // One SDK frame is one capture frame. A turn ending on the user's Stop
+        // suppresses the terminal fact rather than the whole frame, so the facts
+        // that arrived with it are still committed.
+        const frame = translator.translateFrame(message);
+        if (frame) {
+          const facts = interruptRequested
+            ? frame.facts.filter((fact) => fact.type !== "turn_end")
+            : frame.facts;
+          if (facts.length > 0) yield { ...frame, facts };
         }
 
         contextTokens = extractClaudeCodeContextTokens(message) ?? contextTokens;
@@ -369,8 +374,10 @@ export class SdkSession {
     prompt: string,
     ctx: SessionTurnContext,
   ): AsyncGenerator<string> {
-    for await (const event of this.runTurnEvents(prompt, ctx)) {
-      if (event.type === "prose_delta") yield event.delta;
+    for await (const frame of this.runTurnEvents(prompt, ctx)) {
+      for (const fact of frame.facts) {
+        if (fact.type === "prose_delta") yield fact.delta;
+      }
     }
   }
 
@@ -545,7 +552,7 @@ export class SdkSessionRegistry {
   async *runTurnEvents(
     conversationId: string,
     req: SessionTurnRequest,
-  ): AsyncGenerator<AssistantStreamEvent> {
+  ): AsyncGenerator<AssistantCaptureFrame> {
     const existing = this.sessions.get(conversationId);
     const effort = req.effort ?? null;
     let decision = decideRecovery(
@@ -582,7 +589,7 @@ export class SdkSessionRegistry {
     if (decision.outcome === "resumed") {
       const resumed = this.mintSession(conversationId, req, effort, decision.cursor);
       const attempt = resumed.runTurnEvents(req.deltaPrompt, this.turnCtx(req));
-      let first: IteratorResult<AssistantStreamEvent> | undefined;
+      let first: IteratorResult<AssistantCaptureFrame> | undefined;
       try {
         first = await attempt.next();
       } catch (error) {
@@ -668,8 +675,10 @@ export class SdkSessionRegistry {
     conversationId: string,
     req: SessionTurnRequest,
   ): AsyncGenerator<string> {
-    for await (const event of this.runTurnEvents(conversationId, req)) {
-      if (event.type === "prose_delta") yield event.delta;
+    for await (const frame of this.runTurnEvents(conversationId, req)) {
+      for (const fact of frame.facts) {
+        if (fact.type === "prose_delta") yield fact.delta;
+      }
     }
   }
 

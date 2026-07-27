@@ -1,5 +1,10 @@
 import { describe, it, expect, vi } from "vitest";
-import { createAssistantEventStream } from "../../src/api/assistantEventStream";
+import {
+  CaptureFrameQueue,
+  createAssistantCaptureStream,
+} from "../../src/api/assistantCaptureStream";
+import type { AssistantCaptureBatch } from "../../src/api/assistantCapture";
+import { createCaptureBatch } from "../../src/api/assistantCapture";
 import {
   createOwnedStreamRun,
   detachedAttemptContext,
@@ -62,19 +67,37 @@ function instrumentedRawStream(chunks: string[]): {
   return { stream: stream(), state };
 }
 
-describe("createAssistantEventStream ownership", () => {
+/**
+ * A translator double for the direct-HTTP bridge. It turns each raw SSE payload
+ * into one fact, which the queue then seals into one batch, so these tests
+ * exercise the real frame-preserving path rather than a flat event list.
+ */
+function frameQueue(): CaptureFrameQueue {
+  let index = 0;
+  return new CaptureFrameQueue({
+    translate: () => {
+      index += 1;
+      return [{ type: "segment_start" as const, segmentId: `s${index}` }];
+    },
+    finishEvents: () => [],
+    metadata,
+    providerMessageKey: () => "msg_1",
+  });
+}
+
+describe("createAssistantCaptureStream ownership", () => {
   // Criterion 19, fixed in phase 2. Promoted from `it.fails` when the defect closed.
   it("closes the raw transport iterator on early consumer return", async () => {
     const { stream, state } = instrumentedRawStream(["a", "b", "c"]);
-    const pending: AssistantStreamEvent[] = [];
-    const result = createAssistantEventStream(
+    const frames = frameQueue();
+    const result = createAssistantCaptureStream(
       stream,
-      pending,
-      { finishEvents: () => [], metadata },
+      frames,
+      { translate: () => [], finishEvents: () => [], metadata, providerMessageKey: () => undefined },
       { attempt: detachedAttemptContext("t"), provider: "anthropic", abort: () => {} },
     );
 
-    pending.push({ type: "segment_start", segmentId: "s1" });
+    frames.onPayload({}, "{}");
     const iterator = result.events[Symbol.asyncIterator]();
     await iterator.next();
     await iterator.return?.(undefined);
@@ -84,16 +107,16 @@ describe("createAssistantEventStream ownership", () => {
 
   it("aborts the transport when the consumer returns early", async () => {
     const { stream } = instrumentedRawStream(["a", "b", "c"]);
-    const pending: AssistantStreamEvent[] = [];
+    const frames = frameQueue();
     const abort = vi.fn();
-    const result = createAssistantEventStream(
+    const result = createAssistantCaptureStream(
       stream,
-      pending,
-      { finishEvents: () => [], metadata },
+      frames,
+      { translate: () => [], finishEvents: () => [], metadata, providerMessageKey: () => undefined },
       { attempt: detachedAttemptContext("t"), provider: "anthropic", abort },
     );
 
-    pending.push({ type: "segment_start", segmentId: "s1" });
+    frames.onPayload({}, "{}");
     const iterator = result.events[Symbol.asyncIterator]();
     await iterator.next();
     await iterator.return?.(undefined);
@@ -103,15 +126,15 @@ describe("createAssistantEventStream ownership", () => {
 
   it("still resolves every metadata promise on early consumer return", async () => {
     const { stream } = instrumentedRawStream(["a"]);
-    const pending: AssistantStreamEvent[] = [];
-    const result = createAssistantEventStream(
+    const frames = frameQueue();
+    const result = createAssistantCaptureStream(
       stream,
-      pending,
-      { finishEvents: () => [], metadata },
+      frames,
+      { translate: () => [], finishEvents: () => [], metadata, providerMessageKey: () => undefined },
       { attempt: detachedAttemptContext("t"), provider: "anthropic", abort: () => {} },
     );
 
-    pending.push({ type: "segment_start", segmentId: "s1" });
+    frames.onPayload({}, "{}");
     const iterator = result.events[Symbol.asyncIterator]();
     await iterator.next();
     await iterator.return?.(undefined);
@@ -128,15 +151,15 @@ describe("createAssistantEventStream ownership", () => {
 
   it("settles once with the consumer_returned reason", async () => {
     const { stream } = instrumentedRawStream(["a", "b"]);
-    const pending: AssistantStreamEvent[] = [];
-    const result = createAssistantEventStream(
+    const frames = frameQueue();
+    const result = createAssistantCaptureStream(
       stream,
-      pending,
-      { finishEvents: () => [], metadata },
+      frames,
+      { translate: () => [], finishEvents: () => [], metadata, providerMessageKey: () => undefined },
       { attempt: detachedAttemptContext("t"), provider: "anthropic", abort: () => {} },
     );
 
-    pending.push({ type: "segment_start", segmentId: "s1" });
+    frames.onPayload({}, "{}");
     const iterator = result.events[Symbol.asyncIterator]();
     await iterator.next();
     await iterator.return?.(undefined);
@@ -148,16 +171,31 @@ describe("createAssistantEventStream ownership", () => {
   });
 });
 
+/** One fact per batch, the honest shape for a double with no frame structure. */
+function batchOf(
+  event: AssistantStreamEvent,
+  leaseId: string,
+  ordinal: number,
+): AssistantCaptureBatch {
+  return createCaptureBatch({
+    leaseId,
+    frameKey: `derived-fake-${ordinal}`,
+    frameKeySource: "derived",
+    facts: [event],
+  });
+}
+
 /** An owned run over a fixed event list whose closure is observable. */
 function instrumentedRun(events: AssistantStreamEvent[], label = "attempt"): {
-  run: AssistantStreamRun<AssistantStreamEvent>;
+  run: AssistantStreamRun;
   state: { closed: boolean };
 } {
   const state = { closed: false };
   const gate = createStreamMetadataGate();
-  async function* generator(): AsyncGenerator<AssistantStreamEvent> {
+  async function* generator(): AsyncGenerator<AssistantCaptureBatch> {
     try {
-      for (const event of events) yield event;
+      let ordinal = 0;
+      for (const event of events) yield batchOf(event, label, (ordinal += 1));
     } finally {
       state.closed = true;
       gate.settleRemaining();
@@ -182,7 +220,7 @@ describe("streamWithRetry ownership", () => {
       { type: "prose_delta", segmentId: "s1", delta: "hello" },
       { type: "prose_delta", segmentId: "s1", delta: " world" },
     ]);
-    const owner = new TurnRunOwner<AssistantStreamEvent>("turn-1");
+    const owner = new TurnRunOwner("turn-1");
     const wrapped = streamWithRetry(() => run, owner);
 
     const iterator = wrapped.events[Symbol.asyncIterator]();
@@ -197,7 +235,7 @@ describe("streamWithRetry ownership", () => {
       { type: "segment_start", segmentId: "s1" },
       { type: "prose_delta", segmentId: "s1", delta: "hello" },
     ]);
-    const owner = new TurnRunOwner<AssistantStreamEvent>("turn-1");
+    const owner = new TurnRunOwner("turn-1");
     const wrapped = streamWithRetry(() => run, owner);
 
     const iterator = wrapped.events[Symbol.asyncIterator]();
@@ -214,7 +252,7 @@ describe("streamWithRetry ownership", () => {
   it("proves the abandoned pre-commit attempt quiet before the next one opens", async () => {
     const closed: boolean[] = [];
     const priorClosedAtConstruction: Array<boolean | null> = [];
-    const owner = new TurnRunOwner<AssistantStreamEvent>("turn-1");
+    const owner = new TurnRunOwner("turn-1");
     let attempt = 0;
 
     const makeStream = (): AssistantStreamRun<AssistantStreamEvent> => {
@@ -254,7 +292,7 @@ describe("streamWithRetry ownership", () => {
 
   it("exposes cancellation and settlement", async () => {
     const { run } = instrumentedRun([]);
-    const owner = new TurnRunOwner<AssistantStreamEvent>("turn-1");
+    const owner = new TurnRunOwner("turn-1");
     const wrapped = streamWithRetry(() => run, owner);
 
     // Criterion 15 and 20: an owner can ask an attempt to stop and can wait for
@@ -266,7 +304,7 @@ describe("streamWithRetry ownership", () => {
   });
 
   it("settles a factory throw without leaving an unowned lease", async () => {
-    const owner = new TurnRunOwner<AssistantStreamEvent>("turn-1");
+    const owner = new TurnRunOwner("turn-1");
     const wrapped = streamWithRetry(() => {
       throw new Error("could not construct the provider stream");
     }, owner);
@@ -283,7 +321,7 @@ describe("streamWithRetry ownership", () => {
   });
 
   it("refuses to retry once a consequential callback entered", async () => {
-    const owner = new TurnRunOwner<AssistantStreamEvent>("turn-1");
+    const owner = new TurnRunOwner("turn-1");
     let attempts = 0;
     const makeStream = (): AssistantStreamRun<AssistantStreamEvent> => {
       attempts += 1;
@@ -318,7 +356,7 @@ describe("streamWithRetry ownership", () => {
 
   it("resolves wrapper metadata on a zero-event attempt", async () => {
     const { run } = instrumentedRun([]);
-    const owner = new TurnRunOwner<AssistantStreamEvent>("turn-1");
+    const owner = new TurnRunOwner("turn-1");
     const wrapped = streamWithRetry(() => run, owner);
 
     for await (const _event of wrapped.events) void _event;
@@ -341,17 +379,19 @@ describe("downstream failure stops the provider", () => {
       { type: "segment_start", segmentId: "s1" },
       { type: "prose_delta", segmentId: "s1", delta: "hello" },
     ]);
-    const owner = new TurnRunOwner<AssistantStreamEvent>("turn-1");
+    const owner = new TurnRunOwner("turn-1");
     const wrapped = streamWithRetry(() => run, owner);
-    const applyEvent = vi.fn((event: AssistantStreamEvent) => {
-      if (event.type === "prose_delta") throw new Error("builder rejected the batch");
+    const applyBatch = vi.fn((batch: AssistantCaptureBatch) => {
+      if (batch.facts.some((fact) => fact.type === "prose_delta")) {
+        throw new Error("builder rejected the batch");
+      }
     });
 
     let thrown: unknown = null;
     try {
-      for await (const event of wrapped.events) {
+      for await (const batch of wrapped.events) {
         try {
-          applyEvent(event);
+          applyBatch(batch);
         } catch (error) {
           // What runToolLoop does: name the reason before unwinding, so the
           // `consumer_returned` the unwind produces cannot claim it first

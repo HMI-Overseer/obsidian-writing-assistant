@@ -1,5 +1,7 @@
 import { createStreamMetadataGate } from "../../src/api/assistantStreamRun";
 import type { AssistantStreamRun } from "../../src/api/assistantStreamRun";
+import type { AssistantCaptureBatch } from "../../src/api/assistantCapture";
+import { createCaptureBatch } from "../../src/api/assistantCapture";
 import {
   createOwnedStreamRun,
   detachedAttemptContext,
@@ -32,19 +34,40 @@ export interface LegacyStreamShape {
   replayEvidence: Promise<AssistantReplayEvidence>;
 }
 
+/**
+ * Since phase 4 a run carries capture batches, so each event a legacy fake
+ * yields becomes one single-fact frame.
+ *
+ * That is the honest reading of a fake with no frame structure of its own: it
+ * never claimed two facts arrived together. A test that needs a real multi-fact
+ * frame builds the batch itself rather than going through here, so this cannot
+ * become a way to assert atomicity against a shape no provider produces.
+ */
 export function ownedRunFromLegacy(
   legacy: LegacyStreamShape,
   label = "test-attempt",
-): AssistantStreamRun<AssistantStreamEvent> {
+): AssistantStreamRun {
   const metadata = createStreamMetadataGate();
 
   // The legacy promises resolve in the inner generator's own `finally`, so they
   // are awaited here after it completes and before the run settles. Settling the
   // gate any later would let the run's `settleRemaining()` win with fallbacks and
   // silently replace the terminal facts a test is asserting on.
-  async function* source(): AsyncGenerator<AssistantStreamEvent> {
+  async function* source(): AsyncGenerator<AssistantCaptureBatch> {
+    let ordinal = 0;
     try {
-      yield* legacy.events;
+      for await (const event of legacy.events) {
+        ordinal += 1;
+        yield createCaptureBatch({
+          leaseId: label,
+          // Bytes alone would collide for two identical deltas; a fake has no
+          // wire identity, so the key is marked derived and never indexed for
+          // redelivery either way.
+          frameKey: `derived-legacy-${ordinal}`,
+          frameKeySource: "derived",
+          facts: [event],
+        });
+      }
     } finally {
       metadata.usage.settle(await legacy.usage.catch(() => null));
       metadata.stopReason.settle(await legacy.stopReason.catch(() => "unknown"));

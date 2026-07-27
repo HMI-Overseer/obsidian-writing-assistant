@@ -1,11 +1,11 @@
 {
   "fixtureVersion": 1,
-  "case": "intra-frame-duplicate-tool-id",
+  "case": "cross-frame-duplicate-tool-id",
   "transport": "sdk",
   "sdkVersion": "0.3.207",
   "cliVersion": "2.1.218",
   "provenance": "synthetic",
-  "description": "One completed assistant frame naming the same exact tool-use ID at two distinct local positions.",
+  "description": "Two partial content_block_start frames at distinct provider block indices claiming one exact tool-use ID.",
   "frames": [
     {
       "type": "stream_event",
@@ -24,34 +24,39 @@
       }
     },
     {
-      "type": "assistant",
-      "uuid": "frame_1",
+      "type": "stream_event",
+      "uuid": "frame_bs_msg_1_0",
       "session_id": "sess_1",
-      "request_id": "req_msg_1",
       "parent_tool_use_id": null,
-      "message": {
-        "id": "msg_1",
-        "role": "assistant",
-        "model": "fixture-model",
-        "stop_reason": null,
-        "content": [
-          {
-            "type": "tool_use",
-            "id": "toolu_1",
-            "name": "Glob",
-            "input": {
-              "path": "fixture-path"
-            }
-          },
-          {
-            "type": "tool_use",
-            "id": "toolu_1",
-            "name": "Glob",
-            "input": {
-              "path": "fixture-path"
-            }
+      "event": {
+        "type": "content_block_start",
+        "index": 0,
+        "content_block": {
+          "type": "tool_use",
+          "id": "toolu_1",
+          "name": "Glob",
+          "input": {
+            "path": "fixture-path"
           }
-        ]
+        }
+      }
+    },
+    {
+      "type": "stream_event",
+      "uuid": "frame_bs_msg_1_1",
+      "session_id": "sess_1",
+      "parent_tool_use_id": null,
+      "event": {
+        "type": "content_block_start",
+        "index": 1,
+        "content_block": {
+          "type": "tool_use",
+          "id": "toolu_1",
+          "name": "Glob",
+          "input": {
+            "path": "fixture-path"
+          }
+        }
       }
     },
     {

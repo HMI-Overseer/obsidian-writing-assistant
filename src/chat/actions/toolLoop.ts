@@ -9,6 +9,7 @@ import type {
   AgenticStep,
   AssistantReplayEvidence,
   AssistantTurnRecord,
+  ProviderCaptureDiagnostic,
   ProviderOption,
   SamplingParams,
 } from "../../shared/types";
@@ -27,11 +28,9 @@ import {
   ASK_TOOL_NAMES,
 } from "../../tools/ask/definition";
 import type { AskUserResponder } from "../../tools/ask/types";
-import type {
-  AssistantStreamEvent,
-  UsageResult,
-  StopReason,
-} from "../../api/usageTypes";
+import type { UsageResult, StopReason } from "../../api/usageTypes";
+import { CaptureConflictError } from "../../api/assistantCapture";
+import { boundedFailureMessage } from "../../api/assistantStreamRun";
 import { VAULT_TOOL_NAMES } from "../../tools/vault/definition";
 import { executeVaultTool } from "../../tools/vault/handlers";
 import type { VaultToolContext } from "../../tools/vault/handlers";
@@ -65,6 +64,7 @@ import { generateId } from "../../utils";
 import {
   AssistantTurnBuilder,
   type AssistantTurnSnapshot,
+  type CaptureCommitResult,
 } from "../turns/AssistantTurnBuilder";
 
 export type { VaultToolContext, ToolExecutionContext };
@@ -223,10 +223,7 @@ export async function runToolLoop(
   // settled decision 12), so every attempt of every round has a lease from before
   // its construction, and a user Stop cancels through one named path rather than
   // being inferred from whichever `AbortError` surfaces first.
-  const runOwner = new TurnRunOwner<AssistantStreamEvent>(
-    turnBuilder.snapshot().id,
-    signal,
-  );
+  const runOwner = new TurnRunOwner(turnBuilder.snapshot().id, signal);
 
   try {
     return await runRounds();
@@ -280,26 +277,55 @@ export async function runToolLoop(
       const segmentIds: string[] = [];
       streamedSegmentIds = segmentIds;
       roundText = "";
-      for await (const event of streamResult.events) {
+      for await (const batch of streamResult.events) {
+        let commit: CaptureCommitResult;
         try {
-          if (event.type === "segment_start") segmentIds.push(event.segmentId);
-          if (
-            event.type === "tool_call_identity" &&
-            event.correlation !== "none"
-          ) {
-            toolCorrelations.set(event.toolCallId, event.correlation);
-          }
-          if (event.type === "prose_delta") {
-            roundText += event.delta;
-            callbacks.onDelta(event.delta);
-          }
-          applyAssistantStreamEvent(turnBuilder, event, modelRounds, callbacks);
+          // The whole frame lands or none of it does. Nothing below runs on a
+          // refused batch, so a rejected declaration creates no executable call,
+          // no review host, and no replay block.
+          commit = turnBuilder.applyCaptureBatch(batch, modelRounds);
         } catch (error) {
-          // A builder rejection, an `onDelta` subscriber, or a snapshot callback
-          // throwing is a downstream failure, and it must stop the provider rather
-          // than merely surface (RFC-0011 invariant 11). Cancelling here, before
-          // unwinding, is what makes the reason honest: the `consumer_returned`
-          // that the unwind itself produces would otherwise claim it first.
+          if (error instanceof CaptureConflictError) {
+            // The transcript is no longer authoritative. Retire the conflicting
+            // declaration's own batch atomically, publish that one terminal
+            // snapshot, and stop the provider before anything acts on it.
+            const terminal = turnBuilder.invalidateCapturedFacts(
+              conflictingBatchIds(turnBuilder, error),
+              captureConflictDiagnostic(provider, error),
+            );
+            callbacks.onTurnSnapshot?.(terminal);
+            await runOwner.cancelAll("capture_failed");
+            await runOwner.awaitQuiescence();
+          } else {
+            await runOwner.cancelAll("downstream_failed");
+          }
+          throw error;
+        }
+        try {
+          // Post-commit, and only from what committed (RFC-0011 settled decision
+          // 9). One committed batch produces at most one snapshot callback.
+          segmentIds.push(...commit.startedSegments);
+          for (const correlated of commit.toolCorrelations) {
+            if (correlated.correlation === "none") continue;
+            toolCorrelations.set(correlated.toolCallId, correlated.correlation);
+          }
+          for (const delta of commit.proseDeltas) {
+            roundText += delta;
+            callbacks.onDelta(delta);
+          }
+          for (const toolName of commit.declaredTools) {
+            if (ALL_LOOP_TOOL_NAMES.has(toolName)) {
+              callbacks.onToolDeclared?.(toolName);
+            }
+          }
+          if (!commit.duplicate) callbacks.onTurnSnapshot?.(commit.snapshot);
+        } catch (error) {
+          // An `onDelta` subscriber or a snapshot callback throwing is a
+          // downstream failure, and it must stop the provider rather than merely
+          // surface (RFC-0011 invariant 11). Cancelling here, before unwinding, is
+          // what makes the reason honest: the `consumer_returned` that the unwind
+          // itself produces would otherwise claim it first. The batch stays
+          // committed; a callback cannot expose a half-applied one.
           await runOwner.cancelAll("downstream_failed");
           throw error;
         }
@@ -732,106 +758,41 @@ export async function runToolLoop(
   }
 }
 
-/** Apply one ordered declaration event to the canonical turn builder. */
-export function applyAssistantStreamEvent(
+/**
+ * The batches whose facts a capture conflict retires.
+ *
+ * A conflict names the refused batch and, when the collision is over an exact
+ * tool ID, the earlier declaration it collided with. The earlier declaration's
+ * own batch is what loses authority: the refused one published nothing, so it
+ * owns no items to retire. When the conflict names no tool ID there is nothing
+ * to trace back to, and no item is invalidated on a guess.
+ */
+function conflictingBatchIds(
   builder: AssistantTurnBuilder,
-  event: AssistantStreamEvent,
-  round: number,
-  callbacks?: Pick<
-    ToolLoopCallbacks,
-    "onToolDeclared" | "onTurnSnapshot"
-  >,
-): void {
-  switch (event.type) {
-    case "segment_start":
-      builder.startSegment({
-        segmentId: event.segmentId,
-        providerMessageId: event.providerMessageId,
-      });
-      break;
-    case "prose_delta":
-      builder.appendProseDelta(event.segmentId, event.delta, {
-        providerBlockId: event.providerBlockId,
-        deltaKey: event.deltaKey,
-      });
-      break;
-    case "tool_call_start":
-      builder.startToolCall(event.segmentId, {
-        declarationKey: event.declarationKey,
-        toolName: event.toolName,
-        providerBlockId: event.providerBlockId,
-        round,
-      });
-      if (
-        event.toolName !== undefined &&
-        ALL_LOOP_TOOL_NAMES.has(event.toolName)
-      ) {
-        callbacks?.onToolDeclared?.(event.toolName);
-      }
-      break;
-    case "tool_call_delta":
-      if (event.nameDelta !== undefined) {
-        builder.appendToolNameDelta(event.declarationKey, event.nameDelta);
-      }
-      if (event.argumentsDelta !== undefined) {
-        builder.appendToolArgumentsDelta(
-          event.declarationKey,
-          event.argumentsDelta,
-          { deltaKey: event.deltaKey },
-        );
-      }
-      break;
-    case "tool_call_identity":
-      builder.bindToolCallId(
-        event.declarationKey,
-        event.toolCallId,
-        event.correlation === "none" ? "provider_id" : event.correlation,
-      );
-      break;
-    case "segment_reconcile":
-      builder.reconcileCompletedSegment({
-        segmentId: event.segmentId,
-        providerMessageId: event.providerMessageId,
-        blocks: event.blocks,
-      });
-      break;
-    case "tool_result": {
-      const item = builder
-        .snapshot()
-        .items.find(
-          (candidate) =>
-            candidate.type === "tool_call" &&
-            candidate.toolCallId === event.toolCallId,
-        );
-      const capture =
-        item?.type === "tool_call"
-          ? captureStepFields(
-              item.toolName,
-              item.toolArgs ?? {},
-              {
-                content: event.content,
-                isError: event.isError,
-              },
-            )
-          : { resultRecord: event.content };
-      builder.updateToolLifecycle(event.toolCallId, {
-        state: event.isError ? "failed" : "completed",
-        ...capture,
-        ...(event.isError
-          ? { isError: true, errorContent: event.content }
-          : {}),
-      });
-      break;
-    }
-    case "stream_diagnostic":
-      break;
-    case "segment_end":
-      builder.finishSegment(event.segmentId);
-      break;
-    case "turn_end":
-      break;
-  }
-  callbacks?.onTurnSnapshot?.(builder.snapshot());
+  error: CaptureConflictError,
+): string[] {
+  if (error.toolCallId === undefined) return [];
+  const owner = builder
+    .snapshot()
+    .items.find(
+      (item) =>
+        item.type === "tool_call" && item.toolCallId === error.toolCallId,
+    );
+  const originBatchId = owner?.captureEvidence?.originBatchId;
+  return originBatchId === undefined ? [] : [originBatchId];
+}
+
+/** Bounded, payload-free evidence of why capture stopped being authoritative. */
+function captureConflictDiagnostic(
+  provider: ProviderOption,
+  error: CaptureConflictError,
+): ProviderCaptureDiagnostic {
+  return {
+    code: `capture_conflict_${error.kind}`,
+    provider,
+    stage: "publication",
+    message: boundedFailureMessage(error),
+  };
 }
 
 function assistantContentForSegments(

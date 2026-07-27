@@ -39,6 +39,7 @@ interface PendingThinking {
  */
 export class AnthropicStreamTranslator {
   private readonly segmentId: string;
+  private messageId: string | undefined;
   private started = false;
   private ended = false;
   private inputTokens = 0;
@@ -66,6 +67,7 @@ export class AnthropicStreamTranslator {
         typeof message?.id === "string" && message.id.trim()
           ? message.id
           : undefined;
+      this.messageId = providerMessageId;
       events.push(...this.start(providerMessageId));
       this.captureUsage(asRecord(message?.usage));
       return events;
@@ -102,6 +104,14 @@ export class AnthropicStreamTranslator {
       { type: "turn_end", status: "completed" },
     );
     return events;
+  }
+
+  /**
+   * Anthropic's `message.id` is unique per request, so it needs no further
+   * scope qualification to stay collision-free across attempts.
+   */
+  providerMessageKey(): string | undefined {
+    return this.messageId;
   }
 
   metadata(): AssistantStreamMetadata {

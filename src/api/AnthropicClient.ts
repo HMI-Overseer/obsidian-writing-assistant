@@ -2,7 +2,6 @@ import type { SamplingParams } from "../shared/types";
 import type { ChatRequest } from "../shared/chatRequest";
 import type { ChatClient } from "./chatClient";
 import type {
-  AssistantStreamEvent,
   CompletionResult,
   StopReason,
   UsageResult,
@@ -27,7 +26,10 @@ import {
 } from "./buildAnthropicPayload";
 import { generateId } from "../utils";
 import { AnthropicStreamTranslator } from "./anthropicStreamTranslator";
-import { createAssistantEventStream } from "./assistantEventStream";
+import {
+  CaptureFrameQueue,
+  createAssistantCaptureStream,
+} from "./assistantCaptureStream";
 
 /** Extracts text deltas from Anthropic SSE content_block_delta events. */
 const anthropicDeltaExtractor: DeltaExtractor = (json: unknown): string | null => {
@@ -156,7 +158,7 @@ export class AnthropicClient implements ChatClient {
     model: string,
     params: SamplingParams,
     attempt: AssistantStreamAttemptContext,
-  ): AssistantStreamRun<AssistantStreamEvent> {
+  ): AssistantStreamRun {
     const cacheSettings = request.anthropicCacheSettings;
     const { system, messages } = buildAnthropicMessages(request, cacheSettings, model);
     const anthropicTools = formatRequestTools(request);
@@ -165,7 +167,9 @@ export class AnthropicClient implements ChatClient {
     const translator = new AnthropicStreamTranslator({
       segmentId: `segment-${generateId()}`,
     });
-    const pendingEvents: AssistantStreamEvent[] = [];
+    // One SSE payload becomes one capture batch: the queue keeps the frame
+    // boundary the flat pending-event array used to erase.
+    const frames = new CaptureFrameQueue(translator);
     // The transport gets a controller this attempt owns, linked to the lease
     // signal rather than replacing it, so cancelling one attempt cannot reach
     // another and the lease keeps the cancel reason.
@@ -176,9 +180,9 @@ export class AnthropicClient implements ChatClient {
       transport.signal,
       buildAnthropicHeaders(this.apiKey, ANTHROPIC_VERSION),
       anthropicDeltaExtractor,
-      (event) => pendingEvents.push(...translator.translate(event)),
+      frames.onPayload,
     );
-    return createAssistantEventStream(rawGenerator, pendingEvents, translator, {
+    return createAssistantCaptureStream(rawGenerator, frames, translator, {
       attempt,
       provider: "anthropic",
       abort: () => {

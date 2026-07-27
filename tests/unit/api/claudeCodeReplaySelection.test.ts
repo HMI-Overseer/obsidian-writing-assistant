@@ -12,6 +12,7 @@ import type {
 } from "../../../src/shared/types";
 import type { ChatRequest } from "../../../src/shared/chatRequest";
 import type { SessionRecovery } from "../../../src/api/harnessSession";
+import { proseTurnFrames } from "../../helpers/captureFrames";
 
 const cursor: ClaudeCodeResumeCursor = {
   sessionId: "session-1",
@@ -28,7 +29,7 @@ function clientFor(decision: SessionRecovery): ClaudeCodeClient {
       run: (input: SdkSessionTurnInput) =>
         (async function* () {
           input.onRecoveryDecision?.(decision);
-          yield "Done.";
+          yield* proseTurnFrames(["Done."]);
         })(),
       hardDispose: () => Promise.resolve(),
     },

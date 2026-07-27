@@ -4,7 +4,10 @@ import { describe, expect, it } from "vitest";
 import { ClaudeCodeSdkMessageTranslator } from "../../../../src/api/sdk/claudeCodeSdkMessageTranslator";
 import { AssistantTurnBuilder } from "../../../../src/chat/turns/AssistantTurnBuilder";
 import type { AssistantTurnSnapshot } from "../../../../src/chat/turns/AssistantTurnBuilder";
-import { applyAssistantStreamEvent } from "../../../../src/chat/actions/toolLoop";
+import {
+  CaptureConflictError,
+  sealCaptureFrame,
+} from "../../../../src/api/assistantCapture";
 
 /**
  * RFC-0011 phase 0: the incident, reproduced from sanitized live protocol bytes.
@@ -14,10 +17,13 @@ import { applyAssistantStreamEvent } from "../../../../src/chat/actions/toolLoop
  * moment it is fixed, which is the signal to promote them to plain `it` in the
  * phase named in their comment. Nothing here may be relaxed to keep them green.
  *
- * Phase 3 closed the declaration-identity defect, so criteria 1, 2, and 3 are
- * plain `it` now and the assertions that recorded the old behavior were
- * retargeted to the invariant that replaced it. One `it.fails` remains, and it
- * is phase 4's because it needs the atomic transaction rather than identity.
+ * Phase 3 closed the declaration-identity defect and phase 4 the publication one,
+ * so every assertion here is a plain `it` now. Two corrections phase 4 had to
+ * make are recorded in its run record: the duplicate-tool-ID fixture carried
+ * partial declarations that made its collision cross-frame rather than the
+ * intra-frame one its own description claimed, and the assertion that closed it
+ * additionally required the turn to be error-free, which contradicts the settled
+ * rule that a capture conflict cancels the attempt.
  */
 
 const FIXTURE_DIR = join(
@@ -40,12 +46,26 @@ function loadFixture(name: string): CaptureFixture {
 interface ReplayOutcome {
   error: Error | null;
   snapshots: AssistantTurnSnapshot[];
+  /**
+   * What the builder still holds after the replay, taken on every path.
+   *
+   * Distinct from the last published snapshot on purpose: a refused batch
+   * publishes nothing either way, so only the builder's own visible state can
+   * tell "nothing was applied" from "something was applied and not announced".
+   */
+  visible: AssistantTurnSnapshot;
 }
 
 /**
  * Drives one fixture through the production capture path exactly as
- * {@link runToolLoop} does: translate each frame, then apply every translated
- * event to the builder, publishing a snapshot after each one.
+ * {@link runToolLoop} does: translate each SDK frame into one capture batch, seal
+ * it to this attempt, and commit it whole, publishing one snapshot per committed
+ * batch.
+ *
+ * Phase 4 changed the publication unit, so this changed with it rather than
+ * keeping the old event-by-event path alive for the test. That is the point of
+ * the harness: the assertions below are about production behavior, and they stop
+ * meaning anything the moment the harness stops being the production path.
  */
 function replayThroughCurrentCapture(fixtureName: string): ReplayOutcome {
   const fixture = loadFixture(fixtureName);
@@ -60,22 +80,21 @@ function replayThroughCurrentCapture(fixtureName: string): ReplayOutcome {
     createId: counterIds(),
   });
   const snapshots: AssistantTurnSnapshot[] = [];
-  const callbacks = {
-    onTurnSnapshot: (snapshot: AssistantTurnSnapshot) => {
-      snapshots.push(snapshot);
-    },
-  };
 
   try {
-    for (const frame of fixture.frames) {
-      for (const event of translator.translate(frame)) {
-        applyAssistantStreamEvent(builder, event, 0, callbacks);
-      }
+    for (const rawFrame of fixture.frames) {
+      const frame = translator.translateFrame(rawFrame);
+      if (!frame) continue;
+      const commit = builder.applyCaptureBatch(
+        sealCaptureFrame("turn-incident#1", frame),
+        0,
+      );
+      if (!commit.duplicate) snapshots.push(commit.snapshot);
     }
   } catch (error) {
-    return { error: error as Error, snapshots };
+    return { error: error as Error, snapshots, visible: builder.snapshot() };
   }
-  return { error: null, snapshots };
+  return { error: null, snapshots, visible: builder.snapshot() };
 }
 
 function counterIds(): (kind: "segment" | "item") => string {
@@ -213,16 +232,46 @@ describe("RFC-0011 incident, related protocol shapes", () => {
     expect(tools.map((item) => item.toolCallId)).toEqual(["toolu_1", "toolu_2"]);
   });
 
-  // Criterion 6, fixed in phase 4. Two *real* provider blocks claim one exact
-  // ID here, which stays a genuine conflict; what must change is that the first
-  // declaration's row is already visible when the second one is refused.
-  // Suppressing it needs the atomic transaction, not declaration identity.
-  it.fails("publishes nothing when one frame claims one tool ID twice", () => {
-    const { error, snapshots } = replayThroughCurrentCapture(
+  // Criterion 6, closed in phase 4. One completed frame names one exact tool-use
+  // ID at two local positions, so the collision is inside a single batch. The
+  // conflict is real and cancels the attempt, which is why the turn is not
+  // error-free; what the transaction changes is that the first of the two
+  // declarations never becomes visible.
+  it("publishes nothing when one frame claims one tool ID twice", () => {
+    const { error, snapshots, visible } = replayThroughCurrentCapture(
       "sdk-0.3.207-cli-2.1.218-intra-frame-duplicate-tool-id",
     );
-    expect(error).toBeNull();
+
+    expect(error).toBeInstanceOf(CaptureConflictError);
+    expect((error as CaptureConflictError).batchId).toBe(
+      "turn-incident#1:frame_1",
+    );
     expect(toolItems(snapshots[snapshots.length - 1])).toHaveLength(0);
+    // The load-bearing half: the first of the frame's two declarations is not
+    // merely unannounced, it was never applied.
+    expect(toolItems(visible)).toHaveLength(0);
+  });
+
+  // Criterion 7's detection half. Two *real* provider blocks at distinct indices
+  // claim one exact ID across two frames, which stays a genuine conflict. Here
+  // the first declaration is legitimately visible, because its own batch
+  // committed cleanly; only the second is refused. Retiring the first is the
+  // separate atomic invalidation the tool loop runs on the typed conflict.
+  it("refuses only the later batch when two frames claim one tool ID", () => {
+    const { error, visible } = replayThroughCurrentCapture(
+      "sdk-0.3.207-cli-2.1.218-cross-frame-duplicate-tool-id",
+    );
+
+    expect(error).toBeInstanceOf(CaptureConflictError);
+    expect((error as CaptureConflictError).batchId).toBe(
+      "turn-incident#1:frame_bs_msg_1_1",
+    );
+    expect((error as CaptureConflictError).toolCallId).toBe("toolu_1");
+    const tools = toolItems(visible);
+    expect(tools).toHaveLength(1);
+    expect(tools[0]?.captureEvidence?.originBatchId).toBe(
+      "turn-incident#1:frame_bs_msg_1_0",
+    );
   });
 
   it("mints a plugin fallback ID for a declaration it could not identify", () => {
@@ -232,10 +281,9 @@ describe("RFC-0011 incident, related protocol shapes", () => {
       toolCorrelation: "provider_id",
     });
     const builder = new AssistantTurnBuilder({ turnId: "turn-malformed" });
-    for (const frame of fixture.frames) {
-      for (const event of translator.translate(frame)) {
-        applyAssistantStreamEvent(builder, event, 0);
-      }
+    for (const rawFrame of fixture.frames) {
+      const frame = translator.translateFrame(rawFrame);
+      if (frame) builder.applyCaptureBatch(sealCaptureFrame("turn-malformed#1", frame), 0);
     }
 
     // Criterion 25 in the plan's settled decisions: a fallback ID is valid only

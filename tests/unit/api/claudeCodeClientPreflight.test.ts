@@ -21,7 +21,11 @@ import { ClaudeCodeClient, type ClaudeCodeRuntime } from "../../../src/api/Claud
 import { ClaudeCodeContextOverflowError } from "../../../src/api/claudeCodeContextPreflight";
 import type { ChatRequest } from "../../../src/shared/chatRequest";
 import type { SamplingParams } from "../../../src/shared/types";
-import type { AssistantStreamEvent } from "../../../src/api/usageTypes";
+import type {
+  AssistantCaptureBatch,
+  AssistantCaptureFrame,
+} from "../../../src/api/assistantCapture";
+import { proseTurnFrames } from "../../helpers/captureFrames";
 import { detachedAttemptContext } from "../../../src/api/assistantStreamRuntime";
 
 const params: SamplingParams = {
@@ -43,18 +47,18 @@ function request(userContent: string): ChatRequest {
   };
 }
 
-function okGen(): AsyncGenerator<string> {
-  return (async function* () {
-    yield "ok";
-  })();
+function okGen(): AsyncGenerator<AssistantCaptureFrame> {
+  return proseTurnFrames(["ok"]);
 }
 
 async function drain(
-  gen: AsyncGenerator<AssistantStreamEvent>,
+  batches: AsyncIterable<AssistantCaptureBatch>,
 ): Promise<string[]> {
   const out: string[] = [];
-  for await (const event of gen) {
-    if (event.type === "prose_delta") out.push(event.delta);
+  for await (const batch of batches) {
+    for (const fact of batch.facts) {
+      if (fact.type === "prose_delta") out.push(fact.delta);
+    }
   }
   return out;
 }

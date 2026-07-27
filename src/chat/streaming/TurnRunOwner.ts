@@ -59,10 +59,10 @@ function constructionFailureSettlement(
  * settles whether the factory threw, the provider failed, the consumer walked
  * away, or the turn completed normally.
  */
-export class AttemptLease<Event> {
+export class AttemptLease {
   readonly context: AssistantStreamAttemptContext;
 
-  private run: AssistantStreamRun<Event> | null = null;
+  private run: AssistantStreamRun | null = null;
   private leaseState: AttemptLeaseState = "open";
   private stopping: Promise<AssistantStreamSettlement> | null = null;
   private readonly controller: AbortController;
@@ -95,7 +95,7 @@ export class AttemptLease<Event> {
   }
 
   /** Hands the lease the run its factory produced. */
-  attach(run: AssistantStreamRun<Event>): void {
+  attach(run: AssistantStreamRun): void {
     this.run = run;
     // A run that settles on its own, by exhaustion or by its own failure, settles
     // the lease with it. The lease never invents a second account of the same
@@ -157,12 +157,12 @@ export class AttemptLease<Event> {
 /** How the owner reports why a retry is not permitted. */
 export type RetryRefusal = "consequential_callback_entered";
 
-export class TurnRunOwner<Event> {
+export class TurnRunOwner {
   readonly turnId: string;
 
-  private readonly leases: AttemptLease<Event>[] = [];
+  private readonly leases: AttemptLease[] = [];
   private nextOrdinal = 1;
-  private selected: AttemptLease<Event> | null = null;
+  private selected: AttemptLease | null = null;
   private callbackEntered = false;
   private readonly turnSignal: AbortSignal | undefined;
   private readonly onTurnAbort: () => void;
@@ -191,7 +191,7 @@ export class TurnRunOwner<Event> {
   }
 
   /** The attempt the turn selected, once one has been committed. */
-  get committedAttempt(): AttemptLease<Event> | null {
+  get committedAttempt(): AttemptLease | null {
     return this.selected;
   }
 
@@ -226,20 +226,16 @@ export class TurnRunOwner<Event> {
    * Opens the next attempt. Called before the provider factory, so construction
    * failure still has a lease to settle.
    */
-  openAttempt(): AttemptLease<Event> {
+  openAttempt(): AttemptLease {
     const controller = new AbortController();
     if (this.turnSignal?.aborted) controller.abort();
-    const lease = new AttemptLease<Event>(
-      this.turnId,
-      this.nextOrdinal++,
-      controller,
-    );
+    const lease = new AttemptLease(this.turnId, this.nextOrdinal++, controller);
     this.leases.push(lease);
     return lease;
   }
 
   /** Explicitly transfers the committed attempt to the turn's ownership. */
-  commitAttempt(lease: AttemptLease<Event>): void {
+  commitAttempt(lease: AttemptLease): void {
     lease.commit();
     this.selected = lease;
   }

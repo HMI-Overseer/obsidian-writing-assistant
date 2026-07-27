@@ -2,7 +2,6 @@ import type { Message, SamplingParams } from "../shared/types";
 import type { ChatRequest } from "../shared/chatRequest";
 import type { ChatClient } from "./chatClient";
 import type {
-  AssistantStreamEvent,
   CompletionResult,
   UsageResult,
   StopReason,
@@ -21,7 +20,10 @@ import { isRecord, parseToolArguments } from "./parsing";
 import { streamFetch } from "./streamingTransport";
 import { buildCompletionPayload } from "./buildPayload";
 import { OpenAICompatibleStreamTranslator } from "./openAICompatibleStreamTranslator";
-import { createAssistantEventStream } from "./assistantEventStream";
+import {
+  CaptureFrameQueue,
+  createAssistantCaptureStream,
+} from "./assistantCaptureStream";
 import { buildOpenAICompatibleMessages } from "./buildOpenAICompatibleMessages";
 
 export interface OpenAIModelListResult {
@@ -86,7 +88,7 @@ export class OpenAIClient implements ChatClient {
     model: string,
     params: SamplingParams,
     attempt: AssistantStreamAttemptContext,
-  ): AssistantStreamRun<AssistantStreamEvent> {
+  ): AssistantStreamRun {
     const messages = this.buildMessages(request);
     const openAITools = request.tools?.length
       ? formatOpenAITools(request.tools)
@@ -98,7 +100,10 @@ export class OpenAIClient implements ChatClient {
       segmentId: `segment-${generateId()}`,
       provider: "openai",
     });
-    const pendingEvents: AssistantStreamEvent[] = [];
+    // One chunk becomes one capture batch. A tool call whose provider ID arrives
+    // on a later chunk therefore stays a later identity-only batch, rather than
+    // being folded back into the batch that declared it.
+    const frames = new CaptureFrameQueue(translator);
     const transport = createLinkedAbort(attempt);
     const rawStream = streamFetch(
       url,
@@ -106,10 +111,10 @@ export class OpenAIClient implements ChatClient {
       transport.signal,
       this.headers,
       undefined,
-      (event) => pendingEvents.push(...translator.translate(event)),
+      frames.onPayload,
     );
 
-    return createAssistantEventStream(rawStream, pendingEvents, translator, {
+    return createAssistantCaptureStream(rawStream, frames, translator, {
       attempt,
       provider: "openai",
       abort: () => {

@@ -104,6 +104,38 @@ describe("describeReplayFidelity", () => {
         loweredReason: "claude_code_tool_correlation_missing",
       },
     ],
+    [
+      // Runtime placement composes its reason with whatever the provider already
+      // reported (phase 4), so the label reads the list rather than one value.
+      // Losing the second reason here would relabel a Claude turn "textual
+      // replay", which is true but stops naming which provider it came from.
+      "textual Claude rebuild",
+      {
+        tier: "textual",
+        capabilities: {
+          captureOrder: "segment",
+          toolCorrelation: "provider_id",
+          coldReplay: "textual",
+          nativeResume: false,
+        },
+        loweredReason:
+          "segment_placed_provider_item_present,claude_code_structural_cold_replay_deferred",
+      },
+    ],
+    [
+      "degraded legacy capture",
+      {
+        tier: "textual",
+        capabilities: {
+          captureOrder: "segment",
+          toolCorrelation: "none",
+          coldReplay: "textual",
+          nativeResume: false,
+        },
+        loweredReason:
+          "segment_placed_provider_item_present,claude_code_legacy_stream_json_capture",
+      },
+    ],
   ] as const)("labels %s", (expected, evidence) => {
     expect(describeReplayFidelity(evidence)).toBe(expected);
   });

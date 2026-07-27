@@ -3,6 +3,7 @@ import type {
   ProviderOption,
   ProviderQuiescence,
 } from "../shared/types";
+import type { AssistantCaptureBatch } from "./assistantCapture";
 import type {
   AssistantStreamAttemptContext,
   AssistantStreamRun,
@@ -32,7 +33,7 @@ import {
  */
 
 /** Everything one owned attempt needs to run and to stop. */
-export interface OwnedStreamRunConfig<Event> {
+export interface OwnedStreamRunConfig {
   /** Identity and cancellation authority, allocated by the turn-run owner. */
   attempt: AssistantStreamAttemptContext;
   /** Provider key, recorded on diagnostics so a settlement names its source. */
@@ -41,7 +42,7 @@ export interface OwnedStreamRunConfig<Event> {
    * Opens the underlying source. Called once, lazily, on first iteration, so an
    * attempt that is constructed and then abandoned never starts a provider.
    */
-  open: () => AsyncIterable<Event>;
+  open: () => AsyncIterable<AssistantCaptureBatch>;
   /** Resolved on every exit path, including construction failure and zero events. */
   metadata: StreamMetadataGate;
   /**
@@ -93,9 +94,9 @@ async function settleWithin(
   }
 }
 
-export function createOwnedStreamRun<Event>(
-  config: OwnedStreamRunConfig<Event>,
-): AssistantStreamRun<Event> {
+export function createOwnedStreamRun(
+  config: OwnedStreamRunConfig,
+): AssistantStreamRun {
   const diagnostics: ProviderCaptureDiagnostic[] = [];
   const settlement = createSettleOnce<AssistantStreamSettlement>({
     quiescence: "forced",
@@ -104,7 +105,7 @@ export function createOwnedStreamRun<Event>(
     diagnostics: [],
   });
 
-  let iterator: AsyncIterator<Event> | null = null;
+  let iterator: AsyncIterator<AssistantCaptureBatch> | null = null;
   let stopping: Promise<void> | null = null;
   let reason: StreamCancelReason | null = null;
 
@@ -205,7 +206,7 @@ export function createOwnedStreamRun<Event>(
     await stopping;
   };
 
-  async function* events(): AsyncGenerator<Event> {
+  async function* events(): AsyncGenerator<AssistantCaptureBatch> {
     // "exhausted" is the only outcome that needs no cleanup: the source is already
     // terminal, so there is nothing to return and nothing left to dispose.
     let outcome: "running" | "exhausted" | "failed" = "running";

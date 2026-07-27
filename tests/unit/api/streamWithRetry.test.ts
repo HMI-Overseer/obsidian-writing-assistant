@@ -77,15 +77,16 @@ function makeStream(shape: StreamShape): AssistantStreamRun<AssistantStreamEvent
 }
 
 /** A fresh turn-run owner; every attempt now needs a lease before construction. */
-function owner(): TurnRunOwner<AssistantStreamEvent> {
-  return new TurnRunOwner<AssistantStreamEvent>("turn-retry-test");
+function owner(): TurnRunOwner {
+  return new TurnRunOwner("turn-retry-test");
 }
 
+/** Flattens the run's capture batches back to facts, in arrival order. */
 async function collect(
-  result: AssistantStreamRun<AssistantStreamEvent>,
+  result: AssistantStreamRun,
 ): Promise<AssistantStreamEvent[]> {
   const output: AssistantStreamEvent[] = [];
-  for await (const event of result.events) output.push(event);
+  for await (const batch of result.events) output.push(...batch.facts);
   return output;
 }
 
@@ -157,7 +158,7 @@ describe("streamWithRetry", () => {
     const output: AssistantStreamEvent[] = [];
     await expect(
       (async () => {
-        for await (const event of result.events) output.push(event);
+        for await (const batch of result.events) output.push(...batch.facts);
       })(),
     ).rejects.toThrow("HTTP 500");
     expect(output).toEqual([start]);

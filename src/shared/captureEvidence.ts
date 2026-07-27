@@ -137,8 +137,25 @@ export function lowerEvidenceFromCapture(
       coldReplay,
       nativeResume,
     },
-    loweredReason: loweredReasonFor(floor, invalid, forced) ?? evidence.loweredReason,
+    loweredReason: composeLoweredReasons(
+      loweredReasonFor(floor, invalid, forced),
+      evidence.loweredReason,
+    ),
   };
+}
+
+/**
+ * Keeps both the placement reason and whatever the provider already reported.
+ *
+ * Replacing the incoming reason would discard why the provider itself had
+ * lowered the turn, which is the more specific of the two: "this was a legacy
+ * stream-json capture" survives alongside "an item is only segment-placed".
+ */
+function composeLoweredReasons(
+  ...reasons: Array<string | undefined>
+): string | undefined {
+  const present = [...new Set(reasons.filter((reason) => reason !== undefined))];
+  return present.length === 0 ? undefined : present.join(",");
 }
 
 function weakestOf(

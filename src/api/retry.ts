@@ -9,7 +9,7 @@ import {
   createSettleOnce,
   createStreamMetadataGate,
 } from "./assistantStreamRun";
-import type { AssistantStreamEvent } from "./usageTypes";
+import type { AssistantCaptureBatch } from "./assistantCapture";
 
 export interface RetryOptions {
   /** Maximum number of attempts (including the initial one). Default: 3. */
@@ -150,10 +150,10 @@ export async function withRetry<T>(
  *   already did. That is lease evidence, not "did the UI see a delta".
  */
 export function streamWithRetry(
-  makeStream: (attempt: AssistantStreamAttemptContext) => AssistantStreamRun<AssistantStreamEvent>,
-  owner: TurnRunOwner<AssistantStreamEvent>,
+  makeStream: (attempt: AssistantStreamAttemptContext) => AssistantStreamRun,
+  owner: TurnRunOwner,
   options?: RetryOptions,
-): AssistantStreamRun<AssistantStreamEvent> {
+): AssistantStreamRun {
   const maxAttempts = options?.maxAttempts ?? DEFAULT_MAX_ATTEMPTS;
   const initialDelayMs = options?.initialDelayMs ?? DEFAULT_INITIAL_DELAY_MS;
   const maxDelayMs = options?.maxDelayMs ?? DEFAULT_MAX_DELAY_MS;
@@ -169,7 +169,7 @@ export function streamWithRetry(
     diagnostics: [],
   });
 
-  const forward = (chosen: AssistantStreamRun<AssistantStreamEvent>): void => {
+  const forward = (chosen: AssistantStreamRun): void => {
     void chosen.usage.then(
       (value) => metadata.usage.settle(value),
       () => metadata.usage.settleWithFallback(),
@@ -192,19 +192,19 @@ export function streamWithRetry(
     );
   };
 
-  async function* events(): AsyncGenerator<AssistantStreamEvent> {
+  async function* events(): AsyncGenerator<AssistantCaptureBatch> {
     let lastError: unknown;
     let committed = false;
     let drained = false;
     // Retained outside the attempt loop so the `finally` can return the iterator
     // this wrapper acquired by hand (RFC-0011 criterion 19).
-    let activeIterator: AsyncIterator<AssistantStreamEvent> | null = null;
+    let activeIterator: AsyncIterator<AssistantCaptureBatch> | null = null;
     try {
       for (let attempt = 1; attempt <= maxAttempts; attempt++) {
         // The lease exists before the factory runs, so construction failure is an
         // owned failure rather than an orphan.
         const lease = owner.openAttempt();
-        let run: AssistantStreamRun<AssistantStreamEvent>;
+        let run: AssistantStreamRun;
         try {
           run = makeStream(lease.context);
         } catch (error) {
@@ -220,7 +220,7 @@ export function streamWithRetry(
 
         const iterator = run.events[Symbol.asyncIterator]();
         activeIterator = iterator;
-        let first: IteratorResult<AssistantStreamEvent>;
+        let first: IteratorResult<AssistantCaptureBatch>;
         try {
           first = await iterator.next();
         } catch (error) {

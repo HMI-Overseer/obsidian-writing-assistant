@@ -5,6 +5,15 @@ import { createAbortError, throwIfError } from "./httpTransport";
 /** Extracts a text delta from a parsed SSE JSON payload. Returns null if the event is not a text delta. */
 export type DeltaExtractor = (json: unknown) => string | null;
 
+/**
+ * Receives one parsed SSE payload plus the raw bytes it was parsed from.
+ *
+ * The raw form is what a capture frame key is derived from, hashed before any
+ * JSON parsing so that whitespace and key order the parser would erase stay
+ * visible (RFC-0011 settled decision 6).
+ */
+export type SSEPayloadListener = (json: unknown, raw: string) => void;
+
 /** Default extractor for OpenAI-compatible SSE streams. */
 export function openAIDeltaExtractor(json: unknown): string | null {
   const record = json as Record<string, unknown>;
@@ -30,7 +39,7 @@ export async function* streamNode(
   signal?: AbortSignal,
   headers?: Record<string, string>,
   extractDelta: DeltaExtractor = openAIDeltaExtractor,
-  onEvent?: (json: unknown) => void
+  onEvent?: SSEPayloadListener
 ): AsyncGenerator<string> {
   if (signal?.aborted) throw createAbortError();
 
@@ -119,7 +128,7 @@ export async function* streamNode(
             continue; // Skip malformed chunks from the stream.
           }
 
-          onEvent?.(parsed);
+          onEvent?.(parsed, payload);
 
           const sseError = extractSSEError(parsed);
           if (sseError) {
@@ -180,7 +189,7 @@ export async function* streamFetch(
   signal?: AbortSignal,
   headers?: Record<string, string>,
   extractDelta: DeltaExtractor = openAIDeltaExtractor,
-  onEvent?: (json: unknown) => void
+  onEvent?: SSEPayloadListener
 ): AsyncGenerator<string> {
   const res = await fetch(url, {
     method: "POST",
@@ -229,7 +238,7 @@ export async function* streamFetch(
           continue; // Skip malformed chunks from the stream.
         }
 
-        onEvent?.(parsed);
+        onEvent?.(parsed, payload);
 
         const sseError = extractSSEError(parsed);
         if (sseError) throw new Error(sseError);

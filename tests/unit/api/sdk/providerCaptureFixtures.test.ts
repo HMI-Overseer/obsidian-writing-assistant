@@ -29,6 +29,7 @@ describe("provider-capture fixtures", () => {
       "sdk-0.3.207-cli-2.1.218-block-index-reuse-across-messages.json",
       "sdk-0.3.207-cli-2.1.218-completed-only-no-partials.json",
       "sdk-0.3.207-cli-2.1.218-conflicting-duplicate-delivery.json",
+      "sdk-0.3.207-cli-2.1.218-cross-frame-duplicate-tool-id.json",
       "sdk-0.3.207-cli-2.1.218-duplicate-frame-delivery.json",
       "sdk-0.3.207-cli-2.1.218-intra-frame-duplicate-tool-id.json",
       "sdk-0.3.207-cli-2.1.218-lifecycle-before-declaration.json",

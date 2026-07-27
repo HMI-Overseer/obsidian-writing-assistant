@@ -1,4 +1,12 @@
 import type {
+  AssistantCaptureBatch,
+  CaptureBatchId,
+  CaptureFactsFingerprint,
+} from "../../api/assistantCapture";
+import { CaptureConflictError } from "../../api/assistantCapture";
+import type { AssistantStreamEvent } from "../../api/usageTypes";
+import { captureStepFields } from "../../tools/resultDigest";
+import type {
   AssistantProseItem,
   AssistantToolCallItem,
   AssistantToolLifecycleState,
@@ -8,6 +16,8 @@ import type {
   AssistantTurnStatus,
   CompletedAskGuidanceRecord,
   ProviderCaptureDiagnostic,
+  ProviderItemCaptureEvidence,
+  ProviderItemPlacement,
   ProviderQuiescence,
   ProviderReplayCapsule,
 } from "../../shared/types";
@@ -120,6 +130,7 @@ interface MutableSegment extends AssistantTurnSegment {
 
 interface MutableProseItem extends AssistantProseItem {
   providerBlockIds: Set<string>;
+  captureEvidence: ProviderItemCaptureEvidence;
 }
 
 interface MutableToolCallItem
@@ -129,6 +140,7 @@ interface MutableToolCallItem
   declarationIndex: number;
   providerBlockId?: string;
   correlation?: AssistantToolCorrelation;
+  captureEvidence: ProviderItemCaptureEvidence;
 }
 
 type MutableItem = MutableProseItem | MutableToolCallItem;
@@ -151,6 +163,101 @@ interface ReconciledProseRun {
 
 type ReconciledPart = ReconciledProseRun | CompletedAssistantToolCallBlock;
 
+/**
+ * Every mutable fact one assistant turn holds, in one object.
+ *
+ * Grouping it is what makes {@link AssistantTurnBuilder.applyCaptureBatch}
+ * atomic: a transaction clones this whole object, applies and validates the
+ * batch on the clone, and swaps one reference on success. Rollback mutation and
+ * a second hand-written planning reducer were both rejected (settled decision 7)
+ * because either would have to stay in step with the granular methods by hand,
+ * and a drift between them is exactly the class of bug this is fixing.
+ *
+ * The maps hold the same item objects the arrays do. `structuredClone` preserves
+ * that sharing within one call, so the clone is a self-consistent graph rather
+ * than a set of indexes pointing at the previous state's items.
+ */
+interface AssistantTurnBuilderState {
+  segments: MutableSegment[];
+  segmentById: Map<string, MutableSegment>;
+  items: MutableItem[];
+  itemById: Map<string, MutableItem>;
+  declarationByKey: Map<string, MutableToolCallItem>;
+  toolByCallId: Map<string, MutableToolCallItem>;
+  toolItemReservationByCallId: Map<string, string>;
+  pendingLifecycleByCallId: Map<string, PendingLifecycle>;
+  providerBlockItemIds: Map<string, string>;
+  proseDeltaByKey: Map<string, RecordedDelta>;
+  argumentDeltaByKey: Map<string, RecordedDelta>;
+  domainIds: Set<string>;
+  /**
+   * Committed batch IDs and the protocol bytes they carried.
+   *
+   * Only batches whose frame key is the provider's own wire identity are
+   * indexed, because only there does a repeated key prove redelivery. This is
+   * not the lease-local batch journal of settled decision 10: it records no
+   * applied effects, no dependent batches, and no effect boundaries, and
+   * decision 15.3 defers those until a real `supersedes` frame is observed.
+   */
+  committedBatches: Map<CaptureBatchId, CaptureFactsFingerprint>;
+  captureDiagnostics: ProviderCaptureDiagnostic[];
+  activeSegmentId: string | null;
+  openProseItemId: string | null;
+  /** Identity every item created inside the open transaction is stamped with. */
+  currentBatch: { batchId: CaptureBatchId; placement: ProviderItemPlacement } | null;
+}
+
+function createBuilderState(turnId: string): AssistantTurnBuilderState {
+  return {
+    segments: [],
+    segmentById: new Map(),
+    items: [],
+    itemById: new Map(),
+    declarationByKey: new Map(),
+    toolByCallId: new Map(),
+    toolItemReservationByCallId: new Map(),
+    pendingLifecycleByCallId: new Map(),
+    providerBlockItemIds: new Map(),
+    proseDeltaByKey: new Map(),
+    argumentDeltaByKey: new Map(),
+    domainIds: new Set([turnId]),
+    committedBatches: new Map(),
+    captureDiagnostics: [],
+    activeSegmentId: null,
+    openProseItemId: null,
+    currentBatch: null,
+  };
+}
+
+/**
+ * What one committed capture batch changed.
+ *
+ * Post-commit notifications are derived from this rather than from the facts the
+ * batch carried, so a subscriber is told only about work that actually landed
+ * (settled decision 9).
+ */
+export interface CaptureBatchChanges {
+  /** Segments this batch opened, in arrival order. */
+  startedSegments: string[];
+  /** Visible prose bytes this batch committed, in arrival order. */
+  proseDeltas: string[];
+  /** Tool names this batch declared, in arrival order. */
+  declaredTools: string[];
+  /** Exact correlation evidence this batch committed. */
+  toolCorrelations: Array<{
+    toolCallId: string;
+    correlation: AssistantToolCorrelation | "none";
+  }>;
+}
+
+export interface CaptureCommitResult extends CaptureBatchChanges {
+  batchId: CaptureBatchId;
+  /** True when this was a byte-identical redelivery and nothing was applied. */
+  duplicate: boolean;
+  /** The one snapshot this batch produced. */
+  snapshot: AssistantTurnSnapshot;
+}
+
 export class AssistantTurnBuilderError extends Error {
   constructor(message: string) {
     super(message);
@@ -168,20 +275,10 @@ export class AssistantTurnBuilderError extends Error {
 export class AssistantTurnBuilder {
   private readonly turnId: string;
   private readonly createId: (kind: AssistantTurnBuilderIdKind) => string;
-  private readonly segments: MutableSegment[] = [];
-  private readonly segmentById = new Map<string, MutableSegment>();
-  private readonly items: MutableItem[] = [];
-  private readonly itemById = new Map<string, MutableItem>();
-  private readonly declarationByKey = new Map<string, MutableToolCallItem>();
-  private readonly toolByCallId = new Map<string, MutableToolCallItem>();
-  private readonly toolItemReservationByCallId = new Map<string, string>();
-  private readonly pendingLifecycleByCallId = new Map<string, PendingLifecycle>();
-  private readonly providerBlockItemIds = new Map<string, string>();
-  private readonly proseDeltaByKey = new Map<string, RecordedDelta>();
-  private readonly argumentDeltaByKey = new Map<string, RecordedDelta>();
-  private readonly domainIds = new Set<string>();
-  private activeSegmentId: string | null = null;
-  private openProseItemId: string | null = null;
+  /** The published state. Every snapshot any consumer has seen came from here. */
+  private committed: AssistantTurnBuilderState;
+  /** The draft a capture transaction is applying to, or null outside one. */
+  private working: AssistantTurnBuilderState | null = null;
   private finishedRecord: AssistantTurnRecord | null = null;
 
   constructor(options: AssistantTurnBuilderOptions) {
@@ -189,7 +286,264 @@ export class AssistantTurnBuilder {
     this.turnId = options.turnId;
     this.createId =
       options.createId ?? ((kind) => `${kind}-${generateId()}`);
-    this.domainIds.add(options.turnId);
+    this.committed = createBuilderState(options.turnId);
+  }
+
+  /**
+   * The state the mutating methods read and write: the transaction draft while
+   * one is open, the published state otherwise.
+   */
+  private get state(): AssistantTurnBuilderState {
+    return this.working ?? this.committed;
+  }
+
+  /**
+   * Commit one capture batch, or commit nothing.
+   *
+   * The whole frame is applied to a clone of the published state. Any fact that
+   * fails leaves that clone unreferenced, so a conflict on the second declaration
+   * inside a frame cannot leave the first one visible: that is the invariant the
+   * incident broke, and it is not reachable by fixing identity alone.
+   *
+   * No callback runs during application. The commit result carries what the batch
+   * changed so the caller can notify after the swap (settled decision 9), which is
+   * what keeps a subscriber from ever observing the draft.
+   */
+  applyCaptureBatch(
+    batch: AssistantCaptureBatch,
+    round?: number,
+  ): CaptureCommitResult {
+    this.assertMutable();
+    if (this.working !== null) {
+      throw new AssistantTurnBuilderError(
+        "A capture batch is already being applied.",
+      );
+    }
+
+    const redelivery = this.checkRedelivery(batch);
+    if (redelivery) return redelivery;
+
+    const draft = cloneBuilderState(this.committed);
+    draft.currentBatch = {
+      batchId: batch.batchId,
+      placement:
+        batch.providerMessageKey === undefined
+          ? { kind: "unplaced" }
+          : { kind: "segment", providerMessageKey: batch.providerMessageKey },
+    };
+    const changed: CaptureBatchChanges = {
+      startedSegments: [],
+      proseDeltas: [],
+      declaredTools: [],
+      toolCorrelations: [],
+    };
+
+    this.working = draft;
+    try {
+      for (const fact of batch.facts) this.applyCaptureFact(fact, changed, round);
+    } catch (error) {
+      // The draft is dropped whole. Nothing this batch touched was ever visible,
+      // so there is no partial state to undo.
+      this.working = null;
+      throw asCaptureConflict(error, batch);
+    }
+    draft.currentBatch = null;
+    if (batch.frameKeySource === "provider") {
+      draft.committedBatches.set(batch.batchId, batch.factsFingerprint);
+    }
+    // The one reference swap. Everything above ran on state no consumer holds.
+    this.committed = draft;
+    this.working = null;
+
+    return {
+      batchId: batch.batchId,
+      duplicate: false,
+      snapshot: this.snapshot(),
+      ...changed,
+    };
+  }
+
+  /**
+   * Atomically retire every fact an earlier batch owns, after a later batch
+   * conflicted with it.
+   *
+   * The declarations stay visible, marked capture-invalid, because a tool the
+   * provider really declared and may already have run is not made safer by being
+   * hidden. What they lose is authority: they cannot enter replay, and their
+   * evidence lowers the whole turn below exact capture.
+   */
+  invalidateCapturedFacts(
+    batchIds: readonly CaptureBatchId[],
+    diagnostic?: ProviderCaptureDiagnostic,
+  ): AssistantTurnSnapshot {
+    this.assertMutable();
+    const targets = new Set(batchIds);
+    const draft = cloneBuilderState(this.committed);
+    for (const item of draft.items) {
+      if (!targets.has(item.captureEvidence.originBatchId)) continue;
+      item.captureEvidence = {
+        ...item.captureEvidence,
+        validity: "capture_invalid",
+      };
+      if (
+        item.type === "tool_call" &&
+        (item.state === "declared" || item.state === "running")
+      ) {
+        item.state = "failed";
+      }
+    }
+    if (diagnostic) draft.captureDiagnostics.push(diagnostic);
+    this.committed = draft;
+    return this.snapshot();
+  }
+
+  /** Records one bounded terminal diagnostic on the turn. */
+  recordCaptureDiagnostic(diagnostic: ProviderCaptureDiagnostic): void {
+    this.assertMutable();
+    this.committed.captureDiagnostics.push(diagnostic);
+  }
+
+  /**
+   * Whether this batch was already committed, and whether it still says what it
+   * said the first time.
+   */
+  private checkRedelivery(
+    batch: AssistantCaptureBatch,
+  ): CaptureCommitResult | null {
+    if (batch.frameKeySource !== "provider") return null;
+    const committed = this.committed.committedBatches.get(batch.batchId);
+    if (committed === undefined) return null;
+    if (committed !== batch.factsFingerprint) {
+      throw new CaptureConflictError(
+        "fingerprint_mismatch",
+        "A redelivered capture batch carried different protocol bytes.",
+        { batchId: batch.batchId, conflictingBatchId: batch.batchId },
+      );
+    }
+    // Skipped through the committed index rather than reapplied, so redelivery
+    // preserves the original committed item IDs (settled decision 8).
+    return {
+      batchId: batch.batchId,
+      duplicate: true,
+      snapshot: this.snapshot(),
+      startedSegments: [],
+      proseDeltas: [],
+      declaredTools: [],
+      toolCorrelations: [],
+    };
+  }
+
+  /**
+   * Apply one ordered declaration fact to the open transaction.
+   *
+   * This was applyAssistantStreamEvent() in the tool loop, where it published a
+   * snapshot after every event. Moving it inside the builder is the point: a fact
+   * is now part of a frame, and a frame commits or it does not.
+   */
+  private applyCaptureFact(
+    fact: AssistantStreamEvent,
+    changed: CaptureBatchChanges,
+    round?: number,
+  ): void {
+    switch (fact.type) {
+      case "segment_start":
+        this.startSegment({
+          segmentId: fact.segmentId,
+          ...(fact.providerMessageId === undefined
+            ? {}
+            : { providerMessageId: fact.providerMessageId }),
+        });
+        changed.startedSegments.push(fact.segmentId);
+        break;
+      case "prose_delta":
+        this.appendProseDelta(fact.segmentId, fact.delta, {
+          ...(fact.providerBlockId === undefined
+            ? {}
+            : { providerBlockId: fact.providerBlockId }),
+          ...(fact.deltaKey === undefined ? {} : { deltaKey: fact.deltaKey }),
+        });
+        changed.proseDeltas.push(fact.delta);
+        break;
+      case "tool_call_start":
+        this.startToolCall(fact.segmentId, {
+          declarationKey: fact.declarationKey,
+          ...(fact.toolName === undefined ? {} : { toolName: fact.toolName }),
+          ...(fact.providerBlockId === undefined
+            ? {}
+            : { providerBlockId: fact.providerBlockId }),
+          ...(round === undefined ? {} : { round }),
+        });
+        if (fact.toolName !== undefined) changed.declaredTools.push(fact.toolName);
+        break;
+      case "tool_call_delta":
+        if (fact.nameDelta !== undefined) {
+          this.appendToolNameDelta(fact.declarationKey, fact.nameDelta);
+        }
+        if (fact.argumentsDelta !== undefined) {
+          this.appendToolArgumentsDelta(
+            fact.declarationKey,
+            fact.argumentsDelta,
+            {
+              ...(fact.deltaKey === undefined ? {} : { deltaKey: fact.deltaKey }),
+            },
+          );
+        }
+        break;
+      case "tool_call_identity":
+        this.bindToolCallId(
+          fact.declarationKey,
+          fact.toolCallId,
+          fact.correlation === "none" ? "provider_id" : fact.correlation,
+        );
+        changed.toolCorrelations.push({
+          toolCallId: fact.toolCallId,
+          correlation: fact.correlation,
+        });
+        break;
+      case "segment_reconcile":
+        this.reconcileCompletedSegment({
+          segmentId: fact.segmentId,
+          ...(fact.providerMessageId === undefined
+            ? {}
+            : { providerMessageId: fact.providerMessageId }),
+          blocks: fact.blocks,
+        });
+        break;
+      case "tool_result": {
+        const item = this.state.toolByCallId.get(fact.toolCallId);
+        const capture = item
+          ? captureStepFields(item.toolName, item.toolArgs ?? {}, {
+              content: fact.content,
+              isError: fact.isError,
+            })
+          : { resultRecord: fact.content };
+        this.updateToolLifecycle(fact.toolCallId, {
+          state: fact.isError ? "failed" : "completed",
+          ...capture,
+          ...(fact.isError ? { isError: true, errorContent: fact.content } : {}),
+        });
+        break;
+      }
+      case "stream_diagnostic":
+        break;
+      case "segment_end":
+        this.finishSegment(fact.segmentId);
+        break;
+      case "turn_end":
+        break;
+    }
+  }
+
+  /** The capture evidence an item created right now carries for good. */
+  private newItemEvidence(): ProviderItemCaptureEvidence {
+    const batch = this.state.currentBatch;
+    return {
+      // An item minted outside a capture transaction was authored by the plugin,
+      // not observed on the wire, so it makes no ordering claim.
+      originBatchId: batch?.batchId ?? `direct:${this.turnId}`,
+      placement: batch ? cloneValue(batch.placement) : { kind: "unplaced" },
+      validity: "valid",
+    };
   }
 
   startSegment(input: StartAssistantTurnSegment = {}): string {
@@ -198,10 +552,10 @@ export class AssistantTurnBuilder {
     const segmentId = input.segmentId ?? this.nextDomainId("segment");
     assertNonEmpty(segmentId, "Segment ID");
 
-    const existing = this.segmentById.get(segmentId);
+    const existing = this.state.segmentById.get(segmentId);
     if (existing) {
       this.mergeSegmentMetadata(existing, input);
-      if (!existing.finished && this.activeSegmentId !== segmentId) {
+      if (!existing.finished && this.state.activeSegmentId !== segmentId) {
         throw new AssistantTurnBuilderError(
           `Segment "${segmentId}" is open but is not the active segment.`,
         );
@@ -209,9 +563,9 @@ export class AssistantTurnBuilder {
       return segmentId;
     }
 
-    if (this.activeSegmentId !== null) {
+    if (this.state.activeSegmentId !== null) {
       throw new AssistantTurnBuilderError(
-        `Finish segment "${this.activeSegmentId}" before starting "${segmentId}".`,
+        `Finish segment "${this.state.activeSegmentId}" before starting "${segmentId}".`,
       );
     }
     if (!generated) this.claimDomainId(segmentId, "segment");
@@ -227,9 +581,9 @@ export class AssistantTurnBuilder {
       finished: false,
       toolCount: 0,
     };
-    this.segments.push(segment);
-    this.segmentById.set(segmentId, segment);
-    this.activeSegmentId = segmentId;
+    this.state.segments.push(segment);
+    this.state.segmentById.set(segmentId, segment);
+    this.state.activeSegmentId = segmentId;
     return segmentId;
   }
 
@@ -243,7 +597,7 @@ export class AssistantTurnBuilder {
     if (delta.length === 0) return null;
 
     const repeatedTarget = this.checkRepeatedDelta(
-      this.proseDeltaByKey,
+      this.state.proseDeltaByKey,
       options.deltaKey,
       delta,
       "prose",
@@ -265,7 +619,7 @@ export class AssistantTurnBuilder {
       );
     }
     if (prose && prose.segmentId !== segment.id) prose = null;
-    if (prose && this.openProseItemId !== prose.id) {
+    if (prose && this.state.openProseItemId !== prose.id) {
       throw new AssistantTurnBuilderError(
         `Provider block "${options.providerBlockId}" cannot resume after tool activity.`,
       );
@@ -279,19 +633,20 @@ export class AssistantTurnBuilder {
         segmentId,
         text: "",
         providerBlockIds: new Set<string>(),
+        captureEvidence: this.newItemEvidence(),
       };
-      this.items.push(prose);
-      this.itemById.set(itemId, prose);
-      this.openProseItemId = itemId;
+      this.state.items.push(prose);
+      this.state.itemById.set(itemId, prose);
+      this.state.openProseItemId = itemId;
     }
 
     prose.text += delta;
     if (blockKey !== null) {
       prose.providerBlockIds.add(blockKey);
-      this.providerBlockItemIds.set(blockKey, prose.id);
+      this.state.providerBlockItemIds.set(blockKey, prose.id);
     }
     this.recordDelta(
-      this.proseDeltaByKey,
+      this.state.proseDeltaByKey,
       options.deltaKey,
       prose.id,
       delta,
@@ -304,13 +659,13 @@ export class AssistantTurnBuilder {
     const segment = this.requireWritableSegment(segmentId);
     assertNonEmpty(input.declarationKey, "Declaration key");
 
-    const existing = this.declarationByKey.get(input.declarationKey);
+    const existing = this.state.declarationByKey.get(input.declarationKey);
     if (existing) {
       this.mergeRepeatedToolStart(existing, segmentId, input);
       return existing.id;
     }
 
-    this.openProseItemId = null;
+    this.state.openProseItemId = null;
     const itemId = this.resolveDeclaredToolItemId(input);
     const tool: MutableToolCallItem = {
       type: "tool_call",
@@ -329,12 +684,13 @@ export class AssistantTurnBuilder {
       ...(input.round === undefined ? {} : { round: input.round }),
       declarationKey: input.declarationKey,
       declarationIndex: segment.toolCount,
+      captureEvidence: this.newItemEvidence(),
     };
     segment.toolCount += 1;
 
-    this.items.push(tool);
-    this.itemById.set(itemId, tool);
-    this.declarationByKey.set(input.declarationKey, tool);
+    this.state.items.push(tool);
+    this.state.itemById.set(itemId, tool);
+    this.state.declarationByKey.set(input.declarationKey, tool);
     this.bindProviderBlock(tool, input.providerBlockId);
 
     if (input.toolCallId !== undefined) {
@@ -363,7 +719,7 @@ export class AssistantTurnBuilder {
   ): void {
     this.assertMutable();
     const repeatedTarget = this.checkRepeatedDelta(
-      this.argumentDeltaByKey,
+      this.state.argumentDeltaByKey,
       options.deltaKey,
       delta,
       "tool arguments",
@@ -374,7 +730,7 @@ export class AssistantTurnBuilder {
     tool.toolArguments += delta;
     this.refreshParsedToolArguments(tool);
     this.recordDelta(
-      this.argumentDeltaByKey,
+      this.state.argumentDeltaByKey,
       options.deltaKey,
       declarationKey,
       delta,
@@ -388,7 +744,7 @@ export class AssistantTurnBuilder {
   ): string {
     this.assertMutable();
     assertNonEmpty(toolCallId, "Tool-call ID");
-    const tool = this.declarationByKey.get(declarationKey);
+    const tool = this.state.declarationByKey.get(declarationKey);
     if (!tool) {
       throw new AssistantTurnBuilderError(
         `Unknown declaration key "${declarationKey}".`,
@@ -410,13 +766,13 @@ export class AssistantTurnBuilder {
       return tool.id;
     }
 
-    const positioned = this.toolByCallId.get(toolCallId);
+    const positioned = this.state.toolByCallId.get(toolCallId);
     if (positioned && positioned !== tool) {
       throw new AssistantTurnBuilderError(
         `Tool-call ID "${toolCallId}" is already bound to item "${positioned.id}".`,
       );
     }
-    const reservedId = this.toolItemReservationByCallId.get(toolCallId);
+    const reservedId = this.state.toolItemReservationByCallId.get(toolCallId);
     if (reservedId !== undefined && reservedId !== tool.id) {
       throw new AssistantTurnBuilderError(
         `Tool-call ID "${toolCallId}" reserved item "${reservedId}", not "${tool.id}".`,
@@ -425,8 +781,8 @@ export class AssistantTurnBuilder {
 
     tool.toolCallId = toolCallId;
     tool.correlation = correlation;
-    this.toolByCallId.set(toolCallId, tool);
-    this.toolItemReservationByCallId.set(toolCallId, tool.id);
+    this.state.toolByCallId.set(toolCallId, tool);
+    this.state.toolItemReservationByCallId.set(toolCallId, tool.id);
     this.applyPendingLifecycle(toolCallId, tool);
     return tool.id;
   }
@@ -434,7 +790,7 @@ export class AssistantTurnBuilder {
   reserveToolItemId(toolCallId: string, itemId?: string): string {
     this.assertMutable();
     assertNonEmpty(toolCallId, "Tool-call ID");
-    const positioned = this.toolByCallId.get(toolCallId);
+    const positioned = this.state.toolByCallId.get(toolCallId);
     if (positioned) {
       if (itemId !== undefined && itemId !== positioned.id) {
         throw new AssistantTurnBuilderError(
@@ -444,7 +800,7 @@ export class AssistantTurnBuilder {
       return positioned.id;
     }
 
-    const existing = this.toolItemReservationByCallId.get(toolCallId);
+    const existing = this.state.toolItemReservationByCallId.get(toolCallId);
     if (existing !== undefined) {
       if (itemId !== undefined && itemId !== existing) {
         throw new AssistantTurnBuilderError(
@@ -456,7 +812,7 @@ export class AssistantTurnBuilder {
 
     const reservedId = itemId ?? this.nextDomainId("item");
     if (itemId !== undefined) this.claimDomainId(itemId, "item");
-    this.toolItemReservationByCallId.set(toolCallId, reservedId);
+    this.state.toolItemReservationByCallId.set(toolCallId, reservedId);
     return reservedId;
   }
 
@@ -466,34 +822,34 @@ export class AssistantTurnBuilder {
   ): string {
     this.assertMutable();
     assertNonEmpty(toolCallId, "Tool-call ID");
-    const tool = this.toolByCallId.get(toolCallId);
+    const tool = this.state.toolByCallId.get(toolCallId);
     if (tool) {
       this.mergeLifecycleIntoTool(tool, update);
       return tool.id;
     }
 
     const itemId = this.reserveToolItemId(toolCallId);
-    const pending = this.pendingLifecycleByCallId.get(toolCallId);
+    const pending = this.state.pendingLifecycleByCallId.get(toolCallId);
     const merged = this.mergeLifecycleUpdates(pending?.update ?? {}, update);
-    this.pendingLifecycleByCallId.set(toolCallId, { itemId, update: merged });
+    this.state.pendingLifecycleByCallId.set(toolCallId, { itemId, update: merged });
     return itemId;
   }
 
   finishSegment(segmentId: string): void {
     this.assertMutable();
-    const segment = this.segmentById.get(segmentId);
+    const segment = this.state.segmentById.get(segmentId);
     if (!segment) {
       throw new AssistantTurnBuilderError(`Unknown segment "${segmentId}".`);
     }
     if (segment.finished) return;
-    if (this.activeSegmentId !== segmentId) {
+    if (this.state.activeSegmentId !== segmentId) {
       throw new AssistantTurnBuilderError(
         `Segment "${segmentId}" is not the active segment.`,
       );
     }
 
-    this.openProseItemId = null;
-    for (const item of this.items) {
+    this.state.openProseItemId = null;
+    for (const item of this.state.items) {
       if (item.type !== "tool_call" || item.segmentId !== segmentId) continue;
       if (item.toolName.trim().length === 0) {
         throw new AssistantTurnBuilderError(
@@ -507,12 +863,12 @@ export class AssistantTurnBuilder {
     }
 
     segment.finished = true;
-    this.activeSegmentId = null;
+    this.state.activeSegmentId = null;
   }
 
   reconcileCompletedSegment(completed: CompletedAssistantSegment): void {
     this.assertMutable();
-    const segment = this.segmentById.get(completed.segmentId);
+    const segment = this.state.segmentById.get(completed.segmentId);
     if (!segment) {
       throw new AssistantTurnBuilderError(
         `Unknown segment "${completed.segmentId}".`,
@@ -528,8 +884,8 @@ export class AssistantTurnBuilder {
     );
     this.assertNoToolDeclarationWasOmitted(completed.segmentId, reconciledItems);
     this.replaceSegmentItems(completed.segmentId, reconciledItems);
-    if (this.activeSegmentId === completed.segmentId) {
-      this.openProseItemId = null;
+    if (this.state.activeSegmentId === completed.segmentId) {
+      this.state.openProseItemId = null;
     }
   }
 
@@ -543,11 +899,11 @@ export class AssistantTurnBuilder {
       return this.finishedRecord;
     }
 
-    if (this.activeSegmentId !== null) {
-      this.finishSegment(this.activeSegmentId);
+    if (this.state.activeSegmentId !== null) {
+      this.finishSegment(this.state.activeSegmentId);
     }
     if (status === "interrupted") {
-      for (const item of this.items) {
+      for (const item of this.state.items) {
         if (
           item.type === "tool_call" &&
           (item.state === "declared" || item.state === "running")
@@ -557,7 +913,7 @@ export class AssistantTurnBuilder {
       }
     }
 
-    const record = this.buildSnapshot(status);
+    const record = this.buildSnapshot(status, this.committed);
     for (const item of record.items) {
       if (item.type === "tool_call" && item.toolCallId === undefined) {
         throw new AssistantTurnBuilderError(
@@ -579,7 +935,9 @@ export class AssistantTurnBuilder {
 
   snapshot(): AssistantTurnSnapshot {
     if (this.finishedRecord) return this.finishedRecord;
-    return freezeClone(this.buildSnapshot("streaming"));
+    // Deliberately the published state, never the transaction draft: a snapshot
+    // taken while a batch is being applied must show the last committed turn.
+    return freezeClone(this.buildSnapshot("streaming", this.committed));
   }
 
   private assertMutable(): void {
@@ -592,8 +950,8 @@ export class AssistantTurnBuilder {
     for (let attempt = 0; attempt < 100; attempt += 1) {
       const id = this.createId(kind);
       assertNonEmpty(id, `${kind} ID`);
-      if (!this.domainIds.has(id)) {
-        this.domainIds.add(id);
+      if (!this.state.domainIds.has(id)) {
+        this.state.domainIds.add(id);
         return id;
       }
     }
@@ -604,12 +962,12 @@ export class AssistantTurnBuilder {
 
   private claimDomainId(id: string, kind: AssistantTurnBuilderIdKind): void {
     assertNonEmpty(id, `${kind} ID`);
-    if (this.domainIds.has(id)) {
+    if (this.state.domainIds.has(id)) {
       throw new AssistantTurnBuilderError(
         `Domain ID "${id}" is already in use.`,
       );
     }
-    this.domainIds.add(id);
+    this.state.domainIds.add(id);
   }
 
   private mergeSegmentMetadata(
@@ -638,14 +996,14 @@ export class AssistantTurnBuilder {
   }
 
   private requireWritableSegment(segmentId: string): MutableSegment {
-    const segment = this.segmentById.get(segmentId);
+    const segment = this.state.segmentById.get(segmentId);
     if (!segment) {
       throw new AssistantTurnBuilderError(`Unknown segment "${segmentId}".`);
     }
     if (segment.finished) {
       throw new AssistantTurnBuilderError(`Segment "${segmentId}" is finished.`);
     }
-    if (this.activeSegmentId !== segmentId) {
+    if (this.state.activeSegmentId !== segmentId) {
       throw new AssistantTurnBuilderError(
         `Segment "${segmentId}" is not the active segment.`,
       );
@@ -654,8 +1012,8 @@ export class AssistantTurnBuilder {
   }
 
   private openProseItem(): MutableProseItem | null {
-    if (this.openProseItemId === null) return null;
-    const item = this.itemById.get(this.openProseItemId);
+    if (this.state.openProseItemId === null) return null;
+    const item = this.state.itemById.get(this.state.openProseItemId);
     return item?.type === "prose" ? item : null;
   }
 
@@ -665,8 +1023,8 @@ export class AssistantTurnBuilder {
   }
 
   private itemForProviderBlock(blockKey: string): MutableItem | undefined {
-    const itemId = this.providerBlockItemIds.get(blockKey);
-    return itemId === undefined ? undefined : this.itemById.get(itemId);
+    const itemId = this.state.providerBlockItemIds.get(blockKey);
+    return itemId === undefined ? undefined : this.state.itemById.get(itemId);
   }
 
   private bindProviderBlock(
@@ -675,7 +1033,7 @@ export class AssistantTurnBuilder {
   ): void {
     if (providerBlockId === undefined) return;
     const blockKey = this.providerBlockKey(tool.segmentId, providerBlockId);
-    const existing = this.providerBlockItemIds.get(blockKey);
+    const existing = this.state.providerBlockItemIds.get(blockKey);
     if (existing !== undefined && existing !== tool.id) {
       throw new AssistantTurnBuilderError(
         `Provider block "${providerBlockId}" already belongs to item "${existing}".`,
@@ -690,14 +1048,14 @@ export class AssistantTurnBuilder {
       );
     }
     tool.providerBlockId = providerBlockId;
-    this.providerBlockItemIds.set(blockKey, tool.id);
+    this.state.providerBlockItemIds.set(blockKey, tool.id);
   }
 
   private resolveDeclaredToolItemId(input: StartAssistantToolCall): string {
     const reserved =
       input.toolCallId === undefined
         ? undefined
-        : this.toolItemReservationByCallId.get(input.toolCallId);
+        : this.state.toolItemReservationByCallId.get(input.toolCallId);
     if (
       input.itemId !== undefined &&
       reserved !== undefined &&
@@ -768,7 +1126,7 @@ export class AssistantTurnBuilder {
   private requireWritableDeclaration(
     declarationKey: string,
   ): MutableToolCallItem {
-    const tool = this.declarationByKey.get(declarationKey);
+    const tool = this.state.declarationByKey.get(declarationKey);
     if (!tool) {
       throw new AssistantTurnBuilderError(
         `Unknown declaration key "${declarationKey}".`,
@@ -791,7 +1149,7 @@ export class AssistantTurnBuilder {
     toolCallId: string,
     tool: MutableToolCallItem,
   ): void {
-    const pending = this.pendingLifecycleByCallId.get(toolCallId);
+    const pending = this.state.pendingLifecycleByCallId.get(toolCallId);
     if (!pending) return;
     if (pending.itemId !== tool.id) {
       throw new AssistantTurnBuilderError(
@@ -799,7 +1157,7 @@ export class AssistantTurnBuilder {
       );
     }
     this.mergeLifecycleIntoTool(tool, pending.update);
-    this.pendingLifecycleByCallId.delete(toolCallId);
+    this.state.pendingLifecycleByCallId.delete(toolCallId);
   }
 
   private mergeLifecycleIntoTool(
@@ -975,7 +1333,7 @@ export class AssistantTurnBuilder {
     for (const providerBlockId of part.providerBlockIds) {
       const blockKey = this.providerBlockKey(segmentId, providerBlockId);
       prose.providerBlockIds.add(blockKey);
-      this.providerBlockItemIds.set(blockKey, prose.id);
+      this.state.providerBlockItemIds.set(blockKey, prose.id);
     }
     return prose;
   }
@@ -987,8 +1345,9 @@ export class AssistantTurnBuilder {
       segmentId,
       text: "",
       providerBlockIds: new Set<string>(),
+      captureEvidence: this.newItemEvidence(),
     };
-    this.itemById.set(prose.id, prose);
+    this.state.itemById.set(prose.id, prose);
     return prose;
   }
 
@@ -1004,7 +1363,7 @@ export class AssistantTurnBuilder {
         `Provider block "${block.providerBlockId}" changed from prose to tool.`,
       );
     }
-    const byCall = this.toolByCallId.get(block.toolCallId);
+    const byCall = this.state.toolByCallId.get(block.toolCallId);
     if (byBlock && byCall && byBlock !== byCall) {
       throw new AssistantTurnBuilderError(
         `Completed tool "${block.toolCallId}" conflicts with provider block identity.`,
@@ -1035,13 +1394,13 @@ export class AssistantTurnBuilder {
     block: CompletedAssistantToolCallBlock,
   ): MutableToolCallItem {
     const declarationKey = `completed:${segmentId}:${block.providerBlockId}`;
-    if (this.declarationByKey.has(declarationKey)) {
+    if (this.state.declarationByKey.has(declarationKey)) {
       throw new AssistantTurnBuilderError(
         `Completed declaration key "${declarationKey}" is already in use.`,
       );
     }
     const itemId =
-      this.toolItemReservationByCallId.get(block.toolCallId) ??
+      this.state.toolItemReservationByCallId.get(block.toolCallId) ??
       this.nextDomainId("item");
     const tool: MutableToolCallItem = {
       type: "tool_call",
@@ -1052,10 +1411,11 @@ export class AssistantTurnBuilder {
       state: "declared",
       declarationKey,
       declarationIndex: segment.toolCount,
+      captureEvidence: this.newItemEvidence(),
     };
     segment.toolCount += 1;
-    this.itemById.set(itemId, tool);
-    this.declarationByKey.set(declarationKey, tool);
+    this.state.itemById.set(itemId, tool);
+    this.state.declarationByKey.set(declarationKey, tool);
     this.bindToolCallId(declarationKey, block.toolCallId, "provider_id");
     return tool;
   }
@@ -1065,7 +1425,7 @@ export class AssistantTurnBuilder {
     reconciledItems: MutableItem[],
   ): void {
     const retained = new Set(reconciledItems.map((item) => item.id));
-    const omitted = this.items.find(
+    const omitted = this.state.items.find(
       (item) =>
         item.segmentId === segmentId &&
         item.type === "tool_call" &&
@@ -1082,11 +1442,11 @@ export class AssistantTurnBuilder {
     segmentId: string,
     reconciledItems: MutableItem[],
   ): void {
-    const segmentIndex = this.segments.findIndex((segment) => segment.id === segmentId);
-    let insertionIndex = this.items.length;
-    for (let index = 0; index < this.items.length; index += 1) {
-      const itemSegmentIndex = this.segments.findIndex(
-        (segment) => segment.id === this.items[index].segmentId,
+    const segmentIndex = this.state.segments.findIndex((segment) => segment.id === segmentId);
+    let insertionIndex = this.state.items.length;
+    for (let index = 0; index < this.state.items.length; index += 1) {
+      const itemSegmentIndex = this.state.segments.findIndex(
+        (segment) => segment.id === this.state.items[index].segmentId,
       );
       if (itemSegmentIndex >= segmentIndex) {
         insertionIndex = index;
@@ -1094,35 +1454,44 @@ export class AssistantTurnBuilder {
       }
     }
 
-    const previousItems = this.items.filter((item) => item.segmentId === segmentId);
+    const previousItems = this.state.items.filter((item) => item.segmentId === segmentId);
     for (const item of previousItems) {
       if (
         item.type === "prose" &&
         !reconciledItems.some((reconciled) => reconciled.id === item.id)
       ) {
-        this.itemById.delete(item.id);
+        this.state.itemById.delete(item.id);
         for (const blockKey of item.providerBlockIds) {
-          if (this.providerBlockItemIds.get(blockKey) === item.id) {
-            this.providerBlockItemIds.delete(blockKey);
+          if (this.state.providerBlockItemIds.get(blockKey) === item.id) {
+            this.state.providerBlockItemIds.delete(blockKey);
           }
         }
       }
     }
 
-    const withoutSegment = this.items.filter((item) => item.segmentId !== segmentId);
-    const priorCount = this.items
+    const withoutSegment = this.state.items.filter((item) => item.segmentId !== segmentId);
+    const priorCount = this.state.items
       .slice(0, insertionIndex)
       .filter((item) => item.segmentId !== segmentId).length;
     withoutSegment.splice(priorCount, 0, ...reconciledItems);
-    this.items.splice(0, this.items.length, ...withoutSegment);
+    this.state.items.splice(0, this.state.items.length, ...withoutSegment);
   }
 
-  private buildSnapshot(status: AssistantTurnStatus): AssistantTurnSnapshot {
+  /**
+   * Version 2 is what the capture path writes now (RFC-0011 phase 4): every item
+   * carries the evidence of how it was placed, so a consumer never has to infer
+   * an ordering claim from a list position. Load-time migration is the only other
+   * writer of version 2 and stays as it is.
+   */
+  private buildSnapshot(
+    status: AssistantTurnStatus,
+    state: AssistantTurnBuilderState,
+  ): AssistantTurnSnapshot {
     return {
-      schemaVersion: 1,
+      schemaVersion: 2,
       id: this.turnId,
       status,
-      segments: this.segments.map((segment) => ({
+      segments: state.segments.map((segment) => ({
         id: segment.id,
         ...(segment.providerMessageId === undefined
           ? {}
@@ -1131,7 +1500,10 @@ export class AssistantTurnBuilder {
           ? {}
           : { replayCapsule: cloneValue(segment.replayCapsule) }),
       })),
-      items: this.items.map((item) => this.snapshotItem(item)),
+      items: state.items.map((item) => this.snapshotItem(item)),
+      ...(state.captureDiagnostics.length === 0
+        ? {}
+        : { captureDiagnostics: cloneValue(state.captureDiagnostics) }),
     };
   }
 
@@ -1149,6 +1521,7 @@ export class AssistantTurnBuilder {
         ...(item.actionAnchor === undefined
           ? {}
           : { actionAnchor: item.actionAnchor }),
+        captureEvidence: cloneValue(item.captureEvidence),
       };
     }
     return {
@@ -1184,8 +1557,39 @@ export class AssistantTurnBuilder {
         : { askGuidance: cloneValue(item.askGuidance) }),
       ...(item.askStatus === undefined ? {} : { askStatus: item.askStatus }),
       ...(item.round === undefined ? {} : { round: item.round }),
+      captureEvidence: cloneValue(item.captureEvidence),
     };
   }
+}
+
+/**
+ * A deep copy whose internal sharing survives.
+ *
+ * The index maps hold the same objects the item array does, and `structuredClone`
+ * keeps that identity within one call, so the draft is a coherent graph rather
+ * than a set of indexes still pointing at the published state.
+ */
+function cloneBuilderState(
+  state: AssistantTurnBuilderState,
+): AssistantTurnBuilderState {
+  return structuredClone(state);
+}
+
+/**
+ * Names a builder rejection as the capture conflict it is.
+ *
+ * The builder speaks in declaration keys and item IDs; the capture path needs the
+ * batch that was refused and a bounded reason. Anything that is not an identity
+ * rejection propagates untouched, because inventing a conflict kind for an
+ * unknown failure would hide it.
+ */
+function asCaptureConflict(error: unknown, batch: AssistantCaptureBatch): unknown {
+  if (!(error instanceof AssistantTurnBuilderError)) return error;
+  const toolCallId = error.message.match(/Tool-call ID "([^"]+)"/)?.[1];
+  return new CaptureConflictError("intra_batch", error.message, {
+    batchId: batch.batchId,
+    ...(toolCallId === undefined ? {} : { toolCallId }),
+  });
 }
 
 function assertNonEmpty(value: string, label: string): void {

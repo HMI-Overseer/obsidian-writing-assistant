@@ -10,7 +10,7 @@ import type {
   ReasoningLevel,
 } from "../shared/types";
 import type { ClaudeCodeRuntime, SdkSessionTurnInput } from "../api/ClaudeCodeClient";
-import type { AssistantStreamEvent } from "../api/usageTypes";
+import type { AssistantCaptureFrame } from "../api/assistantCapture";
 import { resolveClaudeBinary } from "../api/claudeCodeProcess";
 import { isSdkAvailable } from "../api/sdk/claudeAgentSdk";
 import type { Options } from "../api/sdk/claudeAgentSdk";
@@ -349,7 +349,7 @@ export class ClaudeCodeService {
     input: SdkSessionTurnInput,
     agentic: boolean,
     resumeCursor?: ClaudeCodeResumeCursor,
-  ): AsyncGenerator<AssistantStreamEvent> {
+  ): AsyncGenerator<AssistantCaptureFrame> {
     const toolNames = agentic
       ? this.createToolProvider().listTools().map((definition) => definition.name)
       : [];

@@ -317,9 +317,13 @@ describe("ClaudeCodeSdkMessageTranslator", () => {
       }),
     );
 
+    // The whole message arrived as one completed frame, so its `content`
+    // position happens to equal the provider's block index. The translator
+    // cannot tell that from a fragment, since only `message_stop` ends a
+    // provider message, so the exact tool-use ID is the identity here.
     expect(events).toContainEqual({
       type: "tool_call_identity",
-      declarationKey: "segment-sdk-0:block-1",
+      declarationKey: "segment-sdk-0:tool-toolu_fixture_legacy_visible_1",
       toolCallId: "toolu_fixture_legacy_visible_1",
       correlation: "none",
     });

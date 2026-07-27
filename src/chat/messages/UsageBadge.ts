@@ -200,15 +200,19 @@ export function renderUsageBadge(
   return badgeEl;
 }
 
-/** Human-readable replay surface selected for the committed assistant revision. */
+/**
+ * Human-readable replay surface selected for the committed assistant revision.
+ *
+ * "Legacy" is read from the reason that actually means it, never inferred from
+ * a `segment` plus uncorrelated pair. Those two facts are reachable together on
+ * the SDK path (a callback arriving without a provider tool-use ID lowers
+ * correlation, and runtime evidence may lower capture order), and an SDK run
+ * labelled "legacy" would be a plain lie about which transport served the turn.
+ */
 export function describeReplayFidelity(
   evidence: AssistantReplayEvidence,
 ): string {
-  if (
-    evidence.loweredReason === "claude_code_legacy_stream_json_capture" ||
-    (evidence.capabilities.captureOrder === "segment" &&
-      evidence.capabilities.toolCorrelation === "none")
-  ) {
+  if (evidence.loweredReason === "claude_code_legacy_stream_json_capture") {
     return "degraded legacy capture";
   }
   if (evidence.tier === "native") return "native Claude continuation";

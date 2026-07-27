@@ -20,6 +20,7 @@ export class ClaudeCodeSdkMessageTranslator {
   private readonly partialTextBySegment: string[] = [];
   private readonly declaredToolKeys = new Set<string>();
   private readonly closedBlockKeys = new Set<string>();
+  private readonly blockIdByToolCall = new Map<string, string>();
   private activeSegmentId: string | null = null;
   private segmentIndex = 0;
 
@@ -82,6 +83,7 @@ export class ClaudeCodeSdkMessageTranslator {
         ];
       }
       this.declaredToolKeys.add(declarationKey);
+      this.rememberToolBlockId(segmentId, toolCallId, providerBlockId);
       return [
         ...prefix,
         {
@@ -164,11 +166,10 @@ export class ClaudeCodeSdkMessageTranslator {
     for (const [index, rawBlock] of content.entries()) {
       const block = asRecord(rawBlock);
       if (!block) continue;
-      const providerBlockId = `block-${index}`;
       if (block.type === "text") {
         const text = stringValue(block.text) ?? "";
         visibleText += text;
-        blocks.push({ type: "prose", providerBlockId, text });
+        blocks.push({ type: "prose", providerBlockId: `block-${index}`, text });
         continue;
       }
       if (block.type !== "tool_use" && block.type !== "mcp_tool_use") continue;
@@ -182,6 +183,7 @@ export class ClaudeCodeSdkMessageTranslator {
         );
         continue;
       }
+      const providerBlockId = this.toolBlockId(segmentId, toolCallId);
       const declarationKey = `${segmentId}:${providerBlockId}`;
       this.declaredToolKeys.add(declarationKey);
       events.push(
@@ -264,6 +266,38 @@ export class ClaudeCodeSdkMessageTranslator {
     return events;
   }
 
+  /** Records the block identity the partial stream gave one exact tool-use ID. */
+  private rememberToolBlockId(
+    segmentId: string,
+    toolCallId: string,
+    providerBlockId: string,
+  ): void {
+    const key = toolBlockKey(segmentId, toolCallId);
+    if (!this.blockIdByToolCall.has(key)) {
+      this.blockIdByToolCall.set(key, providerBlockId);
+    }
+  }
+
+  /**
+   * The block identity for a tool declaration read from a completed `assistant`
+   * frame.
+   *
+   * The CLI splits one provider message into several one-element frames, so a
+   * frame's `content` position is local to that frame and is never the
+   * provider's block index. The exact tool-use ID is what identifies the
+   * declaration: it selects the identity the partial stream already gave this
+   * tool, so the frame enriches that declaration rather than opening a second
+   * one, and it stands in as the identity itself when no partial declared the
+   * tool at all. A tool-derived identity cannot collide with a `block-N` one,
+   * which is what keeps the two sources in one namespace safely.
+   */
+  private toolBlockId(segmentId: string, toolCallId: string): string {
+    return (
+      this.blockIdByToolCall.get(toolBlockKey(segmentId, toolCallId)) ??
+      `tool-${toolCallId}`
+    );
+  }
+
   private ensureSegment(): string {
     if (this.activeSegmentId === null) {
       this.activeSegmentId = this.options.createSegmentId(this.segmentIndex);
@@ -291,6 +325,11 @@ export class ClaudeCodeSdkMessageTranslator {
     this.seenKeys.add(scopedKey);
     return false;
   }
+}
+
+/** Block identities are scoped per segment, so a reused tool ID cannot cross one. */
+function toolBlockKey(segmentId: string, toolCallId: string): string {
+  return `${segmentId} ${toolCallId}`;
 }
 
 function asRecord(value: unknown): RecordValue | null {

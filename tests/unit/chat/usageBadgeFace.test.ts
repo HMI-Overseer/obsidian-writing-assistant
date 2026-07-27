@@ -89,6 +89,21 @@ describe("describeReplayFidelity", () => {
         loweredReason: "claude_code_legacy_stream_json_capture",
       },
     ],
+    [
+      // An SDK turn can reach `segment` plus uncorrelated without ever touching
+      // the legacy transport, so that pair must not be read as "legacy".
+      "textual Claude rebuild",
+      {
+        tier: "textual",
+        capabilities: {
+          captureOrder: "segment",
+          toolCorrelation: "none",
+          coldReplay: "textual",
+          nativeResume: false,
+        },
+        loweredReason: "claude_code_tool_correlation_missing",
+      },
+    ],
   ] as const)("labels %s", (expected, evidence) => {
     expect(describeReplayFidelity(evidence)).toBe(expected);
   });

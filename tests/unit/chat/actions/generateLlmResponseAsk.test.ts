@@ -76,7 +76,11 @@ import {
 } from "../../../../src/tools/ask/result";
 import type { AskAnswers, AskUserResponder } from "../../../../src/tools/ask/types";
 import type { ToolCall } from "../../../../src/tools/types";
-import type { ClaudeCodeToolEvent } from "../../../../src/services/ClaudeCodeService";
+import {
+  ClaudeCodeGenerationHandle,
+  type ClaudeCodeGenerationLease,
+  type ClaudeCodeToolEvent,
+} from "../../../../src/services/ClaudeCodeGenerationLease";
 import { DEFAULT_VAULT_OP_POLICY } from "../../../../src/vault-ops/gateway";
 
 const question = "Which format should I use?";
@@ -239,14 +243,42 @@ function makeClient(rounds: RoundScript[]): ChatClient & {
   };
 }
 
+/**
+ * The Claude Code callback surface as this suite sees it (RFC-0011 phase 5): a
+ * real generation handle, so a fake provider reaches the ask responder and the
+ * lifecycle sink exactly the way an MCP callback does, through the lease the
+ * generation installed, and sees them go away when the generation releases.
+ */
 interface FakeClaudeCodeBridge {
-  setAskUserResponder: ReturnType<typeof vi.fn>;
-  setLiveReview: ReturnType<typeof vi.fn>;
-  setToolListener: ReturnType<typeof vi.fn>;
-  takeCollectedEdits(): ToolCall[];
-  takeCollectedVaultOps(): ToolCall[];
+  handle: ClaudeCodeGenerationHandle;
+  activate: ReturnType<typeof vi.fn>;
   getAskUserResponder(): AskUserResponder | null;
   emitToolEvent(event: ClaudeCodeToolEvent): void;
+}
+
+function makeClaudeCodeBridge(): FakeClaudeCodeBridge {
+  const handle = new ClaudeCodeGenerationHandle({
+    leaseId: "lease-generate-test",
+    conversationId: null,
+    posture: "ask",
+    allowedTools: new Set(["ask_user"]),
+    activeFilePath: "",
+    correlationPosture: "provider_id",
+  });
+  const activate = vi.spyOn(handle, "activate");
+  /** The lease only while it is answering; a released generation owns nothing. */
+  const live = (): ClaudeCodeGenerationLease | null => {
+    const lease = handle.activeLease;
+    return lease && lease.state === "active" ? lease : null;
+  };
+  return {
+    handle,
+    activate: activate as unknown as ReturnType<typeof vi.fn>,
+    getAskUserResponder: () => live()?.context.askResponder ?? null,
+    emitToolEvent: (event) => {
+      live()?.context.lifecycle?.(event);
+    },
+  };
 }
 
 function makeClaudeCodeClient(
@@ -522,23 +554,7 @@ function harness(
       memory: "deny" as const,
     },
   };
-  let askUserResponder: AskUserResponder | null = null;
-  let toolListener: ((event: ClaudeCodeToolEvent) => void) | null = null;
-  const claudeCode: FakeClaudeCodeBridge = {
-    setAskUserResponder: vi.fn((responder: AskUserResponder | null) => {
-      askUserResponder = responder;
-    }),
-    setLiveReview: vi.fn(),
-    setToolListener: vi.fn((listener: ((event: ClaudeCodeToolEvent) => void) | null) => {
-      toolListener = listener;
-    }),
-    takeCollectedEdits: () => [],
-    takeCollectedVaultOps: () => [],
-    getAskUserResponder: () => askUserResponder,
-    emitToolEvent: (event) => {
-      toolListener?.(event);
-    },
-  };
+  const claudeCode = makeClaudeCodeBridge();
   const plugin = {
     settings,
     app: {
@@ -591,6 +607,7 @@ function harness(
       } as CompletionModel,
       posture,
       interactionHost,
+      claudeGeneration: claudeCode.handle,
       finalization:
         finalization === "append"
           ? { kind: "append" as const }
@@ -849,14 +866,16 @@ describe("generateLlmResponse ask_user integration", () => {
     await state.interactionHost.mounted;
 
     expect(state.claudeCode.getAskUserResponder()).not.toBeNull();
-    expect(state.claudeCode.setAskUserResponder).toHaveBeenCalledTimes(1);
+    expect(state.claudeCode.activate).toHaveBeenCalledTimes(1);
 
     state.activeControllers[0]?.abort();
     await pending;
 
     expect(state.interactionHost.interaction).toBeNull();
     expect(state.claudeCode.getAskUserResponder()).toBeNull();
-    expect(state.claudeCode.setAskUserResponder).toHaveBeenLastCalledWith(null);
+    // Released rather than cleared: the generation's own lifetime ended, and the
+    // owners went with it (RFC-0011 phase 5).
+    expect(state.claudeCode.handle.activeLease?.state).toBe("quiescent");
     expect(state.activeControllers.at(-1)).toBeNull();
   });
 

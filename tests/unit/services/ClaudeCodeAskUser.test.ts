@@ -11,9 +11,12 @@ import { DEFAULT_SETTINGS } from "../../../src/constants";
 import { MemoryService } from "../../../src/memory/MemoryService";
 import { VaultMcpServer, type McpToolProvider } from "../../../src/mcp/VaultMcpServer";
 import {
-  ClaudeCodeService,
+  ClaudeCodeGenerationHandle,
+  type ClaudeCodeGenerationLease,
+  type ClaudeCodeGenerationOwners,
   type ClaudeCodeToolEvent,
-} from "../../../src/services/ClaudeCodeService";
+} from "../../../src/services/ClaudeCodeGenerationLease";
+import { ClaudeCodeService } from "../../../src/services/ClaudeCodeService";
 import type { PluginSettings } from "../../../src/shared/types";
 import type { AskAnswers, AskUserResponder } from "../../../src/tools/ask/types";
 import type { ToolCall, ToolResult, VaultOpReviewer } from "../../../src/tools/types";
@@ -57,18 +60,17 @@ function settings(): PluginSettings {
 }
 
 interface ClaudeCodeAskTestSeam {
-  createToolProvider(): McpToolProvider;
-  runAllowedTools: Set<string>;
-  liveReview: VaultOpReviewer | null;
-  toolListener: ((event: ClaudeCodeToolEvent) => void) | null;
-  askUserResponder: AskUserResponder | null;
-  askPending: boolean;
+  createCallbackProvider(handle: ClaudeCodeGenerationHandle): McpToolProvider;
   sdkUsable: Promise<boolean> | null;
   sessionRegistry: { disposeAll(): void };
-  mcpServer: { stop(): void } | null;
 }
 
-function harness() {
+/**
+ * One callback surface for one generation (RFC-0011 phase 5). The allow-list is
+ * sealed before any callback can enter; the ask responder, the review owner, and
+ * the lifecycle sink are installed once, at activation.
+ */
+function harness(allowedTools: string[] = []) {
   const currentSettings = settings();
   let ragReady = false;
   const memoryService = new MemoryService(() => currentSettings.memories);
@@ -81,11 +83,33 @@ function harness() {
   );
   const seam = service as unknown as ClaudeCodeAskTestSeam;
   seam.sdkUsable = Promise.resolve(true);
+  const handle = new ClaudeCodeGenerationHandle({
+    leaseId: "lease-ask-test",
+    conversationId: null,
+    posture: "ask",
+    allowedTools: new Set(allowedTools),
+    activeFilePath: "",
+    correlationPosture: "provider_id",
+  });
+  const provider = seam.createCallbackProvider(handle);
+  const activate = (
+    owners: Partial<ClaudeCodeGenerationOwners> = {},
+  ): ClaudeCodeGenerationLease =>
+    handle.activate({
+      review: null,
+      askResponder: null,
+      askSignal: null,
+      lifecycle: null,
+      signal: null,
+      ...owners,
+    });
   return {
     currentSettings,
     service,
     seam,
-    provider: seam.createToolProvider(),
+    handle,
+    provider,
+    activate,
     setRagReady: (ready: boolean) => {
       ragReady = ready;
     },
@@ -189,6 +213,9 @@ describe("ClaudeCodeService ask_user", () => {
 
   it("advertises ask_user exactly once across stable runtime combinations", async () => {
     const { currentSettings, service, provider, setRagReady } = harness();
+    // The catalogue is the constant stable superset, so it is invariant across
+    // every combination below; the run's allow-list is what varies, and it is
+    // enforced at the callback surface rather than by shrinking this list.
     const policies = [
       { ...DEFAULT_VAULT_OP_POLICY },
       {
@@ -220,19 +247,28 @@ describe("ClaudeCodeService ask_user", () => {
   });
 
   it("allows ask_user only on agentic Claude Code runs", async () => {
-    const { currentSettings, service, seam } = harness();
+    const { currentSettings, service } = harness();
+    const allowedFor = async (): Promise<ReadonlySet<string>> => {
+      const runtime = await service.getRuntime("claudecode", { posture: "ask" });
+      const lease = runtime?.generation?.activate({
+        review: null,
+        askResponder: null,
+        askSignal: null,
+        lifecycle: null,
+        signal: null,
+      });
+      return lease?.context.allowedTools ?? new Set<string>();
+    };
 
     currentSettings.agenticMode = true;
-    await service.getRuntime("claudecode", { posture: "ask" });
-    expect(seam.runAllowedTools.has("ask_user")).toBe(true);
+    expect((await allowedFor()).has("ask_user")).toBe(true);
 
     currentSettings.agenticMode = false;
-    await service.getRuntime("claudecode", { posture: "ask" });
-    expect(seam.runAllowedTools.has("ask_user")).toBe(false);
+    expect((await allowedFor()).has("ask_user")).toBe(false);
   });
 
   it("claims the latch synchronously and refuses callbacks that enter later", async () => {
-    const { service, seam, provider } = harness();
+    const { provider, activate } = harness(["ask_user", "create_directory"]);
     const answers = deferred<AskAnswers>();
     const responder: AskUserResponder = {
       ask: vi.fn(() => answers.promise),
@@ -242,17 +278,18 @@ describe("ClaudeCodeService ask_user", () => {
       content: "Created directory.",
       isReadOnly: false,
     }));
-    seam.runAllowedTools = new Set(["ask_user", "create_directory"]);
-    seam.liveReview = {
-      resolveOne,
-      resolveEditOne: vi.fn(),
-      resolveMemoryOne: vi.fn(),
-    };
-    service.setAskUserResponder(responder);
+    const lease = activate({
+      askResponder: responder,
+      review: {
+        resolveOne,
+        resolveEditOne: vi.fn(),
+        resolveMemoryOne: vi.fn(),
+      } as unknown as VaultOpReviewer,
+    });
 
     const pendingAsk = provider.callTool(call("ask_user", askArguments, "ask-1"));
 
-    expect(seam.askPending).toBe(true);
+    expect(lease.askPending).toBe(true);
     expect(responder.ask).toHaveBeenCalledTimes(1);
 
     const blockedTool = await provider.callTool(
@@ -273,7 +310,7 @@ describe("ClaudeCodeService ask_user", () => {
       content: JSON.stringify({ answers: { [question]: "Detailed" } }),
       isReadOnly: true,
     });
-    expect(seam.askPending).toBe(false);
+    expect(lease.askPending).toBe(false);
 
     await expect(
       provider.callTool(call("create_directory", { path: "Drafts" }, "write-2")),
@@ -282,11 +319,10 @@ describe("ClaudeCodeService ask_user", () => {
   });
 
   it("returns the canonical validation failure without mounting a form", async () => {
-    const { service, seam, provider } = harness();
+    const { provider, activate } = harness(["ask_user"]);
     const host = new FakeInteractionHost();
     const coordinator = new AskInteractionCoordinator(host, new AbortController().signal);
-    seam.runAllowedTools = new Set(["ask_user"]);
-    service.setAskUserResponder(coordinator);
+    const lease = activate({ askResponder: coordinator });
 
     const result = await provider.callTool(
       call("ask_user", { questions: [] }, "invalid-ask"),
@@ -295,32 +331,35 @@ describe("ClaudeCodeService ask_user", () => {
     expect(result.failure?.kind).toBe("invalid-args");
     expect(result.content).toContain("questions_count");
     expect(host.interaction).toBeNull();
-    expect(seam.askPending).toBe(false);
+    expect(lease.askPending).toBe(false);
     coordinator.destroy();
   });
 
   it("abort and generation cleanup clear the form, promise, responder, and latch", async () => {
-    const { service, seam, provider } = harness();
+    const { handle, provider, activate } = harness(["ask_user"]);
     const host = new FakeInteractionHost();
     const abortController = new AbortController();
     const coordinator = new AskInteractionCoordinator(host, abortController.signal);
     const events: ClaudeCodeToolEvent[] = [];
-    service.setToolListener((event) => events.push(event));
-    seam.runAllowedTools = new Set(["ask_user"]);
-    service.setAskUserResponder(coordinator, abortController.signal);
+    const lease = activate({
+      askResponder: coordinator,
+      askSignal: abortController.signal,
+      signal: abortController.signal,
+      lifecycle: (event) => events.push(event),
+    });
 
     const pending = provider.callTool(call("ask_user", askArguments, "abort-ask"));
     await host.waitForMount();
     abortController.abort();
     const result = await pending;
-    service.setAskUserResponder(null);
     coordinator.destroy();
+    await handle.release();
 
     expect(result.content).toContain("ask_cancelled");
     expect(host.interaction).toBeNull();
     expect(coordinator.hasPending()).toBe(false);
-    expect(seam.askUserResponder).toBeNull();
-    expect(seam.askPending).toBe(false);
+    expect(lease.state).toBe("quiescent");
+    expect(lease.askPending).toBe(false);
     expect(events.at(-1)).toMatchObject({
       phase: "end",
       toolName: "ask_user",
@@ -329,17 +368,19 @@ describe("ClaudeCodeService ask_user", () => {
   });
 
   it("refuses a legacy ask callback without mounting a form or latch", async () => {
-    const { service, seam, provider } = harness();
+    const { provider, activate } = harness(["ask_user"]);
     const host = new FakeInteractionHost();
     const abortController = new AbortController();
     const coordinator = new AskInteractionCoordinator(host, abortController.signal);
-    seam.runAllowedTools = new Set(["ask_user"]);
-    service.setAskUserResponder(coordinator, abortController.signal);
+    const lease = activate({
+      askResponder: coordinator,
+      askSignal: abortController.signal,
+    });
     const server = new VaultMcpServer("writing_assistant", provider);
-    const handle = await server.start();
+    const serverHandle = await server.start();
 
     try {
-      const response = await postToolCall(handle, "ask_user", askArguments);
+      const response = await postToolCall(serverHandle, "ask_user", askArguments);
 
       expect(response).toMatchObject({
         result: {
@@ -349,20 +390,18 @@ describe("ClaudeCodeService ask_user", () => {
       expect(JSON.stringify(response)).toContain("exact provider correlation");
       expect(host.interaction).toBeNull();
       expect(coordinator.hasPending()).toBe(false);
-      expect(seam.askPending).toBe(false);
+      expect(lease.askPending).toBe(false);
     } finally {
       server.stop();
-      service.setAskUserResponder(null);
       coordinator.destroy();
     }
   });
 
   it("routes an exactly correlated SDK call and refuses legacy loopback", async () => {
-    const { service, seam, provider } = harness();
+    const { provider, activate } = harness(["ask_user"]);
     const host = new FakeInteractionHost();
     const coordinator = new AskInteractionCoordinator(host, new AbortController().signal);
-    seam.runAllowedTools = new Set(["ask_user"]);
-    service.setAskUserResponder(coordinator);
+    const lease = activate({ askResponder: coordinator });
 
     const sdkAsk = buildVaultSdkTools(provider).find((tool) => tool.name === "ask_user");
     expect(sdkAsk).toBeDefined();
@@ -383,9 +422,9 @@ describe("ClaudeCodeService ask_user", () => {
     });
 
     const server = new VaultMcpServer("writing_assistant", provider);
-    const handle = await server.start();
+    const serverHandle = await server.start();
     try {
-      const response = await postToolCall(handle, "ask_user", askArguments);
+      const response = await postToolCall(serverHandle, "ask_user", askArguments);
       expect(response).toMatchObject({
         result: {
           isError: true,
@@ -397,63 +436,69 @@ describe("ClaudeCodeService ask_user", () => {
       coordinator.destroy();
     }
 
-    expect(seam.askPending).toBe(false);
-    expect(seam.askUserResponder).toBe(coordinator);
+    expect(lease.askPending).toBe(false);
+    expect(lease.context.askResponder).toBe(coordinator);
   });
 
-  it("destroy cancels and clears the responder, latch, sessions, and loopback server", () => {
+  it("destroy cancels the responder, tombstones the surface, and disposes sessions", async () => {
     const { service, seam } = harness();
     const responder: AskUserResponder = {
       ask: vi.fn(),
       cancelPending: vi.fn(),
     };
     const disposeAll = vi.spyOn(seam.sessionRegistry, "disposeAll");
-    const stop = vi.fn();
-    seam.mcpServer = { stop };
-    seam.askPending = true;
-    service.setAskUserResponder(responder);
+    const stop = vi.spyOn(VaultMcpServer.prototype, "stop");
+    seam.sdkUsable = Promise.resolve(false);
+    // The legacy loopback bridge, which is now run-scoped rather than one shared
+    // service-wide server (settled decision 17).
+    const runtime = await service.getRuntime("claudecode", { posture: "ask" });
+    const lease = runtime?.generation?.activate({
+      review: null,
+      askResponder: responder,
+      askSignal: null,
+      lifecycle: null,
+      signal: null,
+    });
 
     service.destroy();
 
     expect(responder.cancelPending).toHaveBeenCalledWith("destroyed");
-    expect(seam.askUserResponder).toBeNull();
-    expect(seam.askPending).toBe(false);
+    expect(lease?.state).toBe("tombstoned");
+    expect(lease?.askPending).toBe(false);
     expect(disposeAll).toHaveBeenCalledTimes(1);
     expect(stop).toHaveBeenCalledTimes(1);
-    expect(seam.mcpServer).toBeNull();
   });
 
   it("destroy settles a real pending ask before disposing every transport resource", async () => {
-    const { service, seam, provider } = harness();
+    const { service, seam, provider, activate } = harness(["ask_user"]);
     const host = new FakeInteractionHost();
     const abortController = new AbortController();
     const coordinator = new AskInteractionCoordinator(host, abortController.signal);
     const disposeAll = vi.spyOn(seam.sessionRegistry, "disposeAll");
-    const stop = vi.fn();
-    service.setToolListener(vi.fn());
-    service.setLiveReview({
-      resolveOne: vi.fn(),
-      resolveEditOne: vi.fn(),
-      resolveMemoryOne: vi.fn(),
+    const lease = activate({
+      askResponder: coordinator,
+      askSignal: abortController.signal,
+      lifecycle: vi.fn(),
+      review: {
+        resolveOne: vi.fn(),
+        resolveEditOne: vi.fn(),
+        resolveMemoryOne: vi.fn(),
+      } as unknown as VaultOpReviewer,
     });
-    seam.mcpServer = { stop };
-    seam.runAllowedTools = new Set(["ask_user"]);
-    service.setAskUserResponder(coordinator, abortController.signal);
     const pending = provider.callTool(call("ask_user", askArguments, "destroy-ask"));
     await host.waitForMount();
 
+    // This surface belongs to a handle the test built, so unload reaches it the
+    // way it reaches a real one: through the lease it holds.
+    lease.tombstone();
     service.destroy();
     const result = await pending;
 
     expect(result.content).toContain("ask_cancelled");
     expect(host.interaction).toBeNull();
     expect(coordinator.hasPending()).toBe(false);
-    expect(seam.askUserResponder).toBeNull();
-    expect(seam.askPending).toBe(false);
-    expect(seam.toolListener).toBeNull();
-    expect(seam.liveReview).toBeNull();
+    expect(lease.state).toBe("tombstoned");
+    expect(lease.askPending).toBe(false);
     expect(disposeAll).toHaveBeenCalledTimes(1);
-    expect(stop).toHaveBeenCalledTimes(1);
-    expect(seam.mcpServer).toBeNull();
   });
 });

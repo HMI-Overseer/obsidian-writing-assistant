@@ -176,16 +176,20 @@ export class ChatGenerationOrchestrator {
     if (store.getSnapshot().messageHistory.length === 0) return;
 
     const posture = composer.getPosture();
-    const client = createChatClient(
+    const runtime = await this.deps.plugin.services.claudeCode.getRuntime(
       activeModel.provider,
-      this.deps.plugin.settings.providerSettings,
-      await this.deps.plugin.services.claudeCode.getRuntime(activeModel.provider, {
+      {
         posture,
         activeFilePath: this.deps.plugin.app.workspace.getActiveFile()?.path,
         conversationId: store.getActiveConversationId() ?? undefined,
         resumeCursor: store.getClaudeCodeResumeCursor(),
         contextWindow: this.deps.plugin.services.modelAvailability.resolveContextWindow(activeModel),
-      }),
+      },
+    );
+    const client = createChatClient(
+      activeModel.provider,
+      this.deps.plugin.settings.providerSettings,
+      runtime,
     );
 
     this.setIsGeneratingAndSync(true);
@@ -199,6 +203,7 @@ export class ChatGenerationOrchestrator {
       client,
       interactionHost,
       posture,
+      ...(runtime?.generation ? { claudeGeneration: runtime.generation } : {}),
       finalization: { kind: "append" },
       setIsGenerating: (v) => this.setIsGeneratingAndSync(v),
       setActiveAbortController: (c) => {

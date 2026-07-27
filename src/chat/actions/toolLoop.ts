@@ -55,6 +55,7 @@ import { extractToolInput } from "../../tools/metadata";
 import { normalizeVaultToolCall } from "../../tools/paths";
 import { streamWithRetry } from "../../api/retry";
 import { TurnRunOwner } from "../streaming/TurnRunOwner";
+import type { GenerationCallbackLease } from "../streaming/TurnRunOwner";
 import type { LiveVaultReview } from "./liveVaultReview";
 import {
   AskInteractionPreconditionError,
@@ -179,6 +180,12 @@ export async function runToolLoop(
   }),
   createActionRef: (toolCallId: string) => string = (toolCallId) =>
     `action-${toolCallId}`,
+  /**
+   * The provider's own callback lease, when it has one (Claude Code). Bound to the
+   * turn-run owner below so a callback that crosses an effect boundary refuses the
+   * turn's next retry, and so each attempt's ordinal reaches the lease as evidence.
+   */
+  callbackLease?: GenerationCallbackLease,
 ): Promise<ToolLoopResult> {
   const toolLoopTurns: ChatTurn[] = [];
   let allWriteToolCalls: ToolCall[] = [];
@@ -224,6 +231,7 @@ export async function runToolLoop(
   // its construction, and a user Stop cancels through one named path rather than
   // being inferred from whichever `AbortError` surfaces first.
   const runOwner = new TurnRunOwner(turnBuilder.snapshot().id, signal);
+  runOwner.bindCallbackLease(callbackLease);
 
   try {
     return await runRounds();

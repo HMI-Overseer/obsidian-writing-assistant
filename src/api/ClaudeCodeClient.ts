@@ -38,6 +38,7 @@ import {
 import { ClaudeCodeSdkMessageTranslator } from "./sdk/claudeCodeSdkMessageTranslator";
 import { isEffortLevel } from "../shared/reasoning";
 import type { McpSdkServerConfigWithInstance } from "./sdk/claudeAgentSdk";
+import type { ClaudeCodeGenerationHandle } from "../services/ClaudeCodeGenerationLease";
 import type { SessionRecovery, SessionTurn } from "./harnessSession";
 import { generateId } from "../utils";
 
@@ -71,6 +72,18 @@ export interface SdkSessionTurnInput {
 export interface ClaudeCodeRuntime {
   /** Subprocess working directory, the vault root. */
   vaultRoot?: string;
+  /**
+   * This generation's grip on every Claude callback surface it can reach
+   * (RFC-0011 phase 5). The chat pipeline activates it with the generation's
+   * review, ask, and lifecycle owners before the provider runs, and releases it in
+   * its `finally`. It rides the runtime rather than being threaded through this
+   * client, the query engine, and the session registry, because the callback a
+   * lease guards is dispatched by the SDK rather than by any of them: the run slot
+   * a persistent session's MCP server captured is the only place the lease could
+   * be read from anyway, and threading would have given up the phase 4 property
+   * that a lease ID enters at exactly one place per provider.
+   */
+  generation?: ClaudeCodeGenerationHandle;
   /**
    * The model's discovered context window (Claude Code reports it per turn; its
    * catalog aliases carry no static size). Feeds the send-path preflight

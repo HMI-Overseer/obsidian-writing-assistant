@@ -4,6 +4,7 @@ import { DEFAULT_SETTINGS } from "../../../src/constants";
 import { MemoryService } from "../../../src/memory/MemoryService";
 import type { PluginSettings } from "../../../src/shared/types";
 import { ClaudeCodeService } from "../../../src/services/ClaudeCodeService";
+import { ClaudeCodeGenerationHandle } from "../../../src/services/ClaudeCodeGenerationLease";
 import type { McpToolProvider } from "../../../src/mcp/VaultMcpServer";
 import type { ToolCall, ToolResult, VaultOpReviewer } from "../../../src/tools/types";
 import { CLAUDE_CODE_STABLE_TOOL_SET } from "../../../src/tools/toolSurface";
@@ -38,12 +39,15 @@ function settings(): PluginSettings {
 }
 
 type ClaudeCodeTestSeam = {
-  createToolProvider(): McpToolProvider;
-  runAllowedTools: Set<string>;
-  liveReview: VaultOpReviewer | null;
+  createCallbackProvider(handle: ClaudeCodeGenerationHandle): McpToolProvider;
 };
 
-function harness() {
+/**
+ * One callback surface with the allow-list this run permits, then the generation's
+ * owners installed once (RFC-0011 phase 5). The allow-list is fixed before any
+ * callback can enter, and the review owner is fixed at activation.
+ */
+function harness(allowedTools: string[] = []) {
   const currentSettings = settings();
   const memoryService = new MemoryService(() => currentSettings.memories);
   const saveSettings = vi.fn(async () => undefined);
@@ -55,13 +59,30 @@ function harness() {
     saveSettings,
   );
   const seam = service as unknown as ClaudeCodeTestSeam;
+  const handle = new ClaudeCodeGenerationHandle({
+    leaseId: "lease-memory-test",
+    conversationId: null,
+    posture: "ask",
+    allowedTools: new Set(allowedTools),
+    activeFilePath: "",
+    correlationPosture: "provider_id",
+  });
+  const provider = seam.createCallbackProvider(handle);
   return {
     currentSettings,
     memoryService,
     saveSettings,
     service,
-    seam,
-    provider: seam.createToolProvider(),
+    handle,
+    provider,
+    activate: (review: VaultOpReviewer | null = null) =>
+      handle.activate({
+        review,
+        askResponder: null,
+        askSignal: null,
+        lifecycle: null,
+        signal: null,
+      }),
   };
 }
 
@@ -94,8 +115,8 @@ describe("ClaudeCodeService memory tools", () => {
   });
 
   it("dispatches recall_memory to the current store", async () => {
-    const { seam, provider } = harness();
-    seam.runAllowedTools = new Set(["recall_memory"]);
+    const { provider, activate } = harness(["recall_memory"]);
+    activate();
 
     const result = await provider.callTool(
       call("recall_memory", { names: ["vault-tone"] }),
@@ -108,19 +129,18 @@ describe("ClaudeCodeService memory tools", () => {
   });
 
   it("dispatches a mutation through resolveMemoryOne with the MCP call id", async () => {
-    const { seam, provider } = harness();
-    seam.runAllowedTools = new Set(["add_memory"]);
+    const { provider, activate } = harness(["add_memory"]);
     const applied: ToolResult = {
       content: 'Added memory "new-rule".',
       isReadOnly: false,
       disposition: "applied",
     };
     const resolveMemoryOne = vi.fn(async () => applied);
-    seam.liveReview = {
+    activate({
       resolveOne: vi.fn(),
       resolveEditOne: vi.fn(),
       resolveMemoryOne,
-    };
+    } as unknown as VaultOpReviewer);
     const mutation = call("add_memory", {
       name: "new-rule",
       type: "rule",
@@ -134,14 +154,13 @@ describe("ClaudeCodeService memory tools", () => {
   });
 
   it("refuses a reviewable mutation when exact provider correlation is unavailable", async () => {
-    const { seam, provider } = harness();
-    seam.runAllowedTools = new Set(["add_memory"]);
+    const { provider, activate } = harness(["add_memory"]);
     const resolveMemoryOne = vi.fn();
-    seam.liveReview = {
+    activate({
       resolveOne: vi.fn(),
       resolveEditOne: vi.fn(),
       resolveMemoryOne,
-    };
+    } as unknown as VaultOpReviewer);
 
     const result = await provider.callTool(
       call("add_memory", {
@@ -162,8 +181,8 @@ describe("ClaudeCodeService memory tools", () => {
   });
 
   it("refuses a denied mutation at runtime even though the stable catalog advertises it", async () => {
-    const { seam, provider } = harness();
-    seam.runAllowedTools = new Set(["recall_memory"]);
+    const { provider, activate } = harness(["recall_memory"]);
+    activate();
 
     const result = await provider.callTool(
       call("forget_memory", { name: "vault-tone" }),

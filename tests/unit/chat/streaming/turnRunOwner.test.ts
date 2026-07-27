@@ -195,6 +195,40 @@ describe("TurnRunOwner retry permission", () => {
     expect(owner.retryRefusal()).toBe("consequential_callback_entered");
   });
 
+  it("refuses retry once the bound callback lease reports a crossed boundary", () => {
+    const owner = new TurnRunOwner<string>("turn-abc");
+    let sink: (() => void) | null = null;
+    owner.bindCallbackLease({
+      noteAttempt: vi.fn(),
+      onConsequentialCallback: (fn: () => void) => {
+        sink = fn;
+      },
+    });
+
+    expect(owner.retryRefusal()).toBeNull();
+    // Phase 2 built the flag and the refusal it drives with no production writer.
+    // This is the writer phase 5 wires: a Claude callback crossing an effect
+    // boundary, reported through the lease.
+    sink?.();
+
+    expect(owner.retryRefusal()).toBe("consequential_callback_entered");
+  });
+
+  it("stamps each attempt's ordinal onto the bound callback lease", () => {
+    const owner = new TurnRunOwner<string>("turn-abc");
+    const noteAttempt = vi.fn();
+    owner.bindCallbackLease({
+      noteAttempt,
+      onConsequentialCallback: () => undefined,
+    });
+
+    owner.openAttempt();
+    owner.openAttempt();
+
+    // The ordinal is evidence on a generation-scoped lease, never its identity.
+    expect(noteAttempt.mock.calls).toEqual([[1], [2]]);
+  });
+
   it("stops listening to the turn signal once released", async () => {
     const controller = new AbortController();
     const owner = new TurnRunOwner<string>("turn-abc", controller.signal);

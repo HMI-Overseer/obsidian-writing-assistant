@@ -57,6 +57,10 @@ import {
 } from "../turns/assistantTurnProjections";
 import { projectRegexEditPreview } from "../messages/regexEditPreview";
 import { lowerEvidenceFromCapture } from "../../shared/captureEvidence";
+import type {
+  ClaudeCodeGenerationHandle,
+  ClaudeCodeGenerationLease,
+} from "../../services/ClaudeCodeGenerationLease";
 
 /**
  * How to commit the completed generation to the store.
@@ -77,6 +81,14 @@ export interface LlmGenerationOptions {
   interactionHost: ComposerInteractionHostPort;
   /** Session approval posture, the replacement for the plan/chat/edit mode (section 6.3). */
   posture: ApprovalPosture;
+  /**
+   * This generation's grip on Claude Code's callback surfaces (RFC-0011 phase 5),
+   * taken from the runtime the caller resolved. Present only for `claudecode`.
+   * Activated with the owners below before any provider call and released in this
+   * function's `finally`, which is what makes "one callback, one generation" a
+   * lifetime rather than a convention.
+   */
+  claudeGeneration?: ClaudeCodeGenerationHandle;
   finalization: FinalizationMode;
   setIsGenerating: (v: boolean) => void;
   setActiveAbortController: (c: AbortController | null) => void;
@@ -142,6 +154,7 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
     client,
     interactionHost,
     posture,
+    claudeGeneration,
     finalization,
     setIsGenerating,
     setActiveAbortController,
@@ -167,6 +180,9 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
   > = {};
   const claudeActionRefsByToolCallId: Record<string, string> = {};
   const claudeToolCorrelations: Record<string, "provider_id"> = {};
+  // Set when this generation actually owns a Claude callback surface, so the tool
+  // loop can bind it to the turn-run owner. Null on every other provider.
+  let claudeLease: ClaudeCodeGenerationLease | undefined;
 
   // Ambient editing (prompt-cache design section 6.3): the edit pipeline (edit renderer, edit
   // review channel is active whenever the session permits any
@@ -220,6 +236,10 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
     });
   } catch (error) {
     askCoordinator.destroy();
+    // Context preparation failed before the main `try`, so its `finally` never
+    // runs. The handle still owns a callback surface (and, on the legacy path, a
+    // live loopback server), so it is released on this path too.
+    await claudeGeneration?.release();
     setActiveAbortController(null);
     await store.persistActiveConversation();
     setIsGenerating(false);
@@ -466,44 +486,49 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
 
     // Claude Code lifecycle callbacks may beat the SDK declaration. They reserve
     // identity and state by exact ID, while SDK events remain the only positioner.
+    //
+    // Activation is the one place this generation's owners are installed, and the
+    // lease has no setter that replaces them afterwards (RFC-0011 settled decision
+    // 19). Every callback admitted from here on reads these objects or none.
     if (claudeCodeAgentic) {
-      plugin.services.claudeCode.setAskUserResponder(
-        askCoordinator,
-        abortController.signal,
-      );
-      plugin.services.claudeCode.setLiveReview(liveReview);
-      plugin.services.claudeCode.setToolListener((event) => {
-        claudeToolCorrelations[event.toolCallId] = "provider_id";
-        if (event.phase === "start") {
-          const actionRef = isActionTool(event.toolName)
-            ? `action-${draftIdentity.revisionId}-${event.toolCallId}`
-            : undefined;
-          if (actionRef) {
-            claudeActionRefsByToolCallId[event.toolCallId] = actionRef;
+      claudeLease = claudeGeneration?.activate({
+        review: liveReview,
+        askResponder: askCoordinator,
+        askSignal: abortController.signal,
+        signal: abortController.signal,
+        lifecycle: (event) => {
+          claudeToolCorrelations[event.toolCallId] = "provider_id";
+          if (event.phase === "start") {
+            const actionRef = isActionTool(event.toolName)
+              ? `action-${draftIdentity.revisionId}-${event.toolCallId}`
+              : undefined;
+            if (actionRef) {
+              claudeActionRefsByToolCallId[event.toolCallId] = actionRef;
+            }
+            turnBuilder.updateToolLifecycle(event.toolCallId, {
+              state: "running",
+              toolName: event.toolName,
+              ...(actionRef ? { actionRef } : {}),
+            });
+          } else {
+            const capture = captureStepFields(event.toolName, event.args, {
+              content: event.content,
+              isError: event.isError,
+              disposition: event.disposition,
+            });
+            turnBuilder.updateToolLifecycle(event.toolCallId, {
+              state: event.isError ? "failed" : "completed",
+              toolName: event.toolName,
+              toolInput: JSON.stringify(event.args),
+              resultRecord: capture.resultRecord,
+              resultDigest: capture.resultDigest,
+              askGuidance: capture.askGuidance,
+              ...(event.askStatus && { askStatus: event.askStatus }),
+              ...(event.isError && { isError: true, errorContent: event.content }),
+            });
           }
-          turnBuilder.updateToolLifecycle(event.toolCallId, {
-            state: "running",
-            toolName: event.toolName,
-            ...(actionRef ? { actionRef } : {}),
-          });
-        } else {
-          const capture = captureStepFields(event.toolName, event.args, {
-            content: event.content,
-            isError: event.isError,
-            disposition: event.disposition,
-          });
-          turnBuilder.updateToolLifecycle(event.toolCallId, {
-            state: event.isError ? "failed" : "completed",
-            toolName: event.toolName,
-            toolInput: JSON.stringify(event.args),
-            resultRecord: capture.resultRecord,
-            resultDigest: capture.resultDigest,
-            askGuidance: capture.askGuidance,
-            ...(event.askStatus && { askStatus: event.askStatus }),
-            ...(event.isError && { isError: true, errorContent: event.content }),
-          });
-        }
-        refreshLiveTurn(turnBuilder.snapshot());
+          refreshLiveTurn(turnBuilder.snapshot());
+        },
       });
     }
 
@@ -551,6 +576,7 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
       turnBuilder,
       (toolCallId) =>
         `action-${draftIdentity.revisionId}-${toolCallId}`,
+      claudeLease,
     );
     const {
       usage: finalUsage,
@@ -660,14 +686,15 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
       });
     }
   } finally {
-    plugin.services.claudeCode.setAskUserResponder(null);
-    plugin.services.claudeCode.setToolListener(null);
-    plugin.services.claudeCode.setLiveReview(null);
     // Resolve any op still parked on the user so no await leaks past the turn.
     liveReview.cancelPending();
     // The generation owns exactly one coordinator. Destroying it settles any
     // remaining interaction before the active generation state is cleared.
     askCoordinator.destroy();
+    // Both of the above run *before* the lease is released, because releasing it
+    // drains the callbacks already admitted and a callback parked on a review the
+    // user will never see would otherwise never return.
+    await claudeGeneration?.release();
     setActiveAbortController(null);
     await store.persistActiveConversation();
     setIsGenerating(false);

@@ -102,16 +102,17 @@ export async function sendMessage(options: SendMessageOptions): Promise<void> {
   store.appendMessage(userMessage);
   transcript.setEmptyStateVisible(false);
 
+  const runtime = await plugin.services.claudeCode.getRuntime(activeModel.provider, {
+    posture,
+    activeFilePath: plugin.app.workspace.getActiveFile()?.path,
+    conversationId: store.getActiveConversationId() ?? undefined,
+    resumeCursor: store.getClaudeCodeResumeCursor(),
+    contextWindow: plugin.services.modelAvailability.resolveContextWindow(activeModel),
+  });
   const client = createChatClient(
     activeModel.provider,
     plugin.settings.providerSettings,
-    await plugin.services.claudeCode.getRuntime(activeModel.provider, {
-      posture,
-      activeFilePath: plugin.app.workspace.getActiveFile()?.path,
-      conversationId: store.getActiveConversationId() ?? undefined,
-      resumeCursor: store.getClaudeCodeResumeCursor(),
-      contextWindow: plugin.services.modelAvailability.resolveContextWindow(activeModel),
-    }),
+    runtime,
   );
 
   await generateLlmResponse({
@@ -123,6 +124,7 @@ export async function sendMessage(options: SendMessageOptions): Promise<void> {
     client,
     interactionHost,
     posture,
+    ...(runtime?.generation ? { claudeGeneration: runtime.generation } : {}),
     finalization: { kind: "append", autoInsert: autoInsertAfterResponse },
     setIsGenerating,
     setActiveAbortController,

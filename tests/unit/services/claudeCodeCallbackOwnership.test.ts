@@ -4,23 +4,31 @@ import { DEFAULT_SETTINGS } from "../../../src/constants";
 import { MemoryService } from "../../../src/memory/MemoryService";
 import type { McpToolProvider } from "../../../src/mcp/VaultMcpServer";
 import {
-  ClaudeCodeService,
+  ClaudeCodeGenerationHandle,
+  ClaudeCodeRunSlot,
+  type ClaudeCodeGenerationOwners,
+  type ClaudeCodeRuntimeScope,
   type ClaudeCodeToolEvent,
-} from "../../../src/services/ClaudeCodeService";
+} from "../../../src/services/ClaudeCodeGenerationLease";
+import { ClaudeCodeService } from "../../../src/services/ClaudeCodeService";
 import type { PluginSettings } from "../../../src/shared/types";
+import type { AskUserResponder } from "../../../src/tools/ask/types";
 import type { ToolCall, ToolResult, VaultOpReviewer } from "../../../src/tools/types";
 import { DEFAULT_VAULT_OP_POLICY } from "../../../src/vault-ops/gateway";
 
 /**
- * RFC-0011 phase 0: Claude Code callback ownership characterization.
+ * RFC-0011 phase 5: Claude Code callback ownership.
  *
  * The MCP tool provider is created once and captured by the SDK server or the
- * loopback server. It reads mutable `ClaudeCodeService` fields at call time, so a
- * callback that arrives after generation cleanup, or after a newer generation
- * installed its own owners, is answered by whatever those fields hold now.
+ * loopback server for the lifetime of the transport it serves. Before phase 5 it
+ * read mutable `ClaudeCodeService` fields at call time, so a callback that arrived
+ * after generation cleanup, or after a newer generation installed its own owners,
+ * was answered by whatever those fields held then. It now reads one
+ * {@link ClaudeCodeRunSlot}, and the lease it resolves to is captured
+ * synchronously at entry.
  *
- * `it.fails` cases state the invariant RFC-0011 requires and turn red when
- * phase 5 lands attempt-scoped generation leases.
+ * Every case here uses a controllable promise rather than a sleep, so "in flight"
+ * is a state the test holds rather than a race it hopes for.
  */
 
 function app(): App {
@@ -42,52 +50,98 @@ function settings(): PluginSettings {
   return {
     ...DEFAULT_SETTINGS,
     agenticMode: true,
-    memoriesEnabled: false,
+    memoriesEnabled: true,
     vaultOpPolicy: { ...DEFAULT_VAULT_OP_POLICY },
   };
 }
 
 interface ServiceSeam {
-  createToolProvider(): McpToolProvider;
-  runAllowedTools: Set<string>;
-  liveReview: VaultOpReviewer | null;
-  toolListener: ((event: ClaudeCodeToolEvent) => void) | null;
-  collectedVaultOps: ToolCall[];
+  createCallbackProvider(
+    handle: ClaudeCodeGenerationHandle,
+    slot?: ClaudeCodeRunSlot,
+  ): McpToolProvider;
+  sessionSlots: Map<string, ClaudeCodeRunSlot>;
+  liveHandles: Set<ClaudeCodeGenerationHandle>;
   sdkUsable: Promise<boolean> | null;
+}
+
+function scope(overrides: Partial<ClaudeCodeRuntimeScope> = {}): ClaudeCodeRuntimeScope {
+  return {
+    leaseId: "lease-test",
+    conversationId: null,
+    posture: "ask",
+    allowedTools: new Set([
+      "write_file",
+      "read_file",
+      "replace_text",
+      "ask_user",
+      "remember",
+    ]),
+    activeFilePath: "Notes/active.md",
+    correlationPosture: "provider_id",
+    ...overrides,
+  };
 }
 
 function harness() {
   const currentSettings = settings();
   const memoryService = new MemoryService(() => currentSettings.memories);
+  const retrieve = vi.fn(async () => []);
+  const ragService = {
+    isReady: () => true,
+    availability: () => "ready",
+    retrieve,
+  };
   const service = new ClaudeCodeService(
     app(),
     () => currentSettings,
-    () => ({ isReady: () => false }) as never,
+    () => ragService as never,
     () => memoryService,
     async () => undefined,
   );
   const seam = service as unknown as ServiceSeam;
   seam.sdkUsable = Promise.resolve(true);
-  // One provider instance, exactly as an SDK MCP server or the loopback server
-  // captures it for the lifetime of its callback surface.
-  return { service, seam, provider: seam.createToolProvider() };
+
+  /**
+   * One callback surface, exactly as an SDK MCP server or the loopback server
+   * captures it: one provider closure over one slot, for the lifetime of its
+   * transport.
+   */
+  const surface = (
+    overrides: Partial<ClaudeCodeRuntimeScope> = {},
+    slot = new ClaudeCodeRunSlot(),
+  ) => {
+    const handle = new ClaudeCodeGenerationHandle(scope(overrides));
+    const provider = seam.createCallbackProvider(handle, slot);
+    return { handle, provider, slot };
+  };
+
+  return { service, seam, currentSettings, surface, retrieve };
 }
 
 function reviewer(label: string, seen: string[]): VaultOpReviewer {
+  const resolve = (call: ToolCall): Promise<ToolResult> => {
+    seen.push(`${label}:${call.name}`);
+    return Promise.resolve({ content: `${label} approved`, isError: false });
+  };
   return {
-    resolveOne: (call: ToolCall): Promise<ToolResult> => {
-      seen.push(`${label}:${call.name}`);
-      return Promise.resolve({ content: `${label} approved`, isError: false });
-    },
-    resolveEditOne: (call: ToolCall): Promise<ToolResult> => {
-      seen.push(`${label}:${call.name}`);
-      return Promise.resolve({ content: `${label} approved`, isError: false });
-    },
-    resolveMemoryOne: (call: ToolCall): Promise<ToolResult> => {
-      seen.push(`${label}:${call.name}`);
-      return Promise.resolve({ content: `${label} approved`, isError: false });
-    },
-  } as unknown as VaultOpReviewer;
+    resolveOne: resolve,
+    resolveEditOne: resolve,
+    resolveMemoryOne: resolve,
+  };
+}
+
+function owners(
+  overrides: Partial<ClaudeCodeGenerationOwners> = {},
+): ClaudeCodeGenerationOwners {
+  return {
+    review: null,
+    askResponder: null,
+    askSignal: null,
+    lifecycle: null,
+    signal: null,
+    ...overrides,
+  };
 }
 
 function vaultOpCall(id: string): ToolCall {
@@ -98,128 +152,603 @@ function vaultOpCall(id: string): ToolCall {
   };
 }
 
-describe("Claude Code late callback ownership", () => {
-  it("routes a late callback to the fallback executor after cleanup clears the review owner", async () => {
-    const { seam, provider } = harness();
+/** A promise the test resolves, so "in flight" is held rather than raced. */
+function gate() {
+  let open!: () => void;
+  const promise = new Promise<void>((resolve) => {
+    open = resolve;
+  });
+  return { promise, open };
+}
+
+describe("Claude Code callback admission", () => {
+  it("answers a callback under the generation that authorized it", async () => {
+    const { surface } = harness();
     const seen: string[] = [];
-    seam.runAllowedTools = new Set(["write_file"]);
-    seam.liveReview = reviewer("run-a", seen);
+    const { handle, provider } = surface();
+    handle.activate(owners({ review: reviewer("run-a", seen) }));
 
-    await provider.callTool(vaultOpCall("toolu_during"));
+    const result = await provider.callTool(vaultOpCall("toolu_during"));
+
     expect(seen).toEqual(["run-a:write_file"]);
-
-    // Generation cleanup, exactly as the finally block in generateLlmResponse
-    // does it: the owners go away while the provider run may still be alive.
-    seam.liveReview = null;
-    seam.toolListener = null;
-
-    const late = await provider.callTool(vaultOpCall("toolu_late"));
-
-    // Invariant 13 and criterion 24: no callback enters after its lease begins
-    // stopping, and none may fall through to a path that was not the authorized
-    // one. The late call instead reached the collect-for-later fallback.
-    expect(seen).toEqual(["run-a:write_file"]);
-    expect(late.isError ?? false).toBe(false);
-    expect(seam.collectedVaultOps.map((op) => op.id)).toEqual(["toolu_late"]);
+    expect(result.isError ?? false).toBe(false);
   });
 
-  // Criterion 24, fixed in phase 5.
-  it.fails("refuses a callback that arrives after its generation released its owners", async () => {
-    const { seam, provider } = harness();
-    seam.runAllowedTools = new Set(["write_file"]);
-    seam.liveReview = reviewer("run-a", []);
+  // Criterion 24, promoted from `it.fails` and fixed here.
+  it("refuses a callback that arrives after its generation released its owners", async () => {
+    const { surface } = harness();
+    const seen: string[] = [];
+    const { handle, provider } = surface();
+    handle.activate(owners({ review: reviewer("run-a", seen) }));
     await provider.callTool(vaultOpCall("toolu_during"));
 
-    seam.liveReview = null;
-    seam.toolListener = null;
+    await handle.release();
     const late = await provider.callTool(vaultOpCall("toolu_late"));
 
     expect(late.isError).toBe(true);
+    // The refusal names the closed surface and nothing about any other generation.
+    expect(late.content).toContain("no_active_generation");
+    expect(seen).toEqual(["run-a:write_file"]);
   });
 
-  it("routes an old run's callback into the next generation's review owner", async () => {
-    const { seam, provider } = harness();
+  // Criterion 27, promoted from `it.fails` and fixed here.
+  //
+  // The mechanism the original assertion used is gone: there is no service field
+  // for a second generation to overwrite. What replaces it is the topology settled
+  // decision 17 requires, a surface per provider session or one-shot run, so the
+  // claim itself is unchanged and now actually holds.
+  it("keeps an old run's callback away from the next generation", async () => {
+    const { surface } = harness();
     const seen: string[] = [];
-    seam.runAllowedTools = new Set(["write_file"]);
-    seam.liveReview = reviewer("run-a", seen);
+    const runA = surface();
+    runA.handle.activate(owners({ review: reviewer("run-a", seen) }));
+    await runA.handle.release();
 
-    // Generation A ends and generation B installs its own owners. The captured
-    // provider is unchanged, so a straggler from A reads B's fields.
-    seam.liveReview = reviewer("run-b", seen);
-    await provider.callTool(vaultOpCall("toolu_from_run_a"));
+    // Generation B is a different generation on its own surface.
+    const runB = surface();
+    runB.handle.activate(owners({ review: reviewer("run-b", seen) }));
 
-    // Invariant 13 and criterion 27: a callback from an old attempt cannot
-    // observe or mutate a new attempt.
-    expect(seen).toEqual(["run-b:write_file"]);
-  });
-
-  // Criterion 27, fixed in phase 5.
-  it.fails("keeps an old run's callback away from the next generation", async () => {
-    const { seam, provider } = harness();
-    const seen: string[] = [];
-    seam.runAllowedTools = new Set(["write_file"]);
-    seam.liveReview = reviewer("run-a", seen);
-    seam.liveReview = reviewer("run-b", seen);
-
-    await provider.callTool(vaultOpCall("toolu_from_run_a"));
+    await runA.provider.callTool(vaultOpCall("toolu_from_run_a"));
 
     expect(seen).toEqual([]);
   });
 
-  it("emits a late lifecycle event into whichever listener is installed now", async () => {
-    const { seam, provider } = harness();
-    const runA: ClaudeCodeToolEvent[] = [];
-    const runB: ClaudeCodeToolEvent[] = [];
-    seam.runAllowedTools = new Set(["read_file"]);
-    seam.toolListener = (event) => runA.push(event);
-    seam.toolListener = (event) => runB.push(event);
+  it("keeps one conversation's surface away from another conversation's generation", async () => {
+    const { surface } = harness();
+    const seen: string[] = [];
+    const alpha = surface({ conversationId: "conversation-alpha" });
+    const beta = surface({ conversationId: "conversation-beta" });
+    beta.handle.activate(owners({ review: reviewer("beta", seen) }));
 
-    await provider.callTool({
-      id: "toolu_late_read",
-      name: "read_file",
-      arguments: { path: "Notes/late.md" },
-    });
+    const crossed = await alpha.provider.callTool(vaultOpCall("toolu_alpha"));
 
-    expect(runA).toHaveLength(0);
-    expect(runB.length).toBeGreaterThan(0);
+    expect(crossed.isError).toBe(true);
+    expect(seen).toEqual([]);
   });
 
-  it("has no admission gate a caller could consult before entering", () => {
-    const { provider } = harness();
-    const surface = provider as unknown as Record<string, unknown>;
+  it("refuses a callback that enters before its generation activated", async () => {
+    const { surface } = harness();
+    const { provider } = surface();
 
-    // Criterion 23 to 26 need a lease with `enterCallback`, in-flight
-    // accounting, and a cancellation signal. None exists yet.
-    expect(typeof surface.enterCallback).toBe("undefined");
-    expect(typeof surface.lease).toBe("undefined");
+    const early = await provider.callTool(vaultOpCall("toolu_early"));
+
+    expect(early.isError).toBe(true);
+    expect(early.content).toContain("no_active_generation");
   });
 
-  it("destroys without waiting for an in-flight callback", async () => {
-    const { service, seam, provider } = harness();
-    let release!: () => void;
-    const gate = new Promise<void>((resolve) => {
-      release = resolve;
-    });
-    seam.runAllowedTools = new Set(["write_file"]);
-    seam.liveReview = {
-      resolveOne: async (): Promise<ToolResult> => {
-        await gate;
-        return { content: "approved", isError: false };
+  it("refuses a callback that arrives after a forced tombstone, forever", async () => {
+    const { surface } = harness();
+    const seen: string[] = [];
+    const { handle, provider } = surface();
+    handle.activate(owners({ review: reviewer("run-a", seen) }));
+
+    handle.tombstone();
+
+    for (const id of ["toolu_first", "toolu_second"]) {
+      const refused = await provider.callTool(vaultOpCall(id));
+      expect(refused.isError).toBe(true);
+      expect(refused.content).toContain("generation_tombstoned");
+    }
+    expect(seen).toEqual([]);
+  });
+});
+
+describe("Claude Code late admission by tool family", () => {
+  const cases: Array<{ family: string; call: ToolCall }> = [
+    {
+      family: "read",
+      call: { id: "toolu_read", name: "read_file", arguments: { path: "Notes/a.md" } },
+    },
+    {
+      family: "edit",
+      call: {
+        id: "toolu_edit",
+        name: "replace_text",
+        arguments: { old_text: "a", new_text: "b" },
       },
-    } as unknown as VaultOpReviewer;
+    },
+    { family: "vault op", call: vaultOpCall("toolu_vault_op") },
+    {
+      family: "memory mutation",
+      call: {
+        id: "toolu_memory",
+        name: "remember",
+        arguments: { title: "T", content: "C" },
+      },
+    },
+    {
+      family: "ask",
+      call: {
+        id: "toolu_ask",
+        name: "ask_user",
+        arguments: {
+          questions: [
+            {
+              question: "Which?",
+              header: "Pick",
+              options: [
+                { label: "A", description: "a" },
+                { label: "B", description: "b" },
+              ],
+              multiSelect: false,
+            },
+          ],
+        },
+      },
+    },
+  ];
+
+  for (const { family, call } of cases) {
+    it(`refuses a late ${family} callback once the generation is stopping`, async () => {
+      const { surface } = harness();
+      const seen: string[] = [];
+      const asked = vi.fn();
+      const { handle, provider } = surface();
+      const lease = handle.activate(
+        owners({
+          review: reviewer("run-a", seen),
+          askResponder: { ask: asked, cancelPending: vi.fn() } as AskUserResponder,
+        }),
+      );
+
+      // Stopping, not yet settled: the window a straggler used to slip through.
+      void lease.beginStopping();
+      const late = await provider.callTool(call);
+
+      expect(late.isError).toBe(true);
+      expect(late.content).toContain("generation_stopping");
+      expect(seen).toEqual([]);
+      expect(asked).not.toHaveBeenCalled();
+    });
+  }
+});
+
+describe("Claude Code in-flight callback accounting", () => {
+  it("lets a callback admitted before the stop finish under its own lease", async () => {
+    const { surface } = harness();
+    const held = gate();
+    const { handle, provider } = surface();
+    const lease = handle.activate(
+      owners({
+        review: {
+          resolveOne: async () => {
+            await held.promise;
+            return { content: "run-a approved", isError: false };
+          },
+          resolveEditOne: vi.fn(),
+          resolveMemoryOne: vi.fn(),
+        } as unknown as VaultOpReviewer,
+      }),
+    );
 
     const pending = provider.callTool(vaultOpCall("toolu_inflight"));
-    const disposeAll = vi.fn();
-    (service as unknown as { sessionRegistry: { disposeAll: () => void } }).sessionRegistry = {
-      disposeAll,
+    expect(lease.inFlightCount).toBe(1);
+
+    let releaseDone = false;
+    const release = handle.release().then(() => {
+      releaseDone = true;
+    });
+    // A callback already admitted keeps the lease from settling.
+    await Promise.resolve();
+    expect(releaseDone).toBe(false);
+    expect(lease.state).toBe("stopping");
+
+    held.open();
+    await expect(pending).resolves.toMatchObject({ content: "run-a approved" });
+    await release;
+    expect(releaseDone).toBe(true);
+    expect(lease.state).toBe("quiescent");
+    expect(lease.inFlightCount).toBe(0);
+  });
+
+  it("refuses a new callback while an earlier one is still draining", async () => {
+    const { surface } = harness();
+    const held = gate();
+    const seen: string[] = [];
+    const { handle, provider } = surface();
+    handle.activate(
+      owners({
+        review: {
+          resolveOne: async (call: ToolCall) => {
+            seen.push(`run-a:${call.id}`);
+            await held.promise;
+            return { content: "run-a approved", isError: false };
+          },
+          resolveEditOne: vi.fn(),
+          resolveMemoryOne: vi.fn(),
+        } as unknown as VaultOpReviewer,
+      }),
+    );
+
+    const pending = provider.callTool(vaultOpCall("toolu_first"));
+    const release = handle.release();
+    const late = await provider.callTool(vaultOpCall("toolu_second"));
+
+    expect(late.isError).toBe(true);
+    expect(seen).toEqual(["run-a:toolu_first"]);
+
+    held.open();
+    await pending;
+    await release;
+  });
+});
+
+describe("Claude Code effect boundaries", () => {
+  it("refuses a vault op at its boundary once the generation is signalled", async () => {
+    const { surface } = harness();
+    const seen: string[] = [];
+    const controller = new AbortController();
+    const { handle, provider } = surface();
+    const lease = handle.activate(
+      owners({ review: reviewer("run-a", seen), signal: controller.signal }),
+    );
+
+    controller.abort();
+    const stopped = await provider.callTool(vaultOpCall("toolu_after_stop"));
+
+    // Criterion 25: the executor is never reached, so nothing was changed.
+    expect(stopped.isError).toBe(true);
+    expect(stopped.content).toContain("vault op review");
+    expect(seen).toEqual([]);
+    expect(lease.consequentialCallbackEntered).toBe(false);
+  });
+
+  it("records the boundary a callback actually crossed, and nothing else", async () => {
+    const { surface } = harness();
+    const seen: string[] = [];
+    const { handle, provider } = surface();
+    const lease = handle.activate(owners({ review: reviewer("run-a", seen) }));
+
+    await provider.callTool({
+      id: "toolu_read",
+      name: "read_file",
+      arguments: { path: "Notes/a.md" },
+    });
+    // Criterion 25 and settled decision 20: read-only vault work has no boundary.
+    expect(lease.consequentialCallbackEntered).toBe(false);
+
+    await provider.callTool(vaultOpCall("toolu_write"));
+
+    expect(lease.consequentialCallbackEntered).toBe(true);
+    expect([...lease.crossedBoundaries]).toEqual(["vault_op_review"]);
+  });
+
+  it("refuses a mutation whose review owner is absent instead of executing it", async () => {
+    const { surface } = harness();
+    const { handle, provider } = surface();
+    const lease = handle.activate(owners({ review: null }));
+
+    const result = await provider.callTool(vaultOpCall("toolu_no_owner"));
+
+    // The collect-for-later fallback is gone: a mutation with no owner is refused,
+    // never routed to an executor the generation did not authorize.
+    expect(result.isError).toBe(true);
+    expect(result.content).toContain("no review owner");
+    expect(lease.consequentialCallbackEntered).toBe(false);
+  });
+
+  it("reports a crossed boundary to the turn-run owner exactly once per callback", async () => {
+    const { surface } = harness();
+    const seen: string[] = [];
+    const { handle, provider } = surface();
+    const lease = handle.activate(owners({ review: reviewer("run-a", seen) }));
+    const notified = vi.fn();
+    lease.onConsequentialCallback(notified);
+    lease.noteAttempt(2);
+
+    await provider.callTool(vaultOpCall("toolu_write"));
+
+    expect(notified).toHaveBeenCalledTimes(1);
+    // The attempt rides the lease as evidence, never as its identity.
+    expect(lease.attemptOrdinal).toBe(2);
+    expect(lease.context.leaseId).toBe("lease-test");
+  });
+});
+
+describe("Claude Code lease-owned context", () => {
+  it("routes lifecycle events to the lease that admitted the callback", async () => {
+    const { surface } = harness();
+    const runAEvents: ClaudeCodeToolEvent[] = [];
+    const runBEvents: ClaudeCodeToolEvent[] = [];
+    const runA = surface();
+    runA.handle.activate(
+      owners({
+        review: reviewer("run-a", []),
+        lifecycle: (event) => runAEvents.push(event),
+      }),
+    );
+    const runB = surface();
+    runB.handle.activate(
+      owners({
+        review: reviewer("run-b", []),
+        lifecycle: (event) => runBEvents.push(event),
+      }),
+    );
+
+    await runA.provider.callTool(vaultOpCall("toolu_a"));
+
+    expect(runAEvents.map((event) => event.phase)).toEqual(["start", "end"]);
+    expect(runBEvents).toEqual([]);
+  });
+
+  it("emits no lifecycle event for a refused callback", async () => {
+    const { surface } = harness();
+    const events: ClaudeCodeToolEvent[] = [];
+    const { handle, provider } = surface();
+    handle.activate(
+      owners({
+        review: reviewer("run-a", []),
+        lifecycle: (event) => events.push(event),
+      }),
+    );
+    await handle.release();
+
+    await provider.callTool(vaultOpCall("toolu_late"));
+
+    expect(events).toEqual([]);
+  });
+
+  it("reads the active note the generation captured, not the live workspace", async () => {
+    const { surface, retrieve } = harness();
+    const { handle, provider } = surface({
+      activeFilePath: "Notes/captured.md",
+      allowedTools: new Set(["semantic_search"]),
+    });
+    handle.activate(owners());
+
+    await provider.callTool({
+      id: "toolu_search",
+      name: "semantic_search",
+      arguments: { query: "captured" },
+    });
+
+    // Criterion 23: the active note is the one the generation captured. The old
+    // path re-read `workspace.getActiveFile()` at callback time, which this
+    // harness leaves null, so reading it live would pass `undefined` here.
+    expect(retrieve).toHaveBeenCalledWith("captured", "Notes/captured.md");
+  });
+
+  it("enforces the lease's own allow-list rather than a later generation's", async () => {
+    const { surface } = harness();
+    const seen: string[] = [];
+    const { handle, provider } = surface({ allowedTools: new Set(["read_file"]) });
+    handle.activate(owners({ review: reviewer("run-a", seen) }));
+
+    const refused = await provider.callTool(vaultOpCall("toolu_write"));
+
+    expect(refused.isError).toBe(true);
+    expect(refused.content).toContain("not permitted in this session");
+    expect(seen).toEqual([]);
+  });
+
+  it("lowers observed correlation on the lease, never on the service", async () => {
+    const { surface } = harness();
+    const { handle, provider } = surface();
+    const lease = handle.activate(owners({ review: reviewer("run-a", []) }));
+    expect(lease.toolCorrelation).toBe("provider_id");
+
+    await provider.callTool({
+      id: "",
+      name: "read_file",
+      arguments: { path: "Notes/a.md" },
+    });
+
+    expect(lease.toolCorrelation).toBe("none");
+    // A later exactly correlated call cannot raise it back.
+    await provider.callTool({
+      id: "toolu_read",
+      name: "read_file",
+      arguments: { path: "Notes/a.md" },
+    });
+    expect(lease.toolCorrelation).toBe("none");
+  });
+});
+
+describe("Claude Code run slot", () => {
+  it("refuses to hand a surface to a second generation before the first released", () => {
+    const first = new ClaudeCodeGenerationHandle(scope());
+    const second = new ClaudeCodeGenerationHandle(scope({ leaseId: "lease-second" }));
+    const slot = new ClaudeCodeRunSlot();
+    first.registerSlot(slot);
+    const firstLease = first.activate(owners());
+
+    second.registerSlot(slot);
+    const secondLease = second.activate(owners());
+
+    expect(slot.peek()).toBe(firstLease);
+    expect(slot.peek()).not.toBe(secondLease);
+  });
+
+  it("hands the surface over once the first generation released it", async () => {
+    const first = new ClaudeCodeGenerationHandle(scope());
+    const second = new ClaudeCodeGenerationHandle(scope({ leaseId: "lease-second" }));
+    const slot = new ClaudeCodeRunSlot();
+    first.registerSlot(slot);
+    first.activate(owners());
+    await first.release();
+
+    second.registerSlot(slot);
+    const secondLease = second.activate(owners());
+
+    expect(slot.isEmpty).toBe(false);
+    expect(slot.peek()).toBe(secondLease);
+  });
+
+  it("never hands over a tombstoned surface", async () => {
+    const first = new ClaudeCodeGenerationHandle(scope());
+    const slot = new ClaudeCodeRunSlot();
+    first.registerSlot(slot);
+    first.activate(owners());
+    first.tombstone();
+
+    const second = new ClaudeCodeGenerationHandle(scope({ leaseId: "lease-second" }));
+    second.registerSlot(slot);
+    second.activate(owners());
+
+    expect(slot.isTombstoned).toBe(true);
+    expect(slot.admit()).toBe("generation_tombstoned");
+    // Releasing the newer generation cannot resurrect it either.
+    await second.release();
+    expect(slot.admit()).toBe("generation_tombstoned");
+  });
+});
+
+describe("ClaudeCodeService generation handles", () => {
+  it("hands each generation its own handle and mutates no run state", async () => {
+    const { service } = harness();
+
+    const first = await service.getRuntime("claudecode", {
+      posture: "ask",
+      activeFilePath: "Notes/first.md",
+    });
+    const second = await service.getRuntime("claudecode", {
+      posture: "auto",
+      activeFilePath: "Notes/second.md",
+    });
+
+    expect(first?.generation).toBeDefined();
+    expect(second?.generation).toBeDefined();
+    expect(first?.generation).not.toBe(second?.generation);
+    expect(first?.generation?.leaseId).not.toBe(second?.generation?.leaseId);
+  });
+
+  it("tombstones a persistent session's surface when its hard dispose runs", async () => {
+    const { service, seam } = harness();
+    const disposeConversation = vi.fn(() => Promise.resolve());
+    (service as unknown as { sessionRegistry: { disposeConversation: unknown } })
+      .sessionRegistry = { disposeConversation };
+    const slot = new ClaudeCodeRunSlot();
+    seam.sessionSlots.set("conversation-1", slot);
+
+    const runtime = await service.getRuntime("claudecode", {
+      posture: "ask",
+      conversationId: "conversation-1",
+    });
+    runtime?.generation?.activate(owners());
+    await runtime?.sdkSession?.hardDispose();
+
+    // Settled decisions 18 and 15.4: the disposed session's surface refuses
+    // forever, and the tombstone dies with that session rather than being kept.
+    expect(slot.isTombstoned).toBe(true);
+    expect(seam.sessionSlots.has("conversation-1")).toBe(false);
+    expect(disposeConversation).toHaveBeenCalledWith("conversation-1");
+  });
+
+  it("retires a surface a prior generation never released, rather than sharing it", async () => {
+    const { service, seam } = harness();
+    const disposeConversation = vi.fn(() => Promise.resolve());
+    (service as unknown as { sessionRegistry: { disposeConversation: unknown } })
+      .sessionRegistry = { disposeConversation };
+    const stale = new ClaudeCodeRunSlot();
+    const abandoned = new ClaudeCodeGenerationHandle(scope());
+    abandoned.registerSlot(stale);
+    abandoned.activate(owners());
+    seam.sessionSlots.set("conversation-1", stale);
+
+    await service.getRuntime("claudecode", {
+      posture: "ask",
+      conversationId: "conversation-1",
+    });
+
+    expect(stale.isTombstoned).toBe(true);
+    expect(seam.sessionSlots.has("conversation-1")).toBe(false);
+    expect(disposeConversation).toHaveBeenCalledWith("conversation-1");
+  });
+
+  it("gives a freshly minted session its own surface, already holding the live lease", async () => {
+    const { service, seam } = harness();
+    let buildOptions:
+      | ((controller: AbortController) => unknown)
+      | undefined;
+    (service as unknown as { sessionRegistry: unknown }).sessionRegistry = {
+      runTurnEvents: (_id: string, req: { buildOptions: typeof buildOptions }) => {
+        buildOptions = req.buildOptions;
+        return (async function* () {})();
+      },
     };
+    const displaced = new ClaudeCodeRunSlot();
+    seam.sessionSlots.set("conversation-1", displaced);
+
+    const runtime = await service.getRuntime("claudecode", {
+      posture: "ask",
+      conversationId: "conversation-1",
+    });
+    const lease = runtime?.generation?.activate(owners());
+    // Consuming the session's turn is what reaches the option factory, and the
+    // factory is what a cold mint runs.
+    const frames = runtime?.sdkSession?.run({
+      fullPrompt: "full",
+      deltaPrompt: "delta",
+      model: "claude-test",
+      systemPrompt: "",
+      reasoning: null,
+      turns: [],
+    } as never);
+    for await (const _frame of frames ?? []) void _frame;
+    buildOptions?.(new AbortController());
+
+    const minted = seam.sessionSlots.get("conversation-1");
+    expect(minted).toBeDefined();
+    expect(minted).not.toBe(displaced);
+    expect(minted?.peek()).toBe(lease);
+    // The surface the new session displaced belonged to the old one, so it dies
+    // with it rather than answering for the new process.
+    expect(displaced.isTombstoned).toBe(true);
+  });
+
+  it("gives the legacy loopback path a run-scoped server, stopped on release", async () => {
+    const { service, seam } = harness();
+    seam.sdkUsable = Promise.resolve(false);
+
+    const first = await service.getRuntime("claudecode", { posture: "ask" });
+    const second = await service.getRuntime("claudecode", { posture: "ask" });
+
+    // Settled decision 17: no shared service-wide loopback provider across runs.
+    expect(first?.mcp?.configJson).toBeDefined();
+    expect(second?.mcp?.configJson).toBeDefined();
+    expect(first?.mcp?.configJson).not.toBe(second?.mcp?.configJson);
+
+    await first?.generation?.release();
+    await second?.generation?.release();
+  });
+
+  it("tombstones every live generation on destroy", async () => {
+    const { service, seam } = harness();
+    (service as unknown as { sessionRegistry: { disposeAll: unknown } }).sessionRegistry = {
+      disposeAll: vi.fn(),
+    };
+    const cancelPending = vi.fn();
+    const runtime = await service.getRuntime("claudecode", { posture: "ask" });
+    runtime?.generation?.activate(
+      owners({
+        askResponder: { ask: vi.fn(), cancelPending } as AskUserResponder,
+      }),
+    );
 
     service.destroy();
-    // Criterion 20: settlement must account for zero in-flight callbacks.
-    // `destroy()` returns void and cannot be awaited.
-    expect(disposeAll).toHaveBeenCalledTimes(1);
 
-    release();
-    await expect(pending).resolves.toMatchObject({ isError: false });
+    expect(cancelPending).toHaveBeenCalledWith("destroyed");
+    expect(seam.liveHandles.size).toBe(0);
+    expect(runtime?.generation?.activeLease?.state).toBe("tombstoned");
   });
 });

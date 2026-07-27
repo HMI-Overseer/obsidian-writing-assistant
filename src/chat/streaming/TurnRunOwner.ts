@@ -157,6 +157,21 @@ export class AttemptLease {
 /** How the owner reports why a retry is not permitted. */
 export type RetryRefusal = "consequential_callback_entered";
 
+/**
+ * The narrow slice of a provider's own callback lease this owner binds to.
+ *
+ * Claude Code is the only provider whose tool calls arrive outside the stream, so
+ * it is the only implementer today. The interface is structural on purpose: the
+ * owner learns that a callback crossed an effect boundary, and the lease learns
+ * which attempt is in flight, without either module importing the other's class.
+ */
+export interface GenerationCallbackLease {
+  /** Records the attempt in flight, as evidence on an admitted callback. */
+  noteAttempt(attemptOrdinal: number): void;
+  /** Registers the notifier a consequential callback fires. */
+  onConsequentialCallback(sink: () => void): void;
+}
+
 export class TurnRunOwner {
   readonly turnId: string;
 
@@ -164,6 +179,7 @@ export class TurnRunOwner {
   private nextOrdinal = 1;
   private selected: AttemptLease | null = null;
   private callbackEntered = false;
+  private callbackLease: GenerationCallbackLease | null = null;
   private readonly turnSignal: AbortSignal | undefined;
   private readonly onTurnAbort: () => void;
 
@@ -217,6 +233,20 @@ export class TurnRunOwner {
     this.callbackEntered = true;
   }
 
+  /**
+   * Binds a provider's own callback lease to this turn (RFC-0011 phase 5). The
+   * lease reports a callback that crossed an effect boundary, which is what
+   * finally gives {@link noteConsequentialCallback} the production writer phase 2
+   * named; in return the owner stamps each attempt's ordinal onto the lease as
+   * evidence, so a consequential outcome can be attributed to the attempt that
+   * produced it without the lease taking its identity from that attempt.
+   */
+  bindCallbackLease(lease: GenerationCallbackLease | undefined): void {
+    if (!lease) return;
+    this.callbackLease = lease;
+    lease.onConsequentialCallback(() => this.noteConsequentialCallback());
+  }
+
   /** Why a retry is refused, or null when it is permitted. */
   retryRefusal(): RetryRefusal | null {
     return this.callbackEntered ? "consequential_callback_entered" : null;
@@ -231,6 +261,7 @@ export class TurnRunOwner {
     if (this.turnSignal?.aborted) controller.abort();
     const lease = new AttemptLease(this.turnId, this.nextOrdinal++, controller);
     this.leases.push(lease);
+    this.callbackLease?.noteAttempt(lease.context.attemptOrdinal);
     return lease;
   }
 

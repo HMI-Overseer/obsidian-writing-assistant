@@ -73,18 +73,19 @@ export async function regenerateMessage(options: RegenerateOptions): Promise<voi
   // Keep the original revision and ledger active while an ephemeral replacement
   // draft streams. Generation commits the replacement atomically when meaningful.
 
+  const runtime = await plugin.services.claudeCode.getRuntime(activeModel.provider, {
+    posture,
+    activeFilePath: plugin.app.workspace.getActiveFile()?.path,
+    conversationId: store.getActiveConversationId() ?? undefined,
+    // Regenerate rewinds the transcript, so the resume gate rejects this cursor and
+    // the turn synthetically rebuilds (section 6.3); passed for a uniform recovery path.
+    resumeCursor: store.getClaudeCodeResumeCursor(),
+    contextWindow: plugin.services.modelAvailability.resolveContextWindow(activeModel),
+  });
   const client = createChatClient(
     activeModel.provider,
     plugin.settings.providerSettings,
-    await plugin.services.claudeCode.getRuntime(activeModel.provider, {
-      posture,
-      activeFilePath: plugin.app.workspace.getActiveFile()?.path,
-      conversationId: store.getActiveConversationId() ?? undefined,
-      // Regenerate rewinds the transcript, so the resume gate rejects this cursor and
-      // the turn synthetically rebuilds (section 6.3); passed for a uniform recovery path.
-      resumeCursor: store.getClaudeCodeResumeCursor(),
-      contextWindow: plugin.services.modelAvailability.resolveContextWindow(activeModel),
-    }),
+    runtime,
   );
 
   await generateLlmResponse({
@@ -96,6 +97,7 @@ export async function regenerateMessage(options: RegenerateOptions): Promise<voi
     client,
     interactionHost,
     posture,
+    ...(runtime?.generation ? { claudeGeneration: runtime.generation } : {}),
     finalization: { kind: "replace", oldMessage },
     setIsGenerating,
     setActiveAbortController,

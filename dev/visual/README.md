@@ -95,19 +95,56 @@ dev/visual/
   fixtures/
     ask.mjs
     chat.mjs
+    images.mjs
     icons.mjs
     memory.mjs
+    modals.mjs
     primitives.mjs
   surfaces/
     index.mjs
     ask.mjs
     assistantTurn.mjs
+    chatStates.mjs
     chrome.mjs
     composer.mjs
+    modals.mjs
     review.mjs
     settings.mjs
+    settingsCoverage.mjs
     transcript.mjs
+    turnMetadata.mjs
 ```
+
+## Surface inventory
+
+The registry currently contains 63 capture IDs. A full current render writes 126 PNGs, one light and
+one dark image for every ID.
+
+- `composer` (11): `composer`, `composerDragOver`, `footerRing`, `modelDropdown`,
+  `knowledgePopover`, `reasoningMenu`, `postureMenu`, `contextPopover`, `toolPopover`,
+  `overflowMenu`, `profilePopover`.
+- `ask` (7): `askSingleIncomplete`, `askOtherReady`, `askMixedReady`, `askMixedNarrow`,
+  `askMaximumContract`, `askMaximumContractNarrow`, `askMixedMinimized`.
+- `transcript` (3): `emptyState`, `transcript`, `bubbleToolbar`.
+- `chatStates` (4): `attachedImageChip`, `modelDropdownEmptyCatalog`,
+  `modelDropdownNoSearchMatches`, `chatHeaderPressure`.
+- `turnMetadata` (4): `ragSources`, `knowledgeGraphContext`, `usageBadge`,
+  `inlineMessageEditor`.
+- `chrome` (4): `historyDrawer`, `historyDrawerClosed`, `chatHeader`, `floatingButtons`.
+- `settings` (14): `settingsGeneral`, `settingsProviders`, `settingsModelSelector`,
+  `settingsBenchmark`, `settingsRag`, `settingsAdvanced`, `settingsMemories`,
+  `settingsMemoriesOff`, `settingsKnowledgeGraph`, `settingsCommands`,
+  `settingsCommandsEmpty`, `settingsVaultOps`, `settingsBenchmarkPopulated`, `settingsRail`.
+- `assistantTurn` (7): `assistantTurnInterleaved`, `assistantTurnStates`,
+  `assistantTurnActionPlacement`, `assistantTurnEditSession`, `assistantTurnNarrow`,
+  `assistantTurnCaptureFailure`, `assistantTurnCaptureFailureNarrow`.
+- `review` (5): `diffTimeline`, `vaultReviewTimeline`, `editReviewTimeline`,
+  `editReviewDeclined`, `inlineDiff`.
+- `modals` (4): `memoryModal`, `commandModal`, `apiKeysDisclaimerModal`,
+  `imagePreviewModal`.
+
+`settingsCoverage.mjs` contributes to the existing `settings` output family so settings surfaces stay
+together in the manifest and contact sheet.
 
 ## What comes from the installed Obsidian (not committed)
 
@@ -155,10 +192,27 @@ outside that number. This matters because width-sensitive components read it: th
 The DOM is a faithful model of the live app, not the live DOM: Obsidian-chrome-heavy surfaces (settings
 modal) are worth a final glance in the running app.
 
+For modal work, first capture a live `outerHTML` dump of the opened Obsidian modal when the app is
+available. Reconstruct both the component content and Obsidian's surrounding `modal-container`,
+`modal-bg`, `modal`, `modal-close-button`, `modal-title`, and `modal-content` hierarchy. The current
+`memoryModal`, `commandModal`, `apiKeysDisclaimerModal`, and `imagePreviewModal` fixtures were built
+from component render sources and the installed `app.css` contract because no trustworthy live dump
+was available. They remain provisional until compared with the running app.
+
+After adding or changing surfaces:
+
+1. Run the affected IDs first in both themes and open `out/index.html`.
+2. Confirm each card is in the intended family, both images load, and its source and dimensions are
+   present.
+3. Read both images directly. For tall surfaces, inspect the whole card rather than only its top.
+4. Run one targeted ID again and confirm unrelated PNG and manifest digests remain unchanged.
+5. Run the full visual command, then lint and tests.
+
 ## Limitations
 
-**Static appearance only:** no runtime state transitions, and reconstructed DOM can drift from the live
-app if a component's markup changes. Keep surfaces in step with their render source.
+**Static appearance only:** no streaming, typing, hover, focus, or active-state coverage, and no
+runtime state transitions. Reconstructed DOM can drift from the live app if a component's markup
+changes. Keep surfaces in step with their render source.
 
 **Animated captures are not byte-stable:** the composer, ask, and progress surfaces contain live CSS
 animations or transitions. The harness does not freeze them or change screenshot timing, so unchanged

@@ -64,6 +64,9 @@ export const turnItem = (
     action = "",
     presentation = "",
     reviewState = "",
+    toolCallId = "",
+    actionRef = "",
+    toolIcon = I.wrench,
   } = {},
 ) => {
   const actionHost =
@@ -73,12 +76,12 @@ export const turnItem = (
       ? body.replace(TOOL_ACTION_SLOT, `${actionHost}${presentation}`)
       : `${body}${actionHost}`;
   return `<li class="lmsa-assistant-turn-item lmsa-assistant-turn-item--${type} has-connector-before${after ? " has-connector-after" : ""}${state ? ` is-${state}` : ""}${reviewState ? ` is-${reviewState}` : ""}${mutating ? " is-mutating" : ""}${fade ? " has-fading-endpoint" : ""}"
-    data-item-id="${id}" data-segment-id="${segment}">
+    data-item-id="${id}" data-segment-id="${segment}"${toolCallId ? ` data-tool-call-id="${toolCallId}"` : ""}${actionRef ? ` data-action-ref="${actionRef}"` : ""}>
     <div class="lmsa-assistant-turn-marker is-${marker}" aria-hidden="true">${
       marker === "thinking"
         ? I.brain
         : marker === "tool"
-          ? I.wrench
+          ? toolIcon
           : marker === "streaming"
             ? I.ellipsis
             : ""
@@ -111,7 +114,7 @@ export const toolTurnBody = (name, detail, state, diagnostics = "") =>
      <span class="lmsa-agentic-timeline-step-detail">${detail}</span>
    </span>
    ${TOOL_ACTION_SLOT}
-   ${diagnostics ? `<div class="lmsa-agentic-timeline-step-expand">${diagnostics}</div>` : ""}`;
+   ${diagnostics ? `<div class="lmsa-agentic-timeline-step-expand" aria-hidden="false">${diagnostics}</div>` : ""}`;
 
 export const assistantTurn = (items, status = "completed", tail = "") =>
   `<div class="lmsa-chat-window-assistant-turn-host">
@@ -160,9 +163,9 @@ export const composerFooter = (stopped = false, interacting = false) =>
     <div class="lmsa-chat-composer-tool-wrap"><div class="lmsa-chat-composer-tool-indicator">${I.wrench}</div></div>
     <div class="lmsa-chat-composer-knowledge-wrap"><div class="lmsa-chat-composer-knowledge-indicator">${I.database}</div></div>
     <div class="lmsa-chat-composer-vision-indicator">${I.eye}</div>
-    <button class="lmsa-chat-composer-posture-pill" aria-label="Edit approval">
+    <button class="lmsa-chat-composer-posture-pill" aria-label="Edit approval: Ask before edits">
       <span class="lmsa-chat-composer-posture-pill-icon">${I.hand}</span>
-      <span class="lmsa-chat-composer-posture-pill-label">Ask</span>
+      <span class="lmsa-chat-composer-posture-pill-label">Ask before edits</span>
       <span class="lmsa-chat-composer-posture-pill-chevron">${I.chevronUp}</span>
     </button>
     <button class="lmsa-chat-composer-send-btn${stopped ? " is-stop" : ""}" aria-label="${stopped ? "Stop generation" : "Send message"}">${stopped ? I.square : I.arrowUp}</button>
@@ -172,18 +175,26 @@ export const composerFooter = (stopped = false, interacting = false) =>
 // Composer panel. `dragover` toggles the is-dragover state class (drag-drop feedback ring, an outline
 // painted outside the box so it exercises compensation #3's reserved-invisible-border case).
 export const composerHtml = (dragover = false) =>
-  `<div class="lmsa-chat-composer"><div class="lmsa-chat-composer-panel${dragover ? " is-dragover" : ""}">
-    <div class="lmsa-chat-composer-normal-body" aria-hidden="false">
-      <div class="lmsa-chat-composer-chips">
-        <button class="lmsa-chat-composer-add-context-btn" aria-label="Add context">${I.plus}</button>
-        <div class="lmsa-chat-composer-chip">
-          <span class="lmsa-chat-composer-chip-icon">${I.file}</span>
-          <span class="lmsa-chat-composer-chip-label">Draft.md</span>
-          <button class="lmsa-chat-composer-chip-remove"><span>${I.x}</span></button>
-        </div>
-      </div>
-      <textarea class="lmsa-chat-composer-textarea" rows="1" placeholder="Ask anything about your writing..."></textarea>
-    </div>
+  `<div class="lmsa-chat-composer">
+    <button class="lmsa-chat-composer-generate-btn lmsa-hidden" aria-label="Generate response">
+      <span class="lmsa-chat-composer-generate-icon">${I.sparkles}</span>
+      <span>Generate response</span>
+    </button>
     <div class="lmsa-chat-composer-interaction-body" aria-hidden="true" hidden></div>
-    ${composerFooter()}
-  </div></div>`;
+    <div class="lmsa-chat-composer-panel${dragover ? " is-dragover" : ""}">
+      <div class="lmsa-context-picker-popover lmsa-hidden"></div>
+      <div class="lmsa-chat-composer-normal-body" aria-hidden="false">
+        <div class="lmsa-chat-composer-chips">
+          <button class="lmsa-chat-composer-add-context-btn" aria-label="Add context">${I.plus}</button>
+          <div class="lmsa-chat-composer-chip">
+            <span class="lmsa-chat-composer-chip-icon">${I.file}</span>
+            <span class="lmsa-chat-composer-chip-label">Draft.md</span>
+            <button class="lmsa-chat-composer-chip-remove"><span>${I.x}</span></button>
+          </div>
+        </div>
+        <div class="lmsa-chat-composer-attachments"></div>
+        <textarea class="lmsa-chat-composer-textarea" rows="1" placeholder="Ask anything about your writing..."></textarea>
+      </div>
+      ${composerFooter()}
+    </div>
+  </div>`;

@@ -2,8 +2,9 @@
 
 A development preview aid: render plugin UI surfaces against **real Obsidian chrome**, in light and dark,
 to PNGs, without launching Obsidian. Useful for eyeballing a component while iterating on its CSS and for
-ad-hoc A/B comparison between two `styles.css` builds. It is **not** an automated test suite (no
-assertions, no CI gate); it is a faster inner loop than driving the live app.
+ad-hoc A/B comparison between two `styles.css` builds. It includes lightweight fixture contract
+assertions, but it is not a browser interaction or pixel-diff test suite. It is a faster inner loop
+than driving the live app.
 
 ## Usage
 
@@ -92,6 +93,7 @@ dev/visual/
     obsidianInstall.mjs   local install discovery
     output.mjs            output paths, manifest merging, and contact sheet
     registry.mjs          surface loading and source validation
+    surfaceAudit.mjs      production DOM and state invariants for fixture drift
   fixtures/
     ask.mjs
     chat.mjs
@@ -117,16 +119,16 @@ dev/visual/
 
 ## Surface inventory
 
-The registry currently contains 63 capture IDs. A full current render writes 126 PNGs, one light and
+The registry currently contains 66 capture IDs. A full current render writes 132 PNGs, one light and
 one dark image for every ID.
 
-- `composer` (11): `composer`, `composerDragOver`, `footerRing`, `modelDropdown`,
-  `knowledgePopover`, `reasoningMenu`, `postureMenu`, `contextPopover`, `toolPopover`,
-  `overflowMenu`, `profilePopover`.
+- `composer` (12): `composer`, `composerDragOver`, `footerRing`, `modelDropdown`,
+  `knowledgePopover`, `reasoningMenu`, `postureMenu`, `contextPopover`,
+  `contextPopoverSearch`, `toolPopover`, `overflowMenu`, `profilePopover`.
 - `ask` (7): `askSingleIncomplete`, `askOtherReady`, `askMixedReady`, `askMixedNarrow`,
   `askMaximumContract`, `askMaximumContractNarrow`, `askMixedMinimized`.
-- `transcript` (3): `emptyState`, `transcript`, `bubbleToolbar`.
-- `chatStates` (4): `attachedImageChip`, `modelDropdownEmptyCatalog`,
+- `transcript` (4): `emptyState`, `transcript`, `messageAttachments`, `bubbleToolbar`.
+- `chatStates` (5): `collapsedChat`, `attachedImageChip`, `modelDropdownEmptyCatalog`,
   `modelDropdownNoSearchMatches`, `chatHeaderPressure`.
 - `turnMetadata` (4): `ragSources`, `knowledgeGraphContext`, `usageBadge`,
   `inlineMessageEditor`.
@@ -178,7 +180,8 @@ Read the component's render `.ts`, then add an entry to the matching module in
 
 [`lib/registry.mjs`](./lib/registry.mjs) throws when `source` is missing or does not exist. Add the
 surface module to [`surfaces/index.mjs`](./surfaces/index.mjs) if it is new; the index throws on
-duplicate IDs.
+duplicate IDs. [`lib/surfaceAudit.mjs`](./lib/surfaceAudit.mjs) checks shared production contracts,
+including settings chrome, composer sibling order, provider rails, and tool timeline identifiers.
 
 Use the icon names the component passes to `setIcon()`. `I` in
 [`fixtures/icons.mjs`](./fixtures/icons.mjs) maps fixture shorthand onto those names, and an unknown

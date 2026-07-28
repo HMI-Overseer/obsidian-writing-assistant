@@ -1,6 +1,7 @@
 import { view } from "../scaffold.mjs";
 import { assistantBubble, assistantTurn, turnItem } from "../fixtures/chat.mjs";
 import { I } from "../fixtures/icons.mjs";
+import { SCENE_IMAGE_URI } from "../fixtures/images.mjs";
 
 export const TRANSCRIPT_SURFACES = {
 
@@ -73,6 +74,42 @@ export const TRANSCRIPT_SURFACES = {
           ),
         )}
       </div></div>`,
+      620,
+    ),
+  },
+
+  // User bubble with the exact attachment gallery shape produced before its markdown host.
+  messageAttachments: {
+    source: "src/chat/messages/ChatTranscript.ts",
+    w: 620,
+    shot: ".lmsa-chat-window-message--user",
+    html: view(
+      `<div class="lmsa-chat-window-messages">
+        <div class="lmsa-chat-window-message lmsa-chat-window-message--user">
+          <div class="lmsa-chat-window-message-avatar">${I.userRound}</div>
+          <div class="lmsa-chat-window-message-column">
+            <div class="lmsa-chat-window-message-chrome">
+              <div class="lmsa-chat-window-message-role">You</div>
+            </div>
+            <div class="lmsa-chat-window-message-body lmsa-ui-card">
+              <div class="lmsa-chat-window-message-content lmsa-chat-window-message-content--markdown">
+                <div class="lmsa-chat-window-attachment-gallery">
+                  <button class="lmsa-chat-window-attachment-thumb" type="button" aria-label="Open harbor-dusk.png">
+                    <img class="lmsa-chat-window-attachment-img" src="${SCENE_IMAGE_URI}" alt="harbor-dusk.png">
+                  </button>
+                  <div class="lmsa-chat-window-attachment-note">
+                    <span class="lmsa-chat-window-attachment-note-icon">${I.fileText}</span>
+                    <span class="lmsa-chat-window-attachment-note-label">Draft.md · truncated</span>
+                  </div>
+                </div>
+                <div class="lmsa-chat-window-message-markdown-host">
+                  <p>Use the attached note and image to describe this harbor.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>`,
       620,
     ),
   },

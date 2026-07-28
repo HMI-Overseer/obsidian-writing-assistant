@@ -30,12 +30,12 @@ export const ASSISTANT_TURN_SURFACES = {
               "tool_call",
               "tool",
               toolTurnBody(
-                "Read file",
+                "Read note",
                 "Drafts/Opening.md",
                 "Completed",
                 `<div class="lmsa-agentic-timeline-arg-entry"><span class="lmsa-agentic-timeline-arg-key">Result</span><pre class="lmsa-agentic-timeline-arg-value">The room was quiet.</pre></div>`,
               ),
-              { state: "completed" },
+              { state: "completed", toolCallId: "tool-1", toolIcon: I.fileText },
             ) +
             turnItem(
               "prose-2",
@@ -48,11 +48,14 @@ export const ASSISTANT_TURN_SURFACES = {
               "tool-2",
               "tool_call",
               "tool",
-              toolTurnBody("Propose edit", "Drafts/Opening.md", "Running"),
+              toolTurnBody("Proposed edit", "Drafts/Opening.md", "Running"),
               {
                 state: "running",
                 mutating: true,
                 segment: "segment-2",
+                toolCallId: "tool-2",
+                actionRef: "edit:tool-2",
+                toolIcon: I.pencil,
                 action: `<div class="lmsa-edit-step-controls">
                   <span class="lmsa-edit-step-pending">pending review</span>
                   <button class="lmsa-edit-step-btn lmsa-edit-step-btn--approve" aria-label="Accept">${I.check}</button>
@@ -64,19 +67,26 @@ export const ASSISTANT_TURN_SURFACES = {
               "tool-3",
               "tool_call",
               "tool",
-              toolTurnBody("Update frontmatter", "Drafts/Opening.md", "Completed"),
+              toolTurnBody("Updated frontmatter", "Drafts/Opening.md", "Completed"),
               {
                 state: "completed",
                 mutating: true,
                 segment: "segment-2",
+                toolCallId: "tool-3",
+                toolIcon: I.fileCode2,
               },
             ) +
             turnItem(
               "tool-4",
               "tool_call",
               "tool",
-              toolTurnBody("Read file", "Style guide.md", "Completed"),
-              { state: "completed", segment: "segment-3" },
+              toolTurnBody("Read note", "Style guide.md", "Completed"),
+              {
+                state: "completed",
+                segment: "segment-3",
+                toolCallId: "tool-4",
+                toolIcon: I.fileText,
+              },
             ) +
             turnItem(
               "prose-3",
@@ -117,7 +127,12 @@ export const ASSISTANT_TURN_SURFACES = {
               "tool_call",
               "tool",
               toolTurnBody("Searched vault", "character arc", "Running"),
-              { after: false, state: "running" },
+              {
+                after: false,
+                state: "running",
+                toolCallId: "tool-running",
+                toolIcon: I.search,
+              },
             ),
             "streaming",
           ),
@@ -129,7 +144,12 @@ export const ASSISTANT_TURN_SURFACES = {
               "tool_call",
               "tool",
               toolTurnBody("Searched vault", "character arc", "Completed"),
-              { after: false, state: "completed" },
+              {
+                after: false,
+                state: "completed",
+                toolCallId: "tool-only",
+                toolIcon: I.search,
+              },
             ),
           ),
         )}
@@ -187,6 +207,9 @@ export const ASSISTANT_TURN_SURFACES = {
             {
               state: "running",
               mutating: true,
+              toolCallId: "memory-1",
+              actionRef: "memory:memory-1",
+              toolIcon: I.brainCircuit,
               action: `<div class="lmsa-memory-step-controls lmsa-vault-step-controls">
                 <span class="lmsa-vault-step-pending">pending approval</span>
                 <button class="lmsa-vault-step-btn lmsa-vault-step-btn--approve" aria-label="Approve">${I.check}</button>
@@ -200,7 +223,7 @@ export const ASSISTANT_TURN_SURFACES = {
               "tool_call",
               "tool",
               toolTurnBody(
-                "Asked a question",
+                "Asked for guidance",
                 "Output format",
                 "Completed",
                 `<div class="lmsa-agentic-timeline-arg-entry">
@@ -208,21 +231,31 @@ export const ASSISTANT_TURN_SURFACES = {
                   <pre class="lmsa-agentic-timeline-arg-value">Which format should I use?\nDetailed</pre>
                 </div>`,
               ),
-              { after: false, state: "completed", segment: "segment-2" },
+              {
+                after: false,
+                state: "completed",
+                segment: "segment-2",
+                toolCallId: "ask-1",
+                toolIcon: I.circleHelp,
+              },
             ),
           "completed",
           `<section class="lmsa-assistant-turn-provisional lmsa-assistant-turn-action-section" aria-label="Pending review that has not received an ordered provider declaration">
             <div class="lmsa-assistant-turn-action-section-heading">Review awaiting declaration</div>
-            <div class="lmsa-assistant-turn-action-summary">
-              <div class="lmsa-assistant-turn-action-heading"><span class="lmsa-assistant-turn-action-family">Vault operation</span><span class="lmsa-assistant-turn-action-state">pending review</span></div>
-              <div class="lmsa-assistant-turn-action-placement">Waiting for the provider declaration.</div>
+            <div class="lmsa-assistant-turn-message-actions">
+              <div class="lmsa-assistant-turn-action-summary">
+                <div class="lmsa-assistant-turn-action-heading"><span class="lmsa-assistant-turn-action-family">Vault operation</span><span class="lmsa-assistant-turn-action-state is-pending">pending review</span></div>
+                <div class="lmsa-assistant-turn-action-placement">Waiting for the provider declaration.</div>
+              </div>
             </div>
           </section>
           <section class="lmsa-assistant-turn-audit lmsa-assistant-turn-action-section" aria-label="Action history without a correlated provider declaration">
             <div class="lmsa-assistant-turn-action-section-heading">Unplaced action audit</div>
-            <div class="lmsa-assistant-turn-action-summary">
-              <div class="lmsa-assistant-turn-action-heading"><span class="lmsa-assistant-turn-action-family">Vault operation</span><span class="lmsa-assistant-turn-action-state">declined</span></div>
-              <div class="lmsa-assistant-turn-action-placement is-warning">The action has effect history, but no provider declaration could be placed.</div>
+            <div class="lmsa-assistant-turn-message-actions">
+              <div class="lmsa-assistant-turn-action-summary">
+                <div class="lmsa-assistant-turn-action-heading"><span class="lmsa-assistant-turn-action-family">Vault operation</span><span class="lmsa-assistant-turn-action-state is-declined">declined</span></div>
+                <div class="lmsa-assistant-turn-action-placement is-warning">The action has effect history, but no provider declaration could be placed.</div>
+              </div>
             </div>
           </section>`,
         ),
@@ -254,8 +287,8 @@ export const ASSISTANT_TURN_SURFACES = {
               "tool-1",
               "tool_call",
               "tool",
-              toolTurnBody("Read file", "Drafts/Opening.md", "Completed"),
-              { state: "completed" },
+              toolTurnBody("Read note", "Drafts/Opening.md", "Completed"),
+              { state: "completed", toolCallId: "tool-1", toolIcon: I.fileText },
             ) +
             editingProseItem(
               "prose-2",
@@ -304,15 +337,24 @@ export const ASSISTANT_TURN_SURFACES = {
               "narrow-tool-1",
               "tool_call",
               "tool",
-              toolTurnBody("Read file", "Drafts/A very long note name.md", "Completed"),
-              { state: "completed" },
+              toolTurnBody("Read note", "Drafts/A very long note name.md", "Completed"),
+              {
+                state: "completed",
+                toolCallId: "narrow-tool-1",
+                toolIcon: I.fileText,
+              },
             ) +
             turnItem(
               "narrow-tool-2",
               "tool_call",
               "tool",
               toolTurnBody("Searched vault", "motif continuity", "Completed"),
-              { after: false, state: "completed" },
+              {
+                after: false,
+                state: "completed",
+                toolCallId: "narrow-tool-2",
+                toolIcon: I.search,
+              },
             ),
         ),
       ),
@@ -344,7 +386,12 @@ export const ASSISTANT_TURN_SURFACES = {
                 "tool_call",
                 "tool",
                 toolTurnBody("Searched vault", "character arc", "Failed"),
-                { after: false, state: "failed" },
+                {
+                  after: false,
+                  state: "failed",
+                  toolCallId: "capture-fail-tool",
+                  toolIcon: I.search,
+                },
               ),
             "failed",
             `<div class="lmsa-assistant-turn-notice is-error" role="status">Error: A redelivered capture batch carried different protocol bytes.</div>`,
@@ -380,7 +427,12 @@ export const ASSISTANT_TURN_SURFACES = {
               "tool_call",
               "tool",
               toolTurnBody("Searched vault", "character arc", "Failed"),
-              { after: false, state: "failed" },
+              {
+                after: false,
+                state: "failed",
+                toolCallId: "narrow-capture-fail-tool",
+                toolIcon: I.search,
+              },
             ),
             "failed",
             `<div class="lmsa-assistant-turn-notice is-error" role="status">Error: A redelivered capture batch carried different protocol bytes.</div>`,

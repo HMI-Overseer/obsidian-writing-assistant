@@ -1,3 +1,5 @@
+import { settingsPanelHeader, settingsRail } from "./fixtures/settings.mjs";
+
 // Harness-only scaffolding. Never mirrors plugin CSS; it only neutralizes anchored/absolute positioning
 // so an element screenshot captures the component in flow, and gives popovers a realistic backdrop.
 export const SCAFFOLD = `
@@ -33,19 +35,65 @@ export const SCAFFOLD = `
 // (.workspace-leaf-content[data-type] > .view-content.lmsa-root > .lmsa-shell). ChatView always
 // stamps data-posture on the root, and the mode accent keys off it, so the harness sets it too:
 // "auto" is what turns --lmsa-mode-accent orange.
-export const view = (inner, w, { posture = "ask" } = {}) =>
+export const view = (inner, w, { posture = "ask", rootClass = "" } = {}) =>
   `<div class="lmsa-harness-stage"${w ? ` style="width:${w}px"` : ""}>
      <div class="workspace-leaf-content" data-type="writing-assistant-chat">
-       <div class="view-content lmsa-root" data-posture="${posture}">
+       <div class="view-content lmsa-root${rootClass ? ` ${rootClass}` : ""}" data-posture="${posture}">
          <div class="lmsa-shell">${inner}</div>
-       </div>
+     </div>
      </div></div>`;
 
+// Popovers are sensitive to their live ancestors: the overflow menu uses the composer's named
+// container and the header popovers inherit sizing from the metadata wrap. These hosts preserve
+// those relationships while SCAFFOLD keeps the captured component itself in flow.
+export const composerFooterView = (inner, w, options) =>
+  view(
+    `<div class="lmsa-chat-composer">
+      <div class="lmsa-chat-composer-panel">
+        <div class="lmsa-chat-composer-footer">
+          <div class="lmsa-chat-composer-footer-row"></div>
+          ${inner}
+        </div>
+      </div>
+    </div>`,
+    w,
+    options,
+  );
+
+export const composerPanelView = (inner, w, options) =>
+  view(
+    `<div class="lmsa-chat-composer">
+      <div class="lmsa-chat-composer-panel">${inner}</div>
+    </div>`,
+    w,
+    options,
+  );
+
+export const headerPopoverView = (inner, w, options) =>
+  view(
+    `<div class="lmsa-chat-header">
+      <div class="lmsa-chat-header-copy">
+        <div class="lmsa-chat-header-meta-wrap">${inner}</div>
+      </div>
+    </div>`,
+    w,
+    options,
+  );
+
 // Settings tabs render into the plugin's own settings chain inside Obsidian's modal, NOT the chat root.
-// Reconstruct that chain so the panel gradient/backdrop and card cascade are in play. Screenshot the
-// panel to frame the cards. (Obsidian-chrome-heavy: these carry the most reconstruction risk.)
-export const settingsView = (inner, w = 720, tab = "") =>
+// Reconstruct the complete rail + stage + panel, including the Obsidian Setting heading markup, so
+// the panel receives the same available width and app.css cascade as it does in the live modal.
+export const settingsView = (inner, w = 720, tab = "general") =>
   `<div class="lmsa-harness-stage" style="width:${w}px">
-     <div class="lmsa-settings-root"><div class="lmsa-settings-shell"${tab ? ` data-tab="${tab}"` : ""}><div class="lmsa-settings-stage">
-       <div class="lmsa-settings-panel lmsa-ui-panel"><div class="lmsa-settings-content">${inner}</div></div>
-     </div></div></div></div>`;
+     <div class="vertical-tab-content lmsa-settings-root">
+       <div class="lmsa-settings-shell" data-tab="${tab}">
+         ${settingsRail(tab)}
+         <div class="lmsa-settings-stage">
+           <div class="lmsa-settings-panel lmsa-ui-panel">
+             ${settingsPanelHeader(tab)}
+             <div class="lmsa-settings-content">${inner}</div>
+           </div>
+         </div>
+       </div>
+     </div>
+   </div>`;

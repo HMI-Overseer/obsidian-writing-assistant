@@ -1,12 +1,17 @@
-import { view } from "../scaffold.mjs";
+import {
+  composerFooterView,
+  composerPanelView,
+  headerPopoverView,
+  view,
+} from "../scaffold.mjs";
 import { composerHtml, menuItem } from "../fixtures/chat.mjs";
 import { BRAND, I } from "../fixtures/icons.mjs";
-import { toggle } from "../fixtures/primitives.mjs";
+import { toggle, toggleOff } from "../fixtures/primitives.mjs";
 
 export const COMPOSER_SURFACES = {
   // Composer at rest, wide enough that every footer control shows in place.
   composer: {
-    source: "src/chat/composer/ChatComposer.ts",
+    source: "src/chat/view/createChatLayout.ts",
     w: 600,
     shot: ".lmsa-chat-composer",
     html: view(composerHtml(), 600),
@@ -34,19 +39,21 @@ export const COMPOSER_SURFACES = {
     source: "src/chat/models/ModelDropdownView.ts",
     w: 460,
     shot: ".lmsa-model-dropdown",
-    html: view(
+    html: headerPopoverView(
       `<div class="lmsa-model-dropdown">
         <div class="lmsa-model-dropdown-search">
           <span class="lmsa-model-dropdown-search-icon">${I.search}</span>
-          <input class="lmsa-model-dropdown-search-input" placeholder="Search models" />
-          <button class="lmsa-model-dropdown-refresh">${I.refresh}</button>
+          <input class="lmsa-model-dropdown-search-input" type="text" placeholder="Search models...">
+          <button class="lmsa-model-dropdown-refresh" aria-label="Refresh models">${I.refresh}</button>
         </div>
         <div class="lmsa-model-dropdown-body">
           <div class="lmsa-provider-rail">
-            <div class="lmsa-provider-rail-item lmsa-brand-tint-anthropic is-active">${BRAND.anthropic}</div>
-            <div class="lmsa-provider-rail-item lmsa-brand-tint-openai">${BRAND.openai}</div>
-            <div class="lmsa-provider-rail-item lmsa-brand-tint-lmstudio">${BRAND.lmstudio}</div>
-            <div class="lmsa-provider-rail-item lmsa-brand-tint-claudecode">${BRAND.claudecode}</div>
+            <div class="lmsa-provider-rail-item is-active" title="Favorites">${I.star}</div>
+            <div class="lmsa-provider-rail-divider"></div>
+            <div class="lmsa-provider-rail-item lmsa-brand-tint-lmstudio" title="LM Studio">${BRAND.lmstudio}</div>
+            <div class="lmsa-provider-rail-item lmsa-brand-tint-anthropic" title="Anthropic">${BRAND.anthropic}</div>
+            <div class="lmsa-provider-rail-item lmsa-brand-tint-openai" title="OpenAI">${BRAND.openai}</div>
+            <div class="lmsa-provider-rail-item lmsa-brand-tint-claudecode" title="Claude Code">${BRAND.claudecode}</div>
           </div>
           <div class="lmsa-model-dropdown-list">
             <div class="lmsa-model-dropdown-item is-active">
@@ -65,7 +72,7 @@ export const COMPOSER_SURFACES = {
                 <span class="lmsa-model-dropdown-provider">LM Studio</span>
               </div>
               <span class="lmsa-model-dropdown-state is-loaded"></span>
-              <span class="lmsa-model-dropdown-star">${I.star}</span>
+              <span class="lmsa-model-dropdown-star is-faved">${I.star}</span>
             </div>
             <div class="lmsa-model-dropdown-item">
               <span class="lmsa-model-dropdown-check"></span>
@@ -74,7 +81,7 @@ export const COMPOSER_SURFACES = {
                 <span class="lmsa-model-dropdown-provider">LM Studio</span>
               </div>
               <span class="lmsa-model-dropdown-state is-unloaded"></span>
-              <span class="lmsa-model-dropdown-star">${I.star}</span>
+              <span class="lmsa-model-dropdown-star is-faved">${I.star}</span>
             </div>
           </div>
         </div>
@@ -88,7 +95,7 @@ export const COMPOSER_SURFACES = {
     source: "src/chat/composer/KnowledgePopover.ts",
     w: 360,
     shot: ".lmsa-knowledge-popover",
-    html: view(
+    html: composerFooterView(
       `<div class="lmsa-knowledge-popover">
         <div class="lmsa-knowledge-popover-title">Knowledge</div>
         <div class="lmsa-knowledge-popover-body">
@@ -97,20 +104,21 @@ export const COMPOSER_SURFACES = {
               <span class="lmsa-knowledge-popover-label">Vault retrieval</span>${toggle}
             </div>
             <div class="lmsa-knowledge-popover-model-wrap"><div class="lmsa-settings-model-selector-wrap">
-              <div class="lmsa-settings-model-selector is-active">
+              <div class="lmsa-settings-model-selector">
                 <span class="lmsa-model-selector-status is-cloud"></span>
                 <span class="lmsa-settings-model-selector-label">text-embedding-3-large</span>
                 <span class="lmsa-settings-model-selector-chevron">${I.chevronDown}</span>
               </div>
+              <div class="lmsa-model-dropdown lmsa-hidden"></div>
             </div></div>
             <div class="lmsa-knowledge-popover-status-row">
               <span class="lmsa-knowledge-popover-status">Indexed 1,234 chunks across 87 notes.</span>
-              <button class="lmsa-knowledge-popover-action-btn">${I.gear}</button>
+              <button class="lmsa-knowledge-popover-action-btn" aria-label="Rebuild">${I.refresh}</button>
             </div>
           </div>
           <div class="lmsa-knowledge-popover-section">
             <div class="lmsa-knowledge-popover-row">
-              <span class="lmsa-knowledge-popover-label">Knowledge graph</span>${toggle}
+              <span class="lmsa-knowledge-popover-label">Knowledge graph</span>${toggleOff}
             </div>
             <span class="lmsa-knowledge-popover-status">Graph disabled.</span>
             <span class="lmsa-knowledge-popover-hint">Configure in settings.</span>
@@ -133,9 +141,10 @@ export const COMPOSER_SURFACES = {
     source: "src/chat/composer/ReasoningPill.ts",
     w: 260,
     shot: ".lmsa-reasoning-menu",
-    html: view(
+    html: composerFooterView(
       `<div class="lmsa-reasoning-menu">
         ${menuItem("Default")}
+        ${menuItem("Off")}
         ${menuItem("Low")}
         ${menuItem("Medium")}
         ${menuItem("High", { selected: true })}
@@ -149,7 +158,7 @@ export const COMPOSER_SURFACES = {
     source: "src/chat/composer/PosturePill.ts",
     w: 260,
     shot: ".lmsa-posture-menu",
-    html: view(
+    html: composerFooterView(
       `<div class="lmsa-posture-menu">
         ${menuItem("Ask before edits", { icon: I.hand, selected: true })}
         ${menuItem("Edit automatically", { icon: I.zap })}
@@ -164,7 +173,7 @@ export const COMPOSER_SURFACES = {
     source: "src/chat/composer/ContextPickerPopover.ts",
     w: 320,
     shot: ".lmsa-context-picker-popover",
-    html: view(
+    html: composerPanelView(
       `<div class="lmsa-context-picker-popover">
         <div class="lmsa-context-picker-row is-attach-disabled">
           <div class="lmsa-context-picker-row-main">
@@ -194,12 +203,38 @@ export const COMPOSER_SURFACES = {
     ),
   },
 
+  // Search mode uses a different content tree inside the same anchored popover.
+  contextPopoverSearch: {
+    source: "src/chat/composer/ContextPickerPopover.ts",
+    w: 320,
+    shot: ".lmsa-context-picker-popover",
+    html: composerPanelView(
+      `<div class="lmsa-context-picker-popover is-search">
+        <div class="lmsa-context-picker-search-wrap">
+          <span class="lmsa-context-picker-search-icon">${I.search}</span>
+          <input class="lmsa-context-picker-search-input" type="text" placeholder="Search notes…" value="chapter">
+        </div>
+        <div class="lmsa-context-picker-results">
+          <div class="lmsa-context-picker-result-item">
+            <span class="lmsa-context-picker-result-name">Chapter 01</span>
+            <span class="lmsa-context-picker-result-path">Drafts</span>
+          </div>
+          <div class="lmsa-context-picker-result-item">
+            <span class="lmsa-context-picker-result-name">Chapter notes</span>
+            <span class="lmsa-context-picker-result-path">Planning</span>
+          </div>
+        </div>
+      </div>`,
+      320,
+    ),
+  },
+
   // S9: tool-use popover open, agentic mode on.
   toolPopover: {
     source: "src/chat/composer/ToolUsePopover.ts",
     w: 320,
     shot: ".lmsa-tool-popover",
-    html: view(
+    html: composerFooterView(
       `<div class="lmsa-tool-popover">
         <div class="lmsa-tool-popover-title">Tool use</div>
         <div class="lmsa-tool-popover-body">
@@ -221,13 +256,16 @@ export const COMPOSER_SURFACES = {
   // S11: composer overflow menu open (narrow-width control). Every section is in the DOM.
   overflowMenu: {
     source: "src/chat/composer/ComposerOverflowMenu.ts",
-    w: 260,
+    w: 330,
     shot: ".lmsa-overflow-menu",
-    html: view(
+    html: composerFooterView(
       `<div class="lmsa-overflow-menu">
         <div class="lmsa-overflow-menu-section lmsa-overflow-section-reasoning">
           <div class="lmsa-overflow-menu-heading">Reasoning</div>
           ${menuItem("Default")}
+          ${menuItem("Off")}
+          ${menuItem("Low")}
+          ${menuItem("Medium")}
           ${menuItem("High", { selected: true })}
         </div>
         <div class="lmsa-overflow-menu-section lmsa-overflow-section-vision">
@@ -248,7 +286,7 @@ export const COMPOSER_SURFACES = {
           ${menuItem("Edit automatically", { icon: I.zap })}
         </div>
       </div>`,
-      260,
+      330,
     ),
   },
 
@@ -257,12 +295,13 @@ export const COMPOSER_SURFACES = {
     source: "src/chat/models/ProfileSettingsPopover.ts",
     w: 460,
     shot: ".lmsa-profile-popover",
-    html: view(
+    html: headerPopoverView(
       `<div class="lmsa-profile-popover">
         <div class="lmsa-profile-popover-layout">
           <div class="lmsa-provider-rail">
-            <div class="lmsa-provider-rail-item lmsa-brand-tint-anthropic is-active" title="Anthropic">${BRAND.anthropic}</div>
             <div class="lmsa-provider-rail-item lmsa-brand-tint-lmstudio" title="LM Studio">${BRAND.lmstudio}</div>
+            <div class="lmsa-provider-rail-item lmsa-brand-tint-anthropic is-active" title="Anthropic">${BRAND.anthropic}</div>
+            <div class="lmsa-provider-rail-item lmsa-brand-tint-claudecode" title="Claude Code">${BRAND.claudecode}</div>
             <div class="lmsa-provider-rail-divider"></div>
             <div class="lmsa-provider-rail-item lmsa-brand-tint-openai is-disabled" title="OpenAI">${BRAND.openai}</div>
           </div>
@@ -285,7 +324,7 @@ export const COMPOSER_SURFACES = {
                 <div class="lmsa-params-body">
                   <div class="lmsa-params-section">
                     <label class="lmsa-params-label">System prompt</label>
-                    <textarea class="lmsa-params-textarea" rows="4">You are a co-writer.</textarea>
+                    <textarea class="lmsa-params-textarea" rows="6" placeholder="Enter a system prompt...">You are a co-writer.</textarea>
                   </div>
                   <div class="lmsa-params-section">
                     <label class="lmsa-params-label">Temperature</label>
@@ -303,6 +342,22 @@ export const COMPOSER_SURFACES = {
                       <input class="lmsa-params-number-input" type="number" min="1" max="32768" step="1" value="2000">
                     </div>
                   </div>
+                  <div class="lmsa-params-section">
+                    <label class="lmsa-params-label">Top P</label>
+                    <div class="lmsa-params-slider-row">
+                      <input class="lmsa-params-slider" type="range" min="0" max="1" step="0.05" value="0.90">
+                      <span class="lmsa-params-slider-value">0.90</span>
+                    </div>
+                  </div>
+                  <div class="lmsa-params-section">
+                    <div class="lmsa-params-toggle-row">
+                      <input class="lmsa-params-toggle" type="checkbox" checked>
+                      <label class="lmsa-params-label">Top K</label>
+                    </div>
+                    <div class="lmsa-params-input-row">
+                      <input class="lmsa-params-number-input" type="number" min="1" max="500" step="1" placeholder="e.g. 40" value="40">
+                    </div>
+                  </div>
                 </div>
               </div>
               <div class="lmsa-profile-popover-section lmsa-model-reasoning-section">
@@ -315,7 +370,7 @@ export const COMPOSER_SURFACES = {
                     </div>
                     <div class="lmsa-params-input-row is-disabled">
                       <select class="lmsa-params-select" disabled>
-                        <option>Low</option><option>Medium</option><option>High</option>
+                        <option>Off</option><option>Low</option><option>Medium</option><option>High</option>
                       </select>
                     </div>
                   </div>
@@ -334,6 +389,13 @@ export const COMPOSER_SURFACES = {
                     <select class="lmsa-profile-ttl-select"><option>5 min (default)</option><option>1 hour (2x write cost)</option></select>
                   </div>
                 </div>
+              </div>
+              <div class="lmsa-profile-popover-section">
+                <div class="lmsa-params-toggle-row">
+                  <input class="lmsa-params-toggle" type="checkbox">
+                  <label class="lmsa-params-label">Disable built-in system prompts</label>
+                </div>
+                <span class="lmsa-disable-prompts-warning">Edit, agentic, and tool features may not work correctly.</span>
               </div>
             </div>
           </div>

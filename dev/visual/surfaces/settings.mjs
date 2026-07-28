@@ -8,14 +8,14 @@ export const SETTINGS_SURFACES = {
   // S16: settings General tab, two section cards.
   settingsGeneral: {
     source: "src/settings/GeneralTab.ts",
-    shot: ".lmsa-settings-panel",
+    shot: ".lmsa-settings-shell",
     html: settingsView(
       section(
         "Active Note",
         "Include your currently open note as context so chat responses stay grounded in your writing.",
         `${settingItem("Include active note as context", "Send the content of the currently open note alongside each request.", sw("is-enabled"))}
-        ${settingItem("Include local attachments as context when supported", "When a note is attached and the active model supports vision, send supported local image embeds as extra context.", sw())}
-        ${settingItem("Note context limit", "Maximum characters of note text sent as context, 1000-200000 (default 8000).", `<input type="text" value="8000">`)}`,
+        ${settingItem("Include local attachments as context when supported", "When a note is attached and the active model supports vision, send supported local image embeds from that note as extra context.", sw())}
+        ${settingItem("Note context limit", "Maximum characters of note text sent as context, 1000–200000 (default: 8000). Longer notes are trimmed; continuation commands keep the ending.", `<input type="text" value="8000">`)}`,
         I.fileText,
       ) +
         section(
@@ -32,15 +32,35 @@ export const SETTINGS_SURFACES = {
           </div>`,
           I.heart,
         ),
+      720,
+      "general",
     ),
   },
 
   // S17: settings Providers tab, provider cards (brand-tint icons, status dots, auth fields).
   settingsProviders: {
     source: "src/settings/ProvidersTab.ts",
-    shot: ".lmsa-settings-panel",
+    shot: ".lmsa-settings-shell",
     html: settingsView(
       `<div class="lmsa-provider-cards">
+        <div class="lmsa-provider-card">
+          <div class="lmsa-provider-card-header">
+            <div class="lmsa-provider-card-iconwrap">
+              <div class="lmsa-provider-card-icon lmsa-brand-tint-lmstudio">${BRAND.lmstudio}</div>
+              <span class="lmsa-provider-status-dot is-ok"></span>
+            </div>
+            <div class="lmsa-provider-card-info">
+              <div class="lmsa-provider-card-name-row">
+                <span class="lmsa-provider-card-name">LM Studio</span>
+                <span class="lmsa-provider-card-version lmsa-hidden"></span>
+              </div>
+              <div class="lmsa-provider-card-status">Local server · 3 models last seen</div>
+            </div>
+            <span class="lmsa-provider-card-chevron">${I.chevronDown}</span>
+            <div class="lmsa-provider-card-toggle">${sw("is-enabled")}</div>
+          </div>
+          <div class="lmsa-provider-card-bodywrap" inert><div class="lmsa-provider-card-bodyclip"><div class="lmsa-provider-card-body"></div></div></div>
+        </div>
         <div class="lmsa-provider-card is-expanded">
           <div class="lmsa-provider-card-header">
             <div class="lmsa-provider-card-iconwrap">
@@ -79,20 +99,23 @@ export const SETTINGS_SURFACES = {
             </div>
           </div></div></div>
         </div>
-        <div class="lmsa-provider-card is-off">
+        <div class="lmsa-provider-card">
           <div class="lmsa-provider-card-header">
             <div class="lmsa-provider-card-iconwrap">
-              <div class="lmsa-provider-card-icon lmsa-brand-tint-lmstudio">${BRAND.lmstudio}</div>
-              <span class="lmsa-provider-status-dot is-warn"></span>
+              <div class="lmsa-provider-card-icon lmsa-brand-tint-openai">${BRAND.openai}</div>
+              <span class="lmsa-provider-status-dot is-ok"></span>
             </div>
             <div class="lmsa-provider-card-info">
-              <div class="lmsa-provider-card-name-row"><span class="lmsa-provider-card-name">LM Studio</span></div>
-              <div class="lmsa-provider-card-status">No models discovered yet</div>
+              <div class="lmsa-provider-card-name-row">
+                <span class="lmsa-provider-card-name">OpenAI</span>
+                <span class="lmsa-provider-card-version lmsa-hidden"></span>
+              </div>
+              <div class="lmsa-provider-card-status">API key set · 6 models available in chat</div>
             </div>
             <span class="lmsa-provider-card-chevron">${I.chevronDown}</span>
-            <div class="lmsa-provider-card-toggle">${sw()}</div>
+            <div class="lmsa-provider-card-toggle">${sw("is-enabled")}</div>
           </div>
-          <div class="lmsa-provider-card-bodywrap"><div class="lmsa-provider-card-bodyclip"><div class="lmsa-provider-card-body"></div></div></div>
+          <div class="lmsa-provider-card-bodywrap" inert><div class="lmsa-provider-card-bodyclip"><div class="lmsa-provider-card-body"></div></div></div>
         </div>
         <div class="lmsa-provider-card is-off">
           <div class="lmsa-provider-card-header">
@@ -110,24 +133,26 @@ export const SETTINGS_SURFACES = {
             <span class="lmsa-provider-card-chevron">${I.chevronDown}</span>
             <div class="lmsa-provider-card-toggle">${sw("is-disabled")}</div>
           </div>
-          <div class="lmsa-provider-card-bodywrap"><div class="lmsa-provider-card-bodyclip"><div class="lmsa-provider-card-body"></div></div></div>
+          <div class="lmsa-provider-card-bodywrap" inert><div class="lmsa-provider-card-bodyclip"><div class="lmsa-provider-card-body"></div></div></div>
         </div>
       </div>
       <p class="lmsa-provider-footnote">Cloud model catalogs ship with the plugin and refresh with each release. Local models are discovered live from LM Studio.</p>`,
+      720,
+      "providers",
     ),
   },
 
   // S18: shared settings model selector, dropdown open (delta (a) pre-existing search border lives here).
   settingsModelSelector: {
     source: "src/settings/ui.ts",
-    w: 480,
+    w: 720,
     shot: ".lmsa-settings-model-selector-wrap",
     html: settingsView(
       `<div class="lmsa-settings-model-selector-wrap">
         <div class="lmsa-settings-model-selector is-active">
           <span class="lmsa-model-selector-status is-cloud"></span>
           <span class="lmsa-settings-model-selector-label">Claude Sonnet 4.5</span>
-          <span class="lmsa-settings-model-selector-chevron">${I.chevronDown}</span>
+          <span class="lmsa-settings-model-selector-chevron">${I.chevronUp}</span>
         </div>
         <div class="lmsa-model-dropdown">
           <div class="lmsa-model-dropdown-search">
@@ -139,8 +164,10 @@ export const SETTINGS_SURFACES = {
             <div class="lmsa-provider-rail">
               <div class="lmsa-provider-rail-item is-active" title="Favorites">${I.star}</div>
               <div class="lmsa-provider-rail-divider"></div>
-              <div class="lmsa-provider-rail-item lmsa-brand-tint-anthropic" title="Anthropic">${BRAND.anthropic}</div>
               <div class="lmsa-provider-rail-item lmsa-brand-tint-lmstudio" title="LM Studio">${BRAND.lmstudio}</div>
+              <div class="lmsa-provider-rail-item lmsa-brand-tint-anthropic" title="Anthropic">${BRAND.anthropic}</div>
+              <div class="lmsa-provider-rail-item lmsa-brand-tint-openai" title="OpenAI">${BRAND.openai}</div>
+              <div class="lmsa-provider-rail-item lmsa-brand-tint-claudecode" title="Claude Code">${BRAND.claudecode}</div>
             </div>
             <div class="lmsa-model-dropdown-list">
               <div class="lmsa-model-dropdown-item is-active">
@@ -159,20 +186,21 @@ export const SETTINGS_SURFACES = {
                   <span class="lmsa-model-dropdown-provider">LM Studio</span>
                 </div>
                 <span class="lmsa-model-dropdown-state is-unloaded"></span>
-                <span class="lmsa-model-dropdown-star">${I.star}</span>
+                <span class="lmsa-model-dropdown-star is-faved">${I.star}</span>
               </div>
             </div>
           </div>
         </div>
       </div>`,
-      480,
+      720,
+      "providers",
     ),
   },
 
   // S19: settings Benchmark tab, model-selection + test-suites cards.
   settingsBenchmark: {
     source: "src/settings/BenchmarkTab.ts",
-    shot: ".lmsa-settings-panel",
+    shot: ".lmsa-settings-shell",
     html: settingsView(
       section(
         "Model selection",
@@ -180,9 +208,12 @@ export const SETTINGS_SURFACES = {
         `${settingItem(
           "Completion model",
           "The model used to run benchmark tests.",
+          "",
           `<div class="lmsa-settings-model-selector-wrap lmsa-benchmark-model-wrap">
             <div class="lmsa-settings-model-selector"><span class="lmsa-model-selector-status is-unknown"></span><span class="lmsa-settings-model-selector-label">Select model...</span><span class="lmsa-settings-model-selector-chevron">${I.chevronDown}</span></div>
+            <div class="lmsa-model-dropdown lmsa-hidden"></div>
             <button class="lmsa-profile-settings-btn" aria-label="Profile settings">${I.gear}</button>
+            <div class="lmsa-profile-popover lmsa-hidden"></div>
           </div>`,
         )}`,
         I.target,
@@ -231,13 +262,15 @@ export const SETTINGS_SURFACES = {
           </div>`,
           I.flaskConical,
         ),
+      720,
+      "benchmark",
     ),
   },
 
   // S20: settings Index / RAG tab. The stale/drift notice (muted amber) is the key chip.
   settingsRag: {
     source: "src/settings/RagTab.ts",
-    shot: ".lmsa-settings-panel",
+    shot: ".lmsa-settings-shell",
     html: settingsView(
       section(
         "Vault retrieval",
@@ -249,6 +282,7 @@ export const SETTINGS_SURFACES = {
           "",
           `<div class="lmsa-settings-model-selector-wrap">
             <div class="lmsa-settings-model-selector"><span class="lmsa-model-selector-status is-cloud"></span><span class="lmsa-settings-model-selector-label">text-embedding-3-large</span><span class="lmsa-settings-model-selector-chevron">${I.chevronDown}</span></div>
+            <div class="lmsa-model-dropdown lmsa-hidden"></div>
           </div>`,
         )}`,
         I.search,
@@ -267,28 +301,62 @@ export const SETTINGS_SURFACES = {
                 <button class="lmsa-ui-btn lmsa-ui-btn-secondary is-visible">Rebuild index</button>
               </div>
             </div>
-            <div class="lmsa-index-progress is-visible">
-              <div class="lmsa-index-progress-bar"><div class="lmsa-index-progress-fill" style="width:42%"></div></div>
-              <span class="lmsa-index-progress-text">54 / 128 files (42%)</span>
+            <div class="lmsa-index-progress">
+              <div class="lmsa-index-progress-bar"><div class="lmsa-index-progress-fill" style="width:0%"></div></div>
+              <span class="lmsa-index-progress-text"></span>
             </div>
           </div>`,
           I.database,
-        )}</div>`,
+        ) +
+          section(
+            "Automatic reindexing",
+            "Keep the index current as your vault changes. Automatic runs never load a local embedding model that is not already running, they wait until it is.",
+            `${settingItem("Reindex on startup", "When the plugin loads, scan for notes changed while it was off and index them.", sw("is-enabled"))}
+            ${settingItem("Watch for changes", "Reindex each note as it is created, edited, renamed, or deleted.", sw("is-enabled"))}
+            ${settingItem("Auto-reindex on cloud models", "Allow automatic runs to embed through a metered cloud model. Off keeps automatic reindexing local-only, so cloud embedding stays manual and avoids unexpected API cost.", sw())}`,
+            I.refresh,
+          ) +
+          section(
+            "Retrieval",
+            "Control how many and which results are injected as context.",
+            `${settingItem("Metadata enrichment", "Prepend tags, folder path, and wikilink targets to each chunk before embedding. Improves entity disambiguation in creative writing vaults.", sw("is-enabled"))}
+            ${settingItem("Results per query", "Number of relevant chunks to inject, 1–20 (default: 5).", `<input type="text" value="5">`)}
+            ${settingItem("Max chunks per file", "Limit how many chunks a single file can contribute, 1–20 (default: 5).", `<input type="text" value="5">`)}
+            ${settingItem("Minimum similarity", "Only include results above this score, 0–0.8 (default: 0.3).", `<input type="text" value="0.3">`)}`,
+            I.filter,
+          ) +
+          section(
+            "Chunking",
+            "Configure how vault notes are split into retrieval-friendly pieces.",
+            `${settingItem("Chunk size", "Target characters per chunk, 500–3000 (default: 1500).", `<input type="text" value="1500">`)}
+            ${settingItem("Chunk overlap", "Characters of overlap between adjacent chunks, 0–500 (default: 200).", `<input type="text" value="200">`)}
+            ${settingItem("Exclude patterns", "Glob patterns for files to exclude from indexing (one per line).", `<textarea rows="4" placeholder="e.g. templates/**">Templates/**</textarea>`)}`,
+            I.scissors,
+          )}</div>`,
+      720,
+      "retrieval",
     ),
   },
 
   // S21a: settings Advanced tab.
   settingsAdvanced: {
     source: "src/settings/AdvancedTab.ts",
-    shot: ".lmsa-settings-panel",
+    shot: ".lmsa-settings-shell",
     html: settingsView(
       section(
         "Agentic mode",
         "Allow the model to call tools: search your vault, read notes, and apply structured edits across multiple reasoning rounds.",
-        `${settingItem("Enable agentic mode", "Vault search and edit tools become available.", sw())}
-        ${settingItem("Max tool rounds", "Maximum read-only tool rounds per turn. Default 8.", `<input type="text" value="8">`)}`,
+        `${settingItem("Enable agentic mode", "Vault search and edit tools become available. The model can read notes and iterate before producing a response.", sw())}
+        ${settingItem("Max tool rounds", "Maximum read-only tool rounds per turn (vault search and outline inspection before the model responds or edits). Default: 8.", `<input type="text" value="8">`)}`,
         I.bot,
       ) +
+        section(
+          "Document Editing",
+          "Configure how AI-proposed edits are matched against your notes.",
+          `${settingItem("Diff context lines", "Number of lines shown above and below each diff hunk for context.", `<input type="text" value="3">`)}
+          ${settingItem("Minimum match confidence", "Fuzzy match confidence threshold (0–1). Matches below this score are flagged as unresolved. Default: 0.7", `<input type="text" value="0.7">`)}`,
+          I.fileDiff,
+        ) +
         section(
           "System prompt prefix",
           "Prepended before your custom prompt (set in the chat popover) on every turn. Leave empty to use only your custom prompt. Edit-format guidance is added automatically when editing.",
@@ -300,13 +368,15 @@ export const SETTINGS_SURFACES = {
           )}`,
           I.messageSquare,
         ),
+      720,
+      "advanced",
     ),
   },
 
   // S21d: settings Memories tab (feature card + the records table + budget bar).
   settingsMemories: {
     source: "src/settings/MemoriesTab.ts",
-    shot: ".lmsa-settings-panel",
+    shot: ".lmsa-settings-shell",
     html: settingsView(
       section(
         "Memory",
@@ -326,6 +396,9 @@ export const SETTINGS_SURFACES = {
              ${memoryRow("vault-tone", "context", "The vault's grimdark tone and genre; recall when setting scene mood.")}`,
           ),
           I.bookOpen,
+        ).replace(
+          '<div class="lmsa-settings-section-footer"></div>',
+          '<div class="lmsa-settings-section-footer"><button class="lmsa-btn-add lmsa-ui-btn lmsa-ui-btn-primary">Add memory</button></div>',
         ),
       720,
       "memories",
@@ -335,7 +408,7 @@ export const SETTINGS_SURFACES = {
   // S21e: settings Memories tab with the feature switched off (records card inactive).
   settingsMemoriesOff: {
     source: "src/settings/MemoriesTab.ts",
-    shot: ".lmsa-settings-panel",
+    shot: ".lmsa-settings-shell",
     html: settingsView(
       section(
         "Memory",
@@ -362,19 +435,53 @@ export const SETTINGS_SURFACES = {
   // S21b: settings Knowledge-graph tab (warning card + graph status with per-folder coverage).
   settingsKnowledgeGraph: {
     source: "src/settings/KnowledgeGraphTab.ts",
-    shot: ".lmsa-settings-panel",
+    shot: ".lmsa-settings-shell",
     html: settingsView(
       section(
         "Before you begin",
         "",
-        `${settingItem("Compute", "Every note is sent to a completion model to extract entities and relationships.", "")}
-        ${settingItem("Large vaults", "Extraction can take a while and consume tokens on cloud providers.", "")}`,
+        `${settingItem("Compute", "Every note is sent to a completion model to find relationships and interconnect entities, then each entity is embedded. This is resource intensive on both compute and memory.", "")}
+        ${settingItem("Large vaults", "Vaults with hundreds or thousands of notes will take considerably longer to process.", "")}
+        ${settingItem("Cost", "Cloud providers charge per token. A full build can consume a meaningful amount of API credits.", "")}
+        ${settingItem("Benefits", "Once built, the graph surfaces connections across notes that are hard to find manually, useful for world-building, story planning, and discovering narrative threads between characters, locations, and events.", "")}`,
         I.triangleAlert,
         "lmsa-kg-warning",
       ) +
-        `<div class="lmsa-kg-conditional">${section(
+        section(
           "Knowledge graph",
           "Use an LLM to extract entities and relationships from your vault, building a semantic knowledge graph that discovers connections across notes.",
+          `${settingItem("Enable knowledge graph", "When enabled, the plugin can extract entities and relationships from your vault using a completion model.", sw("is-enabled"))}
+          ${settingItem(
+            "Completion model",
+            "Generates structured entity and relationship data from your notes.",
+            "",
+            `<div class="lmsa-settings-model-selector-wrap">
+              <div class="lmsa-settings-model-selector">
+                <span class="lmsa-model-selector-status is-cloud"></span>
+                <span class="lmsa-settings-model-selector-label">Claude Sonnet 4.5</span>
+                <span class="lmsa-settings-model-selector-chevron">${I.chevronDown}</span>
+              </div>
+              <div class="lmsa-model-dropdown lmsa-hidden"></div>
+            </div>`,
+          )}
+          ${settingItem(
+            "Embedding model",
+            "Encodes extracted entities as vectors for similarity search.",
+            "",
+            `<div class="lmsa-settings-model-selector-wrap">
+              <div class="lmsa-settings-model-selector">
+                <span class="lmsa-model-selector-status is-cloud"></span>
+                <span class="lmsa-settings-model-selector-label">text-embedding-3-large</span>
+                <span class="lmsa-settings-model-selector-chevron">${I.chevronDown}</span>
+              </div>
+              <div class="lmsa-model-dropdown lmsa-hidden"></div>
+            </div>`,
+          )}`,
+          I.gitFork,
+        ) +
+        `<div class="lmsa-kg-conditional">${section(
+          "Graph",
+          "Manage the extracted knowledge graph.",
           `<div class="lmsa-index-status">
             <div class="lmsa-index-status-header">
               <div class="lmsa-index-status-info">
@@ -403,47 +510,33 @@ export const SETTINGS_SURFACES = {
                 <span class="lmsa-kg-folder-name">Locations</span>
                 <div class="lmsa-kg-folder-bar"><div class="lmsa-kg-folder-bar-fill" style="width:60%"></div></div>
                 <span class="lmsa-kg-folder-count">6 / 10</span>
-                <div class="lmsa-kg-folder-action"><button class="lmsa-ui-btn lmsa-kg-folder-btn lmsa-kg-folder-stop-btn">Stop</button></div>
+                <div class="lmsa-kg-folder-action"><button class="lmsa-ui-btn lmsa-ui-btn-secondary lmsa-kg-folder-btn">Resume</button></div>
               </div>
             </div>
           </div>`,
-          I.gitFork,
-        )}</div>`,
+          I.database,
+        ) +
+          section(
+            "Filtering",
+            "Control which files are included in graph extraction.",
+            settingItem(
+              "Exclude patterns",
+              "Glob patterns for files to exclude from extraction (one per line).",
+              `<textarea rows="4" placeholder="e.g. templates/**">Templates/**</textarea>`,
+            ),
+            I.filter,
+          )}</div>`,
+      720,
+      "knowledge-graph",
     ),
   },
 
-  // S26: settings navigation rail (SettingsTab.ts renderRail). The rail is the sibling of the stage
-  // inside .lmsa-settings-shell and is absent from settingsView(), so the rail-item button-reset overrides
-  // (SettingsTab.css base block + is-active block) had no harness coverage. One item is-active so the
-  // is-active background/box-shadow overrides render; the group is-active so the label accent renders.
-  // Hover (rail-item:hover, group-label hover) stays live-app: the harness is static.
+  // S26: settings navigation rail (SettingsTab.ts renderRail), isolated from the complete settings
+  // shell used by every tab capture. Hover stays live-app: the harness is static.
   settingsRail: {
     source: "src/settings/SettingsTab.ts",
-    w: 200,
+    w: 720,
     shot: ".lmsa-settings-rail",
-    html: `<div class="lmsa-harness-stage" style="width:180px">
-      <div class="lmsa-settings-root"><div class="lmsa-settings-shell">
-        <div class="lmsa-settings-rail">
-          <div class="lmsa-settings-rail-group is-active">
-            <span class="lmsa-settings-rail-group-label">Chat</span>
-            <button class="lmsa-settings-rail-item is-active" type="button">
-              <span class="lmsa-settings-rail-icon">${I.gear}</span>
-              <span class="lmsa-settings-rail-label">General</span>
-            </button>
-            <button class="lmsa-settings-rail-item" type="button">
-              <span class="lmsa-settings-rail-icon">${I.database}</span>
-              <span class="lmsa-settings-rail-label">Providers</span>
-            </button>
-          </div>
-          <div class="lmsa-settings-rail-group">
-            <span class="lmsa-settings-rail-group-label">Retrieval</span>
-            <button class="lmsa-settings-rail-item" type="button">
-              <span class="lmsa-settings-rail-icon">${I.brain}</span>
-              <span class="lmsa-settings-rail-label">Knowledge</span>
-            </button>
-          </div>
-        </div>
-      </div></div>
-    </div>`,
+    html: settingsView("", 720, "general"),
   },
 };

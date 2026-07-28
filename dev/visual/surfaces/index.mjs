@@ -38,6 +38,7 @@ for (const [family, surfaces] of MODULES) {
 
 const SURFACE_ORDER = [
   "composer",
+  "collapsedChat",
   "askSingleIncomplete",
   "askOtherReady",
   "askMixedReady",
@@ -55,6 +56,7 @@ const SURFACE_ORDER = [
   "chatHeaderPressure",
   "knowledgePopover",
   "transcript",
+  "messageAttachments",
   "bubbleToolbar",
   "ragSources",
   "knowledgeGraphContext",
@@ -63,6 +65,7 @@ const SURFACE_ORDER = [
   "reasoningMenu",
   "postureMenu",
   "contextPopover",
+  "contextPopoverSearch",
   "toolPopover",
   "overflowMenu",
   "profilePopover",

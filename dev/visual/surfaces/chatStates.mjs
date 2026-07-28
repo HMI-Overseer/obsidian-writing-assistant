@@ -1,18 +1,39 @@
-import { view } from "../scaffold.mjs";
+import { headerPopoverView, view } from "../scaffold.mjs";
 import { composerFooter } from "../fixtures/chat.mjs";
 import { BRAND, I } from "../fixtures/icons.mjs";
 import { SCENE_IMAGE_URI } from "../fixtures/images.mjs";
 
 export const CHAT_STATE_SURFACES = {
+  // The real width guard hides every shell child except this overlay below MIN_VIEW_WIDTH_PX.
+  collapsedChat: {
+    source: "src/chat/view/createChatLayout.ts",
+    w: 260,
+    shot: ".lmsa-root",
+    html: view(
+      `<div class="lmsa-collapsed-overlay">
+        <div class="lmsa-collapsed-text">Widen the panel to use the chat</div>
+      </div>
+      <div class="lmsa-chat-header">Hidden live chat chrome</div>`,
+      260,
+      { rootClass: "is-collapsed" },
+    ),
+  },
+
   // A staged image sits between context chips and the textarea. The product calls this an attachment
   // preview, while the coverage plan names the state "attached-image chip".
   attachedImageChip: {
-    source: "src/chat/composer/ChatComposer.ts",
+    source: "src/chat/view/createChatLayout.ts",
     w: 600,
     shot: ".lmsa-chat-composer-panel",
     html: view(
       `<div class="lmsa-chat-composer">
+        <button class="lmsa-chat-composer-generate-btn lmsa-hidden" aria-label="Generate response">
+          <span class="lmsa-chat-composer-generate-icon">${I.sparkles}</span>
+          <span>Generate response</span>
+        </button>
+        <div class="lmsa-chat-composer-interaction-body" aria-hidden="true" hidden></div>
         <div class="lmsa-chat-composer-panel">
+          <div class="lmsa-context-picker-popover lmsa-hidden"></div>
           <div class="lmsa-chat-composer-normal-body" aria-hidden="false">
             <div class="lmsa-chat-composer-chips">
               <button class="lmsa-chat-composer-add-context-btn" aria-label="Add context">${I.plus}</button>
@@ -25,7 +46,6 @@ export const CHAT_STATE_SURFACES = {
             </div>
             <textarea class="lmsa-chat-composer-textarea" rows="1" placeholder="Ask anything about your writing...">Describe the mood of this setting.</textarea>
           </div>
-          <div class="lmsa-chat-composer-interaction-body" aria-hidden="true" hidden></div>
           ${composerFooter()}
         </div>
       </div>`,
@@ -38,7 +58,7 @@ export const CHAT_STATE_SURFACES = {
     source: "src/chat/models/ModelDropdownView.ts",
     w: 460,
     shot: ".lmsa-model-dropdown",
-    html: view(
+    html: headerPopoverView(
       `<div class="lmsa-model-dropdown">
         <div class="lmsa-model-dropdown-list">
           <div class="lmsa-model-dropdown-empty">No models available. Enable a provider in settings.</div>
@@ -53,7 +73,7 @@ export const CHAT_STATE_SURFACES = {
     source: "src/chat/models/ModelDropdownView.ts",
     w: 460,
     shot: ".lmsa-model-dropdown",
-    html: view(
+    html: headerPopoverView(
       `<div class="lmsa-model-dropdown">
         <div class="lmsa-model-dropdown-search">
           <span class="lmsa-model-dropdown-search-icon">${I.search}</span>

@@ -119,15 +119,25 @@ export const askForm = (
 
 export const askComposerHtml = (questions, state) =>
   `<div class="lmsa-chat-composer">
+    <button class="lmsa-chat-composer-generate-btn lmsa-hidden" aria-label="Generate response">
+      <span class="lmsa-chat-composer-generate-icon">${I.sparkles}</span>
+      <span>Generate response</span>
+    </button>
     <div class="lmsa-chat-composer-interaction-body${state?.collapsed ? " is-collapsed" : ""}" aria-hidden="false">
       ${askForm(questions, state)}
     </div>
     <div class="lmsa-chat-composer-panel is-interacting is-ask-interaction">
-    <div class="lmsa-chat-composer-normal-body" aria-hidden="true" inert>
-      <textarea class="lmsa-chat-composer-textarea" rows="1" disabled>An exact draft remains mounted here.</textarea>
+      <div class="lmsa-context-picker-popover lmsa-hidden"></div>
+      <div class="lmsa-chat-composer-normal-body" aria-hidden="true" inert>
+        <div class="lmsa-chat-composer-chips">
+          <button class="lmsa-chat-composer-add-context-btn" aria-label="Add context">${I.plus}</button>
+        </div>
+        <div class="lmsa-chat-composer-attachments"></div>
+        <textarea class="lmsa-chat-composer-textarea" rows="1" disabled>An exact draft remains mounted here.</textarea>
+      </div>
+      ${composerFooter(true, true)}
     </div>
-    ${composerFooter(true, true)}
-  </div></div>`;
+  </div>`;
 
 export const askStageHtml = (questions, state) =>
   `<div class="lmsa-ask-visual-stage">

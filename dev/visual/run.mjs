@@ -16,6 +16,7 @@ import { auditIconNames } from "./lib/iconAudit.mjs";
 import { getObsidianChromiumVersion } from "./lib/obsidianInstall.mjs";
 import { renderOutputPath, updateOutput } from "./lib/output.mjs";
 import { SURFACE_FAMILIES, SURFACES } from "./lib/registry.mjs";
+import { auditSurfaceContracts } from "./lib/surfaceAudit.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO = resolve(HERE, "..", "..");
@@ -36,6 +37,8 @@ if (!existsSync(currentCss)) {
   console.error(`No styles.css at ${currentCss}. Run \`npm run build:css\` first.`);
   process.exit(1);
 }
+
+console.log(`surface audit: ${auditSurfaceContracts(SURFACES)} fixture contract(s) covered`);
 
 const iconAudit = auditIconNames(join(REPO, "src"));
 if (iconAudit.missing.length > 0) {

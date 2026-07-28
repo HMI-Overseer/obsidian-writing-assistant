@@ -32,6 +32,9 @@ export const REVIEW_SURFACES = {
               state: "running",
               reviewState: "edit-pending",
               mutating: true,
+              toolCallId: "edit-tool",
+              actionRef: "edit:edit-tool",
+              toolIcon: I.pencil,
               action: `<div class="lmsa-edit-step-controls">
                 <span class="lmsa-edit-step-pending">pending review</span>
                 <button class="lmsa-edit-step-btn lmsa-edit-step-btn--approve" aria-label="Accept">${I.check}</button>
@@ -56,14 +59,9 @@ export const REVIEW_SURFACES = {
     ),
   },
 
-  // S23: vault-review timeline (write op preview + step controls + turn footer). Plus a standalone
-  // dismissable chip to exercise the lmsa-ui-chip-dismiss !important override (cascade check-item; no
-  // component emits it inside the timeline, per source).
-  // The footer deliberately shows the FULL option set (approve-all AND undo) so one shot covers the
-  // footer's chrome; the live footer gates each button on eligibility, so undo does not co-occur with
-  // a still-pending approve-all. Read this surface for the buttons' styling, not for a reachable state.
-  // The left diff pane is empty on purpose: this is `write_file` creating a new note, so there is no
-  // prior content to show.
+  // S23: reachable mixed vault-review state. One operation has already applied and two still await
+  // approval, so the live footer legitimately contains both "Approve all remaining" and "Undo".
+  // The write preview's left diff pane is empty because this creates a new note.
   vaultReviewTimeline: {
     source: "src/chat/messages/vaultReviewTimeline.ts",
     w: 620,
@@ -72,35 +70,78 @@ export const REVIEW_SURFACES = {
       assistantBubble(
         assistantTurn(
           turnItem(
-            "vault-tool",
+            "vault-applied",
             "tool_call",
             "tool",
-            toolTurnBody("Write file", "Notes/New Scene.md", "Running"),
+            toolTurnBody("Created folder", "Notes", "Completed"),
             {
-              after: false,
-              state: "running",
-              reviewState: "vault-awaiting",
+              state: "completed",
+              reviewState: "vault-applied",
               mutating: true,
+              toolCallId: "vault-applied",
+              actionRef: "vault:vault-applied",
+              toolIcon: I.folderPlus,
               action: `<div class="lmsa-vault-step-controls">
-                <span class="lmsa-vault-step-pending">pending approval</span>
-                <button class="lmsa-vault-step-btn lmsa-vault-step-btn--approve" aria-label="Approve">${I.check}</button>
-                <button class="lmsa-vault-step-btn lmsa-vault-step-btn--decline" aria-label="Decline">${I.x}</button>
+                <span class="lmsa-vault-step-state">Applied</span>
               </div>`,
-              presentation: `<div class="lmsa-vault-timeline-preview">
-                <div class="lmsa-chat-window-diff-hunk" data-status="pending">
-                  <div class="lmsa-chat-window-diff-hunk-body lmsa-chat-window-diff-hunk-body--split">
-                    <div class="lmsa-chat-window-diff-row">
-                      <div class="lmsa-chat-window-diff-side lmsa-chat-window-diff-side--left lmsa-chat-window-diff-side--empty"></div>
-                      <div class="lmsa-chat-window-diff-side lmsa-chat-window-diff-side--right lmsa-chat-window-diff-line--added">
-                        <span class="lmsa-chat-window-diff-gutter"></span>
-                        <span class="lmsa-chat-window-diff-text"># New Scene</span>
+            },
+          ) +
+            turnItem(
+              "vault-write",
+              "tool_call",
+              "tool",
+              toolTurnBody("Write file", "Notes/New Scene.md", "Running"),
+              {
+                state: "running",
+                reviewState: "vault-awaiting",
+                mutating: true,
+                toolCallId: "vault-write",
+                actionRef: "vault:vault-write",
+                toolIcon: I.filePlus,
+                action: `<div class="lmsa-vault-step-controls">
+                  <span class="lmsa-vault-step-pending">pending approval</span>
+                  <button class="lmsa-vault-step-btn lmsa-vault-step-btn--approve" aria-label="Approve">${I.check}</button>
+                  <button class="lmsa-vault-step-btn lmsa-vault-step-btn--decline" aria-label="Decline">${I.x}</button>
+                </div>`,
+                presentation: `<div class="lmsa-vault-timeline-preview">
+                  <div class="lmsa-chat-window-diff-hunk" data-status="pending">
+                    <div class="lmsa-chat-window-diff-hunk-body lmsa-chat-window-diff-hunk-body--split">
+                      <div class="lmsa-chat-window-diff-row">
+                        <div class="lmsa-chat-window-diff-side lmsa-chat-window-diff-side--left lmsa-chat-window-diff-side--empty"></div>
+                        <div class="lmsa-chat-window-diff-side lmsa-chat-window-diff-side--right lmsa-chat-window-diff-line--added">
+                          <span class="lmsa-chat-window-diff-gutter"></span>
+                          <span class="lmsa-chat-window-diff-text"># New Scene</span>
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
-              </div>`,
-            },
-          ),
+                </div>`,
+              },
+            ) +
+            turnItem(
+              "vault-move",
+              "tool_call",
+              "tool",
+              toolTurnBody(
+                "Move file",
+                "Drafts/Old Scene.md → Drafts/Revised Scene.md",
+                "Running",
+              ),
+              {
+                after: false,
+                state: "running",
+                reviewState: "vault-awaiting",
+                mutating: true,
+                toolCallId: "vault-move",
+                actionRef: "vault:vault-move",
+                toolIcon: I.fileSymlink,
+                action: `<div class="lmsa-vault-step-controls">
+                  <span class="lmsa-vault-step-pending">pending approval</span>
+                  <button class="lmsa-vault-step-btn lmsa-vault-step-btn--approve" aria-label="Approve">${I.check}</button>
+                  <button class="lmsa-vault-step-btn lmsa-vault-step-btn--decline" aria-label="Decline">${I.x}</button>
+                </div>`,
+              },
+            ),
           "streaming",
           `<div class="lmsa-vault-review-footer">
             <button class="lmsa-vault-review-footer-btn lmsa-vault-review-footer-btn--approve"><span class="lmsa-vault-review-footer-btn-icon">${I.check}</span>Approve all remaining</button>
@@ -129,6 +170,9 @@ export const REVIEW_SURFACES = {
               state: "completed",
               reviewState: "edit-applied",
               mutating: true,
+              toolCallId: "edit-applied",
+              actionRef: "edit:edit-applied",
+              toolIcon: I.pencil,
               action: `<div class="lmsa-edit-step-controls">
                 <span class="lmsa-edit-step-state">Applied</span>
                 <button class="lmsa-edit-step-btn lmsa-edit-step-btn--undo" aria-label="Undo">${I.undo2}</button>
@@ -140,12 +184,15 @@ export const REVIEW_SURFACES = {
               "edit-pending",
               "tool_call",
               "tool",
-              toolTurnBody("Propose edit", "Chapter 2.md", "Running"),
+              toolTurnBody("Proposed edit", "Chapter 2.md", "Running"),
               {
                 after: false,
                 state: "running",
                 reviewState: "edit-pending",
                 mutating: true,
+                toolCallId: "edit-pending",
+                actionRef: "edit:edit-pending",
+                toolIcon: I.pencil,
                 action: `<div class="lmsa-edit-step-controls">
                   <span class="lmsa-edit-step-pending">pending review</span>
                   <button class="lmsa-edit-step-btn lmsa-edit-step-btn--approve" aria-label="Accept">${I.check}</button>
@@ -188,6 +235,9 @@ export const REVIEW_SURFACES = {
               state: "completed",
               reviewState: "edit-skipped",
               mutating: true,
+              toolCallId: "edit-declined",
+              actionRef: "edit:edit-declined",
+              toolIcon: I.pencil,
               action: `<div class="lmsa-edit-step-controls">
                 <span class="lmsa-edit-step-state">Skipped</span>
               </div>`,

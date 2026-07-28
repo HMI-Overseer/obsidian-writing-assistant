@@ -1,8 +1,20 @@
-export const toggle = `<div class="lmsa-knowledge-popover-control"><div class="lmsa-toggle is-enabled"></div></div>`;
+export const toggle =
+  `<div class="lmsa-knowledge-popover-control">` +
+  `<div class="lmsa-toggle is-enabled" role="switch" aria-checked="true" tabindex="0"></div>` +
+  `</div>`;
+
+export const toggleOff =
+  `<div class="lmsa-knowledge-popover-control">` +
+  `<div class="lmsa-toggle" role="switch" aria-checked="false" tabindex="0"></div>` +
+  `</div>`;
 
 // A plain lmsa-toggle (state driven by is-enabled / is-disabled), rendered entirely by the real plugin
 // CSS (thumb is a ::after, no child element). Used by the settings surfaces.
-export const sw = (state = "") => `<div class="lmsa-toggle${state ? " " + state : ""}"></div>`;
+export const sw = (state = "") => {
+  const enabled = state.split(" ").includes("is-enabled");
+  const disabled = state.split(" ").includes("is-disabled");
+  return `<div class="lmsa-toggle${state ? " " + state : ""}" role="switch" aria-checked="${enabled}" tabindex="0"${disabled ? ' aria-disabled="true"' : ""}></div>`;
+};
 
 // A settings section card shell (ui.ts createSection). `title` heads it; `body` is the inner markup.
 // A settings section card shell, mirroring createSettingsSection(container, title, description,

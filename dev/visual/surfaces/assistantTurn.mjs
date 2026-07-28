@@ -91,8 +91,9 @@ export const ASSISTANT_TURN_SURFACES = {
     ),
   },
 
-  // Phase 4 lifecycle gallery: live empty placeholder, tool-only completion,
-  // interruption after prose, failed empty turn, and honest completed empty turn.
+  // Phase 4 lifecycle gallery: live empty placeholder, running and completed
+  // tool-only turns, interruption after prose, failed empty turn, and honest
+  // completed empty turn.
   assistantTurnStates: {
     source: "src/chat/messages/AssistantTurnView.ts",
     w: 620,
@@ -107,6 +108,18 @@ export const ASSISTANT_TURN_SURFACES = {
               <span class="lmsa-assistant-turn-empty-marker">${I.more}</span>
               <span class="lmsa-assistant-turn-empty-label">Assistant is responding.</span>
             </div>`,
+          ),
+        )}
+        ${assistantBubble(
+          assistantTurn(
+            turnItem(
+              "tool-running",
+              "tool_call",
+              "tool",
+              toolTurnBody("Searched vault", "character arc", "Running"),
+              { after: false, state: "running" },
+            ),
+            "streaming",
           ),
         )}
         ${assistantBubble(

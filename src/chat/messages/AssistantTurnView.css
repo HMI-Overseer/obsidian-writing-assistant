@@ -276,6 +276,7 @@
 
 .lmsa-assistant-turn-empty {
   position: relative;
+  isolation: isolate;
   display: grid;
   grid-template-columns: var(--lmsa-turn-rail-width) minmax(0, 1fr);
   column-gap: var(--lmsa-turn-rail-gap);
@@ -286,6 +287,7 @@
 .lmsa-assistant-turn-empty::before {
   content: "";
   position: absolute;
+  z-index: -1;
   left: calc((var(--lmsa-turn-rail-width) - 2px) / 2);
   top: calc(-1 * (34px + 0.25rem - var(--lmsa-turn-marker-center)));
   bottom: calc(100% - var(--lmsa-turn-marker-center));
@@ -295,6 +297,8 @@
 }
 
 .lmsa-assistant-turn-empty-marker {
+  position: relative;
+  z-index: 1;
   grid-column: 1;
   justify-self: center;
   display: inline-flex;

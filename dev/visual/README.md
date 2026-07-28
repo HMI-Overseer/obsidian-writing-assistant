@@ -9,13 +9,56 @@ assertions, no CI gate); it is a faster inner loop than driving the live app.
 
 ```
 npm run build:css                 # produce the styles.css the harness renders
-npm run visual                    # all surfaces, current build, both themes -> dev/visual/out/
+npm run visual                    # all surfaces, current build, both themes
 npm run visual -- composer        # just one surface
 npm run visual -- --themes dark   # dark only
-npm run visual -- --baseline ../some-other-build/styles.css   # A/B a second build (…-baseline.png)
+npm run visual -- --baseline ../some-other-build/styles.css   # A/B a second build
 ```
 
-Output PNGs land in `dev/visual/out/` (gitignored).
+Output lands in `dev/visual/out/` (gitignored):
+
+```
+out/
+  index.html
+  manifest.json
+  current/
+    composer/
+      composer-light.png
+      composer-dark.png
+    ask/
+    transcript/
+    assistantTurn/
+    review/
+    settings/
+    chrome/
+  baseline/             # created when --baseline is used
+    composer/
+    ask/
+    transcript/
+    assistantTurn/
+    review/
+    settings/
+    chrome/
+```
+
+The family directories mirror the modules under [`surfaces/`](./surfaces/). Current and baseline
+builds use the same PNG names under separate directory trees.
+
+Open [`out/index.html`](./out/index.html) directly from disk to review the contact sheet. It groups all
+registered surfaces by family and places light and dark renders side by side. Each card shows the
+surface ID, source path, and exact PNG dimensions. When baseline renders exist, each theme also places
+the current and baseline builds side by side. The sheet has inline CSS, requires no server or network
+access, and links each preview to its full-size PNG.
+
+[`out/manifest.json`](./out/manifest.json) records one entry per rendered build, surface, and theme.
+Each entry includes the surface ID, source path, PNG dimensions, family, build, theme, relative PNG
+path, browser Chromium version, and Obsidian Chromium version.
+
+A targeted render updates only the selected surface's PNGs and manifest entries. Existing entries for
+other surfaces, themes, and builds remain intact, and the contact sheet is regenerated from the merged
+manifest. This also applies to `--themes`, so a dark-only render preserves the last light render. A
+targeted baseline run can leave intentional "Not rendered" placeholders for baseline combinations
+that have not been captured yet.
 
 ## How it works
 
@@ -47,6 +90,7 @@ dev/visual/
     iconAudit.mjs         setIcon() literal audit
     lucideIcons.mjs       installed Obsidian icon geometry
     obsidianInstall.mjs   local install discovery
+    output.mjs            output paths, manifest merging, and contact sheet
     registry.mjs          surface loading and source validation
   fixtures/
     ask.mjs
@@ -115,6 +159,13 @@ modal) are worth a final glance in the running app.
 
 **Static appearance only:** no runtime state transitions, and reconstructed DOM can drift from the live
 app if a component's markup changes. Keep surfaces in step with their render source.
+
+**Animated captures are not byte-stable:** the composer, ask, and progress surfaces contain live CSS
+animations or transitions. The harness does not freeze them or change screenshot timing, so unchanged
+runs can capture different frames and produce different PNG hashes. Use successful rendering,
+manifest completeness, contact-sheet inspection, and other structural checks as evidence for these
+surfaces. Do not treat byte equality as a reliable gate until animation timing is addressed in a
+separate harness-hardening change.
 
 **A different browser engine:** the harness renders in whatever Chromium is on this machine, while
 Obsidian renders in the one its Electron bundles, and the two are usually several majors apart. CSS

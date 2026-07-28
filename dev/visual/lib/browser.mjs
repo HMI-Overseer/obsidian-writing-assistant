@@ -44,6 +44,10 @@ export async function captureElement(browser, html, shot, out) {
     await page.setViewportSize({ width: VIEWPORT.width, height: needed });
     el = await page.$(shot);
   }
-  await el.screenshot({ path: out });
+  const png = await el.screenshot({ path: out });
   await page.close();
+  return {
+    width: png.readUInt32BE(16),
+    height: png.readUInt32BE(20),
+  };
 }

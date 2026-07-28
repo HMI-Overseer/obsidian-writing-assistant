@@ -6,15 +6,25 @@ import { REVIEW_SURFACES } from "./review.mjs";
 import { SETTINGS_SURFACES } from "./settings.mjs";
 import { CHROME_SURFACES } from "./chrome.mjs";
 
-const MODULES = [COMPOSER_SURFACES, ASK_SURFACES, TRANSCRIPT_SURFACES, ASSISTANT_TURN_SURFACES, REVIEW_SURFACES, SETTINGS_SURFACES, CHROME_SURFACES];
+const MODULES = [
+  ["composer", COMPOSER_SURFACES],
+  ["ask", ASK_SURFACES],
+  ["transcript", TRANSCRIPT_SURFACES],
+  ["assistantTurn", ASSISTANT_TURN_SURFACES],
+  ["review", REVIEW_SURFACES],
+  ["settings", SETTINGS_SURFACES],
+  ["chrome", CHROME_SURFACES],
+];
 const merged = {};
+const familyById = {};
 
-for (const surfaces of MODULES) {
+for (const [family, surfaces] of MODULES) {
   for (const [id, surface] of Object.entries(surfaces)) {
     if (Object.prototype.hasOwnProperty.call(merged, id)) {
       throw new Error(`Duplicate visual surface id: ${id}`);
     }
     merged[id] = surface;
+    familyById[id] = family;
   }
 }
 
@@ -70,4 +80,8 @@ const SURFACE_ORDER = [
 
 export const SURFACES = Object.fromEntries(
   SURFACE_ORDER.map((id) => [id, merged[id]]),
+);
+
+export const SURFACE_FAMILIES = Object.fromEntries(
+  SURFACE_ORDER.map((id) => [id, familyById[id]]),
 );

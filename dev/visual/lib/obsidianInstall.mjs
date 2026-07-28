@@ -16,14 +16,14 @@ import {
   statSync,
   writeFileSync,
 } from "node:fs";
-import { dirname, join } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import * as asar from "@electron/asar";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
 /** Directory holding the gitignored copies of whatever we extract. */
-export const CACHE_DIR = join(HERE, ".cache");
+export const CACHE_DIR = resolve(HERE, "..", ".cache");
 
 // Candidate directories that hold an Obsidian `*.asar`. Override with OBSIDIAN_ASAR=<full path>.
 function candidateAsars() {

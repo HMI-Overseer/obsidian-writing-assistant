@@ -1,4 +1,4 @@
-// Resolves and caches Obsidian's own `app.css` for the visual harness.
+// Resolves and caches Obsidian's own `app.css` for the visual harness project.
 //
 // The harness loads Obsidian's real stylesheet so the plugin-vs-Obsidian cascade (unlayered rules,
 // native input/button chrome, theme variables) is reproduced, which a plain browser cannot do. That CSS

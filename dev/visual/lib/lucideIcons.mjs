@@ -86,7 +86,7 @@ function parseFromAppJs() {
   if (tableAt < 0 || aliasesAt < 0) {
     throw new Error(
       "Could not find the icon table in Obsidian's app.js. Its shape likely changed in this release; " +
-        "re-anchor the lookups in dev/visual/lucideIcons.mjs.",
+        "re-anchor the lookups in dev/visual/lib/lucideIcons.mjs.",
     );
   }
   return {

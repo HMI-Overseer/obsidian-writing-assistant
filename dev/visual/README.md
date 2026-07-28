@@ -19,8 +19,12 @@ Output PNGs land in `dev/visual/out/` (gitignored).
 
 ## How it works
 
-Each surface in [`surfaces.mjs`](./surfaces.mjs) reconstructs a component's DOM from its render source
-(the class names the `.ts` emits). [`render.mjs`](./render.mjs) composes, per theme and build:
+Each module in [`surfaces/`](./surfaces/) exports a plain object of surfaces that reconstruct component
+DOM from render sources, using the class names emitted by the corresponding `.ts` files. The registry
+merges those modules, rejects duplicate IDs, and requires every surface to declare a `source` path that
+exists in the repository.
+
+[`run.mjs`](./run.mjs) composes, per theme and build:
 
 1. Obsidian's own `app.css` (so the plugin-vs-Obsidian cascade, native input/button chrome, and theme
    variables are real, the thing a plain browser render misses),
@@ -30,14 +34,45 @@ Each surface in [`surfaces.mjs`](./surfaces.mjs) reconstructs a component's DOM 
 then screenshots the surface element in headless Chrome (your installed Chrome via Playwright's
 `channel: "chrome"`, no browser download; falls back to a managed Chromium if none is found).
 
+The harness is arranged as a small project:
+
+```
+dev/visual/
+  run.mjs                 CLI parsing, orchestration, and reporting
+  scaffold.mjs            harness-only CSS and Obsidian view wrappers
+  lib/
+    appCss.mjs            Obsidian app.css extraction
+    browser.mjs           browser launch, viewport policy, and capture
+    compose.mjs           document assembly
+    iconAudit.mjs         setIcon() literal audit
+    lucideIcons.mjs       installed Obsidian icon geometry
+    obsidianInstall.mjs   local install discovery
+    registry.mjs          surface loading and source validation
+  fixtures/
+    ask.mjs
+    chat.mjs
+    icons.mjs
+    memory.mjs
+    primitives.mjs
+  surfaces/
+    index.mjs
+    ask.mjs
+    assistantTurn.mjs
+    chrome.mjs
+    composer.mjs
+    review.mjs
+    settings.mjs
+    transcript.mjs
+```
+
 ## What comes from the installed Obsidian (not committed)
 
-[`obsidianInstall.mjs`](./obsidianInstall.mjs) locates the local app and reads out of it into a
+[`lib/obsidianInstall.mjs`](./lib/obsidianInstall.mjs) locates the local app and reads out of it into a
 gitignored `dev/visual/.cache/`. All of it is **Obsidian's proprietary asset** and must not be committed
 or redistributed:
 
-- **`app.css`**, via [`appCss.mjs`](./appCss.mjs), for the cascade described above.
-- **Lucide icon geometry**, via [`lucideIcons.mjs`](./lucideIcons.mjs). Obsidian draws every `setIcon()`
+- **`app.css`**, via [`lib/appCss.mjs`](./lib/appCss.mjs), for the cascade described above.
+- **Lucide icon geometry**, via [`lib/lucideIcons.mjs`](./lib/lucideIcons.mjs). Obsidian draws every `setIcon()`
   glyph from a table in its `app.js` and tags the result `class="svg-icon lucide-<name>"`. That class is
   load-bearing: `app.css` sizes and strokes icons through it (`var(--icon-size)` / `var(--icon-stroke)`,
   18px / 1.75px by default) and the plugin's own CSS never sets `stroke-width`. Reading the real table
@@ -52,10 +87,22 @@ for the executable.
 
 ## Adding a surface
 
-Read the component's render `.ts`, mirror the element/class structure into a new entry in `SURFACES`
-(`shot` is the CSS selector to screenshot, `w` an optional stage width), and re-run. Use the icon names
-the component passes to `setIcon()`; `I` in `surfaces.mjs` maps the surfaces' shorthand onto those names,
-and an unknown name throws rather than rendering nothing.
+Read the component's render `.ts`, then add an entry to the matching module in
+[`surfaces/`](./surfaces/). Each entry requires:
+
+- `source`: the repository-relative path to the component `.ts` file being reconstructed.
+- `shot`: the CSS selector to screenshot.
+- `html`: the reconstructed markup.
+- `w`: an optional stage width.
+
+[`lib/registry.mjs`](./lib/registry.mjs) throws when `source` is missing or does not exist. Add the
+surface module to [`surfaces/index.mjs`](./surfaces/index.mjs) if it is new; the index throws on
+duplicate IDs.
+
+Use the icon names the component passes to `setIcon()`. `I` in
+[`fixtures/icons.mjs`](./fixtures/icons.mjs) maps fixture shorthand onto those names, and an unknown
+name throws rather than rendering nothing. Every visual run also audits literal `setIcon(el, "name")`
+calls under `src/` against `ICON_NAMES` and reports missing names at startup.
 
 `w` is the width of the **component under test**: the stage is `content-box`, so its own padding sits
 outside that number. This matters because width-sensitive components read it: the composer footer is a
@@ -71,7 +118,7 @@ app if a component's markup changes. Keep surfaces in step with their render sou
 
 **A different browser engine:** the harness renders in whatever Chromium is on this machine, while
 Obsidian renders in the one its Electron bundles, and the two are usually several majors apart. CSS
-newer than Obsidian's engine looks correct here and does nothing in the app. `render.mjs` prints both
+newer than Obsidian's engine looks correct here and does nothing in the app. `run.mjs` prints both
 versions on every run so the gap stays visible; when a surface hinges on a recent CSS feature, confirm it
 in the running app.
 

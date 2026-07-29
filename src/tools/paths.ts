@@ -6,13 +6,13 @@
  * to a true vault-relative path at the tool-call boundary so the normal
  * validators see the real target:
  *
- *  1. An absolute filesystem path (e.g. "D:\vault\Harbingers\sandbox 2\Lore").
+ *  1. An absolute filesystem path (e.g. "D:\vault\ExampleVault\sandbox 2\Lore").
  *     Left untranslated it resolves to nothing in the vault, silently bypassing
  *     the folder/existence guards, and surfaces later as a baffling apply-time
  *     error ("…\Lore no longer exists").
  *  2. A relative path that redundantly leads with the *vault's own name*
- *     (e.g. "Harbingers/sandbox 2" in a vault named "Harbingers"). Vault ops
- *     apply relative to the root, so this lands at "Harbingers/Harbingers/…", a
+ *     (e.g. "ExampleVault/sandbox 2" in a vault named "ExampleVault"). Vault ops
+ *     apply relative to the root, so this lands at "ExampleVault/ExampleVault/…", a
  *     spurious nested folder. The leading vault-name segment is always redundant.
  */
 

@@ -20,7 +20,7 @@ function noteCountLabel(count: number): string {
   return `${count} note${count === 1 ? "" : "s"}`;
 }
 
-/** One-line checklist summary for an op, e.g. "New file Characters/Vex.md (1.2 KB)". */
+/** One-line checklist summary for an op, e.g. "New file Characters/Alice.md (1.2 KB)". */
 export function summarizeOp(op: VaultOperation): string {
   switch (op.kind) {
     case "create":

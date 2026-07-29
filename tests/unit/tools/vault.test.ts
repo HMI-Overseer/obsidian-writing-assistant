@@ -833,7 +833,7 @@ describe("get_frontmatter", () => {
       files: [a, b],
       fileCaches: {
         "Characters/Alaric.md": {
-          frontmatter: { species: "human", affiliation: "Harbingers", position: { start: 0 } },
+          frontmatter: { species: "human", affiliation: "Guild", position: { start: 0 } },
         },
         "Characters/Will.md": {
           frontmatter: { species: "elf", status: "alive", position: { start: 0 } },

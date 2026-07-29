@@ -1,0 +1,211 @@
+import { describe, expect, it } from "vitest";
+import {
+  editApprovalRequest,
+  memoryApprovalRequest,
+  vaultOpApprovalRequest,
+} from "../../../../src/chat/interactions/approvalRequests";
+import type { VaultOperation } from "../../../../src/vault-ops/types";
+import type { ResolvedEdit } from "../../../../src/editing/editTypes";
+import type { MemoryMutation } from "../../../../src/tools/memory/handlers";
+
+const FP = { mtime: 1, size: 2 };
+
+const CREATE: VaultOperation = {
+  kind: "create",
+  path: "Notes/Alice.md",
+  content: "hi",
+};
+const OVERWRITE: VaultOperation = {
+  kind: "overwrite",
+  path: "Notes/Alice.md",
+  content: "hi",
+  expect: FP,
+};
+const DIR: VaultOperation = { kind: "createDir", path: "Notes/Folder" };
+const MOVE: VaultOperation = {
+  kind: "move",
+  from: "a.md",
+  to: "b.md",
+  expect: FP,
+};
+const TRASH: VaultOperation = {
+  kind: "trash",
+  path: "a.md",
+  expect: FP,
+  snapshot: "x",
+};
+const MOVE_FOLDER: VaultOperation = {
+  kind: "moveFolder",
+  from: "Drafts/X",
+  to: "Manuscript/X",
+};
+const TRASH_FOLDER: VaultOperation = { kind: "trashFolder", path: "Drafts/X" };
+const REPLACE: VaultOperation = {
+  kind: "replaceInVault",
+  search: "Silver Age",
+  replace: "Golden Age",
+  caseSensitive: false,
+  wholeWord: false,
+  targets: [
+    { path: "Lore/A.md", content: "x", expect: FP },
+    { path: "Lore/B.md", content: "y", expect: FP },
+  ],
+  occurrences: 3,
+};
+
+function resolvedEdit(startLine: number): ResolvedEdit {
+  return {
+    id: "resolved-1",
+    editBlock: {
+      id: "block-1",
+      searchText: "old",
+      replaceText: "new",
+      rawBlock: "",
+    },
+    matchOffset: 0,
+    matchLength: 3,
+    matchedText: "old",
+    startLine,
+    endLine: startLine,
+    contextBefore: [],
+    contextAfter: [],
+    matchType: "exact",
+    confidence: 1,
+  };
+}
+
+describe("vaultOpApprovalRequest", () => {
+  it("derives summary and detail from the shared op summary helpers", () => {
+    const request = vaultOpApprovalRequest({
+      approvalId: "op-1",
+      toolCallId: "call-1",
+      op: CREATE,
+    });
+
+    expect(request).toEqual({
+      approvalId: "op-1",
+      channel: "vault-op",
+      toolCallId: "call-1",
+      summary: "New file Notes/Alice.md (2 B)",
+      detail: "Notes/Alice.md",
+    });
+  });
+
+  it("covers every op kind without authoring a second vocabulary", () => {
+    const summaries = [
+      OVERWRITE,
+      DIR,
+      MOVE,
+      TRASH,
+      MOVE_FOLDER,
+      TRASH_FOLDER,
+      REPLACE,
+    ].map((op) =>
+      vaultOpApprovalRequest({ approvalId: "op", toolCallId: "call", op }),
+    );
+
+    expect(summaries.map((request) => request.summary)).toEqual([
+      "Overwrite Notes/Alice.md (2 B)",
+      "New folder Notes/Folder",
+      "Move a.md → b.md",
+      "Trash a.md",
+      "Move folder Drafts/X → Manuscript/X",
+      "Trash folder Drafts/X",
+      'Replace "Silver Age" → "Golden Age" in 2 notes (3 matches)',
+    ]);
+    expect(summaries.map((request) => request.detail)).toEqual([
+      "Notes/Alice.md",
+      "Notes/Folder",
+      "a.md → b.md",
+      "a.md",
+      "Drafts/X → Manuscript/X",
+      "Drafts/X",
+      '"Silver Age" → "Golden Age"',
+    ]);
+    expect(summaries.every((request) => request.channel === "vault-op")).toBe(true);
+  });
+});
+
+describe("editApprovalRequest", () => {
+  it("names the edited file and the resolved start line", () => {
+    expect(
+      editApprovalRequest({
+        approvalId: "hunk-1",
+        toolCallId: "call-2",
+        kind: "edit",
+        filePath: "Chapters/The War.md",
+        resolvedEdit: resolvedEdit(42),
+      }),
+    ).toEqual({
+      approvalId: "hunk-1",
+      channel: "edit",
+      toolCallId: "call-2",
+      summary: "Edit Chapters/The War.md",
+      detail: "Line 42",
+    });
+  });
+
+  it("keeps the frontmatter and insert channels in their own words", () => {
+    expect(
+      editApprovalRequest({
+        approvalId: "hunk-2",
+        toolCallId: "call-3",
+        kind: "frontmatter",
+        filePath: "Chapters/The War.md",
+        resolvedEdit: resolvedEdit(1),
+      }).summary,
+    ).toBe("Frontmatter update Chapters/The War.md");
+    expect(
+      editApprovalRequest({
+        approvalId: "hunk-3",
+        toolCallId: "call-4",
+        kind: "insert",
+        filePath: "Chapters/The War.md",
+        resolvedEdit: resolvedEdit(9),
+      }).summary,
+    ).toBe("Insert into Chapters/The War.md");
+  });
+});
+
+describe("memoryApprovalRequest", () => {
+  it("names the memory and the mutation kind", () => {
+    const add: MemoryMutation = {
+      kind: "add",
+      memory: {
+        name: "Alice speaks in short sentences",
+        type: "character",
+        description: "Voice note",
+        enabled: true,
+      },
+    };
+    const forget: MemoryMutation = {
+      kind: "forget",
+      name: "Alice speaks in short sentences",
+    };
+
+    expect(
+      memoryApprovalRequest({
+        approvalId: "memory-1",
+        toolCallId: "call-5",
+        mutation: add,
+      }),
+    ).toEqual({
+      approvalId: "memory-1",
+      channel: "memory",
+      toolCallId: "call-5",
+      summary: 'Remember "Alice speaks in short sentences"',
+    });
+    expect(
+      memoryApprovalRequest({
+        approvalId: "memory-2",
+        toolCallId: "call-6",
+        mutation: forget,
+      }),
+    ).toEqual({
+      approvalId: "memory-2",
+      channel: "memory",
+      toolCallId: "call-6",
+      summary: 'Forget "Alice speaks in short sentences"',
+    });
+  });
+});

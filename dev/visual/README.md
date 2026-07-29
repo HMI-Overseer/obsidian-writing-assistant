@@ -95,6 +95,7 @@ dev/visual/
     registry.mjs          surface loading and source validation
     surfaceAudit.mjs      production DOM and state invariants for fixture drift
   fixtures/
+    approval.mjs
     ask.mjs
     chat.mjs
     images.mjs
@@ -104,6 +105,7 @@ dev/visual/
     primitives.mjs
   surfaces/
     index.mjs
+    approval.mjs
     ask.mjs
     assistantTurn.mjs
     chatStates.mjs
@@ -119,7 +121,7 @@ dev/visual/
 
 ## Surface inventory
 
-The registry currently contains 66 capture IDs. A full current render writes 132 PNGs, one light and
+The registry currently contains 75 capture IDs. A full current render writes 150 PNGs, one light and
 one dark image for every ID.
 
 - `composer` (12): `composer`, `composerDragOver`, `footerRing`, `modelDropdown`,
@@ -127,6 +129,14 @@ one dark image for every ID.
   `contextPopoverSearch`, `toolPopover`, `overflowMenu`, `profilePopover`.
 - `ask` (7): `askSingleIncomplete`, `askOtherReady`, `askMixedReady`, `askMixedNarrow`,
   `askMaximumContract`, `askMaximumContractNarrow`, `askMixedMinimized`.
+- `approval` (9): `approvalDefault`, `approvalDefaultNarrow`, `approvalOtherExpanded`,
+  `approvalOtherExpandedNarrow`, `approvalLongSummary`, `approvalLongSummaryNarrow`,
+  `approvalMinimized`, `approvalWithTimeline`, `approvalWithEditTimeline`. The first seven
+  put the drawer over a stand-in transcript, so the form itself is what a reader compares.
+  The last two are composites: a complete assistant turn plus the drawer deciding one of its
+  steps, vault channel and edit channel. Read those when the question is what the timeline
+  still reports after RFC-0012 took the decision off it; they pair with `vaultReviewTimeline`
+  and `editReviewTimeline`, which render the same turns with no drawer.
 - `transcript` (4): `emptyState`, `transcript`, `messageAttachments`, `bubbleToolbar`.
 - `chatStates` (5): `collapsedChat`, `attachedImageChip`, `modelDropdownEmptyCatalog`,
   `modelDropdownNoSearchMatches`, `chatHeaderPressure`.
@@ -182,6 +192,11 @@ Read the component's render `.ts`, then add an entry to the matching module in
 surface module to [`surfaces/index.mjs`](./surfaces/index.mjs) if it is new; the index throws on
 duplicate IDs. [`lib/surfaceAudit.mjs`](./lib/surfaceAudit.mjs) checks shared production contracts,
 including settings chrome, composer sibling order, provider rails, and tool timeline identifiers.
+
+**Also add the ID to `SURFACE_ORDER`** in that same index. It is the registry, not a sort key:
+everything downstream is built by mapping over it, so an ID a module exports but the list omits used
+to be dropped silently, rendering nothing and reporting nothing. The index now throws in both
+directions instead, naming the offending IDs.
 
 Use the icon names the component passes to `setIcon()`. `I` in
 [`fixtures/icons.mjs`](./fixtures/icons.mjs) maps fixture shorthand onto those names, and an unknown

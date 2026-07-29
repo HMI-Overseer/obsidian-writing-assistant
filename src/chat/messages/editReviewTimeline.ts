@@ -40,13 +40,6 @@ export interface EditReviewTimelineOptions {
   live?: boolean;
   /** Ambiguous legacy ownership renders status and diff without mutation controls. */
   readOnly?: boolean;
-  /**
-   * Flip the session into auto-apply ("Edit automatically"). When provided, the bulk bar
-   * offers an "Accept all this session" action that accepts the current pending hunks and
-   * calls this so the rest of the session's edits apply without gating. Absent on history
-   * mounts where there is no live session to change.
-   */
-  onEnterAutoApply?: () => void;
 }
 
 /** Per-hunk state class on the step element, drives the status dot tint. */
@@ -117,7 +110,6 @@ export class EditReviewTimelineView {
   private readonly entries = new Map<string, HunkEntry>();
   private readonly syntheticSteps = new Map<string, HTMLElement>();
   private fallbackListEl: HTMLElement | null = null;
-  private bulkBarEl: HTMLElement | null = null;
   // Side-by-side is the default review view; the per-card toggle still offers unified.
   private diffMode: DiffMode = "split";
   private readonly unsubscribes: Array<() => void>;
@@ -147,7 +139,6 @@ export class EditReviewTimelineView {
   private cleanPriorDecorations(): void {
     const t = this.opts.timelineEl;
     t.querySelectorAll(".lmsa-edit-review-fallback").forEach((e) => e.remove());
-    t.querySelectorAll(".lmsa-edit-review-bulk").forEach((e) => e.remove());
     t.querySelectorAll(".lmsa-edit-step-controls, .lmsa-edit-timeline-hunk").forEach((e) =>
       e.remove(),
     );
@@ -165,66 +156,6 @@ export class EditReviewTimelineView {
         this.decorateStep(this.locateStep(hunk), hunk, controller, fileName);
       }
     }
-    this.renderBulkBar();
-  }
-
-  /** Pending hunks across every file's controller (the aggregate the bulk bar acts on). */
-  private allPendingCount(): number {
-    return this.opts.controllers.reduce((n, c) => n + c.pendingHunks().length, 0);
-  }
-
-  /**
-   * Turn-level accept-all / reject-all bar spanning every edited file, shown only when
-   * two or more hunks are still pending across the turn. Saves clicking down a long
-   * timeline; per-hunk controls stay for granular review. The optional third action
-   * also flips the session to auto-apply.
-   */
-  private renderBulkBar(): void {
-    if (this.opts.readOnly) {
-      this.bulkBarEl?.remove();
-      this.bulkBarEl = null;
-      return;
-    }
-    const pendingCount = this.allPendingCount();
-    if (pendingCount < 2) {
-      this.bulkBarEl?.remove();
-      this.bulkBarEl = null;
-      return;
-    }
-
-    if (!this.bulkBarEl) {
-      this.bulkBarEl = this.opts.timelineEl.createDiv({ cls: "lmsa-edit-review-bulk" });
-      this.bulkBarEl.addEventListener("click", (e) => e.stopPropagation());
-    }
-    this.bulkBarEl.empty();
-
-    const acceptAll = this.bulkBarEl.createEl("button", {
-      cls: "lmsa-ui-compact-btn lmsa-edit-bulk-btn lmsa-edit-bulk-btn--accept",
-      text: `Accept all (${pendingCount})`,
-    });
-    acceptAll.addEventListener("click", () => void this.acceptAllFiles());
-
-    const rejectAll = this.bulkBarEl.createEl("button", {
-      cls: "lmsa-ui-compact-btn lmsa-ui-compact-btn-secondary lmsa-edit-bulk-btn",
-      text: "Reject all",
-    });
-    rejectAll.addEventListener("click", () => this.opts.controllers.forEach((c) => c.rejectAll()));
-
-    if (this.opts.onEnterAutoApply) {
-      const session = this.bulkBarEl.createEl("button", {
-        cls: "lmsa-ui-compact-btn lmsa-ui-compact-btn-secondary lmsa-edit-bulk-btn",
-        text: "Accept all this session",
-      });
-      session.addEventListener("click", () => {
-        void this.acceptAllFiles();
-        this.opts.onEnterAutoApply?.();
-      });
-    }
-  }
-
-  /** Accept every pending hunk across all files. */
-  private async acceptAllFiles(): Promise<void> {
-    for (const controller of this.opts.controllers) await controller.acceptAll();
   }
 
   /**
@@ -367,7 +298,8 @@ export class EditReviewTimelineView {
       return;
     }
 
-    // Pending. A no-match can't be applied, offer only a way to dismiss it.
+    // Pending. A no-match can't be applied, and it never parked a decision either, so
+    // it keeps its own dismiss affordance.
     if (noMatch) {
       controlsEl.createSpan({ cls: "lmsa-edit-step-state is-error", text: "No match" });
       const decline = this.iconButton(controlsEl, "x", "Dismiss", "decline");
@@ -375,11 +307,10 @@ export class EditReviewTimelineView {
       return;
     }
 
+    // The accept / reject decision is made in the composer drawer while the generation
+    // is live (RFC-0012); the timeline is the record, so this is a status label. The
+    // diff card and the applied-state Undo above it both stay.
     controlsEl.createSpan({ cls: "lmsa-edit-step-pending", text: "pending review" });
-    const approve = this.iconButton(controlsEl, "check", "Accept", "approve");
-    approve.addEventListener("click", () => void controller.accept(hunk.id));
-    const decline = this.iconButton(controlsEl, "x", "Reject", "decline");
-    decline.addEventListener("click", () => controller.reject(hunk.id));
   }
 
   private iconButton(
@@ -428,7 +359,6 @@ export class EditReviewTimelineView {
     entry.stateEl.classList.add(stateClass(view, entry.noMatch));
     entry.diffView.setStatus(change.status);
     this.renderControls(entry, view);
-    this.renderBulkBar();
   }
 }
 

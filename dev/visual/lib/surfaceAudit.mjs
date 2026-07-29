@@ -112,7 +112,22 @@ export function auditSurfaceContracts(surfaces) {
   requireMarkup(
     surfaces.vaultReviewTimeline,
     "vaultReviewTimeline",
-    ["is-vault-applied", "vault-write", "vault-move", "Approve all", ">Undo<"],
+    // The live approve / decline decision moved to the composer drawer (RFC-0012), so the
+    // awaiting steps carry a status label and the footer carries only Undo. Undo is a
+    // post-decision action on a durable record and deliberately stayed.
+    ["is-vault-applied", "vault-write", "vault-move", "pending approval", ">Undo<"],
+    failures,
+  );
+  rejectMarkup(
+    surfaces.vaultReviewTimeline,
+    "vaultReviewTimeline",
+    ["Approve all", "lmsa-vault-step-btn"],
+    failures,
+  );
+  rejectMarkup(
+    surfaces.editReviewTimeline,
+    "editReviewTimeline",
+    ["lmsa-edit-review-bulk", "lmsa-edit-step-btn--approve"],
     failures,
   );
   requireMarkup(

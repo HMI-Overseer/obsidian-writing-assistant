@@ -31,7 +31,7 @@ export const WRITE_FILE_TOOL: CanonicalToolDefinition = {
         type: "string",
         description:
           "Vault-relative path to an Obsidian document, a Markdown note (.md) or a canvas (.canvas), " +
-          "e.g. 'Characters/Vex.md'. Other file types are refused. Missing parent folders are created automatically.",
+          "e.g. 'Characters/Alice.md'. Other file types are refused. Missing parent folders are created automatically.",
       },
       content: {
         type: "string",
@@ -86,7 +86,7 @@ export const MOVE_FILE_TOOL: CanonicalToolDefinition = {
         type: "string",
         description:
           "Destination vault-relative path, must be an Obsidian document (.md or .canvas), " +
-          "e.g. 'Characters/Vex.md'. Missing parent folders are created automatically.",
+          "e.g. 'Characters/Alice.md'. Missing parent folders are created automatically.",
       },
     },
     required: ["from", "to"],

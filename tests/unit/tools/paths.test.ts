@@ -8,25 +8,25 @@ import {
 import type { ToolCall } from "../../../src/tools/types";
 import type { App } from "obsidian";
 
-const ROOT = "D:\\vault\\Harbingers";
-const NAME = "Harbingers";
+const ROOT = "D:\\vault\\ExampleVault";
+const NAME = "ExampleVault";
 
 describe("toVaultRelativePath", () => {
   it("strips the vault root from an absolute Windows path inside the vault", () => {
-    expect(toVaultRelativePath("D:\\vault\\Harbingers\\sandbox 2\\Lore", ROOT, NAME)).toBe(
+    expect(toVaultRelativePath("D:\\vault\\ExampleVault\\sandbox 2\\Lore", ROOT, NAME)).toBe(
       "sandbox 2/Lore",
     );
   });
 
   it("normalizes backslashes in the stripped remainder to forward slashes", () => {
-    expect(toVaultRelativePath("D:\\vault\\Harbingers\\Characters\\Vex.md", ROOT, NAME)).toBe(
-      "Characters/Vex.md",
+    expect(toVaultRelativePath("D:\\vault\\ExampleVault\\Characters\\Alice.md", ROOT, NAME)).toBe(
+      "Characters/Alice.md",
     );
   });
 
   it("matches the vault root case-insensitively (drive letter / casing)", () => {
-    expect(toVaultRelativePath("d:/VAULT/harbingers/Lore/The_Nexus.md", ROOT, NAME)).toBe(
-      "Lore/The_Nexus.md",
+    expect(toVaultRelativePath("d:/VAULT/examplevault/Lore/The_Archive.md", ROOT, NAME)).toBe(
+      "Lore/The_Archive.md",
     );
   });
 
@@ -41,44 +41,44 @@ describe("toVaultRelativePath", () => {
   });
 
   it("does not treat a sibling folder sharing a name prefix as inside the vault", () => {
-    // "D:/vault/Harbingers2" is a different folder, must not be mistaken for the root.
-    expect(toVaultRelativePath("D:\\vault\\Harbingers2\\Lore", ROOT, NAME)).toBe(
-      "D:\\vault\\Harbingers2\\Lore",
+    // "D:/vault/ExampleVault2" is a different folder, must not be mistaken for the root.
+    expect(toVaultRelativePath("D:\\vault\\ExampleVault2\\Lore", ROOT, NAME)).toBe(
+      "D:\\vault\\ExampleVault2\\Lore",
     );
   });
 
   it("maps the vault root itself to the empty (root) path", () => {
-    expect(toVaultRelativePath("D:\\vault\\Harbingers", ROOT, NAME)).toBe("");
+    expect(toVaultRelativePath("D:\\vault\\ExampleVault", ROOT, NAME)).toBe("");
   });
 
   it("passes the path through untouched when the base path is unknown", () => {
-    expect(toVaultRelativePath("D:\\vault\\Harbingers\\Lore", undefined, NAME)).toBe(
-      "D:\\vault\\Harbingers\\Lore",
+    expect(toVaultRelativePath("D:\\vault\\ExampleVault\\Lore", undefined, NAME)).toBe(
+      "D:\\vault\\ExampleVault\\Lore",
     );
   });
 
   // --- redundant leading vault-name segment (the double-nesting bug) ---------
 
   it("strips a relative path that redundantly leads with the vault name", () => {
-    expect(toVaultRelativePath("Harbingers/sandbox 2", ROOT, NAME)).toBe("sandbox 2");
+    expect(toVaultRelativePath("ExampleVault/sandbox 2", ROOT, NAME)).toBe("sandbox 2");
   });
 
   it("strips the vault-name prefix case-insensitively and tolerates a leading slash", () => {
-    expect(toVaultRelativePath("/harbingers/sandbox 2/Lore", ROOT, NAME)).toBe("sandbox 2/Lore");
+    expect(toVaultRelativePath("/examplevault/sandbox 2/Lore", ROOT, NAME)).toBe("sandbox 2/Lore");
   });
 
   it("strips a vault-name segment left in an absolute path's remainder", () => {
-    expect(toVaultRelativePath("D:\\vault\\Harbingers\\Harbingers\\sandbox 2", ROOT, NAME)).toBe(
+    expect(toVaultRelativePath("D:\\vault\\ExampleVault\\ExampleVault\\sandbox 2", ROOT, NAME)).toBe(
       "sandbox 2",
     );
   });
 
   it("leaves a bare vault-name path alone (only the prefix form is redundant)", () => {
-    expect(toVaultRelativePath("Harbingers", ROOT, NAME)).toBe("Harbingers");
+    expect(toVaultRelativePath("ExampleVault", ROOT, NAME)).toBe("ExampleVault");
   });
 
   it("does not strip a folder that merely starts with the vault name", () => {
-    expect(toVaultRelativePath("HarbingersNotes/x.md", ROOT, NAME)).toBe("HarbingersNotes/x.md");
+    expect(toVaultRelativePath("ExampleVaultNotes/x.md", ROOT, NAME)).toBe("ExampleVaultNotes/x.md");
   });
 });
 
@@ -159,7 +159,7 @@ describe("normalizeVaultToolCall", () => {
     const call: ToolCall = {
       id: "0",
       name: "create_directory",
-      arguments: { path: "Harbingers/sandbox 2" },
+      arguments: { path: "ExampleVault/sandbox 2" },
     };
     expect(normalizeVaultToolCall(app, call).arguments.path).toBe("sandbox 2");
   });
@@ -169,9 +169,9 @@ describe("normalizeVaultToolCall", () => {
     const call: ToolCall = {
       id: "0b",
       name: "create_directory",
-      arguments: { path: "Harbingers/sandbox 2" },
+      arguments: { path: "ExampleVault/sandbox 2" },
     };
-    // A genuine top-level "Harbingers" folder stays addressable, no stripping.
+    // A genuine top-level "ExampleVault" folder stays addressable, no stripping.
     expect(normalizeVaultToolCall(collidingApp, call)).toBe(call);
   });
 
@@ -179,7 +179,7 @@ describe("normalizeVaultToolCall", () => {
     const call: ToolCall = {
       id: "1",
       name: "write_file",
-      arguments: { path: "D:\\vault\\Harbingers\\sandbox 2\\Lore", content: "x" },
+      arguments: { path: "D:\\vault\\ExampleVault\\sandbox 2\\Lore", content: "x" },
     };
     const out = normalizeVaultToolCall(app, call);
     expect(out.arguments.path).toBe("sandbox 2/Lore");
@@ -191,12 +191,12 @@ describe("normalizeVaultToolCall", () => {
       id: "1b",
       name: "get_frontmatter",
       arguments: {
-        paths: ["Harbingers/Characters/Vex.md", "D:\\vault\\Harbingers\\Lore\\The_Nexus.md", "Plot.md"],
+        paths: ["ExampleVault/Characters/Alice.md", "D:\\vault\\ExampleVault\\Lore\\The_Archive.md", "Plot.md"],
       },
     };
     expect(normalizeVaultToolCall(app, call).arguments.paths).toEqual([
-      "Characters/Vex.md",
-      "Lore/The_Nexus.md",
+      "Characters/Alice.md",
+      "Lore/The_Archive.md",
       "Plot.md",
     ]);
   });
@@ -206,13 +206,13 @@ describe("normalizeVaultToolCall", () => {
       id: "2",
       name: "move_file",
       arguments: {
-        from: "D:\\vault\\Harbingers\\Inbox\\Draft.md",
-        to: "D:\\vault\\Harbingers\\Characters\\Vex.md",
+        from: "D:\\vault\\ExampleVault\\Inbox\\Draft.md",
+        to: "D:\\vault\\ExampleVault\\Characters\\Alice.md",
       },
     };
     const out = normalizeVaultToolCall(app, call);
     expect(out.arguments.from).toBe("Inbox/Draft.md");
-    expect(out.arguments.to).toBe("Characters/Vex.md");
+    expect(out.arguments.to).toBe("Characters/Alice.md");
   });
 
   it("returns the same object when nothing needs translating", () => {
@@ -236,7 +236,7 @@ describe("normalizeVaultToolCall", () => {
     const call: ToolCall = {
       id: "5",
       name: "write_file",
-      arguments: { path: "D:\\vault\\Harbingers\\Lore", content: "x" },
+      arguments: { path: "D:\\vault\\ExampleVault\\Lore", content: "x" },
     };
     // No base path means the absolute prefix can't be stripped; the vault-name
     // segment is mid-path (not leading), so nothing changes.

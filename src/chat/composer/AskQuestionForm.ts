@@ -113,13 +113,13 @@ export class AskQuestionForm {
 
   private renderForm(): RenderedForm {
     const formEl = this.refs.containerEl.createEl("form", {
-      cls: "lmsa-ask-form",
+      cls: "lmsa-ask-form lmsa-interaction-form",
       attr: {
         novalidate: "true",
       },
     });
     const toolbarEl = formEl.createDiv({
-      cls: "lmsa-ask-form-toolbar",
+      cls: "lmsa-interaction-toolbar",
     });
     const tabsEl = toolbarEl.createDiv({
       cls: "lmsa-ask-form-tabs",
@@ -130,7 +130,7 @@ export class AskQuestionForm {
     });
     const bodyId = `${this.formId}-body`;
     const collapseButton = toolbarEl.createEl("button", {
-      cls: "lmsa-ask-form-collapse",
+      cls: "lmsa-interaction-collapse",
       attr: {
         type: "button",
         "aria-label": "Minimize questions",
@@ -140,7 +140,7 @@ export class AskQuestionForm {
     });
     setIcon(collapseButton, "chevron-down");
     const bodyEl = formEl.createDiv({
-      cls: "lmsa-ask-form-body",
+      cls: "lmsa-interaction-body",
       attr: { id: bodyId },
     });
     const questionsEl = bodyEl.createDiv({ cls: "lmsa-ask-form-questions" });
@@ -249,7 +249,7 @@ export class AskQuestionForm {
     });
 
     const optionsEl = fieldsetEl.createDiv({
-      cls: "lmsa-ask-form-options",
+      cls: "lmsa-interaction-options",
     });
     const optionInputs = question.options.map((option, optionIndex) =>
       this.renderOption(optionsEl, question, questionIndex, optionIndex),
@@ -277,9 +277,9 @@ export class AskQuestionForm {
     const option = question.options[optionIndex];
     const inputId = `${this.formId}-q${questionIndex}-o${optionIndex}`;
     const descriptionId = `${inputId}-description`;
-    const rowEl = containerEl.createDiv({ cls: "lmsa-ask-form-option" });
+    const rowEl = containerEl.createDiv({ cls: "lmsa-interaction-option" });
     const input = rowEl.createEl("input", {
-      cls: "lmsa-ask-form-option-input",
+      cls: "lmsa-interaction-option-input",
       attr: {
         type: question.multiSelect ? "checkbox" : "radio",
         id: inputId,
@@ -288,15 +288,15 @@ export class AskQuestionForm {
       },
     });
     const labelEl = rowEl.createEl("label", {
-      cls: "lmsa-ask-form-option-label",
+      cls: "lmsa-interaction-option-label",
       attr: { for: inputId },
     });
     labelEl.createSpan({
-      cls: "lmsa-ask-form-option-name",
+      cls: "lmsa-interaction-option-name",
       text: option.label,
     });
     labelEl.createSpan({
-      cls: "lmsa-ask-form-option-description",
+      cls: "lmsa-interaction-option-description",
       text: option.description,
       attr: { id: descriptionId },
     });
@@ -330,10 +330,10 @@ export class AskQuestionForm {
     const inputId = `${this.formId}-q${questionIndex}-other`;
     const textId = `${inputId}-text`;
     const rowEl = containerEl.createDiv({
-      cls: "lmsa-ask-form-option lmsa-ask-form-other-option",
+      cls: "lmsa-interaction-option lmsa-interaction-other-option",
     });
     const input = rowEl.createEl("input", {
-      cls: "lmsa-ask-form-option-input",
+      cls: "lmsa-interaction-option-input",
       attr: {
         type: question.multiSelect ? "checkbox" : "radio",
         id: inputId,
@@ -341,18 +341,18 @@ export class AskQuestionForm {
       },
     });
     const labelEl = rowEl.createEl("label", {
-      cls: "lmsa-ask-form-option-label",
+      cls: "lmsa-interaction-option-label",
       attr: { for: inputId },
     });
     labelEl.createSpan({
-      cls: "lmsa-ask-form-option-name",
+      cls: "lmsa-interaction-option-name",
       text: "Other",
     });
 
-    const textWrap = rowEl.createDiv({ cls: "lmsa-ask-form-other-text" });
+    const textWrap = rowEl.createDiv({ cls: "lmsa-interaction-other-text" });
     textWrap.hidden = true;
     const textarea = textWrap.createEl("textarea", {
-      cls: "lmsa-ask-form-other-textarea",
+      cls: "lmsa-interaction-other-textarea",
       attr: {
         id: textId,
         "aria-label": "Other answer",
@@ -392,7 +392,7 @@ export class AskQuestionForm {
 
   private renderError(containerEl: HTMLElement): HTMLElement {
     return containerEl.createDiv({
-      cls: "lmsa-ask-form-error lmsa-hidden",
+      cls: "lmsa-interaction-error lmsa-hidden",
       attr: {
         role: "alert",
         "aria-live": "assertive",

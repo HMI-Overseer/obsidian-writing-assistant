@@ -23,12 +23,32 @@ export const SCAFFOLD = `
   .lmsa-drawer-probe{position:relative;display:flex;width:340px;height:180px;
     border:1px solid var(--background-modifier-border);border-radius:8px;background:var(--background-primary)}
   .lmsa-drawer-probe-content{margin:auto;color:var(--text-muted);font-size:13px}
-  .lmsa-ask-visual-stage{position:relative;height:760px;overflow:hidden}
-  .lmsa-ask-visual-stage>.lmsa-chat-composer{position:absolute;right:0;bottom:0;left:0}
-  .lmsa-ask-visual-transcript{display:flex;flex-direction:column;gap:18px;padding:28px 24px}
-  .lmsa-ask-visual-bubble{max-width:72%;padding:12px 14px;border-radius:14px;
-    background:var(--background-secondary);color:var(--text-normal);font-size:14px;line-height:1.5}
-  .lmsa-ask-visual-bubble.is-user{align-self:flex-end;background:var(--background-modifier-hover)}
+  /* Drawer stages: the interaction body is anchored above an absolutely-placed composer,
+     so both interaction kinds need the same bounded stage to render in. */
+  .lmsa-ask-visual-stage,.lmsa-approval-visual-stage{position:relative;height:760px;overflow:hidden}
+  .lmsa-ask-visual-stage>.lmsa-chat-composer,
+  .lmsa-approval-visual-stage>.lmsa-chat-composer{position:absolute;right:0;bottom:0;left:0}
+  /* Composite drawer + timeline stages. The fixed-height stage above models the drawer
+     floating over a scrolled transcript, which is true but crops the assistant turn behind
+     the drawer, so it cannot answer "what does the timeline still show". This variant drops
+     the stage to its content and lets the composer sit in flow, the same anchored-position
+     neutralization this scaffold does for popovers, so the whole turn and the whole drawer
+     are both in frame. */
+  .lmsa-approval-visual-stage.is-flow{height:auto;overflow:visible}
+  .lmsa-approval-visual-stage.is-flow>.lmsa-chat-composer{position:relative}
+  /* The drawer is absolutely anchored above the composer (bottom:calc(100% - 12px)), so
+     un-anchoring the composer alone throws it off the top of the stage. Put the drawer in
+     flow too, keeping its 24px side inset and its 12px tuck into the composer, so the
+     stack reads transcript, drawer, composer with nothing overlapping and nothing cropped. */
+  .lmsa-approval-visual-stage.is-flow .lmsa-chat-composer-interaction-body{
+    position:static;margin:0 24px -12px;max-height:none}
+  /* No stand-in bubble styling here on purpose. The drawer stages render the plugin's real
+     transcript markup (the userMessage / assistantProse / messagesPane helpers in
+     fixtures/chat.mjs), so message chrome comes from styles.css like every other surface.
+     Invented chrome in the scaffold made half the family unreviewable: a reader could not
+     tell whether what they were looking at was the plugin or the harness. */
+  .lmsa-ask-visual-stage>.lmsa-messages-pane,
+  .lmsa-approval-visual-stage>.lmsa-messages-pane{padding:24px 20px}
 `;
 
 // Wrap component markup in the Obsidian view chain the plugin renders into

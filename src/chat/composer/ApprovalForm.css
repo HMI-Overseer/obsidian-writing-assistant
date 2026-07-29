@@ -1,0 +1,70 @@
+/* Approval form (RFC-0012)
+ *
+ * The collapsing shell, the option rows, the expanding Other, and its textarea all come
+ * from the shared `lmsa-interaction-*` blocks in AskQuestionForm.css. Only the header
+ * and the actions row are the approval form's own, because only they differ from the
+ * ask form. */
+
+.lmsa-approval-form-decision {
+  min-width: 0;
+  padding: 0;
+  margin: 0;
+  border: 0;
+}
+
+.lmsa-approval-form-legend {
+  display: flex;
+  float: left;
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  flex-direction: column;
+  gap: 4px;
+  padding: 2px 2px 12px;
+}
+
+/* Sits in the toolbar, so it is what stays visible when the drawer is minimized. */
+.lmsa-approval-form-eyebrow {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--lmsa-mode-accent, var(--interactive-accent));
+  font-size: var(--font-ui-smaller);
+  font-weight: var(--font-medium);
+  line-height: 1.3;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lmsa-approval-form-summary {
+  overflow-wrap: anywhere;
+  color: var(--text-normal);
+  font-size: var(--font-ui-small);
+  font-weight: var(--font-semibold);
+  line-height: 1.5;
+}
+
+.lmsa-approval-form-detail {
+  overflow-wrap: anywhere;
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+  line-height: 1.4;
+}
+
+.lmsa-approval-form-actions {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: flex-end;
+  padding-top: 2px;
+}
+
+.lmsa-approval-form-submit {
+  min-width: 132px;
+  margin-left: auto;
+}
+
+@container (max-width: 360px) {
+  .lmsa-approval-form-submit {
+    width: 100%;
+  }
+}

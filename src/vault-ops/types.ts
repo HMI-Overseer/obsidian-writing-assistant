@@ -91,7 +91,7 @@ export interface ReviewableVaultOp {
   op: VaultOperation;
   gate: "auto" | "ask";
   status: VaultOpStatus;
-  /** e.g. "Create Characters/Vex.md (1.2 KB)". */
+  /** e.g. "Create Characters/Alice.md (1.2 KB)". */
   summary: string;
   /** move only: backlinks that will be rewritten (from metadataCache). */
   linkImpact?: number;

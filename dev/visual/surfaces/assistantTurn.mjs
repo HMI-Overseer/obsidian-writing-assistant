@@ -58,8 +58,6 @@ export const ASSISTANT_TURN_SURFACES = {
                 toolIcon: I.pencil,
                 action: `<div class="lmsa-edit-step-controls">
                   <span class="lmsa-edit-step-pending">pending review</span>
-                  <button class="lmsa-edit-step-btn lmsa-edit-step-btn--approve" aria-label="Accept">${I.check}</button>
-                  <button class="lmsa-edit-step-btn lmsa-edit-step-btn--decline" aria-label="Reject">${I.x}</button>
                 </div>`,
               },
             ) +
@@ -212,8 +210,6 @@ export const ASSISTANT_TURN_SURFACES = {
               toolIcon: I.brainCircuit,
               action: `<div class="lmsa-memory-step-controls lmsa-vault-step-controls">
                 <span class="lmsa-vault-step-pending">pending approval</span>
-                <button class="lmsa-vault-step-btn lmsa-vault-step-btn--approve" aria-label="Approve">${I.check}</button>
-                <button class="lmsa-vault-step-btn lmsa-vault-step-btn--decline" aria-label="Decline">${I.x}</button>
               </div>
               <div class="lmsa-vault-timeline-preview lmsa-memory-review-preview"><pre class="lmsa-agentic-timeline-arg-value">Prefer restrained narration with concrete images.</pre></div>`,
             },

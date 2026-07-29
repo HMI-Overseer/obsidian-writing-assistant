@@ -10,7 +10,7 @@ import type { IndexingState } from "../../../src/rag/types";
 // "drop the last vector" response leaves a genuine hole in the middle of a file.
 const LONG_CONTENT =
   "The rain fell steadily over the quiet harbour town that morning, and " +
-  "Mara watched the grey water from her window while the fishing boats " +
+  "Alice watched the grey water from her window while the fishing boats " +
   "rocked against the pier, their lanterns swaying in the wind as the " +
   "storm slowly gathered its strength far out beyond the breakwater wall.";
 

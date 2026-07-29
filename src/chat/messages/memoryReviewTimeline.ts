@@ -1,4 +1,3 @@
-import { setIcon } from "obsidian";
 import type { MemoryMutation } from "../../tools/memory/handlers";
 import type { ToolCall } from "../../tools/types";
 import type { Memory } from "../../shared/types";
@@ -25,10 +24,6 @@ export interface MemoryReviewTimelineOptions {
   /** Canonical placement by exact declaration identity (ADR-0031). */
   findActionHostByToolCallId?: (toolCallId: string) => HTMLElement | null;
   proposals: ReviewableMemoryProposal[];
-  callbacks: {
-    onApprove: (proposalId: string) => Promise<void>;
-    onDecline: (proposalId: string) => void;
-  };
 }
 
 const STATE_CLASSES = [
@@ -146,28 +141,13 @@ export class MemoryReviewTimelineView {
     proposal: ReviewableMemoryProposal,
   ): void {
     if (proposal.status === "pending") {
+      // The decision is made in the composer drawer while the generation is live
+      // (RFC-0012); the timeline is the record, so this is a status label. The memory
+      // preview beneath it stays, because that is the evidence.
       controls.createSpan({
         cls: "lmsa-vault-step-pending",
         text: "pending approval",
       });
-      const approve = controls.createEl("button", {
-        cls: "lmsa-vault-step-btn lmsa-vault-step-btn--approve",
-        attr: { "aria-label": "Approve" },
-      });
-      setIcon(approve, "check");
-      approve.addEventListener("click", () => {
-        approve.disabled = true;
-        void this.opts.callbacks.onApprove(proposal.id);
-      });
-
-      const decline = controls.createEl("button", {
-        cls: "lmsa-vault-step-btn lmsa-vault-step-btn--decline",
-        attr: { "aria-label": "Decline" },
-      });
-      setIcon(decline, "x");
-      decline.addEventListener("click", () =>
-        this.opts.callbacks.onDecline(proposal.id),
-      );
       return;
     }
 

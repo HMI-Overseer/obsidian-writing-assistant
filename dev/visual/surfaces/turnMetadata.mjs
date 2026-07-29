@@ -44,7 +44,7 @@ export const TURN_METADATA_SURFACES = {
             <div class="lmsa-chat-window-rag-sources-list">
               <div class="lmsa-chat-window-rag-rewritten-query">Retrieved as: "harbor conflict early warnings"</div>
               <div class="lmsa-chat-window-rag-source-row">
-                <a class="lmsa-chat-window-rag-source-link">World/Port Azure &gt; Guild dispute</a>
+                <a class="lmsa-chat-window-rag-source-link">World/Harbor Town &gt; Guild dispute</a>
                 <span class="lmsa-chat-window-rag-source-score">92%</span>
               </div>
               <div class="lmsa-chat-window-rag-source-row">
@@ -52,7 +52,7 @@ export const TURN_METADATA_SURFACES = {
                 <span class="lmsa-chat-window-rag-source-score">84%</span>
               </div>
               <div class="lmsa-chat-window-rag-source-row">
-                <a class="lmsa-chat-window-rag-source-link">Characters/Mara Venn</a>
+                <a class="lmsa-chat-window-rag-source-link">Characters/Alice</a>
                 <span class="lmsa-chat-window-rag-source-score">71%</span>
               </div>
             </div>
@@ -72,17 +72,17 @@ export const TURN_METADATA_SURFACES = {
     html: view(
       assistantBubble(
         assistantTurn(
-          assistantProse("The graph connects Mara to the guild dispute and the Port Azure council."),
+          assistantProse("The graph connects Alice to the guild dispute and the harbor council."),
           "completed",
           `<details class="lmsa-chat-window-rag-sources" open>
             <summary class="lmsa-chat-window-rag-sources-summary">2 vault sources</summary>
             <div class="lmsa-chat-window-rag-sources-list">
               <div class="lmsa-chat-window-rag-source-row">
-                <a class="lmsa-chat-window-rag-source-link">Characters/Mara Venn</a>
+                <a class="lmsa-chat-window-rag-source-link">Characters/Alice</a>
                 <span class="lmsa-chat-window-rag-source-score">89%</span>
               </div>
               <div class="lmsa-chat-window-rag-source-row">
-                <a class="lmsa-chat-window-rag-source-link">World/Port Azure</a>
+                <a class="lmsa-chat-window-rag-source-link">World/Harbor Town</a>
                 <span class="lmsa-chat-window-rag-source-score">82%</span>
               </div>
             </div>
@@ -91,11 +91,11 @@ export const TURN_METADATA_SURFACES = {
               <div class="lmsa-chat-window-graph-entity-pills">
                 <div class="lmsa-chat-window-graph-entity-pill" title="A cartographer caught between the council and the guild.">
                   <span class="lmsa-chat-window-graph-entity-type lmsa-chat-window-graph-entity-type--character">character</span>
-                  <span class="lmsa-chat-window-graph-entity-name">Mara Venn</span>
+                  <span class="lmsa-chat-window-graph-entity-name">Alice</span>
                 </div>
                 <div class="lmsa-chat-window-graph-entity-pill">
                   <span class="lmsa-chat-window-graph-entity-type lmsa-chat-window-graph-entity-type--location">location</span>
-                  <span class="lmsa-chat-window-graph-entity-name">Port Azure</span>
+                  <span class="lmsa-chat-window-graph-entity-name">Harbor Town</span>
                 </div>
                 <div class="lmsa-chat-window-graph-entity-pill">
                   <span class="lmsa-chat-window-graph-entity-type lmsa-chat-window-graph-entity-type--event">event</span>
@@ -111,8 +111,8 @@ export const TURN_METADATA_SURFACES = {
                 </div>
               </div>
               <div class="lmsa-chat-window-graph-relations">
-                <div class="lmsa-chat-window-graph-relation">Mara Venn → investigates → Guild dispute</div>
-                <div class="lmsa-chat-window-graph-relation">Guild dispute → occurs at → Port Azure</div>
+                <div class="lmsa-chat-window-graph-relation">Alice → investigates → Guild dispute</div>
+                <div class="lmsa-chat-window-graph-relation">Guild dispute → occurs at → Harbor Town</div>
                 <div class="lmsa-chat-window-graph-relation">Harbor ledger → reveals → Smuggling route</div>
               </div>
             </details>

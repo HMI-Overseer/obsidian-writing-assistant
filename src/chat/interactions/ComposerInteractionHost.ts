@@ -2,16 +2,31 @@ import type {
   AskAnswers,
   ValidatedAskRequest,
 } from "../../tools/ask/types";
+import { ApprovalForm } from "../composer/ApprovalForm";
 import { AskQuestionForm } from "../composer/AskQuestionForm";
 import type { ChatLayoutRefs } from "../types";
+import type { ApprovalDecision, ApprovalRequest } from "./approvalTypes";
 
-export type ComposerInteraction = {
-  kind: "ask";
-  interactionId: string;
-  request: ValidatedAskRequest;
-  onSubmit: (answers: AskAnswers) => void;
-  onCancel: () => void;
-};
+/**
+ * The drawer serves two producers, discriminated on `kind`. They share a mount point
+ * and nothing else: the ask and approval state machines stay separate, because approval
+ * has disposition, policy, scope, and mutation semantics that ask does not.
+ */
+export type ComposerInteraction =
+  | {
+      kind: "ask";
+      interactionId: string;
+      request: ValidatedAskRequest;
+      onSubmit: (answers: AskAnswers) => void;
+      onCancel: () => void;
+    }
+  | {
+      kind: "approval";
+      interactionId: string;
+      request: ApprovalRequest;
+      onSubmit: (decision: ApprovalDecision) => void;
+      onCancel: () => void;
+    };
 
 export interface ComposerInteractionHostPort {
   mount(interaction: ComposerInteraction): boolean;
@@ -30,9 +45,15 @@ type ComposerInteractionHostRefs = Pick<
   | "actionBtn"
 >;
 
+/** The lifecycle both forms implement; the host needs nothing else from them. */
+interface MountedForm {
+  disable(): void;
+  destroy(): void;
+}
+
 interface ActiveInteraction {
   interaction: ComposerInteraction;
-  form: AskQuestionForm;
+  form: MountedForm;
 }
 
 export class ComposerInteractionHost implements ComposerInteractionHostPort {
@@ -40,30 +61,19 @@ export class ComposerInteractionHost implements ComposerInteractionHostPort {
   private destroyed = false;
 
   constructor(private readonly refs: ComposerInteractionHostRefs) {
-    this.setInteractionVisible(false);
+    this.setInteractionVisible(null);
   }
 
   mount(interaction: ComposerInteraction): boolean {
     if (this.destroyed || this.active) return false;
 
-    this.setInteractionVisible(true);
+    this.setInteractionVisible(interaction.kind);
     try {
-      const form = new AskQuestionForm(
-        {
-          interactionId: interaction.interactionId,
-          request: interaction.request,
-        },
-        {
-          containerEl: this.refs.composerInteractionEl,
-        },
-        {
-          onSubmit: interaction.onSubmit,
-        },
-      );
+      const form = this.createForm(interaction);
       this.active = { interaction, form };
       return true;
     } catch (error) {
-      this.setInteractionVisible(false);
+      this.setInteractionVisible(null);
       this.refs.composerInteractionEl.empty();
       throw error;
     }
@@ -90,17 +100,39 @@ export class ComposerInteractionHost implements ComposerInteractionHostPort {
     active?.interaction.onCancel();
   }
 
+  private createForm(interaction: ComposerInteraction): MountedForm {
+    const refs = { containerEl: this.refs.composerInteractionEl };
+    if (interaction.kind === "approval") {
+      return new ApprovalForm(
+        {
+          interactionId: interaction.interactionId,
+          request: interaction.request,
+        },
+        refs,
+        { onSubmit: interaction.onSubmit },
+      );
+    }
+    return new AskQuestionForm(
+      {
+        interactionId: interaction.interactionId,
+        request: interaction.request,
+      },
+      refs,
+      { onSubmit: interaction.onSubmit },
+    );
+  }
+
   private clearActive(): void {
     const active = this.active;
     if (!active) {
-      this.setInteractionVisible(false);
+      this.setInteractionVisible(null);
       return;
     }
     this.active = null;
     active.form.disable();
     active.form.destroy();
     this.refs.composerInteractionEl.empty();
-    this.setInteractionVisible(false);
+    this.setInteractionVisible(null);
     if (this.refs.actionBtn.isConnected) {
       this.refs.actionBtn.focus();
     } else if (this.refs.textareaEl.isConnected) {
@@ -108,9 +140,15 @@ export class ComposerInteractionHost implements ComposerInteractionHostPort {
     }
   }
 
-  private setInteractionVisible(visible: boolean): void {
+  /** `kind` is null when nothing is mounted. */
+  private setInteractionVisible(kind: ComposerInteraction["kind"] | null): void {
+    const visible = kind !== null;
     this.refs.composerPanelEl.toggleClass("is-interacting", visible);
-    this.refs.composerPanelEl.toggleClass("is-ask-interaction", visible);
+    this.refs.composerPanelEl.toggleClass("is-ask-interaction", kind === "ask");
+    this.refs.composerPanelEl.toggleClass(
+      "is-approval-interaction",
+      kind === "approval",
+    );
     this.refs.composerFooterEl.toggleClass("is-interacting", visible);
 
     this.refs.composerNormalBodyEl.hidden = false;

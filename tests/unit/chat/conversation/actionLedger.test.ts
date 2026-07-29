@@ -319,6 +319,42 @@ describe("action control eligibility and supersession", () => {
     ).toBe(false);
   });
 
+  // RFC-0012 D2: a failed apply is terminal on the live surface, and the Retry moves to
+  // the durable ledger. That only holds if `apply_failed` really does leave the vault-op
+  // target retry-eligible between turns, so assert it rather than assuming it.
+  it("leaves a failed vault-op apply retry-eligible on the durable ledger", () => {
+    const vaultEntry = createPlacedToolAction({
+      actionRef: "action-vault",
+      revisionId: "revision-1",
+      family: "vault_op",
+      itemId: "tool-item-1",
+      correlation: { kind: "provider_id", toolCallId: "tool-call-1" },
+      payload: {
+        proposalId: "proposal-1",
+        createdAt: 1,
+        targets: [
+          {
+            targetId: "target-1",
+            operation: { kind: "createDir", path: "Drafts" },
+            gate: "ask",
+            summary: "New folder Drafts",
+          },
+        ],
+      },
+      proposedEvents: [event("proposed")],
+    });
+
+    let failed = append(vaultEntry, "approved", "target-1", 2);
+    failed = append(failed, "apply_failed", "target-1", 3);
+
+    const state = deriveActionLedgerState(failed).targets["target-1"];
+    expect(state.effect).toBe("failed");
+    expect(state.retry).toBe("eligible");
+    expect(
+      deriveActionControlEligibility(failed, "target-1", activeHead).canRetry,
+    ).toBe(true);
+  });
+
   it("supersedes only unresolved targets and preserves applied evidence", () => {
     let entry = placedEntry(["target-1", "target-2"]);
     entry = append(entry, "approved", "target-1", 3);

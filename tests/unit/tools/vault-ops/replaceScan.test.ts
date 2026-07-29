@@ -7,30 +7,30 @@ import {
 describe("applyReplacement", () => {
   test("replaces every occurrence and counts them", () => {
     const { content, count } = applyReplacement(
-      "Age of Laurels rose; the Age of Laurels fell.",
-      { search: "Age of Laurels", replace: "Age of Ambition" },
+      "Silver Age rose; the Silver Age fell.",
+      { search: "Silver Age", replace: "Golden Age" },
     );
     expect(count).toBe(2);
-    expect(content).toBe("Age of Ambition rose; the Age of Ambition fell.");
+    expect(content).toBe("Golden Age rose; the Golden Age fell.");
   });
 
   test("is case-insensitive by default", () => {
-    const { content, count } = applyReplacement("age of laurels / Age of Laurels", {
-      search: "Age of Laurels",
-      replace: "Age of Ambition",
+    const { content, count } = applyReplacement("silver age / Silver Age", {
+      search: "Silver Age",
+      replace: "Golden Age",
     });
     expect(count).toBe(2);
-    expect(content).toBe("Age of Ambition / Age of Ambition");
+    expect(content).toBe("Golden Age / Golden Age");
   });
 
   test("caseSensitive matches case exactly", () => {
-    const { content, count } = applyReplacement("age of laurels / Age of Laurels", {
-      search: "Age of Laurels",
-      replace: "Age of Ambition",
+    const { content, count } = applyReplacement("silver age / Silver Age", {
+      search: "Silver Age",
+      replace: "Golden Age",
       caseSensitive: true,
     });
     expect(count).toBe(1);
-    expect(content).toBe("age of laurels / Age of Ambition");
+    expect(content).toBe("silver age / Golden Age");
   });
 
   test("wholeWord does not match inside a larger word", () => {
@@ -94,26 +94,26 @@ describe("applyReplacement", () => {
 });
 
 describe("findReplaceTargets", () => {
-  const files = ["Lore/Cosmology.md", "Lore/Magic.md", "Characters/Vex.md"];
+  const files = ["Lore/Cosmology.md", "Lore/Magic.md", "Characters/Alice.md"];
   const content: Record<string, string> = {
-    "Lore/Cosmology.md": "The Age of Laurels and again Age of Laurels.",
-    "Lore/Magic.md": "Age of Laurels here.",
-    "Characters/Vex.md": "no mention.",
+    "Lore/Cosmology.md": "The Silver Age and again Silver Age.",
+    "Lore/Magic.md": "Silver Age here.",
+    "Characters/Alice.md": "no mention.",
   };
   const read = (p: string) => content[p] ?? null;
 
   test("returns only files with matches, with per-file counts and new content", () => {
     const targets = findReplaceTargets(files, read, {
-      search: "Age of Laurels",
-      replace: "Age of Ambition",
+      search: "Silver Age",
+      replace: "Golden Age",
     });
     expect(targets).toEqual([
       {
         path: "Lore/Cosmology.md",
-        content: "The Age of Ambition and again Age of Ambition.",
+        content: "The Golden Age and again Golden Age.",
         count: 2,
       },
-      { path: "Lore/Magic.md", content: "Age of Ambition here.", count: 1 },
+      { path: "Lore/Magic.md", content: "Golden Age here.", count: 1 },
     ]);
   });
 

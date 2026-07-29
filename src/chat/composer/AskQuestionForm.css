@@ -38,7 +38,12 @@
   padding-bottom: 18px;
 }
 
+/* Both interaction kinds recede the composer behind the drawer; these are drawer
+ * container rules, not ask-form rules, so the approval kind joins the selector rather
+ * than restating the block in ApprovalForm.css. */
 .lmsa-chat-composer-panel.is-ask-interaction
+  .lmsa-chat-composer-normal-body,
+.lmsa-chat-composer-panel.is-approval-interaction
   .lmsa-chat-composer-normal-body {
   opacity: 0.58;
   pointer-events: none;
@@ -46,6 +51,8 @@
 }
 
 .lmsa-chat-composer-panel.is-ask-interaction
+  .lmsa-chat-composer-textarea,
+.lmsa-chat-composer-panel.is-approval-interaction
   .lmsa-chat-composer-textarea {
   max-height: 72px;
 }
@@ -70,9 +77,14 @@
   margin-left: auto;
 }
 
-/* Ask form */
+/* Shared interaction shell
+ *
+ * The collapsing grid, the toolbar that carries the minimize control, and the control
+ * itself. Both drawer forms need them: the drawer floats over the transcript, so either
+ * kind has to be able to get out of the way and come back. Ask-specific chrome (tabs,
+ * questions, legend) stays named for the ask form below. */
 
-.lmsa-ask-form {
+.lmsa-interaction-form {
   display: grid;
   min-width: 0;
   grid-template-rows: auto minmax(0, 1fr);
@@ -80,11 +92,11 @@
   transition: grid-template-rows 160ms ease;
 }
 
-.lmsa-ask-form.is-collapsed {
+.lmsa-interaction-form.is-collapsed {
   grid-template-rows: auto minmax(0, 0fr);
 }
 
-.lmsa-ask-form-toolbar {
+.lmsa-interaction-toolbar {
   display: flex;
   min-width: 0;
   align-items: center;
@@ -92,16 +104,7 @@
   gap: 12px;
 }
 
-.lmsa-ask-form-tabs {
-  display: flex;
-  width: fit-content;
-  max-width: 100%;
-  min-width: 0;
-  gap: 8px;
-  overflow: visible;
-}
-
-.lmsa-ask-form-body {
+.lmsa-interaction-body {
   display: flex;
   min-height: 0;
   min-width: 0;
@@ -118,14 +121,14 @@
     padding 160ms ease;
 }
 
-.lmsa-ask-form.is-collapsed .lmsa-ask-form-body {
+.lmsa-interaction-form.is-collapsed .lmsa-interaction-body {
   padding-top: 0;
   opacity: 0;
   pointer-events: none;
   scale: 0.97;
 }
 
-button.lmsa-ask-form-collapse {
+button.lmsa-interaction-collapse {
   display: flex;
   width: 28px;
   height: 28px;
@@ -143,16 +146,27 @@ button.lmsa-ask-form-collapse {
   cursor: pointer;
 }
 
-button.lmsa-ask-form-collapse:hover,
-button.lmsa-ask-form-collapse:focus-visible {
+button.lmsa-interaction-collapse:hover,
+button.lmsa-interaction-collapse:focus-visible {
   background: var(--background-modifier-hover);
   box-shadow: none;
   color: var(--text-normal);
 }
 
-.lmsa-ask-form-collapse svg {
+.lmsa-interaction-collapse svg {
   width: 16px;
   height: 16px;
+}
+
+/* Ask form */
+
+.lmsa-ask-form-tabs {
+  display: flex;
+  width: fit-content;
+  max-width: 100%;
+  min-width: 0;
+  gap: 8px;
+  overflow: visible;
 }
 
 button.lmsa-ask-form-tab {
@@ -289,7 +303,15 @@ button.lmsa-ask-form-tab.is-active {
   line-height: 1.5;
 }
 
-.lmsa-ask-form-options {
+/* Shared interaction controls
+ *
+ * The option row, the expanding Other, and the error line are the drawer's own
+ * vocabulary, not the ask form's: RFC-0012's approval form consumes the same rules.
+ * They live under `lmsa-interaction-*` so the two forms share one definition rather
+ * than two copies that drift. Everything above and below this block is ask-specific
+ * (tabs, questions, collapse) and stays named for the ask form. */
+
+.lmsa-interaction-options {
   display: flex;
   clear: both;
   min-width: 0;
@@ -297,7 +319,7 @@ button.lmsa-ask-form-tab.is-active {
   gap: 2px;
 }
 
-.lmsa-ask-form-option {
+.lmsa-interaction-option {
   display: grid;
   min-width: 0;
   grid-template-columns: min-content minmax(0, 1fr);
@@ -308,25 +330,25 @@ button.lmsa-ask-form-tab.is-active {
   transition: background 120ms ease, box-shadow 120ms ease;
 }
 
-.lmsa-ask-form-option:hover,
-.lmsa-ask-form-option:focus-within {
+.lmsa-interaction-option:hover,
+.lmsa-interaction-option:focus-within {
   background: var(--background-modifier-hover);
 }
 
-.lmsa-ask-form-option-input:checked
-  + .lmsa-ask-form-option-label
-  .lmsa-ask-form-option-name {
+.lmsa-interaction-option-input:checked
+  + .lmsa-interaction-option-label
+  .lmsa-interaction-option-name {
   color: var(--interactive-accent);
 }
 
-.lmsa-ask-form-option-input {
+.lmsa-interaction-option-input {
   width: 16px;
   height: 16px;
   margin: 0;
   accent-color: var(--interactive-accent);
 }
 
-.lmsa-ask-form-option-label {
+.lmsa-interaction-option-label {
   display: flex;
   min-width: 0;
   cursor: pointer;
@@ -334,7 +356,7 @@ button.lmsa-ask-form-tab.is-active {
   gap: 2px;
 }
 
-.lmsa-ask-form-option-name {
+.lmsa-interaction-option-name {
   overflow-wrap: anywhere;
   color: var(--text-normal);
   font-size: var(--font-ui-small);
@@ -342,14 +364,14 @@ button.lmsa-ask-form-tab.is-active {
   line-height: 1.35;
 }
 
-.lmsa-ask-form-option-description {
+.lmsa-interaction-option-description {
   overflow-wrap: anywhere;
   color: var(--text-muted);
   font-size: var(--font-ui-smaller);
   line-height: 1.4;
 }
 
-.lmsa-ask-form-other-text {
+.lmsa-interaction-other-text {
   display: flex;
   min-width: 0;
   flex-direction: column;
@@ -358,23 +380,23 @@ button.lmsa-ask-form-tab.is-active {
   padding: 2px 0;
 }
 
-.lmsa-ask-form-other-text[hidden] {
+.lmsa-interaction-other-text[hidden] {
   display: none;
 }
 
-.lmsa-ask-form-other-option.is-other-expanded
-  > .lmsa-ask-form-option-input {
+.lmsa-interaction-other-option.is-other-expanded
+  > .lmsa-interaction-option-input {
   grid-row: 1 / span 2;
   align-self: start;
   margin-top: 12px;
 }
 
-.lmsa-ask-form-other-option > .lmsa-ask-form-option-label {
+.lmsa-interaction-other-option > .lmsa-interaction-option-label {
   grid-column: 2;
   grid-row: 1;
 }
 
-.lmsa-ask-form-other-textarea {
+.lmsa-interaction-other-textarea {
   box-sizing: border-box;
   width: 100%;
   min-height: 72px;
@@ -389,17 +411,19 @@ button.lmsa-ask-form-tab.is-active {
   line-height: 1.45;
 }
 
-.lmsa-ask-form-other-textarea:focus {
+.lmsa-interaction-other-textarea:focus {
   border-color: var(--interactive-accent);
   box-shadow: 0 0 0 2px
     color-mix(in srgb, var(--interactive-accent) 20%, transparent);
 }
 
-.lmsa-ask-form-error {
+.lmsa-interaction-error {
   color: var(--text-error);
   font-size: var(--font-ui-smaller);
   line-height: 1.4;
 }
+
+/* Ask form, continued */
 
 .lmsa-ask-form-actions {
   display: flex;
@@ -437,8 +461,8 @@ button.lmsa-ask-form-tab.is-active {
 
 @media (prefers-reduced-motion: reduce) {
   .lmsa-chat-composer-interaction-body,
-  .lmsa-ask-form,
-  .lmsa-ask-form-body,
+  .lmsa-interaction-form,
+  .lmsa-interaction-body,
   button.lmsa-ask-form-tab::after {
     transition: none;
   }

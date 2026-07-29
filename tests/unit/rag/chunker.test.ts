@@ -205,13 +205,13 @@ describe("buildEmbeddingText", () => {
       chunkIndex: 0,
     };
     const meta = {
-      tags: ["strand/will", "age-of-laurels"],
+      tags: ["strand/will", "silver-age"],
       folder: "Books/Prequel/Characters",
       links: ["Strife Strand", "The Bearer"],
     };
     const result = buildEmbeddingText(chunk, meta);
     expect(result).toBe(
-      "[Tags: strand/will, age-of-laurels]\n" +
+      "[Tags: strand/will, silver-age]\n" +
       "[Folder: Books/Prequel/Characters]\n" +
       "[Links: Strife Strand, The Bearer]\n" +
       "Will > Relationship with Strife\n" +

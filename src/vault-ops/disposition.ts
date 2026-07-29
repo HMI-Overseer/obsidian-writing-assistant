@@ -89,13 +89,37 @@ function target(op: VaultOperation): string {
 }
 
 /**
+ * Append the user's decline guidance to a decline message as one distinct
+ * sentence (RFC-0012). The single place the three disposition builders compose
+ * it, so their wording cannot drift.
+ *
+ * Guidance is strictly additive: absent, empty, and whitespace-only all return
+ * the base message byte for byte, so a plain "no" reads exactly as it always
+ * has. A trailing period the user typed is stripped, the same uniform terminal
+ * punctuation every model-facing sentence here gets.
+ *
+ * A decline is a policy outcome, not a failure, so this never reaches
+ * `failure.recovery` (ADR-0021) and never flips `isError`.
+ */
+export function withDeclineGuidance(message: string, guidance?: string): string {
+  const trimmed = guidance?.trim() ?? "";
+  if (trimmed === "") return message;
+  const sentence = trimmed.endsWith(".") ? trimmed.slice(0, -1) : trimmed;
+  return `${message} The user's guidance: ${sentence}.`;
+}
+
+/**
  * Build the tool-result message for a resolved op. The model reads this as the
  * real outcome of its call, replacing the old fixed "queued for review" string.
+ *
+ * `guidance` is the user's free text from a drawer decline and is honoured on
+ * that branch only ({@link withDeclineGuidance}).
  */
 export function dispositionMessage(
   op: VaultOperation,
   disposition: VaultOpDisposition,
   reason?: string,
+  guidance?: string,
 ): string {
   switch (disposition) {
     case "auto-applied":
@@ -103,7 +127,10 @@ export function dispositionMessage(
     case "applied":
       return `${appliedVerb(op)} ${target(op)}.`;
     case "declined":
-      return `Declined by user, ${target(op)} was not changed.`;
+      return withDeclineGuidance(
+        `Declined by user, ${target(op)} was not changed.`,
+        guidance,
+      );
     case "failed":
       // "Error:" prefix so the model reads this as a failure on the text-only loop
       // channel, the same signal the read tools and the system prompt rely on.
@@ -157,6 +184,9 @@ function appliedMatchPhrase(matchType: MatchType): string | null {
  * symptom-C signal (the user-facing half is the diff card's "1 of N" badge); it matters
  * most for an auto-applied edit, where there is no user click and the disposition is the
  * only channel that isn't silent.
+ *
+ * `guidance` is the user's free text from a drawer decline, honoured on that branch only
+ * ({@link withDeclineGuidance}).
  */
 export function editDispositionMessage(
   kind: EditOpKind,
@@ -165,6 +195,7 @@ export function editDispositionMessage(
   reason?: string,
   matchType?: MatchType,
   occurrenceCount?: number,
+  guidance?: string,
 ): string {
   const tool =
     kind === "frontmatter" ? "update_frontmatter" : kind === "insert" ? "insert_into_note" : "propose_edit";
@@ -191,7 +222,10 @@ export function editDispositionMessage(
     case "applied":
       return `Applied ${what} to ${t}${appliedSuffix(false)}.`;
     case "declined":
-      return `Declined by user, ${what} to ${t} was not applied.`;
+      return withDeclineGuidance(
+        `Declined by user, ${what} to ${t} was not applied.`,
+        guidance,
+      );
     case "failed":
       // "Error:" prefix so the model reads this as a failure on the text-only loop
       // channel, the same signal the read tools and the system prompt rely on.

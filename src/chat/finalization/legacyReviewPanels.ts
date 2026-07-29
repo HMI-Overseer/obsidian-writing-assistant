@@ -27,7 +27,6 @@ const READ_ONLY_EDIT_CALLBACKS: EditReviewCallbacks = {
 
 const READ_ONLY_VAULT_CALLBACKS: VaultReviewCallbacks = {
   onOpsChanged: () => undefined,
-  onApplied: () => undefined,
   onUndone: () => undefined,
 };
 
@@ -113,7 +112,6 @@ function renderLegacyVaultHistory(
     },
     callbacks: READ_ONLY_VAULT_CALLBACKS,
     existingRecord: message.appliedVaultOps,
-    autoApply: false,
   });
 }
 

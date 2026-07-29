@@ -37,17 +37,15 @@ export const REVIEW_SURFACES = {
               toolIcon: I.pencil,
               action: `<div class="lmsa-edit-step-controls">
                 <span class="lmsa-edit-step-pending">pending review</span>
-                <button class="lmsa-edit-step-btn lmsa-edit-step-btn--approve" aria-label="Accept">${I.check}</button>
-                <button class="lmsa-edit-step-btn lmsa-edit-step-btn--decline" aria-label="Reject">${I.x}</button>
               </div>`,
               presentation: `<div class="lmsa-edit-timeline-hunk">${splitHunk("pending", {
                 location: "Lines 6-17",
                 fileName: "Alex.md",
                 contextLine: "5",
-                contextText: "affiliations: [The Cast, Survival Group Alpha]",
+                contextText: "affiliations: [Guild, Watch]",
                 changeLine: "6",
                 removedText:
-                  'role: <span class="lmsa-chat-window-diff-highlight">Primary POV / Leader</span>',
+                  'role: <span class="lmsa-chat-window-diff-highlight">Narrator / Lead</span>',
                 addedText:
                   'role: <span class="lmsa-chat-window-diff-highlight">Co-Leader</span>',
               })}</div>`,
@@ -60,7 +58,8 @@ export const REVIEW_SURFACES = {
   },
 
   // S23: reachable mixed vault-review state. One operation has already applied and two still await
-  // approval, so the live footer legitimately contains both "Approve all remaining" and "Undo".
+  // approval. The decision itself lives in the composer drawer (RFC-0012), so the awaiting steps
+  // carry a status label and the footer carries only Undo.
   // The write preview's left diff pane is empty because this creates a new note.
   vaultReviewTimeline: {
     source: "src/chat/messages/vaultReviewTimeline.ts",
@@ -100,8 +99,6 @@ export const REVIEW_SURFACES = {
                 toolIcon: I.filePlus,
                 action: `<div class="lmsa-vault-step-controls">
                   <span class="lmsa-vault-step-pending">pending approval</span>
-                  <button class="lmsa-vault-step-btn lmsa-vault-step-btn--approve" aria-label="Approve">${I.check}</button>
-                  <button class="lmsa-vault-step-btn lmsa-vault-step-btn--decline" aria-label="Decline">${I.x}</button>
                 </div>`,
                 presentation: `<div class="lmsa-vault-timeline-preview">
                   <div class="lmsa-chat-window-diff-hunk" data-status="pending">
@@ -137,14 +134,11 @@ export const REVIEW_SURFACES = {
                 toolIcon: I.fileSymlink,
                 action: `<div class="lmsa-vault-step-controls">
                   <span class="lmsa-vault-step-pending">pending approval</span>
-                  <button class="lmsa-vault-step-btn lmsa-vault-step-btn--approve" aria-label="Approve">${I.check}</button>
-                  <button class="lmsa-vault-step-btn lmsa-vault-step-btn--decline" aria-label="Decline">${I.x}</button>
                 </div>`,
               },
             ),
           "streaming",
           `<div class="lmsa-vault-review-footer">
-            <button class="lmsa-vault-review-footer-btn lmsa-vault-review-footer-btn--approve"><span class="lmsa-vault-review-footer-btn-icon">${I.check}</span>Approve all remaining</button>
             <button class="lmsa-vault-review-footer-btn"><span class="lmsa-vault-review-footer-btn-icon">${I.undo2}</span>Undo</button>
           </div>`,
         ),
@@ -153,7 +147,9 @@ export const REVIEW_SURFACES = {
     ),
   },
 
-  // S24: edit-review timeline, multi-hunk populated state (one applied + undo, one pending) + bulk bar.
+  // S24: edit-review timeline, multi-hunk populated state (one applied + undo, one pending).
+  // The bulk bar is gone with the live decision (RFC-0012); the session escape hatch is now
+  // "Approve everything this session" in the composer drawer.
   editReviewTimeline: {
     source: "src/chat/messages/editReviewTimeline.ts",
     w: 620,
@@ -195,18 +191,11 @@ export const REVIEW_SURFACES = {
                 toolIcon: I.pencil,
                 action: `<div class="lmsa-edit-step-controls">
                   <span class="lmsa-edit-step-pending">pending review</span>
-                  <button class="lmsa-edit-step-btn lmsa-edit-step-btn--approve" aria-label="Accept">${I.check}</button>
-                  <button class="lmsa-edit-step-btn lmsa-edit-step-btn--decline" aria-label="Reject">${I.x}</button>
                 </div>`,
                 presentation: `<div class="lmsa-edit-timeline-hunk">${splitHunk("pending", { fileName: "Chapter 2.md" })}</div>`,
               },
             ),
           "streaming",
-          `<div class="lmsa-edit-review-bulk">
-            <button class="lmsa-ui-compact-btn lmsa-edit-bulk-btn lmsa-edit-bulk-btn--accept">Accept all (2)</button>
-            <button class="lmsa-ui-compact-btn lmsa-ui-compact-btn-secondary lmsa-edit-bulk-btn">Reject all</button>
-            <button class="lmsa-ui-compact-btn lmsa-ui-compact-btn-secondary lmsa-edit-bulk-btn">Accept all this session</button>
-          </div>`,
         ),
       ),
       620,
@@ -227,7 +216,7 @@ export const REVIEW_SURFACES = {
             "tool",
             toolTurnBody(
               "Proposed edit",
-              "The Lighthouse Keeper.md",
+              "Chapter 3.md",
               "Completed",
             ),
             {
@@ -245,10 +234,10 @@ export const REVIEW_SURFACES = {
                 `<div class="lmsa-edit-timeline-hunk">` +
                 splitHunk("rejected", {
                   location: "Line 9",
-                  fileName: "The Lighthouse Keeper.md",
+                  fileName: "Chapter 3.md",
                   contextLine: "8",
                   contextText:
-                    "Mara lit the lamp anyway, hands steady from years of practice.",
+                    "She lit the lamp anyway, hands steady from years of practice.",
                   changeLine: "9",
                   removedText:
                     "Near midnight, she saw it, a single light bobbing far out on the water.",

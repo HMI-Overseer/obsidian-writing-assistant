@@ -63,8 +63,8 @@ describe("formatBytes", () => {
 
 describe("summarizeOp", () => {
   it("summarizes a create with its size", () => {
-    const op: VaultOperation = { kind: "create", path: "Characters/Vex.md", content: "hi" };
-    expect(summarizeOp(op)).toBe("New file Characters/Vex.md (2 B)");
+    const op: VaultOperation = { kind: "create", path: "Characters/Alice.md", content: "hi" };
+    expect(summarizeOp(op)).toBe("New file Characters/Alice.md (2 B)");
   });
 
   it("summarizes an overwrite", () => {
@@ -101,8 +101,8 @@ describe("summarizeOp", () => {
   it("summarizes a replaceInVault with its terms, note count, and match count", () => {
     const op: VaultOperation = {
       kind: "replaceInVault",
-      search: "Age of Laurels",
-      replace: "Age of Ambition",
+      search: "Silver Age",
+      replace: "Golden Age",
       caseSensitive: false,
       wholeWord: false,
       targets: [
@@ -112,7 +112,7 @@ describe("summarizeOp", () => {
       occurrences: 3,
     };
     expect(summarizeOp(op)).toBe(
-      'Replace "Age of Laurels" → "Age of Ambition" in 2 notes (3 matches)',
+      'Replace "Silver Age" → "Golden Age" in 2 notes (3 matches)',
     );
   });
 

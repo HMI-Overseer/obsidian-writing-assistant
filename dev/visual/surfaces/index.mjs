@@ -1,5 +1,6 @@
 import { COMPOSER_SURFACES } from "./composer.mjs";
 import { ASK_SURFACES } from "./ask.mjs";
+import { APPROVAL_SURFACES } from "./approval.mjs";
 import { TRANSCRIPT_SURFACES } from "./transcript.mjs";
 import { ASSISTANT_TURN_SURFACES } from "./assistantTurn.mjs";
 import { REVIEW_SURFACES } from "./review.mjs";
@@ -14,6 +15,7 @@ const MODULES = [
   ["composer", COMPOSER_SURFACES],
   ["chatStates", CHAT_STATE_SURFACES],
   ["ask", ASK_SURFACES],
+  ["approval", APPROVAL_SURFACES],
   ["transcript", TRANSCRIPT_SURFACES],
   ["turnMetadata", TURN_METADATA_SURFACES],
   ["assistantTurn", ASSISTANT_TURN_SURFACES],
@@ -46,6 +48,15 @@ const SURFACE_ORDER = [
   "askMaximumContract",
   "askMaximumContractNarrow",
   "askMixedMinimized",
+  "approvalDefault",
+  "approvalDefaultNarrow",
+  "approvalOtherExpanded",
+  "approvalOtherExpandedNarrow",
+  "approvalLongSummary",
+  "approvalLongSummaryNarrow",
+  "approvalMinimized",
+  "approvalWithTimeline",
+  "approvalWithEditTimeline",
   "emptyState",
   "composerDragOver",
   "footerRing",
@@ -104,6 +115,25 @@ const SURFACE_ORDER = [
   "chatHeader",
   "floatingButtons",
 ];
+
+// SURFACE_ORDER is the registry, not just a sort key: everything below reads from it, so a
+// surface a module exports but this list omits is silently dropped. It renders nothing,
+// audits nothing, and reports no error, which reads exactly like "the surface is fine".
+// Both directions are checked, because a stale id here would drop a real surface too.
+const missingFromOrder = Object.keys(merged).filter((id) => !SURFACE_ORDER.includes(id));
+if (missingFromOrder.length > 0) {
+  throw new Error(
+    `Visual surface(s) exported but absent from SURFACE_ORDER, so they would never render: ${missingFromOrder.join(", ")}`,
+  );
+}
+const missingFromModules = SURFACE_ORDER.filter(
+  (id) => !Object.prototype.hasOwnProperty.call(merged, id),
+);
+if (missingFromModules.length > 0) {
+  throw new Error(
+    `SURFACE_ORDER names surface(s) no module exports: ${missingFromModules.join(", ")}`,
+  );
+}
 
 export const SURFACES = Object.fromEntries(
   SURFACE_ORDER.map((id) => [id, merged[id]]),

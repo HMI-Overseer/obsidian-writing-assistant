@@ -58,6 +58,16 @@ import {
   MemoryReviewTimelineView,
   type ReviewableMemoryProposal,
 } from "../messages/memoryReviewTimeline";
+import type {
+  ApprovalDecision,
+  ApprovalRequest,
+  ApprovalRequester,
+} from "../interactions/approvalTypes";
+import {
+  editApprovalRequest,
+  memoryApprovalRequest,
+  vaultOpApprovalRequest,
+} from "../interactions/approvalRequests";
 import { generateId } from "../../utils";
 
 /** A converted op classified by how it must resolve. */
@@ -67,10 +77,21 @@ type Entry =
   | { call: ToolCall; kind: "auto"; reviewable: ReviewableVaultOp }
   | { call: ToolCall; kind: "ask"; reviewable: ReviewableVaultOp };
 
+/**
+ * How a parked decision settled. `guidance` is the user's free text from a drawer
+ * decline, carried to the disposition builder as a distinct trailing sentence
+ * (RFC-0012); it is meaningless on any other disposition.
+ */
+interface ParkedOutcome {
+  disposition: VaultOpDisposition;
+  reason?: string;
+  guidance?: string;
+}
+
 /** A parked ask op: its promise resolves when the user (or a cancel) decides. */
 interface PendingResolution {
-  resolve: (outcome: { disposition: VaultOpDisposition; reason?: string }) => void;
-  promise: Promise<{ disposition: VaultOpDisposition; reason?: string }>;
+  resolve: (outcome: ParkedOutcome) => void;
+  promise: Promise<ParkedOutcome>;
 }
 
 function memoryBeforeMutation(
@@ -114,8 +135,6 @@ export interface LiveEditReviewDeps {
   inlineDiff: InlineDiffManager;
   /** Resolver tuning from settings (context lines, min confidence). */
   resolveOptions: { contextLines: number; minConfidence: number };
-  /** Flip the session to auto-apply; powers the timeline's "Accept all this session". */
-  onEnterAutoApply?: () => void;
 }
 
 export interface LiveVaultReviewOptions {
@@ -135,6 +154,18 @@ export interface LiveVaultReviewOptions {
   edit?: LiveEditReviewDeps;
   /** Dedicated memory mutation dependencies, absent while the feature is off. */
   memory?: MemoryToolContext;
+  /**
+   * Flip the session to auto-apply. Reached from "Approve everything this session" on
+   * every channel, not just edits, which is why it sits here rather than under
+   * {@link LiveEditReviewDeps}.
+   */
+  onEnterAutoApply?: () => void;
+  /**
+   * The generation's approval lane in the composer drawer (RFC-0012). Absent only for a
+   * review constructed without a composer; a parked decision then stays parked, exactly
+   * as it did before the drawer existed.
+   */
+  approvals?: ApprovalRequester;
 }
 
 /**
@@ -163,7 +194,15 @@ export class LiveVaultReview implements VaultOpReviewer {
   private readonly getProvisionalActionHost?: () => HTMLElement;
   private readonly onReviewPlacementChanged?: () => void;
   private readonly policy: VaultOpPolicy;
-  private readonly posture: ApprovalPosture;
+  /**
+   * Session approval posture. Mutable, unlike the value captured at construction: D1 of
+   * the RFC-0012 plan makes "Approve everything this session" take effect inside the
+   * current turn, so a later round of the same turn gates on the new posture rather than
+   * the one the turn started with.
+   */
+  private posture: ApprovalPosture;
+  private readonly onEnterAutoApply?: () => void;
+  private readonly approvals?: ApprovalRequester;
 
   private readonly proposal: VaultOperationProposal;
   private appliedRecord: AppliedVaultOpRecord | null = null;
@@ -177,6 +216,13 @@ export class LiveVaultReview implements VaultOpReviewer {
    * controller subscription. Keys are all `generateId()`, so they never collide.
    */
   private readonly pending = new Map<string, PendingResolution>();
+  /**
+   * Guidance from a drawer decline, held from the decision until the resolution that
+   * consumes it. The edit channel needs this: it settles through the controller's
+   * subscription (the in-note overlay is a second renderer over the same controller), so
+   * the guidance cannot ride the call that triggers the rejection. Keyed by hunk id.
+   */
+  private readonly declineGuidance = new Map<string, string>();
   /** Serializes registration/auto-apply so concurrent calls can't race the overlay. */
   private lock: Promise<void> = Promise.resolve();
 
@@ -218,6 +264,8 @@ export class LiveVaultReview implements VaultOpReviewer {
     this.posture = opts.posture;
     this.editDeps = opts.edit;
     this.memoryDeps = opts.memory;
+    this.onEnterAutoApply = opts.onEnterAutoApply;
+    this.approvals = opts.approvals;
     this.proposal = { id: generateId(), ops: [], createdAt: Date.now() };
   }
 
@@ -264,8 +312,8 @@ export class LiveVaultReview implements VaultOpReviewer {
     const parkedEntries = askEntries.map((e) => ({ e, parked: this.pending.get(e.reviewable.id) }));
     for (const { e, parked } of parkedEntries) {
       if (!parked) continue;
-      const { disposition, reason } = await parked.promise;
-      results.set(e.call.id, dispoResult(e.reviewable.op, disposition, reason));
+      const { disposition, reason, guidance } = await parked.promise;
+      results.set(e.call.id, dispoResult(e.reviewable.op, disposition, reason, guidance));
     }
 
     return calls.map((c) => ({ tc: c, result: results.get(c.id) ?? cancelledFallback(c) }));
@@ -463,6 +511,33 @@ export class LiveVaultReview implements VaultOpReviewer {
           continue;
         }
 
+        if (gate !== "auto") {
+          // Offer the decision *before* the hunk joins a controller, so a refused call
+          // leaves no orphan diff card for a change nobody will ever be shown.
+          this.park(call.id);
+          const offered = this.requestApproval(
+            editApprovalRequest({
+              approvalId: call.id,
+              toolCallId: call.id,
+              kind,
+              filePath: file.path,
+              resolvedEdit: resolved,
+            }),
+            (decision) =>
+              this.applyDecision(
+                decision,
+                () => this.approveEdit(file.path, call.id),
+                (guidance) => this.declineEdit(file.path, call.id, guidance),
+              ),
+            () => this.pending.has(call.id),
+          );
+          if (!offered) {
+            this.pending.delete(call.id);
+            results.set(call.id, approvalLaneBusyFailure(call.name));
+            continue;
+          }
+        }
+
         const controller = this.ensureEditController(file.path, docText);
         // One in-loop edit call produces one review hunk. Preserve the tool-call
         // identity so the review mounts on that exact declaration instead of the
@@ -481,7 +556,6 @@ export class LiveVaultReview implements VaultOpReviewer {
           this.autoSoFar++;
           autoApplied.push({ callId: call.id, hunkId: hunk.id, kind, path: file.path, matchType, occurrenceCount });
         } else {
-          this.park(hunk.id);
           parked.push({ callId: call.id, hunkId: hunk.id, kind, path: file.path, matchType, occurrenceCount });
         }
       }
@@ -524,9 +598,17 @@ export class LiveVaultReview implements VaultOpReviewer {
           results.set(p.callId, editCancelled(p.kind, p.path));
           return;
         }
-        const { disposition, reason } = await pending.promise;
+        const { disposition, reason, guidance } = await pending.promise;
         results.set(p.callId, {
-          content: editDispositionMessage(p.kind, p.path, disposition, reason, p.matchType, p.occurrenceCount),
+          content: editDispositionMessage(
+            p.kind,
+            p.path,
+            disposition,
+            reason,
+            p.matchType,
+            p.occurrenceCount,
+            guidance,
+          ),
           isReadOnly: false,
           isError: disposition === "failed",
           failure: disposition === "failed" ? { kind: "failed", recovery: reason } : undefined,
@@ -621,6 +703,7 @@ export class LiveVaultReview implements VaultOpReviewer {
       parked.resolve({ disposition: "cancelled" });
     }
     this.pending.clear();
+    this.declineGuidance.clear();
 
     const cancelledIds = new Set(this.pendingMemories.keys());
     for (const [proposalId, parked] of this.pendingMemories) {
@@ -644,6 +727,164 @@ export class LiveVaultReview implements VaultOpReviewer {
       }
     }
     this.remountMemories();
+  }
+
+  // --- Live approval (RFC-0012) ------------------------------------------
+
+  /**
+   * Offer one parked decision in the composer drawer. Returns `false` only when the
+   * lane refused it, in which case the caller must unpark and refuse its own call with
+   * {@link approvalLaneBusyFailure}; nothing was shown and nothing was written.
+   *
+   * With no coordinator wired, the decision simply stays parked, which is what happened
+   * before the drawer existed.
+   */
+  private requestApproval(
+    request: ApprovalRequest,
+    decide: (decision: ApprovalDecision) => void,
+    isLive: () => boolean,
+  ): boolean {
+    if (!this.approvals) return true;
+    return this.approvals.request(request, decide, isLive);
+  }
+
+  /**
+   * Perform one drawer decision on whichever channel raised it.
+   *
+   * `approve-session` performs the approval *first* and enters auto-apply after, so the
+   * change the user was looking at is applied by the choice they made rather than by the
+   * posture that choice installs. The posture flip is unconditional: a tool that then
+   * failed does not undo the session decision the user made.
+   */
+  private applyDecision(
+    decision: ApprovalDecision,
+    approve: () => Promise<void>,
+    decline: (guidance: string) => void,
+  ): void {
+    if (decision.kind === "decline") {
+      decline(decision.guidance);
+      return;
+    }
+    void (async () => {
+      try {
+        await approve();
+      } catch (error) {
+        console.error("[chat] An approved change could not be applied.", error);
+      }
+      if (decision.kind === "approve-session") this.enterAutoApply();
+    })();
+  }
+
+  /**
+   * Flip the session to auto-apply (D1). Our own posture moves first, so the next round
+   * of *this* turn stops gating; the callback then moves the composer's posture pill to
+   * match.
+   *
+   * The accepted cost: under `auto`, `resolveGate` returns `auto` unconditionally, so
+   * from here to the end of the turn the per-class `deny`, the `scopes` restriction, and
+   * the `maxAutoOps` circuit breaker are all overridden. The drawer's copy says so, and
+   * the posture pill is reversible at any time.
+   */
+  private enterAutoApply(): void {
+    this.posture = "auto";
+    this.onEnterAutoApply?.();
+  }
+
+  /**
+   * The vault channel's apply owner. This ran inside `VaultReviewTimelineView.applyOps`
+   * until the decision moved to the drawer; it lives here now, so one owner serves both
+   * surfaces and the view can be a record rather than an actor.
+   */
+  async approveOp(opId: string): Promise<void> {
+    const op = this.decidableOp(opId);
+    if (!op) return;
+
+    const result = await this.applyOne(op);
+    if (!result.ok) {
+      // D2: a failed apply is terminal on the live surface. A decision the user made is
+      // not undone by a tool that then failed, so it is reported as a failure (the same
+      // shape `applyAuto` already produces) and the retry moves to the durable ledger,
+      // where `foldEvent` already marks an `apply_failed` vault op retry-eligible.
+      op.status = "failed";
+      this.remount();
+      this.settleParked(opId, { disposition: "failed", reason: result.reason });
+      return;
+    }
+
+    op.status = "applied";
+    // Merge before remounting: the fresh view reads `existingRecord` for the Undo footer
+    // and for an overwrite preview's "before", so remounting first loses both.
+    this.mergeRecord(result.applied);
+    this.remount();
+    this.handleResolved(opId, "applied");
+  }
+
+  /** The vault channel's decline owner, carrying the drawer's optional guidance. */
+  declineOp(opId: string, guidance?: string): void {
+    const op = this.decidableOp(opId);
+    if (!op) return;
+    op.status = "rejected";
+    this.remount();
+    this.handleResolved(opId, "declined", guidance);
+  }
+
+  /**
+   * The op a decision may still act on, or null.
+   *
+   * On the timeline a settled op simply stops rendering its buttons, so the repaint
+   * enforced this. The drawer is not repainted from proposal state, so the guard has to
+   * be written down: without it a decision that beats another settlement path here
+   * (decline propagation, cancellation, the in-note overlay) would write to disk again.
+   */
+  private decidableOp(opId: string): ReviewableVaultOp | null {
+    const op = this.proposal.ops.find((candidate) => candidate.id === opId);
+    if (!op) return null;
+    return op.status === "pending" || op.status === "accepted" ? op : null;
+  }
+
+  /**
+   * Apply one approved op through the batch orchestrator (ADR-0006), so its pre-flight,
+   * ordering, and drift-guarded undo all still hold. A throw is folded into the same
+   * failure shape a refused batch produces, so the model always reads an honest outcome
+   * rather than the turn hanging on an unresolved promise.
+   */
+  private async applyOne(
+    op: ReviewableVaultOp,
+  ): Promise<
+    | { ok: true; applied: Array<{ opId: string; inverse: VaultOperation }> }
+    | { ok: false; reason: string }
+  > {
+    try {
+      const result = await applyVaultOpBatch(this.app, [
+        { id: op.id, op: op.op },
+      ]);
+      if (result.ok) return { ok: true, applied: result.applied };
+      return {
+        ok: false,
+        reason: result.conflicts[0]?.reason ?? result.error ?? "operation failed",
+      };
+    } catch (error) {
+      return {
+        ok: false,
+        reason: error instanceof Error ? error.message : "operation failed",
+      };
+    }
+  }
+
+  /** The edit channel's approve owner; the controller that owns the file applies it. */
+  private async approveEdit(filePath: string, hunkId: string): Promise<void> {
+    if (!this.pending.has(hunkId)) return;
+    await this.editControllers.get(filePath)?.accept(hunkId);
+  }
+
+  /**
+   * The edit channel's decline owner. The guidance is parked alongside, because the
+   * resolution arrives later through the controller's subscription.
+   */
+  private declineEdit(filePath: string, hunkId: string, guidance: string): void {
+    if (!this.pending.has(hunkId)) return;
+    if (guidance !== "") this.declineGuidance.set(hunkId, guidance);
+    this.editControllers.get(filePath)?.reject(hunkId);
   }
 
   // -----------------------------------------------------------------------
@@ -678,9 +919,9 @@ export class LiveVaultReview implements VaultOpReviewer {
       mutation: prepared.mutation,
       status: "pending",
     };
-    this.memoryProposals.push(proposal);
 
     if (gate === "auto") {
+      this.memoryProposals.push(proposal);
       const before = memoryBeforeMutation(
         proposal.mutation,
         deps.getMemories(),
@@ -703,7 +944,29 @@ export class LiveVaultReview implements VaultOpReviewer {
       return result;
     }
 
+    // Raise the decision before the proposal joins the review, so a refused call leaves
+    // no orphan row for a mutation that will never be offered.
     const parked = this.parkMemory(proposal.id);
+    const offered = this.requestApproval(
+      memoryApprovalRequest({
+        approvalId: proposal.id,
+        toolCallId: call.id,
+        mutation: proposal.mutation,
+      }),
+      (decision) =>
+        this.applyDecision(
+          decision,
+          () => this.approveMemory(proposal.id),
+          (guidance) => this.declineMemory(proposal.id, guidance),
+        ),
+      () => this.pendingMemories.has(proposal.id),
+    );
+    if (!offered) {
+      this.pendingMemories.delete(proposal.id);
+      return approvalLaneBusyFailure(call.name);
+    }
+
+    this.memoryProposals.push(proposal);
     this.remountMemories();
     return parked.promise;
   }
@@ -749,7 +1012,7 @@ export class LiveVaultReview implements VaultOpReviewer {
     this.remountMemories();
   }
 
-  private declineMemory(proposalId: string): void {
+  private declineMemory(proposalId: string, guidance?: string): void {
     const proposal = this.memoryProposals.find(
       (candidate) => candidate.id === proposalId,
     );
@@ -759,7 +1022,12 @@ export class LiveVaultReview implements VaultOpReviewer {
     this.pendingMemories.delete(proposalId);
     proposal.status = "declined";
     parked.resolve({
-      content: memoryDispositionMessage(proposal.mutation, "declined"),
+      content: memoryDispositionMessage(
+        proposal.mutation,
+        "declined",
+        undefined,
+        guidance,
+      ),
       isReadOnly: false,
       disposition: "declined",
     });
@@ -775,10 +1043,6 @@ export class LiveVaultReview implements VaultOpReviewer {
           this.resolveReviewHost(toolCallId),
       }),
       proposals: this.memoryProposals,
-      callbacks: {
-        onApprove: (proposalId) => this.approveMemory(proposalId),
-        onDecline: (proposalId) => this.declineMemory(proposalId),
-      },
     });
     this.onReviewPlacementChanged?.();
   }
@@ -864,14 +1128,42 @@ export class LiveVaultReview implements VaultOpReviewer {
       if (autoConsumed) this.autoSoFar++;
 
       const reviewable = buildReviewableOp(this.app, op, gate, isSatisfied, call.id);
-      this.proposal.ops.push(reviewable);
 
+      if (!isSatisfied && gate === "ask") {
+        // Offer the decision *before* the op joins the proposal, so a refused call
+        // leaves no orphan row on the timeline for a change nobody will ever be shown.
+        this.park(reviewable.id);
+        const offered = this.requestApproval(
+          vaultOpApprovalRequest({
+            approvalId: reviewable.id,
+            toolCallId: call.id,
+            op: reviewable.op,
+          }),
+          (decision) =>
+            this.applyDecision(
+              decision,
+              () => this.approveOp(reviewable.id),
+              (guidance) => this.declineOp(reviewable.id, guidance),
+            ),
+          () => this.pending.has(reviewable.id),
+        );
+        if (!offered) {
+          this.pending.delete(reviewable.id);
+          entries.push({
+            call,
+            kind: "error",
+            result: approvalLaneBusyFailure(call.name),
+          });
+          continue;
+        }
+      }
+
+      this.proposal.ops.push(reviewable);
       if (isSatisfied) {
         entries.push({ call, kind: "satisfied", reviewable });
       } else if (gate === "auto") {
         entries.push({ call, kind: "auto", reviewable });
       } else {
-        this.park(reviewable.id);
         entries.push({ call, kind: "ask", reviewable });
       }
     }
@@ -947,12 +1239,25 @@ export class LiveVaultReview implements VaultOpReviewer {
     this.pending.set(opId, { resolve, promise });
   }
 
-  /** The timeline reported a terminal user decision, resolve the parked promise. */
-  private handleResolved(opId: string, disposition: "applied" | "declined"): void {
+  /** Resolve one parked decision. The single place a `pending` entry is retired. */
+  private settleParked(opId: string, outcome: ParkedOutcome): void {
     const parked = this.pending.get(opId);
     if (!parked) return;
     this.pending.delete(opId);
-    parked.resolve({ disposition });
+    parked.resolve(outcome);
+  }
+
+  /** A terminal user decision landed, resolve the parked promise. */
+  private handleResolved(
+    opId: string,
+    disposition: "applied" | "declined",
+    guidance?: string,
+  ): void {
+    if (!this.pending.has(opId)) return;
+    this.settleParked(opId, {
+      disposition,
+      ...(guidance !== undefined && { guidance }),
+    });
     // A declined folder (or one already stranded) leaves nowhere for the ops that
     // were going to write inside it, fail those before they can be approved.
     if (disposition === "declined") this.propagateDeclines();
@@ -990,9 +1295,7 @@ export class LiveVaultReview implements VaultOpReviewer {
 
       const reason = `the folder "${blocker}" was declined, so there is nowhere to put "${dest}"`;
       o.status = "failed";
-      const parked = this.pending.get(o.id);
-      this.pending.delete(o.id);
-      parked?.resolve({ disposition: "failed", reason });
+      this.settleParked(o.id, { disposition: "failed", reason });
       if (o.op.kind === "createDir") missingDirs.add(normalizePath(o.op.path));
       changed = true;
     }
@@ -1061,7 +1364,6 @@ export class LiveVaultReview implements VaultOpReviewer {
       app: this.app,
       controllers,
       live: true,
-      ...(deps.onEnterAutoApply && { onEnterAutoApply: deps.onEnterAutoApply }),
     });
     this.onReviewPlacementChanged?.();
     for (const controller of controllers) deps.inlineDiff.attach(controller);
@@ -1069,14 +1371,19 @@ export class LiveVaultReview implements VaultOpReviewer {
 
   /** A hunk reached a terminal status in either renderer, resolve its parked promise. */
   private handleEditResolved(hunkId: string, status: EditStatus): void {
-    const parked = this.pending.get(hunkId);
-    if (!parked) return;
+    if (!this.pending.has(hunkId)) return;
     if (status === "accepted") {
-      this.pending.delete(hunkId);
-      parked.resolve({ disposition: "applied" });
+      this.declineGuidance.delete(hunkId);
+      this.settleParked(hunkId, { disposition: "applied" });
     } else if (status === "rejected") {
-      this.pending.delete(hunkId);
-      parked.resolve({ disposition: "declined" });
+      // A drawer decline parked its guidance here on the way in; a rejection from the
+      // in-note overlay simply has none.
+      const guidance = this.declineGuidance.get(hunkId);
+      this.declineGuidance.delete(hunkId);
+      this.settleParked(hunkId, {
+        disposition: "declined",
+        ...(guidance !== undefined && { guidance }),
+      });
     }
     // "pending" (a mid-loop undo) leaves the op parked, rare and intentionally ignored.
   }
@@ -1087,13 +1394,9 @@ export class LiveVaultReview implements VaultOpReviewer {
       onOpsChanged: () => {
         /* proposal mutated in place; persistence happens at finalization. */
       },
-      onApplied: (record) => {
-        this.appliedRecord = record;
-      },
       onUndone: () => {
         this.appliedRecord = null;
       },
-      onOpResolved: (opId, disposition) => this.handleResolved(opId, disposition),
     };
     new VaultReviewTimelineView({
       timelineEl: this.timelineEl,
@@ -1105,10 +1408,9 @@ export class LiveVaultReview implements VaultOpReviewer {
       proposal: this.proposal,
       callbacks,
       existingRecord: this.appliedRecord ?? undefined,
-      autoApply: false,
-      // Live mount serializes ask approval: one op offered at a time, so an early
-      // decline strands its dependents before they're approved (the next round's
-      // proposal then sees the real disposition).
+      // Live mount serializes ask approval: one op decided at a time, so the rest read
+      // "waiting for the previous step" and the timeline still shows queue depth now
+      // that the decision itself is in the drawer.
       serial: true,
     });
     this.onReviewPlacementChanged?.();
@@ -1154,9 +1456,10 @@ function dispoResult(
   op: VaultOperation,
   disposition: VaultOpDisposition,
   reason?: string,
+  guidance?: string,
 ): ToolResult {
   return {
-    content: dispositionMessage(op, disposition, reason),
+    content: dispositionMessage(op, disposition, reason, guidance),
     isReadOnly: false,
     isError: disposition === "failed",
     failure: disposition === "failed" ? { kind: "failed", recovery: reason } : undefined,
@@ -1165,6 +1468,29 @@ function dispoResult(
     // applied op (ADR-0016).
     disposition,
   };
+}
+
+/**
+ * The refusal for an approval raised while the drawer already holds one (RFC-0012).
+ *
+ * The lane is single-slot and refuses *before* the channel parks, so nothing is
+ * awaiting, nothing was shown, and nothing was written; the model simply re-issues the
+ * call, which is the established idiom for every other contention case here
+ * (`askSkippedSiblingFailure`, `effectBoundaryRefusal`, `toolNotAllowedFailure`).
+ *
+ * Reachable only from concurrent Claude Code callbacks: `capRoundToMutation` truncates
+ * every plugin-loop round at its first mutating call, so the direct path can never have
+ * two approvals in flight at once.
+ */
+function approvalLaneBusyFailure(toolName: string): ToolResult {
+  return toolFailure({
+    kind: "precondition",
+    what:
+      `${toolName} was not proposed: another change is already waiting for the ` +
+      "user's approval, and only one is offered at a time",
+    recovery: "retry this call once the pending change has been decided",
+    isReadOnly: false,
+  });
 }
 
 /** A call with no result is a parked op cancelled before it decided. */

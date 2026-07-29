@@ -37,6 +37,7 @@ import { captureStepFields } from "../../tools/resultDigest";
 import { CONTEXT_DANGER_THRESHOLD } from "../../constants";
 import type { ComposerInteractionHostPort } from "../interactions/ComposerInteractionHost";
 import { AskInteractionCoordinator } from "../interactions/AskInteractionCoordinator";
+import { ApprovalInteractionCoordinator } from "../interactions/ApprovalInteractionCoordinator";
 import { generateId } from "../../utils";
 import {
   AssistantTurnBuilder,
@@ -227,6 +228,12 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
     interactionHost,
     abortController.signal,
   );
+  // The generation's live-approval lane (RFC-0012): the same host and the same signal as
+  // the ask coordinator, sharing a mount point and nothing else.
+  const approvalCoordinator = new ApprovalInteractionCoordinator(
+    interactionHost,
+    abortController.signal,
+  );
 
   let apiMessages;
   try {
@@ -264,6 +271,7 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
     });
   } catch (error) {
     askCoordinator.destroy();
+    approvalCoordinator.destroy();
     // Context preparation failed before the main `try`, so its `finally` never
     // runs. The handle still owns a callback surface (and, on the legacy path, a
     // live loopback server), so it is released on this path too.
@@ -364,10 +372,12 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
           contextLines: plugin.settings.diffContextLines,
           minConfidence: plugin.settings.diffMinMatchConfidence,
         },
-        ...(onEnterAutoApply && { onEnterAutoApply }),
       },
     }),
     ...(memoryToolContext && { memory: memoryToolContext }),
+    // Session approval is offered on every channel now, not just edits (RFC-0012).
+    ...(onEnterAutoApply && { onEnterAutoApply }),
+    approvals: approvalCoordinator,
   });
 
   // Vault ops operate on arbitrary paths, so they need only the app + the live
@@ -765,9 +775,13 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
   } finally {
     // Resolve any op still parked on the user so no await leaks past the turn.
     liveReview.cancelPending();
-    // The generation owns exactly one coordinator. Destroying it settles any
-    // remaining interaction before the active generation state is cleared.
+    // The generation owns exactly one coordinator per lane. Destroying them settles any
+    // remaining interaction before the active generation state is cleared. The approval
+    // coordinator only clears the drawer; `cancelPending()` above already resolved every
+    // parked decision, and two owners for one settlement is how double-resolve bugs
+    // start.
     askCoordinator.destroy();
+    approvalCoordinator.destroy();
     // Both of the above run *before* the lease is released, because releasing it
     // drains the callbacks already admitted and a callback parked on a review the
     // user will never see would otherwise never return.

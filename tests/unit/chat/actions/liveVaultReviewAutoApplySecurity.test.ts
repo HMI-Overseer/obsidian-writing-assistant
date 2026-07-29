@@ -69,7 +69,7 @@ import { LiveVaultReview } from "../../../../src/chat/actions/liveVaultReview";
 function makeApp(): App {
   return {
     vault: {
-      getName: () => "Harbingers",
+      getName: () => "ExampleVault",
       getAbstractFileByPath: () => null,
       getFileByPath: () => null,
       read: () => Promise.resolve(""),

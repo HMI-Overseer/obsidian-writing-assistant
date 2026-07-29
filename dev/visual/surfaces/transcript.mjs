@@ -1,5 +1,11 @@
 import { view } from "../scaffold.mjs";
-import { assistantBubble, assistantTurn, turnItem } from "../fixtures/chat.mjs";
+import {
+  assistantBubble,
+  assistantTurn,
+  messagesPane,
+  turnItem,
+  userMessage,
+} from "../fixtures/chat.mjs";
 import { I } from "../fixtures/icons.mjs";
 import { SCENE_IMAGE_URI } from "../fixtures/images.mjs";
 
@@ -43,25 +49,15 @@ export const TRANSCRIPT_SURFACES = {
     w: 620,
     shot: ".lmsa-chat-window-messages",
     html: view(
-      `<div class="lmsa-messages-pane"><div class="lmsa-chat-window-messages">
-        <div class="lmsa-chat-window-message lmsa-chat-window-message--user">
-          <div class="lmsa-chat-window-message-avatar">${I.userRound}</div>
-          <div class="lmsa-chat-window-message-column">
-            <div class="lmsa-chat-window-message-chrome"><div class="lmsa-chat-window-message-role">You</div></div>
-            <div class="lmsa-chat-window-message-body lmsa-ui-card">
-              <div class="lmsa-chat-window-message-content lmsa-chat-window-message-content--markdown">
-                <p>Show me a Python hello world.</p>
-              </div>
-            </div>
-          </div>
-        </div>
-        ${assistantBubble(
-          assistantTurn(
-            turnItem(
-              "prose-1",
-              "prose",
-              "iconless",
-              `<p>Here you go:</p>
+      messagesPane(
+        userMessage("<p>Show me a Python hello world.</p>") +
+          assistantBubble(
+            assistantTurn(
+              turnItem(
+                "prose-1",
+                "prose",
+                "iconless",
+                `<p>Here you go:</p>
                <div class="lmsa-md-codeblock">
                  <div class="lmsa-md-codeblock-header">
                    <span class="lmsa-md-codeblock-language">python</span>
@@ -69,11 +65,11 @@ export const TRANSCRIPT_SURFACES = {
                  </div>
                  <pre class="lmsa-md-codeblock-pre"><code class="language-python">print("hello world")</code></pre>
                </div>`,
-              { after: false, fade: true },
+                { after: false, fade: true },
+              ),
             ),
           ),
-        )}
-      </div></div>`,
+      ),
       620,
     ),
   },

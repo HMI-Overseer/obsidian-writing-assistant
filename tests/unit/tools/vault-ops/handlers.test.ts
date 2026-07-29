@@ -51,7 +51,7 @@ describe("executeVaultOpTool", () => {
     it("acknowledges a new file as a create", () => {
       const app = makeApp({});
       const result = executeVaultOpTool(
-        call("write_file", { path: "Characters/Vex.md", content: "hi" }),
+        call("write_file", { path: "Characters/Alice.md", content: "hi" }),
         { app, overlay: NO_OVERLAY },
       );
       expect(result.isError).toBeUndefined();
@@ -75,9 +75,9 @@ describe("executeVaultOpTool", () => {
     });
 
     it("acknowledges an existing file as an overwrite", () => {
-      const app = makeApp({ "Characters/Vex.md": "file" });
+      const app = makeApp({ "Characters/Alice.md": "file" });
       const result = executeVaultOpTool(
-        call("write_file", { path: "Characters/Vex.md", content: "hi" }),
+        call("write_file", { path: "Characters/Alice.md", content: "hi" }),
         { app, overlay: NO_OVERLAY },
       );
       expect(result.content).toContain("Overwrite of");
@@ -129,7 +129,7 @@ describe("executeVaultOpTool", () => {
     it("acknowledges a valid move", () => {
       const app = makeApp({ "Inbox/Draft.md": "file" });
       const result = executeVaultOpTool(
-        call("move_file", { from: "Inbox/Draft.md", to: "Characters/Vex.md" }),
+        call("move_file", { from: "Inbox/Draft.md", to: "Characters/Alice.md" }),
         { app, overlay: NO_OVERLAY },
       );
       expect(result.content).toContain("Move");
@@ -137,9 +137,9 @@ describe("executeVaultOpTool", () => {
     });
 
     it("errors when the destination already exists", () => {
-      const app = makeApp({ "Inbox/Draft.md": "file", "Characters/Vex.md": "file" });
+      const app = makeApp({ "Inbox/Draft.md": "file", "Characters/Alice.md": "file" });
       const result = executeVaultOpTool(
-        call("move_file", { from: "Inbox/Draft.md", to: "Characters/Vex.md" }),
+        call("move_file", { from: "Inbox/Draft.md", to: "Characters/Alice.md" }),
         { app, overlay: NO_OVERLAY },
       );
       expect(result.isError).toBe(true);
@@ -149,7 +149,7 @@ describe("executeVaultOpTool", () => {
     it("errors when the source does not exist", () => {
       const app = makeApp({});
       const result = executeVaultOpTool(
-        call("move_file", { from: "Inbox/Draft.md", to: "Characters/Vex.md" }),
+        call("move_file", { from: "Inbox/Draft.md", to: "Characters/Alice.md" }),
         { app, overlay: NO_OVERLAY },
       );
       expect(result.isError).toBe(true);

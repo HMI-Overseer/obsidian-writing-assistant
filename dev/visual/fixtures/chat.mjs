@@ -132,6 +132,34 @@ export const assistantBubble = (turn) =>
     ${turn}
   </div>`;
 
+// A user message exactly as ChatTranscript builds it: avatar, role chrome, and the card body
+// hosting rendered markdown. Any surface that needs conversation behind it uses this, so no
+// surface invents its own approximation of what a message looks like.
+export const userMessage = (html) =>
+  `<div class="lmsa-chat-window-message lmsa-chat-window-message--user">
+    <div class="lmsa-chat-window-message-avatar">${I.userRound}</div>
+    <div class="lmsa-chat-window-message-column">
+      <div class="lmsa-chat-window-message-chrome"><div class="lmsa-chat-window-message-role">You</div></div>
+      <div class="lmsa-chat-window-message-body lmsa-ui-card">
+        <div class="lmsa-chat-window-message-content lmsa-chat-window-message-content--markdown">
+          ${html}
+        </div>
+      </div>
+    </div>
+  </div>`;
+
+// An assistant message whose turn is a single prose item, the shape a plain textual reply
+// takes. `fade` is the streaming-endpoint treatment the last item carries.
+export const assistantProse = (html, id = "prose-1") =>
+  assistantBubble(
+    assistantTurn(turnItem(id, "prose", "iconless", html, { after: false, fade: true })),
+  );
+
+// The transcript's own scroll container. Surfaces that show conversation render into this
+// rather than a bespoke stage wrapper, so message spacing and width come from the plugin.
+export const messagesPane = (inner) =>
+  `<div class="lmsa-messages-pane"><div class="lmsa-chat-window-messages">${inner}</div></div>`;
+
 // Shared footer menu item used by the reasoning / posture / overflow menus (menuItem.ts).
 export const menuItem = (label, { icon, selected } = {}) =>
   `<div class="lmsa-footer-menu-item${selected ? " is-selected" : ""}">

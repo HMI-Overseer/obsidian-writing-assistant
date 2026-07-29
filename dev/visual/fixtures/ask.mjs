@@ -1,4 +1,9 @@
-import { composerFooter } from "./chat.mjs";
+import {
+  assistantProse,
+  composerFooter,
+  messagesPane,
+  userMessage,
+} from "./chat.mjs";
 import { I } from "./icons.mjs";
 
 export const askOption = (
@@ -8,12 +13,12 @@ export const askOption = (
   description,
   { checked = false, focused = false, multi = false } = {},
 ) =>
-  `<div class="lmsa-ask-form-option">
-    <input class="lmsa-ask-form-option-input" type="${multi ? "checkbox" : "radio"}"
+  `<div class="lmsa-interaction-option">
+    <input class="lmsa-interaction-option-input" type="${multi ? "checkbox" : "radio"}"
       id="${id}" name="${name}" aria-describedby="${id}-description"${checked ? " checked" : ""}${focused ? " autofocus" : ""}>
-    <label class="lmsa-ask-form-option-label" for="${id}">
-      <span class="lmsa-ask-form-option-name">${label}</span>
-      <span class="lmsa-ask-form-option-description" id="${id}-description">${description}</span>
+    <label class="lmsa-interaction-option-label" for="${id}">
+      <span class="lmsa-interaction-option-name">${label}</span>
+      <span class="lmsa-interaction-option-description" id="${id}-description">${description}</span>
     </label>
   </div>`;
 
@@ -22,14 +27,14 @@ export const askOther = (
   name,
   { checked = false, multi = false, text = "" } = {},
 ) =>
-  `<div class="lmsa-ask-form-option lmsa-ask-form-other-option${checked ? " is-other-expanded" : ""}">
-    <input class="lmsa-ask-form-option-input" type="${multi ? "checkbox" : "radio"}"
+  `<div class="lmsa-interaction-option lmsa-interaction-other-option${checked ? " is-other-expanded" : ""}">
+    <input class="lmsa-interaction-option-input" type="${multi ? "checkbox" : "radio"}"
       id="${id}" name="${name}"${checked ? " checked" : ""}>
-    <label class="lmsa-ask-form-option-label" for="${id}">
-      <span class="lmsa-ask-form-option-name">Other</span>
+    <label class="lmsa-interaction-option-label" for="${id}">
+      <span class="lmsa-interaction-option-name">Other</span>
     </label>
-    <div class="lmsa-ask-form-other-text"${checked ? "" : " hidden"}>
-      <textarea class="lmsa-ask-form-other-textarea" id="${id}-text" aria-label="Other answer" rows="3"
+    <div class="lmsa-interaction-other-text"${checked ? "" : " hidden"}>
+      <textarea class="lmsa-interaction-other-textarea" id="${id}-text" aria-label="Other answer" rows="3"
         maxlength="500" placeholder="Type your answer">${text}</textarea>
     </div>
   </div>`;
@@ -61,7 +66,7 @@ export const askQuestion = ({
           </span>
           <span class="lmsa-ask-form-question-text">${question}</span>
         </legend>
-        <div class="lmsa-ask-form-options">
+        <div class="lmsa-interaction-options">
           ${options.map((option, optionIndex) => askOption(
             `${id}-o${optionIndex}`,
             id,
@@ -98,18 +103,18 @@ export const askForm = (
   const panels = questions
     .map((question, questionIndex) => question.html(questionIndex === activeIndex))
     .join("");
-  return `<form class="lmsa-ask-form${collapsed ? " is-collapsed" : ""}">
-    <div class="lmsa-ask-form-toolbar">
+  return `<form class="lmsa-ask-form lmsa-interaction-form${collapsed ? " is-collapsed" : ""}">
+    <div class="lmsa-interaction-toolbar">
       <div class="lmsa-ask-form-tabs" role="tablist" aria-label="Questions">${tabs}</div>
-      <button class="lmsa-ask-form-collapse" type="button"
+      <button class="lmsa-interaction-collapse" type="button"
         aria-label="${collapsed ? "Expand questions" : "Minimize questions"}"
         aria-controls="ask-visual-body" aria-expanded="${collapsed ? "false" : "true"}">
         ${collapsed ? I.chevronUp : I.chevronDown}
       </button>
     </div>
-    <div class="lmsa-ask-form-body" id="ask-visual-body" aria-hidden="${collapsed ? "true" : "false"}"${collapsed ? " inert" : ""}>
+    <div class="lmsa-interaction-body" id="ask-visual-body" aria-hidden="${collapsed ? "true" : "false"}"${collapsed ? " inert" : ""}>
       <div class="lmsa-ask-form-questions">${panels}</div>
-      <div class="lmsa-ask-form-error${showError ? "" : " lmsa-hidden"}" role="alert">Answer every question before submitting.</div>
+      <div class="lmsa-interaction-error${showError ? "" : " lmsa-hidden"}" role="alert">Answer every question before submitting.</div>
       <div class="lmsa-ask-form-actions">
         <button class="lmsa-ui-btn lmsa-ui-btn-primary lmsa-ask-form-submit" type="submit"${ready ? "" : " disabled"}>Submit answers</button>
       </div>
@@ -139,14 +144,22 @@ export const askComposerHtml = (questions, state) =>
     </div>
   </div>`;
 
+// Real transcript markup, same as the approval stage: the conversation behind a drawer is
+// the plugin's own, so a regression in message chrome is visible here too.
 export const askStageHtml = (questions, state) =>
   `<div class="lmsa-ask-visual-stage">
-    <div class="lmsa-ask-visual-transcript">
-      <div class="lmsa-ask-visual-bubble is-user">Help me decide how this handoff should be structured.</div>
-      <div class="lmsa-ask-visual-bubble">I need a few choices before I can finish the recommendation.</div>
-      <div class="lmsa-ask-visual-bubble is-user">Keep the answer practical and easy to review.</div>
-      <div class="lmsa-ask-visual-bubble">The form opens over this conversation without moving the composer.</div>
-    </div>
+    ${messagesPane(
+      userMessage("<p>Help me decide how this handoff should be structured.</p>") +
+        assistantProse(
+          "<p>I need a few choices before I can finish the recommendation.</p>",
+          "ask-prose-1",
+        ) +
+        userMessage("<p>Keep the answer practical and easy to review.</p>") +
+        assistantProse(
+          "<p>The form opens over this conversation without moving the composer.</p>",
+          "ask-prose-2",
+        ),
+    )}
     ${askComposerHtml(questions, state)}
   </div>`;
 

@@ -24,25 +24,25 @@ describe("backlinkCount", () => {
   });
 
   it("counts the keys of the file's backlink data", () => {
-    const file = { path: "vex.md" };
+    const file = { path: "alice.md" };
     const app = makeApp(
-      { "vex.md": file },
-      { "vex.md": { data: { "a.md": [], "b.md": [], "c.md": [] } } },
+      { "alice.md": file },
+      { "alice.md": { data: { "a.md": [], "b.md": [], "c.md": [] } } },
     );
-    expect(backlinkCount(app, "vex.md")).toBe(3);
+    expect(backlinkCount(app, "alice.md")).toBe(3);
   });
 
   it("returns 0 when the file has no incoming links", () => {
-    const file = { path: "vex.md" };
-    const app = makeApp({ "vex.md": file }, { "vex.md": { data: {} } });
-    expect(backlinkCount(app, "vex.md")).toBe(0);
+    const file = { path: "alice.md" };
+    const app = makeApp({ "alice.md": file }, { "alice.md": { data: {} } });
+    expect(backlinkCount(app, "alice.md")).toBe(0);
   });
 
   it("returns 0 (not a throw) when getBacklinksForFile yields no object", () => {
     // The `?.data ?? {}` guard is load-bearing: Obsidian's undocumented method can
     // return null/undefined, and an un-guarded `.data` would throw here.
-    const file = { path: "vex.md" };
-    const app = makeApp({ "vex.md": file }, { "vex.md": null });
-    expect(backlinkCount(app, "vex.md")).toBe(0);
+    const file = { path: "alice.md" };
+    const app = makeApp({ "alice.md": file }, { "alice.md": null });
+    expect(backlinkCount(app, "alice.md")).toBe(0);
   });
 });

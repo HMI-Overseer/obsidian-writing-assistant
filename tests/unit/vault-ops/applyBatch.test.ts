@@ -130,12 +130,12 @@ function makeVault() {
 describe("applyVaultOpBatch", () => {
   it("applies a create and records a trash inverse", async () => {
     const { app, files } = makeVault();
-    const op: VaultOperation = { kind: "create", path: "Characters/Vex.md", content: "hi" };
+    const op: VaultOperation = { kind: "create", path: "Characters/Alice.md", content: "hi" };
 
     const result = await applyVaultOpBatch(app, [{ id: "a", op }]);
 
     expect(result.ok).toBe(true);
-    expect(files.has("Characters/Vex.md")).toBe(true);
+    expect(files.has("Characters/Alice.md")).toBe(true);
     expect(result.applied).toHaveLength(1);
     expect(result.applied[0]).toMatchObject({ opId: "a", inverse: { kind: "trash" } });
   });

@@ -4,12 +4,10 @@ import { TFile, TFolder, normalizePath } from "obsidian";
 import type { ToolCall } from "../../../../src/tools/types";
 import type { VaultOpPolicy } from "../../../../src/vault-ops/gateway";
 
-// Capture the review view's wiring without a real DOM: the test simulates clicks
-// by invoking the captured `onOpResolved` callback.
+// Capture what the review view is asked to render, without a real DOM. The view is a
+// record now (RFC-0012), so decisions are driven through the drawer lane below rather
+// than through a captured view callback.
 const captured = vi.hoisted(() => ({
-  callbacks: null as unknown as {
-    onOpResolved?: (opId: string, disposition: "applied" | "declined") => void;
-  } | null,
   proposalOps: [] as Array<{ id: string; status: string; gate: string }>,
   editHunkIds: [] as string[],
   editReviewHosts: [] as Array<HTMLElement | null>,
@@ -17,8 +15,7 @@ const captured = vi.hoisted(() => ({
 
 vi.mock("../../../../src/chat/messages/vaultReviewTimeline", () => ({
   VaultReviewTimelineView: class {
-    constructor(opts: { callbacks: typeof captured.callbacks; proposal: { ops: typeof captured.proposalOps } }) {
-      captured.callbacks = opts.callbacks;
+    constructor(opts: { proposal: { ops: typeof captured.proposalOps } }) {
       captured.proposalOps = opts.proposal.ops;
     }
   },
@@ -62,6 +59,66 @@ import {
   LiveVaultReview,
   type LiveEditReviewDeps,
 } from "../../../../src/chat/actions/liveVaultReview";
+import { applyVaultOpBatch } from "../../../../src/vault-ops/applyBatch";
+import type {
+  ApprovalDecision,
+  ApprovalRequest,
+  ApprovalRequester,
+} from "../../../../src/chat/interactions/approvalTypes";
+
+/**
+ * The drawer's approval lane, as LiveVaultReview sees it (RFC-0012). Single-slot and
+ * refusing rather than queueing by default, exactly like ApprovalInteractionCoordinator,
+ * so these tests exercise the contention rule the real one enforces.
+ *
+ * `concurrent: true` builds a lane that offers several decisions at once. Production has
+ * no such lane; it exists only to reach `propagateDeclines`, whose logic still has to be
+ * right even though a single-slot lane means at most one vault op is ever parked. Any
+ * test using it says so in place.
+ */
+class FakeApprovals implements ApprovalRequester {
+  readonly raised: ApprovalRequest[] = [];
+  private readonly active = new Map<string, (decision: ApprovalDecision) => void>();
+
+  constructor(private readonly concurrent = false) {}
+
+  request(
+    request: ApprovalRequest,
+    decide: (decision: ApprovalDecision) => void,
+    isLive: () => boolean,
+  ): boolean {
+    if (!this.concurrent && this.active.size > 0) return false;
+    if (!isLive()) return false;
+    this.raised.push(request);
+    this.active.set(request.approvalId, decide);
+    return true;
+  }
+
+  /** True while the drawer is showing a decision. */
+  get mounted(): boolean {
+    return this.active.size > 0;
+  }
+
+  get latest(): ApprovalRequest {
+    const request = this.raised[this.raised.length - 1];
+    if (!request) throw new Error("no approval was raised");
+    return request;
+  }
+
+  /** Settle a mounted decision the way the form's submit does: lane first, then decide. */
+  submit(decision: ApprovalDecision, approvalId?: string): void {
+    const id = approvalId ?? [...this.active.keys()][0];
+    const decide = id === undefined ? undefined : this.active.get(id);
+    if (id === undefined || !decide) throw new Error("no approval is mounted");
+    this.active.delete(id);
+    decide(decision);
+  }
+
+  /** Abort / destroy clears the drawer without resolving anything. */
+  clear(): void {
+    this.active.clear();
+  }
+}
 
 function makeApp(existing: { files?: string[]; folders?: string[]; content?: string } = {}): App {
   const folders = new Set((existing.folders ?? []).map(normalizePath));
@@ -129,7 +186,6 @@ const TIMELINE_EL = {} as unknown as HTMLElement;
 const flush = () => new Promise((r) => setTimeout(r, 0));
 
 beforeEach(() => {
-  captured.callbacks = null;
   captured.proposalOps = [];
   captured.editHunkIds = [];
   captured.editReviewHosts = [];
@@ -177,10 +233,12 @@ describe("LiveVaultReview", () => {
   });
 
   it("suspends an ask-gated op until the user approves, then reports applied", async () => {
+    const approvals = new FakeApprovals();
     const review = new LiveVaultReview({
       app: makeApp(),
       timelineEl: TIMELINE_EL,
       policy: POLICY({ create: "ask" }),
+      approvals,
     });
 
     const pending = review.resolveRound([writeCall("c1", "Notes/A.md")]);
@@ -188,35 +246,41 @@ describe("LiveVaultReview", () => {
     // Not resolved yet, the op is parked on the user.
     expect(captured.proposalOps[0].status).toBe("pending");
 
-    // Simulate the approve click reported by the timeline.
-    const opId = captured.proposalOps[0].id;
-    captured.callbacks?.onOpResolved?.(opId, "applied");
+    approvals.submit({ kind: "approve" });
 
     const [{ result }] = await pending;
     expect(result.content).toBe('Created "Notes/A.md".');
   });
 
   it("reports declined when the user declines an ask-gated op", async () => {
+    const approvals = new FakeApprovals();
     const review = new LiveVaultReview({
       app: makeApp(),
       timelineEl: TIMELINE_EL,
       policy: POLICY({ create: "ask" }),
+      approvals,
     });
 
     const pending = review.resolveRound([writeCall("c1", "Notes/A.md")]);
     await flush();
-    captured.callbacks?.onOpResolved?.(captured.proposalOps[0].id, "declined");
+    approvals.submit({ kind: "decline", guidance: "" });
 
     const [{ result }] = await pending;
     expect(result.content).toBe('Declined by user, "Notes/A.md" was not changed.');
     expect(result.isError).toBeFalsy();
   });
 
+  // Decline propagation. Production's single-slot lane means at most one vault op is
+  // ever parked, so this needs a lane that offers several at once; the logic still has
+  // to be right, because it is the guard that stops a dependent being approved into a
+  // folder that will not exist.
   it("strands ops inside a declined folder as failed, naming the prerequisite", async () => {
+    const approvals = new FakeApprovals(true);
     const review = new LiveVaultReview({
       app: makeApp(),
       timelineEl: TIMELINE_EL,
       policy: POLICY(), // everything ask-gated
+      approvals,
     });
 
     const pending = review.resolveRound([
@@ -227,11 +291,8 @@ describe("LiveVaultReview", () => {
     await flush();
     expect(captured.proposalOps).toHaveLength(3);
 
-    // Decline the folder. Honor the onOpResolved contract: the timeline flips the
-    // op's status to terminal *before* reporting it.
     const dirOp = captured.proposalOps[0];
-    dirOp.status = "rejected";
-    captured.callbacks?.onOpResolved?.(dirOp.id, "declined");
+    approvals.submit({ kind: "decline", guidance: "" }, dirOp.id);
 
     const results = await pending;
     expect(results[0].result.content).toBe('Declined by user, "Drafts" was not changed.');
@@ -246,10 +307,12 @@ describe("LiveVaultReview", () => {
   });
 
   it("leaves a sibling op outside the declined folder decidable", async () => {
+    const approvals = new FakeApprovals(true);
     const review = new LiveVaultReview({
       app: makeApp(),
       timelineEl: TIMELINE_EL,
       policy: POLICY(),
+      approvals,
     });
 
     const pending = review.resolveRound([
@@ -260,14 +323,13 @@ describe("LiveVaultReview", () => {
     await flush();
 
     const dirOp = captured.proposalOps[0];
-    dirOp.status = "rejected";
-    captured.callbacks?.onOpResolved?.(dirOp.id, "declined");
+    approvals.submit({ kind: "decline", guidance: "" }, dirOp.id);
 
     // The independent op is untouched by propagation, still awaiting its own decision.
     const sibling = captured.proposalOps[2];
     expect(sibling.status).toBe("pending");
-    sibling.status = "applied";
-    captured.callbacks?.onOpResolved?.(sibling.id, "applied");
+    approvals.submit({ kind: "approve" }, sibling.id);
+    await flush();
 
     const results = await pending;
     expect(results[1].result.isError).toBe(true); // inside Drafts, stranded
@@ -474,12 +536,12 @@ describe("LiveVaultReview", () => {
   });
 
   it("reports a zero-match replace_in_vault as an honest no-match, not a conversion error", async () => {
-    // The in-the-wild repro: the doc says "Velmoor", the model searched "Velomoor" (typo),
+    // The in-the-wild repro: the doc says "Riverton", the model searched "Velomoor" (typo),
     // so nothing matched. A zero-match replace converts to no op *and* no error, which used
     // to fall through to "invalid replace_in_vault arguments, could not convert operation",
     // misreading a clean empty result as malformed arguments. It must self-describe instead.
     const review = new LiveVaultReview({
-      app: makeApp({ files: ["Lore/Vex.md"], content: "Velmoor is a distant place." }),
+      app: makeApp({ files: ["Lore/Alice.md"], content: "Riverton is a distant place." }),
       timelineEl: TIMELINE_EL,
       policy: POLICY(),
     });
@@ -507,7 +569,7 @@ describe("LiveVaultReview", () => {
 
   it("scopes the no-match message to the path when one was given", async () => {
     const review = new LiveVaultReview({
-      app: makeApp({ files: ["Lore/Vex.md"], content: "Velmoor is a distant place." }),
+      app: makeApp({ files: ["Lore/Alice.md"], content: "Riverton is a distant place." }),
       timelineEl: TIMELINE_EL,
       policy: POLICY(),
     });
@@ -559,27 +621,31 @@ describe("LiveVaultReview disposition capture", () => {
   });
 
   it("carries applied when the user approves an ask-gated op", async () => {
+    const approvals = new FakeApprovals();
     const review = new LiveVaultReview({
       app: makeApp(),
       timelineEl: TIMELINE_EL,
       policy: POLICY({ create: "ask" }),
+      approvals,
     });
     const pending = review.resolveRound([writeCall("c1", "Notes/A.md")]);
     await flush();
-    captured.callbacks?.onOpResolved?.(captured.proposalOps[0].id, "applied");
+    approvals.submit({ kind: "approve" });
     const [{ result }] = await pending;
     expect(result.disposition).toBe("applied");
   });
 
   it("carries declined when the user declines (the field a decline needs, isError is false)", async () => {
+    const approvals = new FakeApprovals();
     const review = new LiveVaultReview({
       app: makeApp(),
       timelineEl: TIMELINE_EL,
       policy: POLICY({ create: "ask" }),
+      approvals,
     });
     const pending = review.resolveRound([writeCall("c1", "Notes/A.md")]);
     await flush();
-    captured.callbacks?.onOpResolved?.(captured.proposalOps[0].id, "declined");
+    approvals.submit({ kind: "decline", guidance: "" });
     const [{ result }] = await pending;
     expect(result.isError).toBeFalsy();
     expect(result.disposition).toBe("declined");
@@ -597,11 +663,14 @@ describe("LiveVaultReview disposition capture", () => {
     expect(result.disposition).toBe("satisfied");
   });
 
+  // Needs a lane that offers several at once; see the propagation test above.
   it("carries failed for a dependent stranded by a declined prerequisite", async () => {
+    const approvals = new FakeApprovals(true);
     const review = new LiveVaultReview({
       app: makeApp(),
       timelineEl: TIMELINE_EL,
       policy: POLICY(),
+      approvals,
     });
     const pending = review.resolveRound([
       { id: "d1", name: "create_directory", arguments: { path: "Drafts" } },
@@ -609,8 +678,7 @@ describe("LiveVaultReview disposition capture", () => {
     ]);
     await flush();
     const dirOp = captured.proposalOps[0];
-    dirOp.status = "rejected";
-    captured.callbacks?.onOpResolved?.(dirOp.id, "declined");
+    approvals.submit({ kind: "decline", guidance: "" }, dirOp.id);
     const results = await pending;
     expect(results[0].result.disposition).toBe("declined");
     expect(results[1].result.isError).toBe(true);
@@ -628,5 +696,321 @@ describe("LiveVaultReview disposition capture", () => {
       { id: "e1", name: "propose_edit", arguments: { path: "Notes/A.md", search: "She nodded.", replace: "She smiled." } },
     ]);
     expect(result.disposition).toBe("auto-applied");
+  });
+});
+
+// RFC-0012: the decision moves to the composer drawer. The same promise, the same
+// disposition, decided in a different place.
+describe("LiveVaultReview live approval routing", () => {
+  function vaultReview(
+    approvals: FakeApprovals,
+    overrides: Partial<VaultOpPolicy> = {},
+    onEnterAutoApply?: () => void,
+  ) {
+    return new LiveVaultReview({
+      app: makeApp(),
+      timelineEl: TIMELINE_EL,
+      policy: POLICY(overrides),
+      approvals,
+      ...(onEnterAutoApply && { onEnterAutoApply }),
+    });
+  }
+
+  it("raises exactly one request per parked op, with the derived summary and both ids", async () => {
+    const approvals = new FakeApprovals();
+    const review = vaultReview(approvals);
+
+    const pending = review.resolveRound([writeCall("c1", "Notes/A.md")]);
+    await flush();
+
+    expect(approvals.raised).toHaveLength(1);
+    expect(approvals.latest).toEqual({
+      approvalId: captured.proposalOps[0].id,
+      channel: "vault-op",
+      toolCallId: "c1",
+      summary: "New file Notes/A.md (5 B)",
+      detail: "Notes/A.md",
+    });
+
+    approvals.submit({ kind: "approve" });
+    const [{ result }] = await pending;
+    // Byte-identical to the disposition an inline click produced.
+    expect(result.content).toBe('Created "Notes/A.md".');
+    expect(result.disposition).toBe("applied");
+    expect(captured.proposalOps[0].status).toBe("applied");
+    expect(review.getAppliedRecord()?.applied).toHaveLength(1);
+  });
+
+  it("declines with no guidance to today's message, byte for byte", async () => {
+    const approvals = new FakeApprovals();
+    const review = vaultReview(approvals);
+
+    const pending = review.resolveRound([writeCall("c1", "Notes/A.md")]);
+    await flush();
+    approvals.submit({ kind: "decline", guidance: "" });
+
+    const [{ result }] = await pending;
+    expect(result.content).toBe('Declined by user, "Notes/A.md" was not changed.');
+    expect(result.isError).toBeFalsy();
+    expect(result.disposition).toBe("declined");
+    expect(result.failure).toBeUndefined();
+    expect(captured.proposalOps[0].status).toBe("rejected");
+  });
+
+  it("carries decline guidance to the model as a distinct sentence, still not an error", async () => {
+    const approvals = new FakeApprovals();
+    const review = vaultReview(approvals);
+
+    const pending = review.resolveRound([writeCall("c1", "Notes/A.md")]);
+    await flush();
+    approvals.submit({
+      kind: "decline",
+      guidance: "put drafts under Drafts/, not Notes/",
+    });
+
+    const [{ result }] = await pending;
+    expect(result.content).toBe(
+      'Declined by user, "Notes/A.md" was not changed. ' +
+        "The user's guidance: put drafts under Drafts/, not Notes/.",
+    );
+    expect(result.isError).toBeFalsy();
+    expect(result.disposition).toBe("declined");
+    // A decline is a policy outcome, not a failure (ADR-0021).
+    expect(result.failure).toBeUndefined();
+  });
+
+  // D1: session approval takes effect inside the current turn, which it did not before.
+  it("approve-session applies this op and stops gating the rest of the same turn", async () => {
+    const approvals = new FakeApprovals();
+    const onEnterAutoApply = vi.fn();
+    const review = vaultReview(approvals, {}, onEnterAutoApply);
+
+    const first = review.resolveRound([writeCall("c1", "Notes/A.md")]);
+    await flush();
+    approvals.submit({ kind: "approve-session" });
+
+    const [firstResult] = await first;
+    expect(firstResult.result.content).toBe('Created "Notes/A.md".');
+    expect(onEnterAutoApply).toHaveBeenCalledOnce();
+
+    // The next round of the SAME turn no longer asks.
+    const [second] = await review.resolveRound([writeCall("c2", "Notes/B.md")]);
+    expect(second.result.content).toBe('Created "Notes/B.md" (auto-applied).');
+    expect(approvals.raised).toHaveLength(1);
+  });
+
+  // D2: the interaction settles on submit, so a tool that then failed is reported as a
+  // failure rather than re-opening the drawer.
+  it("reports a failed apply as terminal, with the conflict reason, and clears the drawer", async () => {
+    const approvals = new FakeApprovals();
+    const review = vaultReview(approvals);
+    vi.mocked(applyVaultOpBatch).mockResolvedValueOnce({
+      ok: false,
+      conflicts: [{ opId: "x", reason: "the file changed on disk" }],
+      applied: [],
+    } as never);
+
+    const pending = review.resolveRound([writeCall("c1", "Notes/A.md")]);
+    await flush();
+    approvals.submit({ kind: "approve" });
+
+    const [{ result }] = await pending;
+    expect(result.content).toBe(
+      'Error: could not create "Notes/A.md", the file changed on disk.',
+    );
+    expect(result.isError).toBe(true);
+    expect(result.disposition).toBe("failed");
+    expect(captured.proposalOps[0].status).toBe("failed");
+    expect(approvals.mounted).toBe(false);
+    expect(review.getAppliedRecord()).toBeNull();
+  });
+
+  /**
+   * A round carrying several mutating calls is unreachable on the plugin loop
+   * (`capRoundToMutation` defers everything after the first mutation and drains it one
+   * per later round) and on Claude Code (one call per `resolveOne`). Asserted here
+   * anyway, because `resolveRound` is reachable directly: under decision 11 the extra
+   * ops are refused *before parking*, so they never become timeline rows and the model
+   * re-issues them once the pending decision has been made.
+   *
+   * This is the case `propagateDeclines` used to cover. It only fires when two ask ops
+   * are parked at once, which a single-slot lane makes impossible, so decline
+   * propagation is now unreachable while a coordinator is wired. It stays in place and
+   * stays covered by the timeline-path test above, which parks without a drawer.
+   */
+  it("refuses the rest of a multi-mutation round rather than parking them behind one", async () => {
+    const approvals = new FakeApprovals();
+    const review = vaultReview(approvals);
+
+    const pending = review.resolveRound([
+      { id: "d1", name: "create_directory", arguments: { path: "Drafts" } },
+      writeCall("c1", "Drafts/A.md"),
+      writeCall("c2", "Drafts/B.md"),
+    ]);
+    await flush();
+
+    // Exactly one decision is ever shown.
+    expect(approvals.raised).toHaveLength(1);
+    expect(approvals.latest.summary).toBe("New folder Drafts");
+
+    approvals.submit({ kind: "decline", guidance: "keep drafts in Notes/" });
+
+    const results = await pending;
+    expect(results[0].result.content).toContain("The user's guidance: keep drafts in Notes/.");
+    for (const refused of results.slice(1)) {
+      expect(refused.result.isError).toBe(true);
+      expect(refused.result.failure?.kind).toBe("precondition");
+      expect(refused.result.content).toContain("retry this call");
+    }
+    // Only the offered op became a row; the refused pair left nothing behind.
+    expect(review.getProposal()?.ops).toHaveLength(1);
+    expect(review.getAppliedRecord()).toBeNull();
+  });
+
+  it("cancelPending resolves every parked decision and leaves the ops decidable later", async () => {
+    const approvals = new FakeApprovals();
+    const review = vaultReview(approvals);
+
+    const pending = review.resolveRound([writeCall("c1", "Notes/A.md")]);
+    await flush();
+
+    review.cancelPending();
+    approvals.clear(); // the coordinator's own abort listener does this in production
+
+    const [{ result }] = await pending;
+    expect(result.content).toContain("still pending review");
+    // Left pending, so the durable ledger can still decide it between turns.
+    expect(captured.proposalOps[0].status).toBe("pending");
+    expect(approvals.mounted).toBe(false);
+  });
+
+  // Decision 11: reachable only from concurrent Claude Code callbacks, since
+  // capRoundToMutation caps the plugin loop at one mutation per round.
+  it("refuses a second concurrent approval instead of queueing it, leaving no orphan row", async () => {
+    const approvals = new FakeApprovals();
+    const review = vaultReview(approvals);
+
+    const first = review.resolveOne(writeCall("ignored", "Notes/A.md"), "mcp-1");
+    await flush();
+    const second = await review.resolveOne(
+      writeCall("ignored", "Notes/B.md"),
+      "mcp-2",
+    );
+
+    expect(second.isError).toBe(true);
+    expect(second.failure?.kind).toBe("precondition");
+    expect(second.content).toContain("already waiting for the user's approval");
+    expect(second.content).toContain("retry this call");
+    // The refused call added no reviewable op, so the timeline shows no row for a
+    // change that was never offered.
+    expect(review.getProposal()?.ops).toHaveLength(1);
+    expect(approvals.raised).toHaveLength(1);
+
+    approvals.submit({ kind: "approve" });
+    expect((await first).content).toBe('Created "Notes/A.md".');
+  });
+
+  it("routes the edit channel to the drawer with its own derived summary", async () => {
+    const approvals = new FakeApprovals();
+    const review = new LiveVaultReview({
+      app: makeApp({ files: ["Notes/A.md"], content: "She nodded.\nHe waited.\n" }),
+      timelineEl: TIMELINE_EL,
+      policy: POLICY({ edit: "ask" }),
+      edit: EDIT_DEPS(),
+      approvals,
+    });
+
+    const pending = review.resolveEdits([
+      {
+        id: "e1",
+        name: "propose_edit",
+        arguments: { path: "Notes/A.md", search: "He waited.", replace: "He left." },
+      },
+    ]);
+    await flush();
+
+    expect(approvals.latest).toEqual({
+      approvalId: "e1",
+      channel: "edit",
+      toolCallId: "e1",
+      summary: "Edit Notes/A.md",
+      detail: "Line 2",
+    });
+
+    approvals.submit({ kind: "approve" });
+    const [{ result }] = await pending;
+    expect(result.content).toBe('Applied edit to "Notes/A.md".');
+    expect(result.disposition).toBe("applied");
+  });
+
+  it("carries edit decline guidance through the controller subscription", async () => {
+    const approvals = new FakeApprovals();
+    const review = new LiveVaultReview({
+      app: makeApp({ files: ["Notes/A.md"], content: "She nodded.\nHe waited.\n" }),
+      timelineEl: TIMELINE_EL,
+      policy: POLICY({ edit: "ask" }),
+      edit: EDIT_DEPS(),
+      approvals,
+    });
+
+    const pending = review.resolveEdits([
+      {
+        id: "e1",
+        name: "propose_edit",
+        arguments: { path: "Notes/A.md", search: "He waited.", replace: "He left." },
+      },
+    ]);
+    await flush();
+    approvals.submit({ kind: "decline", guidance: "he stays until she speaks" });
+
+    const [{ result }] = await pending;
+    expect(result.content).toBe(
+      'Declined by user, edit to "Notes/A.md" was not applied. ' +
+        "The user's guidance: he stays until she speaks.",
+    );
+    expect(result.isError).toBeFalsy();
+    expect(result.disposition).toBe("declined");
+  });
+
+  it("refuses a second concurrent edit approval, leaving no orphan diff card", async () => {
+    const approvals = new FakeApprovals();
+    const review = new LiveVaultReview({
+      app: makeApp({
+        files: ["Notes/A.md", "Notes/B.md"],
+        content: "She nodded.\nHe waited.\n",
+      }),
+      timelineEl: TIMELINE_EL,
+      policy: POLICY({ edit: "ask" }),
+      edit: EDIT_DEPS(),
+      approvals,
+    });
+
+    const first = review.resolveEditOne(
+      {
+        id: "ignored",
+        name: "propose_edit",
+        arguments: { path: "Notes/A.md", search: "He waited.", replace: "He left." },
+      },
+      "mcp-e1",
+    );
+    await flush();
+    const second = await review.resolveEditOne(
+      {
+        id: "ignored",
+        name: "propose_edit",
+        arguments: { path: "Notes/B.md", search: "He waited.", replace: "He ran." },
+      },
+      "mcp-e2",
+    );
+
+    expect(second.isError).toBe(true);
+    expect(second.failure?.kind).toBe("precondition");
+    // No controller and no hunk were created for the refused call.
+    expect(review.getEditProposals().map((proposal) => proposal.targetFilePath)).toEqual([
+      "Notes/A.md",
+    ]);
+
+    approvals.submit({ kind: "approve" });
+    expect((await first).disposition).toBe("applied");
   });
 });

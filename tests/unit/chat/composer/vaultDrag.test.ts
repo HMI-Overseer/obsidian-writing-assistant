@@ -96,7 +96,7 @@ describe("getDroppedVaultMarkdownFiles, dataTransfer fallback", () => {
   it("resolves an obsidian:// URL from the drop text", () => {
     const file = tfile("Notes/The Witness.md");
     const app = makeApp({ draggable: null, files: [file] });
-    const url = "obsidian://open?vault=Harbingers&file=Notes%2FThe%20Witness.md";
+    const url = "obsidian://open?vault=ExampleVault&file=Notes%2FThe%20Witness.md";
     expect(getDroppedVaultMarkdownFiles(app, dropEvent(url))).toEqual([file]);
   });
 

@@ -72,52 +72,6 @@
   margin-right: 2px;
 }
 
-/* Approve / Decline are quiet icon-only affordances, not buttons: the
-   established subtle recipe (cf. BubbleActionToolbar), transparent, no chrome,
-   muted, with only a hover wash. Obsidian's base button styling is reset so it
-   can't reintroduce the chunky look. */
-.lmsa-vault-step-controls .lmsa-vault-step-btn,
-.lmsa-memory-step-controls .lmsa-vault-step-btn {
-  @apply lmsa:inline-flex lmsa:cursor-pointer lmsa:items-center lmsa:justify-center lmsa:rounded-md lmsa:border-none lmsa:bg-transparent lmsa:p-0;
-  box-shadow: none;
-  outline: none;
-  appearance: none;
-  min-height: unset;
-  width: 20px;
-  height: 20px;
-  font: inherit;
-  line-height: 1;
-  color: var(--text-faint);
-  transition: background 120ms ease, color 120ms ease;
-}
-
-.lmsa-vault-step-controls .lmsa-vault-step-btn:focus-visible,
-.lmsa-memory-step-controls .lmsa-vault-step-btn:focus-visible {
-  box-shadow: 0 0 0 2px var(--lmsa-mode-accent);
-}
-
-.lmsa-vault-step-controls .lmsa-vault-step-btn:disabled,
-.lmsa-memory-step-controls .lmsa-vault-step-btn:disabled {
-  opacity: 0.5;
-  cursor: default;
-}
-
-.lmsa-vault-step-controls .lmsa-vault-step-btn svg,
-.lmsa-memory-step-controls .lmsa-vault-step-btn svg {
-  width: 14px;
-  height: 14px;
-}
-
-.lmsa-vault-step-controls .lmsa-vault-step-btn--approve:hover:not(:disabled),
-.lmsa-memory-step-controls .lmsa-vault-step-btn--approve:hover:not(:disabled) {
-  color: var(--lmsa-mode-accent);
-}
-
-.lmsa-vault-step-controls .lmsa-vault-step-btn--decline:hover:not(:disabled),
-.lmsa-memory-step-controls .lmsa-vault-step-btn--decline:hover:not(:disabled) {
-  color: var(--text-error);
-}
-
 /* Resolved-state label (Applied / Declined / auto / Cancelled). */
 .lmsa-vault-step-state {
   font-size: var(--font-ui-smaller);
@@ -261,14 +215,6 @@
 .lmsa-vault-review-footer .lmsa-vault-review-footer-btn-icon svg {
   width: 13px;
   height: 13px;
-}
-
-/* "Approve all" is text-only: muted at rest like the other footer actions, and
-   on hover the text alone shifts to the accent, no background wash, so nothing
-   reads as a button outline. */
-.lmsa-vault-review-footer .lmsa-vault-review-footer-btn--approve:hover:not(:disabled) {
-  background: transparent;
-  color: var(--lmsa-mode-accent);
 }
 
 /* ── Fallback rows (ops with no matching live step, e.g. Claude Code) ── */

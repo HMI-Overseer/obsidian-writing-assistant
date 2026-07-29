@@ -6,7 +6,7 @@ import type {
   VaultOperationProposal,
   VaultOpStatus,
 } from "../../vault-ops/types";
-import { applyVaultOpBatch, undoVaultOpBatch } from "../../vault-ops/applyBatch";
+import { undoVaultOpBatch } from "../../vault-ops/applyBatch";
 import { opDetailLine, opPrimaryPath } from "../../vault-ops/summary";
 import { buildWritePreviewHunk } from "../../vault-ops/writePreview";
 import { TOOL_LABELS, pendingToolLabel } from "../../tools/metadata";
@@ -38,13 +38,17 @@ const TOOL_NAME_BY_KIND: Record<VaultOperation["kind"], string> = {
 
 /**
  * Folds a {@link VaultOperationProposal} into the agentic timeline (Finding C
- * re-open): the vault ops are tool calls, already shown as timeline steps,
- * so the review lives *on those steps* rather than in a separate panel. Each
- * ask-gated step gains inline Approve / Decline; approving applies that op
- * immediately and the step flips to applied. Auto-gated ops apply on mount. A
- * footer (rendered outside the collapsible step list, so it survives a collapse)
- * offers "Approve all remaining" when several await review and "Undo" while the
- * batch is live. A superseded batch drops its actions entirely.
+ * re-open): the vault ops are tool calls, already shown as timeline steps, so the
+ * review lives *on those steps* rather than in a separate panel.
+ *
+ * This is a **record, not an actor** (RFC-0012). It renders each op's status, the
+ * write preview, the affected-file list of a vault-wide replace, and the Undo footer,
+ * and it applies nothing: while a generation is live the approve / decline decision is
+ * made in the composer interaction drawer, and {@link LiveVaultReview} owns the apply.
+ * Between turns the durable action ledger owns both. A footer (rendered outside the
+ * collapsible step list, so it survives a collapse) offers Undo while the batch is
+ * live, because undo is a post-decision action on a durable record. A superseded batch
+ * drops its actions entirely.
  *
  * Steps are matched to ops by tool-call id (`AgenticStep.toolCallId` ===
  * `ReviewableVaultOp.sourceToolCallId`, tagged on the element as
@@ -52,23 +56,16 @@ const TOOL_NAME_BY_KIND: Record<VaultOperation["kind"], string> = {
  * and never claims a provider declaration.
  */
 
+/**
+ * What this view still reports. Only Undo mutates from here now, so the surface is one
+ * status change and one record clear; the approve / decline decision and its apply both
+ * moved out (RFC-0012).
+ */
 export type VaultReviewCallbacks = {
   /** Op statuses changed (persist the proposal). */
   onOpsChanged: (proposal: VaultOperationProposal) => void;
-  /** A batch applied or grew (persist the applied record). */
-  onApplied: (record: AppliedVaultOpRecord) => void;
   /** Every applied op was undone (clear the applied record). */
   onUndone: () => void;
-  /**
-   * An op reached a terminal user decision, `applied` (approved) or `declined`.
-   * Only the live in-loop mount sets this: it resolves the pending tool-result
-   * promise the model is blocked on (in-loop-tool-approval-blocking-flow). Fired
-   * only once an op's {@link VaultOpStatus} actually becomes terminal, so the tool
-   * result never asserts an outcome this view doesn't already hold. A failed apply
-   * leaves the op pending (retryable) and does NOT fire, the model stays blocked
-   * until the user retries or declines.
-   */
-  onOpResolved?: (opId: string, disposition: "applied" | "declined") => void;
 };
 
 export interface VaultReviewTimelineOptions {
@@ -79,16 +76,12 @@ export interface VaultReviewTimelineOptions {
   proposal: VaultOperationProposal;
   callbacks: VaultReviewCallbacks;
   existingRecord?: AppliedVaultOpRecord;
-  /** Fresh finalization only: apply auto-gated ops once on mount. */
-  autoApply?: boolean;
   /**
-   * In-loop live mount only: surface ask-gated ops **one at a time**
-   * (ask-ops-resolve-as-batch-not-sequential). Only the first awaiting ask op
-   * carries Approve / Decline; the rest read "waiting for the previous step", and
-   * the "Approve all remaining" footer is suppressed. The user thus decides each op
-   * before the next is offered, so an early decline can strand the dependent ops
-   * (failed with a reason) before they're ever approved. The finalized review mounts
-   * with this off, so the durable surface keeps its batch affordances.
+   * In-loop live mount only: show ask-gated ops as decided **one at a time**
+   * (ask-ops-resolve-as-batch-not-sequential). Only the first awaiting ask op reads
+   * "pending approval"; the rest read "waiting for the previous step". Now that the
+   * decision itself lives in the drawer, this is what shows queue depth on the
+   * timeline. The finalized review mounts with this off.
    */
   serial?: boolean;
 }
@@ -175,13 +168,6 @@ export class VaultReviewTimelineView {
     this.appliedRecord = opts.existingRecord ?? null;
     this.cleanPriorDecorations();
     this.paint();
-
-    // Fresh finalization only: auto-gated ops apply once (historical re-renders
-    // pass autoApply=false and carry an existingRecord, so nothing re-applies).
-    if (opts.autoApply && !opts.existingRecord && !opts.proposal.historical) {
-      const autoOps = opts.proposal.ops.filter((o) => o.gate === "auto" && o.status === "pending");
-      if (autoOps.length > 0) void this.applyOps(autoOps);
-    }
   }
 
   // Painting: idempotent, re-run after every state change.
@@ -549,23 +535,10 @@ export class VaultReviewTimelineView {
       // Primary "needs you" signal: an inline label in the detail type scale,
       // tinted with the edit-mode accent. The approve/decline that follow
       // are quiet icon-only affordances, not buttons.
+      // The decision itself is made in the composer drawer while the generation is live
+      // (RFC-0012); the timeline is the record, so this is a status label, not a
+      // control. The diff preview, the affected-file list, and Undo all stay.
       controls.createSpan({ cls: "lmsa-vault-step-pending", text: "pending approval" });
-
-      const approve = controls.createEl("button", {
-        cls: "lmsa-vault-step-btn lmsa-vault-step-btn--approve",
-        attr: { "aria-label": "Approve" },
-      });
-      setIcon(approve, "check");
-      approve.disabled = this.isProcessing;
-      approve.addEventListener("click", () => void this.applyOps([op]));
-
-      const decline = controls.createEl("button", {
-        cls: "lmsa-vault-step-btn lmsa-vault-step-btn--decline",
-        attr: { "aria-label": "Decline" },
-      });
-      setIcon(decline, "x");
-      decline.disabled = this.isProcessing;
-      decline.addEventListener("click", () => this.skip(op.id));
       return;
     }
 
@@ -600,91 +573,33 @@ export class VaultReviewTimelineView {
   }
 
   /**
-   * Turn-level actions, rendered *outside* the collapsible step list (a sibling of
-   * the timeline disclosure in `timelineEl`) so they stay reachable when the
-   * timeline is collapsed. Dropped entirely once the batch is superseded.
+   * The Undo action, rendered *outside* the collapsible step list (a sibling of the
+   * timeline disclosure in `timelineEl`) so it stays reachable when the timeline is
+   * collapsed. Dropped entirely once the batch is superseded.
+   *
+   * Undo is a post-decision action on a durable record, so it stays here even though
+   * the approve / decline decision moved to the composer drawer (RFC-0012).
    */
   private paintFooter(): void {
     this.footerEl?.remove();
     this.footerEl = null;
     if (this.opts.proposal.historical) return;
-
-    const appliable = this.appliableOps();
-    const hasApplied = !!this.appliedRecord && this.appliedRecord.applied.length > 0;
-    // Serial mode offers ops one at a time, so a batch "Approve all" would defeat it.
-    const showApproveAll = !this.opts.serial && appliable.length >= 2;
-    if (!showApproveAll && !hasApplied) return;
+    if (!this.appliedRecord || this.appliedRecord.applied.length === 0) return;
 
     const footer = this.opts.timelineEl.createDiv({ cls: "lmsa-vault-review-footer" });
     this.footerEl = footer;
 
-    if (showApproveAll) {
-      const approveAll = footer.createEl("button", {
-        cls: "lmsa-vault-review-footer-btn lmsa-vault-review-footer-btn--approve",
-      });
-      setIcon(approveAll.createSpan({ cls: "lmsa-vault-review-footer-btn-icon" }), "check");
-      approveAll.createSpan({ text: "Approve all remaining" });
-      approveAll.disabled = this.isProcessing;
-      approveAll.addEventListener("click", () => void this.applyOps(appliable));
-    }
-
-    if (hasApplied) {
-      const undo = footer.createEl("button", {
-        cls: "lmsa-vault-review-footer-btn",
-      });
-      setIcon(undo.createSpan({ cls: "lmsa-vault-review-footer-btn-icon" }), "undo-2");
-      undo.createSpan({ text: "Undo" });
-      undo.disabled = this.isProcessing;
-      undo.addEventListener("click", () => void this.undo());
-    }
+    const undo = footer.createEl("button", {
+      cls: "lmsa-vault-review-footer-btn",
+    });
+    setIcon(undo.createSpan({ cls: "lmsa-vault-review-footer-btn-icon" }), "undo-2");
+    undo.createSpan({ text: "Undo" });
+    undo.disabled = this.isProcessing;
+    undo.addEventListener("click", () => void this.undo());
   }
 
-  // Actions route through the batch orchestrator (ADR-0006), so its pre-flight,
-  // ordering, and drift-guarded undo all hold.
-
-  /** ask-gated ops not yet applied or declined, what Approve / Approve-all commit. */
-  private appliableOps(): ReviewableVaultOp[] {
-    return this.opts.proposal.ops.filter(
-      (o) => o.gate === "ask" && (o.status === "pending" || o.status === "accepted"),
-    );
-  }
-
-  private async applyOps(toApply: ReviewableVaultOp[]): Promise<void> {
-    if (this.isProcessing || toApply.length === 0) return;
-    this.isProcessing = true;
-    this.paint();
-    try {
-      const result = await applyVaultOpBatch(
-        this.opts.app,
-        toApply.map((r) => ({ id: r.id, op: r.op })),
-      );
-      if (!result.ok) {
-        const reason = result.conflicts[0]?.reason ?? result.error ?? "operation failed";
-        new Notice(`Couldn't apply vault operations: ${reason}`);
-        return; // statuses unchanged, retry once the conflict clears.
-      }
-      for (const r of toApply) r.status = "applied";
-      this.mergeAppliedRecord(result.applied);
-      this.opts.callbacks.onOpsChanged(this.opts.proposal);
-      if (this.appliedRecord) this.opts.callbacks.onApplied(this.appliedRecord);
-      for (const r of toApply) this.opts.callbacks.onOpResolved?.(r.id, "applied");
-    } catch (error) {
-      new Notice(`Failed to apply vault operations: ${messageOf(error)}`);
-    } finally {
-      this.isProcessing = false;
-      this.paint();
-    }
-  }
-
-  private skip(opId: string): void {
-    if (this.isProcessing) return;
-    const op = this.opts.proposal.ops.find((o) => o.id === opId);
-    if (!op || (op.status !== "pending" && op.status !== "accepted")) return;
-    op.status = "rejected";
-    this.paint();
-    this.opts.callbacks.onOpsChanged(this.opts.proposal);
-    this.opts.callbacks.onOpResolved?.(op.id, "declined");
-  }
+  // Undo routes through the batch orchestrator (ADR-0006), so its pre-flight,
+  // ordering, and drift guard all hold.
 
   private async undo(): Promise<void> {
     if (this.isProcessing || !this.appliedRecord) return;
@@ -714,20 +629,4 @@ export class VaultReviewTimelineView {
     }
   }
 
-  private mergeAppliedRecord(applied: Array<{ opId: string; inverse: VaultOperation }>): void {
-    if (!this.appliedRecord) {
-      this.appliedRecord = {
-        proposalId: this.opts.proposal.id,
-        applied: [...applied],
-        appliedAt: Date.now(),
-      };
-    } else {
-      this.appliedRecord.applied = [...this.appliedRecord.applied, ...applied];
-      this.appliedRecord.appliedAt = Date.now();
-    }
-  }
-}
-
-function messageOf(error: unknown): string {
-  return error instanceof Error ? error.message : "Unknown error";
 }

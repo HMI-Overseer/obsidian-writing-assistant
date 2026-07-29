@@ -93,10 +93,6 @@
   height: 14px;
 }
 
-.lmsa-edit-step-controls .lmsa-edit-step-btn--approve:hover {
-  color: var(--lmsa-mode-accent);
-}
-
 .lmsa-edit-step-controls .lmsa-edit-step-btn--decline:hover {
   color: var(--text-error);
 }
@@ -132,25 +128,3 @@
   display: none;
 }
 
-/* ── Proposal-level bulk actions (multi-hunk) ───────────────────── */
-
-.lmsa-edit-review-bulk {
-  @apply lmsa:flex lmsa:flex-wrap lmsa:items-center lmsa:gap-2;
-  margin-top: 8px;
-  padding-top: 8px;
-  border-top: 1px solid color-mix(in srgb, var(--background-modifier-border) 70%, transparent);
-}
-
-.lmsa-edit-review-bulk .lmsa-edit-bulk-btn {
-  @apply lmsa:cursor-pointer;
-}
-
-.lmsa-edit-review-bulk .lmsa-edit-bulk-btn--accept {
-  border: 1px solid color-mix(in srgb, var(--lmsa-mode-accent) 45%, var(--background-modifier-border));
-  background: color-mix(in srgb, var(--lmsa-mode-accent) 12%, var(--background-primary));
-  color: var(--lmsa-mode-accent);
-}
-
-.lmsa-edit-review-bulk .lmsa-edit-bulk-btn--accept:hover {
-  background: color-mix(in srgb, var(--lmsa-mode-accent) 20%, var(--background-primary));
-}

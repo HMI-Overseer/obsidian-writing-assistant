@@ -151,30 +151,41 @@
   );
 }
 
+/* A tool step carries the posture accent, like the composer pill and every other
+   accented surface, so the transcript says which posture produced it. This used
+   `--text-accent`, which is Obsidian's link accent and tracks nothing the plugin
+   sets, so the timeline stayed the same colour in every posture. */
 .lmsa-assistant-turn-marker.is-tool {
-  color: var(--text-accent);
+  color: var(--lmsa-mode-accent);
   border-color: color-mix(
     in srgb,
-    var(--text-accent) 50%,
+    var(--lmsa-mode-accent) 50%,
     var(--background-modifier-border)
   );
   background: color-mix(
     in srgb,
-    var(--text-accent) 8%,
+    var(--lmsa-mode-accent) 8%,
     var(--background-primary)
   );
 }
 
+/* A step that touched the vault fills its marker instead of outlining it.
+   The distinction is form, not hue, deliberately: it used to be `--text-accent`
+   against `--interactive-accent`, which Obsidian derives from one accent colour a
+   single lightness step apart *and swaps between light and dark*. So the signal
+   was all but invisible in ask posture, where each mutation is a decision, and it
+   pointed the opposite way in one of the two themes. A solid dot survives every
+   posture, both themes, and any accent the user picks. */
 .lmsa-assistant-turn-item.is-mutating
   > .lmsa-assistant-turn-marker {
-  color: var(--lmsa-mode-accent);
-  border-color: color-mix(
-    in srgb,
-    var(--lmsa-mode-accent) 52%,
-    var(--background-modifier-border)
-  );
+  color: var(--background-primary);
+  border-color: var(--lmsa-mode-accent);
+  background: var(--lmsa-mode-accent);
 }
 
+/* Red throughout, background included. Without the fill this only recoloured the
+   glyph and ring, leaving whatever tint the step carried a moment ago: a failed
+   mutating step showed a red glyph on a solid accent disc. */
 .lmsa-assistant-turn-item:is(.is-failed, .is-interrupted)
   > .lmsa-assistant-turn-marker {
   color: var(--text-error);
@@ -182,6 +193,11 @@
     in srgb,
     var(--text-error) 52%,
     var(--background-modifier-border)
+  );
+  background: color-mix(
+    in srgb,
+    var(--text-error) 12%,
+    var(--background-primary)
   );
 }
 
@@ -397,7 +413,7 @@
   margin-top: 6px;
   padding: 0.45rem 0.6rem;
   border: 1px solid var(--background-modifier-border);
-  border-left: 2px solid var(--interactive-accent);
+  border-left: 2px solid var(--lmsa-mode-accent);
   border-radius: 6px;
   background: var(--background-secondary);
   font-size: var(--font-ui-small);
@@ -468,7 +484,7 @@
 }
 
 .lmsa-assistant-turn-action-control:is(.is-approve, .is-apply) {
-  border-color: var(--interactive-accent);
+  border-color: var(--lmsa-mode-accent);
 }
 
 .lmsa-assistant-turn-action-control.is-decline {

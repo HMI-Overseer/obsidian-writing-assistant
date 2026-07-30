@@ -200,7 +200,7 @@ button.lmsa-ask-form-tab::after {
   left: 8px;
   height: 2px;
   border-radius: 999px;
-  background: var(--interactive-accent);
+  background: var(--lmsa-mode-accent);
   content: "";
   transform: scaleX(0);
   transform-origin: left center;
@@ -247,8 +247,8 @@ button.lmsa-ask-form-tab.is-active {
 }
 
 .lmsa-ask-form-tab.is-complete .lmsa-ask-form-tab-status {
-  border-color: var(--interactive-accent);
-  background: var(--interactive-accent);
+  border-color: var(--lmsa-mode-accent);
+  background: var(--lmsa-mode-accent);
 }
 
 .lmsa-ask-form-questions {
@@ -338,14 +338,24 @@ button.lmsa-ask-form-tab.is-active {
 .lmsa-interaction-option-input:checked
   + .lmsa-interaction-option-label
   .lmsa-interaction-option-name {
-  color: var(--interactive-accent);
+  color: var(--lmsa-mode-accent);
 }
 
+/* Obsidian gives radios and checkboxes `appearance: none` and paints them itself
+   from `--checkbox-color`, so `accent-color` (which only tints the native widget)
+   never reached these and they stayed on Obsidian's accent while the rest of the
+   form followed the posture. Retint Obsidian's own token instead, hover included,
+   or the box flashes back to the base accent under the cursor. */
 .lmsa-interaction-option-input {
   width: 16px;
   height: 16px;
   margin: 0;
-  accent-color: var(--interactive-accent);
+  --checkbox-color: var(--lmsa-mode-accent);
+  --checkbox-color-hover: color-mix(
+    in srgb,
+    var(--lmsa-mode-accent) 85%,
+    white
+  );
 }
 
 .lmsa-interaction-option-label {
@@ -412,9 +422,9 @@ button.lmsa-ask-form-tab.is-active {
 }
 
 .lmsa-interaction-other-textarea:focus {
-  border-color: var(--interactive-accent);
+  border-color: var(--lmsa-mode-accent);
   box-shadow: 0 0 0 2px
-    color-mix(in srgb, var(--interactive-accent) 20%, transparent);
+    color-mix(in srgb, var(--lmsa-mode-accent) 20%, transparent);
 }
 
 .lmsa-interaction-error {

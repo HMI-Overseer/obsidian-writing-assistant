@@ -274,7 +274,7 @@ describe("action control eligibility and supersession", () => {
     driftGuardAllowsUndo: true,
   };
 
-  it("gates approval, apply, and retry by active head but keeps historical Undo", () => {
+  it("gates approval and apply by active head but keeps historical Undo", () => {
     const proposed = placedEntry();
     expect(
       deriveActionControlEligibility(proposed, "target-1", activeHead),
@@ -282,7 +282,6 @@ describe("action control eligibility and supersession", () => {
       canApprove: true,
       canDecline: true,
       canApply: false,
-      canRetry: false,
       canUndo: false,
     });
     expect(
@@ -308,7 +307,6 @@ describe("action control eligibility and supersession", () => {
       canApprove: false,
       canDecline: false,
       canApply: false,
-      canRetry: false,
       canUndo: true,
     });
     expect(
@@ -319,10 +317,11 @@ describe("action control eligibility and supersession", () => {
     ).toBe(false);
   });
 
-  // RFC-0012 D2: a failed apply is terminal on the live surface, and the Retry moves to
-  // the durable ledger. That only holds if `apply_failed` really does leave the vault-op
-  // target retry-eligible between turns, so assert it rather than assuming it.
-  it("leaves a failed vault-op apply retry-eligible on the durable ledger", () => {
+  // A failed apply is terminal on every surface now. The ledger still records the
+  // target as retry-eligible, because that state describes recorded history and
+  // older conversations replay through it, but no control may act on it: the model
+  // owns what happens after a tool fails.
+  it("offers no control for a failed vault-op apply, retry-eligible or not", () => {
     const vaultEntry = createPlacedToolAction({
       actionRef: "action-vault",
       revisionId: "revision-1",
@@ -351,7 +350,26 @@ describe("action control eligibility and supersession", () => {
     expect(state.effect).toBe("failed");
     expect(state.retry).toBe("eligible");
     expect(
-      deriveActionControlEligibility(failed, "target-1", activeHead).canRetry,
+      deriveActionControlEligibility(failed, "target-1", activeHead),
+    ).toEqual({
+      canApprove: false,
+      canDecline: false,
+      canApply: false,
+      canUndo: false,
+    });
+  });
+
+  // A conversation saved before the retry control was removed can carry a
+  // `retry_requested` event. Its Apply is honoured as written, because the user
+  // asked for that attempt and the record is not rewritten to suit a later build.
+  it("still honours an Apply that an already recorded retry request armed", () => {
+    let entry = placedEntry();
+    entry = append(entry, "approved", "target-1", 2);
+    entry = append(entry, "apply_failed", "target-1", 3);
+    entry = append(entry, "retry_requested", "target-1", 4);
+
+    expect(
+      deriveActionControlEligibility(entry, "target-1", activeHead).canApply,
     ).toBe(true);
   });
 

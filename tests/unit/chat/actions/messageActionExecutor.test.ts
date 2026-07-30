@@ -174,13 +174,20 @@ describe("message action executor", () => {
       "apply_succeeded",
       "undo_succeeded",
     ]);
+    // Undoing settles the target: the memory is back as it was, and the transcript
+    // offers nothing further. Re-applying it is a fresh request to the model.
     expect(
       memory.getActionControlEligibility(
         "assistant-1",
         "action-1",
         "target-1",
-      ).canRetry,
-    ).toBe(true);
+      ),
+    ).toEqual({
+      canApprove: false,
+      canDecline: false,
+      canApply: false,
+      canUndo: false,
+    });
   });
 
   it("records an undo refusal without erasing the applied effect", async () => {

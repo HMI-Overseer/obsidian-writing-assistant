@@ -121,11 +121,21 @@ export interface ActionControlContext {
   driftGuardAllowsUndo: boolean;
 }
 
+/**
+ * What a reader may still do to one target from the transcript.
+ *
+ * There is no retry. A failed mutation is the model's problem to solve, not a
+ * button on a record: the model sees the failure in the tool result and decides
+ * what to do next, with the whole conversation in hand. Re-firing a stale
+ * mutation by hand, turns later and against a vault that has moved on, is the
+ * timeline acting instead of recording. `retry_requested` stays in the event
+ * vocabulary (ADR-0030) so conversations that already recorded one still replay
+ * exactly as written, and {@link ActionRetryState} still tracks it.
+ */
 export interface ActionControlEligibility {
   canApprove: boolean;
   canDecline: boolean;
   canApply: boolean;
-  canRetry: boolean;
   canUndo: boolean;
 }
 
@@ -257,7 +267,6 @@ export function deriveActionControlEligibility(
       canApprove: false,
       canDecline: false,
       canApply: false,
-      canRetry: false,
       canUndo: false,
     };
   }
@@ -293,17 +302,15 @@ export function deriveActionControlEligibility(
         state.approval === "approved") &&
       state.effect === "none" &&
       !state.superseded,
+    // A target left `retry: "requested"` by an older conversation keeps its Apply,
+    // because that request is recorded history and refusing it now would strand
+    // work the user already asked for. Nothing can enter that state any more.
     canApply:
       actionable &&
       entry.family !== "interaction" &&
       !state.superseded &&
       ((state.approval === "approved" && state.effect === "none") ||
         state.retry === "requested"),
-    canRetry:
-      actionable &&
-      !state.superseded &&
-      RETRY_FAMILIES.has(entry.family) &&
-      state.retry === "eligible",
     canUndo,
   };
 }

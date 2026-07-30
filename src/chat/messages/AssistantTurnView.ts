@@ -7,10 +7,7 @@ import type {
   AssistantTurnSnapshot,
 } from "../turns/AssistantTurnBuilder";
 import type { MarkdownBubbleRenderer } from "../rendering/MarkdownBubbleRenderer";
-import {
-  deriveActionLedgerState,
-  type ActionControlEligibility,
-} from "../conversation/actionLedger";
+import type { ActionControlEligibility } from "../conversation/actionLedger";
 import { TOOL_ICONS, isMutatingTool } from "../../tools/metadata";
 import {
   AssistantActionHostCoordinator,
@@ -57,6 +54,7 @@ interface ToolItemRefs {
   toolSummaryEl: HTMLElement;
   nameEl: HTMLElement;
   detailEl: HTMLElement;
+  askEl: HTMLElement;
   diagnosticsEl: HTMLElement;
   expanded: boolean;
   hasDisclosure: boolean;
@@ -392,6 +390,14 @@ export class AssistantTurnView {
     const detailEl = toolSummaryEl.createSpan({
       cls: "lmsa-agentic-timeline-step-detail",
     });
+    // A question and its answer are the reader's own words, not diagnostics. They
+    // get their own full-width slot under the step, alongside where an edit's diff
+    // hunk and a write's preview mount, rather than a line squeezed into the
+    // summary row or buried in the collapsed disclosure.
+    const askEl = state.contentEl.createDiv({
+      cls: "lmsa-assistant-turn-ask lmsa-hidden",
+    });
+    askEl.addEventListener("click", (event) => event.stopPropagation());
     const diagnosticsEl = state.contentEl.createDiv({
       cls: "lmsa-agentic-timeline-step-expand lmsa-hidden",
       attr: { "aria-hidden": "true" },
@@ -423,6 +429,7 @@ export class AssistantTurnView {
       toolSummaryEl,
       nameEl,
       detailEl,
+      askEl,
       diagnosticsEl,
       expanded: false,
       hasDisclosure: false,
@@ -586,7 +593,40 @@ export class AssistantTurnView {
       refs.diagnosticsEl.addClass("lmsa-hidden");
       refs.diagnosticsEl.setAttribute("aria-hidden", "true");
     }
+    this.renderAskTranscript(refs.askEl, item);
     this.renderToolDiagnostics(refs.diagnosticsEl, item);
+  }
+
+  /**
+   * The questions the assistant asked and the answers given, kept in the
+   * transcript because reading back a conversation is when they matter most.
+   * Steps that asked nothing render an empty, hidden slot.
+   */
+  private renderAskTranscript(
+    askEl: HTMLElement,
+    item: AssistantTurnToolRenderItem,
+  ): void {
+    askEl.empty();
+    const questions = item.askGuidance?.questions ?? [];
+    askEl.toggleClass("lmsa-hidden", questions.length === 0);
+    for (const question of questions) {
+      const rowEl = askEl.createDiv({ cls: "lmsa-assistant-turn-ask-row" });
+      rowEl.createDiv({
+        cls: "lmsa-assistant-turn-ask-question",
+        text: question.question,
+      });
+      const answers = Array.isArray(question.answer)
+        ? question.answer
+        : [question.answer];
+      const answerEl = rowEl.createDiv({
+        cls: "lmsa-assistant-turn-ask-answer",
+      });
+      setIcon(
+        answerEl.createSpan({ cls: "lmsa-assistant-turn-ask-answer-icon" }),
+        "corner-down-right",
+      );
+      answerEl.createSpan({ text: answers.join(", ") });
+    }
   }
 
   private renderToolDiagnostics(
@@ -618,18 +658,6 @@ export class AssistantTurnView {
         "Arguments",
         item.toolArguments,
       );
-    }
-    if (item.askGuidance) {
-      for (const question of item.askGuidance.questions) {
-        const answers = Array.isArray(question.answer)
-          ? question.answer
-          : [question.answer];
-        this.renderDiagnosticEntry(
-          diagnosticsEl,
-          question.header,
-          `${question.question}\n${answers.join("\n")}`,
-        );
-      }
     }
     if (item.resultRecord) {
       this.renderDiagnosticEntry(
@@ -791,11 +819,6 @@ export class AssistantTurnView {
   }
 }
 
-type SummaryLedgerEntry = Exclude<
-  ToolActionLedgerEntry,
-  { family: "edit" }
->;
-
 class ActionLedgerSummaryView implements AssistantActionView {
   readonly element: HTMLElement;
 
@@ -824,18 +847,6 @@ class ActionLedgerSummaryView implements AssistantActionView {
     }
     this.element.empty();
     this.element.dataset.actionRef = entry.actionRef;
-    const state = deriveActionLedgerState(entry);
-    const headingEl = this.element.createDiv({
-      cls: "lmsa-assistant-turn-action-heading",
-    });
-    headingEl.createSpan({
-      cls: "lmsa-assistant-turn-action-family",
-      text: actionFamilyLabel(entry),
-    });
-    headingEl.createSpan({
-      cls: `lmsa-assistant-turn-action-state is-${state.aggregate}`,
-      text: actionStateLabel(state.aggregate),
-    });
     if (entry.placement.state === "provisional") {
       this.element.createDiv({
         cls: "lmsa-assistant-turn-action-placement",
@@ -848,75 +859,46 @@ class ActionLedgerSummaryView implements AssistantActionView {
           "The action has effect history, but no provider declaration could be placed.",
       });
     }
-    const targetsEl = this.element.createEl("ul", {
-      cls: "lmsa-assistant-turn-action-targets",
-    });
     const model = buildActionLedgerReviewModel(
       entry,
       (targetId) => this.getEligibility(entry, targetId),
     );
-    for (const target of model.targets) {
-      const targetEl = targetsEl.createEl("li");
-      targetEl.createSpan({
-        cls: "lmsa-assistant-turn-action-target-label",
-        text: target.label,
+    // Only what the reader can still act on. An action with nothing left to decide
+    // is already told by its own step, so it contributes no row at all.
+    const actionable = model.targets.filter(
+      (target) => target.controls.length > 0,
+    );
+    // The step names the one thing it acted on. Only a multi-target action has to
+    // say which target a button belongs to.
+    const nameTargets = actionable.length > 1;
+    for (const target of actionable) {
+      const controlsEl = this.element.createDiv({
+        cls: "lmsa-assistant-turn-action-controls",
       });
-      targetEl.createSpan({
-        cls: `lmsa-assistant-turn-action-target-state is-${target.state}`,
-        text: target.state.replace(/_/g, " "),
-      });
-      if (target.error) {
-        targetEl.createDiv({
-          cls: "lmsa-assistant-turn-action-error",
-          text: target.error,
+      if (nameTargets) {
+        controlsEl.createSpan({
+          cls: "lmsa-assistant-turn-action-target-label",
+          text: target.label,
         });
       }
-      if (target.undoRefusal) {
-        targetEl.createDiv({
-          cls: "lmsa-assistant-turn-action-error",
-          text: target.undoRefusal,
+      for (const control of target.controls) {
+        const label = actionControlLabel(control);
+        const buttonEl = controlsEl.createEl("button", {
+          cls: `lmsa-assistant-turn-action-control is-${control}`,
+          text: label,
+          attr: {
+            type: "button",
+            "aria-label": `${label} ${target.label}`,
+          },
         });
-      }
-      if (target.controls.length > 0) {
-        const controlsEl = targetEl.createDiv({
-          cls: "lmsa-assistant-turn-action-controls",
+        buttonEl.addEventListener("click", () => {
+          this.onControl(entry, target.targetId, control);
         });
-        for (const control of target.controls) {
-          const label = actionControlLabel(control);
-          const buttonEl = controlsEl.createEl("button", {
-            cls: `lmsa-assistant-turn-action-control is-${control}`,
-            text: label,
-            attr: {
-              type: "button",
-              "aria-label": `${label} ${target.label}`,
-            },
-          });
-          buttonEl.addEventListener("click", () => {
-            this.onControl(entry, target.targetId, control);
-          });
-        }
       }
     }
   }
 
   destroy(): void {}
-}
-
-function actionFamilyLabel(entry: SummaryLedgerEntry): string {
-  switch (entry.family) {
-    case "vault_op":
-      return "Vault operation";
-    case "memory":
-      return "Memory change";
-    case "interaction":
-      return "Question";
-  }
-}
-
-function actionStateLabel(
-  state: ReturnType<typeof deriveActionLedgerState>["aggregate"],
-): string {
-  return state.replace(/_/g, " ");
 }
 
 export function actionTargetLabels(
@@ -952,8 +934,6 @@ function actionControlLabel(control: ActionReviewControl): string {
       return "Decline";
     case "apply":
       return "Apply";
-    case "retry":
-      return "Retry";
     case "undo":
       return "Undo";
   }
@@ -963,6 +943,5 @@ const NO_ACTION_ELIGIBILITY: ActionControlEligibility = {
   canApprove: false,
   canDecline: false,
   canApply: false,
-  canRetry: false,
   canUndo: false,
 };

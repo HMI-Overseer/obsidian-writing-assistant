@@ -81,7 +81,6 @@ export class ChatBubbleActionHandler {
           canApprove: false,
           canDecline: false,
           canApply: false,
-          canRetry: false,
           canUndo: false,
         },
       onActionControl: (messageId, actionRef, targetId, control) =>
@@ -120,12 +119,8 @@ export class ChatBubbleActionHandler {
       await this.deps.syncConversationUi();
       return;
     }
-    const type =
-      control === "approve"
-        ? "approved"
-        : control === "decline"
-          ? "declined"
-          : "retry_requested";
+    // `apply` and `undo` returned above, so the decision is the whole remainder.
+    const type = control === "approve" ? "approved" : "declined";
     const appended = store.appendEligibleActionEvent(
       messageId,
       actionRef,

@@ -434,7 +434,6 @@ export class ChatSessionMemory {
       canApprove: false,
       canDecline: false,
       canApply: false,
-      canRetry: false,
       canUndo: false,
     };
     if (messageIndex === -1) return unavailable;
@@ -672,14 +671,17 @@ function eventIsEligible(
     case "apply_succeeded":
     case "apply_failed":
       return eligibility.canApply;
-    case "retry_requested":
-      return eligibility.canRetry;
     case "undo_succeeded":
     case "undo_refused":
       return eligibility.canUndo;
     // Write-ahead audit evidence (`intent_recorded`, `outcome_unknown`) is
     // history, never an actionable control: both describe work that already
     // left the plugin's hands (ADR-0033).
+    //
+    // `retry_requested` is here for the same reason by a different route: no
+    // control produces one any more, so nothing may append one either. Existing
+    // ones replay untouched.
+    case "retry_requested":
     case "proposed":
     case "superseded":
     case "intent_recorded":

@@ -380,19 +380,57 @@
   padding-top: 0.35rem;
 }
 
-.lmsa-assistant-turn-action-heading {
+/* A settled action contributes no row, so its host must take no space either,
+   otherwise every completed step carries the padding of an invisible summary. */
+.lmsa-assistant-turn-action-summary:empty {
+  display: none;
+}
+
+/* ── Ask transcript: the questions and the answers given ──────────
+   Its own full-width row under the step, the same slot the write preview and
+   the edit diff take, so a question reads as part of the conversation instead
+   of a fragment wedged into the step's summary line. */
+
+.lmsa-assistant-turn-ask {
+  flex-basis: 100%;
+  width: 100%;
+  margin-top: 6px;
+  padding: 0.45rem 0.6rem;
+  border: 1px solid var(--background-modifier-border);
+  border-left: 2px solid var(--interactive-accent);
+  border-radius: 6px;
+  background: var(--background-secondary);
+  font-size: var(--font-ui-small);
+}
+
+.lmsa-assistant-turn-ask-row + .lmsa-assistant-turn-ask-row {
+  margin-top: 0.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--background-modifier-border);
+}
+
+.lmsa-assistant-turn-ask-question {
+  color: var(--text-muted);
+}
+
+.lmsa-assistant-turn-ask-answer {
   display: flex;
-  flex-wrap: wrap;
   align-items: baseline;
-  justify-content: space-between;
-  gap: 0.35rem 0.75rem;
+  gap: 0.35rem;
+  margin-top: 0.15rem;
+  color: var(--text-normal);
 }
 
-.lmsa-assistant-turn-action-family {
-  font-weight: 600;
+.lmsa-assistant-turn-ask-answer-icon {
+  flex: 0 0 auto;
+  color: var(--text-faint);
 }
 
-.lmsa-assistant-turn-action-state,
+.lmsa-assistant-turn-ask-answer-icon .svg-icon {
+  width: 13px;
+  height: 13px;
+}
+
 .lmsa-assistant-turn-action-placement {
   color: var(--text-muted);
   font-size: var(--font-ui-smaller);
@@ -402,34 +440,17 @@
   color: var(--text-warning);
 }
 
-.lmsa-assistant-turn-action-targets {
-  margin: 0;
-  padding-left: 1.2rem;
-  color: var(--text-muted);
-  font-size: var(--font-ui-small);
-}
-
-.lmsa-assistant-turn-action-targets > li {
-  margin-top: 0.25rem;
-}
-
-.lmsa-assistant-turn-action-target-state {
-  margin-left: 0.5rem;
-  color: var(--text-faint);
-  font-size: var(--font-ui-smaller);
-}
-
-.lmsa-assistant-turn-action-error {
-  margin-top: 0.2rem;
-  color: var(--text-error);
-  font-size: var(--font-ui-smaller);
-}
-
 .lmsa-assistant-turn-action-controls {
   display: flex;
   flex-wrap: wrap;
+  align-items: baseline;
   gap: 0.35rem;
   margin-top: 0.35rem;
+}
+
+.lmsa-assistant-turn-action-target-label {
+  color: var(--text-muted);
+  font-size: var(--font-ui-small);
 }
 
 .lmsa-assistant-turn-action-control {

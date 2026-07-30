@@ -127,7 +127,6 @@ const activeEligibility = {
   canApprove: true,
   canDecline: true,
   canApply: false,
-  canRetry: false,
   canUndo: false,
 };
 
@@ -205,7 +204,7 @@ describe("ledger-backed review models", () => {
     });
   });
 
-  it("shows one derived applied or undone state without repeating effect events", () => {
+  it("offers only what is still actionable, never the target's lifecycle state", () => {
     const applied = entry("memory");
     applied.events.push({
       eventId: "applied-memory",
@@ -239,20 +238,47 @@ describe("ledger-backed review models", () => {
         canDecline: false,
         canUndo: true,
       })).targets[0],
-    ).toMatchObject({
-      state: "applied",
+    ).toEqual({
+      targetId: "target-memory",
+      label: "fixture-memory",
       controls: ["undo"],
     });
+    // An undone target used to offer Retry, a redo button hiding in an audit log.
+    // It now offers nothing, so it contributes no row at all.
     expect(
       buildActionLedgerReviewModel(undone, () => ({
         ...activeEligibility,
         canApprove: false,
         canDecline: false,
-        canRetry: true,
       })).targets[0],
-    ).toMatchObject({
-      state: "undone",
-      controls: ["retry"],
+    ).toEqual({
+      targetId: "target-memory",
+      label: "fixture-memory",
+      controls: [],
     });
+  });
+
+  it("keeps a failed target's error out of the transcript projection", () => {
+    const failed = entry("vault_op");
+    failed.events.push({
+      eventId: "failed-vault",
+      type: "apply_failed",
+      targetId: "target-vault_op",
+      createdAt: 2,
+      error: "Vault operation failed.",
+    });
+
+    const target = buildActionLedgerReviewModel(failed, () => ({
+      ...activeEligibility,
+      canApprove: false,
+      canDecline: false,
+    })).targets[0];
+
+    expect(target).toEqual({
+      targetId: "target-vault_op",
+      label: "Create Fixture.md",
+      controls: [],
+    });
+    expect(JSON.stringify(target)).not.toContain("failed");
   });
 });

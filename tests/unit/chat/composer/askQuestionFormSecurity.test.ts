@@ -21,9 +21,10 @@ describe("ask question rendering security", () => {
     expect(form).toContain("text: option.label");
     expect(form).toContain("text: option.description");
     expect(form).toContain("maxlength: String(ASK_USER_LIMITS.otherText)");
-    expect(timeline).toContain(
-      "`${question.question}\\n${answers.join(\"\\n\")}`",
-    );
+    // The completed transcript shows the question and the answer in the open now,
+    // so both stay on `text:` assignments rather than any markup-bearing path.
+    expect(timeline).toContain("text: question.question");
+    expect(timeline).toContain('answerEl.createSpan({ text: answers.join(", ") })');
     expect(timeline).not.toContain("AskQuestionForm");
   });
 

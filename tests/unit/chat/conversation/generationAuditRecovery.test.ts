@@ -337,7 +337,6 @@ describe("audit evidence is inert", () => {
       canApprove: false,
       canDecline: false,
       canApply: false,
-      canRetry: false,
       canUndo: false,
     });
   });

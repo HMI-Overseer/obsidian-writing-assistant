@@ -1,23 +1,11 @@
 import type { ToolActionLedgerEntry } from "../../shared/types";
-import {
-  deriveActionLedgerState,
-  type ActionControlEligibility,
-  type ActionEffectState,
-} from "../conversation/actionLedger";
+import type { ActionControlEligibility } from "../conversation/actionLedger";
 
 export type ActionReviewControl =
   | "approve"
   | "decline"
   | "apply"
-  | "retry"
   | "undo";
-
-export type ActionReviewTargetState =
-  | "pending"
-  | "approved"
-  | "declined"
-  | "superseded"
-  | ActionEffectState;
 
 export interface ActionLedgerReviewBinding {
   actionRef: string;
@@ -25,13 +13,20 @@ export interface ActionLedgerReviewBinding {
   itemId?: string;
 }
 
+/**
+ * One reviewable target, as the transcript offers it: what it is, and what the
+ * reader can still do about it.
+ *
+ * Deliberately carries no lifecycle state and no failure text. A step's own
+ * marker already shows whether its tool succeeded, and the model that made the
+ * call reads the failure and speaks to it in prose. Repeating either as a word
+ * beside the step was internal bookkeeping shown to the reader, and the exact
+ * error stays one disclosure away on the step it belongs to.
+ */
 export interface ActionLedgerReviewTarget {
   targetId: string;
   label: string;
-  state: ActionReviewTargetState;
   controls: ActionReviewControl[];
-  error?: string;
-  undoRefusal?: string;
 }
 
 export interface ActionLedgerReviewModel {
@@ -54,7 +49,6 @@ export function buildActionLedgerReviewModel(
   entry: ToolActionLedgerEntry,
   getEligibility: (targetId: string) => ActionControlEligibility,
 ): ActionLedgerReviewModel {
-  const derived = deriveActionLedgerState(entry);
   const placement = entry.placement;
   return {
     family: entry.family,
@@ -65,30 +59,12 @@ export function buildActionLedgerReviewModel(
         ? { itemId: placement.itemId }
         : {}),
     },
-    targets: entry.payload.targets.map((target) => {
-      const state = derived.targets[target.targetId];
-      return {
-        targetId: target.targetId,
-        label: targetLabel(entry, target.targetId),
-        state: visibleState(state.approval, state.effect),
-        controls: controlsFor(getEligibility(target.targetId)),
-        ...(state.lastApplyError === undefined
-          ? {}
-          : { error: state.lastApplyError }),
-        ...(state.lastUndoRefusal === undefined
-          ? {}
-          : { undoRefusal: state.lastUndoRefusal }),
-      };
-    }),
+    targets: entry.payload.targets.map((target) => ({
+      targetId: target.targetId,
+      label: targetLabel(entry, target.targetId),
+      controls: controlsFor(getEligibility(target.targetId)),
+    })),
   };
-}
-
-function visibleState(
-  approval: ReturnType<typeof deriveActionLedgerState>["targets"][string]["approval"],
-  effect: ActionEffectState,
-): ActionReviewTargetState {
-  if (effect !== "none") return effect;
-  return approval === "unproposed" ? "pending" : approval;
 }
 
 function controlsFor(
@@ -98,7 +74,6 @@ function controlsFor(
   if (eligibility.canApprove) controls.push("approve");
   if (eligibility.canDecline) controls.push("decline");
   if (eligibility.canApply) controls.push("apply");
-  if (eligibility.canRetry) controls.push("retry");
   if (eligibility.canUndo) controls.push("undo");
   return controls;
 }

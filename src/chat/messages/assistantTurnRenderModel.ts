@@ -505,6 +505,11 @@ function accessibleToolState(
   }
 }
 
+/**
+ * Whether the step has anything behind its disclosure. Ask guidance is absent on
+ * purpose: questions and answers are shown in the open, so they no longer make a
+ * step expandable on their own.
+ */
 function hasToolDisclosure(
   item: Extract<AssistantTurnSnapshotItem, { type: "tool_call" }>,
   args: Record<string, unknown> | undefined,
@@ -514,8 +519,7 @@ function hasToolDisclosure(
     args !== undefined ||
     item.resultRecord !== undefined ||
     item.resultDigest !== undefined ||
-    item.errorContent !== undefined ||
-    item.askGuidance !== undefined
+    item.errorContent !== undefined
   );
 }
 

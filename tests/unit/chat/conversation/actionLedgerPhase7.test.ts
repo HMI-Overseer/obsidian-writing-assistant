@@ -109,7 +109,6 @@ describe("message-local action eligibility", () => {
       canApprove: true,
       canDecline: true,
       canApply: false,
-      canRetry: false,
       canUndo: false,
     });
 
@@ -129,7 +128,6 @@ describe("message-local action eligibility", () => {
       canApprove: false,
       canDecline: false,
       canApply: false,
-      canRetry: false,
     });
   });
 
@@ -246,7 +244,6 @@ describe("message-local action eligibility", () => {
     ).toMatchObject({
       canApprove: false,
       canApply: false,
-      canRetry: false,
       canUndo: true,
     });
   });
@@ -294,7 +291,6 @@ describe("message-local action eligibility", () => {
       canApprove: false,
       canDecline: false,
       canApply: false,
-      canRetry: false,
       canUndo: true,
     });
   });

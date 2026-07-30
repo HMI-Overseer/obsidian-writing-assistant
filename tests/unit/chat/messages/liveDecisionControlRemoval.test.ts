@@ -99,12 +99,15 @@ describe("live timeline decision controls are gone", () => {
   it("leaves the durable between-turns controls untouched", () => {
     const ledger = source("src/chat/messages/actionLedgerReview.ts");
 
-    // Criterion 2: the ledger still renders its own approve / decline / apply / retry /
+    // Criterion 2: the ledger still renders its own approve / decline / apply /
     // undo. Those operate between turns and were never in scope.
     expect(ledger).toContain("canApprove");
     expect(ledger).toContain("canDecline");
     expect(ledger).toContain("canApply");
-    expect(ledger).toContain("canRetry");
     expect(ledger).toContain("canUndo");
+    // Retry is not among them: a failed tool is the model's to resolve, and a
+    // transcript that re-fires a stale mutation stops being a record.
+    expect(ledger).not.toContain("canRetry");
+    expect(ledger).not.toContain('"retry"');
   });
 });

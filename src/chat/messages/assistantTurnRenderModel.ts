@@ -10,7 +10,11 @@ import type {
   AssistantTurnSnapshotItem,
 } from "../turns/AssistantTurnBuilder";
 import { getActiveAssistantRevision } from "../conversation/assistantRevisions";
-import { TOOL_LABELS, pendingToolLabel } from "../../tools/metadata";
+import {
+  TOOL_LABELS,
+  extractToolInput,
+  pendingToolLabel,
+} from "../../tools/metadata";
 import { GENERATION_STOPPED_LABEL } from "../types";
 
 export type AssistantTurnMarker = "streaming" | "thinking" | "tool" | "none";
@@ -376,6 +380,7 @@ function buildRenderItem(
       legacy: false,
     };
   }
+  const { args, detail } = toolDisplay(item);
   return {
     type: "tool_call",
     id: item.id,
@@ -385,12 +390,8 @@ function buildRenderItem(
       : { toolCallId: item.toolCallId }),
     toolName: item.toolName,
     toolArguments: item.toolArguments,
-    ...(item.toolArgs === undefined
-      ? {}
-      : { toolArgs: structuredClone(item.toolArgs) }),
-    ...(item.toolInput === undefined
-      ? {}
-      : { toolInput: item.toolInput }),
+    ...(args === undefined ? {} : { toolArgs: args }),
+    ...(detail === undefined ? {} : { toolInput: detail }),
     state: item.state,
     ...(item.resultRecord === undefined
       ? {}
@@ -418,12 +419,58 @@ function buildRenderItem(
       : { askStatus: item.askStatus }),
     label: toolLabel(item),
     accessibleState: accessibleToolState(item.state),
-    hasDisclosure: hasToolDisclosure(item),
+    hasDisclosure: hasToolDisclosure(item, args),
     marker: "tool",
     connector,
     fadeIncomingConnector: false,
     legacy: false,
   };
+}
+
+/**
+ * What a step shows about the call it made: its arguments as an object, and the
+ * one-line detail rendered beside the label.
+ *
+ * The two capture paths record arguments in different fields. The plugin tool loop
+ * streams them into `toolArguments`, which the builder parses into `toolArgs`; the
+ * Claude Code lifecycle has no argument stream and records them as a JSON blob in
+ * `toolInput` instead. Reading both as one source makes the paths render alike and
+ * recovers the arguments of already persisted turns without rewriting them.
+ *
+ * The detail is always the reader's phrasing of the target ("Books"), never the
+ * wire form the model sent ("{"path":"Books"}"), which belongs in the disclosure
+ * where each argument gets its own labelled row. A recorded input that is not that
+ * wire form is text some other writer meant to be read, so it stands as the detail
+ * when {@link extractToolInput} has no summary for the tool.
+ */
+function toolDisplay(
+  item: Extract<AssistantTurnSnapshotItem, { type: "tool_call" }>,
+): { args?: Record<string, unknown>; detail?: string } {
+  const recordedArgs = parseArgumentObject(item.toolInput);
+  const args =
+    item.toolArgs === undefined ? recordedArgs : structuredClone(item.toolArgs);
+  const summary = args
+    ? extractToolInput({ name: item.toolName, arguments: args })
+    : undefined;
+  const detail = summary ?? (recordedArgs ? undefined : item.toolInput);
+  return {
+    ...(args === undefined ? {} : { args }),
+    ...(detail === undefined ? {} : { detail }),
+  };
+}
+
+function parseArgumentObject(
+  text: string | undefined,
+): Record<string, unknown> | undefined {
+  if (text === undefined) return undefined;
+  try {
+    const parsed: unknown = JSON.parse(text);
+    return typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)
+      ? (parsed as Record<string, unknown>)
+      : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 function toolLabel(
@@ -460,9 +507,11 @@ function accessibleToolState(
 
 function hasToolDisclosure(
   item: Extract<AssistantTurnSnapshotItem, { type: "tool_call" }>,
+  args: Record<string, unknown> | undefined,
 ): boolean {
   return (
     item.toolArguments.trim().length > 0 ||
+    args !== undefined ||
     item.resultRecord !== undefined ||
     item.resultDigest !== undefined ||
     item.errorContent !== undefined ||

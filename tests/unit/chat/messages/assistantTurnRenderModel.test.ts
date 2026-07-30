@@ -339,6 +339,60 @@ describe("assistant turn render model", () => {
       errorContent: html,
     });
   });
+
+  it("summarizes what a call operated on instead of showing its raw arguments", () => {
+    const model = buildAssistantTurnRenderModel(
+      turn("completed", [
+        {
+          ...tool("t1", "s1", "call-1"),
+          toolName: "list_directory",
+          toolArguments: '{"path":"Books"}',
+          toolArgs: { path: "Books" },
+          toolInput: undefined,
+        },
+        {
+          ...tool("t2", "s1", "call-2"),
+          toolName: "search_content",
+          toolArguments: "",
+          toolArgs: undefined,
+          toolInput: '{"query":"prequel"}',
+        },
+        {
+          ...tool("t3", "s1", "call-3"),
+          toolName: "list_directory",
+          toolArguments: "",
+          toolArgs: undefined,
+          toolInput: "{}",
+        },
+      ]),
+    );
+
+    expect(
+      model.items.map((item) =>
+        item.type === "tool_call" ? item.toolInput : null,
+      ),
+    ).toEqual(["Books", "prequel", undefined]);
+  });
+
+  it("recovers arguments a lifecycle capture recorded as a JSON input blob", () => {
+    const model = buildAssistantTurnRenderModel(
+      turn("completed", [
+        {
+          ...tool("t1", "s1", "call-1"),
+          toolArguments: "",
+          toolArgs: undefined,
+          toolInput: '{"path":"Books/Overview.md"}',
+        },
+      ]),
+    );
+
+    expect(model.items[0]).toMatchObject({
+      type: "tool_call",
+      toolArgs: { path: "Books/Overview.md" },
+      toolInput: "Books/Overview.md",
+      hasDisclosure: true,
+    });
+  });
 });
 
 function sourceItemKeys(value: object): string[] {

@@ -12,6 +12,7 @@ import { normalizePluginSettings } from "./settings/settingsMigration";
 import { WritingAssistantSettingTab } from "./settings/SettingsTab";
 import { ServiceContainer } from "./services/ServiceContainer";
 import { reportIfRejected } from "./asyncCallbacks";
+import { installDriverBridge } from "./dev/driverBridge";
 
 export default class WritingAssistantChat extends Plugin {
   settings!: PluginSettings;
@@ -151,6 +152,11 @@ export default class WritingAssistantChat extends Plugin {
       this.initLeafIfNeeded();
     } else {
       this.app.workspace.onLayoutReady(() => this.initLeafIfNeeded());
+    }
+
+    // The live scenario driver's setup-and-readout seam (RFC-0013), compiled out of a release.
+    if (DEV_DRIVER) {
+      installDriverBridge(this);
     }
   }
 

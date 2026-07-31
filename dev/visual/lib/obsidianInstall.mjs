@@ -46,6 +46,20 @@ function candidateAsars() {
 }
 
 /**
+ * The newest Obsidian `*.asar` on this machine. The live-scenario driver copies it into its
+ * scratch profile so a run pins the application under test instead of letting a fresh profile
+ * download whatever the current release happens to be.
+ */
+export function resolveObsidianAsar() {
+  const [newest] = candidateAsars();
+  if (newest) return newest;
+  throw new Error(
+    "Could not find an Obsidian asar. Set OBSIDIAN_ASAR=<path to obsidian-*.asar> and retry.\n" +
+      "On Windows it is typically %APPDATA%/obsidian/obsidian-<version>.asar.",
+  );
+}
+
+/**
  * Reads one entry (`app.css`, `app.js`, …) out of the newest Obsidian asar we can find.
  * Throws with the override hint if no install yields the entry.
  */
@@ -77,6 +91,19 @@ function candidateExecutables() {
   }
   out.push("/opt/Obsidian/obsidian", "/usr/bin/obsidian", "/usr/local/bin/obsidian");
   return out.filter((p) => existsSync(p));
+}
+
+/**
+ * The Obsidian executable to launch. Same candidate search as the Chromium probe below, which
+ * only ever needed a file to read; the driver needs a process to start.
+ */
+export function resolveObsidianExecutable() {
+  const [first] = candidateExecutables();
+  if (first) return first;
+  throw new Error(
+    "Could not find an installed Obsidian. Set OBSIDIAN_EXE=<path to Obsidian.exe> and retry.\n" +
+      "On Windows it is typically %LOCALAPPDATA%/Programs/Obsidian/Obsidian.exe.",
+  );
 }
 
 const UA_VERSION = /Chrome\/(\d+\.\d+\.\d+\.\d+)/;

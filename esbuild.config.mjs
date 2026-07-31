@@ -13,7 +13,11 @@ If you want to view the source, please visit the GitHub repository of this plugi
 const _importMetaUrl = require('url').pathToFileURL(__filename).href;
 `;
 
-const prod = process.argv[2] === "production";
+const mode = process.argv[2] ?? "watch";
+const prod = mode === "production";
+// `driver` is the development bundle built once instead of watched: the live scenario driver
+// installs a build into a scratch vault per run, and a watcher never exits.
+const oneShot = prod || mode === "driver";
 const postcssArgs = ["node_modules/postcss-cli/index.js", "src/styles/index.css", "-o", "styles.css"];
 
 function runCssBuild(watch = false) {
@@ -72,12 +76,18 @@ const context = await esbuild.context({
   logLevel: "info",
   sourcemap: prod ? false : "inline",
   treeShaking: true,
-  // See the `_importMetaUrl` shim in the banner above.
-  define: { "import.meta.url": "_importMetaUrl" },
+  define: {
+    // See the `_importMetaUrl` shim in the banner above.
+    "import.meta.url": "_importMetaUrl",
+    // The live scenario driver's bridge and scripted provider are compiled out of a release
+    // artifact entirely: a literal `false` makes every guarded call site dead code, and
+    // tree-shaking then drops the modules behind them (RFC-0013).
+    DEV_DRIVER: prod ? "false" : "true",
+  },
   outfile: "main.js",
 });
 
-if (prod) {
+if (oneShot) {
   await runCssBuild();
   await context.rebuild();
   await context.dispose();

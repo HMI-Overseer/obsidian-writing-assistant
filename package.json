@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "node esbuild.config.mjs",
     "build": "node esbuild.config.mjs production",
+    "build:driver": "node esbuild.config.mjs driver",
     "build:css": "postcss src/styles/index.css -o styles.css",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src package.json",
@@ -18,6 +19,7 @@
     "test:integration": "vitest run tests/integration",
     "test:coverage": "vitest run --coverage",
     "visual": "node dev/visual/run.mjs",
+    "drive": "node dev/driver/run.mjs",
     "update-pricing": "node scripts/update-pricing.mjs",
     "version": "node version-bump.mjs && node scripts/update-pricing.mjs && git add manifest.json versions.json src/api/pricingData.json src/providers/catalogData.json"
   },

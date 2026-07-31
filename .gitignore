@@ -33,6 +33,9 @@ coverage/
 dev/visual/.cache/
 dev/visual/out/
 
+# Live scenario driver run directories (screenshots and transcripts of a real session)
+dev/driver/out/
+
 # AI slop
 .claude/
 AGENTS.md

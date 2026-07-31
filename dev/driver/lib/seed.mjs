@@ -10,6 +10,11 @@
 //
 // Step 7 is the only ordering constraint in the list: the trust key has to be in place before
 // the plugin would load, and it can only be written once a renderer exists. See `grantTrust`.
+//
+// Step 5 gained a half-step the RFC does not name. Arming the scripted provider used to require
+// a build the maintainer would never ship; it is now an epilogue appended to the installed copy
+// of the bundle, asserted against the bundle's shape before the run launches. See
+// `scriptedProvider.mjs`. A run with no script skips it and installs the release build untouched.
 import { createHash } from "node:crypto";
 import {
   cpSync,
@@ -23,6 +28,9 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { resolveObsidianAsar } from "../../visual/lib/obsidianInstall.mjs";
+import { writeScratchMarker } from "./clean.mjs";
+import { mergeSettings } from "./scenario.mjs";
+import { installEpilogue } from "./scriptedProvider.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO = resolve(HERE, "..", "..", "..");
@@ -48,7 +56,7 @@ function hashFile(path) {
  * Returns the paths and the manifest facts the runner needs, including the minted vault id that
  * makes step 7's localStorage key predictable.
  */
-export function seedRun({ fixture, theme, vaultId }) {
+export function seedRun({ fixture, theme, vaultId, script = null, settings = null, run = null }) {
   const fixtureDir = join(FIXTURES, fixture);
   const notesDir = join(fixtureDir, "notes");
   const settingsPath = join(fixtureDir, "settings.json");
@@ -98,9 +106,19 @@ export function seedRun({ fixture, theme, vaultId }) {
     artifacts[artifact] = hashFile(source);
   }
 
-  const settings = JSON.parse(readFileSync(settingsPath, "utf8"));
-  writeFileSync(join(pluginDir, "data.json"), `${JSON.stringify(settings, null, 2)}\n`);
-  seedConversations(pluginDir, settings);
+  // 5a. Arm the scripted provider, by appending an asserted epilogue to the *installed copy* of
+  //     the bundle. The repository's own main.js is the maintainer's live plugin and is never
+  //     written to. Nothing is appended when no script is armed, so a sandbox run drives the
+  //     release artifact untouched.
+  const epilogue = script ? installEpilogue(join(pluginDir, "main.js")) : null;
+
+  // A scenario's own settings are merged over the fixture's committed baseline here rather than
+  // applied through the bridge once the app is up, so the plugin boots on them. Configuring a
+  // running app would exercise a settings path no user takes on the way to the state a scenario
+  // is about.
+  const resolved = mergeSettings(JSON.parse(readFileSync(settingsPath, "utf8")), settings);
+  writeFileSync(join(pluginDir, "data.json"), `${JSON.stringify(resolved, null, 2)}\n`);
+  seedConversations(pluginDir, resolved);
 
   // 6. Register and open, under a driver-minted vault id.
   writeFileSync(
@@ -112,7 +130,22 @@ export function seedRun({ fixture, theme, vaultId }) {
     )}\n`,
   );
 
-  return { root, profileDir, vaultDir, pluginDir, vaultId, artifacts, pinnedAsar: asarName };
+  // Not part of the recipe: what the clean mode reads, so a leftover scratch root can say which
+  // run made it and whether the driver detached from it and left an app running on the vault.
+  writeScratchMarker(root, { vaultId, fixture, run, detached: false });
+
+  return {
+    root,
+    profileDir,
+    vaultDir,
+    pluginDir,
+    vaultId,
+    artifacts,
+    pinnedAsar: asarName,
+    scriptId: script?.id ?? null,
+    settingsPatch: settings ?? null,
+    epilogue,
+  };
 }
 
 /**

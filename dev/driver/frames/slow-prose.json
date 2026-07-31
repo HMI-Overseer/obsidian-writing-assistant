@@ -1,0 +1,93 @@
+{
+  "description": "A prose turn paced slowly enough to be stopped by hand while it is still streaming.",
+  "completionText": "",
+  "frames": [
+    {
+      "frameKey": "slow:open",
+      "providerMessageKey": "driver-fixture:msg-1",
+      "delayMs": 0,
+      "facts": [{ "type": "segment_start", "segmentId": "slow-seg-1" }]
+    },
+    {
+      "frameKey": "slow:delta-1",
+      "providerMessageKey": "driver-fixture:msg-1",
+      "delayMs": 600,
+      "facts": [
+        {
+          "type": "prose_delta",
+          "segmentId": "slow-seg-1",
+          "delta": "Eleven years dark, and Mara climbed it anyway. "
+        }
+      ]
+    },
+    {
+      "frameKey": "slow:delta-2",
+      "providerMessageKey": "driver-fixture:msg-1",
+      "delayMs": 600,
+      "facts": [
+        {
+          "type": "prose_delta",
+          "segmentId": "slow-seg-1",
+          "delta": "The climbing had never been about the light. "
+        }
+      ]
+    },
+    {
+      "frameKey": "slow:delta-3",
+      "providerMessageKey": "driver-fixture:msg-1",
+      "delayMs": 600,
+      "facts": [
+        {
+          "type": "prose_delta",
+          "segmentId": "slow-seg-1",
+          "delta": "It had been about the stair, which nobody had swept in as long, "
+        }
+      ]
+    },
+    {
+      "frameKey": "slow:delta-4",
+      "providerMessageKey": "driver-fixture:msg-1",
+      "delayMs": 600,
+      "facts": [
+        {
+          "type": "prose_delta",
+          "segmentId": "slow-seg-1",
+          "delta": "and about the door at the top, which nobody had opened in longer. "
+        }
+      ]
+    },
+    {
+      "frameKey": "slow:delta-5",
+      "providerMessageKey": "driver-fixture:msg-1",
+      "delayMs": 600,
+      "facts": [
+        {
+          "type": "prose_delta",
+          "segmentId": "slow-seg-1",
+          "delta": "This sentence is here so the turn is still running when the run stops it, "
+        }
+      ]
+    },
+    {
+      "frameKey": "slow:delta-6",
+      "providerMessageKey": "driver-fixture:msg-1",
+      "delayMs": 600,
+      "facts": [
+        {
+          "type": "prose_delta",
+          "segmentId": "slow-seg-1",
+          "delta": "and a run that reaches the end of the script instead has a scenario to fix."
+        }
+      ]
+    },
+    {
+      "frameKey": "slow:close",
+      "providerMessageKey": "driver-fixture:msg-1",
+      "delayMs": 600,
+      "facts": [
+        { "type": "segment_end", "segmentId": "slow-seg-1" },
+        { "type": "turn_end", "status": "completed" }
+      ]
+    }
+  ]
+}

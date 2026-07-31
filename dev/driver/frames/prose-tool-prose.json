@@ -1,0 +1,103 @@
+{
+  "description": "Prose, a read_file step against the fixture vault, then prose in a second round.",
+  "completionText": "",
+  "frames": [
+    {
+      "frameKey": "tool:r1-open",
+      "providerMessageKey": "driver-fixture:msg-1",
+      "delayMs": 0,
+      "facts": [{ "type": "segment_start", "segmentId": "tool-r1" }]
+    },
+    {
+      "frameKey": "tool:r1-delta-1",
+      "providerMessageKey": "driver-fixture:msg-1",
+      "facts": [
+        {
+          "type": "prose_delta",
+          "segmentId": "tool-r1",
+          "delta": "Let me read the opening as it stands before I suggest anything.\n\n"
+        }
+      ]
+    },
+    {
+      "frameKey": "tool:r1-declare",
+      "providerMessageKey": "driver-fixture:msg-1",
+      "facts": [
+        {
+          "type": "tool_call_start",
+          "segmentId": "tool-r1",
+          "declarationKey": "tool-r1-decl-1",
+          "toolName": "read_file"
+        }
+      ]
+    },
+    {
+      "frameKey": "tool:r1-args",
+      "providerMessageKey": "driver-fixture:msg-1",
+      "facts": [
+        {
+          "type": "tool_call_delta",
+          "declarationKey": "tool-r1-decl-1",
+          "argumentsDelta": "{\"path\":\"Chapters/One.md\"}"
+        }
+      ]
+    },
+    {
+      "frameKey": "tool:r1-identity",
+      "providerMessageKey": "driver-fixture:msg-1",
+      "facts": [
+        {
+          "type": "tool_call_identity",
+          "declarationKey": "tool-r1-decl-1",
+          "toolCallId": "driver-read-1",
+          "correlation": "provider_id"
+        }
+      ]
+    },
+    {
+      "frameKey": "tool:r1-close",
+      "providerMessageKey": "driver-fixture:msg-1",
+      "facts": [
+        { "type": "segment_end", "segmentId": "tool-r1" },
+        { "type": "turn_end", "status": "completed" }
+      ]
+    },
+
+    {
+      "frameKey": "tool:r2-open",
+      "providerMessageKey": "driver-fixture:msg-2",
+      "delayMs": 0,
+      "facts": [{ "type": "segment_start", "segmentId": "tool-r2" }]
+    },
+    {
+      "frameKey": "tool:r2-delta-1",
+      "providerMessageKey": "driver-fixture:msg-2",
+      "facts": [
+        {
+          "type": "prose_delta",
+          "segmentId": "tool-r2",
+          "delta": "The chapter opens on the tower and then explains it for two paragraphs. "
+        }
+      ]
+    },
+    {
+      "frameKey": "tool:r2-delta-2",
+      "providerMessageKey": "driver-fixture:msg-2",
+      "facts": [
+        {
+          "type": "prose_delta",
+          "segmentId": "tool-r2",
+          "delta": "Cut the explaining and let Mara climb it in the first sentence."
+        }
+      ]
+    },
+    {
+      "frameKey": "tool:r2-close",
+      "providerMessageKey": "driver-fixture:msg-2",
+      "facts": [
+        { "type": "segment_end", "segmentId": "tool-r2" },
+        { "type": "turn_end", "status": "completed" }
+      ]
+    }
+  ]
+}

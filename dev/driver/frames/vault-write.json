@@ -1,0 +1,123 @@
+{
+  "description": "A write_file the ask gate stops on, then prose. Drives approve and decline alike.",
+  "completionText": "",
+  "_comment": [
+    "Round one is paced at 400ms a frame rather than the 40ms default, so the tool call lands",
+    "about 1.6s after send. Two reasons, and the second is a finding rather than a preference.",
+    "",
+    "A real provider does not emit a tool call 240ms after the request, so the default pacing was",
+    "never faithful for a round that ends in one.",
+    "",
+    "And at the default pacing this scenario failed about half the time, with the write refused as",
+    "'the vault op review did not happen'. Measured cause, from an instrumented run recorded in the",
+    "2026-07-31 Stage 2 run record: the composer's 300ms draft-save debounce and the write-ahead",
+    "audit's intent persist both call ConversationStorage.save() for the same conversation, which",
+    "is not serialized, so the second swap finds the destination the first has just re-created.",
+    "That is a defect in the plugin, not in the driver, and it is deliberately not worked around",
+    "anywhere except here, in a declared per-frame delay, with this note beside it."
+  ],
+  "frames": [
+    {
+      "frameKey": "write:r1-open",
+      "providerMessageKey": "driver-fixture:msg-1",
+      "delayMs": 0,
+      "facts": [{ "type": "segment_start", "segmentId": "write-r1" }]
+    },
+    {
+      "frameKey": "write:r1-delta-1",
+      "providerMessageKey": "driver-fixture:msg-1",
+      "delayMs": 400,
+      "facts": [
+        {
+          "type": "prose_delta",
+          "segmentId": "write-r1",
+          "delta": "Here is chapter two, in the same close third as chapter one.\n\n"
+        }
+      ]
+    },
+    {
+      "frameKey": "write:r1-declare",
+      "providerMessageKey": "driver-fixture:msg-1",
+      "delayMs": 400,
+      "facts": [
+        {
+          "type": "tool_call_start",
+          "segmentId": "write-r1",
+          "declarationKey": "write-r1-decl-1",
+          "toolName": "write_file"
+        }
+      ]
+    },
+    {
+      "frameKey": "write:r1-args",
+      "providerMessageKey": "driver-fixture:msg-1",
+      "delayMs": 400,
+      "facts": [
+        {
+          "type": "tool_call_delta",
+          "declarationKey": "write-r1-decl-1",
+          "argumentsDelta": "{\"path\":\"Chapters/Two.md\",\"content\":\"# Two\\n\\nThe stair had been shut for eleven years and Mara went up it anyway.\\n\"}"
+        }
+      ]
+    },
+    {
+      "frameKey": "write:r1-identity",
+      "providerMessageKey": "driver-fixture:msg-1",
+      "delayMs": 400,
+      "facts": [
+        {
+          "type": "tool_call_identity",
+          "declarationKey": "write-r1-decl-1",
+          "toolCallId": "driver-write-1",
+          "correlation": "provider_id"
+        }
+      ]
+    },
+    {
+      "frameKey": "write:r1-close",
+      "providerMessageKey": "driver-fixture:msg-1",
+      "delayMs": 0,
+      "facts": [
+        { "type": "segment_end", "segmentId": "write-r1" },
+        { "type": "turn_end", "status": "completed" }
+      ]
+    },
+
+    {
+      "frameKey": "write:r2-open",
+      "providerMessageKey": "driver-fixture:msg-2",
+      "delayMs": 0,
+      "facts": [{ "type": "segment_start", "segmentId": "write-r2" }]
+    },
+    {
+      "frameKey": "write:r2-delta-1",
+      "providerMessageKey": "driver-fixture:msg-2",
+      "facts": [
+        {
+          "type": "prose_delta",
+          "segmentId": "write-r2",
+          "delta": "That was the only change I had in mind for chapter two. "
+        }
+      ]
+    },
+    {
+      "frameKey": "write:r2-delta-2",
+      "providerMessageKey": "driver-fixture:msg-2",
+      "facts": [
+        {
+          "type": "prose_delta",
+          "segmentId": "write-r2",
+          "delta": "The timeline above holds what actually became of it."
+        }
+      ]
+    },
+    {
+      "frameKey": "write:r2-close",
+      "providerMessageKey": "driver-fixture:msg-2",
+      "facts": [
+        { "type": "segment_end", "segmentId": "write-r2" },
+        { "type": "turn_end", "status": "completed" }
+      ]
+    }
+  ]
+}

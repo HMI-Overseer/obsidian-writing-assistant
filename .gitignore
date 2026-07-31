@@ -33,8 +33,10 @@ coverage/
 dev/visual/.cache/
 dev/visual/out/
 
-# Live scenario driver run directories (screenshots and transcripts of a real session)
+# Live scenario driver run directories (screenshots and transcripts of a real session),
+# and the previous run's choices, which `--last` repeats
 dev/driver/out/
+dev/driver/.last.json
 
 # AI slop
 .claude/

@@ -1,5 +1,14 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join, posix } from "node:path";
+import {
+  escapeHtml,
+  figureMarkup,
+  missingMarkup,
+  sheetDocument,
+  sheetResponsiveCss,
+  SHEET_CARD_CSS,
+  SHEET_FRAME_CSS,
+} from "../../lib/contactSheet.mjs";
 
 const MANIFEST_VERSION = 1;
 const BUILD_ORDER = ["current", "baseline"];
@@ -69,31 +78,18 @@ function mergeRenders(existing, updates, surfaces, familyById) {
   return sortRenders([...byKey.values()], surfaces, familyById);
 }
 
-function escapeHtml(value) {
-  return String(value)
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#039;");
-}
-
 function imageMarkup(entry, label) {
   if (!entry) {
-    return `<div class="missing">
-      <strong>${escapeHtml(label)}</strong><span>Not rendered</span>
-    </div>`;
+    return missingMarkup({ label, note: "Not rendered" });
   }
 
-  const dimensions = `${entry.dimensions.width} x ${entry.dimensions.height} px`;
-  return `<figure>
-    <figcaption><strong>${escapeHtml(label)}</strong><span>${dimensions}</span></figcaption>
-    <a href="${escapeHtml(entry.path)}">
-      <img src="${escapeHtml(entry.path)}" alt="${escapeHtml(
-        `${entry.id}, ${entry.theme}, ${entry.build}`,
-      )}">
-    </a>
-  </figure>`;
+  return figureMarkup({
+    label,
+    meta: `${entry.dimensions.width} x ${entry.dimensions.height} px`,
+    href: entry.path,
+    src: entry.path,
+    alt: `${entry.id}, ${entry.theme}, ${entry.build}`,
+  });
 }
 
 function themeMarkup(id, theme, builds, renderByKey) {
@@ -133,40 +129,9 @@ function familyMarkup(family, ids, surfaces, builds, renderByKey) {
   </section>`;
 }
 
-function contactSheet(manifest, surfaces, familyById) {
-  const renderByKey = new Map(
-    manifest.renders.map((render) => [renderKey(render), render]),
-  );
-  const hasBaseline = manifest.renders.some((render) => render.build === "baseline");
-  const builds = hasBaseline ? BUILD_ORDER : ["current"];
-  const familyOrder = [...new Set(Object.values(familyById))];
-  const content = familyOrder
-    .map((family) => {
-      const ids = Object.keys(surfaces).filter((id) => familyById[id] === family);
-      return familyMarkup(family, ids, surfaces, builds, renderByKey);
-    })
-    .join("");
-
-  return `<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Visual harness contact sheet</title>
-  <style>
-    :root {
-      color-scheme: light dark;
-      font-family: ui-sans-serif, system-ui, sans-serif;
-      background: Canvas;
-      color: CanvasText;
-    }
-    * { box-sizing: border-box; }
-    body { margin: 0; padding: 32px; }
-    main { margin: 0 auto; max-width: 1800px; }
-    h1, h2, h3, h4, p { margin-top: 0; }
-    h1 { margin-bottom: 8px; }
-    .intro { color: GrayText; margin-bottom: 32px; }
-    .family { margin-bottom: 48px; }
+/** This harness's own subject: families, surfaces, and the theme pair beside each other. */
+function surfaceCss(builds) {
+  return `    .family { margin-bottom: 48px; }
     .family > h2 { border-bottom: 2px solid GrayText; padding-bottom: 8px; }
     .surface {
       border: 1px solid GrayText;
@@ -185,49 +150,35 @@ function contactSheet(manifest, surfaces, familyById) {
       display: grid;
       gap: 12px;
       grid-template-columns: repeat(${builds.length}, minmax(0, 1fr));
-    }
-    figure, .missing { margin: 0; min-width: 0; }
-    figcaption, .missing {
-      align-items: baseline;
-      display: flex;
-      gap: 12px;
-      justify-content: space-between;
-      margin-bottom: 6px;
-      text-transform: capitalize;
-    }
-    figcaption span, .missing span { color: GrayText; font-size: 0.85rem; }
-    img {
-      background: ButtonFace;
-      border: 1px solid GrayText;
-      display: block;
-      height: auto;
-      max-width: 100%;
-    }
-    .missing {
-      border: 1px dashed GrayText;
-      min-height: 120px;
-      padding: 12px;
-    }
-    @media (max-width: 900px) {
-      body { padding: 16px; }
-      .themes { grid-template-columns: 1fr; }
+    }`;
+}
+
+const RESPONSIVE_CSS = sheetResponsiveCss(`      .themes { grid-template-columns: 1fr; }
       .theme + .theme { border-left: 0; border-top: 1px solid GrayText; }
-      .builds { grid-template-columns: 1fr; }
-    }
-  </style>
-</head>
-<body>
-  <main>
-    <h1>Visual harness contact sheet</h1>
-    <p class="intro">
-      ${Object.keys(surfaces).length} registered surfaces, grouped by family.
-      Light and dark renders are shown side by side.
-    </p>
-    ${content}
-  </main>
-</body>
-</html>
-`;
+      .builds { grid-template-columns: 1fr; }`);
+
+function contactSheet(manifest, surfaces, familyById) {
+  const renderByKey = new Map(
+    manifest.renders.map((render) => [renderKey(render), render]),
+  );
+  const hasBaseline = manifest.renders.some((render) => render.build === "baseline");
+  const builds = hasBaseline ? BUILD_ORDER : ["current"];
+  const familyOrder = [...new Set(Object.values(familyById))];
+  const content = familyOrder
+    .map((family) => {
+      const ids = Object.keys(surfaces).filter((id) => familyById[id] === family);
+      return familyMarkup(family, ids, surfaces, builds, renderByKey);
+    })
+    .join("");
+
+  return sheetDocument({
+    title: "Visual harness contact sheet",
+    heading: "Visual harness contact sheet",
+    intro: `${Object.keys(surfaces).length} registered surfaces, grouped by family.
+      Light and dark renders are shown side by side.`,
+    css: [SHEET_FRAME_CSS, surfaceCss(builds), SHEET_CARD_CSS, RESPONSIVE_CSS].join("\n"),
+    body: content,
+  });
 }
 
 export function renderOutputPath(build, family, id, theme) {

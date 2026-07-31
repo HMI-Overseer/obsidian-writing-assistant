@@ -6,7 +6,6 @@
   "scripts": {
     "dev": "node esbuild.config.mjs",
     "build": "node esbuild.config.mjs production",
-    "build:driver": "node esbuild.config.mjs driver",
     "build:css": "postcss src/styles/index.css -o styles.css",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src package.json",

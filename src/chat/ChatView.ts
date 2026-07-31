@@ -37,7 +37,6 @@ import type { ChatLayoutRefs } from "./types";
 import { ChatHistoryDrawer } from "./view/ChatHistoryDrawer";
 import { createChatLayout } from "./view/createChatLayout";
 import { EmptyStateCarousel } from "./view/EmptyStateCarousel";
-import { attachDriverView, detachDriverView } from "../dev/driverBridge";
 
 const NO_MODEL_SELECTED_LABEL = "No model selected";
 /** Below this width the "widen the panel" overlay replaces the chat. */
@@ -512,18 +511,6 @@ export class ChatView extends ItemView {
       this.handleWidthChange(entry.contentRect.width);
     });
     this.resizeObserver.observe(this.contentEl);
-
-    // The live scenario driver's readout sources, handed over rather than reached for: every
-    // member below is private, so a bridge that composed its own readout would need a
-    // structural assertion, and a rename would then break the driver silently (RFC-0013).
-    if (DEV_DRIVER) {
-      attachDriverView({
-        sessionStore: this.sessionStore,
-        orchestrator: this.orchestrator,
-        interactionHost: this.interactionHost,
-      });
-      this.register(() => detachDriverView());
-    }
   }
 
   async onClose(): Promise<void> {

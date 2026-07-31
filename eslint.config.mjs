@@ -13,9 +13,6 @@ export default tseslint.config(
     // TS parser never sees package.json, which is linted with the JSON language.
     files: ["**/*.{ts,cts,mts,tsx}"],
     languageOptions: {
-      // A build-time constant esbuild substitutes, declared for the type checker in
-      // src/dev/devDriver.d.ts. `no-undef` reads globals, not ambient declarations.
-      globals: { DEV_DRIVER: "readonly" },
       parserOptions: {
         projectService: true,
         tsconfigRootDir: import.meta.dirname,

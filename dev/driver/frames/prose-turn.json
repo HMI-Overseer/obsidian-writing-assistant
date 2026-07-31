@@ -1,4 +1,5 @@
 {
+  "description": "One prose segment, streamed over several deltas, then a clean turn end.",
   "completionText": "The tower answered the way it always did, which was not at all.",
   "frames": [
     {

@@ -1,0 +1,53 @@
+{
+  "description": "One frame key delivered twice with different bytes. ADR-0031 fingerprint mismatch.",
+  "completionText": "",
+  "frames": [
+    {
+      "frameKey": "conflict:open",
+      "providerMessageKey": "driver-fixture:msg-1",
+      "delayMs": 0,
+      "facts": [{ "type": "segment_start", "segmentId": "conflict-seg-1" }]
+    },
+    {
+      "frameKey": "conflict:delta-1",
+      "providerMessageKey": "driver-fixture:msg-1",
+      "facts": [
+        {
+          "type": "prose_delta",
+          "segmentId": "conflict-seg-1",
+          "delta": "The tower had been shut for eleven years. "
+        }
+      ]
+    },
+    {
+      "frameKey": "conflict:delta-1",
+      "providerMessageKey": "driver-fixture:msg-1",
+      "facts": [
+        {
+          "type": "prose_delta",
+          "segmentId": "conflict-seg-1",
+          "delta": "The tower had been shut for nine years. "
+        }
+      ]
+    },
+    {
+      "frameKey": "conflict:unreached",
+      "providerMessageKey": "driver-fixture:msg-1",
+      "facts": [
+        {
+          "type": "prose_delta",
+          "segmentId": "conflict-seg-1",
+          "delta": "Nothing past the conflicting frame is ever published."
+        }
+      ]
+    },
+    {
+      "frameKey": "conflict:close",
+      "providerMessageKey": "driver-fixture:msg-1",
+      "facts": [
+        { "type": "segment_end", "segmentId": "conflict-seg-1" },
+        { "type": "turn_end", "status": "completed" }
+      ]
+    }
+  ]
+}

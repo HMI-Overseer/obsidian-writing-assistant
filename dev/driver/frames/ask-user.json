@@ -1,0 +1,115 @@
+{
+  "description": "An ask_user question raised in the composer drawer, then prose in a second round.",
+  "completionText": "",
+  "_comment": [
+    "Round one is paced at 400ms a frame for the same two reasons vault-write.json records: a real",
+    "provider does not emit a tool call 240ms after the request, and `ask_user` crosses the same",
+    "write-ahead effect boundary a vault op does, so it meets the same unserialized-save race the",
+    "2026-07-31 Stage 2 run record measures. The defect is the plugin's; this is a declared delay,",
+    "not a workaround hidden in the driver."
+  ],
+  "frames": [
+    {
+      "frameKey": "ask:r1-open",
+      "providerMessageKey": "driver-fixture:msg-1",
+      "delayMs": 0,
+      "facts": [{ "type": "segment_start", "segmentId": "ask-r1" }]
+    },
+    {
+      "frameKey": "ask:r1-delta-1",
+      "providerMessageKey": "driver-fixture:msg-1",
+      "delayMs": 400,
+      "facts": [
+        {
+          "type": "prose_delta",
+          "segmentId": "ask-r1",
+          "delta": "Before I rewrite the opening I need one thing from you.\n\n"
+        }
+      ]
+    },
+    {
+      "frameKey": "ask:r1-declare",
+      "providerMessageKey": "driver-fixture:msg-1",
+      "delayMs": 400,
+      "facts": [
+        {
+          "type": "tool_call_start",
+          "segmentId": "ask-r1",
+          "declarationKey": "ask-r1-decl-1",
+          "toolName": "ask_user"
+        }
+      ]
+    },
+    {
+      "frameKey": "ask:r1-args",
+      "providerMessageKey": "driver-fixture:msg-1",
+      "delayMs": 400,
+      "facts": [
+        {
+          "type": "tool_call_delta",
+          "declarationKey": "ask-r1-decl-1",
+          "argumentsDelta": "{\"questions\":[{\"question\":\"Whose head should the opening stay in?\",\"header\":\"Viewpoint\",\"multiSelect\":false,\"options\":[{\"label\":\"Mara, close third\",\"description\":\"What chapter one already does.\"},{\"label\":\"The tower\",\"description\":\"Open on the place, reach Mara in the second paragraph.\"},{\"label\":\"Omniscient\",\"description\":\"Pull back and narrate both.\"}]}]}"
+        }
+      ]
+    },
+    {
+      "frameKey": "ask:r1-identity",
+      "providerMessageKey": "driver-fixture:msg-1",
+      "delayMs": 400,
+      "facts": [
+        {
+          "type": "tool_call_identity",
+          "declarationKey": "ask-r1-decl-1",
+          "toolCallId": "driver-ask-1",
+          "correlation": "provider_id"
+        }
+      ]
+    },
+    {
+      "frameKey": "ask:r1-close",
+      "providerMessageKey": "driver-fixture:msg-1",
+      "delayMs": 0,
+      "facts": [
+        { "type": "segment_end", "segmentId": "ask-r1" },
+        { "type": "turn_end", "status": "completed" }
+      ]
+    },
+
+    {
+      "frameKey": "ask:r2-open",
+      "providerMessageKey": "driver-fixture:msg-2",
+      "delayMs": 0,
+      "facts": [{ "type": "segment_start", "segmentId": "ask-r2" }]
+    },
+    {
+      "frameKey": "ask:r2-delta-1",
+      "providerMessageKey": "driver-fixture:msg-2",
+      "facts": [
+        {
+          "type": "prose_delta",
+          "segmentId": "ask-r2",
+          "delta": "Understood. I will keep the opening where chapter one already stands, "
+        }
+      ]
+    },
+    {
+      "frameKey": "ask:r2-delta-2",
+      "providerMessageKey": "driver-fixture:msg-2",
+      "facts": [
+        {
+          "type": "prose_delta",
+          "segmentId": "ask-r2",
+          "delta": "and cut the throat-clearing rather than move the camera."
+        }
+      ]
+    },
+    {
+      "frameKey": "ask:r2-close",
+      "providerMessageKey": "driver-fixture:msg-2",
+      "facts": [
+        { "type": "segment_end", "segmentId": "ask-r2" },
+        { "type": "turn_end", "status": "completed" }
+      ]
+    }
+  ]
+}

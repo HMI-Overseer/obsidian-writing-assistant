@@ -169,18 +169,25 @@
   );
 }
 
-/* A step that touched the vault fills its marker instead of outlining it.
-   The distinction is form, not hue, deliberately: it used to be `--text-accent`
-   against `--interactive-accent`, which Obsidian derives from one accent colour a
-   single lightness step apart *and swaps between light and dark*. So the signal
-   was all but invisible in ask posture, where each mutation is a decision, and it
-   pointed the opposite way in one of the two themes. A solid dot survives every
-   posture, both themes, and any accent the user picks. */
+/* A step that touched the vault carries the accent at full strength in its ring,
+   where a read-only step's ring is mixed halfway into the border colour. Weight, not
+   hue: this used to be `--text-accent` against `--interactive-accent`, which Obsidian
+   derives from one accent colour a single lightness step apart *and swaps between
+   light and dark*, so the signal was all but invisible in ask posture and pointed the
+   opposite way in one of the two themes. A ring weight survives every posture, both
+   themes, and any accent the user picks, and unlike a solid fill it stays in the same
+   visual language as the status tints (applied, failed, declined), which every
+   reviewed step wears and which would otherwise be the only outlined dots on the
+   timeline. */
 .lmsa-assistant-turn-item.is-mutating
   > .lmsa-assistant-turn-marker {
-  color: var(--background-primary);
+  color: var(--lmsa-mode-accent);
   border-color: var(--lmsa-mode-accent);
-  background: var(--lmsa-mode-accent);
+  background: color-mix(
+    in srgb,
+    var(--lmsa-mode-accent) 8%,
+    var(--background-primary)
+  );
 }
 
 /* Red throughout, background included. Without the fill this only recoloured the
@@ -282,11 +289,19 @@
   min-width: 0;
 }
 
+/* The host is the step row's own flex child, so it is what has to be placed. An
+   icon-only button carries no text baseline, so the row's `align-items: baseline`
+   seats it on its bottom edge, which hoists the whole row and drags the marker (pinned
+   to a fixed centre) out of line with the text. Give the host exactly one line box and
+   centre in it: controls then sit on the step's text, not on the taller `min-height`
+   row, which is what centring on the row itself would do. */
 .lmsa-assistant-turn-item--tool_call
   > .lmsa-agentic-timeline-step-body
   > .lmsa-assistant-turn-action-host {
   display: inline-flex;
-  align-items: baseline;
+  align-items: center;
+  align-self: flex-start;
+  height: 1.5em;
   flex: 0 0 auto;
 }
 
@@ -402,6 +417,16 @@
   display: none;
 }
 
+/* Inline on a tool step the summary *is* the control row, sharing the line with the
+   step's name and path, so it takes no leading padding. The padding above is for the
+   stacked placement notices, which are their own block under the step. */
+.lmsa-assistant-turn-item--tool_call
+  > .lmsa-agentic-timeline-step-body
+  > .lmsa-assistant-turn-action-host
+  > .lmsa-assistant-turn-action-summary {
+  padding-top: 0;
+}
+
 /* ── Ask transcript: the questions and the answers given ──────────
    Its own full-width row under the step, the same slot the write preview and
    the edit diff take, so a question reads as part of the conversation instead
@@ -459,9 +484,8 @@
 .lmsa-assistant-turn-action-controls {
   display: flex;
   flex-wrap: wrap;
-  align-items: baseline;
-  gap: 0.35rem;
-  margin-top: 0.35rem;
+  align-items: center;
+  gap: 0.25rem;
 }
 
 .lmsa-assistant-turn-action-target-label {
@@ -469,25 +493,49 @@
   font-size: var(--font-ui-small);
 }
 
-.lmsa-assistant-turn-action-control {
-  min-height: 28px;
-  padding: 0.2rem 0.65rem;
-  border: 1px solid var(--background-modifier-border);
-  border-radius: 6px;
-  background: var(--interactive-normal);
+/* Transparent icon affordances in the bubble action bar's language (copy / edit /
+   regenerate): no border, no fill, just a hover wash. Obsidian's base button chrome
+   is reset here, and the two-class descendant selector is what out-specifies it, a
+   lone `.lmsa-assistant-turn-action-control` loses to `app.css`. */
+.lmsa-assistant-turn-action-controls .lmsa-assistant-turn-action-control {
+  @apply lmsa:inline-flex lmsa:h-6 lmsa:w-6 lmsa:cursor-pointer lmsa:items-center lmsa:justify-center lmsa:rounded-md lmsa:border-none lmsa:bg-transparent lmsa:p-0;
+  box-shadow: none;
+  outline: none;
+  appearance: none;
+  min-height: unset;
+  font: inherit;
+  line-height: 1;
+  color: var(--text-muted);
+  transition: background 120ms ease, color 120ms ease;
+}
+
+.lmsa-assistant-turn-action-controls
+  .lmsa-assistant-turn-action-control:hover {
+  background: var(--background-modifier-hover);
   color: var(--text-normal);
   box-shadow: none;
 }
 
-.lmsa-assistant-turn-action-control:hover {
-  background: var(--interactive-hover);
+.lmsa-assistant-turn-action-controls
+  .lmsa-assistant-turn-action-control:focus-visible {
+  box-shadow: 0 0 0 2px var(--lmsa-mode-accent);
 }
 
-.lmsa-assistant-turn-action-control:is(.is-approve, .is-apply) {
-  border-color: var(--lmsa-mode-accent);
+.lmsa-assistant-turn-action-controls
+  .lmsa-assistant-turn-action-control svg {
+  width: 14px;
+  height: 14px;
 }
 
-.lmsa-assistant-turn-action-control.is-decline {
+/* Intent on hover only, so the resting row stays one quiet colour: the accent for the
+   two that go ahead, red for the one that does not. Mirrors the edit channel's buttons. */
+.lmsa-assistant-turn-action-controls
+  .lmsa-assistant-turn-action-control:is(.is-approve, .is-apply):hover {
+  color: var(--lmsa-mode-accent);
+}
+
+.lmsa-assistant-turn-action-controls
+  .lmsa-assistant-turn-action-control.is-decline:hover {
   color: var(--text-error);
 }
 

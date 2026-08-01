@@ -885,12 +885,12 @@ class ActionLedgerSummaryView implements AssistantActionView {
         const label = actionControlLabel(control);
         const buttonEl = controlsEl.createEl("button", {
           cls: `lmsa-assistant-turn-action-control is-${control}`,
-          text: label,
           attr: {
             type: "button",
             "aria-label": `${label} ${target.label}`,
           },
         });
+        setIcon(buttonEl, ACTION_CONTROL_ICONS[control]);
         buttonEl.addEventListener("click", () => {
           this.onControl(entry, target.targetId, control);
         });
@@ -926,6 +926,22 @@ export function actionTargetLabels(
   }
 }
 
+/**
+ * Glyph per review control. These are quiet icon affordances, not buttons, so the
+ * word lives in the `aria-label` and the icon carries the row. Same vocabulary the
+ * edit channel already uses for the identical decisions
+ * ({@link ./editReviewTimeline.EditReviewTimelineView}), so one action reads the same
+ * whichever renderer owns it. `play` is Apply, which runs an approved target whose
+ * effect has not happened yet.
+ */
+const ACTION_CONTROL_ICONS: Record<ActionReviewControl, string> = {
+  approve: "check",
+  decline: "x",
+  apply: "play",
+  undo: "undo-2",
+};
+
+/** The word behind each glyph, for the button's accessible name. */
 function actionControlLabel(control: ActionReviewControl): string {
   switch (control) {
     case "approve":

@@ -277,8 +277,16 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
     // live loopback server), so it is released on this path too.
     await claudeGeneration?.release();
     setActiveAbortController(null);
-    await store.persistActiveConversation();
-    setIsGenerating(false);
+    // Same shape as the `finally` below, with one difference: this path is already throwing
+    // something worth reading, so a failed write here is swallowed rather than allowed to replace
+    // the error that caused it.
+    try {
+      await store.persistActiveConversation();
+    } catch (persistError) {
+      console.error("[chat] The failed turn's state could not be persisted.", persistError);
+    } finally {
+      setIsGenerating(false);
+    }
     throw error;
   }
 
@@ -297,7 +305,15 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
     apiMessages.anthropicCacheSettings = activeProfile.anthropicCacheSettings;
   }
 
-  await store.persistActiveConversation();
+  // The write-ahead persist, before a single token is asked for. It still refuses the turn when it
+  // cannot make the audit durable, and it no longer leaves the composer generating while it does:
+  // nothing above this line is inside a `finally` that would have cleared the flag.
+  try {
+    await store.persistActiveConversation();
+  } catch (error) {
+    setIsGenerating(false);
+    throw error;
+  }
 
   const contextWindow = plugin.services.modelAvailability.resolveContextWindow(activeModel);
   if (contextWindow) {
@@ -787,8 +803,16 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
     // user will never see would otherwise never return.
     await claudeGeneration?.release();
     setActiveAbortController(null);
-    await store.persistActiveConversation();
-    setIsGenerating(false);
+    // The retry still rethrows, because a terminal write that did not land is the caller's to
+    // know about and the audit is deliberately left on hand for it (ADR-0033). What must not
+    // depend on it is the flag below: it sat after this await, so a failed write skipped it and
+    // left the composer a stop button on a turn that had finished, until Obsidian was reloaded.
+    // Reached in ordinary use, by the composer's debounced draft save colliding with this write.
+    try {
+      await store.persistActiveConversation();
+    } finally {
+      setIsGenerating(false);
+    }
   }
 }
 

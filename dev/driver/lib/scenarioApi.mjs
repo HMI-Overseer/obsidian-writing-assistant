@@ -100,10 +100,32 @@ function message(error) {
 }
 
 /**
+ * Says what the driver is waiting on, once a wait has lasted long enough to look like a hang.
+ *
+ * Nothing here waits, and nothing here decides anything: the first line is painted a second in, so
+ * a step that takes 40ms prints nothing at all and a step that has stopped arriving names itself
+ * and counts. The complaint this answers is a real one from 2026-07-31: a click at a selector that
+ * does not exist spends fifteen seconds in silence, and silence from an instrument is
+ * indistinguishable from a wedged terminal.
+ */
+function reporting(onProgress, text) {
+  if (!onProgress) return () => {};
+  const started = Date.now();
+  const timer = setInterval(() => {
+    onProgress(`${text}  ${Math.round((Date.now() - started) / 1000)}s`);
+  }, 1000);
+  return () => {
+    clearInterval(timer);
+    onProgress(null);
+  };
+}
+
+/**
  * @param onBreakpoint pause mode's hook. `shot()` doubles as the breakpoint because the places a
  *   scenario already declares worth looking at are exactly the places worth stopping at.
+ * @param onProgress optional, and given a line of text or null. @see reporting.
  */
-export function createScenarioApi({ page, record, onBreakpoint }) {
+export function createScenarioApi({ page, record, onBreakpoint, onProgress = null }) {
   let index = 0;
 
   // The state before the last action, which is what the next checkpoint compares against.
@@ -123,6 +145,7 @@ export function createScenarioApi({ page, record, onBreakpoint }) {
   /** Records the attempt either way, then lets a failure stop the run. */
   const step = async (kind, label, act) => {
     baseline = await readBaseline(page);
+    const settled = reporting(onProgress, `${kind} ${label}`);
     try {
       const value = await act();
       record.action(kind, label, true);
@@ -130,10 +153,19 @@ export function createScenarioApi({ page, record, onBreakpoint }) {
     } catch (error) {
       record.action(kind, label, false, message(error));
       throw new Error(`Scenario step ${kind} "${label}" failed: ${message(error)}`);
+    } finally {
+      settled();
     }
   };
 
-  const shot = async (label, { selector, breakpoint = true } = {}) => {
+  /**
+   * @param perishable what this moment holds that a handover would destroy, in words, or absent.
+   *   Only the scenario knows: `abort-mid-turn` needs the turn *still streaming* one line later,
+   *   and a turn keeps streaming while the app is handed over, so a breakpoint here is a breakpoint
+   *   that guarantees the step after it fails. A review parked at an approval gate is the opposite
+   *   and is not declared: it waits for a person, which is exactly what a handover is.
+   */
+  const shot = async (label, { selector, breakpoint = true, perishable = null } = {}) => {
     index += 1;
     const name = `${String(index).padStart(2, "0")}-${slug(label)}`;
     const target = selector ? await page.$(selector) : page;
@@ -147,8 +179,10 @@ export function createScenarioApi({ page, record, onBreakpoint }) {
     // the point here is what was true at this moment.
     const { messages: _transcript, ...readout } = state;
     record.shot(label, `shots/${name}.png`, `state/${name}.json`, readout);
-    // A shot taken from the handover console must not re-enter the handover console.
-    if (breakpoint && onBreakpoint) await onBreakpoint(label);
+    // A shot taken from the handover console must not re-enter the handover console. The shot
+    // itself is taken either way: what a perishable moment costs is the chance to sit in it, not
+    // the evidence of it.
+    if (breakpoint && onBreakpoint) await onBreakpoint(label, { perishable });
   };
 
   const api = {
@@ -204,12 +238,15 @@ export function createScenarioApi({ page, record, onBreakpoint }) {
      */
     async awaitCheckpoint(name, timeoutMs = CHECKPOINT_TIMEOUT_MS) {
       const started = Date.now();
+      const settled = reporting(onProgress, `waiting for checkpoint "${name}"`);
       try {
         await awaitBridgeCheckpoint(page, name, timeoutMs, baseline);
         record.checkpoint(name, true, { ms: Date.now() - started });
       } catch (error) {
         record.checkpoint(name, false, { ms: Date.now() - started, detail: message(error) });
         throw new Error(`Checkpoint "${name}" never arrived. ${message(error)}`);
+      } finally {
+        settled();
       }
     },
   };

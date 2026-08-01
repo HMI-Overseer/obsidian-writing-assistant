@@ -16,6 +16,8 @@ const CONVERSATIONS_DIR = "conversations";
  */
 export class ConversationStorage {
   private dirCreated = false;
+  /** The save in flight for each conversation id, so the next one queues behind it. */
+  private readonly saving = new Map<string, Promise<void>>();
 
   constructor(
     private readonly app: App,
@@ -52,7 +54,35 @@ export class ConversationStorage {
     return null;
   }
 
+  /**
+   * Persists one conversation, never overlapping another save of the same one.
+   *
+   * The write-then-swap below is atomic against a crash and was not atomic against a second
+   * caller: there is one temp path per conversation, so two overlapping saves shared it and one of
+   * them lost, either renaming onto a destination the winner had already created or finding its own
+   * temp already consumed. Serialising per id is the whole fix, and per id rather than globally
+   * because two different conversations share nothing.
+   *
+   * Callers overlap in ordinary use, which is what makes this load-bearing rather than defensive:
+   * the composer's debounced draft save can land in the middle of the turn's own final persist.
+   */
   async save(conversation: Conversation): Promise<void> {
+    const id = conversation.id;
+    const queued = (this.saving.get(id) ?? Promise.resolve()).then(() => this.write(conversation));
+    // What the *next* save chains onto never rejects, so one failed write cannot poison the queue
+    // behind it, and an unawaited link is never an unhandled rejection. The caller still sees its
+    // own failure, from `queued`, which is what it awaits.
+    const link = queued.catch(() => {});
+    this.saving.set(id, link);
+    try {
+      await queued;
+    } finally {
+      // Only when nothing queued behind it, or the save that did would be dropped from the chain.
+      if (this.saving.get(id) === link) this.saving.delete(id);
+    }
+  }
+
+  private async write(conversation: Conversation): Promise<void> {
     await this.ensureDir();
     const path = this.filePath(conversation.id);
     const tmpPath = this.tmpPath(conversation.id);

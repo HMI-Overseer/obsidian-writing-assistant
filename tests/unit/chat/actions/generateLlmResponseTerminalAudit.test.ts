@@ -348,9 +348,12 @@ function harness() {
     destroy: vi.fn(),
   } as unknown as ComposerInteractionHostPort;
 
+  const setIsGenerating = vi.fn();
+
   return {
     store,
     plugin,
+    setIsGenerating,
     onDisk: () => {
       const raw = files.get("conversation-1");
       return raw ? normalizeConversation(JSON.parse(raw)) : null;
@@ -373,7 +376,7 @@ function harness() {
         interactionHost,
         posture: "ask",
         finalization: { kind: "append" },
-        setIsGenerating: vi.fn(),
+        setIsGenerating,
         setActiveAbortController: vi.fn(),
       }),
   };
@@ -499,6 +502,22 @@ describe("terminal transaction", () => {
     // The provider is stopped and the evidence is still on hand, which is what
     // one bounded retry needs (section 9.4).
     expect(h.store.getGenerationAudit()?.intents).toHaveLength(1);
+  });
+
+  it("clears the generating flag even when that terminal persist fails", async () => {
+    // The failure above rethrows on purpose, and the line that cleared the flag sat after it in the
+    // same block, so it was skipped: the turn ended, nothing caught the rejection, and the composer
+    // stayed a stop button until Obsidian was reloaded. The driver reached this by ordinary means,
+    // with the composer's debounced draft save colliding with this very write.
+    const h = harness();
+    await h.store.restorePersistedState();
+    h.failSaveWhen((conversation) =>
+      conversation.messages.some((message) => message.role === "assistant"),
+    );
+
+    await expect(h.run([{ toolCall: true }, {}])).rejects.toThrow("disk full");
+
+    expect(h.setIsGenerating).toHaveBeenCalledWith(false);
   });
 
   it("persists a failed turn whose ledger records an applied action", async () => {

@@ -168,3 +168,84 @@ describe("ConversationStorage", () => {
     expect(files.has(TMP)).toBe(false);
   });
 });
+
+/**
+ * Two saves of one conversation at the same time (RFC-0013 finding 8).
+ *
+ * `save()` is write-tmp-then-swap with one tmp path per conversation, and nothing serialised the
+ * callers, so two overlapping saves of the same id shared that tmp file. The driver reproduced both
+ * halves of the race on the release build: the loser renames onto a destination the winner has
+ * already created (`Destination file already exists!`), or finds its own tmp already consumed
+ * (`ENOENT: rename '<id>.json.tmp'`).
+ *
+ * That is not academic. The turn's final persist runs in `generateLlmResponse`'s `finally`, and
+ * when it lost this race the rejection skipped `setIsGenerating(false)` and left the composer stuck
+ * as a stop button until Obsidian was reloaded.
+ *
+ * Red-green: every case here was observed failing against the unserialised version.
+ */
+describe("two saves of the same conversation at once", () => {
+  it("neither one fails, whichever order they are started in", async () => {
+    const { storage } = makeStorage();
+    const results = await Promise.allSettled([
+      storage.save(makeConversation({ title: "first" })),
+      storage.save(makeConversation({ title: "second" })),
+    ]);
+    expect(results.map((result) => result.status)).toStrictEqual(["fulfilled", "fulfilled"]);
+  });
+
+  it("leaves the live file whole and the temp file gone", async () => {
+    const { storage, files } = makeStorage();
+    await Promise.all([
+      storage.save(makeConversation({ title: "first" })),
+      storage.save(makeConversation({ title: "second" })),
+    ]);
+    expect(files.has(TMP)).toBe(false);
+    expect(JSON.parse(files.get(MAIN) as string).title).toBe("second");
+  });
+
+  it("runs them one after another rather than interleaving their writes", async () => {
+    // The interleaving is the defect itself: write, write, rename, rename cannot work when both
+    // writes went to the same temp path.
+    const { storage, adapter } = makeStorage();
+    const order: string[] = [];
+    adapter.write.mockImplementation(async (p: string) => {
+      order.push(`write ${p}`);
+      await Promise.resolve();
+    });
+    adapter.rename.mockImplementation(async (from: string, to: string) => {
+      order.push(`rename ${from} -> ${to}`);
+    });
+    await Promise.all([
+      storage.save(makeConversation({ title: "first" })),
+      storage.save(makeConversation({ title: "second" })),
+    ]);
+    expect(order).toStrictEqual([
+      `write ${TMP}`,
+      `rename ${TMP} -> ${MAIN}`,
+      `write ${TMP}`,
+      `rename ${TMP} -> ${MAIN}`,
+    ]);
+  });
+
+  it("a failed save does not take the next one down with it", async () => {
+    // The queue must not be poisoned: one bad write would otherwise reject every later save of that
+    // conversation, which is the same wedge one layer down.
+    const { storage, adapter } = makeStorage();
+    adapter.write.mockRejectedValueOnce(new Error("disk full"));
+    const first = storage.save(makeConversation({ title: "first" }));
+    const second = storage.save(makeConversation({ title: "second" }));
+    await expect(first).rejects.toThrow(/disk full/);
+    await expect(second).resolves.toBeUndefined();
+  });
+
+  it("still serialises saves of different conversations independently", async () => {
+    const { storage, files } = makeStorage();
+    await Promise.all([
+      storage.save(makeConversation({ id: "c1", title: "one" })),
+      storage.save(makeConversation({ id: "c2", title: "two" })),
+    ]);
+    expect(JSON.parse(files.get(`${DIR}/c1.json`) as string).title).toBe("one");
+    expect(JSON.parse(files.get(`${DIR}/c2.json`) as string).title).toBe("two");
+  });
+});

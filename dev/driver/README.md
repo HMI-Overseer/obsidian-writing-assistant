@@ -22,41 +22,53 @@ real provider, including RFC-0011's live Obsidian walk. See
 ## Usage
 
 ```
-npm run drive                # ask what to do, in numbered lists
+npm run drive                # ask what to do
 npm run drive -- --last      # repeat the previous run's choices
 npm run drive -- --no-build  # reuse the artifacts already on disk
 ```
 
-Everything is a numbered list, starting with what to do:
+Every question is a list you move through with the **arrow keys** (or `wasd`, or `jk`) and confirm
+with **enter**. Entries are still numbered and a number still jumps to one: type `1`, or `1` then
+`1` for entry 11, and the highlight moves as you type so what a number means is visible before enter
+commits it. The list is replaced by the answer once it is chosen, so a session's scrollback is what
+was picked rather than every menu it was picked from.
+
+**Ctrl-C** ends a run. At a question it unwinds: the app closes and the run directory is finished
+like any other ending. Away from one it stops the app before it stops the driver, because the app is
+launched detached and would otherwise outlive it. Anything else typed while the driver is not asking
+is discarded at the moment it arrives, never held to answer the next question with.
+
+If stdin is not a terminal (a pipe, a CI job), the same lists are printed numbered and read a line
+at a time. Nothing else changes.
+
+The first question is what to do:
 
 ```
-  how do you want to drive
-    1) sandbox                      seed a disposable vault, launch it, hand it over. no scenario.
-    2) walk                         run a scenario, write a run directory, close.
-    3) walk, then take over         run a scenario, then hand the app over instead of exiting.
-    4) walk, pausing at every shot  each shot is a breakpoint.
-    5) clean                        remove scratch vaults and run directories left by earlier runs.
-
   scenario
+  arrows or wasd to move, a number to jump, enter to choose
 
     everything at once
-     1) sweep the simulated scenarios  11 runs in series, one directory each, no tokens spent
+  >  1) sweep the scenarios               9 runs in series, one directory each, no tokens spent
+     2) sweep the instrument's own alarms 2 runs that must fail. run this after changing the driver.
 
     simulated, authored frames. free, repeatable, and where most defects turn up
-     2) abort-mid-turn                 Stop a streaming turn from the composer, and read what it settled as.
-     3) approval-approve               A write_file stopped at the ask gate, approved in the composer drawer.
+     3) abort-mid-turn                 Stop a streaming turn from the composer, and read what it settled as.
+     4) approval-approve               A write_file stopped at the ask gate, approved in the composer drawer.
      ...
-    10) regenerate-settled-turn        Settle a turn, then regenerate it from the bubble's own action toolbar.
+    11) regenerate-settled-turn        Settle a turn, then regenerate it from the bubble's own action toolbar.
 
     live, a real provider. real tokens or a real local model, and not repeatable
-    11) live-orphan-recovery           Approve a write, kill the renderer under it, and read what recovery left.
-    12) live-rfc0011-walk              RFC-0011's live Obsidian walk: search, write, approve, stop, re-send.
-    13) live-tool-turn                 A real model, asked to read a note and answer from it. The matrix scenario.
+    12) live-orphan-recovery           Approve a write, kill the renderer under it, and read what recovery left.
+    13) live-rfc0011-walk              RFC-0011's live Obsidian walk: search, write, approve, stop, re-send.
+    14) live-tool-turn                 A real model, asked to read a note and answer from it. The matrix scenario.
 
-    the instrument's own alarms. these are meant to fail, and a sweep includes them
-    14) _selftest-missed-click         Clicks a selector that does not exist. Must fail visibly.
-    15) _selftest-missing-checkpoint   Waits for a turn it never starts. Must fail visibly.
+    the instrument's own alarms. these are meant to fail, and have a sweep of their own
+    15) _selftest-missed-click         Clicks a selector that does not exist. Must fail visibly.
+    16) _selftest-missing-checkpoint   Waits for a turn it never starts. Must fail visibly.
 ```
+
+A list taller than the window scrolls with the highlight, and says how many entries are hidden above
+and below it rather than quietly showing the first ten.
 
 What a choice costs is a **group**, not a word inside a description. Simulated first, because that
 is where most defects turn up and none of it spends anything; live second; the instrument's own
@@ -64,9 +76,10 @@ alarms last, so nothing that is meant to fail sits at entry 1 where somebody pic
 
 ### Sweeping them all
 
-The first entry runs every simulated scenario in series, one seeded vault and one launch each, and
-writes a sheet above them. It is the answer to "I want to look at everything and see what broke",
-and it is an entry in the list rather than a flag for the same reason the matrix is:
+The first entry runs every scenario that is meant to complete, in series, one seeded vault and one
+launch each, and writes a sheet above them. It is the answer to "I want to look at everything and
+see what broke", and it is an entry in the list rather than a flag for the same reason the matrix
+is:
 
 ```
 dev/driver/out/<timestamp>-sweep-simulated/index.html
@@ -79,12 +92,18 @@ directory.
 A failing scenario does **not** stop the sweep. Stopping would hide every scenario after the first
 defect, which is the opposite of what a sweep is for.
 
-**The self-tests are in it, with their expectation inverted.** A sweep is what gets run after a
-refactor, which is exactly when "does this instrument still notice a missed click" needs answering,
-so leaving them out would buy a green sheet by declining to ask. A scenario declaring `mustFail`
-reads as `failed as designed`; one that *completes* reads as `passed, so the instrument has stopped
-noticing`, in the same red as any other gap. The sweep's exit code counts only the scenarios that
-did not do what they said they would.
+**The self-tests are a sweep of their own**, and the second entry is it. They are meant to fail, so
+a sweep run to look for defects in the *application* should not spend two of its launches, and two
+of its breakpoints under pause mode, on runs whose failure means nothing is wrong. They keep an
+entry because the question they ask ("does this still notice a missed click") is worth asking after
+any change to the driver, and a check nobody can find in a list is a check nobody runs. What the
+scenario sweep therefore no longer covers is printed on its own sheet rather than left to be
+assumed.
+
+Either way the expectation is inverted rather than skipped: a scenario declaring `mustFail` reads as
+`failed as designed`, and one that *completes* reads as `passed, so the instrument has stopped
+noticing`, in the same red as any other gap. A sweep's exit code counts only the scenarios that did
+not do what they said they would.
 
 Live scenarios are not swept: each needs a model chosen and spends real tokens, so they are run one
 at a time. A model sweep is what the matrix is for.
@@ -126,6 +145,31 @@ keep working. The vault is throwaway: write to it, break it, delete notes in it.
 
 Pause mode turns every `shot()` in a scenario into a breakpoint, which is how you take over from a
 state a scenario built rather than one you had to reach by hand. Takeover does the same at the end.
+Inside a sweep the header says which scenario of how many you are stopped in, and `close` there
+finishes that run and goes on to the next rather than ending everything.
+
+**One kind of moment is not a breakpoint**, and a scenario declares it:
+
+```js
+await app.shot("streaming, with the send button showing stop", {
+  perishable: "a turn that is still streaming, which the stop below needs",
+});
+```
+
+A handover does not pause the application. A turn that is streaming when the console opens has
+settled by the time anyone continues, so a breakpoint there guarantees the step after it fails, for
+a reason belonging to the instrument rather than to the app. Pause mode declines to stop, names what
+the moment held, and takes the shot anyway: what perishes is the chance to sit in the state, not the
+evidence of it. Sandbox mode is where you sit in one.
+
+A review parked at an approval gate is the opposite and is deliberately not declared. It waits for a
+person, which is exactly what a handover is.
+
+While a walk is running, one line at the bottom says what it is waiting on and for how long, and
+takes itself back when the wait is over. It appears a second in, so a step that takes 40ms prints
+nothing and a step that has stopped arriving names itself. A click at a selector that does not exist
+waits 15 seconds and a checkpoint that never comes waits five minutes; both used to be silent, and
+silence from an instrument is indistinguishable from a wedged terminal.
 
 `npm run drive` builds the **release** bundle, because there is no special build any more, so a run
 leaves a production artifact in place rather than a development one.
@@ -228,14 +272,15 @@ and left alone. Every run ends by saying how much is sitting there.
 | Piece | What it is |
 |---|---|
 | `run.mjs` | build, seed, launch, attach, then walk or hand over |
-| `lib/picker.mjs` | the numbered lists, and `--last` |
+| `lib/picker.mjs` | who owns stdin, the status line, Ctrl-C, and `--last` |
+| `lib/menu.mjs` | the menu itself: keys in, lines out, and nothing else |
 | `lib/handoff.mjs` | hand the app over and wait for the terminal |
 | `lib/clean.mjs` | what has accumulated, and the mode that removes it |
 | `lib/seed.mjs` | the launch and seeding recipe, in RFC-0013's own order |
 | `lib/liveSettings.mjs` | what a live run boots on, out of the installed plugin's own settings |
 | `lib/models.mjs` | the model question, the reachability preflight, and selecting one by hand |
 | `lib/bridge.mjs` | `window.__lmsaDriver`, injected: the shape assertion, and the checkpoint engine |
-| `lib/scenario.mjs` | the scenario shape, validated before anything launches |
+| `lib/scenario.mjs` | the scenario shape validated before anything launches, and how the list reads |
 | `lib/scenarioApi.mjs` | what a scenario is handed: real input out, structured state back |
 | `lib/runDirectory.mjs` | the step ledger, written as the run proceeds |
 | `lib/sheet.mjs` | the review sheet and the index over runs |

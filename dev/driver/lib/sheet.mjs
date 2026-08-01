@@ -636,6 +636,11 @@ export function renderSuiteSheet(suite) {
         suite.complete
           ? ""
           : `<br><span class="verdict is-gap">The sweep itself did not finish.</span>`
+      }
+      ${
+        // What a sweep chose not to run, on the sheet that would otherwise read as covering
+        // everything. A bounded scope stated is a scope; a bounded scope unstated is a claim.
+        suite.omitted ? `<br><span class="note">${escapeHtml(suite.omitted)}</span>` : ""
       }`,
     css: `${CSS}
     .grid { grid-template-columns: repeat(${columns}, minmax(0, 1fr)); }`,

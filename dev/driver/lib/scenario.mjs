@@ -193,6 +193,95 @@ export async function loadScenario(id) {
   return validateScenario(module.default, id);
 }
 
+/** Every scenario on disk, loaded and validated, so a typo in one fails before a launch. */
+export async function loadScenarios() {
+  const scenarios = [];
+  for (const id of listScenarioIds()) scenarios.push(await loadScenario(id));
+  return scenarios;
+}
+
+/**
+ * The scenario list, grouped by what choosing one costs you.
+ *
+ * Simulated first, because that is where most defects are found and none of it spends anything.
+ * Live second, marked as a group rather than by a prefix inside a description: "this one costs real
+ * tokens" is not something a reader should have to notice in prose. The instrument's own alarms
+ * last, because they are meant to fail and should not be entries 1 and 2 that somebody picks by
+ * accident.
+ *
+ * The sweep is an entry in this list rather than a flag, for the same reason the matrix is an entry
+ * in the model list: a mode that only exists as a flag is a mode nobody finds.
+ */
+export async function scenarioMenu(scenarios = null) {
+  const all = scenarios ?? (await loadScenarios());
+  const simulated = all.filter((one) => one.provider.kind !== "live" && !one.mustFail);
+  const live = all.filter((one) => one.provider.kind === "live");
+  const alarms = all.filter((one) => one.mustFail);
+  const entry = (scenario, group) => ({
+    label: scenario.id,
+    detail: scenario.description,
+    group,
+    value: { scenario: scenario.id, suite: null },
+  });
+
+  return [
+    {
+      group: "everything at once",
+      label: "sweep the scenarios",
+      detail: `${simulated.length} runs in series, one directory each, no tokens spent`,
+      value: { scenario: null, suite: "simulated" },
+    },
+    {
+      group: "everything at once",
+      label: "sweep the instrument's own alarms",
+      detail: `${alarms.length} runs that must fail. run this after changing the driver.`,
+      value: { scenario: null, suite: "alarms" },
+    },
+    ...simulated.map((one) =>
+      entry(one, "simulated, authored frames. free, repeatable, and where most defects turn up"),
+    ),
+    ...live.map((one) =>
+      entry(one, "live, a real provider. real tokens or a real local model, and not repeatable"),
+    ),
+    ...alarms.map((one) =>
+      entry(one, "the instrument's own alarms. these are meant to fail, and a sweep includes them"),
+    ),
+  ];
+}
+
+/**
+ * Which scenarios a named sweep covers.
+ *
+ * Two sweeps, not one, and the split is the maintainer's: the instrument's own alarms are meant to
+ * fail, and a sweep run to look for defects in the *application* should not spend two of its eleven
+ * launches, and two of its breakpoints under pause mode, on runs whose failure means nothing is
+ * wrong. They keep their own entry rather than being deleted, because the question they ask ("does
+ * this still notice a missed click") is worth asking after any change to the driver, and a check
+ * nobody can find in a list is a check nobody runs.
+ *
+ * What that trades away is stated rather than hidden: a scenario sweep no longer re-checks the
+ * instrument, so its sheet says so and names the sweep that does.
+ */
+const SUITES = {
+  simulated: (one) => one.provider.kind !== "live" && !one.mustFail,
+  alarms: (one) => one.provider.kind !== "live" && one.mustFail,
+};
+
+export async function suiteScenarios(suite, scenarios = null) {
+  const covers = SUITES[suite];
+  if (!covers) throw new Error(`There is no "${suite}" sweep.`);
+  const covered = (scenarios ?? (await loadScenarios())).filter(covers);
+  if (covered.length === 0) throw new Error(`The "${suite}" sweep covers no scenarios.`);
+  return covered;
+}
+
+/** What a sweep deliberately did not run, for the sheet to say out loud. */
+export function suiteOmission(suite) {
+  return suite === "simulated"
+    ? "the instrument's own alarms were not run. \"sweep the instrument's own alarms\" runs those."
+    : null;
+}
+
 /**
  * A scenario's settings over the fixture's committed baseline.
  *

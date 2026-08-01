@@ -11,6 +11,12 @@
 // lands. If it ever is not, the stop affordance is not on screen and the click fails loudly
 // naming the selector, which is the correct failure rather than a screenshot of a settled turn
 // captioned "streaming".
+//
+// That last sentence has one exception, and the shot below declares it. Pause mode turns every shot
+// into a breakpoint, and a handover does not pause the application: the turn keeps streaming while
+// somebody reads the console, so it has settled by the time they continue and the stop below then
+// fails for a reason that is the instrument's, not the app's. Declaring what the moment holds is
+// what lets pause mode decline to stop here and say why.
 
 import { CHAT_ROOT, COMPOSER_STOP } from "../lib/scenarioApi.mjs";
 
@@ -25,7 +31,9 @@ export default {
     await app.send("Rewrite the opening of chapter one at length.");
 
     await app.awaitCheckpoint("turn-started");
-    await app.shot("streaming, with the send button showing stop");
+    await app.shot("streaming, with the send button showing stop", {
+      perishable: "a turn that is still streaming, which the stop below needs",
+    });
 
     await app.click(COMPOSER_STOP);
     await app.awaitCheckpoint("turn-settled");

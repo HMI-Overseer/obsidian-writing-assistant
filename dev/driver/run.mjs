@@ -37,11 +37,12 @@ import {
   runClean,
   scratchSummary,
 } from "./lib/clean.mjs";
-import { handOver } from "./lib/handoff.mjs";
+import { handOver, perishableNotice } from "./lib/handoff.mjs";
 import { INSTALLED_SETTINGS_PATH, readLiveProviderSettings } from "./lib/liveSettings.mjs";
 import { askLiveModel, preflight, reachability, selectModelInUi } from "./lib/models.mjs";
 import {
   createTerminal,
+  isTerminalClosed,
   readLastChoices,
   repeatableChoices,
   writeLastChoices,
@@ -56,9 +57,11 @@ import {
   frameDescription,
   listFixtureIds,
   listFrameIds,
-  listScenarioIds,
   loadScenario,
   mergeSettings,
+  scenarioMenu,
+  suiteOmission,
+  suiteScenarios,
 } from "./lib/scenario.mjs";
 import { createScenarioApi } from "./lib/scenarioApi.mjs";
 import { suiteVerdict } from "./lib/sheet.mjs";
@@ -151,7 +154,7 @@ async function askChoices(terminal) {
     };
   }
 
-  const chosen = await terminal.choose("scenario", await scenarioOptions());
+  const chosen = await terminal.choose("scenario", await scenarioMenu());
   if (chosen.suite) {
     return {
       mode,
@@ -177,71 +180,6 @@ async function askChoices(terminal) {
     // a launch rather than here. See `resolveLive`, and RFC-0013's unresolved question 6.
     live: null,
   };
-}
-
-/**
- * The scenario list, grouped by what choosing one costs you.
- *
- * Simulated first, because that is where most defects are found and none of it spends anything.
- * Live second, marked as a group rather than by a prefix inside a description, because "this one
- * costs real tokens" is the kind of thing a reader should not have to notice in prose. The
- * instrument's own alarms last, because they are meant to fail and should not be entries 1 and 2
- * that somebody picks by accident.
- *
- * The sweep is an entry in this list rather than a flag, for the same reason the matrix is an
- * entry in the model list: a mode that only exists as a flag is a mode nobody finds.
- */
-async function scenarioOptions() {
-  const scenarios = [];
-  for (const id of listScenarioIds()) scenarios.push(await loadScenario(id));
-
-  const simulated = scenarios.filter((s) => s.provider.kind !== "live" && !s.mustFail);
-  const live = scenarios.filter((s) => s.provider.kind === "live");
-  const alarms = scenarios.filter((s) => s.mustFail);
-  const entry = (scenario) => ({
-    label: scenario.id,
-    detail: scenario.description,
-    value: { scenario: scenario.id, suite: null },
-  });
-
-  return [
-    {
-      group: "everything at once",
-      label: "sweep the simulated scenarios",
-      detail: `${simulated.length + alarms.length} runs in series, one directory each, no tokens spent`,
-      value: { scenario: null, suite: "simulated" },
-    },
-    ...simulated.map((scenario) => ({
-      ...entry(scenario),
-      group: "simulated, authored frames. free, repeatable, and where most defects turn up",
-    })),
-    ...live.map((scenario) => ({
-      ...entry(scenario),
-      group: "live, a real provider. real tokens or a real local model, and not repeatable",
-    })),
-    ...alarms.map((scenario) => ({
-      ...entry(scenario),
-      group: "the instrument's own alarms. these are meant to fail, and a sweep includes them",
-    })),
-  ];
-}
-
-/**
- * Which scenarios a named sweep covers.
- *
- * The self-tests are in it, with their expectation inverted rather than excluded. A sweep is what
- * gets run after a refactor, which is exactly when the question "does this instrument still
- * notice a missed click" needs answering, and leaving them out would have bought a green sheet by
- * declining to ask.
- */
-async function suiteScenarios(suite) {
-  const scenarios = [];
-  for (const id of listScenarioIds()) {
-    const scenario = await loadScenario(id);
-    if (suite === "simulated" && scenario.provider.kind !== "live") scenarios.push(scenario);
-  }
-  if (scenarios.length === 0) throw new Error(`The "${suite}" sweep covers no scenarios.`);
-  return scenarios;
 }
 
 // ─── launch ─────────────────────────────────────────────────────────────────────────────────
@@ -401,7 +339,12 @@ async function resolveLive({ terminal, choices, scenario, livePatch, consoleLine
   });
 
   try {
-    const api = createScenarioApi({ page: up.page, record: silentRecord(), onBreakpoint: null });
+    const api = createScenarioApi({
+      page: up.page,
+      record: silentRecord(),
+      onBreakpoint: null,
+      onProgress: (text) => terminal.status(text),
+    });
     await api.awaitCheckpoint("plugin-ready");
     await assertBridgeShape(up.page, false);
     await up.page.evaluate(() => window.__lmsaDriver.openChat());
@@ -476,7 +419,7 @@ function providerLabel({ script, live, model }) {
  *
  * @returns the ledger and whether the driver detached from the app it launched.
  */
-async function performRun({ choices, scenario, script, livePatch, model, name }) {
+async function performRun({ choices, scenario, script, livePatch, model, name, sweep = null }) {
   const consoleLines = [];
   // A scenario carries its own vault, so a sweep can span fixtures without the picker having
   // asked about any of them.
@@ -520,6 +463,7 @@ async function performRun({ choices, scenario, script, livePatch, model, name })
 
   let up = null;
   let detached = false;
+  let interrupted = null;
 
   try {
     up = await bringUpApp({
@@ -530,6 +474,10 @@ async function performRun({ choices, scenario, script, livePatch, model, name })
       run: record.dir,
       consoleLines,
     });
+    // Ctrl-C while nothing is being asked cannot unwind through an await inside Playwright, so the
+    // one thing it must still do is not leave a real Obsidian running on a scratch vault: the app
+    // is launched detached, so it outlives its parent unless something says otherwise.
+    terminal.onAbort(() => stopApp(up.app));
     record.note({
       vaultId: up.vaultId,
       vaultDir: up.seeded.vaultDir,
@@ -553,6 +501,8 @@ async function performRun({ choices, scenario, script, livePatch, model, name })
         record,
         at,
         resumable,
+        sweep,
+        alarm: scenario?.mustFail === true,
         provider: providerLabel({ script, live: choices.live, model }),
         shot: (label) => api.shot(label, { breakpoint: false }),
         snapshot: () => readState(up.page),
@@ -563,7 +513,17 @@ async function performRun({ choices, scenario, script, livePatch, model, name })
     api = createScenarioApi({
       page: up.page,
       record,
-      onBreakpoint: choices.mode === "pause" ? (label) => pause(`shot "${label}"`, true) : null,
+      onBreakpoint:
+        choices.mode === "pause"
+          ? async (label, { perishable } = {}) => {
+              if (perishable) {
+                for (const line of perishableNotice(label, perishable)) terminal.say(line);
+                return;
+              }
+              await pause(`shot "${label}"`, true);
+            }
+          : null,
+      onProgress: (text) => terminal.status(text),
     });
 
     // The plugin being *in* the registry and the layout being ready, not merely the registry
@@ -605,6 +565,21 @@ async function performRun({ choices, scenario, script, livePatch, model, name })
     if (error instanceof HandoverExit) {
       detached = error.choice === "detach";
       record.note({ complete: true, endedAt: "handover" });
+    } else if (isTerminalClosed(error)) {
+      // Ctrl-C at a question ends this run the way "close" does, and then stops everything above
+      // it: the app is shut down and the artifacts are written by the block below, and a sweep
+      // does not march on into the next scenario because somebody asked it to stop.
+      record.note({ endedAt: "interrupted", error: error.message });
+      interrupted = error;
+      process.exitCode = 130;
+    } else if (scenario?.mustFail === true) {
+      // An alarm failing is the alarm working. Printing a stack trace for it, as this did, is how
+      // the instrument's own self-test came to read as a defect in the application: the loudest
+      // thing on screen was a Playwright error about a button that does not exist and is not
+      // supposed to. The reason is recorded in full; what the terminal gets is one line.
+      record.note({ error: error instanceof Error ? error.message : String(error) });
+      terminal.say(`  failed as designed. that is what this alarm is for:`);
+      terminal.say(`  ${scenario.description}`);
     } else {
       record.note({ error: error instanceof Error ? error.message : String(error) });
       process.exitCode = 1;
@@ -652,9 +627,12 @@ async function performRun({ choices, scenario, script, livePatch, model, name })
         stopApp(up.app);
       }
     }
+    terminal.onAbort(null);
     terminal.say(`  wrote ${record.dir.replace(`${REPO}${sep}`, "")}`);
   }
 
+  // After the artifacts, never instead of them.
+  if (interrupted) throw interrupted;
   return { record, detached };
 }
 
@@ -751,16 +729,22 @@ try {
         suite: choices.suite,
         mode: choices.mode,
         theme: choices.theme,
+        // Carried into the manifest rather than worked out by the renderer, so the sheet says what
+        // this sweep did not cover even when it is read months later by something else.
+        omitted: suiteOmission(choices.suite),
         startedAt: new Date().toISOString(),
       },
     });
     terminal.say(
-      `\n  sweeping ${scenarios.length} scenarios, one run each\n  ` +
-        suite.dir.replace(`${REPO}${sep}`, ""),
+      `\n  sweeping ${scenarios.length} scenarios, one run each` +
+        // Said before the first launch rather than discovered at the fourth breakpoint: pausing at
+        // every shot of every scenario is a long sitting, and it is worth knowing that up front.
+        (choices.mode === "pause" ? ", pausing at every shot of every one" : "") +
+        `\n  ${suite.dir.replace(`${REPO}${sep}`, "")}`,
     );
 
     const swept = [];
-    for (const entry of scenarios) {
+    for (const [position, entry] of scenarios.entries()) {
       // A failing scenario does not stop the sweep. Its run directory records what happened and
       // the sheet above says so; stopping would hide every scenario after the first defect, which
       // is the opposite of what a sweep is for.
@@ -771,6 +755,7 @@ try {
         livePatch,
         model: null,
         name: `${started}-${entry.id}`,
+        sweep: { position: position + 1, total: scenarios.length },
       });
       const snapshot = record.snapshot();
       suite.addRun(snapshot);

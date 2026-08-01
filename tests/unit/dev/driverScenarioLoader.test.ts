@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
-// @ts-expect-error the driver is plain ESM outside the typechecked source tree (plan D6).
-import { mergeSettings, validateScenario } from "../../../dev/driver/lib/scenario.mjs";
+import {
+  mergeSettings,
+  scenarioMenu,
+  suiteOmission,
+  suiteScenarios,
+  validateScenario,
+  // @ts-expect-error the driver is plain ESM outside the typechecked source tree (plan D6).
+} from "../../../dev/driver/lib/scenario.mjs";
 
 /**
  * The scenario loader fails on an unknown key rather than ignoring it, for the same reason the
@@ -155,5 +161,111 @@ describe("a scenario that is meant to fail", () => {
     expect(() => validateScenario({ ...GOOD, mustFail: false }, "prose-turn")).toThrow(
       /mustFail is true or absent/,
     );
+  });
+});
+
+/**
+ * How the list reads before anything is chosen (RFC-0013 plan section 4.1).
+ *
+ * The maintainer's complaint on 2026-07-31 was that live and simulated were told apart only by a
+ * word inside a description, which is a distinction that decides whether a choice spends money and
+ * so cannot live in prose somebody has to notice. The grouping is the fix, and these pin it: a live
+ * scenario must never appear under the free heading, and a sweep must never launch one.
+ */
+const scenarios = (kinds: { kind: string; mustFail?: boolean }[]) =>
+  kinds.map((one, index) => ({
+    id: `scenario-${index}`,
+    description: `number ${index}`,
+    mustFail: one.mustFail === true,
+    provider: { kind: one.kind },
+  }));
+
+describe("the scenario list", () => {
+  const mixed = scenarios([
+    { kind: "scripted" },
+    { kind: "live" },
+    { kind: "scripted", mustFail: true },
+  ]);
+
+  it("puts what a choice costs in the heading, not in the description", async () => {
+    const menu = await scenarioMenu(mixed);
+    const groupOf = (id: string) => menu.find((entry) => entry.label === id)?.group ?? "";
+    expect(groupOf("scenario-0")).toMatch(/free/);
+    expect(groupOf("scenario-1")).toMatch(/real tokens/);
+    expect(groupOf("scenario-2")).toMatch(/meant to fail/);
+    // Never the other way around: a live scenario under the free heading is the failure this
+    // grouping exists to prevent.
+    expect(groupOf("scenario-1")).not.toMatch(/free/);
+  });
+
+  it("offers the sweep first, and it is an entry rather than a flag", async () => {
+    const menu = await scenarioMenu(mixed);
+    expect(menu[0].value).toStrictEqual({ scenario: null, suite: "simulated" });
+    expect(menu[0].detail).toContain("no tokens spent");
+  });
+
+  it("counts only what a sweep will actually run", async () => {
+    const menu = await scenarioMenu(mixed);
+    const swept = await suiteScenarios("simulated", mixed);
+    expect(menu[0].detail).toContain(`${swept.length} runs`);
+  });
+
+  it("offers the alarms as their own sweep, so the check stays findable", async () => {
+    // Findable by its name, not only by its shape: this entry is the whole reason taking the alarms
+    // out of the scenario sweep is not the same as dropping the check.
+    const menu = await scenarioMenu(mixed);
+    const alarms = menu.find((entry) => entry.value?.suite === "alarms");
+    expect(alarms?.label).toContain("alarms");
+    expect(alarms?.detail).toContain("must fail");
+    expect(menu.indexOf(alarms)).toBe(1);
+  });
+});
+
+/**
+ * Two sweeps, not one, at the maintainer's call on 2026-08-01. A sweep run to look for defects in
+ * the application should not spend launches, and pause-mode breakpoints, on runs whose failure
+ * means nothing is wrong. The alarms keep an entry of their own, because the question they ask is
+ * worth asking after any change to the driver, and what the scenario sweep no longer covers is
+ * said on its own sheet rather than left to be assumed.
+ */
+describe("what a sweep covers", () => {
+  it("the scenarios that are meant to complete, and not the alarms", async () => {
+    const swept = await suiteScenarios(
+      "simulated",
+      scenarios([{ kind: "scripted" }, { kind: "scripted", mustFail: true }]),
+    );
+    expect(swept.map((one) => one.id)).toStrictEqual(["scenario-0"]);
+  });
+
+  it("and the other way round for the alarm sweep", async () => {
+    const swept = await suiteScenarios(
+      "alarms",
+      scenarios([{ kind: "scripted" }, { kind: "scripted", mustFail: true }]),
+    );
+    expect(swept.map((one) => one.id)).toStrictEqual(["scenario-1"]);
+  });
+
+  it("never a live one, because each needs a model and spends real tokens", async () => {
+    const swept = await suiteScenarios("simulated", scenarios([{ kind: "scripted" }, { kind: "live" }]));
+    expect(swept.map((one) => one.provider.kind)).toStrictEqual(["scripted"]);
+  });
+
+  it("refuses a sweep that would launch nothing rather than reporting a green zero", async () => {
+    await expect(suiteScenarios("simulated", scenarios([{ kind: "live" }]))).rejects.toThrow(
+      /covers no scenarios/,
+    );
+  });
+
+  it("refuses a sweep name it does not have, rather than sweeping nothing under it", async () => {
+    await expect(suiteScenarios("everything", scenarios([{ kind: "scripted" }]))).rejects.toThrow(
+      /no "everything" sweep/,
+    );
+  });
+
+  it("says what it left out, on the sweep that leaves something out", () => {
+    // No silent caps: a sheet that covered nine of eleven and said "every scenario did what it was
+    // meant to" would be making a claim about the two it declined to run.
+    expect(suiteOmission("simulated")).toMatch(/alarms were not run/);
+    expect(suiteOmission("alarms")).toBeNull();
   });
 });

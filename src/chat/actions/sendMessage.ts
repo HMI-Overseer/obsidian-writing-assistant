@@ -86,6 +86,10 @@ export async function sendMessage(options: SendMessageOptions): Promise<void> {
   composer.clearAttachments();
   composer.clearAttachedNotes();
   store.setDraft("");
+  // A draft that has just been sent is not a draft, and the save armed by the last keystroke would
+  // otherwise land in the middle of this turn's own writes. Storage serialises them now, so this is
+  // no longer a correctness fix; it is one fewer pointless write of a draft that is already empty.
+  store.clearDraftSaveTimer();
   setIsGenerating(true);
 
   if (store.ensureConversationTitleFromFirstUserMessage(text)) {

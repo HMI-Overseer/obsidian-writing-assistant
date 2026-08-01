@@ -14,12 +14,15 @@ import { handOver, perishableNotice } from "../../../dev/driver/lib/handoff.mjs"
 
 function terminalSaying(choice: string) {
   const lines: string[] = [];
+  const offered: { label: string; detail?: string }[] = [];
   return {
     lines,
+    offered,
     say(text = "") {
       lines.push(text);
     },
-    async choose() {
+    async choose(_title: string, options: { label: string; detail?: string; value: string }[]) {
+      offered.push(...options);
       return choice;
     },
     async line() {
@@ -121,5 +124,73 @@ describe("the breakpoint pause mode declines to take", () => {
     // waiting on the far side of it.
     expect(lines.join(" ")).toContain("sandbox mode");
     expect(lines.join(" ")).toContain("recorded");
+  });
+});
+
+describe("the two disclosures a breakpoint owes you", () => {
+  it("says the app has not moved when the shot only re-frames the last one", async () => {
+    // Most scenarios end by shooting the whole window and then the transcript alone. Under pause
+    // mode both are breakpoints, so continuing from the first hands back a screen that has not
+    // changed, which reads as a driver that ignored the keypress.
+    const terminal = terminalSaying("continue");
+    await handOver({ ...HANDOVER, terminal, reframes: ".lmsa-root" });
+    const said = terminal.lines.join("\n");
+    expect(said).toContain("the app has not moved");
+    expect(said).toContain(".lmsa-root");
+    expect(said).toContain("nothing was clicked between the two");
+  });
+
+  it("says nothing of the kind when the moment is a new one", async () => {
+    const terminal = terminalSaying("continue");
+    await handOver({ ...HANDOVER, terminal });
+    expect(terminal.lines.join("\n")).not.toContain("the app has not moved");
+  });
+
+  it("says the scenario has ended, and which one continuing opens", async () => {
+    const terminal = terminalSaying("continue");
+    await handOver({
+      ...HANDOVER,
+      terminal,
+      finished: true,
+      sweep: { position: 3, total: 9 },
+    });
+    expect(terminal.lines.join("\n")).toContain(
+      "the scenario has ended. continue closes this run and opens scenario 4 of 9",
+    );
+  });
+
+  it("does not promise a next scenario at the end of the last one", async () => {
+    const terminal = terminalSaying("continue");
+    await handOver({
+      ...HANDOVER,
+      terminal,
+      finished: true,
+      sweep: { position: 9, total: 9 },
+    });
+    const said = terminal.lines.join("\n");
+    expect(said).toContain("the last of the sweep");
+    expect(said).not.toContain("opens scenario 10");
+  });
+
+  it("and says only that the run closes when there is no sweep", async () => {
+    const terminal = terminalSaying("continue");
+    await handOver({ ...HANDOVER, terminal, finished: true });
+    const said = terminal.lines.join("\n");
+    expect(said).toContain("the scenario has ended. continue closes this run.");
+    expect(said).not.toContain("scenario 2");
+  });
+});
+
+describe("what continuing is offered as", () => {
+  it("resuming the walk, in the middle of one", async () => {
+    const terminal = terminalSaying("continue");
+    await handOver({ ...HANDOVER, terminal });
+    expect(terminal.offered[0]).toMatchObject({ label: "continue", detail: "resume the walk from here" });
+  });
+
+  it("closing the run, at the end of one, because there is no walk left to resume", async () => {
+    const terminal = terminalSaying("continue");
+    await handOver({ ...HANDOVER, terminal, finished: true });
+    expect(terminal.offered[0].detail).toBe("the walk is over: close this run and go on");
   });
 });

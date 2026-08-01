@@ -165,6 +165,26 @@ evidence of it. Sandbox mode is where you sit in one.
 A review parked at an approval gate is the opposite and is deliberately not declared. It waits for a
 person, which is exactly what a handover is.
 
+**Two things a breakpoint tells you when continuing appears to do nothing.** Most scenarios end by
+shooting the whole window and then the transcript alone, so the next breakpoint is the same moment
+in a tighter frame, and it says so:
+
+```
+  the app has not moved. this shot re-frames the last one, cropped to
+  .lmsa-root, for the sheet. nothing was clicked between the two.
+```
+
+It is measured, not assumed: a shot counts as a re-framing only when it is scoped **and** the
+bridge's state is unchanged since the previous one. A scoped shot after something happened is a new
+moment, and an unscoped shot with an unchanged state is the opposite case, a hover or a selected
+radio that the bridge cannot see and the picture is the only evidence of.
+
+Pause mode also stops at the end of the walk and says it is the end:
+
+```
+  the scenario has ended. continue closes this run and opens scenario 4 of 9.
+```
+
 While a walk is running, one line at the bottom says what it is waiting on and for how long, and
 takes itself back when the wait is over. It appears a second in, so a step that takes 40ms prints
 nothing and a step that has stopped arriving names itself. A click at a selector that does not exist

@@ -491,7 +491,7 @@ async function performRun({ choices, scenario, script, livePatch, model, name, s
     });
 
     let api = null;
-    const pause = async (at, resumable) => {
+    const pause = async (at, resumable, extra = {}) => {
       // Recorded before the handover, not after, so a run that dies while somebody is driving it
       // still says that somebody was driving it.
       record.note({ handDriven: true });
@@ -506,6 +506,7 @@ async function performRun({ choices, scenario, script, livePatch, model, name, s
         provider: providerLabel({ script, live: choices.live, model }),
         shot: (label) => api.shot(label, { breakpoint: false }),
         snapshot: () => readState(up.page),
+        ...extra,
       });
       if (next !== "continue") throw new HandoverExit(next);
     };
@@ -515,12 +516,12 @@ async function performRun({ choices, scenario, script, livePatch, model, name, s
       record,
       onBreakpoint:
         choices.mode === "pause"
-          ? async (label, { perishable } = {}) => {
+          ? async (label, { perishable, reframes } = {}) => {
               if (perishable) {
                 for (const line of perishableNotice(label, perishable)) terminal.say(line);
                 return;
               }
-              await pause(`shot "${label}"`, true);
+              await pause(`shot "${label}"`, true, { reframes });
             }
           : null,
       onProgress: (text) => terminal.status(text),
@@ -558,6 +559,11 @@ async function performRun({ choices, scenario, script, livePatch, model, name, s
 
     if (choices.mode === "sandbox" || choices.mode === "takeover") {
       await pause(scenario ? `the end of ${scenario.id}` : null, false);
+    } else if (choices.mode === "pause" && scenario) {
+      // Pause mode stops at the end too, and says it is the end. The last shots of a scenario are
+      // often two framings of one moment, so continuing through them changes nothing on screen and
+      // the only signal that a scenario was over used to be the next one starting.
+      await pause(`the end of ${scenario.id}`, true, { finished: true });
     }
 
     record.note({ complete: true });

@@ -112,3 +112,56 @@ describe("when a shot is a breakpoint", () => {
     expect(stops).toStrictEqual([]);
   });
 });
+
+describe("a shot that only re-frames the one before it", () => {
+  /** Two shots, the second scoped, with control over whether anything changed between them. */
+  async function twoShots({ changes }: { changes: boolean }) {
+    let world = 0;
+    const seen: (string | null)[] = [];
+    const page = {
+      async evaluate() {
+        return { viewOpen: true, generating: false, messageCount: world, turnItems: [] };
+      },
+      async $() {
+        return { async screenshot() {} };
+      },
+      async screenshot() {},
+    };
+    const api = createScenarioApi({
+      page,
+      record: fakeRecord(),
+      onBreakpoint: async (_label: string, options: { reframes?: string | null } = {}) => {
+        seen.push(options.reframes ?? null);
+      },
+    });
+    await api.shot("the whole window");
+    if (changes) world += 1;
+    await api.shot("the transcript alone", { selector: ".lmsa-root" });
+    return seen;
+  }
+
+  it("says which selector it was cropped to when nothing changed", async () => {
+    expect(await twoShots({ changes: false })).toStrictEqual([null, ".lmsa-root"]);
+  });
+
+  it("says nothing when the state moved, because then it is a new moment", async () => {
+    // Both halves are required. A scoped shot after something happened is not a re-framing.
+    expect(await twoShots({ changes: true })).toStrictEqual([null, null]);
+  });
+
+  it("never calls an unscoped shot a re-framing, however still the state is", async () => {
+    // The unscoped ones with an unchanged state are the opposite case: a hover, or a selected
+    // radio, which the bridge cannot see and the picture is the only evidence of.
+    const seen: (string | null)[] = [];
+    const api = createScenarioApi({
+      page: fakePage(),
+      record: fakeRecord(),
+      onBreakpoint: async (_label: string, options: { reframes?: string | null } = {}) => {
+        seen.push(options.reframes ?? null);
+      },
+    });
+    await api.shot("an answer chosen, before submit");
+    await api.shot("the same again, nothing moved");
+    expect(seen).toStrictEqual([null, null]);
+  });
+});

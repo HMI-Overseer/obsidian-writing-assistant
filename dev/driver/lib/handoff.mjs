@@ -54,6 +54,8 @@ export async function handOver({
   provider,
   sweep = null,
   alarm = false,
+  reframes = null,
+  finished = false,
 }) {
   terminal.say("");
   terminal.say("  ────────────────────────────────────────────────────────────");
@@ -87,6 +89,27 @@ export async function handOver({
   if (alarm) {
     terminal.say("  this one is an alarm: it is meant to fail, and continuing is what makes it.");
   }
+  // Why the screen did not change when you continued into this one. It is a second framing of the
+  // moment you were already handed, taken for the sheet rather than for the app, and without this
+  // line it reads as a driver that ignored the keypress.
+  if (reframes) {
+    terminal.say(`  the app has not moved. this shot re-frames the last one, cropped to`);
+    terminal.say(`  ${reframes}, for the sheet. nothing was clicked between the two.`);
+  }
+  // The walk is over, and the run does not end until you say so. Otherwise the last few stops of a
+  // scenario are indistinguishable from its middle, and the only way to learn that a scenario had
+  // finished was that the next one started.
+  if (finished) {
+    terminal.say(
+      `  the scenario has ended. continue closes this run${
+        sweep
+          ? sweep.position < sweep.total
+            ? ` and opens scenario ${sweep.position + 1} of ${sweep.total}`
+            : ", the last of the sweep"
+          : ""
+      }.`,
+    );
+  }
   // A turn in flight is two different situations, and telling them apart is the difference between
   // a true warning and a false one. A turn parked on the drawer is *waiting for a person*, which is
   // exactly what a handover is, so it is still there when you resume however long you take. Only a
@@ -106,7 +129,15 @@ export async function handOver({
   for (;;) {
     const choice = await terminal.choose("now what", [
       ...(resumable
-        ? [{ label: "continue", detail: "resume the walk from here", value: "continue" }]
+        ? [
+            {
+              label: "continue",
+              // There is no walk left to resume at the end of one, and an option that says there is
+              // is the same small lie as a screen that stopped changing with no explanation.
+              detail: finished ? "the walk is over: close this run and go on" : "resume the walk from here",
+              value: "continue",
+            },
+          ]
         : []),
       {
         label: "close",

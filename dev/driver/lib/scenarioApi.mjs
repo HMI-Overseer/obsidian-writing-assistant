@@ -127,6 +127,16 @@ function reporting(onProgress, text) {
  */
 export function createScenarioApi({ page, record, onBreakpoint, onProgress = null }) {
   let index = 0;
+  /**
+   * The last shot's state, so a shot that changed nothing can say so.
+   *
+   * Most scenarios end by shooting the whole window and then the transcript alone, and a few shoot
+   * the drawer alone the same way. Those are two framings of one moment: the picture differs, the
+   * application does not. Under pause mode each is a breakpoint, so continuing from the first hands
+   * back a screen that has not moved, which reads as a driver that ignored the keypress. Measured
+   * rather than assumed, because "it has a selector" is not the same claim as "nothing changed".
+   */
+  let lastShotState = null;
 
   // The state before the last action, which is what the next checkpoint compares against.
   //
@@ -179,10 +189,20 @@ export function createScenarioApi({ page, record, onBreakpoint, onProgress = nul
     // the point here is what was true at this moment.
     const { messages: _transcript, ...readout } = state;
     record.shot(label, `shots/${name}.png`, `state/${name}.json`, readout);
+
+    // Whether this picture is a second framing of the last one. Both halves are required: a shot
+    // scoped to an element after something happened is a new moment, and an unscoped shot with an
+    // unchanged state is one the bridge cannot see the change in, which is exactly why it was
+    // taken. `an answer chosen, before submit` is that second kind: a selected radio moves nothing
+    // this reads, and the picture is the only evidence of it.
+    const asJson = JSON.stringify(state);
+    const reframes = selector && lastShotState === asJson ? selector : null;
+    lastShotState = asJson;
+
     // A shot taken from the handover console must not re-enter the handover console. The shot
     // itself is taken either way: what a perishable moment costs is the chance to sit in it, not
     // the evidence of it.
-    if (breakpoint && onBreakpoint) await onBreakpoint(label, { perishable });
+    if (breakpoint && onBreakpoint) await onBreakpoint(label, { perishable, reframes });
   };
 
   const api = {

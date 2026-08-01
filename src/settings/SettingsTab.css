@@ -1,11 +1,10 @@
 .lmsa-settings-root {
   @apply lmsa:pb-8;
   scrollbar-gutter: stable;
-  /* .lmsa-settings-root is Obsidian's own .vertical-tab-content element, which sets
-     `padding-inline-start: var(--size-4-12)` (0,1,0). This physical `padding-left` is equal
-     specificity but later in source, and physical wins over logical for the same used value,
-     so it zeroes the left inset without `!important`. */
-  padding-left: 0;
+  /* .lmsa-settings-root is Obsidian's own .vertical-tab-content element, and Obsidian owns its
+     inline inset: that padding is what centres the settings content column. Do not zero it to
+     bleed the rail to the modal edge. The rail is designed to float inside the inset instead,
+     rounded on both sides, which is why it carries a full border and a symmetric radius. */
 }
 
 .lmsa-settings-shell {
@@ -20,10 +19,7 @@
   top: 0;
   width: 110px;
   padding: 14px 8px;
-  border-radius: 0 20px 20px 0;
-  border-left: none;
-  margin-left: 0;
-  padding-left: 14px;
+  border-radius: 20px;
   background:
     radial-gradient(circle at top left, var(--lmsa-tint-5), transparent 42%),
     linear-gradient(180deg, var(--lmsa-surface-overlay), var(--lmsa-surface-raised));
@@ -161,9 +157,6 @@
     width: auto;
     padding: 8px 12px;
     border-radius: 16px;
-    border-left: 1px solid var(--background-modifier-border);
-    margin-left: 0;
-    padding-left: 12px;
     background:
       radial-gradient(circle at top left, var(--lmsa-tint-5), transparent 42%),
       linear-gradient(180deg, var(--lmsa-surface-overlay), var(--lmsa-surface-raised));

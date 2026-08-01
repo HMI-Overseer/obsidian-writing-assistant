@@ -145,19 +145,18 @@ export async function prepareApiMessages(
   const useVaultTools = settings.agenticMode && usePluginTools;
   const claudeCodeRetrievesViaMcp = isClaudeCode && settings.agenticMode;
 
-  // Ambient editing: with the plan/chat/edit modes gone, one
-  // unified system prefix frames every turn. A non-agentic turn (no tools) still edits,
-  // via SEARCH/REPLACE blocks the diff engine parses, so it carries the regex-edit format
-  // guidance whenever editing is permitted but no tools carry it.
+  // Ambient editing: a non-agentic turn (no tools) still edits, via SEARCH/REPLACE blocks
+  // the diff engine parses, so it carries the regex-edit format guidance whenever editing
+  // is permitted but no tools carry it.
   const editsPermitted = writesPermitted(settings.vaultOpPolicy, posture);
   const useRegexEditGuidance = !useVaultTools && !claudeCodeRetrievesViaMcp && editsPermitted;
 
-  const basePrefix = settings.systemPromptPrefix;
+  // The user's own wording reaches the model through the active profile's custom prompt,
+  // which rides the cached block. There is no separate always-on prefix.
   const memoryIndex = settings.memoriesEnabled
     ? memoryService.getPinnedIndex(store.getActiveConversationId())
     : "";
   const cachedSystemPrompt = [profileSystemPrompt, memoryIndex].filter(Boolean).join("\n\n");
-  const systemPrompt = [basePrefix, cachedSystemPrompt].filter(Boolean).join("\n\n");
 
   // The active note + extra notes (and their embedded images) are frozen into a
   // point-in-time snapshot bound to the user turn at send time (snapshotNoteAttachments),
@@ -336,7 +335,7 @@ export async function prepareApiMessages(
 
   const finalSystemPrompt = disableBuiltinSystemPrompts
     ? cachedSystemPrompt
-    : systemPrompt +
+    : cachedSystemPrompt +
       groundingNote +
       vaultGuidance +
       editGuidance +
@@ -360,7 +359,6 @@ export async function prepareApiMessages(
     fullSystemPrompt: finalSystemPrompt,
     cachedSystemPrompt,
     tailParts: [
-      basePrefix,
       groundingNoteBody,
       vaultGuidanceBody,
       editGuidanceBody,

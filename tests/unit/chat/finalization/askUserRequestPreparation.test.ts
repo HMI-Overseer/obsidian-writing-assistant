@@ -48,7 +48,6 @@ function settings(
     ...DEFAULT_SETTINGS,
     agenticMode,
     vaultOpPolicy: { ...policy },
-    systemPromptPrefix: "Base prefix.",
   };
 }
 

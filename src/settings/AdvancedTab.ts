@@ -1,8 +1,5 @@
 import type WritingAssistantChat from "../main";
-import {
-  DEFAULT_MAX_TOOL_ROUNDS,
-  DEFAULT_SYSTEM_PROMPT_PREFIX,
-} from "../constants";
+import { DEFAULT_MAX_TOOL_ROUNDS } from "../constants";
 import { createSettingsSection, SettingItem } from "./ui";
 
 export function renderAdvancedTab(container: HTMLElement, plugin: WritingAssistantChat): void {
@@ -84,56 +81,5 @@ export function renderAdvancedTab(container: HTMLElement, plugin: WritingAssista
             await plugin.saveSettings();
           }
         })
-    );
-
-  // ── System prompt prefix ────────────────────────────────────────────────
-
-  const prompts = createSettingsSection(
-    container,
-    "System prompt prefix",
-    "Prepended before your custom prompt (set in the chat popover) on every turn. Leave empty to use only your custom prompt. Edit-format guidance is added automatically when editing.",
-    { icon: "message-square" }
-  );
-
-  renderPromptPrefixSetting(
-    prompts.bodyEl, plugin, "Prefix",
-    "Prepended before your custom prompt on every turn.",
-    "systemPromptPrefix", DEFAULT_SYSTEM_PROMPT_PREFIX
-  );
-}
-
-type PromptPrefixKey = "systemPromptPrefix";
-
-function renderPromptPrefixSetting(
-  container: HTMLElement,
-  plugin: WritingAssistantChat,
-  name: string,
-  desc: string,
-  key: PromptPrefixKey,
-  defaultValue: string,
-): void {
-  let textareaEl: HTMLTextAreaElement;
-
-  new SettingItem(container)
-    .setName(name)
-    .setDesc(desc)
-    .addTextArea((textarea) => {
-      textareaEl = textarea.inputEl;
-      textareaEl.rows = 6;
-      textareaEl.classList.add("lmsa-monospace");
-      textarea
-        .setPlaceholder("No prefix, using your custom prompt only")
-        .setValue(plugin.settings[key])
-        .onChange(async (value) => {
-          plugin.settings[key] = value;
-          await plugin.saveSettings();
-        });
-    })
-    .addButton((btn) =>
-      btn.setButtonText("Reset to default").onClick(async () => {
-        plugin.settings[key] = defaultValue;
-        await plugin.saveSettings();
-        textareaEl.value = defaultValue;
-      })
     );
 }

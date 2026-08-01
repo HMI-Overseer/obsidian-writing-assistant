@@ -1243,12 +1243,6 @@ export interface PluginSettings {
   memoriesEnabled: boolean;
   /** Persistent memories (RFC-0007 shape); seeded once from `DEFAULT_MEMORIES`, then user-owned. */
   memories: Memory[];
-  /**
-   * The unified system prompt prefix, prepended before the profile's custom prompt on
-    * every turn now that the plan/chat/edit modes are gone. Edit-format guidance
-   * (tool-edit or non-agentic SEARCH/REPLACE) is appended dynamically, not stored here.
-   */
-  systemPromptPrefix: string;
   /** Whether the user has accepted the API keys privacy disclaimer. */
   apiKeysDisclaimerAccepted: boolean;
   /** Master gate for all tool use. When false, no mode uses tools. */

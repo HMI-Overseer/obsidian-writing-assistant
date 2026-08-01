@@ -170,7 +170,7 @@ export function auditSurfaceContracts(surfaces) {
   requireMarkup(
     surfaces.settingsAdvanced,
     "settingsAdvanced",
-    [">Agentic mode<", ">Document Editing<", ">System prompt prefix<"],
+    [">Agentic mode<", ">Document Editing<"],
     failures,
   );
 

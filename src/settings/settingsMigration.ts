@@ -366,9 +366,6 @@ type LegacyPersistedSettings = Partial<PluginSettings> & {
   /** Pre-rework flat model arrays, folded into lmStudioModelCache / customModels. */
   completionModels?: unknown;
   embeddingModels?: unknown;
-  /** Pre-unification per-mode prompt prefixes, folded into systemPromptPrefix. */
-  chatSystemPromptPrefix?: unknown;
-  planSystemPromptPrefix?: unknown;
   /** Pre-unification per-mode round budgets, folded into maxToolRounds. */
   maxToolRoundsChat?: unknown;
   maxToolRoundsEdit?: unknown;
@@ -516,25 +513,6 @@ function normalizeModelIdAliases(
   return aliases;
 }
 
-/**
- * Build a fully-populated {@link PluginSettings} from whatever
- * `Plugin.loadData()` returned (a partial saved blob, or `null` on first run).
- * Every field defaults from {@link DEFAULT_SETTINGS}; collections are validated
- * element-by-element so a single bad entry can't poison the rest.
- */
-/**
- * Migrates the prompt prefix. The plan/chat/edit mode prompts collapsed into one
- * unified prefix: a new `systemPromptPrefix` wins; otherwise
- * a customized legacy chat (then plan) prefix is carried forward, so a user's prior
- * wording survives. The edit-format prompts are dropped (their guidance is now dynamic).
- */
-function migrateSystemPromptPrefix(data: LegacyPersistedSettings | null): string {
-  if (typeof data?.systemPromptPrefix === "string") return data.systemPromptPrefix;
-  if (typeof data?.chatSystemPromptPrefix === "string") return data.chatSystemPromptPrefix;
-  if (typeof data?.planSystemPromptPrefix === "string") return data.planSystemPromptPrefix;
-  return DEFAULT_SETTINGS.systemPromptPrefix;
-}
-
 // The old per-mode round budgets (`maxToolRoundsEdit` / `maxToolRoundsChat`) collapsed
 // into one `maxToolRounds` once the modes were gone; carry a customized legacy value
 // forward, the live chat budget preferred over the dead edit one.
@@ -614,6 +592,15 @@ export function normalizeMemories(raw: unknown): Memory[] {
   return memories;
 }
 
+/**
+ * Build a fully-populated {@link PluginSettings} from whatever
+ * `Plugin.loadData()` returned (a partial saved blob, or `null` on first run).
+ * Every field defaults from {@link DEFAULT_SETTINGS}; collections are validated
+ * element-by-element so a single bad entry can't poison the rest.
+ *
+ * The returned object carries only current fields, so a retired key still sitting in
+ * `data.json` is dropped on the next save without a migration step.
+ */
 export function normalizePluginSettings(data: Partial<PluginSettings> | null): PluginSettings {
   const legacyCompletion = readLegacyModelRows(data, "completionModels");
   const legacyEmbedding = readLegacyModelRows(data, "embeddingModels");
@@ -691,7 +678,6 @@ export function normalizePluginSettings(data: Partial<PluginSettings> | null): P
         ? data.memoriesEnabled
         : DEFAULT_SETTINGS.memoriesEnabled,
     memories: normalizeMemories(data?.memories),
-    systemPromptPrefix: migrateSystemPromptPrefix(data),
     apiKeysDisclaimerAccepted:
       typeof data?.apiKeysDisclaimerAccepted === "boolean"
         ? data.apiKeysDisclaimerAccepted

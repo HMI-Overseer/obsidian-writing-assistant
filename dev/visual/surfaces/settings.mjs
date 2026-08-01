@@ -356,17 +356,6 @@ export const SETTINGS_SURFACES = {
           `${settingItem("Diff context lines", "Number of lines shown above and below each diff hunk for context.", `<input type="text" value="3">`)}
           ${settingItem("Minimum match confidence", "Fuzzy match confidence threshold (0–1). Matches below this score are flagged as unresolved. Default: 0.7", `<input type="text" value="0.7">`)}`,
           I.fileDiff,
-        ) +
-        section(
-          "System prompt prefix",
-          "Prepended before your custom prompt (set in the chat popover) on every turn. Leave empty to use only your custom prompt. Edit-format guidance is added automatically when editing.",
-          `${settingItem(
-            "Prefix",
-            "Prepended before your custom prompt on every turn.",
-            `<textarea class="lmsa-monospace" rows="6" placeholder="No prefix, using your custom prompt only"></textarea>
-             <button class="lmsa-ui-btn lmsa-ui-btn-secondary">Reset to default</button>`,
-          )}`,
-          I.messageSquare,
         ),
       720,
       "advanced",

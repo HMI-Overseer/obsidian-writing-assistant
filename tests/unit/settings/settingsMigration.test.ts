@@ -27,11 +27,9 @@ describe("normalizePluginSettings", () => {
     const result = normalizePluginSettings({
       maxContextChars: 9000,
       agenticMode: true,
-      systemPromptPrefix: "custom prefix",
     });
     expect(result.maxContextChars).toBe(9000);
     expect(result.agenticMode).toBe(true);
-    expect(result.systemPromptPrefix).toBe("custom prefix");
     // untouched fields fall back to defaults
     expect(result.maxToolRounds).toBe(DEFAULT_SETTINGS.maxToolRounds);
   });
@@ -59,25 +57,16 @@ describe("normalizePluginSettings", () => {
     expect(newWins.maxToolRounds).toBe(30);
   });
 
-  // The plan/chat/edit mode prompts collapsed into one unified systemPromptPrefix
-  // (prompt-cache design section 6.3). A user's customized legacy chat (then plan) prefix is
-  // carried forward; a new systemPromptPrefix wins over any legacy field.
-  it("migrates a legacy chat/plan prompt prefix into systemPromptPrefix", () => {
-    const fromChat = normalizePluginSettings({
-      chatSystemPromptPrefix: "my chat prefix",
-    } as unknown as Partial<PluginSettings>);
-    expect(fromChat.systemPromptPrefix).toBe("my chat prefix");
-
-    const fromPlan = normalizePluginSettings({
-      planSystemPromptPrefix: "my plan prefix",
-    } as unknown as Partial<PluginSettings>);
-    expect(fromPlan.systemPromptPrefix).toBe("my plan prefix");
-
-    const newWins = normalizePluginSettings({
+  // The always-on system prompt prefix is retired: the profile's custom prompt is the only
+  // user-authored prompt text. A retired key still on disk (the unified field or either
+  // pre-unification per-mode field) is dropped rather than carried into the live settings.
+  it("drops the retired system prompt prefix fields", () => {
+    const result = normalizePluginSettings({
       systemPromptPrefix: "new",
       chatSystemPromptPrefix: "old chat",
+      planSystemPromptPrefix: "old plan",
     } as unknown as Partial<PluginSettings>);
-    expect(newWins.systemPromptPrefix).toBe("new");
+    expect(result).toEqual(DEFAULT_SETTINGS);
   });
 
   it("rejects wrong-typed scalars and falls back to defaults", () => {

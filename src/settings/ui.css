@@ -345,10 +345,6 @@
   outline: none;
 }
 
-.lmsa-monospace {
-  font-family: var(--font-monospace);
-}
-
 /* ── Range inputs ──────────────────────────────────────────────────────── */
 
 .lmsa-settings-root input[type="range"] {

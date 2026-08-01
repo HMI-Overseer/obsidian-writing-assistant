@@ -178,12 +178,6 @@ export const DEFAULT_MEMORIES: readonly Memory[] = [
   },
 ];
 
-// The unified system prompt prefix is shared now that the plan/chat/edit modes are gone. Edit
-// capability rides the dynamic tool/regex guidance, so the prefix stays general.
-export const DEFAULT_SYSTEM_PROMPT_PREFIX =
-  "When asked to research, explore, or find information, search exhaustively before answering. " +
-  "Use multiple rounds of tool calls if needed, and synthesize only after you have gathered enough context.";
-
 // A high backstop, not the primary spin control (D5): the per-turn identical-call
 // guard in the tool loop catches a model repeating the same call; the round cap
 // only stops genuinely unbounded multi-hop work. A budget of 5 was too small and
@@ -256,7 +250,6 @@ export const DEFAULT_SETTINGS: PluginSettings = {
   knowledgeGraph: { ...DEFAULT_KNOWLEDGE_GRAPH_SETTINGS },
   memoriesEnabled: false,
   memories: DEFAULT_MEMORIES.map((memory) => ({ ...memory })),
-  systemPromptPrefix: DEFAULT_SYSTEM_PROMPT_PREFIX,
   apiKeysDisclaimerAccepted: false,
   agenticMode: true,
   maxToolRounds: DEFAULT_MAX_TOOL_ROUNDS,

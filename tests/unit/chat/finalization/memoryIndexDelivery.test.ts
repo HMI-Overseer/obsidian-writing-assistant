@@ -36,7 +36,6 @@ function settings(overrides: Partial<PluginSettings> = {}): PluginSettings {
     ...DEFAULT_SETTINGS,
     memories: [memory()],
     vaultOpPolicy: { ...DENY_WRITES_POLICY },
-    systemPromptPrefix: "Base prefix.",
     ...overrides,
   };
 }
@@ -72,7 +71,7 @@ describe("memory index delivery", () => {
     });
 
     expect(JSON.stringify(request)).toBe(
-      '{"systemPrompt":"Profile prompt.","modeTail":"Base prefix.",' +
+      '{"systemPrompt":"Profile prompt.",' +
         '"documentContext":null,"ragContext":null,"messages":[],' +
         '"replayEvidence":{"tier":"structural","capabilities":' +
         '{"captureOrder":"exact","toolCorrelation":"provider_id",' +
@@ -87,14 +86,14 @@ describe("memory index delivery", () => {
       agenticMode: false,
       modelCapabilities: undefined,
       expectedSystemPrefix: "Profile prompt.\n\n",
-      expectedModeTail: "Base prefix.",
+      expectedModeTail: undefined,
     },
     {
       label: "a non-tool-trained local model",
       activeProvider: "lmstudio" as const,
       agenticMode: true,
       modelCapabilities: { trainedForToolUse: false },
-      expectedSystemPrefix: "Base prefix.\n\nProfile prompt.\n\n",
+      expectedSystemPrefix: "Profile prompt.\n\n",
       expectedModeTail: undefined,
     },
   ])(
@@ -203,7 +202,7 @@ describe("memory index delivery", () => {
     });
 
     expect(request.systemPrompt).toBe("Profile prompt.");
-    expect(request.modeTail).toBe("Base prefix.");
+    expect(request.modeTail).toBeUndefined();
   });
 
   it("pins prompt bytes until invalidation and then changes the fingerprint", async () => {

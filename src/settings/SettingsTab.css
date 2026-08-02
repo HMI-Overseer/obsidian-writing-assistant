@@ -8,3 +8,23 @@
   /* Obsidian owns the page root's inline inset: that padding is what centres the settings
      content column. Do not zero it to bleed the panel to the modal edge. */
 }
+
+/* ── The root list's groups ────────────────────────────────────────────────
+ * The tab's own page: three groups of navigable page entries. Obsidian paints the visible card on
+ * `.setting-items` rather than on the group, which is only a width container, so the hover
+ * treatment goes there. The accent ring is the one `.lmsa-settings-section:hover` draws, and it is
+ * a `box-shadow` rather than a border because `--setting-items-border-width` is 0 here: there is no
+ * border to colour, and giving it one would change the resting card too.
+ *
+ * Hover is scoped to the group so the heading lights its own card. The heading is a sibling of
+ * `.setting-items`, not a child of it, so keying the hover on the card alone would leave the label
+ * above it dead.
+ * ---------------------------------------------------------------------- */
+
+.lmsa-settings-nav-group > .setting-items {
+  transition: box-shadow 200ms ease;
+}
+
+.lmsa-settings-nav-group:hover > .setting-items {
+  box-shadow: 0 0 0 1px var(--lmsa-tint-20);
+}

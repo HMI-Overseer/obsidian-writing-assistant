@@ -1,0 +1,84 @@
+import type { SettingDefinitionGroup, SettingDefinitionRender } from "obsidian";
+import { setIcon } from "obsidian";
+import { SettingItem } from "../ui";
+
+/**
+ * One section card, the same anatomy `createSettingsSection` builds imperatively.
+ *
+ * `name` and `desc` are the card's own search entry as well as its heading and lead paragraph.
+ */
+export interface SettingsSection {
+  name: string;
+  desc: string;
+  /** Lucide icon drawn in the card's badge. */
+  icon: string;
+  rows: SettingDefinitionRender[];
+}
+
+/**
+ * A row that draws its own block DOM.
+ *
+ * Obsidian builds the `.setting-item` host and seeds its own name and description into it before
+ * calling `render`, so a row that owns its markup clears the host first. `name` and `desc` stay on
+ * the definition, which is what settings search indexes.
+ */
+export function blockRow(
+  name: string,
+  desc: string,
+  cls: string,
+  build: (el: HTMLElement) => void | (() => void)
+): SettingDefinitionRender {
+  return {
+    name,
+    desc,
+    render: (setting) => {
+      setting.settingEl.empty();
+      setting.settingEl.addClass(cls);
+      return build(setting.settingEl);
+    },
+  };
+}
+
+/** A name / description / control row, drawn as the {@link SettingItem} every other tab draws. */
+export function settingRow(
+  name: string,
+  desc: string,
+  build: (item: SettingItem) => void
+): SettingDefinitionRender {
+  return {
+    name,
+    desc,
+    render: (setting) => {
+      build(new SettingItem(setting.settingEl, { adopt: true }).setName(name).setDesc(desc));
+    },
+  };
+}
+
+/**
+ * Builds one group per section card, for a page that renders its own `items` rather than handing a
+ * subtree to an imperative renderer.
+ *
+ * `cls` is the only styling hook a definition carries, and a converted page renders into a settings
+ * page element the API gives us no access to, so the group is the outermost element we own: it
+ * carries the card class, the design tokens, and the tab's accent all three.
+ */
+export function settingsSections(
+  slug: string,
+  sections: SettingsSection[]
+): SettingDefinitionGroup[] {
+  return sections.map((section) => ({
+    type: "group",
+    cls: `lmsa-ui-card lmsa-settings-section lmsa-settings-root lmsa-tab-${slug}`,
+    items: [
+      blockRow(section.name, section.desc, "lmsa-settings-section-head", (el) => {
+        const headerEl = el.createDiv({ cls: "lmsa-settings-section-header" });
+        const headingEl = headerEl.createDiv({ cls: "lmsa-settings-section-heading" });
+        setIcon(headingEl.createDiv({ cls: "lmsa-settings-section-icon" }), section.icon);
+        headingEl.createEl("h3", { cls: "lmsa-settings-section-title", text: section.name });
+        headerEl.createDiv({ cls: "lmsa-settings-section-actions" });
+        el.createEl("p", { cls: "lmsa-settings-section-desc", text: section.desc });
+      }),
+      ...section.rows,
+    ],
+  }));
+}

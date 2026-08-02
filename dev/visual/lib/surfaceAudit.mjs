@@ -38,14 +38,20 @@ export function auditSurfaceContracts(surfaces) {
       surface.source.startsWith("src/settings/") &&
       !surface.source.startsWith("src/settings/modals/")
     ) {
+      // Every settings surface reconstructs Obsidian's settings page. A converted tab renders its
+      // rows from `items`, so its cards are the token host and there is no panel; a tab still
+      // behind an ImperativeTabPage puts both on the page root.
+      const converted = surface.html.includes("setting-group lmsa-ui-card");
       requireMarkup(
         surface,
         id,
         [
-          "setting-page vertical-tab-content lmsa-settings-root",
+          "setting-page vertical-tab-content",
           "setting-page-titlebar",
           "setting-page-content",
-          "lmsa-settings-panel",
+          ...(converted
+            ? ["lmsa-settings-section lmsa-settings-root lmsa-tab-"]
+            : ["vertical-tab-content lmsa-settings-root lmsa-tab-", "lmsa-settings-panel"]),
         ],
         failures,
       );

@@ -40,6 +40,46 @@ export const section = (title, desc, body, icon, extraCls = "") => {
   </div>`;
 };
 
+// A section card on a CONVERTED settings tab, mirroring settingsSections() in
+// definitions/sections.ts: the card is Obsidian's own group element (`cls` is the only styling
+// hook a definition carries, so it holds the card class, the token host and the tab accent), the
+// group's `.setting-items` list is the card body, and the header plus the lead paragraph share the
+// first row host. `tab` is the accent slug, `rows` are convertedRow()/convertedBlock() hosts.
+export const convertedSection = (tab, title, desc, rows, icon) => {
+  if (!icon) {
+    throw new Error(`convertedSection("${title}") needs the icon its tab passes to settingsSections`);
+  }
+  return `<div class="setting-group lmsa-ui-card lmsa-settings-section lmsa-settings-root lmsa-tab-${tab}">
+    <div class="setting-items">
+      <div class="setting-item lmsa-settings-section-head">
+        <div class="lmsa-settings-section-header">
+          <div class="lmsa-settings-section-heading">
+            <div class="lmsa-settings-section-icon">${icon}</div>
+            <h3 class="lmsa-settings-section-title">${title}</h3>
+          </div>
+          <div class="lmsa-settings-section-actions"></div>
+        </div>
+        <p class="lmsa-settings-section-desc">${desc}</p>
+      </div>
+      ${rows}
+    </div>
+  </div>`;
+};
+
+// A converted row: Obsidian's `.setting-item` host, re-dressed by SettingItem's adopt path.
+export const convertedRow = (name, desc, control) =>
+  `<div class="setting-item lmsa-setting-item">
+    <div class="lmsa-setting-item-info">
+      <div class="lmsa-setting-item-name">${name}</div>
+      <div class="lmsa-setting-item-desc">${desc}</div>
+    </div>
+    <div class="lmsa-setting-item-control">${control}</div>
+  </div>`;
+
+// A converted row that draws a block instead of a name / description / control pair.
+export const convertedBlock = (body) =>
+  `<div class="setting-item lmsa-settings-section-block">${body}</div>`;
+
 // A custom (non-Obsidian) settings row: name + description on the left, a control on the right.
 // `below` is the SettingItem case where a caller mounts into `settingEl` instead of `controlEl`
 // (RagTab's embedding-model selector does this), so the control lands after the control slot and

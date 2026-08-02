@@ -103,17 +103,31 @@ export const headerPopoverView = (inner, w, options) =>
 // Settings tabs render into a SettingPage inside Obsidian's settings modal, NOT the chat root.
 // Reconstruct the page chrome Obsidian builds around it (read from the installed app: rootEl is
 // `.setting-page.vertical-tab-content`, holding a `.setting-page-titlebar` and a
-// `.setting-page-content`), so the panel receives the same available width and app.css cascade as
-// it does in the live modal. `.lmsa-settings-root` and `data-tab` sit on the page root because
-// that is where ImperativeTabPage puts them, and the design tokens hang off both.
-export const settingsView = (inner, w = 720, tab = "general") =>
+// `.setting-page-content`), so the content receives the same available width and app.css cascade
+// as it does in the live modal.
+const settingsPage = (inner, w, tab, rootCls) =>
   `<div class="lmsa-harness-stage" style="width:${w}px">
-     <div class="setting-page vertical-tab-content lmsa-settings-root" data-tab="${tab}">
+     <div class="setting-page vertical-tab-content${rootCls ? ` ${rootCls}` : ""}">
        ${settingsPageTitlebar(tab)}
-       <div class="setting-page-content">
-         <div class="lmsa-settings-panel lmsa-ui-panel">
-           <div class="lmsa-settings-content">${inner}</div>
-         </div>
-       </div>
+       <div class="setting-page-content">${inner}</div>
      </div>
    </div>`;
+
+// A tab still rendered by its own renderer, behind an ImperativeTabPage. `.lmsa-settings-root` and
+// the tab-accent class sit on the page root because that is where ImperativeTabPage puts them, and
+// the design tokens hang off both.
+export const settingsView = (inner, w = 720, tab = "general") =>
+  settingsPage(
+    `<div class="lmsa-settings-panel lmsa-ui-panel">
+       <div class="lmsa-settings-content">${inner}</div>
+     </div>`,
+    w,
+    tab,
+    `lmsa-settings-root lmsa-tab-${tab}`,
+  );
+
+// A converted tab, whose rows Obsidian's declarative renderer builds. Its groups sit directly in
+// the page content: there is no panel wrapper, because a definition's only styling hook is the
+// group's own `cls`, so each card carries the token host and the accent instead of the page root.
+export const settingsItemsView = (inner, w = 720, tab = "general") =>
+  settingsPage(inner, w, tab, "");

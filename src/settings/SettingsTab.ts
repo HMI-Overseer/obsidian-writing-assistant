@@ -6,10 +6,10 @@ import type {
 } from "obsidian";
 import { PluginSettingTab } from "obsidian";
 import type WritingAssistantChat from "../main";
-import { renderAdvancedTab } from "./AdvancedTab";
+import { advancedTabSections } from "./AdvancedTab";
 import { renderCommandsTab } from "./CommandsTab";
 import { renderProvidersTab } from "./ProvidersTab";
-import { renderGeneralTab } from "./GeneralTab";
+import { generalTabSections } from "./GeneralTab";
 import { renderRagTab } from "./RagTab";
 import { renderKnowledgeGraphTab } from "./KnowledgeGraphTab";
 import { renderMemoriesTab } from "./MemoriesTab";
@@ -17,6 +17,8 @@ import { renderBenchmarkTab } from "./BenchmarkTab";
 import { renderVaultOpsTab } from "./VaultOpsTab";
 import type { TabPageRenderer } from "./definitions/ImperativeTabPage";
 import { ImperativeTabPage } from "./definitions/ImperativeTabPage";
+import type { SettingsSection } from "./definitions/sections";
+import { settingsSections } from "./definitions/sections";
 
 type TabName = "General" | "Providers" | "Retrieval" | "Knowledge Graph" | "Memories" | "Commands" | "Vault Operations" | "Advanced" | "Benchmark";
 
@@ -58,11 +60,21 @@ export class WritingAssistantSettingTab extends PluginSettingTab {
   }
 
   getSettingDefinitions(): SettingDefinitionItem[] {
+    // A page whose rows are still drawn by the tab renderer it has always had. Only the page name
+    // reaches settings search: the index walker descends into `items`, never into a `page` factory.
     const page = (name: TabName, render: TabPageRenderer): SettingDefinitionPage => ({
       type: "page",
       name,
       desc: TAB_DESCRIPTIONS[name],
       page: () => new ImperativeTabPage(name, TAB_SLUGS[name], render),
+    });
+
+    // A converted page: Obsidian renders the rows and indexes every one of them by name.
+    const converted = (name: TabName, sections: SettingsSection[]): SettingDefinitionPage => ({
+      type: "page",
+      name,
+      desc: TAB_DESCRIPTIONS[name],
+      items: settingsSections(TAB_SLUGS[name], sections),
     });
 
     // Groups render their pages inline under a heading, so this is the rail's grouping without the
@@ -77,7 +89,7 @@ export class WritingAssistantSettingTab extends PluginSettingTab {
 
     return [
       group("Plugin", [
-        page("General", (el) => renderGeneralTab(el, this.plugin)),
+        converted("General", generalTabSections(this.plugin)),
         page("Providers", (el, refresh) => renderProvidersTab(el, this.plugin, refresh)),
       ]),
       group("Knowledge", [
@@ -88,7 +100,7 @@ export class WritingAssistantSettingTab extends PluginSettingTab {
       group("Config", [
         page("Commands", (el, refresh) => renderCommandsTab(el, this.plugin, refresh)),
         page("Vault Operations", (el) => renderVaultOpsTab(el, this.plugin)),
-        page("Advanced", (el) => renderAdvancedTab(el, this.plugin)),
+        converted("Advanced", advancedTabSections(this.plugin)),
         page("Benchmark", (el, refresh) => renderBenchmarkTab(el, this.plugin, refresh)),
       ]),
     ];

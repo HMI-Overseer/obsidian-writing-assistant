@@ -1,7 +1,10 @@
-.lmsa-settings-root {
+/* The page-level half of .lmsa-settings-root. The class also sits on the card groups of a
+   converted page, which must not take page padding, so the scroll-area rules are keyed on
+   Obsidian's own page element: the settings tab container and every settings page root are
+   `.vertical-tab-content`, a card group is not. */
+.vertical-tab-content.lmsa-settings-root {
   @apply lmsa:pb-8;
   scrollbar-gutter: stable;
-  /* .lmsa-settings-root is Obsidian's own settings page root, a .vertical-tab-content element, and
-     Obsidian owns its inline inset: that padding is what centres the settings content column. Do
-     not zero it to bleed the panel to the modal edge. */
+  /* Obsidian owns the page root's inline inset: that padding is what centres the settings
+     content column. Do not zero it to bleed the panel to the modal edge. */
 }

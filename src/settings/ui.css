@@ -75,6 +75,73 @@
   opacity: 0.85;
 }
 
+/* ── Converted section (card) ──────────────────────────────────────────────
+ * A converted tab's rows are built by Obsidian's declarative renderer, so the card is the group
+ * element and its `.setting-items` list is the card body. Obsidian paints its own card chrome on
+ * both (a background, a radius, per-row padding, a plain divider), and it does so through
+ * `.setting-group .setting-item:not(.setting-item-heading)`, which outranks every rule above.
+ * So the whole rhythm is restated here at that ancestry: strip Obsidian's chrome, restore the
+ * body inset and card spacing `.lmsa-settings-section-body` and `.lmsa-settings-content` give an
+ * imperative page, and leave the divider to the gradient `::before` on `.lmsa-setting-item`.
+ * ---------------------------------------------------------------------- */
+
+.setting-group.lmsa-settings-section {
+  @apply lmsa:mb-5;
+}
+
+.setting-group.lmsa-settings-section > .setting-items {
+  @apply lmsa:px-5 lmsa:pb-4;
+  background: none;
+  border: none;
+  border-radius: 0;
+}
+
+.setting-group.lmsa-settings-section > .setting-items > .setting-item {
+  @apply lmsa:m-0 lmsa:px-0 lmsa:py-4;
+  background: none;
+  border: none;
+  border-radius: 0;
+  row-gap: 0;
+}
+
+.setting-group.lmsa-settings-section > .setting-items > .setting-item:last-child {
+  @apply lmsa:pb-0;
+}
+
+.setting-group.lmsa-settings-section > .setting-items > .setting-item::before {
+  border-top: none;
+  top: 0;
+  left: 0;
+  right: 0;
+}
+
+/* Only the rows drawn as `.lmsa-setting-item` carry a divider; a block row draws no line, the
+   same as the blocks that sit directly in a section body on an imperative page. */
+.setting-group.lmsa-settings-section
+  > .setting-items
+  > .setting-item:not(.lmsa-setting-item)::before {
+  content: none;
+}
+
+/* The card's headline row: the header and the lead paragraph, siblings inside the body on an
+   imperative page, share one row host here. */
+.setting-group.lmsa-settings-section > .setting-items > .lmsa-settings-section-head {
+  @apply lmsa:pb-0 lmsa:pt-5;
+}
+
+.lmsa-settings-section-head,
+.lmsa-settings-section-block {
+  @apply lmsa:block;
+}
+
+.lmsa-settings-section-head > .lmsa-settings-section-header {
+  @apply lmsa:p-0;
+}
+
+.lmsa-settings-section-head > .lmsa-settings-section-desc {
+  @apply lmsa:pt-4;
+}
+
 /* ── Warning section, animated border shimmer ─────────────────────────── */
 
 .lmsa-kg-warning {

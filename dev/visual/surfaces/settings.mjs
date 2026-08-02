@@ -1,27 +1,38 @@
-import { settingsView } from "../scaffold.mjs";
+import { settingsItemsView, settingsView } from "../scaffold.mjs";
 import { BRAND, I } from "../fixtures/icons.mjs";
 import { memoryOffState, memoryRow, memoryTable } from "../fixtures/memory.mjs";
-import { section, settingItem, sw } from "../fixtures/primitives.mjs";
+import {
+  convertedBlock,
+  convertedRow,
+  convertedSection,
+  section,
+  settingItem,
+  sw,
+} from "../fixtures/primitives.mjs";
 
 export const SETTINGS_SURFACES = {
 
-  // S16: settings General tab, two section cards.
+  // S16: settings General tab, two section cards. Converted: Obsidian's declarative renderer
+  // builds the group and row elements, so there is no panel and each card is the token host.
   settingsGeneral: {
     source: "src/settings/GeneralTab.ts",
     shot: ".setting-page",
-    html: settingsView(
-      section(
+    html: settingsItemsView(
+      convertedSection(
+        "general",
         "Active Note",
         "Include your currently open note as context so chat responses stay grounded in your writing.",
-        `${settingItem("Include active note as context", "Send the content of the currently open note alongside each request.", sw("is-enabled"))}
-        ${settingItem("Include local attachments as context when supported", "When a note is attached and the active model supports vision, send supported local image embeds from that note as extra context.", sw())}
-        ${settingItem("Note context limit", "Maximum characters of note text sent as context, 1000–200000 (default: 8000). Longer notes are trimmed; continuation commands keep the ending.", `<input type="text" value="8000">`)}`,
+        `${convertedRow("Include active note as context", "Send the content of the currently open note alongside each request.", sw("is-enabled"))}
+        ${convertedRow("Include local attachments as context when supported", "When a note is attached and the active model supports vision, send supported local image embeds from that note as extra context.", sw())}
+        ${convertedRow("Note context limit", "Maximum characters of note text sent as context, 1000–200000 (default: 8000). Longer notes are trimmed; continuation commands keep the ending.", `<input type="text" value="8000">`)}`,
         I.fileText,
       ) +
-        section(
+        convertedSection(
+          "general",
           "Support",
           "This plugin and all of its features are, and will always be, free. If it helped you get closer to achieving your creative goals, you can support this project in the following ways.",
-          `<div class="lmsa-support-grid">
+          convertedBlock(
+            `<div class="lmsa-support-grid">
             <div class="lmsa-support-card">
               <div class="lmsa-support-card-icon">${I.coffee}</div>
               <div class="lmsa-support-card-text">
@@ -30,6 +41,7 @@ export const SETTINGS_SURFACES = {
               </div>
             </div>
           </div>`,
+          ),
           I.heart,
         ),
       720,
@@ -338,23 +350,25 @@ export const SETTINGS_SURFACES = {
     ),
   },
 
-  // S21a: settings Advanced tab.
+  // S21a: settings Advanced tab. Converted, and the red tab accent now resolves on each card.
   settingsAdvanced: {
     source: "src/settings/AdvancedTab.ts",
     shot: ".setting-page",
-    html: settingsView(
-      section(
+    html: settingsItemsView(
+      convertedSection(
+        "advanced",
         "Agentic mode",
         "Allow the model to call tools: search your vault, read notes, and apply structured edits across multiple reasoning rounds.",
-        `${settingItem("Enable agentic mode", "Vault search and edit tools become available. The model can read notes and iterate before producing a response.", sw())}
-        ${settingItem("Max tool rounds", "Maximum read-only tool rounds per turn (vault search and outline inspection before the model responds or edits). Default: 8.", `<input type="text" value="8">`)}`,
+        `${convertedRow("Enable agentic mode", "Vault search and edit tools become available. The model can read notes and iterate before producing a response.", sw())}
+        ${convertedRow("Max tool rounds", "Maximum read-only tool rounds per turn (vault search and outline inspection before the model responds or edits). Default: 8.", `<input type="text" value="8">`)}`,
         I.bot,
       ) +
-        section(
+        convertedSection(
+          "advanced",
           "Document Editing",
           "Configure how AI-proposed edits are matched against your notes.",
-          `${settingItem("Diff context lines", "Number of lines shown above and below each diff hunk for context.", `<input type="text" value="3">`)}
-          ${settingItem("Minimum match confidence", "Fuzzy match confidence threshold (0–1). Matches below this score are flagged as unresolved. Default: 0.7", `<input type="text" value="0.7">`)}`,
+          `${convertedRow("Diff context lines", "Number of lines shown above and below each diff hunk for context.", `<input type="text" value="3">`)}
+          ${convertedRow("Minimum match confidence", "Fuzzy match confidence threshold (0–1). Matches below this score are flagged as unresolved. Default: 0.7", `<input type="text" value="0.7">`)}`,
           I.fileDiff,
         ),
       720,

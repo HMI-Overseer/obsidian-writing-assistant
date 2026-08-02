@@ -28,10 +28,9 @@ export class ImperativeTabPage extends SettingPage {
     super();
     this.title = title;
     // The renderers' styling hangs off these two hooks: `lmsa-settings-root` carries the design
-    // tokens and the form-control skin, and `data-tab` selects the per-tab accent. Obsidian builds
-    // `rootEl` as its own `.vertical-tab-content`, the element that used to carry both.
-    this.rootEl.addClass("lmsa-settings-root");
-    this.rootEl.setAttribute("data-tab", slug);
+    // tokens and the form-control skin, and `lmsa-tab-<slug>` selects the per-tab accent. Obsidian
+    // builds `rootEl` as its own `.vertical-tab-content`, the element that used to carry both.
+    this.rootEl.addClasses(["lmsa-settings-root", `lmsa-tab-${slug}`]);
   }
 
   display(): void {

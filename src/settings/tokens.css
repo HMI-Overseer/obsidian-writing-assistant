@@ -5,6 +5,11 @@
  * Scoped under .lmsa-settings-root so nothing leaks into Obsidian.
  * Every value references Obsidian theme variables via color-mix() and
  * falls back gracefully across light / dark themes.
+ *
+ * .lmsa-settings-root is the outermost element we own on a settings surface,
+ * which is the settings page root for a page we render ourselves and each
+ * card group for a page Obsidian renders from `items` (a definition's only
+ * styling hook is the group's `cls`, so there is nothing higher to put it on).
  * --------------------------------------------------------------------------- */
 
 .lmsa-settings-root {
@@ -55,7 +60,7 @@
  * --------------------------------------------------------------------- */
 
 .lmsa-settings-root {
-  /* ── Section accent defaults (overridden per-tab via data-tab) ──────── */
+  /* ── Section accent defaults (overridden per-tab via .lmsa-tab-*) ───── */
   --lmsa-section-accent: var(--interactive-accent);
   --lmsa-section-accent-secondary: var(--interactive-accent);
 
@@ -85,34 +90,39 @@
  * Obsidian exposes --color-red, --color-blue, --color-purple, etc. as
  * theme-aware palette colors.  Every reference falls back to
  * --interactive-accent for themes that omit the extended palette.
+ *
+ * The tab class sits on the same element as the derived tokens above,
+ * because a derived token resolves the accent of the element it is declared
+ * on, not the one it is used on. It is a class rather than an attribute so
+ * that a card group can carry it: a group definition's only hook is `cls`.
  * ----------------------------------------------------------------------- */
 
-.lmsa-settings-root[data-tab="retrieval"] {
+.lmsa-settings-root.lmsa-tab-retrieval {
   --lmsa-section-accent: var(--color-blue, var(--interactive-accent));
   --lmsa-section-accent-secondary: var(--color-blue, var(--interactive-accent));
 }
 
-.lmsa-settings-root[data-tab="knowledge-graph"] {
+.lmsa-settings-root.lmsa-tab-knowledge-graph {
   --lmsa-section-accent: var(--color-red, var(--interactive-accent));
   --lmsa-section-accent-secondary: var(--color-red, var(--interactive-accent));
 }
 
-.lmsa-settings-root[data-tab="memories"] {
+.lmsa-settings-root.lmsa-tab-memories {
   --lmsa-section-accent: var(--color-orange, var(--interactive-accent));
   --lmsa-section-accent-secondary: var(--color-orange, var(--interactive-accent));
 }
 
-.lmsa-settings-root[data-tab="commands"] {
+.lmsa-settings-root.lmsa-tab-commands {
   --lmsa-section-accent: var(--color-orange, var(--interactive-accent));
   --lmsa-section-accent-secondary: var(--color-orange, var(--interactive-accent));
 }
 
-.lmsa-settings-root[data-tab="advanced"] {
+.lmsa-settings-root.lmsa-tab-advanced {
   --lmsa-section-accent: var(--color-red, var(--interactive-accent));
   --lmsa-section-accent-secondary: var(--color-red, var(--interactive-accent));
 }
 
-.lmsa-settings-root[data-tab="benchmark"] {
+.lmsa-settings-root.lmsa-tab-benchmark {
   --lmsa-section-accent: var(--color-green, var(--interactive-accent));
   --lmsa-section-accent-secondary: var(--color-cyan, var(--interactive-accent));
 }

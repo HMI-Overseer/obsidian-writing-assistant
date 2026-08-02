@@ -169,6 +169,16 @@ export class Dropdown {
  *  produces lmsa-prefixed DOM instead of setting-item classes.
  * ════════════════════════════════════════════════════════════════════════ */
 
+export interface SettingItemOptions {
+  /**
+   * Re-dress `containerEl` itself as the row instead of appending one to it. Obsidian's declarative
+   * renderer builds the `.setting-item` host and seeds its own name and description into it before
+   * it calls a `render` definition, so a converted row takes that element over rather than nesting
+   * a second row inside it.
+   */
+  adopt?: boolean;
+}
+
 export class SettingItem {
   settingEl: HTMLElement;
   infoEl: HTMLElement;
@@ -176,8 +186,14 @@ export class SettingItem {
   descEl: HTMLElement;
   controlEl: HTMLElement;
 
-  constructor(containerEl: HTMLElement) {
-    this.settingEl = containerEl.createDiv({ cls: "lmsa-setting-item" });
+  constructor(containerEl: HTMLElement, options?: SettingItemOptions) {
+    if (options?.adopt) {
+      containerEl.empty();
+      containerEl.addClass("lmsa-setting-item");
+      this.settingEl = containerEl;
+    } else {
+      this.settingEl = containerEl.createDiv({ cls: "lmsa-setting-item" });
+    }
     this.infoEl = this.settingEl.createDiv({ cls: "lmsa-setting-item-info" });
     this.nameEl = this.infoEl.createDiv({ cls: "lmsa-setting-item-name" });
     this.descEl = this.infoEl.createDiv({ cls: "lmsa-setting-item-desc" });

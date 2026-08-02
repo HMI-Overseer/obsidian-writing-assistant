@@ -62,7 +62,7 @@ button.lmsa-chat-composer-posture-pill {
 /* ── Posture menu ─────────────────────────────────────────────────────── */
 
 .lmsa-posture-menu {
-  @apply lmsa:absolute lmsa:z-[120] lmsa:flex-col lmsa:rounded-xl lmsa:border lmsa:border-obsidian-border lmsa:p-1;
+  @apply lmsa:absolute lmsa:z-120 lmsa:flex-col lmsa:rounded-xl lmsa:border lmsa:border-obsidian-border lmsa:p-1;
   display: flex;
   bottom: calc(100% + 8px);
   /* Anchored to the pill (see the tool popover for the rationale): right

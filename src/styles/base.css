@@ -119,17 +119,17 @@
 }
 
 .lmsa-ui-pill-button {
-  @apply lmsa:cursor-pointer lmsa:whitespace-nowrap lmsa:rounded-full lmsa:border lmsa:border-obsidian-border lmsa:px-3 lmsa:py-[7px] lmsa:text-obsidian-text;
+  @apply lmsa:cursor-pointer lmsa:whitespace-nowrap lmsa:rounded-full lmsa:border lmsa:border-obsidian-border lmsa:px-3 lmsa:py-1.75 lmsa:text-obsidian-text;
   font-size: var(--font-ui-small);
   background: color-mix(in srgb, var(--background-secondary) 88%, transparent);
 }
 
 .lmsa-ui-pill-button:hover {
-  @apply lmsa:bg-[var(--background-modifier-hover)];
+  @apply lmsa:bg-(--background-modifier-hover);
 }
 
 .lmsa-ui-icon-btn {
-  @apply lmsa:inline-flex lmsa:h-[34px] lmsa:w-[34px] lmsa:cursor-pointer lmsa:items-center lmsa:justify-center lmsa:rounded-[10px] lmsa:border lmsa:border-obsidian-border lmsa:text-obsidian-muted;
+  @apply lmsa:inline-flex lmsa:h-8.5 lmsa:w-8.5 lmsa:cursor-pointer lmsa:items-center lmsa:justify-center lmsa:rounded-[10px] lmsa:border lmsa:border-obsidian-border lmsa:text-obsidian-muted;
   outline: none;
   appearance: none;
   min-height: unset;
@@ -159,7 +159,7 @@ button.lmsa-ui-icon-btn {
 }
 
 .lmsa-ui-btn {
-  @apply lmsa:inline-flex lmsa:min-h-9 lmsa:items-center lmsa:justify-center lmsa:rounded-[10px] lmsa:px-[14px] lmsa:py-2 lmsa:text-sm;
+  @apply lmsa:inline-flex lmsa:min-h-9 lmsa:items-center lmsa:justify-center lmsa:rounded-[10px] lmsa:px-3.5 lmsa:py-2 lmsa:text-sm;
 }
 
 .lmsa-ui-btn:disabled {
@@ -171,7 +171,7 @@ button.lmsa-ui-icon-btn {
 }
 
 .lmsa-ui-btn-secondary:hover:not(:disabled) {
-  @apply lmsa:bg-[var(--background-modifier-hover)];
+  @apply lmsa:bg-(--background-modifier-hover);
 }
 
 .lmsa-ui-btn-primary {
@@ -193,7 +193,7 @@ button.lmsa-ui-icon-btn {
 }
 
 .lmsa-ui-compact-btn-secondary:hover {
-  @apply lmsa:bg-[var(--background-modifier-hover)] lmsa:text-obsidian-text;
+  @apply lmsa:bg-(--background-modifier-hover) lmsa:text-obsidian-text;
 }
 
 .lmsa-ui-compact-btn-danger {
@@ -207,18 +207,18 @@ button.lmsa-ui-icon-btn {
 }
 
 .lmsa-ui-control-btn {
-  @apply lmsa:inline-flex lmsa:cursor-pointer lmsa:items-center lmsa:gap-[5px] lmsa:rounded-lg lmsa:border lmsa:border-obsidian-border lmsa:bg-transparent lmsa:px-2 lmsa:py-[5px] lmsa:text-obsidian-muted;
+  @apply lmsa:inline-flex lmsa:cursor-pointer lmsa:items-center lmsa:gap-1.25 lmsa:rounded-lg lmsa:border lmsa:border-obsidian-border lmsa:bg-transparent lmsa:px-2 lmsa:py-1.25 lmsa:text-obsidian-muted;
   font-size: var(--font-ui-smaller);
 }
 
 .lmsa-ui-control-btn:hover,
 .lmsa-ui-control-btn.is-active {
-  @apply lmsa:bg-[var(--background-modifier-hover)] lmsa:text-obsidian-text;
+  @apply lmsa:bg-(--background-modifier-hover) lmsa:text-obsidian-text;
   border-color: var(--background-modifier-border-hover, var(--background-modifier-border));
 }
 
 .lmsa-ui-chip {
-  @apply lmsa:inline-flex lmsa:max-w-[220px] lmsa:items-center lmsa:gap-[5px] lmsa:rounded-full lmsa:pb-1 lmsa:pl-2 lmsa:pr-1.5 lmsa:pt-1 lmsa:text-obsidian-muted;
+  @apply lmsa:inline-flex lmsa:max-w-55 lmsa:items-center lmsa:gap-1.25 lmsa:rounded-full lmsa:pb-1 lmsa:pl-2 lmsa:pr-1.5 lmsa:pt-1 lmsa:text-obsidian-muted;
   font-size: var(--font-ui-smaller);
   border: 1px solid color-mix(in srgb, var(--lmsa-mode-accent) 40%, var(--background-modifier-border));
   background: color-mix(in srgb, var(--lmsa-mode-accent) 10%, var(--background-secondary));
@@ -252,7 +252,7 @@ button.lmsa-ui-chip-dismiss {
 }
 
 .lmsa-ui-list-item:hover {
-  @apply lmsa:border-obsidian-border lmsa:bg-[var(--background-modifier-hover)];
+  @apply lmsa:border-obsidian-border lmsa:bg-(--background-modifier-hover);
 }
 
 .lmsa-ui-muted {

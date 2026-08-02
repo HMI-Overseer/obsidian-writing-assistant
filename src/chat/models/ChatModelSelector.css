@@ -37,7 +37,7 @@
 }
 
 .lmsa-model-dropdown {
-  @apply lmsa:absolute lmsa:left-0 lmsa:z-[120] lmsa:flex lmsa:max-h-[360px] lmsa:flex-col lmsa:overflow-hidden lmsa:rounded-[16px] lmsa:border lmsa:border-obsidian-border lmsa:p-2;
+  @apply lmsa:absolute lmsa:left-0 lmsa:z-120 lmsa:flex lmsa:max-h-90 lmsa:flex-col lmsa:overflow-hidden lmsa:rounded-2xl lmsa:border lmsa:border-obsidian-border lmsa:p-2;
   top: calc(100% + 6px);
   width: min(372px, calc(100vw - 48px));
   background:

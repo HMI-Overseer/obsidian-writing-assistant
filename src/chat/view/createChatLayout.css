@@ -59,13 +59,13 @@
 /* ── Shell ───────────────────────────────────────────────────────────────── */
 
 .lmsa-shell {
-  @apply lmsa:mx-auto lmsa:flex lmsa:h-full lmsa:max-w-[980px] lmsa:flex-col;
+  @apply lmsa:mx-auto lmsa:flex lmsa:h-full lmsa:max-w-245 lmsa:flex-col;
 }
 
 /* ── Header ──────────────────────────────────────────────────────────────── */
 
 .lmsa-chat-header {
-  @apply lmsa:flex lmsa:items-center lmsa:justify-between lmsa:gap-4 lmsa:px-[18px] lmsa:pb-3 lmsa:pt-[18px];
+  @apply lmsa:flex lmsa:items-center lmsa:justify-between lmsa:gap-4 lmsa:px-4.5 lmsa:pb-3 lmsa:pt-4.5;
 }
 
 .lmsa-chat-header-copy {
@@ -123,7 +123,7 @@
 }
 
 .lmsa-chat-window-messages {
-  @apply lmsa:flex lmsa:h-full lmsa:flex-col lmsa:gap-[18px] lmsa:overflow-y-auto lmsa:px-[18px] lmsa:pb-6 lmsa:pt-2.5;
+  @apply lmsa:flex lmsa:h-full lmsa:flex-col lmsa:gap-4.5 lmsa:overflow-y-auto lmsa:px-4.5 lmsa:pb-6 lmsa:pt-2.5;
   /* No horizontal scrollbar, wide content scrolls inside its own wrapper
      (code blocks, tables); everything else wraps or clips. */
   overflow-x: hidden;
@@ -132,7 +132,7 @@
 }
 
 .lmsa-history-backdrop {
-  @apply lmsa:pointer-events-none lmsa:absolute lmsa:inset-0 lmsa:z-[8] lmsa:opacity-0;
+  @apply lmsa:pointer-events-none lmsa:absolute lmsa:inset-0 lmsa:z-8 lmsa:opacity-0;
   background: transparent;
   transition: opacity 180ms ease;
 }
@@ -255,7 +255,7 @@ button.lmsa-empty-carousel-nav {
 /* ── Generate response button ────────────────────────────────────────────── */
 
 .lmsa-chat-composer-generate-btn {
-  @apply lmsa:absolute lmsa:z-10 lmsa:inline-flex lmsa:cursor-pointer lmsa:items-center lmsa:gap-1.5 lmsa:whitespace-nowrap lmsa:rounded-full lmsa:px-3 lmsa:py-[7px] lmsa:text-obsidian-text;
+  @apply lmsa:absolute lmsa:z-10 lmsa:inline-flex lmsa:cursor-pointer lmsa:items-center lmsa:gap-1.5 lmsa:whitespace-nowrap lmsa:rounded-full lmsa:px-3 lmsa:py-1.75 lmsa:text-obsidian-text;
   font-size: var(--font-ui-small);
   left: 50%;
   top: 0;

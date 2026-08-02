@@ -501,7 +501,7 @@
 .lmsa-empty-state,
 .lmsa-settings-note,
 .lmsa-advanced-note {
-  @apply lmsa:m-0 lmsa:rounded-[16px] lmsa:border lmsa:p-4;
+  @apply lmsa:m-0 lmsa:rounded-2xl lmsa:border lmsa:p-4;
   color: var(--lmsa-text-secondary);
   border-color: var(--lmsa-border-emphasis);
   background: var(--lmsa-surface-raised);

@@ -10,7 +10,7 @@
 
 .lmsa-chat-window-version-prev:hover:not(:disabled),
 .lmsa-chat-window-version-next:hover:not(:disabled) {
-  @apply lmsa:bg-[var(--background-modifier-hover)] lmsa:text-obsidian-text;
+  @apply lmsa:bg-(--background-modifier-hover) lmsa:text-obsidian-text;
 }
 
 .lmsa-chat-window-version-prev:disabled,

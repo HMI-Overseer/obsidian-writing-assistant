@@ -29,7 +29,7 @@ button.lmsa-profile-settings-btn {
 /* ── Popover shell ──────────────────────────────────────────────────── */
 
 .lmsa-profile-popover {
-  @apply lmsa:absolute lmsa:left-0 lmsa:z-[120] lmsa:flex lmsa:flex-col lmsa:overflow-hidden lmsa:rounded-2xl lmsa:border lmsa:border-obsidian-border lmsa:p-4;
+  @apply lmsa:absolute lmsa:left-0 lmsa:z-120 lmsa:flex lmsa:flex-col lmsa:overflow-hidden lmsa:rounded-2xl lmsa:border lmsa:border-obsidian-border lmsa:p-4;
   top: calc(100% + 6px);
   width: min(400px, calc(100vw - 48px));
   max-height: min(500px, calc(100vh - 120px));
@@ -138,7 +138,7 @@ button.lmsa-profile-settings-btn {
 
 /* Profile dropdown, a pocket edition of the model dropdown's list. */
 .lmsa-profile-menu {
-  @apply lmsa:absolute lmsa:left-0 lmsa:z-[130] lmsa:flex lmsa:flex-col lmsa:gap-0.5 lmsa:rounded-xl lmsa:border lmsa:border-obsidian-border lmsa:p-1.5;
+  @apply lmsa:absolute lmsa:left-0 lmsa:z-130 lmsa:flex lmsa:flex-col lmsa:gap-0.5 lmsa:rounded-xl lmsa:border lmsa:border-obsidian-border lmsa:p-1.5;
   top: calc(100% + 4px);
   min-width: 180px;
   max-width: 100%;

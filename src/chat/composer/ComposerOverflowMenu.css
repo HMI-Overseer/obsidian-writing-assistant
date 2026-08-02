@@ -56,7 +56,7 @@ button.lmsa-chat-composer-overflow-btn {
    like the posture menu (the clamp reserve covers the menu's min-width). */
 
 .lmsa-overflow-menu {
-  @apply lmsa:absolute lmsa:z-[120] lmsa:flex-col lmsa:rounded-xl lmsa:border lmsa:border-obsidian-border lmsa:p-1;
+  @apply lmsa:absolute lmsa:z-120 lmsa:flex-col lmsa:rounded-xl lmsa:border lmsa:border-obsidian-border lmsa:p-1;
   display: flex;
   bottom: calc(100% + 8px);
   /* Right-anchored to --lmsa-overflow-btn; the static value is the

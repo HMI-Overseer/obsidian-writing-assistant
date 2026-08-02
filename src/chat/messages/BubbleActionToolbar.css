@@ -46,7 +46,7 @@
 }
 
 .lmsa-chat-window-message-actions .lmsa-chat-window-action-btn:hover {
-  @apply lmsa:bg-[var(--background-modifier-hover)] lmsa:text-obsidian-text;
+  @apply lmsa:bg-(--background-modifier-hover) lmsa:text-obsidian-text;
   box-shadow: none;
 }
 

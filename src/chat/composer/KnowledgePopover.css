@@ -6,7 +6,7 @@
 /* ── Popover shell ────────────────────────────────────────────────── */
 
 .lmsa-knowledge-popover {
-  @apply lmsa:absolute lmsa:z-[120] lmsa:flex-col lmsa:rounded-2xl lmsa:border lmsa:border-obsidian-border lmsa:p-4;
+  @apply lmsa:absolute lmsa:z-120 lmsa:flex-col lmsa:rounded-2xl lmsa:border lmsa:border-obsidian-border lmsa:p-4;
   --lmsa-knowledge-popover-width: min(300px, calc(100% - 28px));
   bottom: calc(100% + 8px);
   /* Anchored to the knowledge chip (see the tool popover for the rationale);

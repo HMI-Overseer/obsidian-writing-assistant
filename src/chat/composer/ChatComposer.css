@@ -26,7 +26,7 @@
 }
 
 .lmsa-chat-composer-chip {
-  @apply lmsa:inline-flex lmsa:max-w-[220px] lmsa:items-center lmsa:gap-[5px] lmsa:rounded-full lmsa:pb-1 lmsa:pl-2 lmsa:pr-1.5 lmsa:pt-1 lmsa:text-obsidian-muted;
+  @apply lmsa:inline-flex lmsa:max-w-55 lmsa:items-center lmsa:gap-1.25 lmsa:rounded-full lmsa:pb-1 lmsa:pl-2 lmsa:pr-1.5 lmsa:pt-1 lmsa:text-obsidian-muted;
   font-size: var(--font-ui-smaller);
   border: 1px solid color-mix(in srgb, var(--lmsa-mode-accent) 40%, var(--background-modifier-border));
   background: color-mix(in srgb, var(--lmsa-mode-accent) 10%, var(--background-secondary));
@@ -71,7 +71,7 @@
 /* ── Composer panel ──────────────────────────────────────────────────────── */
 
 .lmsa-chat-composer-panel {
-  @apply lmsa:relative lmsa:z-[1] lmsa:overflow-visible lmsa:rounded-[10px] lmsa:border lmsa:border-obsidian-border lmsa:px-[14px] lmsa:pb-1.5 lmsa:pt-[14px];
+  @apply lmsa:relative lmsa:z-1 lmsa:overflow-visible lmsa:rounded-[10px] lmsa:border lmsa:border-obsidian-border lmsa:px-3.5 lmsa:pb-1.5 lmsa:pt-3.5;
   background: linear-gradient(
     180deg,
     color-mix(in srgb, var(--background-primary) 92%, transparent),

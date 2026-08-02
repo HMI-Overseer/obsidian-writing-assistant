@@ -7,6 +7,7 @@
  * added to the definitions is also represented in the UI.
  */
 
+import type { VaultOperation } from "../vault-ops/types";
 import { VAULT_OPS_TOOL_NAMES } from "./vault-ops/definition";
 import { EDIT_TOOL_NAMES } from "./editing/definition";
 import { MEMORY_MUTATION_TOOL_NAMES } from "./memory/definition";
@@ -99,6 +100,36 @@ export const TOOL_PENDING_LABELS: Record<string, string> = {
 /** Label for a tool-call step that is announced/pending (present tense where it matters). */
 export function pendingToolLabel(toolName: string): string {
   return TOOL_PENDING_LABELS[toolName] ?? TOOL_LABELS[toolName] ?? toolName;
+}
+
+/**
+ * The tool name behind each converted operation kind, used to label a vault-op row that
+ * has no matched timeline step of its own ({@link ../chat/messages/vaultReviewTimeline}).
+ * Two kinds share one tool wherever the tool resolves its kind from path state
+ * (`write_file` picks create/overwrite, ADR-0004).
+ *
+ * The *keys* are typechecked against {@link VaultOperation}; the *values* are tool-name
+ * strings nothing checks, so they live here beside the maps they index into rather than
+ * beside their one consumer, and the display-metadata drift guard covers them.
+ */
+export const TOOL_NAME_BY_OP_KIND: Record<VaultOperation["kind"], string> = {
+  create: "write_file",
+  overwrite: "write_file",
+  createDir: "create_directory",
+  move: "move_file",
+  trash: "trash_file",
+  moveFolder: "move_folder",
+  trashFolder: "trash_folder",
+  replaceInVault: "replace_in_vault",
+};
+
+/**
+ * Icon for a synthetic vault-op row, derived from the op's tool rather than listed a
+ * second time: a matched step already draws {@link TOOL_ICONS}, and an unmatched one
+ * must not be able to draw a different glyph for the same operation.
+ */
+export function opKindIcon(kind: VaultOperation["kind"]): string {
+  return TOOL_ICONS[TOOL_NAME_BY_OP_KIND[kind]];
 }
 
 /** Status text shown inline during tool execution (streaming UI). */

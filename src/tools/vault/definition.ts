@@ -374,21 +374,15 @@ export const ALL_VAULT_TOOLS: CanonicalToolDefinition[] = [
   SEARCH_VAULT_TOOL,
 ];
 
-/** Names of all vault tools, all are read-only (results returned to the model). */
-export const VAULT_TOOL_NAMES = new Set([
-  "semantic_search",
-  "search_content",
-  "read_file",
-  "get_outline",
-  "read_section",
-  "list_directory",
-  "directory_tree",
-  "search_files",
-  "get_backlinks",
-  "get_outgoing_links",
-  "find_notes_by_tag",
-  "get_frontmatter",
-]);
+/**
+ * Names of all vault tools, all are read-only (results returned to the model).
+ * Derived from {@link ALL_VAULT_TOOLS}, like the edit / vault-op / memory family sets,
+ * so it cannot fall behind the definitions it stands for. It classifies a refused call
+ * as read-only ({@link ../toolSurface.toolNotAllowedFailure}) and guards the read
+ * dispatch ({@link ./handlers.executeVaultTool}), so a stale entry there is a
+ * mis-classification, not a cosmetic drift.
+ */
+export const VAULT_TOOL_NAMES = new Set(ALL_VAULT_TOOLS.map((tool) => tool.name));
 
 /**
  * The ways `semantic_search` can be unavailable. Extends the static

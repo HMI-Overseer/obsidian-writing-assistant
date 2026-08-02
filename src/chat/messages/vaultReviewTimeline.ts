@@ -9,32 +9,13 @@ import type {
 import { undoVaultOpBatch } from "../../vault-ops/applyBatch";
 import { opDetailLine, opPrimaryPath } from "../../vault-ops/summary";
 import { buildWritePreviewHunk } from "../../vault-ops/writePreview";
-import { TOOL_LABELS, pendingToolLabel } from "../../tools/metadata";
+import {
+  TOOL_LABELS,
+  TOOL_NAME_BY_OP_KIND,
+  opKindIcon,
+  pendingToolLabel,
+} from "../../tools/metadata";
 import { DiffHunkView } from "./DiffHunkView";
-
-/** Icon per op kind, for synthetic fallback rows (matched steps keep their own). */
-const OP_KIND_ICONS: Record<VaultOperation["kind"], string> = {
-  create: "file-plus",
-  overwrite: "file-plus",
-  createDir: "folder-plus",
-  move: "file-symlink",
-  trash: "trash-2",
-  moveFolder: "folder-symlink",
-  trashFolder: "folder-x",
-  replaceInVault: "replace",
-};
-
-/** Tool name behind each operation kind, used for historical labels. */
-const TOOL_NAME_BY_KIND: Record<VaultOperation["kind"], string> = {
-  create: "write_file",
-  overwrite: "write_file",
-  createDir: "create_directory",
-  move: "move_file",
-  trash: "trash_file",
-  moveFolder: "move_folder",
-  trashFolder: "trash_folder",
-  replaceInVault: "replace_in_vault",
-};
 
 /**
  * Folds a {@link VaultOperationProposal} into the agentic timeline (Finding C
@@ -246,7 +227,7 @@ export class VaultReviewTimelineView {
       cls: "lmsa-agentic-timeline-step lmsa-agentic-timeline-step--tool_call",
     });
     const dotEl = stepEl.createDiv({ cls: "lmsa-agentic-timeline-dot" });
-    setIcon(dotEl, OP_KIND_ICONS[op.op.kind] ?? "wrench");
+    setIcon(dotEl, opKindIcon(op.op.kind) ?? "wrench");
     const bodyEl = stepEl.createDiv({ cls: "lmsa-agentic-timeline-step-body" });
     bodyEl.createSpan({ cls: "lmsa-agentic-timeline-step-name", text: op.summary });
     bodyEl.createSpan({
@@ -327,7 +308,7 @@ export class VaultReviewTimelineView {
     const nameEl = labelHostEl.querySelector<HTMLElement>(
       ":scope > .lmsa-agentic-timeline-step-name",
     );
-    const toolName = TOOL_NAME_BY_KIND[op.op.kind];
+    const toolName = TOOL_NAME_BY_OP_KIND[op.op.kind];
     if (nameEl) {
       nameEl.textContent =
         op.status === "applied" ? TOOL_LABELS[toolName] ?? toolName : pendingToolLabel(toolName);

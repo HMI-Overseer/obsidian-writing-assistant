@@ -89,8 +89,12 @@ export function captureStepFields(
  * stays pointers rather than chunk content. Path→content tools (`read_file`,
  * `read_section`) and listing tools (`list_directory`) get no digest, their args
  * are the pointer, or the view is re-derivable.
+ *
+ * Exported for the drift guard in `tests/unit/tools/resultDigest.test.ts`: these are
+ * tool names nothing typechecks, so a rename that misses one silently drops that tool's
+ * replay digest and degrades cold rebuild.
  */
-const DISCOVERY_DIGEST_TOOLS = new Set([
+export const DISCOVERY_DIGEST_TOOLS = new Set([
   "semantic_search",
   "search_content",
   "search_files",

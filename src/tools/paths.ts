@@ -32,8 +32,12 @@ const PATH_ARRAY_ARG_KEYS = ["paths"] as const;
  * (`write_file.path`, `move_file.to`, `create_directory.path`, `replace_in_vault.path`):
  * those are meant to be absent, and snapping one could silently retarget a new file
  * onto an existing note. Read/source/edit-target keys only.
+ *
+ * Exported for the drift guard in `tests/unit/tools/paths.test.ts`: the keys are tool
+ * names nothing typechecks, so a rename that misses one silently switches snapping off
+ * for that tool. The guard asserts every key is still an advertised tool.
  */
-const SNAP_TOOL_KEYS: Record<string, readonly string[]> = {
+export const SNAP_TOOL_KEYS: Record<string, readonly string[]> = {
   read_file: ["path"],
   get_outline: ["path"],
   read_section: ["path"],

@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   boundToolResult,
   captureStepFields,
+  DISCOVERY_DIGEST_TOOLS,
   formatAgenticReplayLines,
   formatResultDigest,
   formatStepReplayLine,
@@ -9,7 +10,10 @@ import {
   RESULT_TRUNCATION_MARKER,
   TOOL_RESULT_CHAR_LIMIT,
 } from "../../../src/tools/resultDigest";
-import { SEMANTIC_SEARCH_UNAVAILABLE_MESSAGE } from "../../../src/tools/vault/definition";
+import {
+  SEMANTIC_SEARCH_UNAVAILABLE_MESSAGE,
+  VAULT_TOOL_NAMES,
+} from "../../../src/tools/vault/definition";
 import type { AgenticStep } from "../../../src/shared/types";
 
 /**
@@ -368,5 +372,51 @@ describe("formatAgenticReplayLines", () => {
 describe("INTERRUPTED_REPLAY_MARKER", () => {
   it("is the marker resolution C appends to an aborted turn", () => {
     expect(INTERRUPTED_REPLAY_MARKER).toBe("[response interrupted by user]");
+  });
+});
+
+/**
+ * Drift guard for DISCOVERY_DIGEST_TOOLS.
+ *
+ * A rename that misses this set silently drops that tool's replay digest: the call
+ * still runs, the timeline still renders, and only a Claude Code cold rebuild is worse
+ * off, which is the one consumer nobody exercises by hand (ADR-0016). Nothing else
+ * fails, so this is the guard.
+ */
+describe("DISCOVERY_DIGEST_TOOLS drift guard", () => {
+  it("names only advertised read tools", () => {
+    for (const name of DISCOVERY_DIGEST_TOOLS) {
+      expect(
+        VAULT_TOOL_NAMES.has(name),
+        `DISCOVERY_DIGEST_TOOLS names "${name}", which is not an advertised vault read tool`,
+      ).toBe(true);
+    }
+  });
+
+  // Every member must reach a live pointer-extraction branch. A renamed tool left in
+  // the set but dropped from digestKeyArg / extractPointers would still be "covered" by
+  // membership alone, so this asserts the extraction actually produces something.
+  it("every member digests a representative hit result into pointers", () => {
+    const HIT_RESULT: Record<string, string> = {
+      semantic_search: "Results:\n[Lore/Fold.md > Origins] (score: 0.81)\nthe fold opened",
+      search_content: "Lore/Fold.md:12: the fold opened",
+      search_files: 'Files matching "Fold*" (1):\nLore/Fold.md',
+      get_backlinks: 'Notes linking to "Lore/Fold.md" (1):\nScenes/Act 1.md',
+      find_notes_by_tag: 'Notes tagged "#lore" (1):\nLore/Fold.md',
+    };
+    const ARGS: Record<string, unknown> = {
+      query: "the fold",
+      pattern: "Fold*",
+      path: "Lore/Fold.md",
+      tag: "lore",
+    };
+    for (const name of DISCOVERY_DIGEST_TOOLS) {
+      const sample = HIT_RESULT[name];
+      expect(sample, `no representative hit result for "${name}"`).toBeDefined();
+      const digest = formatResultDigest(name, ARGS, { content: sample });
+      expect(digest, `no digest produced for "${name}"`).toBeDefined();
+      expect(digest, `"${name}" digested a hit result as empty`).not.toContain("no results");
+      expect(digest).toContain("surfaced:");
+    }
   });
 });

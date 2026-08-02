@@ -1,10 +1,17 @@
 import { describe, it, expect } from "vitest";
 import { FileSystemAdapter, TFile, TFolder, normalizePath } from "obsidian";
 import {
+  SNAP_TOOL_KEYS,
   toVaultRelativePath,
   normalizeVaultToolCall,
   snapToExistingFile,
 } from "../../../src/tools/paths";
+import { ALL_VAULT_TOOLS, VAULT_TOOL_NAMES } from "../../../src/tools/vault/definition";
+import { ALL_EDIT_TOOLS, EDIT_TOOL_NAMES } from "../../../src/tools/editing/definition";
+import {
+  ALL_VAULT_OPS_TOOLS,
+  VAULT_OPS_TOOL_NAMES,
+} from "../../../src/tools/vault-ops/definition";
 import type { ToolCall } from "../../../src/tools/types";
 import type { App } from "obsidian";
 
@@ -335,5 +342,55 @@ describe("normalizeVaultToolCall confusable snapping (existing-file keys only)",
       arguments: { paths: ["Lore/Anno's Crucible.md", "Lore/Missing.md"] },
     });
     expect(out.arguments.paths).toEqual([`Lore/Anno${CURLY}s Crucible.md`, "Lore/Missing.md"]);
+  });
+});
+
+/**
+ * Drift guard for SNAP_TOOL_KEYS (the confusable-punctuation snap table).
+ *
+ * Its keys are tool names nothing typechecks, so a rename that misses one switches
+ * snapping off for that tool in silence: the call still works, it just stops resolving
+ * a curly apostrophe to the note that is right there. Nothing else in the suite would
+ * notice, because every behavioural test below names its tool explicitly.
+ */
+describe("SNAP_TOOL_KEYS drift guard", () => {
+  const ADVERTISED = new Set<string>([
+    ...VAULT_TOOL_NAMES,
+    ...EDIT_TOOL_NAMES,
+    ...VAULT_OPS_TOOL_NAMES,
+  ]);
+
+  it("keys only advertised tools", () => {
+    for (const name of Object.keys(SNAP_TOOL_KEYS)) {
+      expect(
+        ADVERTISED.has(name),
+        `SNAP_TOOL_KEYS has an entry for "${name}", which is not an advertised tool`,
+      ).toBe(true);
+    }
+  });
+
+  it("names only argument keys the tool actually declares", () => {
+    const schemaOf = new Map(
+      [...ALL_VAULT_TOOLS, ...ALL_EDIT_TOOLS, ...ALL_VAULT_OPS_TOOLS].map((t) => [t.name, t]),
+    );
+    for (const [name, keys] of Object.entries(SNAP_TOOL_KEYS)) {
+      const tool = schemaOf.get(name);
+      for (const key of keys) {
+        expect(
+          tool?.parameters.properties[key],
+          `SNAP_TOOL_KEYS["${name}"] names argument "${key}", which that tool does not declare`,
+        ).toBeDefined();
+      }
+    }
+  });
+
+  // The security-relevant half, stated as an assertion rather than only as a comment
+  // on the table: snapping a *destination* could silently retarget a new file onto an
+  // existing note. Nothing but this test says so.
+  it("never snaps a write destination", () => {
+    expect(SNAP_TOOL_KEYS.write_file).toBeUndefined();
+    expect(SNAP_TOOL_KEYS.create_directory).toBeUndefined();
+    expect(SNAP_TOOL_KEYS.replace_in_vault).toBeUndefined();
+    expect(SNAP_TOOL_KEYS.move_file).not.toContain("to");
   });
 });

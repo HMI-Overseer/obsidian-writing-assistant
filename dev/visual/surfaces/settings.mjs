@@ -8,7 +8,7 @@ export const SETTINGS_SURFACES = {
   // S16: settings General tab, two section cards.
   settingsGeneral: {
     source: "src/settings/GeneralTab.ts",
-    shot: ".lmsa-settings-shell",
+    shot: ".setting-page",
     html: settingsView(
       section(
         "Active Note",
@@ -40,7 +40,7 @@ export const SETTINGS_SURFACES = {
   // S17: settings Providers tab, provider cards (brand-tint icons, status dots, auth fields).
   settingsProviders: {
     source: "src/settings/ProvidersTab.ts",
-    shot: ".lmsa-settings-shell",
+    shot: ".setting-page",
     html: settingsView(
       `<div class="lmsa-provider-cards">
         <div class="lmsa-provider-card">
@@ -200,7 +200,7 @@ export const SETTINGS_SURFACES = {
   // S19: settings Benchmark tab, model-selection + test-suites cards.
   settingsBenchmark: {
     source: "src/settings/BenchmarkTab.ts",
-    shot: ".lmsa-settings-shell",
+    shot: ".setting-page",
     html: settingsView(
       section(
         "Model selection",
@@ -270,7 +270,7 @@ export const SETTINGS_SURFACES = {
   // S20: settings Index / RAG tab. The stale/drift notice (muted amber) is the key chip.
   settingsRag: {
     source: "src/settings/RagTab.ts",
-    shot: ".lmsa-settings-shell",
+    shot: ".setting-page",
     html: settingsView(
       section(
         "Vault retrieval",
@@ -341,7 +341,7 @@ export const SETTINGS_SURFACES = {
   // S21a: settings Advanced tab.
   settingsAdvanced: {
     source: "src/settings/AdvancedTab.ts",
-    shot: ".lmsa-settings-shell",
+    shot: ".setting-page",
     html: settingsView(
       section(
         "Agentic mode",
@@ -365,7 +365,7 @@ export const SETTINGS_SURFACES = {
   // S21d: settings Memories tab (feature card + the records table + budget bar).
   settingsMemories: {
     source: "src/settings/MemoriesTab.ts",
-    shot: ".lmsa-settings-shell",
+    shot: ".setting-page",
     html: settingsView(
       section(
         "Memory",
@@ -397,7 +397,7 @@ export const SETTINGS_SURFACES = {
   // S21e: settings Memories tab with the feature switched off (records card inactive).
   settingsMemoriesOff: {
     source: "src/settings/MemoriesTab.ts",
-    shot: ".lmsa-settings-shell",
+    shot: ".setting-page",
     html: settingsView(
       section(
         "Memory",
@@ -424,7 +424,7 @@ export const SETTINGS_SURFACES = {
   // S21b: settings Knowledge-graph tab (warning card + graph status with per-folder coverage).
   settingsKnowledgeGraph: {
     source: "src/settings/KnowledgeGraphTab.ts",
-    shot: ".lmsa-settings-shell",
+    shot: ".setting-page",
     html: settingsView(
       section(
         "Before you begin",
@@ -518,14 +518,5 @@ export const SETTINGS_SURFACES = {
       720,
       "knowledge-graph",
     ),
-  },
-
-  // S26: settings navigation rail (SettingsTab.ts renderRail), isolated from the complete settings
-  // shell used by every tab capture. Hover stays live-app: the harness is static.
-  settingsRail: {
-    source: "src/settings/SettingsTab.ts",
-    w: 720,
-    shot: ".lmsa-settings-rail",
-    html: settingsView("", 720, "general"),
   },
 };

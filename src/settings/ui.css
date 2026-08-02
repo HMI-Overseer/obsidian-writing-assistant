@@ -19,16 +19,6 @@
   opacity: var(--lmsa-shimmer-opacity);
 }
 
-/* ── Panel header ──────────────────────────────────────────────────────── */
-
-.lmsa-settings-panel-header {
-  @apply lmsa:flex lmsa:flex-col lmsa:gap-2 lmsa:px-6 lmsa:pb-5 lmsa:pt-6;
-  border-bottom: 1px solid color-mix(in srgb, var(--lmsa-border-default) 82%, transparent);
-}
-
-/* panel description is now handled by .setting-item-description
-   in SettingsTab.css via Setting.setHeading().setDesc() */
-
 /* ── Content area ──────────────────────────────────────────────────────── */
 
 .lmsa-settings-content {
@@ -495,10 +485,6 @@
 /* ── Responsive ────────────────────────────────────────────────────────── */
 
 @media (max-width: 700px) {
-  .lmsa-settings-panel-header {
-    @apply lmsa:px-4 lmsa:pt-5;
-  }
-
   .lmsa-settings-content {
     @apply lmsa:px-4 lmsa:py-4;
   }

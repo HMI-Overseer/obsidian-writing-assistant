@@ -42,10 +42,10 @@ export function auditSurfaceContracts(surfaces) {
         surface,
         id,
         [
-          "vertical-tab-content lmsa-settings-root",
-          "lmsa-settings-rail",
-          "lmsa-settings-stage",
-          "lmsa-settings-panel-heading",
+          "setting-page vertical-tab-content lmsa-settings-root",
+          "setting-page-titlebar",
+          "setting-page-content",
+          "lmsa-settings-panel",
         ],
         failures,
       );

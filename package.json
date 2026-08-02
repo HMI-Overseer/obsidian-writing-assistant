@@ -38,7 +38,7 @@
     "esbuild": "^0.21.0",
     "eslint": "^9.39.0",
     "eslint-plugin-obsidianmd": "^0.4.1",
-    "obsidian": "latest",
+    "obsidian": "1.13.1",
     "playwright": "^1.61.1",
     "postcss": "8.4.49",
     "postcss-cli": "11.0.0",

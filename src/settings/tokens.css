@@ -47,12 +47,14 @@
 }
 
 /* ── Section-accent–derived tokens ──────────────────────────────────────
- * These MUST live on .lmsa-settings-shell (not .lmsa-settings-root)
- * so they resolve against the per-tab --lmsa-section-accent override
- * set via data-tab selectors below.
+ * These sit on the same element as the per-tab --lmsa-section-accent
+ * override below, so each derived token resolves against the value that
+ * wins on that element. Moving either half to a different element breaks
+ * that: a derived token resolves the accent of the element it is declared
+ * on, not the one it is used on.
  * --------------------------------------------------------------------- */
 
-.lmsa-settings-root .lmsa-settings-shell {
+.lmsa-settings-root {
   /* ── Section accent defaults (overridden per-tab via data-tab) ──────── */
   --lmsa-section-accent: var(--interactive-accent);
   --lmsa-section-accent-secondary: var(--interactive-accent);
@@ -85,47 +87,32 @@
  * --interactive-accent for themes that omit the extended palette.
  * ----------------------------------------------------------------------- */
 
-.lmsa-settings-root .lmsa-settings-shell[data-tab="general"] {
-  --lmsa-section-accent: var(--interactive-accent);
-  --lmsa-section-accent-secondary: var(--interactive-accent);
-}
-
-.lmsa-settings-root .lmsa-settings-shell[data-tab="completion"] {
-  --lmsa-section-accent: var(--interactive-accent);
-  --lmsa-section-accent-secondary: var(--interactive-accent);
-}
-
-.lmsa-settings-root .lmsa-settings-shell[data-tab="embedding"] {
-  --lmsa-section-accent: var(--interactive-accent);
-  --lmsa-section-accent-secondary: var(--interactive-accent);
-}
-
-.lmsa-settings-root .lmsa-settings-shell[data-tab="retrieval"] {
+.lmsa-settings-root[data-tab="retrieval"] {
   --lmsa-section-accent: var(--color-blue, var(--interactive-accent));
   --lmsa-section-accent-secondary: var(--color-blue, var(--interactive-accent));
 }
 
-.lmsa-settings-root .lmsa-settings-shell[data-tab="knowledge-graph"] {
+.lmsa-settings-root[data-tab="knowledge-graph"] {
   --lmsa-section-accent: var(--color-red, var(--interactive-accent));
   --lmsa-section-accent-secondary: var(--color-red, var(--interactive-accent));
 }
 
-.lmsa-settings-root .lmsa-settings-shell[data-tab="memories"] {
+.lmsa-settings-root[data-tab="memories"] {
   --lmsa-section-accent: var(--color-orange, var(--interactive-accent));
   --lmsa-section-accent-secondary: var(--color-orange, var(--interactive-accent));
 }
 
-.lmsa-settings-root .lmsa-settings-shell[data-tab="commands"] {
+.lmsa-settings-root[data-tab="commands"] {
   --lmsa-section-accent: var(--color-orange, var(--interactive-accent));
   --lmsa-section-accent-secondary: var(--color-orange, var(--interactive-accent));
 }
 
-.lmsa-settings-root .lmsa-settings-shell[data-tab="advanced"] {
+.lmsa-settings-root[data-tab="advanced"] {
   --lmsa-section-accent: var(--color-red, var(--interactive-accent));
   --lmsa-section-accent-secondary: var(--color-red, var(--interactive-accent));
 }
 
-.lmsa-settings-root .lmsa-settings-shell[data-tab="benchmark"] {
+.lmsa-settings-root[data-tab="benchmark"] {
   --lmsa-section-accent: var(--color-green, var(--interactive-accent));
   --lmsa-section-accent-secondary: var(--color-cyan, var(--interactive-accent));
 }

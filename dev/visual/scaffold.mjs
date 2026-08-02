@@ -1,4 +1,4 @@
-import { settingsPanelHeader, settingsRail } from "./fixtures/settings.mjs";
+import { settingsPageTitlebar } from "./fixtures/settings.mjs";
 
 // Harness-only scaffolding. Never mirrors plugin CSS; it only neutralizes anchored/absolute positioning
 // so an element screenshot captures the component in flow, and gives popovers a realistic backdrop.
@@ -100,19 +100,19 @@ export const headerPopoverView = (inner, w, options) =>
     options,
   );
 
-// Settings tabs render into the plugin's own settings chain inside Obsidian's modal, NOT the chat root.
-// Reconstruct the complete rail + stage + panel, including the Obsidian Setting heading markup, so
-// the panel receives the same available width and app.css cascade as it does in the live modal.
+// Settings tabs render into a SettingPage inside Obsidian's settings modal, NOT the chat root.
+// Reconstruct the page chrome Obsidian builds around it (read from the installed app: rootEl is
+// `.setting-page.vertical-tab-content`, holding a `.setting-page-titlebar` and a
+// `.setting-page-content`), so the panel receives the same available width and app.css cascade as
+// it does in the live modal. `.lmsa-settings-root` and `data-tab` sit on the page root because
+// that is where ImperativeTabPage puts them, and the design tokens hang off both.
 export const settingsView = (inner, w = 720, tab = "general") =>
   `<div class="lmsa-harness-stage" style="width:${w}px">
-     <div class="vertical-tab-content lmsa-settings-root">
-       <div class="lmsa-settings-shell" data-tab="${tab}">
-         ${settingsRail(tab)}
-         <div class="lmsa-settings-stage">
-           <div class="lmsa-settings-panel lmsa-ui-panel">
-             ${settingsPanelHeader(tab)}
-             <div class="lmsa-settings-content">${inner}</div>
-           </div>
+     <div class="setting-page vertical-tab-content lmsa-settings-root" data-tab="${tab}">
+       ${settingsPageTitlebar(tab)}
+       <div class="setting-page-content">
+         <div class="lmsa-settings-panel lmsa-ui-panel">
+           <div class="lmsa-settings-content">${inner}</div>
          </div>
        </div>
      </div>

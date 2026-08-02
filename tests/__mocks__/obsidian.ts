@@ -5,6 +5,7 @@
 
 export class Plugin {}
 export class PluginSettingTab {}
+export class SettingPage {}
 export class ItemView {
   contentEl = document.createElement("div");
 }

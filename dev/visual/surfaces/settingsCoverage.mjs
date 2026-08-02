@@ -293,7 +293,7 @@ const populatedBenchmarkSection = section(
 export const SETTINGS_COVERAGE_SURFACES = {
   settingsCommands: {
     source: "src/settings/CommandsTab.ts",
-    shot: ".lmsa-settings-shell",
+    shot: ".setting-page",
     html: settingsView(
       commandLibrary(
         commandRow(
@@ -310,7 +310,7 @@ export const SETTINGS_COVERAGE_SURFACES = {
 
   settingsCommandsEmpty: {
     source: "src/settings/CommandsTab.ts",
-    shot: ".lmsa-settings-shell",
+    shot: ".setting-page",
     html: settingsView(
       commandLibrary(
         '<p class="lmsa-empty-state">No custom commands configured yet.</p>',
@@ -322,7 +322,7 @@ export const SETTINGS_COVERAGE_SURFACES = {
 
   settingsVaultOps: {
     source: "src/settings/VaultOpsTab.ts",
-    shot: ".lmsa-settings-shell",
+    shot: ".setting-page",
     html: settingsView(
       section(
         "Approvals",
@@ -357,7 +357,7 @@ export const SETTINGS_COVERAGE_SURFACES = {
 
   settingsBenchmarkPopulated: {
     source: "src/settings/benchmark/BenchmarkRenderers.ts",
-    shot: ".lmsa-settings-shell",
+    shot: ".setting-page",
     html: settingsView(populatedBenchmarkSection, 720, "benchmark"),
   },
 };

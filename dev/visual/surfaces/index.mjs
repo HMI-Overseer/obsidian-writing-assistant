@@ -107,7 +107,6 @@ const SURFACE_ORDER = [
   "editReviewTimeline",
   "editReviewDeclined",
   "inlineDiff",
-  "settingsRail",
   "memoryModal",
   "commandModal",
   "apiKeysDisclaimerModal",

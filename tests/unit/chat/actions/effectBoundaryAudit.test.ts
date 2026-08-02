@@ -184,7 +184,7 @@ const writeCall: ToolCall = {
 };
 const editCall: ToolCall = {
   id: "toolu_edit",
-  name: "propose_edit",
+  name: "edit",
   arguments: { path: "Notes/target.md", edits: [] },
 };
 const memoryCall: ToolCall = {

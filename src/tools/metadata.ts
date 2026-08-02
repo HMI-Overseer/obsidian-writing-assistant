@@ -26,7 +26,7 @@ export const TOOL_ICONS: Record<string, string> = {
   get_outgoing_links: "external-link",
   find_notes_by_tag: "tag",
   get_frontmatter: "file-code",
-  propose_edit: "pencil",
+  edit: "pencil",
   insert_into_note: "list-plus",
   update_frontmatter: "file-code-2",
   write_file: "file-plus",
@@ -57,7 +57,7 @@ export const TOOL_LABELS: Record<string, string> = {
   get_outgoing_links: "Found outgoing links",
   find_notes_by_tag: "Found notes by tag",
   get_frontmatter: "Read frontmatter",
-  propose_edit: "Proposed edit",
+  edit: "Proposed edit",
   insert_into_note: "Inserted into note",
   update_frontmatter: "Updated frontmatter",
   write_file: "Wrote file",
@@ -73,6 +73,30 @@ export const TOOL_LABELS: Record<string, string> = {
   forget_memory: "Forgot memory",
   ask_user: "Asked for guidance",
 };
+
+/**
+ * Display metadata for tool names the surface no longer advertises (RFC-0015).
+ *
+ * A conversation recorded before a rename holds the name that turn really called, and
+ * that record is never rewritten: only the display lookups learn the old spelling, so
+ * the saved turn renders exactly as it did the day it was written instead of falling
+ * back to a raw name and the generic wrench. Nothing dispatches on these keys, and no
+ * retired name is ever advertised to a model. The stage that retires a name adds its
+ * row here, so this table is also the list of names that have ever been in the surface.
+ */
+const RETIRED_TOOL_DISPLAY: Record<string, { icon: string; label: string }> = {
+  propose_edit: { icon: "pencil", label: "Proposed edit" },
+};
+
+/** Icon for a recorded tool call, including one naming a retired tool. */
+export function toolIcon(toolName: string): string {
+  return TOOL_ICONS[toolName] ?? RETIRED_TOOL_DISPLAY[toolName]?.icon ?? "wrench";
+}
+
+/** Past-tense label for a recorded tool call, including one naming a retired tool. */
+export function toolLabel(toolName: string): string {
+  return TOOL_LABELS[toolName] ?? RETIRED_TOOL_DISPLAY[toolName]?.label ?? toolName;
+}
 
 /**
  * Present-tense label for a mutating step *while it is still awaiting approval*, so a
@@ -99,7 +123,7 @@ export const TOOL_PENDING_LABELS: Record<string, string> = {
 
 /** Label for a tool-call step that is announced/pending (present tense where it matters). */
 export function pendingToolLabel(toolName: string): string {
-  return TOOL_PENDING_LABELS[toolName] ?? TOOL_LABELS[toolName] ?? toolName;
+  return TOOL_PENDING_LABELS[toolName] ?? toolLabel(toolName);
 }
 
 /**
@@ -146,7 +170,7 @@ export const TOOL_STATUS_LABELS: Record<string, string> = {
   get_outgoing_links: "Finding outgoing links...",
   find_notes_by_tag: "Finding notes by tag...",
   get_frontmatter: "Reading frontmatter...",
-  propose_edit: "Composing edit...",
+  edit: "Composing edit...",
   insert_into_note: "Inserting into note...",
   update_frontmatter: "Updating frontmatter...",
   write_file: "Writing file...",
@@ -206,7 +230,10 @@ export function extractToolInput(
     case "get_outgoing_links": return typeof args.path === "string" ? args.path : undefined;
     case "find_notes_by_tag": return typeof args.tag === "string" ? args.tag : undefined;
     case "get_frontmatter": return Array.isArray(args.paths) ? `${args.paths.length} note(s)` : undefined;
-    case "propose_edit": return typeof args.explanation === "string" ? args.explanation : undefined;
+    // "propose_edit" is retired ({@link RETIRED_TOOL_DISPLAY}); it stays here so a saved
+    // turn that called it still shows its explanation rather than losing the detail line.
+    case "propose_edit":
+    case "edit": return typeof args.explanation === "string" ? args.explanation : undefined;
     case "insert_into_note": return typeof args.explanation === "string" ? args.explanation : undefined;
     case "update_frontmatter": return typeof args.explanation === "string" ? args.explanation : undefined;
     case "write_file": return typeof args.path === "string" ? args.path : undefined;

@@ -11,7 +11,7 @@ import type { DiffMode } from "./DiffHunkView";
 /**
  * Folds an edit proposal's diff review into the agentic timeline, the edit-channel
  * sibling of {@link ../messages/vaultReviewTimeline.VaultReviewTimelineView}. The
- * `propose_edit` / `update_frontmatter` calls are already timeline steps, so each
+ * `edit` / `update_frontmatter` calls are already timeline steps, so each
  * hunk's review lives *on its step*: approve / decline (and undo) sit inline on the
  * step row exactly like a vault op, and the diff renders always-visible directly
  * beneath the step, nested under the timeline so the connecting line stays

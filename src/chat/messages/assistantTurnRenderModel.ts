@@ -11,9 +11,9 @@ import type {
 } from "../turns/AssistantTurnBuilder";
 import { getActiveAssistantRevision } from "../conversation/assistantRevisions";
 import {
-  TOOL_LABELS,
   extractToolInput,
   pendingToolLabel,
+  toolLabel,
 } from "../../tools/metadata";
 import { GENERATION_STOPPED_LABEL } from "../types";
 
@@ -417,7 +417,7 @@ function buildRenderItem(
     ...(item.askStatus === undefined
       ? {}
       : { askStatus: item.askStatus }),
-    label: toolLabel(item),
+    label: stepLabel(item),
     accessibleState: accessibleToolState(item.state),
     hasDisclosure: hasToolDisclosure(item, args),
     marker: "tool",
@@ -473,7 +473,7 @@ function parseArgumentObject(
   }
 }
 
-function toolLabel(
+function stepLabel(
   item: Extract<AssistantTurnSnapshotItem, { type: "tool_call" }>,
 ): string {
   if (item.toolName === "ask_user") {
@@ -485,7 +485,7 @@ function toolLabel(
   if (item.state === "declared" || item.state === "running") {
     return pendingToolLabel(item.toolName);
   }
-  return TOOL_LABELS[item.toolName] ?? item.toolName;
+  return toolLabel(item.toolName);
 }
 
 function accessibleToolState(

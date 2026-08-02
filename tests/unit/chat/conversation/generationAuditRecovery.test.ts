@@ -54,7 +54,7 @@ function orphan(
         family: "edit",
         targetId: "Notes/b.md",
         correlation: { kind: "provider_id", toolCallId: "toolu_2" },
-        summary: "propose_edit Notes/b.md",
+        summary: "edit Notes/b.md",
         recordedAt: 1700000000002,
         outcome: "resolved",
       },

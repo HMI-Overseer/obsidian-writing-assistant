@@ -1,12 +1,12 @@
 import { describe, test, expect } from "vitest";
 import {
-  validateProposeEdit,
+  validateEdit,
   validateUpdateFrontmatter,
 } from "../../../src/tools/editing/validation";
 
-describe("validateProposeEdit", () => {
+describe("validateEdit", () => {
   test("accepts valid args", () => {
-    const result = validateProposeEdit({ search: "old", replace: "new" });
+    const result = validateEdit({ search: "old", replace: "new" });
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.args.search).toBe("old");
@@ -15,31 +15,31 @@ describe("validateProposeEdit", () => {
   });
 
   test("accepts empty replace for deletions", () => {
-    const result = validateProposeEdit({ search: "old", replace: "" });
+    const result = validateEdit({ search: "old", replace: "" });
     expect(result.ok).toBe(true);
     if (result.ok) expect(result.args.replace).toBe("");
   });
 
   test("treats undefined replace as empty string", () => {
-    const result = validateProposeEdit({ search: "old" });
+    const result = validateEdit({ search: "old" });
     expect(result.ok).toBe(true);
     if (result.ok) expect(result.args.replace).toBe("");
   });
 
   test("rejects non-string search", () => {
-    const result = validateProposeEdit({ search: 123, replace: "new" });
+    const result = validateEdit({ search: 123, replace: "new" });
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error).toContain("search must be a string");
   });
 
   test("parses the optional path argument", () => {
-    const result = validateProposeEdit({ path: "Lore/The Fold.md", search: "old", replace: "new" });
+    const result = validateEdit({ path: "Lore/The Fold.md", search: "old", replace: "new" });
     expect(result.ok).toBe(true);
     if (result.ok) expect(result.args.path).toBe("Lore/The Fold.md");
   });
 
   test("leaves path undefined when omitted (host enforces it)", () => {
-    const result = validateProposeEdit({ search: "old", replace: "new" });
+    const result = validateEdit({ search: "old", replace: "new" });
     expect(result.ok).toBe(true);
     if (result.ok) expect(result.args.path).toBeUndefined();
   });

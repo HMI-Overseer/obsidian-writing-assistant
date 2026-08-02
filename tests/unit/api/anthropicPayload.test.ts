@@ -82,7 +82,7 @@ describe("buildAnthropicMessages", () => {
       {
         role: "assistant",
         content: "Editing now.",
-        toolCalls: [{ id: "tc1", name: "propose_edit", arguments: { path: "a.md" } }],
+        toolCalls: [{ id: "tc1", name: "edit", arguments: { path: "a.md" } }],
         anthropicThinkingBlocks: thinking,
       },
       { role: "tool", content: "ok", toolCallId: "tc1" },
@@ -94,7 +94,7 @@ describe("buildAnthropicMessages", () => {
       { type: "thinking", thinking: "consider the edit", signature: "sig-1" },
       { type: "redacted_thinking", data: "opaque" },
       { type: "text", text: "Editing now." },
-      { type: "tool_use", id: "tc1", name: "propose_edit", input: { path: "a.md" } },
+      { type: "tool_use", id: "tc1", name: "edit", input: { path: "a.md" } },
     ]);
   });
 
@@ -418,7 +418,7 @@ describe("buildAnthropicPayload", () => {
 
   test("includes tools when provided", () => {
     const tools = [{
-      name: "propose_edit",
+      name: "edit",
       description: "Edit.",
       input_schema: { type: "object" as const, properties: {}, required: [] },
     }];
@@ -588,7 +588,7 @@ describe("buildAnthropicPayload reasoning → adaptive thinking + effort (by mod
   // FORCED tool_choice conflicts).
   test("emits thinking + effort alongside tools (gate lifted)", () => {
     const tools = [{
-      name: "propose_edit",
+      name: "edit",
       description: "Edit.",
       input_schema: { type: "object" as const, properties: {}, required: [] },
     }];

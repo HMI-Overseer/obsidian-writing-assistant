@@ -1,6 +1,6 @@
 import { describe, test, expect } from "vitest";
 import {
-  PROPOSE_EDIT_TOOL,
+  EDIT_TOOL,
   UPDATE_FRONTMATTER_TOOL,
   ALL_EDIT_TOOLS,
 } from "../../../src/tools/editing/definition";
@@ -19,14 +19,14 @@ import { cloudStableToolSet } from "../../../src/tools/toolSurface";
 import { toolCallsToEditBlocks } from "../../../src/tools/editing/conversion";
 import type { ToolCall } from "../../../src/tools/types";
 
-describe("PROPOSE_EDIT_TOOL", () => {
+describe("EDIT_TOOL", () => {
   test("has correct name and required params", () => {
-    expect(PROPOSE_EDIT_TOOL.name).toBe("propose_edit");
-    expect(PROPOSE_EDIT_TOOL.parameters.required).toEqual(["path", "search", "replace"]);
+    expect(EDIT_TOOL.name).toBe("edit");
+    expect(EDIT_TOOL.parameters.required).toEqual(["path", "search", "replace"]);
   });
 
   test("has path, search, replace, and explanation properties", () => {
-    const props = PROPOSE_EDIT_TOOL.parameters.properties;
+    const props = EDIT_TOOL.parameters.properties;
     expect(props.path).toBeDefined();
     expect(props.search).toBeDefined();
     expect(props.replace).toBeDefined();
@@ -46,7 +46,7 @@ describe("ALL_EDIT_TOOLS", () => {
   test("contains exactly 3 tools", () => {
     expect(ALL_EDIT_TOOLS).toHaveLength(3);
     const names = ALL_EDIT_TOOLS.map((t) => t.name);
-    expect(names).toContain("propose_edit");
+    expect(names).toContain("edit");
     expect(names).toContain("update_frontmatter");
     expect(names).toContain("insert_into_note");
   });
@@ -171,16 +171,16 @@ describe("SEMANTIC_SEARCH_UNAVAILABLE_MESSAGE", () => {
 });
 
 describe("toolCallsToEditBlocks", () => {
-  test("converts propose_edit tool calls to EditBlocks", () => {
+  test("converts edit tool calls to EditBlocks", () => {
     const toolCalls: ToolCall[] = [
       {
         id: "tc_1",
-        name: "propose_edit",
+        name: "edit",
         arguments: { search: "old text", replace: "new text" },
       },
       {
         id: "tc_2",
-        name: "propose_edit",
+        name: "edit",
         arguments: { search: "another", replace: "" },
       },
     ];
@@ -226,7 +226,7 @@ describe("toolCallsToEditBlocks", () => {
     const toolCalls: ToolCall[] = [
       {
         id: "tc_1",
-        name: "propose_edit",
+        name: "edit",
         arguments: { path: "Lore/The Fold.md", search: "a", replace: "b" },
       },
       {
@@ -241,11 +241,11 @@ describe("toolCallsToEditBlocks", () => {
     expect(blocks[1].targetPath).toBe("Lore/The Fold.md");
   });
 
-  test("normalizes literal \\n escape sequences in propose_edit arguments", () => {
+  test("normalizes literal \\n escape sequences in edit arguments", () => {
     const toolCalls: ToolCall[] = [
       {
         id: "tc_1",
-        name: "propose_edit",
+        name: "edit",
         arguments: {
           search: "line 1\\nline 2",
           replace: "new line 1\\nnew line 2\\n",
@@ -262,7 +262,7 @@ describe("toolCallsToEditBlocks", () => {
     const toolCalls: ToolCall[] = [
       {
         id: "tc_1",
-        name: "propose_edit",
+        name: "edit",
         arguments: { search: "col1\\tcol2", replace: "col1\\tcol2\\\\end" },
       },
     ];
@@ -276,12 +276,12 @@ describe("toolCallsToEditBlocks", () => {
     const toolCalls: ToolCall[] = [
       {
         id: "tc_1",
-        name: "propose_edit",
+        name: "edit",
         arguments: { search: 123, replace: "new" }, // search is not a string
       },
       {
         id: "tc_2",
-        name: "propose_edit",
+        name: "edit",
         arguments: { search: "valid", replace: "also valid" },
       },
     ];
@@ -295,7 +295,7 @@ describe("toolCallsToEditBlocks", () => {
     const toolCalls: ToolCall[] = [
       {
         id: "tc_1",
-        name: "propose_edit",
+        name: "edit",
         arguments: { search: "line 1\nline 2", replace: "new\ntext" },
       },
     ];
@@ -354,7 +354,7 @@ describe("toolCallsToEditBlocks", () => {
 
   test("merges update_frontmatter alongside other tool types", () => {
     const toolCalls: ToolCall[] = [
-      { id: "tc_1", name: "propose_edit", arguments: { search: "a", replace: "b" } },
+      { id: "tc_1", name: "edit", arguments: { search: "a", replace: "b" } },
       {
         id: "tc_2",
         name: "update_frontmatter",
@@ -369,7 +369,7 @@ describe("toolCallsToEditBlocks", () => {
 
     const blocks = toolCallsToEditBlocks(toolCalls);
     expect(blocks).toHaveLength(2);
-    expect(blocks[0].id).toBe("tc_1"); // propose_edit first
+    expect(blocks[0].id).toBe("tc_1"); // edit first
     expect(blocks[1].toolName).toBe("update_frontmatter"); // merged FM block last
     expect(blocks[1].toolArgs?.operations).toHaveLength(2);
   });

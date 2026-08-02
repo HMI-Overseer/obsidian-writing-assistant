@@ -37,7 +37,7 @@ const turn: AssistantTurnRecord = {
       id: "item-edit",
       segmentId: "segment-1",
       toolCallId: "call-edit",
-      toolName: "propose_edit",
+      toolName: "edit",
       toolArguments: "{}",
       toolArgs: {},
       state: "completed",

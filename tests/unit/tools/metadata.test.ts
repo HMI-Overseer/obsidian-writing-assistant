@@ -10,6 +10,8 @@ import {
   TOOL_STATUS_LABELS,
   opKindIcon,
   pendingToolLabel,
+  toolIcon,
+  toolLabel,
 } from "../../../src/tools/metadata";
 import { VAULT_TOOL_NAMES } from "../../../src/tools/vault/definition";
 import { EDIT_TOOL_NAMES } from "../../../src/tools/editing/definition";
@@ -151,6 +153,28 @@ describe("display-metadata coverage", () => {
       expect(TOOL_PENDING_LABELS[name]).toBeUndefined();
       expect(pendingToolLabel(name)).toBe(TOOL_LABELS[name]);
     }
+  });
+});
+
+// A conversation recorded before RFC-0015 holds the tool name that turn really called,
+// and nothing rewrites it. The two lookups that read a *persisted* name (the timeline
+// step label and the rail icon) therefore have to answer for a retired name, or the
+// saved turn degrades to the raw string and the generic wrench the moment the rename
+// lands. Every stage that retires a name adds its case here.
+describe("retired tool names still render", () => {
+  test("propose_edit keeps its label and icon after becoming edit", () => {
+    expect(toolLabel("propose_edit")).toBe("Proposed edit");
+    expect(toolIcon("propose_edit")).toBe("pencil");
+  });
+
+  test("a retired name is not advertised, and its pending label is the retired one", () => {
+    expect(EDIT_TOOL_NAMES.has("propose_edit")).toBe(false);
+    expect(pendingToolLabel("propose_edit")).toBe("Proposed edit");
+  });
+
+  test("a name that never existed still falls back to the raw name and the wrench", () => {
+    expect(toolLabel("nonexistent_tool")).toBe("nonexistent_tool");
+    expect(toolIcon("nonexistent_tool")).toBe("wrench");
   });
 });
 

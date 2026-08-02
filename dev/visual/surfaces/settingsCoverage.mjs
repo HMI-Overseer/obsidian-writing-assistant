@@ -349,7 +349,7 @@ export const SETTINGS_COVERAGE_SURFACES = {
         ${convertedRow("Move or rename", "Moving or renaming a note. Wikilinks and backlinks are rewritten automatically.", gateSelect())}
         ${convertedRow("Trash file", "Sending a note to trash (honoring your deleted-files preference). Files only.", gateSelect())}
         ${convertedRow("Create folder", "Creating a folder. Idempotent, does nothing if it already exists.", gateSelect())}
-        ${convertedRow("Edit document", "Targeted in-document changes and frontmatter updates (propose_edit, update_frontmatter). Ask shows the diff and waits; Auto-apply lands the edit without a click, even on a note you don't have open.", gateSelect())}`,
+        ${convertedRow("Edit document", "Targeted in-document changes and frontmatter updates (edit, update_frontmatter). Ask shows the diff and waits; Auto-apply lands the edit without a click, even on a note you don't have open.", gateSelect())}`,
         I.shieldCheck,
       ) +
         convertedSection(

@@ -46,7 +46,7 @@ const CTX_PATH = "folder/test.md";
 // ---------------------------------------------------------------------------
 
 describe("resolveStructuralEditBlocks", () => {
-  test("passes through regular propose_edit blocks unchanged", async () => {
+  test("passes through regular edit blocks unchanged", async () => {
     const app = mockApp({});
     const blocks: EditBlock[] = [
       { id: "1", searchText: "old", replaceText: "new", rawBlock: "[tc:1]" },
@@ -274,10 +274,10 @@ describe("resolveStructuralEditBlocks", () => {
 });
 
 // ---------------------------------------------------------------------------
-// propose_edit, whitespace-tolerant matching (tool-set-review H1)
+// edit, whitespace-tolerant matching (tool-set-review H1)
 // ---------------------------------------------------------------------------
 
-describe("executeEditTool, propose_edit whitespace-tolerant matching", () => {
+describe("executeEditTool, edit whitespace-tolerant matching", () => {
   test("matches search text that differs only in indentation, instead of a false no-match", async () => {
     // The note indents with a tab; the model reconstructs it with two spaces. A
     // bare indexOf misses (burning a round); the whitespace-normalized fallback
@@ -287,7 +287,7 @@ describe("executeEditTool, propose_edit whitespace-tolerant matching", () => {
     const result = await executeEditTool(
       {
         id: "t",
-        name: "propose_edit",
+        name: "edit",
         arguments: {
           path: CTX_PATH,
           search: "  He drew the blade slowly.",
@@ -308,7 +308,7 @@ describe("executeEditTool, propose_edit whitespace-tolerant matching", () => {
     const result = await executeEditTool(
       {
         id: "t",
-        name: "propose_edit",
+        name: "edit",
         arguments: { path: CTX_PATH, search: "He drew the blade slowly.", replace: "x" },
       },
       { app, filePath: CTX_PATH },
@@ -324,7 +324,7 @@ describe("executeEditTool, propose_edit whitespace-tolerant matching", () => {
     const result = await executeEditTool(
       {
         id: "t",
-        name: "propose_edit",
+        name: "edit",
         arguments: { path: CTX_PATH, search: "She sheathed the sword.", replace: "x" },
       },
       { app, filePath: CTX_PATH },
@@ -336,10 +336,10 @@ describe("executeEditTool, propose_edit whitespace-tolerant matching", () => {
 });
 
 // ---------------------------------------------------------------------------
-// propose_edit, path boundary
+// edit, path boundary
 // ---------------------------------------------------------------------------
 
-describe("executeEditTool, propose_edit path boundary", () => {
+describe("executeEditTool, edit path boundary", () => {
   test("names the boundary for an out-of-vault path, before resolving the target", async () => {
     const getFileByPath = vi.fn();
     const getActiveFile = vi.fn();
@@ -350,7 +350,7 @@ describe("executeEditTool, propose_edit path boundary", () => {
 
     for (const path of ["../../escape.md", "C:/Windows/x.md"]) {
       const result = await executeEditTool(
-        { id: "t", name: "propose_edit", arguments: { path, search: "a", replace: "b" } },
+        { id: "t", name: "edit", arguments: { path, search: "a", replace: "b" } },
         { app, filePath: CTX_PATH },
       );
       expect(result.isError).toBe(true);

@@ -45,7 +45,7 @@ function cfg(): SessionConfig {
     systemPrompt: "Be concise.",
     reasoning: "off",
     agenticMode: true,
-    toolNames: ["propose_edit"],
+    toolNames: ["edit"],
   };
 }
 

@@ -192,7 +192,7 @@
                     "id": "call_fixture_bad_args",
                     "type": "function",
                     "function": {
-                      "name": "propose_edit",
+                      "name": "edit",
                       "arguments": "{\"path\":\"Fixtures/a.md\",\"search\":"
                     }
                   }

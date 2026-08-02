@@ -58,7 +58,7 @@ describe("resolveEdits, match type", () => {
   });
 });
 
-describe("findEditMatch (propose_edit preflight)", () => {
+describe("findEditMatch (edit preflight)", () => {
   it("returns an exact match offset for a verbatim search", () => {
     const doc = "# Title\n\nThe quick brown fox.";
     const m = findEditMatch("quick brown", doc);

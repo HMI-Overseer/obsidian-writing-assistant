@@ -8,8 +8,8 @@ import { toolFailure } from "../toolFailure";
 import { refuseOutsideVault } from "../pathBoundary";
 import { EDIT_TOOL_NAMES } from "./definition";
 import {
+  validateEdit,
   validateInsertIntoNote,
-  validateProposeEdit,
   validateUpdateFrontmatter,
 } from "./validation";
 import type { FrontmatterOperation, InsertWhere } from "./validation";
@@ -42,8 +42,8 @@ export async function executeEditTool(
   }
 
   switch (toolCall.name) {
-    case "propose_edit":
-      return executeProposeEdit(toolCall.arguments, ctx);
+    case "edit":
+      return executeEdit(toolCall.arguments, ctx);
     case "insert_into_note":
       return executeInsertIntoNote(toolCall.arguments, ctx);
     case "update_frontmatter":
@@ -115,15 +115,15 @@ function noTargetFailure(
   });
 }
 
-async function executeProposeEdit(
+async function executeEdit(
   args: Record<string, unknown>,
   ctx: ToolExecutionContext,
 ): Promise<ToolResult> {
-  const v = validateProposeEdit(args);
+  const v = validateEdit(args);
   if (!v.ok) {
     return toolFailure({
       kind: "invalid-args",
-      what: `invalid propose_edit arguments: ${v.error}`,
+      what: `invalid edit arguments: ${v.error}`,
       isReadOnly: false,
     });
   }
@@ -188,7 +188,7 @@ async function executeInsertIntoNote(
   }
 
   // Name an out-of-vault `path` at the boundary before any lookup (mirrors
-  // executeProposeEdit), so the model gets the boundary reason, not a generic
+  // executeEdit), so the model gets the boundary reason, not a generic
   // "not found" that points it to search for an unreachable path.
   if (v.args.path) {
     const outside = refuseOutsideVault(v.args.path, false);

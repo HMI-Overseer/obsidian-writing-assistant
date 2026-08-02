@@ -65,7 +65,7 @@ export interface EditMatch {
  * time for its first two tiers: exact, then whitespace-normalized. Returns the
  * LF-space offset and matched tier, or null when neither tier matches.
  *
- * Shared with the propose_edit in-loop preflight ({@link ../tools/editing/handlers}),
+ * Shared with the edit in-loop preflight ({@link ../tools/editing/handlers}),
  * whose old bare `indexOf` rejected edits the apply step would have accepted on a
  * whitespace difference alone (tabs vs spaces, collapsed runs), the classic
  * search/replace friction (tool-set-review H1). Tier 3 (fuzzy) is deliberately

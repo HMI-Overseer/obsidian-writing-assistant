@@ -1,8 +1,8 @@
 import type { ToolCall } from "../types";
 import type { EditBlock } from "../../editing/editTypes";
 import {
+  validateEdit,
   validateInsertIntoNote,
-  validateProposeEdit,
   validateUpdateFrontmatter,
 } from "./validation";
 import type { FrontmatterOperation } from "./validation";
@@ -109,8 +109,8 @@ function mergeUpdateFrontmatterCalls(calls: ToolCall[]): EditBlock | null {
  */
 export function convertToolCallToEditBlock(tc: ToolCall): EditBlock | null {
   switch (tc.name) {
-    case "propose_edit": {
-      const v = validateProposeEdit(tc.arguments);
+    case "edit": {
+      const v = validateEdit(tc.arguments);
       if (!v.ok) return null; // surfaced to the model via the loop's editError result
       return {
         id: tc.id,

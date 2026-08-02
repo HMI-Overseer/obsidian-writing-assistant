@@ -23,7 +23,7 @@
  * pre-existing file (e.g. undo of a trashed attachment) regardless of type.
  *
  * Note: only `.md` is fully addressable by the markdown-indexed tools
- * (`search_content` / `propose_edit` / `update_frontmatter`); `.canvas` is a real
+ * (`search_content` / `edit` / `update_frontmatter`); `.canvas` is a real
  * Obsidian document but those tools won't see it. Extend
  * {@link WRITABLE_FILE_EXTENSIONS} to widen the allowlist.
  *

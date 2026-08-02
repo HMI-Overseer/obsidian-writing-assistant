@@ -44,7 +44,7 @@ export function getToolTestCases(): BenchmarkTestCase[] {
       id: "tool-basic-call",
       name: "Basic tool call",
       description:
-        "Model should respond with at least one propose_edit tool call when asked to edit a passage. " +
+        "Model should respond with at least one edit tool call when asked to edit a passage. " +
         "Validates that the model uses tools rather than outputting raw text edits.",
       document: TOOL_TEST_DOC,
       systemPromptSuffix: TOOL_EDIT_SYSTEM_PROMPT,
@@ -55,7 +55,7 @@ export function getToolTestCases(): BenchmarkTestCase[] {
       evaluate: evaluateBasicToolCall,
       criteria: {
         expectedOutcome:
-          "Model produces at least one propose_edit call with valid arguments whose search text matches the document and covers the requested phrase.",
+          "Model produces at least one edit call with valid arguments whose search text matches the document and covers the requested phrase.",
         targetKeywords: ["twelve feet tall"],
         targetLabel: "Text to edit in commission section",
         notes:
@@ -66,7 +66,7 @@ export function getToolTestCases(): BenchmarkTestCase[] {
       id: "tool-correct-selection",
       name: "Correct tool for frontmatter",
       description:
-        "When asked to modify frontmatter, model should use update_frontmatter rather than propose_edit.",
+        "When asked to modify frontmatter, model should use update_frontmatter rather than edit.",
       document: TOOL_TEST_DOC,
       systemPromptSuffix: TOOL_EDIT_SYSTEM_PROMPT,
       tools: ALL_EDIT_TOOLS,
@@ -75,10 +75,10 @@ export function getToolTestCases(): BenchmarkTestCase[] {
       ],
       evaluate: evaluateCorrectToolSelection,
       criteria: {
-        expectedOutcome: "Model uses update_frontmatter tool (not propose_edit) to modify frontmatter properties.",
+        expectedOutcome: "Model uses update_frontmatter tool (not edit) to modify frontmatter properties.",
         targetKeywords: ["update_frontmatter"],
         targetLabel: "Correct tool for frontmatter changes",
-        forbiddenKeywords: ["propose_edit"],
+        forbiddenKeywords: ["edit"],
         forbiddenLabel: "Wrong tool for frontmatter",
       },
     },
@@ -86,7 +86,7 @@ export function getToolTestCases(): BenchmarkTestCase[] {
       id: "tool-search-precision",
       name: "Search text precision",
       description:
-        "Model's propose_edit search text should be short and precise, not the entire document or large sections.",
+        "Model's edit search text should be short and precise, not the entire document or large sections.",
       document: TOOL_TEST_DOC,
       systemPromptSuffix: TOOL_EDIT_SYSTEM_PROMPT,
       tools: ALL_EDIT_TOOLS,
@@ -96,7 +96,7 @@ export function getToolTestCases(): BenchmarkTestCase[] {
       evaluate: evaluateSearchPrecision,
       criteria: {
         expectedOutcome:
-          "Model's propose_edit search text is under 200 characters, contains the target phrase, and matches the document.",
+          "Model's edit search text is under 200 characters, contains the target phrase, and matches the document.",
         targetKeywords: ["thatched rooftops"],
         targetLabel: "Target phrase in evening section",
         notes: "Search text should be short (target + a few surrounding lines for context), not a full section or document.",
@@ -116,7 +116,7 @@ export function getToolTestCases(): BenchmarkTestCase[] {
       evaluate: evaluateMultipleEdits,
       criteria: {
         expectedOutcome:
-          "Model produces at least 3 propose_edit calls whose search texts match the document, together covering all three replacements.",
+          "Model produces at least 3 edit calls whose search texts match the document, together covering all three replacements.",
         targetKeywords: ["fourteen", "cherry-red", "slate"],
         targetLabel: "Three distinct replacements",
         notes:

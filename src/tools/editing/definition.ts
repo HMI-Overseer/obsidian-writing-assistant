@@ -5,8 +5,8 @@ import { INSERT_WHERES } from "./validation";
 // Write tools, produce EditBlocks for the diff review pipeline
 // ---------------------------------------------------------------------------
 
-export const PROPOSE_EDIT_TOOL: CanonicalToolDefinition = {
-  name: "propose_edit",
+export const EDIT_TOOL: CanonicalToolDefinition = {
+  name: "edit",
   description:
     "Propose a targeted search-and-replace edit to a note. " +
     "Always pass `path`, the vault-relative path of the note to change (the one shown as the " +
@@ -133,10 +133,10 @@ export const INSERT_INTO_NOTE_TOOL: CanonicalToolDefinition = {
     "line, so put structure (headings, list markers) inside `content` itself. " +
     "The change is shown to the user for review before it is applied. " +
     "Prefer this over write_file (which replaces the whole file) when adding to a note, and over " +
-    "propose_edit when you only need to add content rather than rewrite an existing passage.",
+    "edit when you only need to add content rather than rewrite an existing passage.",
   strategyHint:
     "add content to an existing note without rewriting it: append/prepend, or insert before/after " +
-    "an `anchor` passage. Prefer it over propose_edit when adding (not changing) text, and over " +
+    "an `anchor` passage. Prefer it over edit when adding (not changing) text, and over " +
     "write_file for any note that already has content.",
   errorGuidance:
     "If `path` is missing or the file is not found, supply the correct vault-relative path. " +
@@ -183,7 +183,7 @@ export const INSERT_INTO_NOTE_TOOL: CanonicalToolDefinition = {
 
 /** All edit-mode tools, in the order they should appear in the API request. */
 export const ALL_EDIT_TOOLS: CanonicalToolDefinition[] = [
-  PROPOSE_EDIT_TOOL,
+  EDIT_TOOL,
   INSERT_INTO_NOTE_TOOL,
   UPDATE_FRONTMATTER_TOOL,
 ];

@@ -1,6 +1,6 @@
 /* -----------------------------------------------------------------------
  * Edit review folded into the agentic timeline, the edit-channel sibling of
- * vaultReviewTimeline.css. A propose_edit / update_frontmatter call is a
+ * vaultReviewTimeline.css. An edit / update_frontmatter call is a
  * tool-call step, so its review lives *on* that step: a status-tinted dot,
  * inline approve / decline / undo on the step row (like a vault op), and the
  * diff rendered always-visible directly beneath the row. The step's own

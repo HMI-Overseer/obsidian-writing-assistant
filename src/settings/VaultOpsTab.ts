@@ -52,7 +52,7 @@ export function vaultOpsTabSections(plugin: WritingAssistantChat): SettingsSecti
         ),
         gateRow(
           plugin, "Edit document",
-          "Targeted in-document changes and frontmatter updates (propose_edit, update_frontmatter). Ask shows the diff and waits; Auto-apply lands the edit without a click, even on a note you don't have open.",
+          "Targeted in-document changes and frontmatter updates (edit, update_frontmatter). Ask shows the diff and waits; Auto-apply lands the edit without a click, even on a note you don't have open.",
           "edit"
         ),
       ],

@@ -363,7 +363,7 @@ export class LiveVaultReview implements VaultOpReviewer {
   }
 
   /**
-   * Resolve a round of edit calls (`propose_edit` / `update_frontmatter`). Each
+   * Resolve a round of edit calls (`edit` / `update_frontmatter`). Each
    * call is resolved in-loop with the real three-tier {@link resolveEdits} (not a
    * cheap exact pre-flight), gated by the `edit` policy, and blocks on the user
    * when `ask`, returning the *real* disposition as that call's tool result. A
@@ -415,10 +415,10 @@ export class LiveVaultReview implements VaultOpReviewer {
           continue;
         }
 
-        // A propose_edit with empty search text would otherwise resolve as a bogus
+        // An `edit` with empty search text would otherwise resolve as a bogus
         // exact match (indexOf("") === 0) and silently insert at the top of the file.
         // Frontmatter blocks legitimately carry empty search (insert-at-top), so guard
-        // only the prose edit channel, mirroring the legacy executeProposeEdit check.
+        // only the prose edit channel, mirroring the legacy executeEdit check.
         if (kind === "edit" && block.searchText === "") {
           results.set(
             call.id,

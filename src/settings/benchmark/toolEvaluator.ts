@@ -8,7 +8,7 @@ import type { BenchmarkResult, BenchmarkTestCase, EvaluationCheck } from "./type
  * Check-based evaluators for the edit-tools suite.
  *
  * Beyond verifying that the right tool was called with well-formed arguments,
- * every propose_edit search argument is resolved against the fixture document
+ * every edit search argument is resolved against the fixture document
  * with the real diff engine, a call whose search text would not match the
  * document fails, exactly as it would in real use.
  */
@@ -38,8 +38,8 @@ function producedCallsCheck(toolCalls: ToolCall[]): EvaluationCheck {
   return check("produced-calls", PRODUCED_CALLS, true, `${toolCalls.length} call(s)`);
 }
 
-function proposeEdits(toolCalls: ToolCall[]): ToolCall[] {
-  return toolCalls.filter((tc) => tc.name === "propose_edit");
+function editToolCalls(toolCalls: ToolCall[]): ToolCall[] {
+  return toolCalls.filter((tc) => tc.name === "edit");
 }
 
 function searchArgs(calls: ToolCall[]): string[] {
@@ -91,7 +91,7 @@ function pushSearchMatchChecks(
 
 /**
  * Test: "Basic tool call"
- * Model should produce a propose_edit with valid args whose search text
+ * Model should produce an edit with valid args whose search text
  * matches the document and lands on the requested phrase.
  */
 export function evaluateBasicToolCall(
@@ -104,11 +104,11 @@ export function evaluateBasicToolCall(
   const evidence = toolCalls.map(formatToolCall);
   const checks: EvaluationCheck[] = [producedCallsCheck(toolCalls)];
 
-  const edits = proposeEdits(toolCalls);
+  const edits = editToolCalls(toolCalls);
   checks.push(
     check(
-      "used-propose-edit",
-      "Used propose_edit",
+      "used-edit",
+      "Used edit",
       edits.length > 0,
       edits.length > 0 ? undefined : `used ${toolCalls.map((tc) => tc.name).join(", ")} instead`
     )
@@ -124,7 +124,7 @@ export function evaluateBasicToolCall(
   checks.push(
     check(
       "valid-args",
-      "propose_edit includes search and replace arguments",
+      "edit includes search and replace arguments",
       validArgs,
       validArgs ? undefined : "a call is missing the search or replace string argument"
     )
@@ -150,13 +150,13 @@ export function evaluateBasicToolCall(
   return buildResultFromChecks(
     checks,
     evidence,
-    "propose_edit called with valid arguments that match the document and cover the requested phrase."
+    "edit called with valid arguments that match the document and cover the requested phrase."
   );
 }
 
 /**
  * Test: "Correct tool for frontmatter"
- * Model should use update_frontmatter (not propose_edit) with well-formed
+ * Model should use update_frontmatter (not edit) with well-formed
  * operations that perform the requested changes.
  */
 export function evaluateCorrectToolSelection(
@@ -181,11 +181,11 @@ export function evaluateCorrectToolSelection(
     )
   );
 
-  const editCalls = proposeEdits(toolCalls);
+  const editCalls = editToolCalls(toolCalls);
   checks.push(
     check(
-      "no-propose-edit",
-      "Did not fall back to propose_edit for frontmatter",
+      "no-edit",
+      "Did not fall back to edit for frontmatter",
       editCalls.length === 0,
       editCalls.length === 0
         ? undefined
@@ -251,7 +251,7 @@ export function evaluateCorrectToolSelection(
 
 /**
  * Test: "Search text precision"
- * The propose_edit call targeting the phrase must match the document and be
+ * The edit call targeting the phrase must match the document and be
  * short, not a full section or the whole document.
  */
 export function evaluateSearchPrecision(
@@ -264,18 +264,18 @@ export function evaluateSearchPrecision(
   const evidence = toolCalls.map(formatToolCall);
   const checks: EvaluationCheck[] = [producedCallsCheck(toolCalls)];
 
-  const edits = proposeEdits(toolCalls);
+  const edits = editToolCalls(toolCalls);
   const searches = searchArgs(edits);
   checks.push(
     check(
       "has-search",
-      "propose_edit called with search text",
+      "edit called with search text",
       searches.length > 0,
       searches.length > 0
         ? undefined
         : edits.length === 0
           ? `used ${toolCalls.map((tc) => tc.name).join(", ")} instead`
-          : "propose_edit calls have no valid string search argument"
+          : "edit calls have no valid string search argument"
     )
   );
   if (searches.length === 0) return buildResultFromChecks(checks, evidence, "");
@@ -335,7 +335,7 @@ export function evaluateSearchPrecision(
 
 /**
  * Test: "Multiple distinct edits"
- * Three requested changes should yield three propose_edit calls that each
+ * Three requested changes should yield three edit calls that each
  * match the document and cover all three replacements.
  */
 export function evaluateMultipleEdits(
@@ -348,13 +348,13 @@ export function evaluateMultipleEdits(
   const evidence = toolCalls.map(formatToolCall);
   const checks: EvaluationCheck[] = [producedCallsCheck(toolCalls)];
 
-  const edits = proposeEdits(toolCalls);
+  const edits = editToolCalls(toolCalls);
   checks.push(
     check(
       "three-calls",
-      "Made at least 3 propose_edit calls (one per change)",
+      "Made at least 3 edit calls (one per change)",
       edits.length >= 3,
-      `${edits.length} propose_edit call(s) for 3 requested changes`
+      `${edits.length} edit call(s) for 3 requested changes`
     )
   );
   if (edits.length === 0) return buildResultFromChecks(checks, evidence, "");
@@ -380,6 +380,6 @@ export function evaluateMultipleEdits(
   return buildResultFromChecks(
     checks,
     evidence,
-    "One propose_edit per change, all matching the document and covering all three replacements."
+    "One edit per change, all matching the document and covering all three replacements."
   );
 }

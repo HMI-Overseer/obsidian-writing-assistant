@@ -46,7 +46,7 @@ function toolUseEvents(partialJson: string): unknown[] {
     {
       type: "content_block_start",
       index: 0,
-      content_block: { type: "tool_use", id: "toolu_1", name: "propose_edit" },
+      content_block: { type: "tool_use", id: "toolu_1", name: "edit" },
     },
     { type: "content_block_delta", index: 0, delta: { type: "input_json_delta", partial_json: partialJson } },
     { type: "content_block_stop", index: 0 },
@@ -141,7 +141,7 @@ describe("AnthropicClient.stream tool-call parsing", () => {
 
   test("parses a well-formed tool call's JSON arguments", async () => {
     const toolCalls = await collectToolCalls(toolUseEvents('{"search":"x","replace":"y"}'));
-    expect(toolCalls).toEqual([{ id: "toolu_1", name: "propose_edit", arguments: { search: "x", replace: "y" } }]);
+    expect(toolCalls).toEqual([{ id: "toolu_1", name: "edit", arguments: { search: "x", replace: "y" } }]);
   });
 
   test("surfaces a malformed tool call with empty args instead of dropping it", async () => {
@@ -149,7 +149,7 @@ describe("AnthropicClient.stream tool-call parsing", () => {
     // the model's intent. Now it surfaces with {} so the loop can return a
     // self-correcting error and the model retries.
     const toolCalls = await collectToolCalls(toolUseEvents("{not valid json"));
-    expect(toolCalls).toEqual([{ id: "toolu_1", name: "propose_edit", arguments: {} }]);
+    expect(toolCalls).toEqual([{ id: "toolu_1", name: "edit", arguments: {} }]);
   });
 });
 

@@ -366,7 +366,7 @@ describe("LiveVaultReview", () => {
     expect(review.getAppliedRecord()).toBeNull();
   });
 
-  it("rejects a propose_edit with empty search text instead of matching at offset 0", async () => {
+  it("rejects an edit with empty search text instead of matching at offset 0", async () => {
     // Guards the indexOf("") === 0 footgun: an empty search would otherwise resolve
     // as a confident exact match and silently insert at the top of the file.
     const editDeps = {
@@ -384,7 +384,7 @@ describe("LiveVaultReview", () => {
     });
 
     const [{ result }] = await review.resolveEdits([
-      { id: "e1", name: "propose_edit", arguments: { path: "Notes/A.md", search: "", replace: "x" } },
+      { id: "e1", name: "edit", arguments: { path: "Notes/A.md", search: "", replace: "x" } },
     ]);
 
     expect(result.isError).toBe(true);
@@ -406,7 +406,7 @@ describe("LiveVaultReview", () => {
     });
 
     const [{ result }] = await review.resolveEdits([
-      { id: "e1", name: "propose_edit", arguments: { path: "Notes/A.md", search: "She nodded.", replace: "She smiled." } },
+      { id: "e1", name: "edit", arguments: { path: "Notes/A.md", search: "She nodded.", replace: "She smiled." } },
     ]);
 
     expect(result.isError).toBe(true);
@@ -426,7 +426,7 @@ describe("LiveVaultReview", () => {
     });
 
     const [{ result }] = await review.resolveEdits([
-      { id: "e1", name: "propose_edit", arguments: { path: "Notes/A.md", search: "She nodded.", replace: "She smiled." } },
+      { id: "e1", name: "edit", arguments: { path: "Notes/A.md", search: "She nodded.", replace: "She smiled." } },
     ]);
 
     expect(result.isError).toBeFalsy();
@@ -454,7 +454,7 @@ describe("LiveVaultReview", () => {
     await review.resolveEdits([
       {
         id: "edit-call-1",
-        name: "propose_edit",
+        name: "edit",
         arguments: {
           path: "Notes/A.md",
           search: "She nodded.",
@@ -484,8 +484,8 @@ describe("LiveVaultReview", () => {
     });
 
     const results = await review.resolveEdits([
-      { id: "e1", name: "propose_edit", arguments: { path: "Notes/A.md", search: "She nodded.", replace: "She smiled." } },
-      { id: "e2", name: "propose_edit", arguments: { path: "Notes/B.md", search: "He waited.", replace: "He left." } },
+      { id: "e1", name: "edit", arguments: { path: "Notes/A.md", search: "She nodded.", replace: "She smiled." } },
+      { id: "e2", name: "edit", arguments: { path: "Notes/B.md", search: "He waited.", replace: "He left." } },
     ]);
 
     // Neither edit is rejected, and the second is NOT turned away for touching a
@@ -519,14 +519,14 @@ describe("LiveVaultReview", () => {
     });
 
     const [first] = await review.resolveEdits([
-      { id: "e1", name: "propose_edit", arguments: { path: "Notes/A.md", search: "She nodded.", replace: "She smiled warmly." } },
+      { id: "e1", name: "edit", arguments: { path: "Notes/A.md", search: "She nodded.", replace: "She smiled warmly." } },
     ]);
     expect(first.result.isError).toBeFalsy();
 
     // Next round, same paragraph, search text quoted from the CURRENT document (the
     // model re-read the file), exactly the in-the-wild repro.
     const [second] = await review.resolveEdits([
-      { id: "e2", name: "propose_edit", arguments: { path: "Notes/A.md", search: "She smiled warmly.", replace: "She beamed." } },
+      { id: "e2", name: "edit", arguments: { path: "Notes/A.md", search: "She smiled warmly.", replace: "She beamed." } },
     ]);
 
     expect(second.result.isError).toBeFalsy();
@@ -693,7 +693,7 @@ describe("LiveVaultReview disposition capture", () => {
       edit: EDIT_DEPS(),
     });
     const [{ result }] = await review.resolveEdits([
-      { id: "e1", name: "propose_edit", arguments: { path: "Notes/A.md", search: "She nodded.", replace: "She smiled." } },
+      { id: "e1", name: "edit", arguments: { path: "Notes/A.md", search: "She nodded.", replace: "She smiled." } },
     ]);
     expect(result.disposition).toBe("auto-applied");
   });
@@ -923,7 +923,7 @@ describe("LiveVaultReview live approval routing", () => {
     const pending = review.resolveEdits([
       {
         id: "e1",
-        name: "propose_edit",
+        name: "edit",
         arguments: { path: "Notes/A.md", search: "He waited.", replace: "He left." },
       },
     ]);
@@ -956,7 +956,7 @@ describe("LiveVaultReview live approval routing", () => {
     const pending = review.resolveEdits([
       {
         id: "e1",
-        name: "propose_edit",
+        name: "edit",
         arguments: { path: "Notes/A.md", search: "He waited.", replace: "He left." },
       },
     ]);
@@ -988,7 +988,7 @@ describe("LiveVaultReview live approval routing", () => {
     const first = review.resolveEditOne(
       {
         id: "ignored",
-        name: "propose_edit",
+        name: "edit",
         arguments: { path: "Notes/A.md", search: "He waited.", replace: "He left." },
       },
       "mcp-e1",
@@ -997,7 +997,7 @@ describe("LiveVaultReview live approval routing", () => {
     const second = await review.resolveEditOne(
       {
         id: "ignored",
-        name: "propose_edit",
+        name: "edit",
         arguments: { path: "Notes/B.md", search: "He waited.", replace: "He ran." },
       },
       "mcp-e2",

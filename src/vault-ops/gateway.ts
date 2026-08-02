@@ -31,7 +31,7 @@ export interface VaultOpPolicy {
   trash: Gate;
   createDir: Gate;
   /**
-   * In-document edits (`propose_edit` and `update_frontmatter`). Edits are vault
+   * In-document edits (`edit` and `update_frontmatter`). Edits are vault
    * ops too (a file mutation), gated like the rest: `deny` removes the edit tools,
    * `ask` blocks on review (today's behaviour), `auto` applies the hunk in-loop,
    * including on a non-active file. See ADR-0018.

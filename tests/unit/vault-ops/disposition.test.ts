@@ -118,7 +118,7 @@ describe("editDispositionMessage", () => {
         "no location matched the search text; re-read the file and retry",
       ),
     ).toBe(
-      'Error: propose_edit did not apply to "The War.md", no location matched the search text; re-read the file and retry.',
+      'Error: edit did not apply to "The War.md", no location matched the search text; re-read the file and retry.',
     );
     expect(editDispositionMessage("frontmatter", "The War.md", "failed")).toBe(
       'Error: update_frontmatter did not apply to "The War.md", the edit could not be resolved.',

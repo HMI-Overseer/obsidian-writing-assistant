@@ -114,7 +114,7 @@
       "content_block": {
         "type": "tool_use",
         "id": "toolu_fixture_edit_1",
-        "name": "propose_edit",
+        "name": "edit",
         "input": {}
       }
     },

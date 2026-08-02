@@ -130,7 +130,7 @@ function assistant(): ConversationMessage {
             id: "tool-item",
             segmentId: "segment-1",
             toolCallId: "tool-call",
-            toolName: "propose_edit",
+            toolName: "edit",
             toolArguments: "{}",
             toolArgs: {},
             state: "completed",

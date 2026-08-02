@@ -170,7 +170,7 @@ describe("OpenAIClient.stream usage accounting", () => {
 
   test("resolves tool calls and usage together on a tool-call stream", async () => {
     mockStreamFetch.mockImplementation(streamImpl([
-      { event: { choices: [{ index: 0, delta: { tool_calls: [{ index: 0, id: "call_1", function: { name: "propose_edit", arguments: "" } }] } }] } },
+      { event: { choices: [{ index: 0, delta: { tool_calls: [{ index: 0, id: "call_1", function: { name: "edit", arguments: "" } }] } }] } },
       { event: { choices: [{ index: 0, delta: { tool_calls: [{ index: 0, function: { arguments: "{\"a\":1}" } }] } }] } },
       { event: { choices: [{ index: 0, delta: {}, finish_reason: "tool_calls" }] } },
       { event: { choices: [], usage: { prompt_tokens: 20, completion_tokens: 8, total_tokens: 28 } } },
@@ -178,7 +178,7 @@ describe("OpenAIClient.stream usage accounting", () => {
     const client = new OpenAIClient("key", "https://api.openai.com/v1");
     const request = makeRequest({
       tools: [{
-        name: "propose_edit",
+        name: "edit",
         description: "Edit the document.",
         parameters: { type: "object", properties: {}, required: [] },
       }],
@@ -188,7 +188,7 @@ describe("OpenAIClient.stream usage accounting", () => {
     const events = await drain(result);
 
     expect(toolCallsOf(events)).toEqual([
-      { id: "call_1", name: "propose_edit", arguments: { a: 1 } },
+      { id: "call_1", name: "edit", arguments: { a: 1 } },
     ]);
     expect(await result.usage).toEqual({ inputTokens: 20, outputTokens: 8 });
     expect(await result.stopReason).toBe("tool_use");
@@ -199,13 +199,13 @@ describe("OpenAIClient.stream usage accounting", () => {
     // tool call: surfaced with {} so the loop returns a self-correcting validation
     // error on the timeline step. Dropping it would silently vanish from the turn.
     mockStreamFetch.mockImplementation(streamImpl([
-      { event: { choices: [{ index: 0, delta: { tool_calls: [{ index: 0, id: "call_1", function: { name: "propose_edit", arguments: "{\"a\":" } }] } }] } },
+      { event: { choices: [{ index: 0, delta: { tool_calls: [{ index: 0, id: "call_1", function: { name: "edit", arguments: "{\"a\":" } }] } }] } },
       { event: { choices: [{ index: 0, delta: {}, finish_reason: "tool_calls" }] } },
     ]));
     const client = new OpenAIClient("key", "https://api.openai.com/v1");
     const request = makeRequest({
       tools: [{
-        name: "propose_edit",
+        name: "edit",
         description: "Edit the document.",
         parameters: { type: "object", properties: {}, required: [] },
       }],
@@ -215,7 +215,7 @@ describe("OpenAIClient.stream usage accounting", () => {
     const events = await drain(result);
 
     expect(toolCallsOf(events)).toEqual([
-      { id: "call_1", name: "propose_edit", arguments: {} },
+      { id: "call_1", name: "edit", arguments: {} },
     ]);
   });
 });

@@ -35,7 +35,7 @@ function longTurn(toolState: "running" | "completed"): AssistantTurnRecord {
       id: `tool-${index}`,
       segmentId: `segment-${index}`,
       toolCallId: `call-${index}`,
-      toolName: index % 2 === 0 ? "read_file" : "propose_edit",
+      toolName: index % 2 === 0 ? "read_file" : "edit",
       toolArguments: `{"path":"Fixture-${index}.md"}`,
       toolArgs: { path: `Fixture-${index}.md` },
       state: index === 37 ? toolState : "completed",

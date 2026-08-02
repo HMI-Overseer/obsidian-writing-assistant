@@ -51,7 +51,7 @@ function overlapsSpan(edit: ResolvedEdit, span: RegionSpan): boolean {
 }
 
 /**
- * Resolves bare search texts (e.g. propose_edit arguments) against the document
+ * Resolves bare search texts (e.g. edit arguments) against the document
  * and classifies each match by region. Regions whose text is absent from the
  * document are ignored.
  */

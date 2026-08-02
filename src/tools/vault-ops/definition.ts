@@ -15,10 +15,10 @@ export const WRITE_FILE_TOOL: CanonicalToolDefinition = {
   description:
     "Create a new note (or overwrite an existing one) at a vault-relative path. " +
     "The whole file content is replaced. The change is shown to the user for review before it is applied. " +
-    "For targeted changes to an existing note's prose, prefer propose_edit instead of overwriting the whole file.",
+    "For targeted changes to an existing note's prose, prefer edit instead of overwriting the whole file.",
   strategyHint:
     "create a new note at a vault path, or replace an existing note's full content. " +
-    "Prefer propose_edit for small changes to an existing note.",
+    "Prefer edit for small changes to an existing note.",
   errorGuidance:
     "If the path points at a folder, choose a file path or use create_directory. " +
     "Paths must be an Obsidian document, a Markdown note (.md) or a canvas (.canvas); other types are refused. " +
@@ -187,10 +187,10 @@ export const REPLACE_IN_VAULT_TOOL: CanonicalToolDefinition = {
     "term, character, or place everywhere it appears. Every matching note is rewritten and the whole " +
     "set of changes is shown to the user for review before anything is applied. " +
     "Use this for a vault-wide rename instead of editing notes one at a time; for a single passage in " +
-    "one note use propose_edit, and never rewrite whole files with write_file just to change a term.",
+    "one note use edit, and never rewrite whole files with write_file just to change a term.",
   strategyHint:
     "rename or relabel an exact term across the whole vault (or one folder) in a single reviewable step, " +
-    "prefer it over editing notes one by one. Use propose_edit for a single passage in one note.",
+    "prefer it over editing notes one by one. Use edit for a single passage in one note.",
   errorGuidance:
     "If no occurrences are found, check spelling and case, or widen the scope, the search is literal, not " +
     "a pattern. If it would change too many unrelated matches, narrow it with a longer search string, set " +

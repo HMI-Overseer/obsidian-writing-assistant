@@ -26,7 +26,7 @@ function err(error: string): ValidationErr {
 // Write tool argument types
 // ---------------------------------------------------------------------------
 
-export interface ProposeEditArgs {
+export interface EditArgs {
   /** Vault-relative path of the note to edit. Required by the tool; enforced at execution. */
   path?: string;
   search: string;
@@ -68,9 +68,9 @@ export interface InsertIntoNoteArgs {
 // Validators
 // ---------------------------------------------------------------------------
 
-export function validateProposeEdit(
+export function validateEdit(
   args: Record<string, unknown>,
-): ValidationResult<ProposeEditArgs> {
+): ValidationResult<EditArgs> {
   if (typeof args.search !== "string") {
     return err("search must be a string. Got: " + typeof args.search);
   }

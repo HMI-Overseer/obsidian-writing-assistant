@@ -1,7 +1,7 @@
 /**
  * Render note content with cat -n style line numbers: a right-aligned line
  * number, a tab, then the line verbatim. Line numbers give the model stable
- * anchors for navigating a long note and for matching `propose_edit` search
+ * anchors for navigating a long note and for matching `edit` search
  * text against the same content it just read (tool-set-review H1). Only the
  * number column is added; everything after the tab is the original line, so an
  * edit's search text must exclude the leading "N\t" prefix.

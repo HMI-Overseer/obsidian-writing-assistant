@@ -198,7 +198,7 @@ export function editDispositionMessage(
   guidance?: string,
 ): string {
   const tool =
-    kind === "frontmatter" ? "update_frontmatter" : kind === "insert" ? "insert_into_note" : "propose_edit";
+    kind === "frontmatter" ? "update_frontmatter" : kind === "insert" ? "insert_into_note" : "edit";
   const what = kind === "frontmatter" ? "frontmatter update" : kind === "insert" ? "insertion" : "edit";
   const t = `"${filePath}"`;
 

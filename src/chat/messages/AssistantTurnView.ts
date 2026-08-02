@@ -8,7 +8,7 @@ import type {
 } from "../turns/AssistantTurnBuilder";
 import type { MarkdownBubbleRenderer } from "../rendering/MarkdownBubbleRenderer";
 import type { ActionControlEligibility } from "../conversation/actionLedger";
-import { TOOL_ICONS, isMutatingTool } from "../../tools/metadata";
+import { isMutatingTool, toolIcon } from "../../tools/metadata";
 import {
   AssistantActionHostCoordinator,
   AssistantTurnItemHostRegistry,
@@ -498,7 +498,7 @@ export class AssistantTurnView {
     } else if (item.marker === "tool") {
       state.markerEl.addClass("is-tool");
       if (item.type === "tool_call") {
-        setIcon(state.markerEl, TOOL_ICONS[item.toolName] ?? "wrench");
+        setIcon(state.markerEl, toolIcon(item.toolName));
       }
     } else {
       state.markerEl.addClass("is-iconless");

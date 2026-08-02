@@ -76,7 +76,7 @@ describe("Anthropic ordered stream translation", () => {
         type: "tool_call_start",
         segmentId: "segment-anthropic",
         declarationKey: "segment-anthropic:block:4",
-        toolName: "propose_edit",
+        toolName: "edit",
       },
       {
         type: "tool_call_identity",

@@ -144,7 +144,7 @@ describe("formatResultDigest, the other discovery tools (same shape)", () => {
 
 describe("formatResultDigest, non-discovery tools get no digest", () => {
   it("returns undefined for path -> content and mutation tools", () => {
-    for (const name of ["read_file", "read_section", "list_directory", "move_file", "propose_edit"]) {
+    for (const name of ["read_file", "read_section", "list_directory", "move_file", "edit"]) {
       expect(formatResultDigest(name, { path: "x.md" }, { content: "anything" })).toBeUndefined();
     }
   });

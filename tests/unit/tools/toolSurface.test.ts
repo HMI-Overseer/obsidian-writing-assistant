@@ -28,7 +28,7 @@ import {
   MEMORY_TOOL_NAMES,
 } from "../../../src/tools/memory/definition";
 
-const EDIT_NAMES = ["propose_edit", "insert_into_note", "update_frontmatter"];
+const EDIT_NAMES = ["edit", "insert_into_note", "update_frontmatter"];
 const VAULT_OP_NAMES = [
   "write_file",
   "create_directory",
@@ -294,7 +294,7 @@ describe("Layer 2 progressive-disclosure core (ADR-0009 / section 6.2.5)", () =>
     expect(isCoreReadTool("directory_tree")).toBe(false);
     expect(isCoreReadTool("get_frontmatter")).toBe(false);
     // Writes always defer.
-    expect(isCoreReadTool("propose_edit")).toBe(false);
+    expect(isCoreReadTool("edit")).toBe(false);
     expect(isCoreReadTool("write_file")).toBe(false);
     // think is core only on the native path, added separately, not a "read".
     expect(isCoreReadTool("think")).toBe(false);

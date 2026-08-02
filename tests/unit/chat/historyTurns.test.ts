@@ -96,7 +96,7 @@ describe("toHistoryTurns legacy compatibility", () => {
       role: "assistant",
       content: "I trimmed the opening.",
       editProposals: [makeProposal([makeHunk("h1", "", "The opening", "accepted")])],
-      toolCalls: [{ id: "t1", name: "propose_edit", arguments: {} }],
+      toolCalls: [{ id: "t1", name: "edit", arguments: {} }],
     };
     const [turn] = toHistoryTurns(message, false);
     expect(turn.content).toContain("[Edit in chapter-3.md:");

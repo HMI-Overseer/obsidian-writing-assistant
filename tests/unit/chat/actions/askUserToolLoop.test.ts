@@ -223,7 +223,7 @@ describe("runToolLoop ask_user barrier", () => {
         toolCalls: [
           call("read-1", "semantic_search", { query: "a" }),
           call("ask-1", "ask_user", askArguments),
-          call("edit-1", "propose_edit", { path: "a.md" }),
+          call("edit-1", "edit", { path: "a.md" }),
           call("op-1", "write_file", { path: "b.md", content: "x" }),
           call("memory-1", "add_memory", { name: "x" }),
           call("unknown-1", "unknown_tool"),

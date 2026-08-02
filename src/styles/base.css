@@ -102,8 +102,13 @@
   box-shadow: 0 14px 40px rgba(0, 0, 0, 0.05);
 }
 
+/* The radius is published as a token because it inherits: a descendant that has to line up with the
+   card's own corner reads it instead of restating the number. The settings search flash does this on
+   a card's first row, where the row's top edge sits flush against the card's. */
 .lmsa-ui-card {
-  @apply lmsa:rounded-[18px] lmsa:border lmsa:border-obsidian-border lmsa:text-obsidian-text;
+  --lmsa-card-radius: 18px;
+  @apply lmsa:border lmsa:border-obsidian-border lmsa:text-obsidian-text;
+  border-radius: var(--lmsa-card-radius);
   background: color-mix(in srgb, var(--background-secondary) 92%, transparent);
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.04);
 }

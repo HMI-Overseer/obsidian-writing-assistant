@@ -83,14 +83,23 @@
 }
 
 .setting-group.lmsa-settings-section > .setting-items {
-  @apply lmsa:px-5 lmsa:pb-4;
+  @apply lmsa:pb-4;
   background: none;
   border: none;
   border-radius: 0;
 }
 
+/*
+ * The card's horizontal inset lives on the ROW, not on `.setting-items`, and that is load-bearing
+ * rather than a matter of taste. Obsidian's settings search flashes a result by putting
+ * `.is-flashing` on the row and painting a background on it for 750ms, so the highlight is exactly
+ * the row's border box. With the inset on the list, that box stopped at the text on one side and
+ * the control on the other and the flash read as highlighting a text container rather than a row.
+ * Stock Obsidian carries the inset on the row for the same reason. Content geometry is unchanged
+ * either way: what moves is only where the padding is declared.
+ */
 .setting-group.lmsa-settings-section > .setting-items > .setting-item {
-  @apply lmsa:m-0 lmsa:px-0 lmsa:py-4;
+  @apply lmsa:m-0 lmsa:px-5 lmsa:py-4;
   background: none;
   border: none;
   border-radius: 0;
@@ -101,11 +110,34 @@
   @apply lmsa:pb-0;
 }
 
+/* The divider spans the row's content, not its border box, so it keeps the inset the row now
+   carries as padding. `inset-x-5` matches the `px-5` above; the two move together. */
 .setting-group.lmsa-settings-section > .setting-items > .setting-item::before {
+  @apply lmsa:inset-x-5;
   border-top: none;
   top: 0;
-  left: 0;
-  right: 0;
+}
+
+/*
+ * The search flash's own corners. `.is-flashing` asks for `var(--radius-s)`, but the reset above
+ * zeroes `border-radius` at a higher specificity, so the highlight came out square. Restoring it
+ * only for the flashing state leaves the resting row's chrome stripped as intended.
+ */
+.setting-group.lmsa-settings-section > .setting-items > .setting-item.is-flashing {
+  border-radius: var(--radius-s);
+}
+
+/*
+ * The card's first row is its headline, which search indexes under the card's own name, so hitting
+ * a card name flashes it. That row's top edge sits flush against the card's top edge (measured gap
+ * 0) and the card does not clip, so a small radius there paints square corners outside the card's
+ * rounded ones. Matching the card's radius makes the highlight follow the corner it shares.
+ * No bottom counterpart is owed: the list's own bottom padding leaves the last row 16px clear of
+ * the card's bottom edge, so its corners are interior.
+ */
+.setting-group.lmsa-settings-section > .setting-items > .setting-item.is-flashing:first-child {
+  border-top-left-radius: var(--lmsa-card-radius);
+  border-top-right-radius: var(--lmsa-card-radius);
 }
 
 /* Only the rows drawn as `.lmsa-setting-item` carry a divider; a block row draws no line, the

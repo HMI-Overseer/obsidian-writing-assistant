@@ -26,7 +26,7 @@ describe("formatWithLineNumbers", () => {
     expect(formatWithLineNumbers("only line")).toBe("1\tonly line");
   });
 
-  test("starts numbering at startLine so a section read matches read_file's numbers", () => {
+  test("starts numbering at startLine so a section read matches read's numbers", () => {
     expect(formatWithLineNumbers("five\nsix", 5)).toBe("5\tfive\n6\tsix");
   });
 

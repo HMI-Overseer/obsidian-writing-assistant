@@ -475,15 +475,19 @@ describe("insert_into_note path boundary (edit channel), real filesystem (sectio
   });
 });
 
-describe("get_outline / read_section path boundary (read channel), real filesystem (section 6.1)", () => {
+describe("read / get_outline path boundary (read channel), real filesystem (section 6.1)", () => {
   // The read channel only resolves an in-vault file (getFileByPath), but it still
   // names the boundary honestly via refuseOutsideVault rather than dead-ending the
-  // model on "not found". Verify on real disk that every escaping outline/section
-  // read is refused at the boundary, before any file is opened, and nothing escapes.
+  // model on "not found". Verify on real disk that every escaping read is refused at
+  // the boundary, before any file is opened, and nothing escapes.
+  //
+  // `read`'s two pathways are both exercised, because the RFC-0015 merge put them
+  // behind one entry point: a boundary check guarding only the whole-note arm would
+  // leave the section arm open, and no compiler sees that.
   const readCtx = (app: App) =>
     ({ app, ragService: {} as unknown as RagService } as VaultToolContext);
 
-  it("refuses every escaping outline/section read, naming the boundary", async () => {
+  it("refuses every escaping read, on either pathway, naming the boundary", async () => {
     const app = makeRealFsApp(vaultRoot);
 
     for (const path of ESCAPING_PATHS) {
@@ -494,11 +498,18 @@ describe("get_outline / read_section path boundary (read channel), real filesyst
       expect(outline.isError, `get_outline should refuse "${path}"`).toBe(true);
       expect(outline.content).toContain("outside the vault");
 
-      const section = await executeVaultTool(
-        { id: `s-${path}`, name: "read_section", arguments: { path, headingPath: "Any" } },
+      const whole = await executeVaultTool(
+        { id: `r-${path}`, name: "read", arguments: { path } },
         readCtx(app),
       );
-      expect(section.isError, `read_section should refuse "${path}"`).toBe(true);
+      expect(whole.isError, `read should refuse "${path}"`).toBe(true);
+      expect(whole.content).toContain("outside the vault");
+
+      const section = await executeVaultTool(
+        { id: `s-${path}`, name: "read", arguments: { path, headingPath: "Any" } },
+        readCtx(app),
+      );
+      expect(section.isError, `read with a headingPath should refuse "${path}"`).toBe(true);
       expect(section.content).toContain("outside the vault");
     }
     expect(filesOutsideVault()).toEqual([]); // reads never write, and nothing escaped.
@@ -534,7 +545,7 @@ describe("smart-quote path resolution, real filesystem", () => {
   // ’ = U+2019, the curly apostrophe Obsidian saves; the model "straightens" it to '.
   const CURLY = "’";
 
-  it("snaps a read_file straight apostrophe to the real curly-quoted file on disk", () => {
+  it("snaps a read straight apostrophe to the real curly-quoted file on disk", () => {
     const app = makeRealFsApp(vaultRoot);
     fs.mkdirSync(nodePath.join(vaultRoot, "Lore"), { recursive: true });
     const realName = `Anno${CURLY}s Crucible.md`;
@@ -542,7 +553,7 @@ describe("smart-quote path resolution, real filesystem", () => {
 
     const call: ToolCall = {
       id: "r",
-      name: "read_file",
+      name: "read",
       arguments: { path: "Lore/Anno's Crucible.md" },
     };
     const normalized = normalizeVaultToolCall(app, call);

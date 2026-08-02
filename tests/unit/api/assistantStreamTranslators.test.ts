@@ -54,7 +54,7 @@ describe("Anthropic ordered stream translation", () => {
         type: "tool_call_start",
         segmentId: "segment-anthropic",
         declarationKey: "segment-anthropic:block:2",
-        toolName: "read_file",
+        toolName: "read",
       },
       {
         type: "tool_call_identity",
@@ -174,7 +174,7 @@ describe("OpenAI-compatible ordered stream translation", () => {
         type: "tool_call_start",
         segmentId: "segment-multi",
         declarationKey: "segment-multi:tool:0",
-        toolName: "read_file",
+        toolName: "read",
       },
       {
         type: "tool_call_identity",
@@ -191,7 +191,7 @@ describe("OpenAI-compatible ordered stream translation", () => {
         type: "tool_call_start",
         segmentId: "segment-multi",
         declarationKey: "segment-multi:tool:1",
-        toolName: "read_file",
+        toolName: "read",
       },
       {
         type: "tool_call_identity",

@@ -185,8 +185,24 @@ describe("formatResultDigest, the other discovery tools (same shape)", () => {
 
 describe("formatResultDigest, non-discovery tools get no digest", () => {
   it("returns undefined for path -> content and mutation tools", () => {
-    for (const name of ["read_file", "read_section", "list_directory", "move_file", "edit"]) {
+    for (const name of ["read", "list_directory", "move_file", "edit"]) {
       expect(formatResultDigest(name, { path: "x.md" }, { content: "anything" })).toBeUndefined();
+    }
+  });
+
+  // D1 point 19 (a merge that changes a result's shape has to find what parses that
+  // shape), asked of `read` rather than reasoned about. The merged tool's two pathways
+  // differ in their header line, `[path]` against `[path > headingPath]`, and this file
+  // holds the only bracket-header parsers in the tree. Both pathways' real bytes are
+  // fed through the digest entry point here: neither reaches an extractor, because
+  // `read` is not a discovery tool, so the shape difference has no consumer.
+  it("neither read pathway reaches a pointer extractor, header line or not", () => {
+    const whole = "[Book.md]\n\n1\t# Act I\n2\tintro";
+    const section = "[Book.md > Act I > Chapter 1]\n\n3\t## Chapter 1\n4\tthe duel was fierce";
+    for (const content of [whole, section]) {
+      expect(formatResultDigest("read", { path: "Book.md" }, { content })).toBeUndefined();
+      expect(captureStepFields("read", { path: "Book.md" }, { content }).resultDigest)
+        .toBeUndefined();
     }
   });
 });
@@ -220,7 +236,7 @@ describe("captureStepFields", () => {
 
   it("bounds the stored record of an oversized result", () => {
     const big = "z".repeat(TOOL_RESULT_CHAR_LIMIT + 500);
-    const fields = captureStepFields("read_file", { path: "big.md" }, { content: big });
+    const fields = captureStepFields("read", { path: "big.md" }, { content: big });
     expect(fields.resultRecord).toBe("z".repeat(TOOL_RESULT_CHAR_LIMIT) + RESULT_TRUNCATION_MARKER);
     expect(fields.resultDigest).toBeUndefined();
   });
@@ -311,11 +327,11 @@ describe("formatStepReplayLine", () => {
       formatStepReplayLine({
         type: "tool_call",
         round: 0,
-        toolName: "read_file",
+        toolName: "read",
         toolInput: "Chapters/chapter-3.md",
         resultRecord: "the chapter text",
       }),
-    ).toBe("[read_file: Chapters/chapter-3.md]");
+    ).toBe("[read: Chapters/chapter-3.md]");
   });
 
   it("renders just the tool name when there is no key argument", () => {
@@ -326,7 +342,7 @@ describe("formatStepReplayLine", () => {
 
   it("returns null for a bare pre-phase-2 step (no capture fields): old transcripts replay unchanged", () => {
     expect(
-      formatStepReplayLine({ type: "tool_call", round: 0, toolName: "read_file", toolInput: "a.md" }),
+      formatStepReplayLine({ type: "tool_call", round: 0, toolName: "read", toolInput: "a.md" }),
     ).toBeNull();
   });
 
@@ -382,7 +398,7 @@ describe("formatAgenticReplayLines", () => {
   it("emits one line per tool_call step, in order, skipping reasoning steps", () => {
     const steps: AgenticStep[] = [
       { type: "reasoning", round: 0, text: "let me look" },
-      { type: "tool_call", round: 0, toolName: "read_file", toolInput: "Chapters/ch3.md", resultRecord: "text" },
+      { type: "tool_call", round: 0, toolName: "read", toolInput: "Chapters/ch3.md", resultRecord: "text" },
       {
         type: "tool_call",
         round: 1,
@@ -399,7 +415,7 @@ describe("formatAgenticReplayLines", () => {
       },
     ];
     expect(formatAgenticReplayLines(steps)).toEqual([
-      "[read_file: Chapters/ch3.md]",
+      "[read: Chapters/ch3.md]",
       '[semantic_search: "oath", no results]',
       "[create_directory: Drafts/Arcs, DECLINED by user]",
     ]);

@@ -72,7 +72,7 @@
       "content_block": {
         "type": "tool_use",
         "id": "toolu_fixture_read_1",
-        "name": "read_file",
+        "name": "read",
         "input": {}
       }
     },

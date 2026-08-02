@@ -27,7 +27,7 @@ const FACTS: AssistantStreamEvent[] = [
     segmentId: "s1",
     declarationKey: "s1:block-2",
     providerBlockId: "block-2",
-    toolName: "read_file",
+    toolName: "read",
   },
   {
     type: "tool_call_identity",

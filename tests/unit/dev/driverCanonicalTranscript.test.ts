@@ -66,7 +66,7 @@ function turnMessage(options: {
               id: `${options.itemId}-tool`,
               segmentId: options.segmentId,
               toolCallId: options.toolCallId,
-              toolName: "read_file",
+              toolName: "read",
               toolArguments: options.toolArguments,
               state: "completed",
             },
@@ -165,7 +165,7 @@ describe("canonicalTranscript", () => {
     expect(turn.quiescence).toBe("proven");
     expect(items.map((item) => item.type)).toStrictEqual(["prose", "tool_call"]);
     expect(items[0].text).toBe("Here is a tighter opening.");
-    expect(items[1].toolName).toBe("read_file");
+    expect(items[1].toolName).toBe("read");
     expect(items[1].toolArguments).toBe('{"path":"Chapters/One.md"}');
     expect(items[1].state).toBe("completed");
     expect(

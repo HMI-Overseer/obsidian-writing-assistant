@@ -1,5 +1,5 @@
 {
-  "description": "Prose, a read_file step against the fixture vault, then prose in a second round.",
+  "description": "Prose, a read step against the fixture vault, then prose in a second round.",
   "completionText": "",
   "frames": [
     {
@@ -27,7 +27,7 @@
           "type": "tool_call_start",
           "segmentId": "tool-r1",
           "declarationKey": "tool-r1-decl-1",
-          "toolName": "read_file"
+          "toolName": "read"
         }
       ]
     },

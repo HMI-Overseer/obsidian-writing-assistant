@@ -30,7 +30,7 @@
                     "id": "call_fixture_read_a",
                     "type": "function",
                     "function": {
-                      "name": "read_file",
+                      "name": "read",
                       "arguments": "{\"path\":\"Fixtures/a.md\"}"
                     }
                   },
@@ -39,7 +39,7 @@
                     "id": "call_fixture_read_b",
                     "type": "function",
                     "function": {
-                      "name": "read_file",
+                      "name": "read",
                       "arguments": "{\"path\":\"Fixtures/b.md\"}"
                     }
                   }
@@ -155,7 +155,7 @@
                     "index": 0,
                     "type": "function",
                     "function": {
-                      "name": "read_file",
+                      "name": "read",
                       "arguments": "{\"path\":\"Fixtures/missing-id.md\"}"
                     }
                   }

@@ -238,30 +238,34 @@ describe("Layer 2 progressive-disclosure core (ADR-0009 / section 6.2.5)", () =>
   // the cached prefix turn over turn, so each tool kept there is a permanent always-on tax
   // and a permanent draw on tool-selection quality; growing it re-bloats exactly the prefix
   // Layer 2 exists to shrink. Crossing this guard should force the section 6.2.5 "does this
-  // primitive earn a non-deferred slot" conversation (the get_outline / read_section
-  // watch-item), not a silent bump.
+  // primitive earn a non-deferred slot" conversation (the get_outline watch-item),
+  // not a silent bump.
   // See docs/03-decisions/ADR-0009-layer-2-progressive-disclosure-deferred.md.
-  const NON_DEFERRED_CORE_MAX = 9;
+  //
+  // Both numbers below moved down by one in RFC-0015's Stage 4, and each move is an
+  // assertion about the new design rather than a test that needed updating: folding the
+  // section read into `read` as a parameter (D4) hands the core back a slot without
+  // giving up the capability, which is the whole point of merging a *core* pair.
+  const NON_DEFERRED_CORE_MAX = 8;
 
-  it("gives recall_memory the seventh core read slot", () => {
+  it("gives recall_memory the sixth core read slot", () => {
     expect(names(CORE_READ_TOOLS)).toEqual([
       "list_directory",
       "semantic_search",
       "search_content",
-      "read_file",
+      "read",
       "get_outline",
-      "read_section",
       "recall_memory",
     ]);
-    expect(CORE_READ_TOOL_NAMES.size).toBe(7);
+    expect(CORE_READ_TOOL_NAMES.size).toBe(6);
   });
 
-  it("holds the enabled anthropic non-deferred core at the deliberate nine-slot cap", () => {
-    // 7 core reads + ask_user + think. The native tool-search entry is non-deferred at the wire
+  it("holds the enabled anthropic non-deferred core at the deliberate eight-slot cap", () => {
+    // 6 core reads + ask_user + think. The native tool-search entry is non-deferred at the wire
     // layer but is not a canonical tool, so it is not counted here.
     const nonDeferred = anthropicNonDeferredToolNames(true);
     expect(nonDeferred.size).toBeLessThanOrEqual(NON_DEFERRED_CORE_MAX);
-    expect(nonDeferred.size).toBe(9);
+    expect(nonDeferred.size).toBe(8);
     expect(nonDeferred.has("recall_memory")).toBe(true);
     expect(nonDeferred.has("ask_user")).toBe(true);
     expect(nonDeferred.has("think")).toBe(true);
@@ -269,7 +273,7 @@ describe("Layer 2 progressive-disclosure core (ADR-0009 / section 6.2.5)", () =>
 
   it("uses one fewer non-deferred slot when memories are disabled", () => {
     const nonDeferred = anthropicNonDeferredToolNames(false);
-    expect(nonDeferred.size).toBe(8);
+    expect(nonDeferred.size).toBe(7);
     expect(nonDeferred.has("recall_memory")).toBe(false);
     expect(nonDeferred.has("ask_user")).toBe(true);
   });
@@ -285,7 +289,7 @@ describe("Layer 2 progressive-disclosure core (ADR-0009 / section 6.2.5)", () =>
   });
 
   it("classifies recall as core, never its memory mutation siblings", () => {
-    expect(isCoreReadTool("read_file")).toBe(true);
+    expect(isCoreReadTool("read")).toBe(true);
     expect(isCoreReadTool("semantic_search")).toBe(true);
     expect(isCoreReadTool("recall_memory")).toBe(true);
     expect(isCoreReadTool("add_memory")).toBe(false);
@@ -374,20 +378,19 @@ describe("anthropicLayer2ToolSet (the direct-API L2 emission)", () => {
   it("emits the non-deferred core (core reads + think) then the deferred tail", () => {
     const got = names(anthropicLayer2ToolSet(opts()));
     // Core reads first (CORE_READ_TOOLS order), then ask_user and think.
-    expect(got.slice(0, 6)).toEqual([
+    expect(got.slice(0, 5)).toEqual([
       "list_directory",
       "semantic_search",
       "search_content",
-      "read_file",
+      "read",
       "get_outline",
-      "read_section",
     ]);
-    expect(got[6]).toBe("ask_user");
-    expect(got[7]).toBe("think");
+    expect(got[5]).toBe("ask_user");
+    expect(got[6]).toBe("think");
     // Then the four deferred tail reads, then the posture/policy-permitted writes.
     // Six before RFC-0015's Stage 3: directory_tree was absorbed into the core
     // list_directory, and the two link tools merged into get_links.
-    expect(got.slice(8)).toEqual([
+    expect(got.slice(7)).toEqual([
       "search_files",
       "find_notes_by_tag",
       "get_links",
@@ -399,8 +402,8 @@ describe("anthropicLayer2ToolSet (the direct-API L2 emission)", () => {
 
   it("places enabled recall in the core and memory mutations in the deferred tail", () => {
     const got = names(anthropicLayer2ToolSet(opts({ memoriesEnabled: true })));
-    expect(got.indexOf("recall_memory")).toBe(6);
-    expect(got.indexOf("ask_user")).toBe(7);
+    expect(got.indexOf("recall_memory")).toBe(5);
+    expect(got.indexOf("ask_user")).toBe(6);
     expect(got.indexOf("add_memory")).toBeGreaterThan(got.indexOf("get_frontmatter"));
     expect(got.indexOf("forget_memory")).toBeGreaterThan(got.indexOf("add_memory"));
   });
@@ -431,7 +434,7 @@ describe("anthropicLayer2ToolSet (the direct-API L2 emission)", () => {
     const got = names(anthropicLayer2ToolSet(opts({ policy: DENY_ALL })));
     expect(got.some((n) => EDIT_TOOL_NAMES.has(n) || VAULT_OPS_TOOL_NAMES.has(n))).toBe(false);
     expect(got).toContain("think");
-    expect(got).toContain("read_file"); // a core read
+    expect(got).toContain("read"); // a core read
     expect(got).toContain("get_frontmatter"); // a tail read still offered
   });
 
@@ -442,14 +445,13 @@ describe("anthropicLayer2ToolSet (the direct-API L2 emission)", () => {
     const deferred = names(anthropicLayer2ToolSet(opts())).filter((n) => !nonDeferred.has(n));
     expect(deferred.length).toBeGreaterThan(0);
     for (const n of deferred) expect(nonDeferred.has(n)).toBe(false);
-    // And the non-deferred core stays exactly the six reads + ask_user + think.
+    // And the non-deferred core stays exactly the five reads + ask_user + think.
     expect([...nonDeferred].sort()).toEqual(
       [
         "ask_user",
         "get_outline",
         "list_directory",
-        "read_file",
-        "read_section",
+        "read",
         "search_content",
         "semantic_search",
         "think",

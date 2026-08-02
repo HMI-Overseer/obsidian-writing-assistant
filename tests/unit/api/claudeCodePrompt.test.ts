@@ -144,12 +144,12 @@ describe("buildClaudeCodePrompt", () => {
           { role: "user", content: "hi" },
           {
             role: "assistant",
-            content: "Did it.\n\n[read_file: a.md]\n\n[create_directory: X, DECLINED by user]",
+            content: "Did it.\n\n[read: a.md]\n\n[create_directory: X, DECLINED by user]",
           },
         ],
       }),
     );
-    expect(prompt).toContain("[read_file: a.md]");
+    expect(prompt).toContain("[read: a.md]");
     expect(prompt).toContain("[create_directory: X, DECLINED by user]");
   });
 

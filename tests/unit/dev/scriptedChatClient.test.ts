@@ -73,7 +73,7 @@ function toolRound(prefix: string) {
           type: "tool_call_start",
           segmentId: prefix,
           declarationKey: `${prefix}-d1`,
-          toolName: "read_file",
+          toolName: "read",
         },
       ],
     },

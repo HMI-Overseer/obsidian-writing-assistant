@@ -39,7 +39,7 @@ describe("AssistantTurnBuilder declaration order", () => {
       declarationKey: "segment-1:0",
       providerBlockId: "block-1",
       toolCallId: "call-read",
-      toolName: "read_file",
+      toolName: "read",
     });
     turn.appendToolArgumentsDelta("segment-1:0", "{\"path\":\"Fixtures/a.md\"}", {
       deltaKey: "args-0",
@@ -100,12 +100,12 @@ describe("AssistantTurnBuilder declaration order", () => {
     turn.startToolCall("segment-1", {
       declarationKey: "segment-1:0",
       toolCallId: "call-a",
-      toolName: "read_file",
+      toolName: "read",
     });
     turn.startToolCall("segment-1", {
       declarationKey: "segment-1:1",
       toolCallId: "call-b",
-      toolName: "read_file",
+      toolName: "read",
     });
     turn.updateToolLifecycle("call-a", { state: "completed" });
     turn.updateToolLifecycle("call-b", { state: "completed" });
@@ -126,7 +126,7 @@ describe("AssistantTurnBuilder declaration order", () => {
     turn.startToolCall("segment-1", {
       declarationKey: "segment-1:0",
       toolCallId: "call-a",
-      toolName: "read_file",
+      toolName: "read",
     });
     turn.updateToolLifecycle("call-a", { state: "completed" });
     turn.finishSegment("segment-1");
@@ -134,7 +134,7 @@ describe("AssistantTurnBuilder declaration order", () => {
     turn.startToolCall("segment-2", {
       declarationKey: "segment-2:0",
       toolCallId: "call-b",
-      toolName: "read_file",
+      toolName: "read",
     });
     turn.updateToolLifecycle("call-b", { state: "completed" });
     turn.finishSegment("segment-2");
@@ -181,7 +181,7 @@ describe("AssistantTurnBuilder identity and lifecycle", () => {
     const declaredId = turn.startToolCall("segment-1", {
       declarationKey: "segment-1:0",
       toolCallId: "call-race",
-      toolName: "read_file",
+      toolName: "read",
     });
 
     expect(declaredId).toBe("item-reserved");
@@ -222,7 +222,7 @@ describe("AssistantTurnBuilder identity and lifecycle", () => {
     turn.startSegment({ segmentId: "segment-1" });
     const itemId = turn.startToolCall("segment-1", {
       declarationKey: "segment-1:0",
-      toolName: "read_file",
+      toolName: "read",
     });
 
     expect(turn.bindToolCallId("segment-1:0", "call-a", "provider_id")).toBe(itemId);
@@ -237,11 +237,11 @@ describe("AssistantTurnBuilder identity and lifecycle", () => {
     turn.startSegment({ segmentId: "segment-1" });
     const firstId = turn.startToolCall("segment-1", {
       declarationKey: "segment-1:0",
-      toolName: "read_file",
+      toolName: "read",
     });
     const secondId = turn.startToolCall("segment-1", {
       declarationKey: "segment-1:1",
-      toolName: "read_file",
+      toolName: "read",
     });
 
     const beforeFinish = turn.snapshot().items;
@@ -274,13 +274,13 @@ describe("AssistantTurnBuilder identity and lifecycle", () => {
     const itemId = turn.startToolCall("segment-1", {
       declarationKey: "segment-1:0",
       toolCallId: "call-a",
-      toolName: "read_file",
+      toolName: "read",
     });
     expect(
       turn.startToolCall("segment-1", {
         declarationKey: "segment-1:0",
         toolCallId: "call-a",
-        toolName: "read_file",
+        toolName: "read",
       }),
     ).toBe(itemId);
     turn.appendToolArgumentsDelta("segment-1:0", "{\"path\":\"Fixtures/a.md\"}", {
@@ -334,7 +334,7 @@ describe("AssistantTurnBuilder completed-message reconciliation", () => {
       declarationKey: "segment-1:0",
       providerBlockId: "block-1",
       toolCallId: "call-a",
-      toolName: "read_file",
+      toolName: "read",
     });
     turn.appendToolArgumentsDelta("segment-1:0", "{\"path\":", {
       deltaKey: "args-0",
@@ -357,7 +357,7 @@ describe("AssistantTurnBuilder completed-message reconciliation", () => {
           type: "tool_call" as const,
           providerBlockId: "block-1",
           toolCallId: "call-a",
-          toolName: "read_file",
+          toolName: "read",
           toolArguments: "{\"path\":\"Fixtures/a.md\"}",
         },
         {
@@ -399,7 +399,7 @@ describe("AssistantTurnBuilder completed-message reconciliation", () => {
       declarationKey: "segment-1:1",
       providerBlockId: "block-1",
       toolCallId: "call-race",
-      toolName: "read_file",
+      toolName: "read",
     });
 
     turn.reconcileCompletedSegment({
@@ -414,7 +414,7 @@ describe("AssistantTurnBuilder completed-message reconciliation", () => {
           type: "tool_call",
           providerBlockId: "block-1",
           toolCallId: "call-race",
-          toolName: "read_file",
+          toolName: "read",
           toolArguments: "{\"path\":\"Fixtures/race.md\"}",
         },
       ],
@@ -434,7 +434,7 @@ describe("AssistantTurnBuilder terminal records", () => {
     toolOnly.startToolCall("segment-tool", {
       declarationKey: "segment-tool:0",
       toolCallId: "call-tool",
-      toolName: "read_file",
+      toolName: "read",
     });
     toolOnly.updateToolLifecycle("call-tool", { state: "completed" });
     toolOnly.finishSegment("segment-tool");
@@ -465,17 +465,17 @@ describe("AssistantTurnBuilder terminal records", () => {
     turn.startToolCall("segment-1", {
       declarationKey: "segment-1:0",
       toolCallId: "call-declared",
-      toolName: "read_file",
+      toolName: "read",
     });
     turn.startToolCall("segment-1", {
       declarationKey: "segment-1:1",
       toolCallId: "call-running",
-      toolName: "read_file",
+      toolName: "read",
     });
     turn.startToolCall("segment-1", {
       declarationKey: "segment-1:2",
       toolCallId: "call-completed",
-      toolName: "read_file",
+      toolName: "read",
     });
     turn.updateToolLifecycle("call-running", { state: "running" });
     turn.updateToolLifecycle("call-completed", {

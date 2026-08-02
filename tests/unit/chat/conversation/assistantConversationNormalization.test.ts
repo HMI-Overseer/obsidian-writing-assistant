@@ -269,7 +269,7 @@ describe("normalizeConversation, conservative legacy ownership", () => {
       content: "The stored final prose.",
       legacySteps: [
         { type: "reasoning", text: "I will inspect the fixture." },
-        { type: "tool_call", toolName: "read_file" },
+        { type: "tool_call", toolName: "read" },
       ],
     });
     expect(revision.createdAt).toBeUndefined();

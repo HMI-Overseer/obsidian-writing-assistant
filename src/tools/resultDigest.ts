@@ -86,9 +86,9 @@ export function captureStepFields(
 /**
  * Discovery-class tools whose *results* are pointers the args don't already carry
  * (ADR-0016): the rebuilt model can re-ground any pointer in one cheap call, so replay
- * stays pointers rather than chunk content. Path→content tools (`read_file`,
- * `read_section`) and listing tools (`list_directory`) get no digest, their args
- * are the pointer, or the view is re-derivable.
+ * stays pointers rather than chunk content. The path→content tool (`read`, on either
+ * pathway) and listing tools (`list_directory`) get no digest, their args are the
+ * pointer, or the view is re-derivable.
  *
  * Exported for the drift guard in `tests/unit/tools/resultDigest.test.ts`: these are
  * tool names nothing typechecks, so a rename that misses one silently drops that tool's
@@ -169,8 +169,8 @@ function firstSentence(text: string): string {
 
 /**
  * Extract the pointer list from a hit result, per tool. `semantic_search` yields
- * `path > heading` (exactly `read_section`'s args); the lexical / link / tag tools
- * yield vault paths the model can `read_file`. Never chunk content.
+ * `path > heading` (exactly `read`'s two args); the lexical / link / tag tools
+ * yield vault paths the model can `read`. Never chunk content.
  */
 function extractPointers(toolName: string, content: string): string[] {
   if (toolName === "semantic_search") {

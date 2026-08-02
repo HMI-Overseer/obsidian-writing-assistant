@@ -116,7 +116,7 @@ function chainMessage(
               id: "t1",
               segmentId: "s1",
               toolCallId: "call-1",
-              toolName: "read_file",
+              toolName: "read",
               toolArguments: '{"path":"chapter.md"}',
               toolArgs: { path: "chapter.md" },
               toolInput: "chapter.md",
@@ -201,7 +201,7 @@ describe("Claude Code session linearity across edit annotations", () => {
     // The pinning mutation (routing the digest into rawContent) makes this go red
     // with a `history-edited` rebuild.
     const steps: AgenticStep[] = [
-      { type: "tool_call", round: 0, toolName: "read_file", toolInput: "chapter-3.md", resultRecord: "text" },
+      { type: "tool_call", round: 0, toolName: "read", toolInput: "chapter-3.md", resultRecord: "text" },
       {
         type: "tool_call",
         round: 0,
@@ -264,7 +264,7 @@ describe("Claude Code session linearity across edit annotations", () => {
       "claudecode",
     );
 
-    expect(annotated.content).toContain("[read_file: chapter.md");
+    expect(annotated.content).toContain("[read: chapter.md");
     expect(annotated.rawContent).toBe("Before.After.");
 
     const input = await captureTurnInput([

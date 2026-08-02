@@ -32,7 +32,7 @@ function chainMessage(): ConversationMessage {
               id: "t1",
               segmentId: "s1",
               toolCallId: "call-1",
-              toolName: "read_file",
+              toolName: "read",
               toolArguments: '{"path":"large-note-name.md"}',
               toolArgs: { path: "large-note-name.md" },
               state: "completed",

@@ -73,7 +73,7 @@ function scope(overrides: Partial<ClaudeCodeRuntimeScope> = {}): ClaudeCodeRunti
     posture: "ask",
     allowedTools: new Set([
       "write_file",
-      "read_file",
+      "read",
       "replace_text",
       "ask_user",
       "remember",
@@ -281,7 +281,7 @@ describe("Claude Code late admission by tool family", () => {
   const cases: Array<{ family: string; call: ToolCall }> = [
     {
       family: "read",
-      call: { id: "toolu_read", name: "read_file", arguments: { path: "Notes/a.md" } },
+      call: { id: "toolu_read", name: "read", arguments: { path: "Notes/a.md" } },
     },
     {
       family: "edit",
@@ -445,7 +445,7 @@ describe("Claude Code effect boundaries", () => {
 
     await provider.callTool({
       id: "toolu_read",
-      name: "read_file",
+      name: "read",
       arguments: { path: "Notes/a.md" },
     });
     // Criterion 25 and settled decision 20: read-only vault work has no boundary.
@@ -646,7 +646,7 @@ describe("Claude Code lease-owned context", () => {
   it("enforces the lease's own allow-list rather than a later generation's", async () => {
     const { surface } = harness();
     const seen: string[] = [];
-    const { handle, provider } = surface({ allowedTools: new Set(["read_file"]) });
+    const { handle, provider } = surface({ allowedTools: new Set(["read"]) });
     handle.activate(owners({ review: reviewer("run-a", seen) }));
 
     const refused = await provider.callTool(vaultOpCall("toolu_write"));
@@ -664,7 +664,7 @@ describe("Claude Code lease-owned context", () => {
 
     await provider.callTool({
       id: "",
-      name: "read_file",
+      name: "read",
       arguments: { path: "Notes/a.md" },
     });
 
@@ -672,7 +672,7 @@ describe("Claude Code lease-owned context", () => {
     // A later exactly correlated call cannot raise it back.
     await provider.callTool({
       id: "toolu_read",
-      name: "read_file",
+      name: "read",
       arguments: { path: "Notes/a.md" },
     });
     expect(lease.toolCorrelation).toBe("none");

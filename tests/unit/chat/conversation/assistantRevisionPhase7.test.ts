@@ -195,7 +195,7 @@ describe("meaningful assistant replacement", () => {
             id: "tool-1",
             segmentId: "segment-1",
             toolCallId: "call-1",
-            toolName: "read_file",
+            toolName: "read",
             toolArguments: "{}",
             toolArgs: {},
             state: "interrupted",

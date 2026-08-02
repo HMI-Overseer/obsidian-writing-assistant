@@ -61,7 +61,7 @@ function declare(
   segmentId = "s1",
 ): AssistantStreamEvent[] {
   return [
-    { type: "tool_call_start", segmentId, declarationKey, toolName: "read_file" },
+    { type: "tool_call_start", segmentId, declarationKey, toolName: "read" },
     { type: "tool_call_identity", declarationKey, toolCallId, correlation: "provider_id" },
   ];
 }
@@ -81,7 +81,7 @@ describe("one batch, one commit", () => {
 
     expect(commit.duplicate).toBe(false);
     expect(commit.startedSegments).toEqual(["s1"]);
-    expect(commit.declaredTools).toEqual(["read_file"]);
+    expect(commit.declaredTools).toEqual(["read"]);
     expect(commit.toolCorrelations).toEqual([
       { toolCallId: "toolu_1", correlation: "provider_id" },
     ]);
@@ -211,7 +211,7 @@ describe("delayed identity", () => {
     turn.applyCaptureBatch(
       batch("f1", [
         ...open(),
-        { type: "tool_call_start", segmentId: "s1", declarationKey: "d1", toolName: "read_file" },
+        { type: "tool_call_start", segmentId: "s1", declarationKey: "d1", toolName: "read" },
       ]),
     );
     const declaredId = toolItems(turn.snapshot())[0]?.id;

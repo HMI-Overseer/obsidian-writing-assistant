@@ -173,7 +173,7 @@ describe("ClaudeCodeSdkMessageTranslator", () => {
             {
               type: "mcp_tool_use",
               id: "toolu_mcp_2",
-              name: "mcp__writing_assistant__read_file",
+              name: "mcp__writing_assistant__read",
               server_name: "writing_assistant",
               input: { path: "Fixtures/ordered.md" },
             },
@@ -215,7 +215,7 @@ describe("ClaudeCodeSdkMessageTranslator", () => {
         {
           type: "tool_call",
           toolCallId: "toolu_mcp_2",
-          toolName: "read_file",
+          toolName: "read",
         },
       ],
     });
@@ -244,7 +244,7 @@ describe("ClaudeCodeSdkMessageTranslator", () => {
         {
           type: "tool_call",
           toolCallId: "toolu_fixture_race_1",
-          toolName: "read_file",
+          toolName: "read",
         },
       ],
     });

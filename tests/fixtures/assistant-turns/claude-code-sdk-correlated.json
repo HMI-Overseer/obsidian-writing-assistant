@@ -16,7 +16,7 @@
           "content_block": {
             "type": "mcp_tool_use",
             "id": "toolu_fixture_sdk_1",
-            "name": "mcp__writing_assistant__read_file",
+            "name": "mcp__writing_assistant__read",
             "server_name": "writing_assistant",
             "input": {}
           }
@@ -34,7 +34,7 @@
             {
               "type": "mcp_tool_use",
               "id": "toolu_fixture_sdk_1",
-              "name": "mcp__writing_assistant__read_file",
+              "name": "mcp__writing_assistant__read",
               "server_name": "writing_assistant",
               "input": {
                 "path": "Fixtures/sdk.md"
@@ -68,7 +68,7 @@
     },
     {
       "source": "handler",
-      "toolName": "read_file",
+      "toolName": "read",
       "args": {
         "path": "Fixtures/sdk.md"
       },

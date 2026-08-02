@@ -26,7 +26,7 @@ import {
 
 const READ_STEP = {
   type: "tool_call",
-  label: "read_file",
+  label: "read",
   state: "completed",
   arguments: '{"path":"Chapters/One.md"}',
   result: "# One\n\nThe tower had been dark eleven years.",

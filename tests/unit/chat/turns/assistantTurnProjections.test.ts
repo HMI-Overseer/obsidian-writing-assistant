@@ -35,7 +35,7 @@ function tool(
     id: "tool-item",
     segmentId: "segment-1",
     toolCallId: "call-1",
-    toolName: "read_file",
+    toolName: "read",
     toolArguments: "{\"path\":\"Fixtures/a.md\"}",
     toolInput: "Fixtures/a.md",
     state: "completed",
@@ -87,14 +87,14 @@ describe("assistant tool textual projections", () => {
   it("uses an existing bounded digest verbatim", () => {
     expect(
       toolFactText(
-        tool({ resultDigest: "[read_file: Fixtures/a.md, synthetic digest]" }),
+        tool({ resultDigest: "[read: Fixtures/a.md, synthetic digest]" }),
       ),
-    ).toBe("[read_file: Fixtures/a.md, synthetic digest]");
+    ).toBe("[read: Fixtures/a.md, synthetic digest]");
   });
 
   it("projects completed, failed, and interrupted tool facts explicitly", () => {
     expect(toolFactText(tool())).toBe(
-      "[read_file: Fixtures/a.md, completed]",
+      "[read: Fixtures/a.md, completed]",
     );
     expect(
       toolFactText(
@@ -104,9 +104,9 @@ describe("assistant tool textual projections", () => {
           errorContent: "Synthetic failure.",
         }),
       ),
-    ).toBe("[read_file: Fixtures/a.md, FAILED: Synthetic failure.]");
+    ).toBe("[read: Fixtures/a.md, FAILED: Synthetic failure.]");
     expect(toolFactText(tool({ state: "interrupted" }))).toBe(
-      `[read_file: Fixtures/a.md, INTERRUPTED: ${INTERRUPTED_TOOL_RESULT_TEXT}]`,
+      `[read: Fixtures/a.md, INTERRUPTED: ${INTERRUPTED_TOOL_RESULT_TEXT}]`,
     );
   });
 });

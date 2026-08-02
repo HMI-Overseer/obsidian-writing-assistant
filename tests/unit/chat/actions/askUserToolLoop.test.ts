@@ -157,9 +157,9 @@ function run(
 
 describe("planAskBarrierBatch", () => {
   it.each([
-    ["first", ["ask_user", "read_file", "write_file"]],
-    ["middle", ["read_file", "ask_user", "write_file"]],
-    ["last", ["read_file", "write_file", "ask_user"]],
+    ["first", ["ask_user", "read", "write_file"]],
+    ["middle", ["read", "ask_user", "write_file"]],
+    ["last", ["read", "write_file", "ask_user"]],
   ])("finds the primary ask when it is %s", (_label, names) => {
     const calls = names.map((name, index) =>
       call(String(index), name, name === "ask_user" ? askArguments : {}),
@@ -175,7 +175,7 @@ describe("planAskBarrierBatch", () => {
   it("keeps later ask calls separate from ordinary siblings", () => {
     const plan = planAskBarrierBatch([
       call("a1", "ask_user", askArguments),
-      call("r1", "read_file"),
+      call("r1", "read"),
       call("a2", "ask_user", askArguments),
     ]);
 
@@ -185,7 +185,7 @@ describe("planAskBarrierBatch", () => {
   });
 
   it("returns null when the batch contains no ask", () => {
-    expect(planAskBarrierBatch([call("r1", "read_file")])).toBeNull();
+    expect(planAskBarrierBatch([call("r1", "read")])).toBeNull();
   });
 });
 
@@ -314,7 +314,7 @@ describe("runToolLoop ask_user barrier", () => {
         deltas: [],
         toolCalls: [
           call("ask-invalid", "ask_user", { questions: [] }),
-          call("read-skipped", "read_file", { path: "a.md" }),
+          call("read-skipped", "read", { path: "a.md" }),
         ],
         stopReason: "tool_use",
       },

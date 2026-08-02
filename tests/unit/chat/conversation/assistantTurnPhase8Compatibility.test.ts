@@ -66,10 +66,10 @@ describe("Phase 8 mixed-history compatibility", () => {
         {
           type: "tool_call",
           round: 0,
-          toolName: "read_file",
+          toolName: "read",
           toolCallId: "legacy-call",
           toolInput: "Fixture.md",
-          resultDigest: "[read_file: Fixture.md]",
+          resultDigest: "[read: Fixture.md]",
         },
       ],
       editProposals: [
@@ -119,7 +119,7 @@ describe("Phase 8 mixed-history compatibility", () => {
       legacySteps: [
         {
           toolCallId: "legacy-call",
-          resultDigest: "[read_file: Fixture.md]",
+          resultDigest: "[read: Fixture.md]",
         },
       ],
     });

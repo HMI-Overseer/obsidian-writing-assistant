@@ -8,7 +8,7 @@ import {
   ALL_VAULT_TOOLS,
   CORE_VAULT_TOOLS,
   GET_OUTLINE_TOOL,
-  READ_SECTION_TOOL,
+  READ_TOOL,
   GET_LINKS_TOOL,
   LIST_DIRECTORY_TOOL,
   LINK_DIRECTIONS,
@@ -55,35 +55,58 @@ describe("ALL_EDIT_TOOLS", () => {
   });
 });
 
-describe("GET_OUTLINE_TOOL / READ_SECTION_TOOL", () => {
+describe("READ_TOOL / GET_OUTLINE_TOOL", () => {
   test("get_outline requires only a path", () => {
     expect(GET_OUTLINE_TOOL.name).toBe("get_outline");
     expect(GET_OUTLINE_TOOL.parameters.required).toEqual(["path"]);
   });
 
-  test("read_section requires path and headingPath", () => {
-    expect(READ_SECTION_TOOL.name).toBe("read_section");
-    expect(READ_SECTION_TOOL.parameters.required).toEqual(["path", "headingPath"]);
-    expect(READ_SECTION_TOOL.parameters.properties.headingPath).toBeDefined();
+  // D4: one required locator, and the section read is what an optional headingPath
+  // selects. There is no mode, no enum, and nothing to mis-select.
+  test("read requires only a path, and headingPath is the optional narrowing", () => {
+    expect(READ_TOOL.name).toBe("read");
+    expect(READ_TOOL.parameters.required).toEqual(["path"]);
+    expect(READ_TOOL.parameters.properties.path).toBeDefined();
+    expect(READ_TOOL.parameters.properties.headingPath).toBeDefined();
   });
 
-  test("both pair tools have a strategyHint so the prompt auto-derives", () => {
-    expect(GET_OUTLINE_TOOL.strategyHint).toBeTruthy();
-    expect(READ_SECTION_TOOL.strategyHint).toBeTruthy();
-  });
-
-  test("both are advertised in ALL_VAULT_TOOLS and registered in VAULT_TOOL_NAMES", () => {
+  test("read_section is retired, and no advertised tool answers to it", () => {
     const names = ALL_VAULT_TOOLS.map((t) => t.name);
-    expect(names).toContain("get_outline");
-    expect(names).toContain("read_section");
-    expect(VAULT_TOOL_NAMES.has("get_outline")).toBe(true);
-    expect(VAULT_TOOL_NAMES.has("read_section")).toBe(true);
+    expect(names).not.toContain("read_section");
+    expect(names).not.toContain("read_file");
+    expect(VAULT_TOOL_NAMES.has("read_section")).toBe(false);
+    expect(VAULT_TOOL_NAMES.has("read_file")).toBe(false);
   });
 
-  test("the pair stays out of the local CORE tier until the benchmark decides", () => {
+  // The merged text is the union of both predecessors' guidance organised by pathway
+  // (RFC-0015's additive rule). The section pathway keeps every piece of its
+  // heading-ambiguity guidance; the wrong-sibling clause is the one thing that goes.
+  test("read's guidance carries both pathways and names no retired tool", () => {
+    const text = [READ_TOOL.description, READ_TOOL.strategyHint, READ_TOOL.errorGuidance]
+      .join("\n");
+    expect(text).not.toContain("read_file");
+    expect(text).not.toContain("read_section");
+    // Whole-note pathway.
+    expect(READ_TOOL.description).toContain("whole note");
+    // Section pathway, including both halves of the ambiguity guidance.
+    expect(READ_TOOL.description).toContain("duplicated");
+    expect(READ_TOOL.errorGuidance).toContain("ambiguous");
+    expect(READ_TOOL.errorGuidance).toContain("get_outline");
+    // The rewritten wrong-sibling clause names the parameter, not a tool.
+    expect(READ_TOOL.errorGuidance).toContain("omit headingPath");
+  });
+
+  test("both have a strategyHint so the prompt auto-derives", () => {
+    expect(GET_OUTLINE_TOOL.strategyHint).toBeTruthy();
+    expect(READ_TOOL.strategyHint).toBeTruthy();
+  });
+
+  test("get_outline stays out of the local CORE tier until the benchmark decides", () => {
     const core = CORE_VAULT_TOOLS.map((t) => t.name);
     expect(core).not.toContain("get_outline");
-    expect(core).not.toContain("read_section");
+    // read travelled the other way: it was already core, and the section pathway
+    // arrived with it rather than staying cloud-only.
+    expect(core).toContain("read");
   });
 });
 

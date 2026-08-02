@@ -13,7 +13,7 @@ import { CHAT_ROOT } from "../lib/scenarioApi.mjs";
 
 export default {
   id: "prose-tool-prose",
-  description: "Prose, a read_file step, then more prose. Two scripted rounds.",
+  description: "Prose, a read step, then more prose. Two scripted rounds.",
   vault: "writing-basic",
   theme: "dark",
   provider: { kind: "scripted", frames: "prose-tool-prose" },

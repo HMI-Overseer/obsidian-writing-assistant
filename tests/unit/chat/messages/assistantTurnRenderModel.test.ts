@@ -30,7 +30,7 @@ function tool(
     id,
     segmentId,
     toolCallId,
-    toolName: "read_file",
+    toolName: "read",
     toolArguments: `{"path":"${id}.md"}`,
     toolArgs: { path: `${id}.md` },
     toolInput: `${id}.md`,
@@ -246,7 +246,7 @@ describe("assistant turn render model", () => {
         {
           type: "tool_call",
           round: 0,
-          toolName: "read_file",
+          toolName: "read",
           toolCallId: "legacy-call",
           toolInput: "Legacy.md",
         },

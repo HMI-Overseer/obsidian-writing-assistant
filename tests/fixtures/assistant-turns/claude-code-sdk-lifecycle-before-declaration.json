@@ -8,7 +8,7 @@
       "event": {
         "type": "tool_started",
         "toolCallId": "toolu_fixture_race_1",
-        "toolName": "read_file"
+        "toolName": "read"
       }
     },
     {
@@ -16,7 +16,7 @@
       "event": {
         "type": "tool_completed",
         "toolCallId": "toolu_fixture_race_1",
-        "toolName": "read_file",
+        "toolName": "read",
         "resultRecord": "synthetic result",
         "isError": false
       }
@@ -31,7 +31,7 @@
           "content_block": {
             "type": "mcp_tool_use",
             "id": "toolu_fixture_race_1",
-            "name": "mcp__writing_assistant__read_file",
+            "name": "mcp__writing_assistant__read",
             "server_name": "writing_assistant",
             "input": {}
           }
@@ -67,7 +67,7 @@
             {
               "type": "mcp_tool_use",
               "id": "toolu_fixture_race_1",
-              "name": "mcp__writing_assistant__read_file",
+              "name": "mcp__writing_assistant__read",
               "server_name": "writing_assistant",
               "input": {
                 "path": "Fixtures/race.md"

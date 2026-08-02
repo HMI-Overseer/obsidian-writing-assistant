@@ -220,11 +220,50 @@ describe("retired tool names still render", () => {
   });
 
   test("a saved call to an absorbed tool still shows its target as the detail line", () => {
-    for (const name of ["directory_tree", "get_backlinks", "get_outgoing_links"]) {
+    for (const name of [
+      "directory_tree",
+      "get_backlinks",
+      "get_outgoing_links",
+      "read_file",
+      "read_section",
+    ]) {
       expect(
         extractToolInput({ name, arguments: { path: "Characters/Will.md" } }),
         `extractToolInput lost the retired case for "${name}"`,
       ).toBe("Characters/Will.md");
+    }
+  });
+
+  test("the two absorbed reads keep the label and icon they were recorded under", () => {
+    expect(toolLabel("read_file")).toBe("Read note");
+    expect(toolIcon("read_file")).toBe("file-text");
+    expect(toolLabel("read_section")).toBe("Read section");
+    expect(toolIcon("read_section")).toBe("text-select");
+  });
+
+  // read_file is the case where the two halves of D2 pull apart. Its display vocabulary
+  // survived the merge unchanged, so its retired row reads exactly like `read`'s live
+  // one; read_section's did not, and a saved section read would otherwise claim to have
+  // been a whole-note read.
+  test("read_section keeps its own wording where read_file shares the absorbing tool's", () => {
+    for (const name of ["read_file", "read_section"]) {
+      expect(VAULT_TOOL_NAMES.has(name)).toBe(false);
+      expect(toolLabel(name)).not.toBe(name);
+    }
+    expect(toolLabel("read_file")).toBe(TOOL_LABELS.read);
+    expect(toolLabel("read_section")).not.toBe(TOOL_LABELS.read);
+  });
+
+  // The composition is read_section's and it now has to serve both retired names plus
+  // the absorbing tool, on both of `read`'s pathways.
+  test("a saved section read still composes path and headingPath", () => {
+    for (const name of ["read_section", "read"]) {
+      expect(
+        extractToolInput({
+          name,
+          arguments: { path: "Book.md", headingPath: "Act I > Chapter 1" },
+        }),
+      ).toBe("Book.md > Act I > Chapter 1");
     }
   });
 

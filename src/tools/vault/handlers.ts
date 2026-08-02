@@ -38,12 +38,10 @@ export async function executeVaultTool(
   switch (toolCall.name) {
     case "semantic_search":
       return executeSearchVault(toolCall.arguments, ctx);
-    case "read_file":
-      return executeReadFile(toolCall.arguments, ctx);
+    case "read":
+      return executeRead(toolCall.arguments, ctx);
     case "get_outline":
       return executeGetOutline(toolCall.arguments, ctx);
-    case "read_section":
-      return executeReadSection(toolCall.arguments, ctx);
     case "list_directory":
       return executeListDirectory(toolCall.arguments, ctx);
     case "search_files":
@@ -141,7 +139,15 @@ async function executeSearchVault(
   return { content: parts.join("\n").replace(/\s+$/, ""), isReadOnly: true };
 }
 
-async function executeReadFile(
+/**
+ * `read` (RFC-0015), the merged whole-note and single-section read. The two
+ * predecessors shared everything up to the file handle, so the merge is one entry
+ * point that validates and resolves once, then branches on whether `headingPath` was
+ * given (D4). `formatWithLineNumbers`' `startLine` already gives both pathways one
+ * line vocabulary, so there is one output shape and nothing to reconcile: the only
+ * difference is the header line, `[path]` against `[path > headingPath]`.
+ */
+async function executeRead(
   args: Record<string, unknown>,
   ctx: VaultToolContext,
 ): Promise<ToolResult> {
@@ -166,9 +172,52 @@ async function executeReadFile(
     });
   }
 
-  const content = await ctx.app.vault.read(file);
+  // A blank headingPath is an absent one, so it widens to the whole note rather than
+  // refusing: there is no value here that returns a plausible wrong answer.
+  const headingPath = typeof args.headingPath === "string" ? args.headingPath.trim() : "";
+  if (!headingPath) {
+    const content = await ctx.app.vault.read(file);
+    return { content: `[${path}]\n\n${formatWithLineNumbers(content)}`, isReadOnly: true };
+  }
 
-  return { content: `[${path}]\n\n${formatWithLineNumbers(content)}`, isReadOnly: true };
+  const headings = ctx.app.metadataCache.getFileCache(file)?.headings ?? [];
+  if (headings.length === 0) {
+    // No sections to address; name the parameter to drop, not a sibling tool. This is
+    // the one piece of guidance the merge rewrites rather than keeps (RFC-0015).
+    return toolFailure({
+      kind: "not-found",
+      what: `note "${path}" has no headings to read a section from`,
+      recovery: "omit headingPath to read it whole",
+    });
+  }
+
+  const lines = (await ctx.app.vault.read(file)).split("\n");
+  const outline = buildOutline(headings, lines.length);
+  const match = matchSection(outline, headingPath);
+
+  if (match.kind === "ambiguous") {
+    return toolFailure({
+      kind: "ambiguous",
+      what: `heading "${headingPath}" matches ${match.candidates.length} sections in "${path}"`,
+      recovery: `pass one of these full headingPaths: ${match.candidates.join(" | ")}`,
+    });
+  }
+  if (match.kind === "not-found") {
+    return toolFailure({
+      kind: "not-found",
+      what: `no heading matching "${headingPath}" in "${path}"`,
+      recovery: "call get_outline to see the note's exact heading paths",
+    });
+  }
+
+  const section = sectionLines(lines, match.heading);
+  // startLine is 1-indexed so a section carries the note's own line numbers, the same
+  // ones the whole-note pathway shows for those lines.
+  const numbered = formatWithLineNumbers(section.join("\n"), match.heading.startLine + 1);
+  return {
+    content: `[${path} > ${match.heading.headingPath}]\n\n${numbered}`,
+    isReadOnly: true,
+  };
 }
 
 async function executeGetOutline(
@@ -198,7 +247,7 @@ async function executeGetOutline(
   const headings = ctx.app.metadataCache.getFileCache(file)?.headings ?? [];
   if (headings.length === 0) {
     return {
-      content: `Note "${path}" has no headings; read it whole with read_file.`,
+      content: `Note "${path}" has no headings; read it whole with read.`,
       isReadOnly: true,
     };
   }
@@ -221,74 +270,6 @@ async function executeGetOutline(
   };
 
   return { content: JSON.stringify(payload, null, 2), isReadOnly: true };
-}
-
-async function executeReadSection(
-  args: Record<string, unknown>,
-  ctx: VaultToolContext,
-): Promise<ToolResult> {
-  const rawPath = typeof args.path === "string" ? args.path.trim() : "";
-  if (!rawPath) {
-    return toolFailure({ kind: "invalid-args", what: "path is required" });
-  }
-  const headingPath = typeof args.headingPath === "string" ? args.headingPath.trim() : "";
-  if (!headingPath) {
-    return toolFailure({
-      kind: "invalid-args",
-      what: "headingPath is required",
-      recovery: "call get_outline to see the note's heading paths, then pass one",
-    });
-  }
-
-  const outside = refuseOutsideVault(rawPath);
-  if (outside) return outside;
-
-  const path = normalizePath(rawPath);
-  const file = ctx.app.vault.getFileByPath(path);
-  if (!file) {
-    return toolFailure({
-      kind: "not-found",
-      what: `no note found at path "${path}"`,
-      recovery: "call list_directory or search_files to find the correct path",
-    });
-  }
-
-  const headings = ctx.app.metadataCache.getFileCache(file)?.headings ?? [];
-  if (headings.length === 0) {
-    // No sections to address; point straight at the whole-note reader, not get_outline.
-    return toolFailure({
-      kind: "not-found",
-      what: `note "${path}" has no headings to read a section from`,
-      recovery: "read it whole with read_file",
-    });
-  }
-
-  const lines = (await ctx.app.vault.read(file)).split("\n");
-  const outline = buildOutline(headings, lines.length);
-  const match = matchSection(outline, headingPath);
-
-  if (match.kind === "ambiguous") {
-    return toolFailure({
-      kind: "ambiguous",
-      what: `heading "${headingPath}" matches ${match.candidates.length} sections in "${path}"`,
-      recovery: `pass one of these full headingPaths: ${match.candidates.join(" | ")}`,
-    });
-  }
-  if (match.kind === "not-found") {
-    return toolFailure({
-      kind: "not-found",
-      what: `no heading matching "${headingPath}" in "${path}"`,
-      recovery: "call get_outline to see the note's exact heading paths",
-    });
-  }
-
-  const section = sectionLines(lines, match.heading);
-  // startLine is 1-indexed so the numbers match read_file's whole-file numbering.
-  const numbered = formatWithLineNumbers(section.join("\n"), match.heading.startLine + 1);
-  return {
-    content: `[${path} > ${match.heading.headingPath}]\n\n${numbered}`,
-    isReadOnly: true,
-  };
 }
 
 /** Cap on the entries one listing shows, so a deep call cannot flood context. */
@@ -546,7 +527,7 @@ async function executeSearchContent(
  * Render one file's matches. With no context, each match is a single
  * `path:line: snippet` line (grep default). With contextLines > 0, surrounding
  * lines are shown, and overlapping windows are merged into one hunk per file,
- * so a model gets the sentence before/after without a follow-up read_file and
+ * so a model gets the sentence before/after without a follow-up read and
  * shared context is never printed twice.
  */
 function renderFileMatches(

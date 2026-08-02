@@ -40,7 +40,7 @@ import type { ConversationMessage } from "../../src/shared/types";
  */
 
 function cfg(): SessionConfig {
-  return { model: "claude-sonnet-4-6", systemPrompt: "Be concise.", agenticMode: true, toolNames: ["read_file"] };
+  return { model: "claude-sonnet-4-6", systemPrompt: "Be concise.", agenticMode: true, toolNames: ["read"] };
 }
 
 function mintedMeta(): HarnessSession {

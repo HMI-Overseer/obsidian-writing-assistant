@@ -17,7 +17,7 @@
             {
               "type": "tool_use",
               "id": "toolu_fixture_legacy_visible_1",
-              "name": "mcp__writing_assistant__read_file",
+              "name": "mcp__writing_assistant__read",
               "input": {
                 "path": "Fixtures/legacy.md"
               }
@@ -33,7 +33,7 @@
         "id": 7,
         "method": "tools/call",
         "params": {
-          "name": "read_file",
+          "name": "read",
           "arguments": {
             "path": "Fixtures/legacy.md"
           }

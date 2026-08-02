@@ -20,7 +20,7 @@ const orderedAssistant: ChatTurn = {
     {
       type: "tool_call",
       toolCallId: "call-1",
-      toolName: "read_file",
+      toolName: "read",
       toolArguments: '{"path":"one.md"}',
       toolArgs: { path: "one.md" },
     },
@@ -28,7 +28,7 @@ const orderedAssistant: ChatTurn = {
     {
       type: "tool_call",
       toolCallId: "call-2",
-      toolName: "read_file",
+      toolName: "read",
       toolArguments: '{"path":"two.md"}',
       toolArgs: { path: "two.md" },
     },
@@ -70,14 +70,14 @@ describe("Phase 6 assistant history serialization", () => {
         {
           type: "tool_use",
           id: "call-1",
-          name: "read_file",
+          name: "read",
           input: { path: "one.md" },
         },
         { type: "text", text: "Between." },
         {
           type: "tool_use",
           id: "call-2",
-          name: "read_file",
+          name: "read",
           input: { path: "two.md" },
         },
       ],
@@ -115,7 +115,7 @@ describe("Phase 6 assistant history serialization", () => {
             id: "call-1",
             type: "function",
             function: {
-              name: "read_file",
+              name: "read",
               arguments: '{"path":"one.md"}',
             },
           },
@@ -123,7 +123,7 @@ describe("Phase 6 assistant history serialization", () => {
             id: "call-2",
             type: "function",
             function: {
-              name: "read_file",
+              name: "read",
               arguments: '{"path":"two.md"}',
             },
           },

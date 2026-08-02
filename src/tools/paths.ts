@@ -38,9 +38,8 @@ const PATH_ARRAY_ARG_KEYS = ["paths"] as const;
  * for that tool. The guard asserts every key is still an advertised tool.
  */
 export const SNAP_TOOL_KEYS: Record<string, readonly string[]> = {
-  read_file: ["path"],
+  read: ["path"],
   get_outline: ["path"],
-  read_section: ["path"],
   get_links: ["path"],
   trash_file: ["path"],
   edit: ["path"],

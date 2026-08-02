@@ -161,7 +161,7 @@ async function executeEdit(
       kind: "no-match",
       what: `search text not found in "${target.path}"`,
       recovery:
-        "match the document exactly, including whitespace and indentation, or use read_file to verify the current content",
+        "match the document exactly, including whitespace and indentation, or use read to verify the current content",
       isReadOnly: false,
     });
   }

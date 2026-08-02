@@ -48,9 +48,16 @@ describe("buildVaultSdkTools (Layer-2 core/tail alwaysLoad split, ADR-0009)", ()
       .map((d) => d.name)
       .sort();
     expect(alwaysLoaded).toEqual(expectedCore);
-    // The Claude Code core is the 6 retrieval / navigation reads plus ask_user.
+    // The Claude Code core is the 5 retrieval / navigation reads plus ask_user.
     // `think` is not bridged to Claude Code, so it never lands here.
-    expect(alwaysLoaded).toHaveLength(7);
+    //
+    // Seven until RFC-0015's Stage 4. This is the third number the read merge moves
+    // (D11 names the other two, CORE_READ_TOOL_NAMES.size and the anthropic
+    // non-deferred set), and it is the same assertion about the new design: section
+    // reading became a parameter on `read`, so the always-loaded set is one shorter
+    // while the capability is unchanged. Note memories are off in this fixture, which
+    // is why recall_memory is not among the five.
+    expect(alwaysLoaded).toHaveLength(6);
     expect(alwaysLoaded.filter((name) => name === "ask_user")).toHaveLength(1);
   });
 

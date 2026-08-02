@@ -21,7 +21,7 @@ function tool(
     id: `item-${id}`,
     segmentId,
     toolCallId: id,
-    toolName: "read_file",
+    toolName: "read",
     toolArguments: `{"path":"${id}.md"}`,
     toolArgs: { path: `${id}.md` },
     state: "completed",
@@ -120,7 +120,7 @@ describe("Phase 6 history expansion", () => {
       {
         type: "tool_call",
         toolCallId: "call-1",
-        toolName: "read_file",
+        toolName: "read",
         toolArguments: '{"path":"call-1.md"}',
         toolArgs: { path: "call-1.md" },
       },

@@ -1,14 +1,14 @@
 /**
- * Pure outline / section logic for the `get_outline` + `read_section` pair
+ * Pure outline / section logic for `get_outline` and `read`'s section pathway
  * (tool-set-review D6). Kept free of Obsidian so it is unit-testable: the
  * handlers feed it `getFileCache().headings` plus the note's lines and render
  * the result.
  *
- * The seam the pair must get right is a single shared `headingPath` vocabulary:
- * `get_outline` emits the full breadcrumb of every heading, and `read_section`
- * accepts that exact string back, so the model pipes one into the other with no
- * translation. {@link buildOutline} produces the breadcrumbs and section spans;
- * {@link matchSection} resolves a (possibly partial or duplicated) `headingPath`
+ * The seam the two must get right is a single shared `headingPath` vocabulary:
+ * `get_outline` emits the full breadcrumb of every heading, and `read` accepts that
+ * exact string back as its optional `headingPath`, so the model pipes one into the
+ * other with no translation. {@link buildOutline} produces the breadcrumbs and section
+ * spans; {@link matchSection} resolves a (possibly partial or duplicated) `headingPath`
  * against them.
  */
 

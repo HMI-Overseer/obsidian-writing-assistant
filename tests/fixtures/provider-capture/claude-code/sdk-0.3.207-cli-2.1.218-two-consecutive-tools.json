@@ -99,7 +99,7 @@
         "content_block": {
           "type": "mcp_tool_use",
           "id": "toolu_2",
-          "name": "mcp__writing_assistant__read_file",
+          "name": "mcp__writing_assistant__read",
           "server_name": "writing_assistant",
           "input": {
             "path": "fixture-path"
@@ -136,7 +136,7 @@
           {
             "type": "mcp_tool_use",
             "id": "toolu_2",
-            "name": "mcp__writing_assistant__read_file",
+            "name": "mcp__writing_assistant__read",
             "server_name": "writing_assistant",
             "input": {
               "path": "fixture-path"

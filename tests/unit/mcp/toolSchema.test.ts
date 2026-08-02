@@ -3,7 +3,7 @@ import { toMcpToolSchema } from "../../../src/mcp/toolSchema";
 import type { CanonicalToolDefinition } from "../../../src/tools/types";
 
 const TOOL: CanonicalToolDefinition = {
-  name: "read_file",
+  name: "read",
   description: "Read a note.",
   parameters: {
     type: "object",
@@ -17,7 +17,7 @@ const TOOL: CanonicalToolDefinition = {
 describe("toMcpToolSchema", () => {
   it("maps a canonical tool to the MCP inputSchema shape", () => {
     expect(toMcpToolSchema(TOOL)).toEqual({
-      name: "read_file",
+      name: "read",
       description: "Read a note.",
       inputSchema: {
         type: "object",

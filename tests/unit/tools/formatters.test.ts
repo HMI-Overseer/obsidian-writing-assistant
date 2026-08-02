@@ -58,7 +58,7 @@ describe("formatAnthropicTools", () => {
 
 describe("formatAnthropicToolsWithSearch (Layer 2 defer split)", () => {
   const READ_TOOL: CanonicalToolDefinition = {
-    name: "read_file",
+    name: "read",
     description: "Read a file.",
     parameters: { type: "object", properties: {}, required: [] },
   };
@@ -71,7 +71,7 @@ describe("formatAnthropicToolsWithSearch (Layer 2 defer split)", () => {
   function build() {
     return formatAnthropicToolsWithSearch([READ_TOOL, TAIL_TOOL], {
       variant: "regex",
-      nonDeferredToolNames: ["read_file"],
+      nonDeferredToolNames: ["read"],
     });
   }
 
@@ -87,7 +87,7 @@ describe("formatAnthropicToolsWithSearch (Layer 2 defer split)", () => {
   });
 
   test("keeps a non-deferred-listed tool out of the deferred set", () => {
-    const read = build().find((t) => t.name === "read_file") as AnthropicTool;
+    const read = build().find((t) => t.name === "read") as AnthropicTool;
     expect(read).toBeDefined();
     expect(read).not.toHaveProperty("defer_loading");
     // Still a fully formatted tool (schema intact), just non-deferred.
@@ -101,7 +101,7 @@ describe("formatAnthropicToolsWithSearch (Layer 2 defer split)", () => {
 
   test("keeps at least one non-deferred tool so the wire 'all deferred' rule cannot trip", () => {
     // The search entry must not defer, and at least one tool must stay non-deferred, else
-    // the API 400s with "All tools have defer_loading set". Here: search entry + read_file.
+    // the API 400s with "All tools have defer_loading set". Here: search entry + read.
     const nonDeferred = build().filter((t) => !("defer_loading" in t && t.defer_loading));
     expect(nonDeferred.length).toBeGreaterThanOrEqual(2);
   });

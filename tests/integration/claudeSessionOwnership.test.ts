@@ -31,7 +31,7 @@ const CONFIG: SessionConfig = {
   model: "claude-sonnet-4-5",
   systemPrompt: "system",
   agenticMode: true,
-  toolNames: ["read_file"],
+  toolNames: ["read"],
 };
 
 function textDelta(text: string) {

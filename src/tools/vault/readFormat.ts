@@ -11,13 +11,14 @@
  * empty note renders as "" (there is nothing to number).
  *
  * `startLine` (1-indexed, default 1) is the file line number of the first line
- * of `content`. read_section passes the heading's line number so its numbers are
- * the *same* numbers read_file would show for those lines (tool-set-review D6's
- * line-number-consistency condition); read_file leaves it at the default. The
- * number column widens to the largest absolute line number so an offset slice
- * still right-aligns.
+ * of `content`. `read`'s section pathway passes the heading's line number so a
+ * section's numbers are the *same* numbers the whole-note pathway would show for
+ * those lines (tool-set-review D6's line-number-consistency condition); the
+ * whole-note pathway leaves it at the default. The number column widens to the
+ * largest absolute line number so an offset slice still right-aligns.
  *
- * Shared by read_file and read_section so both speak one line vocabulary.
+ * This parameter is why `read` can merge the two pathways without reconciling
+ * anything (RFC-0015 D4): they already spoke one line vocabulary.
  */
 export function formatWithLineNumbers(content: string, startLine = 1): string {
   if (content === "") return "";

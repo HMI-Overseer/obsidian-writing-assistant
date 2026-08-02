@@ -145,7 +145,7 @@ function defineBridge({ pluginId, viewType }) {
       label: item.toolName,
       state: item.state,
       ...(item.toolArguments ? { arguments: item.toolArguments } : {}),
-      // The digest when the tool has one, the bounded record otherwise. `read_file` and the
+      // The digest when the tool has one, the bounded record otherwise. `read` and the
       // other path-to-content tools deliberately carry no digest (their arguments are the
       // pointer), so reading only the digest would show a tool step with no result at all,
       // which is the half of a tool step a verdict actually turns on.

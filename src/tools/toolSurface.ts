@@ -6,7 +6,6 @@ import {
   VAULT_TOOL_NAMES,
   CORE_VAULT_TOOLS,
   GET_OUTLINE_TOOL,
-  READ_SECTION_TOOL,
 } from "./vault/definition";
 import { ALL_EDIT_TOOLS } from "./editing/definition";
 import { ALL_VAULT_OPS_TOOLS, allowedVaultOpsTools } from "./vault-ops/definition";
@@ -189,14 +188,16 @@ export function cloudStableToolSet(
 /**
  * The non-deferred Layer-2 core reads: the retrieval / navigation primitives kept
  * always-loaded on both billed paths (ADR-0009). It is {@link CORE_VAULT_TOOLS}
- * (list_directory, semantic_search, search_content, read_file) plus the section-level
- * {@link GET_OUTLINE_TOOL} / {@link READ_SECTION_TOOL} pair. Everything else, the read
+ * (list_directory, semantic_search, search_content, read) plus {@link GET_OUTLINE_TOOL},
+ * the structure survey that makes a headingPath obtainable. Everything else, the read
  * tail and every write, defers.
+ *
+ * One slot shorter since RFC-0015 merged section reading into `read` as a parameter:
+ * the capability stayed and the catalogue entry went, which is what that merge was for.
  */
 export const CORE_READ_TOOLS: CanonicalToolDefinition[] = [
   ...CORE_VAULT_TOOLS,
   GET_OUTLINE_TOOL,
-  READ_SECTION_TOOL,
   RECALL_MEMORY_TOOL,
 ];
 

@@ -539,7 +539,7 @@ describe("runToolLoop phase-2 replay capture", () => {
     const client = countingClient([
       {
         deltas: ["reading"],
-        toolCalls: [{ id: "r-1", name: "read_file", arguments: { path: "x.md" } }],
+        toolCalls: [{ id: "r-1", name: "read", arguments: { path: "x.md" } }],
         stopReason: "tool_use",
       },
       { deltas: ["done"], toolCalls: null, stopReason: "end_turn" },

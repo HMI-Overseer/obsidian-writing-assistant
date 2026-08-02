@@ -35,7 +35,7 @@ function makeTurn(): AssistantTurnRecord {
         id: "tool-item-1",
         segmentId: "segment-1",
         toolCallId: "tool-call-1",
-        toolName: "read_file",
+        toolName: "read",
         toolArguments: "{}",
         toolArgs: {},
         state: "completed",

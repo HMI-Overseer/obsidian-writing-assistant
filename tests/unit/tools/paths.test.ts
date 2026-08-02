@@ -308,10 +308,10 @@ describe("normalizeVaultToolCall confusable snapping (existing-file keys only)",
     expect(out.arguments.to).toBe("Archive/The Sovereign's Halo.md");
   });
 
-  it("snaps read_file `path`", () => {
+  it("snaps read `path`", () => {
     const out = normalizeVaultToolCall(app, {
       id: "r",
-      name: "read_file",
+      name: "read",
       arguments: { path: "Lore/Anno's Crucible.md" },
     });
     expect(out.arguments.path).toBe(`Lore/Anno${CURLY}s Crucible.md`);

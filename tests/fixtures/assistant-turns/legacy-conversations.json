@@ -25,7 +25,7 @@
           {
             "type": "tool_call",
             "round": 0,
-            "toolName": "read_file",
+            "toolName": "read",
             "toolCallId": "legacy_tool_fixture_1",
             "toolInput": "Fixtures/legacy.md",
             "resultRecord": "synthetic result"
@@ -73,7 +73,7 @@
           {
             "type": "tool_call",
             "round": 0,
-            "toolName": "read_file",
+            "toolName": "read",
             "toolCallId": "legacy_tool_fixture_owner",
             "resultRecord": "synthetic result"
           }

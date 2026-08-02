@@ -524,41 +524,7 @@ describe("search_content", () => {
 });
 
 // ---------------------------------------------------------------------------
-// read_file
-// ---------------------------------------------------------------------------
-
-describe("read_file", () => {
-  test("returns content with cat -n style line numbers under the path header", async () => {
-    const note = makeFile("Notes/chapter.md");
-    const ctx = makeCtx({
-      files: [note],
-      fileContents: { "Notes/chapter.md": "First line.\nSecond line.\nThird line." },
-    });
-
-    const result = await executeVaultTool(tc("read_file", { path: "Notes/chapter.md" }), ctx);
-
-    expect(result.isReadOnly).toBe(true);
-    expect(result.isError).toBeUndefined();
-    expect(result.content).toContain("[Notes/chapter.md]");
-    expect(result.content).toContain("1\tFirst line.");
-    expect(result.content).toContain("2\tSecond line.");
-    expect(result.content).toContain("3\tThird line.");
-  });
-
-  test("right-aligns line numbers so anchors line up on a longer note", async () => {
-    const note = makeFile("big.md");
-    const body = Array.from({ length: 12 }, (_, i) => `line ${i + 1}`).join("\n");
-    const ctx = makeCtx({ files: [note], fileContents: { "big.md": body } });
-
-    const result = await executeVaultTool(tc("read_file", { path: "big.md" }), ctx);
-
-    expect(result.content).toContain(" 1\tline 1");
-    expect(result.content).toContain("12\tline 12");
-  });
-});
-
-// ---------------------------------------------------------------------------
-// get_outline / read_section (D6)
+// get_outline, and the structured note the read tests below share (D6)
 // ---------------------------------------------------------------------------
 
 // A small structured note shared by the outline/section tests:
@@ -593,6 +559,35 @@ function bookCtx(): VaultToolContext {
   });
 }
 
+/** A note whose bare "Scene" heading is duplicated under two different acts. */
+function dupCtx(): VaultToolContext {
+  return makeCtx({
+    files: [makeFile("Dup.md")],
+    fileContents: {
+      "Dup.md": ["# Act I", "## Scene", "a", "# Act II", "## Scene", "b"].join("\n"),
+    },
+    fileCaches: {
+      "Dup.md": {
+        headings: [
+          { heading: "Act I", level: 1, position: { start: { line: 0 } } },
+          { heading: "Scene", level: 2, position: { start: { line: 1 } } },
+          { heading: "Act II", level: 1, position: { start: { line: 3 } } },
+          { heading: "Scene", level: 2, position: { start: { line: 4 } } },
+        ],
+      },
+    },
+  });
+}
+
+/** A note with no headings at all, the case both read pathways have to speak to. */
+function flatCtx(): VaultToolContext {
+  return makeCtx({
+    files: [makeFile("Flat.md")],
+    fileContents: { "Flat.md": "just prose, no structure" },
+    fileCaches: { "Flat.md": {} },
+  });
+}
+
 describe("get_outline", () => {
   test("returns JSON with depth, full headingPath, and per-section word/line counts", async () => {
     const result = await executeVaultTool(tc("get_outline", { path: "Book.md" }), bookCtx());
@@ -611,17 +606,11 @@ describe("get_outline", () => {
     expect(parsed.headings[1].words).toBe(6);
   });
 
-  test("says so and points at read_file for a note with no headings", async () => {
-    const ctx = makeCtx({
-      files: [makeFile("Flat.md")],
-      fileContents: { "Flat.md": "just prose, no structure" },
-      fileCaches: { "Flat.md": {} },
-    });
-    const result = await executeVaultTool(tc("get_outline", { path: "Flat.md" }), ctx);
+  test("says so and points at the whole-note read for a note with no headings", async () => {
+    const result = await executeVaultTool(tc("get_outline", { path: "Flat.md" }), flatCtx());
 
     expect(result.isError).toBeUndefined();
-    expect(result.content).toContain("no headings");
-    expect(result.content).toContain("read_file");
+    expect(result.content).toBe('Note "Flat.md" has no headings; read it whole with read.');
   });
 
   test("errors with not-found when the note does not exist", async () => {
@@ -636,90 +625,159 @@ describe("get_outline", () => {
   });
 });
 
-describe("read_section", () => {
-  test("reads a section by its full headingPath with file-consistent line numbers", async () => {
+// ---------------------------------------------------------------------------
+// read (RFC-0015: read_file + read_section merge here, D4)
+//
+// The per-pathway expectations below are the *pre-merge* bytes of the two
+// predecessors, captured by running them on these exact fixtures before the merge
+// landed. The gate's claim is that path alone returns exactly what read_file
+// returned and path plus headingPath exactly what read_section returned, offset
+// line numbers included.
+// ---------------------------------------------------------------------------
+
+describe("read", () => {
+  const WHOLE_SMALL = "[Notes/chapter.md]\n\n1\tFirst line.\n2\tSecond line.\n3\tThird line.";
+  const WHOLE_WIDE =
+    "[big.md]\n\n 1\tline 1\n 2\tline 2\n 3\tline 3\n 4\tline 4\n 5\tline 5\n 6\tline 6\n" +
+    " 7\tline 7\n 8\tline 8\n 9\tline 9\n10\tline 10\n11\tline 11\n12\tline 12";
+  const WHOLE_BOOK =
+    "[Book.md]\n\n1\t# Act I\n2\tintro\n3\t## Chapter 1\n4\tthe duel was fierce\n5\t\n" +
+    "6\t## Chapter 2\n7\tcalm after the storm";
+  const SECTION_LEAF = "[Book.md > Act I > Chapter 1]\n\n3\t## Chapter 1\n4\tthe duel was fierce";
+  const SECTION_TAIL = "[Book.md > Act I > Chapter 2]\n\n6\t## Chapter 2\n7\tcalm after the storm";
+  const SECTION_PARENT =
+    "[Book.md > Act I]\n\n1\t# Act I\n2\tintro\n3\t## Chapter 1\n4\tthe duel was fierce\n5\t\n" +
+    "6\t## Chapter 2\n7\tcalm after the storm";
+
+  const chapterCtx = () =>
+    makeCtx({
+      files: [makeFile("Notes/chapter.md")],
+      fileContents: { "Notes/chapter.md": "First line.\nSecond line.\nThird line." },
+    });
+
+  test("path alone is byte-identical to the retired read_file", async () => {
     const result = await executeVaultTool(
-      tc("read_section", { path: "Book.md", headingPath: "Act I > Chapter 1" }),
-      bookCtx(),
+      tc("read", { path: "Notes/chapter.md" }),
+      chapterCtx(),
     );
 
     expect(result.isReadOnly).toBe(true);
     expect(result.isError).toBeUndefined();
-    expect(result.content).toContain("[Book.md > Act I > Chapter 1]");
-    // Line numbers match read_file's whole-file numbering (heading is file line 3).
-    expect(result.content).toContain("3\t## Chapter 1");
-    expect(result.content).toContain("4\tthe duel was fierce");
+    expect(result.content).toBe(WHOLE_SMALL);
+  });
+
+  test("right-aligns line numbers so anchors line up on a longer note", async () => {
+    const body = Array.from({ length: 12 }, (_, i) => `line ${i + 1}`).join("\n");
+    const ctx = makeCtx({ files: [makeFile("big.md")], fileContents: { "big.md": body } });
+
+    const result = await executeVaultTool(tc("read", { path: "big.md" }), ctx);
+
+    expect(result.content).toBe(WHOLE_WIDE);
+  });
+
+  test("path and headingPath is byte-identical to the retired read_section", async () => {
+    const leaf = await executeVaultTool(
+      tc("read", { path: "Book.md", headingPath: "Act I > Chapter 1" }),
+      bookCtx(),
+    );
+
+    expect(leaf.isReadOnly).toBe(true);
+    expect(leaf.isError).toBeUndefined();
+    // The offset line numbers are the note's own (the heading is file line 3), which is
+    // the piece of the byte-for-byte claim most easily got wrong by hand.
+    expect(leaf.content).toBe(SECTION_LEAF);
     // Stops at the next equal-level heading; does not bleed into Chapter 2.
-    expect(result.content).not.toContain("Chapter 2");
+    expect(leaf.content).not.toContain("calm after the storm");
+
+    const tail = await executeVaultTool(
+      tc("read", { path: "Book.md", headingPath: "Act I > Chapter 2" }),
+      bookCtx(),
+    );
+    expect(tail.content).toBe(SECTION_TAIL);
+  });
+
+  // D4's dispatch, stated from both sides on one note: the same path with and without a
+  // headingPath is the whole note and one section of it.
+  test("headingPath is what narrows the read; without it a structured note comes back whole", async () => {
+    const whole = await executeVaultTool(tc("read", { path: "Book.md" }), bookCtx());
+    expect(whole.isError).toBeUndefined();
+    expect(whole.content).toBe(WHOLE_BOOK);
+
+    const section = await executeVaultTool(
+      tc("read", { path: "Book.md", headingPath: "Act I > Chapter 1" }),
+      bookCtx(),
+    );
+    expect(section.content).toBe(SECTION_LEAF);
+  });
+
+  // A blank headingPath is an absent one: it widens to the whole note rather than
+  // refusing, so there is no value that returns a plausible wrong answer (D7's
+  // principle, applied to the parameter this tool dispatches on).
+  test("a blank headingPath reads the note whole rather than refusing", async () => {
+    const result = await executeVaultTool(
+      tc("read", { path: "Book.md", headingPath: "   " }),
+      bookCtx(),
+    );
+    expect(result.isError).toBeUndefined();
+    expect(result.content).toBe(WHOLE_BOOK);
   });
 
   test("a parent section includes its nested subsections", async () => {
     const result = await executeVaultTool(
-      tc("read_section", { path: "Book.md", headingPath: "Act I" }),
+      tc("read", { path: "Book.md", headingPath: "Act I" }),
       bookCtx(),
     );
-    expect(result.content).toContain("1\t# Act I");
-    expect(result.content).toContain("## Chapter 1");
-    expect(result.content).toContain("## Chapter 2");
+    expect(result.content).toBe(SECTION_PARENT);
   });
 
   test("a duplicated heading is an ambiguous failure listing the candidate paths", async () => {
-    const dupBody = ["# Act I", "## Scene", "a", "# Act II", "## Scene", "b"].join("\n");
-    const ctx = makeCtx({
-      files: [makeFile("Dup.md")],
-      fileContents: { "Dup.md": dupBody },
-      fileCaches: {
-        "Dup.md": {
-          headings: [
-            { heading: "Act I", level: 1, position: { start: { line: 0 } } },
-            { heading: "Scene", level: 2, position: { start: { line: 1 } } },
-            { heading: "Act II", level: 1, position: { start: { line: 3 } } },
-            { heading: "Scene", level: 2, position: { start: { line: 4 } } },
-          ],
-        },
-      },
-    });
     const result = await executeVaultTool(
-      tc("read_section", { path: "Dup.md", headingPath: "Scene" }),
-      ctx,
+      tc("read", { path: "Dup.md", headingPath: "Scene" }),
+      dupCtx(),
     );
 
     expect(result.isError).toBe(true);
     expect(result.failure?.kind).toBe("ambiguous");
-    expect(result.content).toContain("Act I > Scene");
-    expect(result.content).toContain("Act II > Scene");
+    expect(result.content).toBe(
+      'Error: heading "Scene" matches 2 sections in "Dup.md". ' +
+        "pass one of these full headingPaths: Act I > Scene | Act II > Scene.",
+    );
   });
 
   test("an unknown heading is a not-found that points at get_outline", async () => {
     const result = await executeVaultTool(
-      tc("read_section", { path: "Book.md", headingPath: "Epilogue" }),
+      tc("read", { path: "Book.md", headingPath: "Epilogue" }),
       bookCtx(),
     );
     expect(result.isError).toBe(true);
     expect(result.failure?.kind).toBe("not-found");
-    expect(result.content).toContain("get_outline");
+    expect(result.content).toBe(
+      'Error: no heading matching "Epilogue" in "Book.md". ' +
+        "call get_outline to see the note's exact heading paths.",
+    );
   });
 
-  test("on a headingless note it points at read_file, not get_outline", async () => {
-    const ctx = makeCtx({
-      files: [makeFile("Flat.md")],
-      fileContents: { "Flat.md": "just prose" },
-      fileCaches: { "Flat.md": {} },
-    });
+  // The one place the merge changes what the model is told: the wrong-sibling clause
+  // named a tool that no longer exists, so it now names the parameter to drop (D4).
+  test("on a headingless note the section pathway says to omit headingPath", async () => {
     const result = await executeVaultTool(
-      tc("read_section", { path: "Flat.md", headingPath: "Anything" }),
-      ctx,
+      tc("read", { path: "Flat.md", headingPath: "Anything" }),
+      flatCtx(),
     );
     expect(result.isError).toBe(true);
-    expect(result.content).toContain("read_file");
+    expect(result.failure?.kind).toBe("not-found");
+    expect(result.content).toBe(
+      'Error: note "Flat.md" has no headings to read a section from. ' +
+        "omit headingPath to read it whole.",
+    );
+    expect(result.content).not.toContain("read_file");
   });
 
-  test("errors with invalid-args when path or headingPath is missing", async () => {
-    const ctx = bookCtx();
-    const noPath = await executeVaultTool(tc("read_section", { headingPath: "x" }), ctx);
-    expect(noPath.failure?.kind).toBe("invalid-args");
-    const noHeading = await executeVaultTool(tc("read_section", { path: "Book.md" }), ctx);
-    expect(noHeading.failure?.kind).toBe("invalid-args");
+  test("errors with invalid-args when path is missing, on either pathway", async () => {
+    const bare = await executeVaultTool(tc("read", {}), bookCtx());
+    expect(bare.failure?.kind).toBe("invalid-args");
+    const sectioned = await executeVaultTool(tc("read", { headingPath: "Act I" }), bookCtx());
+    expect(sectioned.failure?.kind).toBe("invalid-args");
   });
 });
 
@@ -1107,14 +1165,14 @@ describe("unknown tool", () => {
 describe("failure contract", () => {
   test("a missing path is invalid-args with a recovery step", async () => {
     const ctx = makeCtx({});
-    const result = await executeVaultTool(tc("read_file", {}), ctx);
+    const result = await executeVaultTool(tc("read", {}), ctx);
     expect(result.failure?.kind).toBe("invalid-args");
     expect(result.failure?.recovery).toBeTruthy();
   });
 
   test("a missing note is not-found and points at a way to locate it", async () => {
     const ctx = makeCtx({});
-    const result = await executeVaultTool(tc("read_file", { path: "Missing.md" }), ctx);
+    const result = await executeVaultTool(tc("read", { path: "Missing.md" }), ctx);
     expect(result.failure?.kind).toBe("not-found");
     expect(result.content).toContain("list_directory");
   });
@@ -1159,11 +1217,15 @@ describe("path-boundary safety (reads stay inside the vault)", () => {
     expect(result.content).not.toContain("not found");
   }
 
-  test("read_file names the boundary for an out-of-vault path, never reaching the lookup", async () => {
+  // Both read pathways, because the merge put them behind one entry point: a boundary
+  // check that only guarded the whole-note arm would leave the section arm open.
+  test("read names the boundary on either pathway, never reaching the lookup", async () => {
     const ctx = makeCtx({ files: [makeFile("In/Vault.md")] });
     for (const path of ESCAPING) {
-      const result = await executeVaultTool(tc("read_file", { path }), ctx);
-      expectBoundaryRefusal(result);
+      expectBoundaryRefusal(await executeVaultTool(tc("read", { path }), ctx));
+      expectBoundaryRefusal(
+        await executeVaultTool(tc("read", { path, headingPath: "Any" }), ctx),
+      );
     }
     // Backstop preserved: the index lookup was never even reached for an escaping path.
     expect(ctx.app.vault.getFileByPath).not.toHaveBeenCalled();
@@ -1180,13 +1242,10 @@ describe("path-boundary safety (reads stay inside the vault)", () => {
     expect(ctx.app.vault.getFileByPath).not.toHaveBeenCalled();
   });
 
-  test("get_outline / read_section name the boundary, never reaching the lookup", async () => {
+  test("get_outline names the boundary, never reaching the lookup", async () => {
     const ctx = makeCtx({ files: [makeFile("In/Vault.md")] });
     for (const path of ESCAPING) {
       expectBoundaryRefusal(await executeVaultTool(tc("get_outline", { path }), ctx));
-      expectBoundaryRefusal(
-        await executeVaultTool(tc("read_section", { path, headingPath: "Any" }), ctx),
-      );
     }
     expect(ctx.app.vault.getFileByPath).not.toHaveBeenCalled();
     expect(ctx.app.vault.read).not.toHaveBeenCalled();

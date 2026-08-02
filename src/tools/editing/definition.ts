@@ -10,21 +10,21 @@ export const EDIT_TOOL: CanonicalToolDefinition = {
   description:
     "Propose a targeted search-and-replace edit to a note. " +
     "Always pass `path`, the vault-relative path of the note to change (the one shown as the " +
-    "document to edit, or the path you read with read_file). " +
+    "document to edit, or the path you read with read). " +
     "The edit is shown to the user for review before being applied. " +
     "The note must already contain the search text, for an empty or brand-new note, " +
     "use write_file to set its initial content instead. " +
     "Use one call per distinct change; a single turn edits one file, edit other files in later turns.",
   strategyHint:
     "targeted search/replace for prose changes in a specific note (`path`). Requires exact text " +
-    "from that note, use read_file first if its content is not already in context. " +
+    "from that note, use read first if its content is not already in context. " +
     "For an empty document there is nothing to match; use write_file instead.",
   errorGuidance:
     "If `path` is missing or the file is not found, supply the correct vault-relative path. " +
     "If the search text was not found because the document is empty, switch to write_file to set " +
     "its initial content. If the search text matched more than one place, add the surrounding lines " +
-    "so it identifies exactly one passage. Otherwise re-read the document with read_file and match " +
-    "the exact text, including whitespace and dropping read_file's line-number prefix.",
+    "so it identifies exactly one passage. Otherwise re-read the document with read and match " +
+    "the exact text, including whitespace and dropping read's line-number prefix.",
   parameters: {
     type: "object",
     properties: {
@@ -32,14 +32,14 @@ export const EDIT_TOOL: CanonicalToolDefinition = {
         type: "string",
         description:
           "Vault-relative path of the note to edit (e.g. \"Lore/The Fold.md\"). " +
-          "Use the path of the document under edit or the file you read with read_file.",
+          "Use the path of the document under edit or the file you read with read.",
       },
       search: {
         type: "string",
         description:
           "The exact text to find in the document. Match it character-for-character, " +
           "including whitespace and indentation. " +
-          "If you copied the passage from read_file, drop the leading line-number prefix " +
+          "If you copied the passage from read, drop the leading line-number prefix " +
           "(the right-aligned number and the tab after it); match only the line text itself. " +
           "Keep it SHORT, include only the passage being changed plus 2–3 surrounding lines " +
           "for unambiguous matching. Never include large sections or the full document.",
@@ -140,8 +140,8 @@ export const INSERT_INTO_NOTE_TOOL: CanonicalToolDefinition = {
     "write_file for any note that already has content.",
   errorGuidance:
     "If `path` is missing or the file is not found, supply the correct vault-relative path. " +
-    "For where \"before\"/\"after\", if the anchor was not found, re-read the note with read_file and " +
-    "copy the anchor exactly (dropping read_file's line-number prefix), or use \"append\"/\"prepend\" " +
+    "For where \"before\"/\"after\", if the anchor was not found, re-read the note with read and " +
+    "copy the anchor exactly (dropping read's line-number prefix), or use \"append\"/\"prepend\" " +
     "which need no anchor.",
   parameters: {
     type: "object",
@@ -150,7 +150,7 @@ export const INSERT_INTO_NOTE_TOOL: CanonicalToolDefinition = {
         type: "string",
         description:
           "Vault-relative path of the note to add to (e.g. \"Journal/2026-06-27.md\"). " +
-          "Use the path of the document under edit or the file you read with read_file.",
+          "Use the path of the document under edit or the file you read with read.",
       },
       content: {
         type: "string",
@@ -169,7 +169,7 @@ export const INSERT_INTO_NOTE_TOOL: CanonicalToolDefinition = {
         type: "string",
         description:
           "For where \"before\"/\"after\": the exact existing passage to place the text next to. " +
-          "Match it character-for-character (drop read_file's line-number prefix). " +
+          "Match it character-for-character (drop read's line-number prefix). " +
           "Keep it short, a sentence or a heading line. Not used for \"append\"/\"prepend\".",
       },
       explanation: {

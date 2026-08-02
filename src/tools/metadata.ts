@@ -15,9 +15,8 @@ import { MEMORY_MUTATION_TOOL_NAMES } from "./memory/definition";
 /** Obsidian icon name for each tool in the assistant turn rail. */
 export const TOOL_ICONS: Record<string, string> = {
   semantic_search: "search",
-  read_file: "file-text",
+  read: "file-text",
   get_outline: "list-tree",
-  read_section: "text-select",
   list_directory: "folder",
   search_files: "file-search",
   search_content: "text-search",
@@ -44,9 +43,8 @@ export const TOOL_ICONS: Record<string, string> = {
 /** Past-tense label for completed tool calls. */
 export const TOOL_LABELS: Record<string, string> = {
   semantic_search: "Searched vault",
-  read_file: "Read note",
+  read: "Read note",
   get_outline: "Read outline",
-  read_section: "Read section",
   list_directory: "Listed folder",
   search_files: "Searched files",
   search_content: "Searched content",
@@ -85,6 +83,8 @@ const RETIRED_TOOL_DISPLAY: Record<string, { icon: string; label: string }> = {
   directory_tree: { icon: "folder-tree", label: "Explored tree" },
   get_backlinks: { icon: "link", label: "Found backlinks" },
   get_outgoing_links: { icon: "external-link", label: "Found outgoing links" },
+  read_file: { icon: "file-text", label: "Read note" },
+  read_section: { icon: "text-select", label: "Read section" },
 };
 
 /** Icon for a recorded tool call, including one naming a retired tool. */
@@ -158,9 +158,8 @@ export function opKindIcon(kind: VaultOperation["kind"]): string {
 /** Status text shown inline during tool execution (streaming UI). */
 export const TOOL_STATUS_LABELS: Record<string, string> = {
   semantic_search: "Searching vault...",
-  read_file: "Reading note...",
+  read: "Reading note...",
   get_outline: "Reading outline...",
-  read_section: "Reading section...",
   list_directory: "Listing folder...",
   search_files: "Searching files...",
   search_content: "Searching content...",
@@ -211,9 +210,13 @@ export function extractToolInput(
   const args = tc.arguments;
   switch (tc.name) {
     case "semantic_search": return typeof args.query === "string" ? args.query : undefined;
-    case "read_file": return typeof args.path === "string" ? args.path : undefined;
     case "get_outline": return typeof args.path === "string" ? args.path : undefined;
+    // One case serves `read` and both names it absorbed: the composition is
+    // `read_section`'s, and `read_file` (which had no headingPath) falls to the path
+    // alone, exactly as it did under its own case.
+    case "read_file":
     case "read_section":
+    case "read":
       return typeof args.path === "string" && typeof args.headingPath === "string"
         ? `${args.path} > ${args.headingPath}`
         : typeof args.path === "string"

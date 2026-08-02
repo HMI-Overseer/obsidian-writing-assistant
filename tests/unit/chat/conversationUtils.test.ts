@@ -406,7 +406,7 @@ describe("normalizeConversation, phase-2 agenticStep capture fields", () => {
       id: "msg-1",
       role: "assistant",
       content: "Done.",
-      agenticSteps: [{ type: "tool_call", round: 0, toolName: "read_file", toolCallId: "r-1" }],
+      agenticSteps: [{ type: "tool_call", round: 0, toolName: "read", toolCallId: "r-1" }],
     };
 
     const raw = jsonRoundTrip(makeConversation([msg])) as Record<string, unknown>;

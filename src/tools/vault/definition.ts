@@ -1,21 +1,36 @@
 import type { CanonicalToolDefinition } from "../types";
 import type { RagAvailability } from "../../rag/ragService";
 
-export const READ_FILE_TOOL: CanonicalToolDefinition = {
-  name: "read_file",
+/**
+ * The whole-note and single-section reads under one name (RFC-0015), dispatching on
+ * whether `headingPath` is present. Its guidance is the union of the two predecessors',
+ * organised by pathway per the RFC's additive rule: the section pathway keeps every
+ * piece of its heading-ambiguity guidance, and only the wrong-sibling clause goes,
+ * because the distinction is no longer the model's to make. Kept tight on purpose:
+ * `read` is core, so this text sits in the cached prefix on every request (ADR-0009).
+ */
+export const READ_TOOL: CanonicalToolDefinition = {
+  name: "read",
   description:
-    "Read the full content of a specific vault note by its file path. " +
-    "Use this when you already know which note you need (e.g., from a wikilink or search result) " +
-    "and want the complete text rather than matched chunks. " +
-    "For a long or heavily structured note, call get_outline first to see its heading tree, then " +
-    "read_section to read just the part you need, instead of reading the whole note. " +
-    "Lines are returned with cat -n style line numbers (a right-aligned number, a tab, then the " +
-    "line) for reference only; the text after the tab is verbatim. When quoting a line back to an " +
-    "edit tool, use only that text and drop the line-number prefix.",
+    "Read a vault note by its file path. With path alone, returns the whole note: the " +
+    "complete text, not matched chunks. Add headingPath to read one section instead, the " +
+    "heading plus everything beneath it down to the next heading of the same or higher " +
+    "level, so a parent heading includes its subsections and a deeper headingPath narrows " +
+    "further. Take the headingPath from get_outline, and for a long or heavily structured " +
+    "note prefer outlining first and reading only the part you need. If a bare heading is " +
+    "duplicated in the note, pass the full headingPath to disambiguate. Either way lines " +
+    "come back with cat -n style line numbers (a right-aligned number, a tab, then the " +
+    "line) for reference only, and a section carries the note's own numbers, so the two " +
+    "agree. The text after the tab is verbatim; when quoting a line back to an edit tool, " +
+    "use only that text and drop the line-number prefix.",
   strategyHint:
-    "read a whole note once you know its path (output is line-numbered); for a long structured " +
-    "note, prefer get_outline then read_section",
-  errorGuidance: "If the note was not found, call list_directory first to locate the correct path.",
+    "read a note once you know its path (output is line-numbered); for a long structured " +
+    "note, prefer get_outline then read with that headingPath",
+  errorGuidance:
+    "If the note was not found, call list_directory first to locate the correct path. " +
+    "If the heading was not found, call get_outline to see the note's exact heading paths. " +
+    "If the heading is ambiguous, pass one of the full headingPaths listed in the error. " +
+    "If the note has no headings, omit headingPath.",
   parameters: {
     type: "object",
     properties: {
@@ -24,6 +39,13 @@ export const READ_FILE_TOOL: CanonicalToolDefinition = {
         description:
           "Vault-relative file path (e.g., 'Characters/Will.md'). " +
           "Paths are case-sensitive on most systems.",
+      },
+      headingPath: {
+        type: "string",
+        description:
+          "Optional. The section's full breadcrumb as shown by get_outline, e.g. " +
+          "\"Act I > Chapter 3 > The Duel\". A shorter trailing path narrows to that heading; " +
+          "pass the full path when a bare heading is duplicated. Omit to read the whole note.",
       },
     },
     required: ["path"],
@@ -36,11 +58,11 @@ export const GET_OUTLINE_TOOL: CanonicalToolDefinition = {
     "Get the heading structure of a single note without reading its prose. For each heading it " +
     "returns the depth, the full headingPath (e.g. \"Act I > Chapter 3 > The Duel\"), and an " +
     "approximate word and line count for that heading's section. Use this to survey a long or " +
-    "structured note and decide which part to read, then pass a headingPath to read_section. " +
-    "A note with no headings is reported as such (read it whole with read_file instead).",
+    "structured note and decide which part to read, then pass a headingPath to read. " +
+    "A note with no headings is reported as such (read it whole with read instead).",
   strategyHint:
-    "survey the heading tree of a long note, then read_section the part you need (cheaper than " +
-    "read_file on a whole manuscript)",
+    "survey the heading tree of a long note, then read the part you need by its headingPath " +
+    "(cheaper than reading a whole manuscript)",
   errorGuidance: "If the note was not found, call list_directory or search_files to locate the correct path.",
   parameters: {
     type: "object",
@@ -53,41 +75,6 @@ export const GET_OUTLINE_TOOL: CanonicalToolDefinition = {
       },
     },
     required: ["path"],
-  },
-};
-
-export const READ_SECTION_TOOL: CanonicalToolDefinition = {
-  name: "read_section",
-  description:
-    "Read a single section of a note by its headingPath, exactly as emitted by get_outline " +
-    "(e.g. \"Act I > Chapter 3 > The Duel\"). A section is the heading plus everything beneath it " +
-    "down to the next heading of the same or higher level, so a parent heading includes its " +
-    "subsections; pass a deeper headingPath to read just that part. Output is line-numbered " +
-    "consistently with read_file. Use this instead of read_file to read one part of a long " +
-    "structured note. If a bare heading is duplicated in the note, pass the full headingPath to " +
-    "disambiguate.",
-  strategyHint:
-    "read one section of a structured note by its headingPath from get_outline, instead of the whole note",
-  errorGuidance:
-    "If the heading was not found, call get_outline to see the note's exact heading paths. " +
-    "If the heading is ambiguous, pass one of the full headingPaths listed in the error. " +
-    "If the note has no headings, read it whole with read_file.",
-  parameters: {
-    type: "object",
-    properties: {
-      path: {
-        type: "string",
-        description: "Vault-relative file path (e.g., 'Manuscript/Act I.md').",
-      },
-      headingPath: {
-        type: "string",
-        description:
-          "The section's full breadcrumb as shown by get_outline, e.g. " +
-          "\"Act I > Chapter 3 > The Duel\". A shorter trailing path narrows to that heading; " +
-          "pass the full path when a bare heading is duplicated.",
-      },
-    },
-    required: ["path", "headingPath"],
   },
 };
 
@@ -195,7 +182,7 @@ export const SEARCH_CONTENT_TOOL: CanonicalToolDefinition = {
         description:
           "Lines of surrounding context to show before and after each match (like grep -C), 0–5. " +
           "Defaults to 0. In prose a line is usually a whole paragraph, so 1–2 gives the " +
-          "sentence before/after, set this instead of following a hit with read_file.",
+          "sentence before/after, set this instead of following a hit with read.",
       },
       excludePatterns: {
         type: "array",
@@ -335,15 +322,17 @@ export const CORE_VAULT_TOOLS: CanonicalToolDefinition[] = [
   LIST_DIRECTORY_TOOL,
   SEARCH_VAULT_TOOL,
   SEARCH_CONTENT_TOOL,
-  READ_FILE_TOOL,
+  READ_TOOL,
 ];
 
 /**
  * Full vault tool suite for cloud providers.
- * Adds filename search, Obsidian-native tools (links, tags, frontmatter), and the
- * get_outline / read_section structure pair on top of the core set. The pair is
- * cloud-only for now; CORE (local) inclusion is deferred to the tool benchmark
- * rather than assumed (ADR-0009).
+ * Adds filename search, Obsidian-native tools (links, tags, frontmatter), and
+ * get_outline, the structure survey that makes a headingPath obtainable, on top of the
+ * core set. get_outline is cloud-only for now; CORE (local) inclusion is deferred to
+ * the tool benchmark rather than assumed (ADR-0009). Section reading is no longer a
+ * tool of its own: it is `read` with a headingPath (RFC-0015), so it travels with the
+ * core wherever `read` goes.
  */
 export const ALL_VAULT_TOOLS: CanonicalToolDefinition[] = [
   LIST_DIRECTORY_TOOL,
@@ -352,9 +341,8 @@ export const ALL_VAULT_TOOLS: CanonicalToolDefinition[] = [
   FIND_NOTES_BY_TAG_TOOL,
   GET_LINKS_TOOL,
   GET_FRONTMATTER_TOOL,
-  READ_FILE_TOOL,
+  READ_TOOL,
   GET_OUTLINE_TOOL,
-  READ_SECTION_TOOL,
   SEARCH_VAULT_TOOL,
 ];
 
@@ -397,7 +385,7 @@ export const SEMANTIC_SEARCH_UNAVAILABLE_MESSAGE: Record<
     "notes into vectors; without one it is permanently unavailable, not merely empty. To enable " +
     "it, add an embedding model under Settings → Embedding Model Profiles, then select it " +
     "under Settings → Retrieval (RAG). For now, use search_content to find an exact word or " +
-    "phrase, and list_directory / read_file to navigate by structure.",
+    "phrase, and list_directory / read to navigate by structure.",
   "index-empty":
     "Semantic search did not run: an embedding model is configured, but the index has never been " +
     "built, so there is nothing to search. This does NOT mean the vault is empty. Build it once " +

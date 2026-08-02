@@ -151,7 +151,7 @@ describe("toHistoryTurns legacy compatibility", () => {
           {
             type: "tool_call",
             round: 0,
-            toolName: "read_file",
+            toolName: "read",
             resultRecord: "ordinary direct tool result",
           },
           {
@@ -179,7 +179,7 @@ describe("toHistoryTurns legacy compatibility", () => {
         "I continued with your choice.\n\n" +
           '[ask_user guidance: {"questions":[{"question":"Format","header":"Output","answer":"Detailed"}]}]',
       );
-      expect(turn.content).not.toContain("read_file");
+      expect(turn.content).not.toContain("read");
       expect(turn.content).not.toContain("stale display digest");
       expect(turn.rawContent).toBeUndefined();
     },
@@ -241,7 +241,7 @@ describe("toRequestHistoryTurns error filtering", () => {
  */
 describe("toHistoryTurns, Claude Code replay annotation", () => {
   const steps: AgenticStep[] = [
-    { type: "tool_call", round: 0, toolName: "read_file", toolInput: "Chapters/ch3.md", resultRecord: "text" },
+    { type: "tool_call", round: 0, toolName: "read", toolInput: "Chapters/ch3.md", resultRecord: "text" },
     {
       type: "tool_call",
       round: 0,
@@ -262,7 +262,7 @@ describe("toHistoryTurns, Claude Code replay annotation", () => {
     const [turn] = toHistoryTurns(message, false, "claudecode");
     expect(turn.content).toBe(
       "I read the chapter and tried to make a folder.\n\n" +
-        "[read_file: Chapters/ch3.md]\n\n" +
+        "[read: Chapters/ch3.md]\n\n" +
         "[create_directory: Drafts/Arcs, DECLINED by user]",
     );
     expect(turn.rawContent).toBe("I read the chapter and tried to make a folder.");
@@ -302,7 +302,7 @@ describe("toHistoryTurns, Claude Code replay annotation", () => {
       role: "assistant",
       content: "Old reply.",
       provider: "claudecode",
-      agenticSteps: [{ type: "tool_call", round: 0, toolName: "read_file", toolInput: "a.md" }],
+      agenticSteps: [{ type: "tool_call", round: 0, toolName: "read", toolInput: "a.md" }],
     };
     expect(toHistoryTurns(message, false, "claudecode")).toEqual([
       { role: "assistant", content: "Old reply." },
@@ -317,11 +317,11 @@ describe("toHistoryTurns, Claude Code replay annotation", () => {
       provider: "claudecode",
       interrupted: true,
       agenticSteps: [
-        { type: "tool_call", round: 0, toolName: "read_file", toolInput: "a.md", resultRecord: "text" },
+        { type: "tool_call", round: 0, toolName: "read", toolInput: "a.md", resultRecord: "text" },
       ],
     };
     const [turn] = toHistoryTurns(message, false, "claudecode");
-    expect(turn.content).toBe("Once upon a\n\n[read_file: a.md]\n\n[response interrupted by user]");
+    expect(turn.content).toBe("Once upon a\n\n[read: a.md]\n\n[response interrupted by user]");
     expect(turn.rawContent).toBe("Once upon a");
   });
 
@@ -333,11 +333,11 @@ describe("toHistoryTurns, Claude Code replay annotation", () => {
       provider: "claudecode",
       interrupted: true,
       agenticSteps: [
-        { type: "tool_call", round: 0, toolName: "read_file", toolInput: "a.md", resultRecord: "text" },
+        { type: "tool_call", round: 0, toolName: "read", toolInput: "a.md", resultRecord: "text" },
       ],
     };
     const [turn] = toHistoryTurns(message, false, "claudecode");
-    expect(turn.content).toBe("[read_file: a.md]\n\n[response interrupted by user]");
+    expect(turn.content).toBe("[read: a.md]\n\n[response interrupted by user]");
     // The raw bytes the watermark banked were empty; the hash must still see "".
     expect(turn.rawContent).toBe("");
   });
@@ -346,12 +346,12 @@ describe("toHistoryTurns, Claude Code replay annotation", () => {
     const message: ConversationMessage = {
       id: "m1",
       role: "user",
-      content: "read_file for me",
+      content: "read for me",
       provider: "claudecode",
       interrupted: true,
     };
     expect(toHistoryTurns(message, false, "claudecode")).toEqual([
-      { role: "user", content: "read_file for me" },
+      { role: "user", content: "read for me" },
     ]);
   });
 
@@ -402,7 +402,7 @@ describe("toHistoryTurns, Claude Code replay annotation", () => {
         {
           type: "tool_call",
           round: 0,
-          toolName: "read_file",
+          toolName: "read",
           toolCallId: "read-characterization",
           resultRecord: "synthetic result",
         },
@@ -426,7 +426,7 @@ describe("toHistoryTurns, Claude Code replay annotation", () => {
 
     const [turn] = toHistoryTurns(message, false, "claudecode");
 
-    expect(turn.content).toContain("[read_file");
+    expect(turn.content).toContain("[read");
     expect(turn.content).toContain("[ask_user guidance:");
     expect(turn.content).toContain("[response interrupted by user]");
     expect(turn.rawContent).toBe(raw);

@@ -271,7 +271,7 @@ describe("AnthropicClient.complete Layer-2 block tolerance", () => {
           { type: "text", text: "searching" },
           { type: "server_tool_use", id: "srv_1", name: "tool_search_tool_regex", input: { query: "read" } },
           { type: "tool_search_tool_result", tool_use_id: "srv_1", content: [] },
-          { type: "tool_use", id: "toolu_1", name: "read_file", input: { path: "a.md" } },
+          { type: "tool_use", id: "toolu_1", name: "read", input: { path: "a.md" } },
         ],
         usage: { input_tokens: 5, output_tokens: 7 },
         stop_reason: "tool_use",
@@ -284,7 +284,7 @@ describe("AnthropicClient.complete Layer-2 block tolerance", () => {
 
     expect(result.text).toBe("searching");
     expect(result.toolCalls).toEqual([
-      { id: "toolu_1", name: "read_file", arguments: { path: "a.md" } },
+      { id: "toolu_1", name: "read", arguments: { path: "a.md" } },
     ]);
     expect(result.stopReason).toBe("tool_use");
   });

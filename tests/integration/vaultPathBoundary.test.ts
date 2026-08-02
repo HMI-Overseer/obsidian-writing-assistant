@@ -505,24 +505,26 @@ describe("get_outline / read_section path boundary (read channel), real filesyst
   });
 });
 
-describe("get_outgoing_links path boundary (read channel), real filesystem (section 6.1)", () => {
-  // The forward-link read mirror of get_backlinks: it only ever resolves an in-vault
-  // file (getFileByPath), but still names the boundary honestly via refuseOutsideVault
-  // rather than dead-ending the model on "not found". Verify on real disk that every
-  // escaping outgoing-links read is refused at the boundary, and nothing escapes.
+describe("get_links path boundary (read channel), real filesystem (section 6.1)", () => {
+  // The link read tool only ever resolves an in-vault file (getFileByPath), but still
+  // names the boundary honestly via refuseOutsideVault rather than dead-ending the
+  // model on "not found". Verify on real disk that every escaping link read is refused
+  // at the boundary, in every direction, and that nothing escapes.
   const readCtx = (app: App) =>
     ({ app, ragService: {} as unknown as RagService } as VaultToolContext);
 
-  it("refuses every escaping outgoing-links read, naming the boundary", async () => {
+  it("refuses every escaping link read, in every direction, naming the boundary", async () => {
     const app = makeRealFsApp(vaultRoot);
 
     for (const path of ESCAPING_PATHS) {
-      const result = await executeVaultTool(
-        { id: `g-${path}`, name: "get_outgoing_links", arguments: { path } },
-        readCtx(app),
-      );
-      expect(result.isError, `get_outgoing_links should refuse "${path}"`).toBe(true);
-      expect(result.content).toContain("outside the vault");
+      for (const direction of [undefined, "incoming", "outgoing"]) {
+        const result = await executeVaultTool(
+          { id: `g-${path}-${direction ?? "both"}`, name: "get_links", arguments: { path, direction } },
+          readCtx(app),
+        );
+        expect(result.isError, `get_links should refuse "${path}"`).toBe(true);
+        expect(result.content).toContain("outside the vault");
+      }
     }
     expect(filesOutsideVault()).toEqual([]); // reads never write, and nothing escaped.
   });

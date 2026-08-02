@@ -9,7 +9,10 @@ import {
   CORE_VAULT_TOOLS,
   GET_OUTLINE_TOOL,
   READ_SECTION_TOOL,
-  GET_OUTGOING_LINKS_TOOL,
+  GET_LINKS_TOOL,
+  LIST_DIRECTORY_TOOL,
+  LINK_DIRECTIONS,
+  MAX_LIST_DIRECTORY_DEPTH,
   SEARCH_VAULT_TOOL,
   VAULT_TOOL_NAMES,
   filterSemanticSearchByAvailability,
@@ -84,26 +87,60 @@ describe("GET_OUTLINE_TOOL / READ_SECTION_TOOL", () => {
   });
 });
 
-describe("GET_OUTGOING_LINKS_TOOL (M3)", () => {
-  test("has correct name and requires only a path", () => {
-    expect(GET_OUTGOING_LINKS_TOOL.name).toBe("get_outgoing_links");
-    expect(GET_OUTGOING_LINKS_TOOL.parameters.required).toEqual(["path"]);
-    expect(GET_OUTGOING_LINKS_TOOL.parameters.properties.path).toBeDefined();
+describe("GET_LINKS_TOOL", () => {
+  test("requires only a path, and direction is the optional narrowing (D7)", () => {
+    expect(GET_LINKS_TOOL.name).toBe("get_links");
+    expect(GET_LINKS_TOOL.parameters.required).toEqual(["path"]);
+    expect(GET_LINKS_TOOL.parameters.properties.path).toBeDefined();
+    expect(GET_LINKS_TOOL.parameters.properties.direction).toBeDefined();
+    expect(GET_LINKS_TOOL.parameters.properties.direction.enum).toEqual(LINK_DIRECTIONS);
   });
 
   test("has a strategyHint so the prompt auto-derives", () => {
-    expect(GET_OUTGOING_LINKS_TOOL.strategyHint).toBeTruthy();
+    expect(GET_LINKS_TOOL.strategyHint).toBeTruthy();
   });
 
   test("is advertised in ALL_VAULT_TOOLS and registered in VAULT_TOOL_NAMES", () => {
     const names = ALL_VAULT_TOOLS.map((t) => t.name);
-    expect(names).toContain("get_outgoing_links");
-    expect(VAULT_TOOL_NAMES.has("get_outgoing_links")).toBe(true);
+    expect(names).toContain("get_links");
+    expect(VAULT_TOOL_NAMES.has("get_links")).toBe(true);
   });
 
-  test("mirrors get_backlinks' tiering: cloud-only, not in the local CORE tier", () => {
+  test("keeps both predecessors' tiering: cloud-only, not in the local CORE tier", () => {
     const core = CORE_VAULT_TOOLS.map((t) => t.name);
-    expect(core).not.toContain("get_outgoing_links");
+    expect(core).not.toContain("get_links");
+  });
+
+  // RFC-0015's additive rule: a merged tool's guidance is the union of its
+  // predecessors', organised by pathway, so neither direction loses its own advice.
+  test("its description carries both directions' guidance", () => {
+    expect(GET_LINKS_TOOL.description).toContain("Incoming links");
+    expect(GET_LINKS_TOOL.description).toContain("Outgoing links");
+    expect(GET_LINKS_TOOL.description).toContain("Omit direction");
+  });
+});
+
+describe("LIST_DIRECTORY_TOOL (directory_tree absorbed, D5/D6)", () => {
+  test("keeps path optional and adds depth, also optional", () => {
+    expect(LIST_DIRECTORY_TOOL.name).toBe("list_directory");
+    expect(LIST_DIRECTORY_TOOL.parameters.required).toEqual([]);
+    expect(LIST_DIRECTORY_TOOL.parameters.properties.depth).toBeDefined();
+  });
+
+  test("its description states the depth range and the default", () => {
+    const depth = LIST_DIRECTORY_TOOL.parameters.properties.depth.description ?? "";
+    expect(depth).toContain(`1 to ${MAX_LIST_DIRECTORY_DEPTH}`);
+    expect(depth).toContain("Defaults to 1");
+  });
+
+  // D5: one output shape at every depth. The retired JSON tree left no trace on the
+  // advertised surface, and nothing offers a second encoding to select.
+  test("no tool advertises a directory tree or an output-format switch", () => {
+    const names = ALL_VAULT_TOOLS.map((t) => t.name);
+    expect(names).not.toContain("directory_tree");
+    for (const tool of ALL_VAULT_TOOLS) {
+      expect(Object.keys(tool.parameters.properties)).not.toContain("format");
+    }
   });
 });
 

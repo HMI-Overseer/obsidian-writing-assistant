@@ -108,11 +108,52 @@ describe("formatResultDigest, the other discovery tools (same shape)", () => {
     );
   });
 
-  it("get_backlinks hits digest as the linking paths", () => {
+  it("get_links narrowed to one direction digests as that direction's paths", () => {
     const content = 'Notes linking to "Characters/Mira.md" (2):\nChapters/ch1.md\nChapters/ch3.md';
-    expect(formatResultDigest("get_backlinks", { path: "Characters/Mira.md" }, { content })).toBe(
-      '[get_backlinks: "Characters/Mira.md", surfaced: Chapters/ch1.md; Chapters/ch3.md]',
+    expect(formatResultDigest("get_links", { path: "Characters/Mira.md" }, { content })).toBe(
+      '[get_links: "Characters/Mira.md", surfaced: Chapters/ch1.md; Chapters/ch3.md]',
     );
+  });
+
+  // D7's recorded consequence: the outgoing direction now earns a replay digest it did
+  // not have, because only get_backlinks was in DISCOVERY_DIGEST_TOOLS. Its empty
+  // sentence opens with a quote rather than "No ", so the no-pointer fallback is what
+  // has to catch it.
+  it("get_links digests the outgoing direction, which had no digest before the merge", () => {
+    const hits = 'Notes "Scenes/Act 1.md" links to (1):\nCharacters/Mira.md';
+    expect(formatResultDigest("get_links", { path: "Scenes/Act 1.md" }, { content: hits })).toBe(
+      '[get_links: "Scenes/Act 1.md", surfaced: Characters/Mira.md]',
+    );
+    const empty =
+      '"Scenes/Act 1.md" has no outgoing links. This note links to no other notes; nothing to follow up.';
+    expect(formatResultDigest("get_links", { path: "Scenes/Act 1.md" }, { content: empty })).toBe(
+      '[get_links: "Scenes/Act 1.md", no results]',
+    );
+  });
+
+  // The two-section shape is the one the generic "opens with No " empty check gets
+  // wrong: an empty incoming direction opens the content while outgoing carries hits.
+  it("get_links with both directions digests every section's paths, distinct", () => {
+    const both =
+      'Notes linking to "Characters/Mira.md" (2):\nChapters/ch1.md\nChapters/ch3.md\n\n' +
+      'Notes "Characters/Mira.md" links to (2):\nChapters/ch1.md\nLore/Fold.md';
+    expect(formatResultDigest("get_links", { path: "Characters/Mira.md" }, { content: both })).toBe(
+      '[get_links: "Characters/Mira.md", surfaced: Chapters/ch1.md; Chapters/ch3.md; Lore/Fold.md]',
+    );
+
+    const incomingEmpty =
+      'No notes link to "Characters/Mira.md". This note has no incoming wikilinks; nothing to follow up.\n\n' +
+      'Notes "Characters/Mira.md" links to (1):\nLore/Fold.md';
+    expect(
+      formatResultDigest("get_links", { path: "Characters/Mira.md" }, { content: incomingEmpty }),
+    ).toBe('[get_links: "Characters/Mira.md", surfaced: Lore/Fold.md]');
+
+    const bothEmpty =
+      'No notes link to "Characters/Mira.md". This note has no incoming wikilinks; nothing to follow up.\n\n' +
+      '"Characters/Mira.md" has no outgoing links. This note links to no other notes; nothing to follow up.';
+    expect(
+      formatResultDigest("get_links", { path: "Characters/Mira.md" }, { content: bothEmpty }),
+    ).toBe('[get_links: "Characters/Mira.md", no results]');
   });
 
   it("find_notes_by_tag hits digest as the tagged paths", () => {
@@ -401,7 +442,9 @@ describe("DISCOVERY_DIGEST_TOOLS drift guard", () => {
       semantic_search: "Results:\n[Lore/Fold.md > Origins] (score: 0.81)\nthe fold opened",
       search_content: "Lore/Fold.md:12: the fold opened",
       search_files: 'Files matching "Fold*" (1):\nLore/Fold.md',
-      get_backlinks: 'Notes linking to "Lore/Fold.md" (1):\nScenes/Act 1.md',
+      get_links:
+        'Notes linking to "Lore/Fold.md" (1):\nScenes/Act 1.md\n\n' +
+        'Notes "Lore/Fold.md" links to (1):\nLore/Origins.md',
       find_notes_by_tag: 'Notes tagged "#lore" (1):\nLore/Fold.md',
     };
     const ARGS: Record<string, unknown> = {

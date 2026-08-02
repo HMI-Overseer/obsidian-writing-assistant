@@ -98,7 +98,7 @@ export const DISCOVERY_DIGEST_TOOLS = new Set([
   "semantic_search",
   "search_content",
   "search_files",
-  "get_backlinks",
+  "get_links",
   "find_notes_by_tag",
 ]);
 
@@ -127,10 +127,15 @@ export function formatResultDigest(
     return `[${head}, FAILED: ${firstSentence(result.content)}]`;
   }
 
-  // Empty result: ran fine, found nothing. Every handler's empty message opens "No ";
-  // a hit result never does. Load-bearing on replay: without it the model can neither
-  // trust nor rule out its own earlier retrieval.
-  if (result.content.trimStart().startsWith("No ")) {
+  // Empty result: ran fine, found nothing. Every single-list handler's empty message
+  // opens "No "; a hit result never does. Load-bearing on replay: without it the model
+  // can neither trust nor rule out its own earlier retrieval.
+  //
+  // `get_links` is exempt because it can return two sections: an empty incoming
+  // direction opens the content with "No notes link to ..." while the outgoing section
+  // below it carries hits. Its extraction reads section by section, and the no-pointer
+  // fallback below covers the case where both directions really are empty.
+  if (toolName !== "get_links" && result.content.trimStart().startsWith("No ")) {
     return `[${head}, no results]`;
   }
 
@@ -144,7 +149,7 @@ function digestKeyArg(toolName: string, args: Record<string, unknown>): string {
   const raw =
     toolName === "search_files"
       ? args.pattern
-      : toolName === "get_backlinks"
+      : toolName === "get_links"
         ? args.path
         : toolName === "find_notes_by_tag"
           ? args.tag
@@ -190,8 +195,21 @@ function extractPointers(toolName: string, content: string): string[] {
     return [...seen];
   }
 
-  // search_files / get_backlinks / find_notes_by_tag share one shape: a `… (N):`
-  // header line, then one vault path per line.
+  if (toolName === "get_links") {
+    // One or two blank-line-separated sections, each either a `… (N):` header followed by
+    // one vault path per line, or a single "no links this way" sentence contributing
+    // nothing. Distinct paths: a mutual link appears in both sections and is one pointer.
+    const seen = new Set<string>();
+    for (const section of content.split("\n\n")) {
+      const lines = section.split("\n").map((l) => l.trim()).filter((l) => l.length > 0);
+      if (lines.length === 0 || !lines[0].endsWith("):")) continue;
+      for (const line of lines.slice(1)) seen.add(line);
+    }
+    return [...seen];
+  }
+
+  // search_files / find_notes_by_tag share one shape: a `… (N):` header line, then one
+  // vault path per line.
   return content
     .split("\n")
     .slice(1)

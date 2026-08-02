@@ -8,7 +8,11 @@ import type { ExtendedMetadataCache } from "../../vault-ops/metadata";
 import type { RagContextBlock } from "../../shared/chatRequest";
 import { RagRetrievalError } from "../../rag/ragService";
 import type { RagService } from "../../rag/ragService";
-import { VAULT_TOOL_NAMES, SEMANTIC_SEARCH_UNAVAILABLE_MESSAGE } from "./definition";
+import {
+  VAULT_TOOL_NAMES,
+  SEMANTIC_SEARCH_UNAVAILABLE_MESSAGE,
+  MAX_LIST_DIRECTORY_DEPTH,
+} from "./definition";
 import { formatWithLineNumbers } from "./readFormat";
 import { buildOutline, sectionLines, matchSection, countWords } from "./outline";
 
@@ -42,16 +46,12 @@ export async function executeVaultTool(
       return executeReadSection(toolCall.arguments, ctx);
     case "list_directory":
       return executeListDirectory(toolCall.arguments, ctx);
-    case "directory_tree":
-      return executeDirectoryTree(toolCall.arguments, ctx);
     case "search_files":
       return executeSearchFiles(toolCall.arguments, ctx);
     case "search_content":
       return executeSearchContent(toolCall.arguments, ctx);
-    case "get_backlinks":
-      return executeGetBacklinks(toolCall.arguments, ctx);
-    case "get_outgoing_links":
-      return executeGetOutgoingLinks(toolCall.arguments, ctx);
+    case "get_links":
+      return executeGetLinks(toolCall.arguments, ctx);
     case "find_notes_by_tag":
       return executeFindNotesByTag(toolCall.arguments, ctx);
     case "get_frontmatter":
@@ -291,6 +291,9 @@ async function executeReadSection(
   };
 }
 
+/** Cap on the entries one listing shows, so a deep call cannot flood context. */
+const MAX_LIST_ENTRIES = 500;
+
 function executeListDirectory(
   args: Record<string, unknown>,
   ctx: VaultToolContext,
@@ -316,80 +319,53 @@ function executeListDirectory(
     });
   }
 
+  // An out-of-range depth clamps, exactly as semantic_search's topK and
+  // search_content's contextLines do above: the model named a reach, and the nearest
+  // legal reach is a better answer than spending a round trip on a refusal. There is
+  // no cost argument for refusing either, since MAX_LIST_ENTRIES bounds the output
+  // whatever depth asks for. Absent or non-numeric, one level stands.
+  const depth =
+    typeof args.depth === "number" && Number.isFinite(args.depth)
+      ? Math.min(MAX_LIST_DIRECTORY_DEPTH, Math.max(1, Math.floor(args.depth)))
+      : 1;
+
   const items: string[] = [];
-  for (const child of folder.children) {
-    if (child instanceof TFolder) {
-      items.push(`[DIR] ${child.path}`);
-    } else if (child instanceof TFile && child.extension === "md") {
-      items.push(`[FILE] ${child.path}`);
-    }
-  }
+  collectDirectoryEntries(folder, depth, items);
   items.sort();
 
   const header = rawPath ? `Contents of "${rawPath}"` : "Vault root";
   if (items.length === 0) {
     return { content: `${header}: (empty)`, isReadOnly: true };
   }
+  // Over the bound, the listing is clamped and says how to narrow. It is never refused:
+  // a bound on our own output clamps at write time and does not gate a read (RFC-0010),
+  // and the same shape already serves search_content's hit cap.
+  if (items.length > MAX_LIST_ENTRIES) {
+    const shown = items.slice(0, MAX_LIST_ENTRIES);
+    return {
+      content:
+        `${header}, showing first ${MAX_LIST_ENTRIES} of ${items.length}:\n${shown.join("\n")}` +
+        `\n\n[Showing ${MAX_LIST_ENTRIES} of ${items.length} entries, narrow path to a ` +
+        "subfolder or lower depth to see the rest.]",
+      isReadOnly: true,
+    };
+  }
   return { content: `${header}:\n${items.join("\n")}`, isReadOnly: true };
 }
 
-function executeDirectoryTree(
-  args: Record<string, unknown>,
-  ctx: VaultToolContext,
-): ToolResult {
-  const rawPath = typeof args.path === "string" ? args.path.trim() : "";
-
-  // Boundary first; an omitted path still walks the whole vault tree.
-  if (rawPath) {
-    const outside = refuseOutsideVault(rawPath);
-    if (outside) return outside;
-  }
-
-  const folder = rawPath
-    ? ctx.app.vault.getAbstractFileByPath(normalizePath(rawPath))
-    : ctx.app.vault.getRoot();
-
-  if (!folder || !(folder instanceof TFolder)) {
-    return toolFailure({
-      kind: "not-found",
-      what: `folder not found at path "${rawPath || "/"}"`,
-      recovery: "list a parent folder, or omit path for the whole vault tree",
-    });
-  }
-
-  const tree = buildDirectoryTree(folder);
-  return { content: JSON.stringify(tree, null, 2), isReadOnly: true };
-}
-
-interface TreeNode {
-  name: string;
-  path: string;
-  type: "file" | "directory";
-  children?: TreeNode[];
-}
-
-function buildDirectoryTree(folder: TFolder): TreeNode {
-  const children: TreeNode[] = [];
-
+/**
+ * Collect one folder's `[DIR]` / `[FILE]` lines, recursing while levels remain.
+ * Full paths, so the flat sorted list still encodes the tree.
+ */
+function collectDirectoryEntries(folder: TFolder, levels: number, into: string[]): void {
   for (const child of folder.children) {
     if (child instanceof TFolder) {
-      children.push(buildDirectoryTree(child));
+      into.push(`[DIR] ${child.path}`);
+      if (levels > 1) collectDirectoryEntries(child, levels - 1, into);
     } else if (child instanceof TFile && child.extension === "md") {
-      children.push({ name: child.name, path: child.path, type: "file" });
+      into.push(`[FILE] ${child.path}`);
     }
   }
-
-  children.sort((a, b) => {
-    if (a.type !== b.type) return a.type === "directory" ? -1 : 1;
-    return a.name.localeCompare(b.name);
-  });
-
-  return {
-    name: folder.name || "/",
-    path: folder.path || "/",
-    type: "directory",
-    children,
-  };
 }
 
 function executeSearchFiles(
@@ -651,7 +627,7 @@ function clipLine(line: string): string {
   return trimmed.length <= max ? trimmed : `${trimmed.slice(0, max)}…`;
 }
 
-function executeGetBacklinks(
+function executeGetLinks(
   args: Record<string, unknown>,
   ctx: VaultToolContext,
 ): ToolResult {
@@ -673,61 +649,38 @@ function executeGetBacklinks(
     });
   }
 
-  const backlinks = (ctx.app.metadataCache as ExtendedMetadataCache).getBacklinksForFile(file);
-  const paths = Object.keys(backlinks?.data ?? {}).sort();
+  // Omitting direction asks for both, and so does any value that is not one of the two
+  // (D7): the answer is then a superset of what was meant, so there is no wrong value
+  // to pick and no round trip spent correcting one.
+  const direction = typeof args.direction === "string" ? args.direction.trim().toLowerCase() : "";
+  const wantIncoming = direction !== "outgoing";
+  const wantOutgoing = direction !== "incoming";
 
-  if (paths.length === 0) {
-    return {
-      content: `No notes link to "${path}". This note has no incoming wikilinks; nothing to follow up.`,
-      isReadOnly: true,
-    };
+  const sections: string[] = [];
+
+  if (wantIncoming) {
+    const backlinks = (ctx.app.metadataCache as ExtendedMetadataCache).getBacklinksForFile(file);
+    const incoming = Object.keys(backlinks?.data ?? {}).sort();
+    sections.push(
+      incoming.length === 0
+        ? `No notes link to "${path}". This note has no incoming wikilinks; nothing to follow up.`
+        : `Notes linking to "${path}" (${incoming.length}):\n${incoming.join("\n")}`,
+    );
   }
 
-  return {
-    content: `Notes linking to "${path}" (${paths.length}):\n${paths.join("\n")}`,
-    isReadOnly: true,
-  };
-}
-
-function executeGetOutgoingLinks(
-  args: Record<string, unknown>,
-  ctx: VaultToolContext,
-): ToolResult {
-  const rawPath = typeof args.path === "string" ? args.path.trim() : "";
-  if (!rawPath) {
-    return toolFailure({ kind: "invalid-args", what: "path is required" });
+  if (wantOutgoing) {
+    // resolvedLinks maps each source path to its resolved targets (a Record<target,
+    // count>), the forward-link mirror of getBacklinksForFile. Resolved-only, so it
+    // matches the incoming shape and never lists a link whose target is missing.
+    const outgoing = Object.keys(ctx.app.metadataCache.resolvedLinks[file.path] ?? {}).sort();
+    sections.push(
+      outgoing.length === 0
+        ? `"${path}" has no outgoing links. This note links to no other notes; nothing to follow up.`
+        : `Notes "${path}" links to (${outgoing.length}):\n${outgoing.join("\n")}`,
+    );
   }
 
-  const outside = refuseOutsideVault(rawPath);
-  if (outside) return outside;
-
-  const path = normalizePath(rawPath);
-  const file = ctx.app.vault.getFileByPath(path);
-  if (!file) {
-    return toolFailure({
-      kind: "not-found",
-      what: `no note found at path "${path}"`,
-      recovery: "call list_directory or search_files to find the correct path",
-    });
-  }
-
-  // resolvedLinks maps each source path to its resolved targets (a Record<target,
-  // count>), the forward-link mirror of getBacklinksForFile. Resolved-only, so it
-  // matches get_backlinks' shape and never lists a link whose target is missing.
-  const outgoing = ctx.app.metadataCache.resolvedLinks[file.path] ?? {};
-  const paths = Object.keys(outgoing).sort();
-
-  if (paths.length === 0) {
-    return {
-      content: `"${path}" has no outgoing links. This note links to no other notes; nothing to follow up.`,
-      isReadOnly: true,
-    };
-  }
-
-  return {
-    content: `Notes "${path}" links to (${paths.length}):\n${paths.join("\n")}`,
-    isReadOnly: true,
-  };
+  return { content: sections.join("\n\n"), isReadOnly: true };
 }
 
 function executeFindNotesByTag(

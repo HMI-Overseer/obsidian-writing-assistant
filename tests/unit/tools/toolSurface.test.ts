@@ -291,7 +291,7 @@ describe("Layer 2 progressive-disclosure core (ADR-0009 / section 6.2.5)", () =>
     expect(isCoreReadTool("add_memory")).toBe(false);
     expect(isCoreReadTool("forget_memory")).toBe(false);
     // Tail reads defer.
-    expect(isCoreReadTool("directory_tree")).toBe(false);
+    expect(isCoreReadTool("get_links")).toBe(false);
     expect(isCoreReadTool("get_frontmatter")).toBe(false);
     // Writes always defer.
     expect(isCoreReadTool("edit")).toBe(false);
@@ -384,13 +384,13 @@ describe("anthropicLayer2ToolSet (the direct-API L2 emission)", () => {
     ]);
     expect(got[6]).toBe("ask_user");
     expect(got[7]).toBe("think");
-    // Then the six deferred tail reads, then the posture/policy-permitted writes.
+    // Then the four deferred tail reads, then the posture/policy-permitted writes.
+    // Six before RFC-0015's Stage 3: directory_tree was absorbed into the core
+    // list_directory, and the two link tools merged into get_links.
     expect(got.slice(8)).toEqual([
-      "directory_tree",
       "search_files",
       "find_notes_by_tag",
-      "get_backlinks",
-      "get_outgoing_links",
+      "get_links",
       "get_frontmatter",
       ...EDIT_NAMES,
       ...VAULT_OP_NAMES,

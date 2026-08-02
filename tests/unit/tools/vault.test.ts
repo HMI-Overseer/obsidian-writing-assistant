@@ -143,53 +143,133 @@ describe("list_directory", () => {
 });
 
 // ---------------------------------------------------------------------------
-// directory_tree
+// list_directory + depth (RFC-0015: directory_tree is absorbed here, D5/D6)
+//
+// The expected strings below are the *pre-merge* bytes, captured by running the old
+// executeListDirectory on these exact fixtures before the merge landed, not
+// transcribed from the source. D6's claim is that a call without depth is unchanged,
+// and this is the instrument for it.
 // ---------------------------------------------------------------------------
 
-describe("directory_tree", () => {
-  test("returns recursive JSON tree", async () => {
-    const noteA = makeFile("Characters/Alaric.md");
-    const sub = makeFolder("Characters/Drafts", [makeFile("Characters/Drafts/old.md")]);
-    const folder = makeFolder("Characters", [noteA, sub]);
+/** "Root" holding one note and a chain of `levels` subfolders, each holding one note. */
+function makeNestedRoot(levels: number): TFolder {
+  const paths = ["Root"];
+  for (let i = 1; i <= levels; i++) paths.push(`${paths[i - 1]}/L${i}`);
 
-    const ctx = makeCtx({ abstractFiles: { Characters: folder } });
-    const result = await executeVaultTool(tc("directory_tree", { path: "Characters" }), ctx);
+  let built: TFolder | null = null;
+  for (let i = levels; i >= 0; i--) {
+    const children: (TFile | TFolder)[] = [makeFile(`${paths[i]}/n${i}.md`)];
+    if (built) children.push(built);
+    built = makeFolder(paths[i], children);
+  }
+  return built as TFolder;
+}
+
+describe("list_directory depth", () => {
+  test("without depth, output is byte-identical to the pre-merge listing", async () => {
+    const drafts = makeFolder("Characters/Drafts", [
+      makeFile("Characters/Drafts/old.md"),
+      makeFolder("Characters/Drafts/Deep", [makeFile("Characters/Drafts/Deep/deeper.md")]),
+    ]);
+    const folder = makeFolder("Characters", [
+      makeFile("Characters/Alaric.md"),
+      makeFile("Characters/Will.md"),
+      drafts,
+    ]);
+
+    const listed = await executeVaultTool(
+      tc("list_directory", { path: "Characters" }),
+      makeCtx({ abstractFiles: { Characters: folder } }),
+    );
+    expect(listed.content).toBe(
+      'Contents of "Characters":\n' +
+        "[DIR] Characters/Drafts\n" +
+        "[FILE] Characters/Alaric.md\n" +
+        "[FILE] Characters/Will.md",
+    );
+
+    const root = await executeVaultTool(
+      tc("list_directory", {}),
+      makeCtx({ root: makeFolder("", [makeFile("index.md")]) }),
+    );
+    expect(root.content).toBe("Vault root:\n[FILE] index.md");
+
+    const empty = await executeVaultTool(
+      tc("list_directory", { path: "Empty" }),
+      makeCtx({ abstractFiles: { Empty: makeFolder("Empty") } }),
+    );
+    expect(empty.content).toBe('Contents of "Empty": (empty)');
+  });
+
+  test("depth 3 lists three folder levels, and nothing below them", async () => {
+    const ctx = makeCtx({ abstractFiles: { Root: makeNestedRoot(5) } });
+    const result = await executeVaultTool(tc("list_directory", { path: "Root", depth: 3 }), ctx);
 
     expect(result.isReadOnly).toBe(true);
     expect(result.isError).toBeUndefined();
-    const tree = JSON.parse(result.content);
-    expect(tree.name).toBe("Characters");
-    expect(tree.path).toBe("Characters");
-    expect(tree.type).toBe("directory");
-    const childNames = tree.children.map((c: { name: string }) => c.name);
-    expect(childNames).toContain("Alaric.md");
-    expect(childNames).toContain("Drafts");
-    const alaric = tree.children.find((c: { name: string }) => c.name === "Alaric.md");
-    expect(alaric.path).toBe("Characters/Alaric.md");
-    const drafts = tree.children.find((c: { name: string }) => c.name === "Drafts");
-    expect(drafts.type).toBe("directory");
-    expect(drafts.path).toBe("Characters/Drafts");
-    expect(drafts.children[0].name).toBe("old.md");
-    expect(drafts.children[0].path).toBe("Characters/Drafts/old.md");
+    expect(result.content).toBe(
+      'Contents of "Root":\n' +
+        "[DIR] Root/L1\n" +
+        "[DIR] Root/L1/L2\n" +
+        "[DIR] Root/L1/L2/L3\n" +
+        "[FILE] Root/L1/L2/n2.md\n" +
+        "[FILE] Root/L1/n1.md\n" +
+        "[FILE] Root/n0.md",
+    );
   });
 
-  test("uses vault root when path is omitted", async () => {
-    const note = makeFile("index.md");
-    const root = makeFolder("", [note]);
-    const ctx = makeCtx({ root });
-    const result = await executeVaultTool(tc("directory_tree", {}), ctx);
+  test("an out-of-range depth clamps rather than erroring, exactly as topK does", async () => {
+    const ctx = makeCtx({ abstractFiles: { Root: makeNestedRoot(6) } });
+    const listAt = async (depth: unknown) =>
+      (await executeVaultTool(tc("list_directory", { path: "Root", depth }), ctx)).content;
 
+    // Above the range: clamped to 5, so it stops where depth 5 stops and never reaches
+    // L6, even though the fixture nests six levels deep.
+    expect(await listAt(9)).toBe(await listAt(5));
+    expect(await listAt(9)).toContain("[DIR] Root/L1/L2/L3/L4/L5\n");
+    expect(await listAt(9)).not.toContain("Root/L1/L2/L3/L4/L5/L6");
+    // The ceiling is 5 and not lower: depth 4 stops one level short of what 5 reaches.
+    expect(await listAt(4)).not.toContain("[DIR] Root/L1/L2/L3/L4/L5\n");
+    // Below the range, and a fractional value: floored into range, never refused.
+    expect(await listAt(0)).toBe(await listAt(1));
+    expect(await listAt(-4)).toBe(await listAt(1));
+    expect(await listAt(2.7)).toBe(await listAt(2));
+    // Non-numeric is ignored, so the call behaves as if depth were absent.
+    expect(await listAt("deep")).toBe(await listAt(undefined));
+    for (const depth of [9, 0, -4, 2.7, "deep"]) {
+      const result = await executeVaultTool(tc("list_directory", { path: "Root", depth }), ctx);
+      expect(result.isError, `depth ${String(depth)} must not error`).toBeUndefined();
+    }
+  });
+
+  test("a listing over the entry bound truncates, names the next move, and does not error", async () => {
+    const files = Array.from({ length: 600 }, (_, i) =>
+      makeFile(`Big/n${String(i).padStart(4, "0")}.md`),
+    );
+    const ctx = makeCtx({ abstractFiles: { Big: makeFolder("Big", files) } });
+    const result = await executeVaultTool(tc("list_directory", { path: "Big" }), ctx);
+
+    // RFC-0010: a bound on our own output clamps at write time, it never gates a read.
+    expect(result.isError).toBeUndefined();
     expect(result.isReadOnly).toBe(true);
-    const tree = JSON.parse(result.content);
-    expect(tree.type).toBe("directory");
-    expect(tree.children[0].name).toBe("index.md");
+    expect(result.content.startsWith('Contents of "Big", showing first 500 of 600:\n')).toBe(true);
+    expect(result.content).toContain("[FILE] Big/n0000.md");
+    expect(result.content).not.toContain("[FILE] Big/n0500.md");
+    expect(result.content).toContain(
+      "[Showing 500 of 600 entries, narrow path to a subfolder or lower depth to see the rest.]",
+    );
   });
 
-  test("returns error when folder not found", async () => {
-    const ctx = makeCtx({});
-    const result = await executeVaultTool(tc("directory_tree", { path: "Missing" }), ctx);
-    expect(result.isError).toBe(true);
-    expect(result.content).toContain("Error:");
+  test("a listing exactly at the entry bound is not truncated", async () => {
+    const files = Array.from({ length: 500 }, (_, i) =>
+      makeFile(`Big/n${String(i).padStart(4, "0")}.md`),
+    );
+    const ctx = makeCtx({ abstractFiles: { Big: makeFolder("Big", files) } });
+    const result = await executeVaultTool(tc("list_directory", { path: "Big" }), ctx);
+
+    expect(result.content.startsWith('Contents of "Big":\n')).toBe(true);
+    expect(result.content).not.toContain("showing first");
+    expect(result.content).toContain("[FILE] Big/n0499.md");
   });
 });
 
@@ -644,99 +724,113 @@ describe("read_section", () => {
 });
 
 // ---------------------------------------------------------------------------
-// get_backlinks
+// get_links (RFC-0015: get_backlinks + get_outgoing_links merge here, D7)
+//
+// The per-direction expectations below are the *pre-merge* bytes of the two
+// predecessors, captured by running them on these fixtures before the merge landed.
+// The gate's claim is that narrowing to a direction returns exactly what its
+// predecessor returned, including the two empty-result sentences.
 // ---------------------------------------------------------------------------
 
-describe("get_backlinks", () => {
-  test("returns notes that link to the target", async () => {
-    const target = makeFile("Characters/Will.md");
-    const ctx = makeCtx({
-      files: [target],
+describe("get_links", () => {
+  const LINKED = () =>
+    makeCtx({
+      files: [makeFile("Characters/Will.md")],
       backlinks: {
-        "Characters/Will.md": {
-          "Scenes/Act1.md": [],
-          "Scenes/Act2.md": [],
-        },
+        "Characters/Will.md": { "Scenes/Act2.md": [], "Scenes/Act1.md": [] },
       },
-    });
-
-    const result = await executeVaultTool(tc("get_backlinks", { path: "Characters/Will.md" }), ctx);
-
-    expect(result.isReadOnly).toBe(true);
-    expect(result.isError).toBeUndefined();
-    expect(result.content).toContain("Scenes/Act1.md");
-    expect(result.content).toContain("Scenes/Act2.md");
-    expect(result.content).toContain("(2)");
-  });
-
-  test("reports no backlinks when none exist", async () => {
-    const target = makeFile("Characters/Nobody.md");
-    const ctx = makeCtx({ files: [target] });
-
-    const result = await executeVaultTool(tc("get_backlinks", { path: "Characters/Nobody.md" }), ctx);
-    expect(result.content).toContain("No notes link to");
-    expect(result.isError).toBeUndefined();
-  });
-
-  test("returns error when note not found", async () => {
-    const ctx = makeCtx({});
-    const result = await executeVaultTool(tc("get_backlinks", { path: "Missing.md" }), ctx);
-
-    expect(result.isError).toBe(true);
-    expect(result.content).toContain("Error:");
-  });
-
-  test("returns error when path is empty", async () => {
-    const ctx = makeCtx({});
-    const result = await executeVaultTool(tc("get_backlinks", { path: "" }), ctx);
-    expect(result.isError).toBe(true);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// get_outgoing_links (M3, the forward-link mirror of get_backlinks)
-// ---------------------------------------------------------------------------
-
-describe("get_outgoing_links", () => {
-  test("returns the notes the target links out to (resolved links)", async () => {
-    const source = makeFile("Scenes/Act1.md");
-    const ctx = makeCtx({
-      files: [source],
       resolvedLinks: {
-        "Scenes/Act1.md": {
-          "Characters/Will.md": 1,
-          "Lore/The Fold.md": 2,
-        },
+        "Characters/Will.md": { "Lore/The Fold.md": 2, "Characters/Alaric.md": 1 },
       },
     });
+  const LONELY = () => makeCtx({ files: [makeFile("Scenes/Lonely.md")] });
 
-    const result = await executeVaultTool(
-      tc("get_outgoing_links", { path: "Scenes/Act1.md" }),
-      ctx,
+  const INCOMING_HITS =
+    'Notes linking to "Characters/Will.md" (2):\nScenes/Act1.md\nScenes/Act2.md';
+  const OUTGOING_HITS =
+    'Notes "Characters/Will.md" links to (2):\nCharacters/Alaric.md\nLore/The Fold.md';
+  const INCOMING_EMPTY =
+    'No notes link to "Scenes/Lonely.md". This note has no incoming wikilinks; nothing to follow up.';
+  const OUTGOING_EMPTY =
+    '"Scenes/Lonely.md" has no outgoing links. This note links to no other notes; nothing to follow up.';
+
+  test("direction incoming is byte-identical to the retired get_backlinks", async () => {
+    const hits = await executeVaultTool(
+      tc("get_links", { path: "Characters/Will.md", direction: "incoming" }),
+      LINKED(),
     );
+    expect(hits.isReadOnly).toBe(true);
+    expect(hits.isError).toBeUndefined();
+    expect(hits.content).toBe(INCOMING_HITS);
 
-    expect(result.isReadOnly).toBe(true);
-    expect(result.isError).toBeUndefined();
-    expect(result.content).toContain("Characters/Will.md");
-    expect(result.content).toContain("Lore/The Fold.md");
-    expect(result.content).toContain("(2)");
+    const empty = await executeVaultTool(
+      tc("get_links", { path: "Scenes/Lonely.md", direction: "incoming" }),
+      LONELY(),
+    );
+    expect(empty.isError).toBeUndefined();
+    expect(empty.content).toBe(INCOMING_EMPTY);
   });
 
-  test("reports no outgoing links when the note references nothing", async () => {
-    const source = makeFile("Scenes/Lonely.md");
-    const ctx = makeCtx({ files: [source] });
-
-    const result = await executeVaultTool(
-      tc("get_outgoing_links", { path: "Scenes/Lonely.md" }),
-      ctx,
+  test("direction outgoing is byte-identical to the retired get_outgoing_links", async () => {
+    const hits = await executeVaultTool(
+      tc("get_links", { path: "Characters/Will.md", direction: "outgoing" }),
+      LINKED(),
     );
-    expect(result.content).toContain("no outgoing");
+    expect(hits.isReadOnly).toBe(true);
+    expect(hits.isError).toBeUndefined();
+    expect(hits.content).toBe(OUTGOING_HITS);
+
+    const empty = await executeVaultTool(
+      tc("get_links", { path: "Scenes/Lonely.md", direction: "outgoing" }),
+      LONELY(),
+    );
+    expect(empty.isError).toBeUndefined();
+    expect(empty.content).toBe(OUTGOING_EMPTY);
+  });
+
+  test("omitting direction returns both, each under its own heading", async () => {
+    const both = await executeVaultTool(
+      tc("get_links", { path: "Characters/Will.md" }),
+      LINKED(),
+    );
+    expect(both.isReadOnly).toBe(true);
+    expect(both.isError).toBeUndefined();
+    expect(both.content).toBe(`${INCOMING_HITS}\n\n${OUTGOING_HITS}`);
+  });
+
+  test("an empty direction keeps its own sentence beside the other's hits", async () => {
+    const ctx = makeCtx({
+      files: [makeFile("Scenes/Lonely.md")],
+      resolvedLinks: { "Scenes/Lonely.md": { "Lore/The Fold.md": 1 } },
+    });
+    const result = await executeVaultTool(tc("get_links", { path: "Scenes/Lonely.md" }), ctx);
+
     expect(result.isError).toBeUndefined();
+    expect(result.content).toBe(
+      `${INCOMING_EMPTY}\n\nNotes "Scenes/Lonely.md" links to (1):\nLore/The Fold.md`,
+    );
+  });
+
+  test("both directions empty reads as two sentences, not an error", async () => {
+    const result = await executeVaultTool(tc("get_links", { path: "Scenes/Lonely.md" }), LONELY());
+    expect(result.isError).toBeUndefined();
+    expect(result.content).toBe(`${INCOMING_EMPTY}\n\n${OUTGOING_EMPTY}`);
+  });
+
+  // D7's point: there is no wrong value to pick. An unrecognised direction widens to
+  // both rather than refusing, so the answer is always a superset of what was asked.
+  test("an unrecognised direction returns both rather than refusing", async () => {
+    const result = await executeVaultTool(
+      tc("get_links", { path: "Characters/Will.md", direction: "backwards" }),
+      LINKED(),
+    );
+    expect(result.isError).toBeUndefined();
+    expect(result.content).toBe(`${INCOMING_HITS}\n\n${OUTGOING_HITS}`);
   });
 
   test("returns error when note not found", async () => {
     const ctx = makeCtx({});
-    const result = await executeVaultTool(tc("get_outgoing_links", { path: "Missing.md" }), ctx);
+    const result = await executeVaultTool(tc("get_links", { path: "Missing.md" }), ctx);
 
     expect(result.isError).toBe(true);
     expect(result.content).toContain("Error:");
@@ -744,7 +838,7 @@ describe("get_outgoing_links", () => {
 
   test("returns error when path is empty", async () => {
     const ctx = makeCtx({});
-    const result = await executeVaultTool(tc("get_outgoing_links", { path: "" }), ctx);
+    const result = await executeVaultTool(tc("get_links", { path: "" }), ctx);
     expect(result.isError).toBe(true);
   });
 });
@@ -1076,16 +1170,12 @@ describe("path-boundary safety (reads stay inside the vault)", () => {
     expect(ctx.app.vault.read).not.toHaveBeenCalled();
   });
 
-  test("get_backlinks names the boundary for an out-of-vault path", async () => {
-    const ctx = makeCtx({ files: [makeFile("In/Vault.md")] });
-    const result = await executeVaultTool(tc("get_backlinks", { path: "../../etc/passwd" }), ctx);
-    expectBoundaryRefusal(result);
-  });
-
-  test("get_outgoing_links names the boundary, never reaching the lookup", async () => {
+  test("get_links names the boundary, in every direction, never reaching the lookup", async () => {
     const ctx = makeCtx({ files: [makeFile("In/Vault.md")] });
     for (const path of ESCAPING) {
-      expectBoundaryRefusal(await executeVaultTool(tc("get_outgoing_links", { path }), ctx));
+      for (const direction of [undefined, "incoming", "outgoing"]) {
+        expectBoundaryRefusal(await executeVaultTool(tc("get_links", { path, direction }), ctx));
+      }
     }
     expect(ctx.app.vault.getFileByPath).not.toHaveBeenCalled();
   });
@@ -1102,11 +1192,12 @@ describe("path-boundary safety (reads stay inside the vault)", () => {
     expect(ctx.app.vault.read).not.toHaveBeenCalled();
   });
 
-  test("list_directory / directory_tree name the boundary for an out-of-vault folder", async () => {
+  test("list_directory names the boundary for an out-of-vault folder, at any depth", async () => {
     const ctx = makeCtx({ abstractFiles: { In: makeFolder("In") } });
-    for (const name of ["list_directory", "directory_tree"]) {
-      const result = await executeVaultTool(tc(name, { path: "../.." }), ctx);
-      expectBoundaryRefusal(result);
+    for (const depth of [undefined, 1, 5]) {
+      expectBoundaryRefusal(
+        await executeVaultTool(tc("list_directory", { path: "../..", depth }), ctx),
+      );
     }
     expect(ctx.app.vault.getAbstractFileByPath).not.toHaveBeenCalled();
   });

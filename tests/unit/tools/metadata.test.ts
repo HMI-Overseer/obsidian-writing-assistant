@@ -21,6 +21,7 @@ import {
   MEMORY_TOOL_NAMES,
 } from "../../../src/tools/memory/definition";
 import { ASK_TOOL_NAMES } from "../../../src/tools/ask/definition";
+import { THINK_TOOL_NAME } from "../../../src/tools/think/definition";
 
 describe("isMutatingTool", () => {
   test("every vault-op, edit, and memory mutation tool is classified as mutating", () => {
@@ -123,6 +124,30 @@ describe("display-metadata coverage", () => {
     }
   });
 
+  // The three coverage loops above assert in one direction only, so they catch a name
+  // the surface *gained* and never one it lost: a merge that adds `get_links` and leaves
+  // `get_backlinks` behind passes all three. That leftover is not harmless, it is a live
+  // display row for a tool nothing can call, sitting where D2's RETIRED_TOOL_DISPLAY is
+  // supposed to be the only home for a retired name. SNAP_TOOL_KEYS and
+  // DISCOVERY_DIGEST_TOOLS already assert both directions; these did not.
+  test("no display map holds a name the surface does not advertise", () => {
+    const advertised = new Set([...ALL_TOOL_NAMES, THINK_TOOL_NAME]);
+    const maps: [string, Record<string, string>][] = [
+      ["TOOL_ICONS", TOOL_ICONS],
+      ["TOOL_LABELS", TOOL_LABELS],
+      ["TOOL_STATUS_LABELS", TOOL_STATUS_LABELS],
+      ["TOOL_PENDING_LABELS", TOOL_PENDING_LABELS],
+    ];
+    for (const [label, map] of maps) {
+      for (const name of Object.keys(map)) {
+        expect(
+          advertised.has(name),
+          `${label} has an entry for "${name}", which is not an advertised tool; a retired name belongs in RETIRED_TOOL_DISPLAY`,
+        ).toBe(true);
+      }
+    }
+  });
+
   test("uses the blocking pending label for ask_user", () => {
     expect(pendingToolLabel("ask_user")).toBe("Waiting for your answer");
   });
@@ -170,6 +195,37 @@ describe("retired tool names still render", () => {
   test("a retired name is not advertised, and its pending label is the retired one", () => {
     expect(EDIT_TOOL_NAMES.has("propose_edit")).toBe(false);
     expect(pendingToolLabel("propose_edit")).toBe("Proposed edit");
+  });
+
+  test("the absorbed read tools keep the label and icon they were recorded under", () => {
+    expect(toolLabel("directory_tree")).toBe("Explored tree");
+    expect(toolIcon("directory_tree")).toBe("folder-tree");
+    expect(toolLabel("get_backlinks")).toBe("Found backlinks");
+    expect(toolIcon("get_backlinks")).toBe("link");
+    expect(toolLabel("get_outgoing_links")).toBe("Found outgoing links");
+    expect(toolIcon("get_outgoing_links")).toBe("external-link");
+  });
+
+  // A merge is where the retired entry stops being cosmetic: the absorbing tool's own
+  // label is a different sentence ("Listed folder", "Found links"), so without these
+  // rows a saved turn would either read the wrong thing or fall to the raw name.
+  test("an absorbed name keeps its own wording, not the absorbing tool's", () => {
+    for (const name of ["directory_tree", "get_backlinks", "get_outgoing_links"]) {
+      expect(VAULT_TOOL_NAMES.has(name)).toBe(false);
+      expect(toolLabel(name)).not.toBe(name);
+    }
+    expect(toolLabel("directory_tree")).not.toBe(TOOL_LABELS.list_directory);
+    expect(toolLabel("get_backlinks")).not.toBe(TOOL_LABELS.get_links);
+    expect(toolLabel("get_outgoing_links")).not.toBe(TOOL_LABELS.get_links);
+  });
+
+  test("a saved call to an absorbed tool still shows its target as the detail line", () => {
+    for (const name of ["directory_tree", "get_backlinks", "get_outgoing_links"]) {
+      expect(
+        extractToolInput({ name, arguments: { path: "Characters/Will.md" } }),
+        `extractToolInput lost the retired case for "${name}"`,
+      ).toBe("Characters/Will.md");
+    }
   });
 
   test("a name that never existed still falls back to the raw name and the wrench", () => {

@@ -91,13 +91,18 @@ export const READ_SECTION_TOOL: CanonicalToolDefinition = {
   },
 };
 
+/** Upper bound on list_directory's `depth`, also the schema's stated range. */
+export const MAX_LIST_DIRECTORY_DEPTH = 5;
+
 export const LIST_DIRECTORY_TOOL: CanonicalToolDefinition = {
   name: "list_directory",
   description:
-    "List the immediate contents of a vault folder with [FILE] and [DIR] prefixes. " +
-    "Use this to discover what notes and subfolders exist at a specific level. " +
-    "Omit path to list the vault root.",
-  strategyHint: "discover immediate children of a folder, use directory_tree for a full subtree",
+    "List the contents of a vault folder as [FILE] and [DIR] lines, one full path per line, " +
+    "sorted. Use this to discover what notes and subfolders exist. Omit path for the vault " +
+    "root. One level by default; raise depth to take in a whole subtree in one call. " +
+    "A very large listing is truncated and says so.",
+  strategyHint:
+    "discover what a folder holds, its immediate children by default, a subtree with depth",
   parameters: {
     type: "object",
     properties: {
@@ -107,26 +112,11 @@ export const LIST_DIRECTORY_TOOL: CanonicalToolDefinition = {
           "Vault-relative folder path (e.g., 'Characters' or 'Scenes/Act 1'). " +
           "Omit to list the vault root.",
       },
-    },
-    required: [],
-  },
-};
-
-export const DIRECTORY_TREE_TOOL: CanonicalToolDefinition = {
-  name: "directory_tree",
-  description:
-    "Get a recursive JSON tree of all notes and subfolders within a vault folder. " +
-    "Use this when you need the full structure of a folder and its descendants in one call. " +
-    "Omit path to get the entire vault tree.",
-  strategyHint: "get the full recursive structure of a folder or the whole vault in one call",
-  parameters: {
-    type: "object",
-    properties: {
-      path: {
-        type: "string",
+      depth: {
+        type: "number",
         description:
-          "Vault-relative folder path (e.g., 'Characters'). " +
-          "Omit to get the entire vault tree.",
+          `How many folder levels to list, 1 to ${MAX_LIST_DIRECTORY_DEPTH}. Defaults to 1, ` +
+          "the folder's immediate children. Higher values also list what its subfolders hold.",
       },
     },
     required: [],
@@ -251,45 +241,40 @@ export const SEARCH_VAULT_TOOL: CanonicalToolDefinition = {
   },
 };
 
-export const GET_BACKLINKS_TOOL: CanonicalToolDefinition = {
-  name: "get_backlinks",
-  description:
-    "Find all notes that link to a given note via wikilinks or markdown links. " +
-    "Use this to answer 'which scenes feature this character?' or 'what references this concept?'. " +
-    "More reliable than semantic search for explicit wikilink connections, " +
-    "a scene may link [[Character Name]] without ever spelling out the name in prose.",
-  strategyHint: "find every note that links to a given note (reliable for explicit wikilink connections)",
-  errorGuidance: "If the note was not found, call list_directory to find the correct path.",
-  parameters: {
-    type: "object",
-    properties: {
-      path: {
-        type: "string",
-        description: "Vault-relative path of the target note (e.g., 'Characters/Will.md').",
-      },
-    },
-    required: ["path"],
-  },
-};
+/** The direction a `get_links` call may narrow to. Omitting it asks for both. */
+export type LinkDirection = "incoming" | "outgoing";
 
-export const GET_OUTGOING_LINKS_TOOL: CanonicalToolDefinition = {
-  name: "get_outgoing_links",
+/** Valid `direction` values, also the schema enum (single source of truth). */
+export const LINK_DIRECTIONS: LinkDirection[] = ["incoming", "outgoing"];
+
+export const GET_LINKS_TOOL: CanonicalToolDefinition = {
+  name: "get_links",
   description:
-    "Find all notes a given note links out to via wikilinks or markdown links. " +
-    "The forward-link mirror of get_backlinks: get_backlinks answers 'what links to this note?', " +
-    "get_outgoing_links answers 'what does this note reference?'. " +
-    "Use this to follow what a scene draws on (the characters, locations, and lore it mentions) " +
-    "without reading the whole note and parsing its [[wikilinks]] by hand. " +
+    "Find the notes a given note is connected to by wikilinks or markdown links, in either " +
+    "direction. Incoming links are the notes that link to it: use them to answer 'which " +
+    "scenes feature this character?' or 'what references this concept?'. More reliable than " +
+    "semantic search for explicit wikilink connections, a scene may link [[Character Name]] " +
+    "without ever spelling out the name in prose. Outgoing links are the notes it links out " +
+    "to: use them to follow what a scene draws on (the characters, locations, and lore it " +
+    "mentions) without reading the whole note and parsing its [[wikilinks]] by hand. " +
+    "Omit direction to get both, each under its own heading. " +
     "Returns resolved links only (links whose target note exists).",
   strategyHint:
-    "find every note a given note links out to (the forward-link mirror of get_backlinks)",
+    "find a note's link connections, both directions at once or one of them with direction",
   errorGuidance: "If the note was not found, call list_directory or search_files to find the correct path.",
   parameters: {
     type: "object",
     properties: {
       path: {
         type: "string",
-        description: "Vault-relative path of the source note (e.g., 'Scenes/Act 1.md').",
+        description: "Vault-relative path of the note (e.g., 'Characters/Will.md').",
+      },
+      direction: {
+        type: "string",
+        enum: LINK_DIRECTIONS,
+        description:
+          "Narrow to one direction: \"incoming\" for the notes that link to this one, " +
+          "\"outgoing\" for the notes it links to. Omit for both.",
       },
     },
     required: ["path"],
@@ -355,19 +340,17 @@ export const CORE_VAULT_TOOLS: CanonicalToolDefinition[] = [
 
 /**
  * Full vault tool suite for cloud providers.
- * Adds recursive tree, filename search, Obsidian-native tools (backlinks,
- * outgoing links, tags, frontmatter), and the get_outline / read_section structure
- * pair on top of the core set. The pair is cloud-only for now; CORE (local)
- * inclusion is deferred to the tool benchmark rather than assumed (ADR-0009).
+ * Adds filename search, Obsidian-native tools (links, tags, frontmatter), and the
+ * get_outline / read_section structure pair on top of the core set. The pair is
+ * cloud-only for now; CORE (local) inclusion is deferred to the tool benchmark
+ * rather than assumed (ADR-0009).
  */
 export const ALL_VAULT_TOOLS: CanonicalToolDefinition[] = [
   LIST_DIRECTORY_TOOL,
-  DIRECTORY_TREE_TOOL,
   SEARCH_FILES_TOOL,
   SEARCH_CONTENT_TOOL,
   FIND_NOTES_BY_TAG_TOOL,
-  GET_BACKLINKS_TOOL,
-  GET_OUTGOING_LINKS_TOOL,
+  GET_LINKS_TOOL,
   GET_FRONTMATTER_TOOL,
   READ_FILE_TOOL,
   GET_OUTLINE_TOOL,

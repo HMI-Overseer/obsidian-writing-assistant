@@ -19,11 +19,9 @@ export const TOOL_ICONS: Record<string, string> = {
   get_outline: "list-tree",
   read_section: "text-select",
   list_directory: "folder",
-  directory_tree: "folder-tree",
   search_files: "file-search",
   search_content: "text-search",
-  get_backlinks: "link",
-  get_outgoing_links: "external-link",
+  get_links: "link",
   find_notes_by_tag: "tag",
   get_frontmatter: "file-code",
   edit: "pencil",
@@ -50,11 +48,9 @@ export const TOOL_LABELS: Record<string, string> = {
   get_outline: "Read outline",
   read_section: "Read section",
   list_directory: "Listed folder",
-  directory_tree: "Explored tree",
   search_files: "Searched files",
   search_content: "Searched content",
-  get_backlinks: "Found backlinks",
-  get_outgoing_links: "Found outgoing links",
+  get_links: "Found links",
   find_notes_by_tag: "Found notes by tag",
   get_frontmatter: "Read frontmatter",
   edit: "Proposed edit",
@@ -86,6 +82,9 @@ export const TOOL_LABELS: Record<string, string> = {
  */
 const RETIRED_TOOL_DISPLAY: Record<string, { icon: string; label: string }> = {
   propose_edit: { icon: "pencil", label: "Proposed edit" },
+  directory_tree: { icon: "folder-tree", label: "Explored tree" },
+  get_backlinks: { icon: "link", label: "Found backlinks" },
+  get_outgoing_links: { icon: "external-link", label: "Found outgoing links" },
 };
 
 /** Icon for a recorded tool call, including one naming a retired tool. */
@@ -163,11 +162,9 @@ export const TOOL_STATUS_LABELS: Record<string, string> = {
   get_outline: "Reading outline...",
   read_section: "Reading section...",
   list_directory: "Listing folder...",
-  directory_tree: "Exploring tree...",
   search_files: "Searching files...",
   search_content: "Searching content...",
-  get_backlinks: "Finding backlinks...",
-  get_outgoing_links: "Finding outgoing links...",
+  get_links: "Finding links...",
   find_notes_by_tag: "Finding notes by tag...",
   get_frontmatter: "Reading frontmatter...",
   edit: "Composing edit...",
@@ -222,12 +219,16 @@ export function extractToolInput(
         : typeof args.path === "string"
           ? args.path
           : undefined;
+    // Each retired name ({@link RETIRED_TOOL_DISPLAY}) keeps its case beside the tool that
+    // absorbed it, so a saved turn that called it still shows its target rather than
+    // losing the detail line.
+    case "directory_tree":
     case "list_directory": return typeof args.path === "string" ? args.path : undefined;
-    case "directory_tree": return typeof args.path === "string" ? args.path : undefined;
     case "search_files": return typeof args.pattern === "string" ? args.pattern : undefined;
     case "search_content": return typeof args.query === "string" ? args.query : undefined;
-    case "get_backlinks": return typeof args.path === "string" ? args.path : undefined;
-    case "get_outgoing_links": return typeof args.path === "string" ? args.path : undefined;
+    case "get_backlinks":
+    case "get_outgoing_links":
+    case "get_links": return typeof args.path === "string" ? args.path : undefined;
     case "find_notes_by_tag": return typeof args.tag === "string" ? args.tag : undefined;
     case "get_frontmatter": return Array.isArray(args.paths) ? `${args.paths.length} note(s)` : undefined;
     // "propose_edit" is retired ({@link RETIRED_TOOL_DISPLAY}); it stays here so a saved

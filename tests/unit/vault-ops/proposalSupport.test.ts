@@ -111,26 +111,46 @@ describe("preReadTrashSnapshots", () => {
     } as unknown as App;
   }
 
-  it("snapshots only readable trash_file calls, keyed by normalized path", async () => {
+  it("snapshots only readable trash calls, keyed by normalized path", async () => {
     const app = vaultApp({ "doomed.md": "goodbye" });
     const calls = [
-      call("trash_file", { path: "doomed.md" }, "t1"),
+      call("trash", { path: "doomed.md" }, "t1"),
       call("write_file", { path: "doomed.md", content: "z" }, "w1"),
     ];
     const snapshots = await preReadTrashSnapshots(app, calls);
     expect([...snapshots.entries()]).toEqual([["doomed.md", "goodbye"]]);
   });
 
-  it("ignores a trash_file whose path is not a string", async () => {
+  it("ignores a trash whose path is not a string", async () => {
     const app = vaultApp({ "doomed.md": "goodbye" });
-    const snapshots = await preReadTrashSnapshots(app, [call("trash_file", { path: 42 }, "t1")]);
+    const snapshots = await preReadTrashSnapshots(app, [call("trash", { path: 42 }, "t1")]);
     expect(snapshots.size).toBe(0);
   });
 
-  it("omits a trash_file whose content is unreadable (absent file)", async () => {
+  it("omits a trash whose content is unreadable (absent file)", async () => {
     const app = vaultApp({});
     const snapshots = await preReadTrashSnapshots(app, [
-      call("trash_file", { path: "ghost.md" }, "t1"),
+      call("trash", { path: "ghost.md" }, "t1"),
+    ]);
+    expect(snapshots.size).toBe(0);
+  });
+
+  // The merged `trash` sends its folder pathway through this pre-read too, where the
+  // retired trash_folder never reached it. `getFileByPath` answers null for a folder, so
+  // the folder trash contributes no snapshot and carries none into its op, which is the
+  // invariant `VaultOperation` documents for trashFolder. Asserted rather than reasoned
+  // about, because it is a new arrival on the write path.
+  it("contributes nothing for a folder trash (a folder has no content to snapshot)", async () => {
+    const app = {
+      vault: {
+        // A folder path: real Obsidian's getFileByPath answers null for anything that is
+        // not a TFile, which is what makes the folder pathway inert here.
+        getFileByPath: () => null,
+        read: async () => "unreachable",
+      },
+    } as unknown as App;
+    const snapshots = await preReadTrashSnapshots(app, [
+      call("trash", { path: "Drafts/Act II" }, "t1"),
     ]);
     expect(snapshots.size).toBe(0);
   });

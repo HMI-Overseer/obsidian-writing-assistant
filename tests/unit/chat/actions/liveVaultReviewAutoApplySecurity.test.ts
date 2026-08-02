@@ -162,7 +162,7 @@ describe("LiveVaultReview auto-apply vault-boundary guard (section 6.2)", () => 
     });
 
     const [{ result }] = await review.resolveRound([
-      { id: "c1", name: "move_file", arguments: { from: "Notes/A.md", to: "../../../A.md" } },
+      { id: "c1", name: "move", arguments: { from: "Notes/A.md", to: "../../../A.md" } },
     ]);
 
     expect(result.isError).toBe(true);

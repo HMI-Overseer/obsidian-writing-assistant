@@ -14,11 +14,14 @@ import { summarizeOp } from "./summary";
 import type { ReviewableVaultOp, VaultOperation } from "./types";
 
 /**
- * Pre-read the on-disk content of every `trash_file` call so the synchronous
+ * Pre-read the on-disk content of every `trash` call so the synchronous
  * conversion can stay synchronous: a trashed file's snapshot is what its inverse
  * re-creates on undo. Keyed by normalized path; non-trash calls and unreadable
- * paths contribute nothing. Shared by both proposal builders (the one-shot
- * finalize path and the in-loop {@link LiveVaultReview} path).
+ * paths contribute nothing, which is also how `trash`'s folder pathway is handled:
+ * a folder has no content to read, so `readContentOrNull` returns null for it and
+ * the folder trash carries no snapshot, exactly as it did under its own tool name.
+ * Shared by both proposal builders (the one-shot finalize path and the in-loop
+ * {@link LiveVaultReview} path).
  */
 export async function preReadTrashSnapshots(
   app: App,
@@ -26,7 +29,7 @@ export async function preReadTrashSnapshots(
 ): Promise<Map<string, string>> {
   const snapshots = new Map<string, string>();
   for (const tc of calls) {
-    if (tc.name === "trash_file" && typeof tc.arguments.path === "string") {
+    if (tc.name === "trash" && typeof tc.arguments.path === "string") {
       const content = await readContentOrNull(app, tc.arguments.path);
       if (content !== null) snapshots.set(normalizePath(tc.arguments.path), content);
     }

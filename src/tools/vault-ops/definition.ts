@@ -62,17 +62,22 @@ export const CREATE_DIRECTORY_TOOL: CanonicalToolDefinition = {
   },
 };
 
-export const MOVE_FILE_TOOL: CanonicalToolDefinition = {
-  name: "move_file",
+export const MOVE_TOOL: CanonicalToolDefinition = {
+  name: "move",
   description:
-    "Move or rename a note to a new vault-relative path. " +
-    "All wikilinks and backlinks to the note are rewritten automatically. " +
+    "Move or rename a note, or a whole folder with everything inside it, to a new vault-relative path. " +
+    "The path in `from` decides which: a note moves the note, a folder moves the folder and all its contents. " +
+    "All wikilinks and backlinks to the note, or to the notes inside the folder, are rewritten automatically. " +
+    "Move a folder to reorganize the vault a whole folder at a time, instead of moving notes one by one. " +
+    "A note's destination must stay an Obsidian document (.md or .canvas); a folder's destination carries no extension. " +
     "The change is shown to the user for review before it is applied.",
   strategyHint:
-    "move or rename a note; backlinks are rewritten automatically. Use to reorganize the vault.",
+    "move or rename a note, or a whole folder and its contents in one step; backlinks are rewritten " +
+    "automatically. Prefer the folder form over moving notes one by one to reorganize the vault.",
   errorGuidance:
     "If the destination already exists, choose a new name. " +
-    "The destination must stay an Obsidian document (.md or .canvas), a move cannot change a note into another file type. " +
+    "When the source is a note, the destination must stay an Obsidian document (.md or .canvas), a move " +
+    "cannot change a note into another file type; a folder destination carries no extension. " +
     "If the source does not exist, verify the path with list_directory or search_files.",
   annotations: { destructiveHint: true },
   parameters: {
@@ -80,45 +85,15 @@ export const MOVE_FILE_TOOL: CanonicalToolDefinition = {
     properties: {
       from: {
         type: "string",
-        description: "Current vault-relative path of the note (e.g., 'Inbox/Draft.md').",
+        description:
+          "Current vault-relative path of the note or folder to move " +
+          "(e.g., 'Inbox/Draft.md' or 'Drafts/Act II').",
       },
       to: {
         type: "string",
         description:
-          "Destination vault-relative path, must be an Obsidian document (.md or .canvas), " +
-          "e.g. 'Characters/Alice.md'. Missing parent folders are created automatically.",
-      },
-    },
-    required: ["from", "to"],
-  },
-};
-
-export const MOVE_FOLDER_TOOL: CanonicalToolDefinition = {
-  name: "move_folder",
-  description:
-    "Move or rename an entire folder, with everything inside it, to a new vault-relative path. " +
-    "All wikilinks and backlinks to the notes it contains are rewritten automatically. " +
-    "Use this to reorganize the vault a whole folder at a time, instead of moving notes one by one. " +
-    "The change is shown to the user for review before it is applied.",
-  strategyHint:
-    "move or rename a whole folder and its contents in one step; backlinks are rewritten automatically. " +
-    "Prefer it over moving notes one by one to reorganize the vault.",
-  errorGuidance:
-    "If the destination already exists, choose a new name. " +
-    "If the source is a single note rather than a folder, use move_file instead. " +
-    "If the source does not exist, verify the path with list_directory.",
-  annotations: { destructiveHint: true },
-  parameters: {
-    type: "object",
-    properties: {
-      from: {
-        type: "string",
-        description: "Current vault-relative path of the folder (e.g., 'Drafts/Act II').",
-      },
-      to: {
-        type: "string",
-        description:
-          "Destination vault-relative folder path (e.g., 'Manuscript/Act II'). " +
+          "Destination vault-relative path. For a note it must be an Obsidian document (.md or .canvas), " +
+          "e.g. 'Characters/Alice.md'; for a folder it is a plain folder path, e.g. 'Manuscript/Act II'. " +
           "Missing parent folders are created automatically.",
       },
     },
@@ -126,45 +101,24 @@ export const MOVE_FOLDER_TOOL: CanonicalToolDefinition = {
   },
 };
 
-export const TRASH_FILE_TOOL: CanonicalToolDefinition = {
-  name: "trash_file",
+export const TRASH_TOOL: CanonicalToolDefinition = {
+  name: "trash",
   description:
-    "Send a note to trash. Files only, folders are not accepted. " +
-    "Honors the user's deleted-files preference (system trash or .trash). " +
-    "The change is shown to the user for review before it is applied, and can be undone.",
-  strategyHint: "send a single note to trash (files only). Honors the user's deleted-files preference.",
-  errorGuidance:
-    "If the path is a folder, trash_file does not apply, it targets files only. " +
-    "If the note does not exist, verify the path first.",
-  annotations: { destructiveHint: true },
-  parameters: {
-    type: "object",
-    properties: {
-      path: {
-        type: "string",
-        description: "Vault-relative file path of the note to trash (e.g., 'Inbox/Obsolete.md').",
-      },
-    },
-    required: ["path"],
-  },
-};
-
-export const TRASH_FOLDER_TOOL: CanonicalToolDefinition = {
-  name: "trash_folder",
-  description:
-    "Send a folder to trash when it holds no notes. Empty subfolders inside it are removed along with " +
-    "it, so a whole husk of nested empty folders goes in a single call. A folder that still contains a " +
-    "note anywhere inside is refused, and the error lists the notes so you can clear them first. " +
-    "Use it to clean up the husk left behind after moving a folder's contents elsewhere. " +
+    "Send a note, or a folder that holds no notes, to trash. The path decides which. " +
+    "A folder is accepted only when no note lives anywhere inside it; its empty subfolders are removed " +
+    "along with it, so a whole husk of nested empty folders goes in a single call. A folder that still " +
+    "contains a note is refused, and the error lists the notes so you can clear them first. " +
+    "Use the folder form to clean up the husk left behind after moving a folder's contents elsewhere. " +
     "Honors the user's deleted-files preference (system trash or .trash). " +
     "The change is shown to the user for review before it is applied, and can be undone.",
   strategyHint:
-    "remove a folder that holds no notes (its empty subfolders go with it), e.g. the husk left after " +
-    "moving its notes out. Refused, with the blocking notes listed, if any note remains inside.",
+    "send a single note to trash, or remove a folder that holds no notes (its empty subfolders go with " +
+    "it), e.g. the husk left after moving its notes out. A folder is refused, with the blocking notes " +
+    "listed, if any note remains inside. Honors the user's deleted-files preference.",
   errorGuidance:
-    "If the folder still contains notes, the error lists them: move or trash those first, then trash the " +
+    "If a folder still contains notes, the error lists them: move or trash those first, then trash the " +
     "folder in one call (empty subfolders need not be removed one by one). " +
-    "If the path is a single note, use trash_file instead. If it does not exist, verify the path first.",
+    "If the path does not exist, verify it first.",
   annotations: { destructiveHint: true },
   parameters: {
     type: "object",
@@ -172,8 +126,9 @@ export const TRASH_FOLDER_TOOL: CanonicalToolDefinition = {
       path: {
         type: "string",
         description:
-          "Vault-relative path of the folder to trash (e.g., 'Drafts/Act II'). It must contain no notes, " +
-          "though empty subfolders inside it are fine and are removed with it.",
+          "Vault-relative path of the note or folder to trash (e.g., 'Inbox/Obsolete.md' or " +
+          "'Drafts/Act II'). A folder must contain no notes, though empty subfolders inside it are " +
+          "fine and are removed with it.",
       },
     },
     required: ["path"],
@@ -235,10 +190,8 @@ export const REPLACE_IN_VAULT_TOOL: CanonicalToolDefinition = {
 export const ALL_VAULT_OPS_TOOLS: CanonicalToolDefinition[] = [
   WRITE_FILE_TOOL,
   CREATE_DIRECTORY_TOOL,
-  MOVE_FILE_TOOL,
-  MOVE_FOLDER_TOOL,
-  TRASH_FILE_TOOL,
-  TRASH_FOLDER_TOOL,
+  MOVE_TOOL,
+  TRASH_TOOL,
   REPLACE_IN_VAULT_TOOL,
 ];
 
@@ -249,16 +202,17 @@ export const VAULT_OPS_TOOL_NAMES = new Set(ALL_VAULT_OPS_TOOLS.map((t) => t.nam
  * Policy classes each tool can resolve to. `write_file` maps to *two* classes,
  * it picks `create` or `overwrite` at apply time from whether the path exists
  * (ADR-0004), so it stays usable as long as either is allowed.
+ *
+ * `move` and `trash` resolve their operation kind from path state the same way, but
+ * land on a single class either way: the folder kinds gate as their file siblings
+ * (moveFolder→move, trashFolder→trash, see classOf), so denying "move" or "trash"
+ * detaches the whole tool, folder pathway included.
  */
 const TOOL_POLICY_CLASSES: Record<string, GatedVaultOpClass[]> = {
   write_file: ["create", "overwrite"],
   create_directory: ["createDir"],
-  move_file: ["move"],
-  trash_file: ["trash"],
-  // Folder ops reuse the file siblings' gate class (moveFolder→move, trashFolder→trash,
-  // see classOf), so denying "move"/"trash" detaches the folder tool too.
-  move_folder: ["move"],
-  trash_folder: ["trash"],
+  move: ["move"],
+  trash: ["trash"],
   // A vault-wide replace is gated as an overwrite (it rewrites file content), so it
   // stays available whenever overwrites are allowed, no separate policy knob.
   replace_in_vault: ["overwrite"],

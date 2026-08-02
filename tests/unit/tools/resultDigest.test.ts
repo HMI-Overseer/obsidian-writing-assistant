@@ -185,7 +185,7 @@ describe("formatResultDigest, the other discovery tools (same shape)", () => {
 
 describe("formatResultDigest, non-discovery tools get no digest", () => {
   it("returns undefined for path -> content and mutation tools", () => {
-    for (const name of ["read", "list_directory", "move_file", "edit"]) {
+    for (const name of ["read", "list_directory", "move", "edit"]) {
       expect(formatResultDigest(name, { path: "x.md" }, { content: "anything" })).toBeUndefined();
     }
   });
@@ -205,6 +205,25 @@ describe("formatResultDigest, non-discovery tools get no digest", () => {
         .toBeUndefined();
     }
   });
+
+  // The same question asked of the two gated merges. `move` and `trash` differ between
+  // their pathways only in the acknowledgement's verb, and nothing parses that string,
+  // so the answer is again "no consumer". The half of their result that *is* structured,
+  // the emitted VaultOperation, changes shape between pathways (a folder move carries no
+  // fingerprint, a folder trash no snapshot) and every reader of it switches on the
+  // typechecked `kind`, so tsc is that half's parser and no test can add to it.
+  it("neither pathway of move or trash reaches a pointer extractor", () => {
+    const results: Array<[string, Record<string, unknown>, string]> = [
+      ["move", { from: "A.md", to: "B.md" }, 'Move "A.md" → "B.md" queued for review.'],
+      ["move", { from: "A", to: "B" }, 'Move folder "A" → "B" queued for review.'],
+      ["trash", { path: "A.md" }, 'Trash "A.md" queued for review.'],
+      ["trash", { path: "A" }, 'Trash folder "A" queued for review.'],
+    ];
+    for (const [name, args, content] of results) {
+      expect(formatResultDigest(name, args, { content })).toBeUndefined();
+      expect(captureStepFields(name, args, { content }).resultDigest).toBeUndefined();
+    }
+  });
 });
 
 describe("captureStepFields", () => {
@@ -221,7 +240,7 @@ describe("captureStepFields", () => {
   it("captures each disposition value the review can return", () => {
     for (const disposition of ["applied", "declined", "failed", "auto-applied", "satisfied"] as const) {
       expect(
-        captureStepFields("move_file", { from: "a", to: "b" }, { content: "outcome text", disposition }),
+        captureStepFields("move", { from: "a", to: "b" }, { content: "outcome text", disposition }),
       ).toMatchObject({ disposition });
     }
   });
@@ -360,19 +379,19 @@ describe("formatStepReplayLine", () => {
 
   it("labels every disposition value the review can return", () => {
     const cases: Record<NonNullable<AgenticStep["disposition"]>, string> = {
-      applied: "[move_file: a, applied]",
-      "auto-applied": "[move_file: a, auto-applied]",
-      declined: "[move_file: a, DECLINED by user]",
-      failed: "[move_file: a, FAILED]",
-      satisfied: "[move_file: a, already satisfied]",
-      cancelled: "[move_file: a, CANCELLED before review]",
+      applied: "[move: a, applied]",
+      "auto-applied": "[move: a, auto-applied]",
+      declined: "[move: a, DECLINED by user]",
+      failed: "[move: a, FAILED]",
+      satisfied: "[move: a, already satisfied]",
+      cancelled: "[move: a, CANCELLED before review]",
     };
     for (const [disposition, expected] of Object.entries(cases)) {
       expect(
         formatStepReplayLine({
           type: "tool_call",
           round: 0,
-          toolName: "move_file",
+          toolName: "move",
           toolInput: "a",
           disposition: disposition as AgenticStep["disposition"],
         }),

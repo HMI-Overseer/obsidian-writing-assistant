@@ -125,21 +125,39 @@ describe("executeVaultOpTool", () => {
     });
   });
 
-  describe("move_file", () => {
-    it("acknowledges a valid move", () => {
+  // The acknowledgements below are asserted as whole strings, captured from the two
+  // predecessors before the merge rather than transcribed from their source. A merged
+  // tool that ran the right validator but described the wrong pathway would pass a
+  // `toContain("Move")` and fail here.
+  describe("move", () => {
+    it("acknowledges a note move exactly as the retired move_file did", () => {
       const app = makeApp({ "Inbox/Draft.md": "file" });
       const result = executeVaultOpTool(
-        call("move_file", { from: "Inbox/Draft.md", to: "Characters/Alice.md" }),
+        call("move", { from: "Inbox/Draft.md", to: "Characters/Alice.md" }),
         { app, overlay: NO_OVERLAY },
       );
-      expect(result.content).toContain("Move");
-      expect(result.content).toContain("Inbox/Draft.md");
+      expect(result.isError).toBeUndefined();
+      expect(result.content).toBe(
+        'Move "Inbox/Draft.md" → "Characters/Alice.md" queued for review.',
+      );
+    });
+
+    it("acknowledges a folder move exactly as the retired move_folder did", () => {
+      const app = makeApp({ "Drafts/Act II": "dir" });
+      const result = executeVaultOpTool(
+        call("move", { from: "Drafts/Act II", to: "Manuscript/Act II" }),
+        { app, overlay: NO_OVERLAY },
+      );
+      expect(result.isError).toBeUndefined();
+      expect(result.content).toBe(
+        'Move folder "Drafts/Act II" → "Manuscript/Act II" queued for review.',
+      );
     });
 
     it("errors when the destination already exists", () => {
       const app = makeApp({ "Inbox/Draft.md": "file", "Characters/Alice.md": "file" });
       const result = executeVaultOpTool(
-        call("move_file", { from: "Inbox/Draft.md", to: "Characters/Alice.md" }),
+        call("move", { from: "Inbox/Draft.md", to: "Characters/Alice.md" }),
         { app, overlay: NO_OVERLAY },
       );
       expect(result.isError).toBe(true);
@@ -149,86 +167,55 @@ describe("executeVaultOpTool", () => {
     it("errors when the source does not exist", () => {
       const app = makeApp({});
       const result = executeVaultOpTool(
-        call("move_file", { from: "Inbox/Draft.md", to: "Characters/Alice.md" }),
+        call("move", { from: "Inbox/Draft.md", to: "Characters/Alice.md" }),
         { app, overlay: NO_OVERLAY },
       );
       expect(result.isError).toBe(true);
-    });
-  });
-
-  describe("trash_file", () => {
-    it("acknowledges trashing a file", () => {
-      const app = makeApp({ "Inbox/Obsolete.md": "file" });
-      const result = executeVaultOpTool(call("trash_file", { path: "Inbox/Obsolete.md" }), {
-        app,
-        overlay: NO_OVERLAY,
-      });
-      expect(result.content).toContain("Trash");
-    });
-
-    it("rejects a folder (files only)", () => {
-      const app = makeApp({ Inbox: "dir" });
-      const result = executeVaultOpTool(call("trash_file", { path: "Inbox" }), {
-        app,
-        overlay: NO_OVERLAY,
-      });
-      expect(result.isError).toBe(true);
-      expect(result.content).toContain("files only");
-    });
-  });
-
-  describe("move_folder", () => {
-    it("acknowledges a valid folder move", () => {
-      const app = makeApp({ "Drafts/Act II": "dir" });
-      const result = executeVaultOpTool(
-        call("move_folder", { from: "Drafts/Act II", to: "Manuscript/Act II" }),
-        { app, overlay: NO_OVERLAY },
+      expect(result.content).toBe(
+        'Error: invalid move arguments, source "Inbox/Draft.md" does not exist.',
       );
-      expect(result.isError).toBeUndefined();
-      expect(result.content).toContain("Move folder");
-      expect(result.content).toContain("queued for review");
-    });
-
-    it("steers a file source to move_file", () => {
-      const app = makeApp({ "note.md": "file" });
-      const result = executeVaultOpTool(
-        call("move_folder", { from: "note.md", to: "Archive" }),
-        { app, overlay: NO_OVERLAY },
-      );
-      expect(result.isError).toBe(true);
-      expect(result.content).toContain("move_file");
     });
 
     it("refuses an escaping destination", () => {
       const app = makeApp({ A: "dir" });
-      const result = executeVaultOpTool(
-        call("move_folder", { from: "A", to: "../../escaped" }),
-        { app, overlay: NO_OVERLAY },
-      );
+      const result = executeVaultOpTool(call("move", { from: "A", to: "../../escaped" }), {
+        app,
+        overlay: NO_OVERLAY,
+      });
       expect(result.isError).toBe(true);
       expect(result.content).toContain("outside the vault");
     });
   });
 
-  describe("trash_folder", () => {
-    it("acknowledges trashing a folder", () => {
-      const app = makeApp({ "Drafts/Act II": "dir" });
-      const result = executeVaultOpTool(call("trash_folder", { path: "Drafts/Act II" }), {
+  describe("trash", () => {
+    it("acknowledges a note trash exactly as the retired trash_file did", () => {
+      const app = makeApp({ "Inbox/Obsolete.md": "file" });
+      const result = executeVaultOpTool(call("trash", { path: "Inbox/Obsolete.md" }), {
         app,
         overlay: NO_OVERLAY,
       });
       expect(result.isError).toBeUndefined();
-      expect(result.content).toContain("Trash folder");
+      expect(result.content).toBe('Trash "Inbox/Obsolete.md" queued for review.');
     });
 
-    it("steers a file path to trash_file", () => {
-      const app = makeApp({ "note.md": "file" });
-      const result = executeVaultOpTool(call("trash_folder", { path: "note.md" }), {
+    it("acknowledges a folder trash exactly as the retired trash_folder did", () => {
+      const app = makeApp({ "Drafts/Act II": "dir" });
+      const result = executeVaultOpTool(call("trash", { path: "Drafts/Act II" }), {
+        app,
+        overlay: NO_OVERLAY,
+      });
+      expect(result.isError).toBeUndefined();
+      expect(result.content).toBe('Trash folder "Drafts/Act II" queued for review.');
+    });
+
+    it("errors when the path does not exist", () => {
+      const app = makeApp({});
+      const result = executeVaultOpTool(call("trash", { path: "Gone.md" }), {
         app,
         overlay: NO_OVERLAY,
       });
       expect(result.isError).toBe(true);
-      expect(result.content).toContain("trash_file");
+      expect(result.content).toBe('Error: invalid trash arguments, "Gone.md" does not exist.');
     });
   });
 });
@@ -242,7 +229,7 @@ describe("buildPendingOverlay (intra-turn dependencies, spec section 4)", () => 
     expect(overlay.get("A.md")).toBe("file");
 
     // move A→B now validates against the overlay rather than failing "source not found".
-    const result = executeVaultOpTool(call("move_file", { from: "A.md", to: "B.md" }), {
+    const result = executeVaultOpTool(call("move", { from: "A.md", to: "B.md" }), {
       app,
       overlay,
     });
@@ -253,12 +240,12 @@ describe("buildPendingOverlay (intra-turn dependencies, spec section 4)", () => 
     const app = makeApp({});
     const overlay = buildPendingOverlay(app, [
       call("write_file", { path: "A.md", content: "x" }),
-      call("move_file", { from: "A.md", to: "B.md" }),
+      call("move", { from: "A.md", to: "B.md" }),
     ]);
     expect(overlay.get("A.md")).toBe("absent");
     expect(overlay.get("B.md")).toBe("file");
 
-    const result = executeVaultOpTool(call("move_file", { from: "B.md", to: "C.md" }), {
+    const result = executeVaultOpTool(call("move", { from: "B.md", to: "C.md" }), {
       app,
       overlay,
     });

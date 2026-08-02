@@ -638,7 +638,7 @@ export async function runToolLoop(
     // Vault-op calls execute in the loop AND accumulate for finalization, just
     // like edits. The pending overlay is seeded from vault ops accumulated in
     // PRIOR rounds, captured before this round's are appended, so a later
-    // round's move_file sees an earlier round's write_file.
+    // round's move sees an earlier round's write_file.
     const priorVaultOpCalls = allWriteToolCalls.filter((tc) => VAULT_OPS_TOOL_NAMES.has(tc.name));
     if (liveVaultOpCalls.length > 0) {
       allWriteToolCalls = [...allWriteToolCalls, ...liveVaultOpCalls];

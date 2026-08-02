@@ -332,7 +332,7 @@ describe("applyVaultOpBatch, folder ops", () => {
     expect(vault.files.get("Drafts/Act II/Scenes/One.md")?.content).toBe("precious words"); // ...contents safe.
   });
 
-  it("reorg end-to-end: a same-batch move empties the husk, then trash_folder removes it", async () => {
+  it("reorg end-to-end: a same-batch move empties the husk, then a folder trash removes it", async () => {
     const vault = makeVault();
     vault.folders.add("Drafts/Act II");
     const fp = vault.seedFile("Drafts/Act II/Scene.md", "body");

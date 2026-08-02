@@ -65,8 +65,8 @@ describe("display-metadata coverage", () => {
   // Every tool the timeline can render: vault ops + edit tools + read tools. Unlike
   // MUTATING_TOOL_NAMES, the four display maps below are hand-maintained, so a new
   // tool must be added to each by hand. These drift guards fail loudly when it isn't
-  // (the gap that left move_folder / trash_folder showing a raw tool name and the
-  // generic wrench icon; docs/review/reviews 2026-07-08-edit-tool-review-display F3).
+  // (the gap that left the retired folder ops showing a raw tool name and the generic
+  // wrench icon; docs/review/reviews 2026-07-08-edit-tool-review-display F3).
   const ALL_TOOL_NAMES = [
     ...VAULT_OPS_TOOL_NAMES,
     ...EDIT_TOOL_NAMES,
@@ -264,6 +264,63 @@ describe("retired tool names still render", () => {
           arguments: { path: "Book.md", headingPath: "Act I > Chapter 1" },
         }),
       ).toBe("Book.md > Act I > Chapter 1");
+    }
+  });
+
+  // The gated merges, where a retired display row is at its most load-bearing: both of
+  // each pair's labels are distinct sentences from the merged tool's, so a saved turn
+  // without these rows would lose the file/folder distinction entirely and fall to the
+  // raw name and the generic wrench beside it.
+  test("the four retired write siblings keep the label and icon they were recorded under", () => {
+    expect(toolLabel("move_file")).toBe("Moved file");
+    expect(toolIcon("move_file")).toBe("file-symlink");
+    expect(toolLabel("move_folder")).toBe("Moved folder");
+    expect(toolIcon("move_folder")).toBe("folder-symlink");
+    expect(toolLabel("trash_file")).toBe("Trashed file");
+    expect(toolIcon("trash_file")).toBe("trash-2");
+    expect(toolLabel("trash_folder")).toBe("Trashed folder");
+    expect(toolIcon("trash_folder")).toBe("folder-x");
+  });
+
+  test("a merged write tool's retired names keep their own wording", () => {
+    for (const name of ["move_file", "move_folder"]) {
+      expect(VAULT_OPS_TOOL_NAMES.has(name)).toBe(false);
+      expect(toolLabel(name)).not.toBe(name);
+      expect(toolLabel(name)).not.toBe(TOOL_LABELS.move);
+    }
+    for (const name of ["trash_file", "trash_folder"]) {
+      expect(VAULT_OPS_TOOL_NAMES.has(name)).toBe(false);
+      expect(toolLabel(name)).not.toBe(name);
+      expect(toolLabel(name)).not.toBe(TOOL_LABELS.trash);
+    }
+  });
+
+  // A retired *mutating* name reaches the pending row too, through pendingToolLabel's
+  // fallback chain. Without the retired entry it would read the raw tool name beside a
+  // live approve button; with it, it reads the past-tense label, which is correct for a
+  // saved turn because that turn is over.
+  test("a retired write name has no pending label of its own and falls to its retired one", () => {
+    for (const name of ["move_file", "move_folder", "trash_file", "trash_folder"]) {
+      expect(TOOL_PENDING_LABELS[name]).toBeUndefined();
+      expect(pendingToolLabel(name)).toBe(toolLabel(name));
+      expect(pendingToolLabel(name)).not.toBe(name);
+    }
+  });
+
+  test("a saved call to a retired write sibling still shows its target as the detail line", () => {
+    expect(
+      extractToolInput({ name: "move_file", arguments: { from: "A.md", to: "B.md" } }),
+      "extractToolInput lost the retired case for \"move_file\"",
+    ).toBe("A.md → B.md");
+    expect(
+      extractToolInput({ name: "move_folder", arguments: { from: "A", to: "B" } }),
+      "extractToolInput lost the retired case for \"move_folder\"",
+    ).toBe("A → B");
+    for (const name of ["trash_file", "trash_folder"]) {
+      expect(
+        extractToolInput({ name, arguments: { path: "Inbox/Obsolete.md" } }),
+        `extractToolInput lost the retired case for "${name}"`,
+      ).toBe("Inbox/Obsolete.md");
     }
   });
 

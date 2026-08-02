@@ -28,10 +28,8 @@ export const TOOL_ICONS: Record<string, string> = {
   update_frontmatter: "file-code-2",
   write_file: "file-plus",
   create_directory: "folder-plus",
-  move_file: "file-symlink",
-  move_folder: "folder-symlink",
-  trash_file: "trash-2",
-  trash_folder: "folder-x",
+  move: "file-symlink",
+  trash: "trash-2",
   replace_in_vault: "replace",
   think: "brain",
   recall_memory: "brain",
@@ -56,10 +54,8 @@ export const TOOL_LABELS: Record<string, string> = {
   update_frontmatter: "Updated frontmatter",
   write_file: "Wrote file",
   create_directory: "Created folder",
-  move_file: "Moved file",
-  move_folder: "Moved folder",
-  trash_file: "Trashed file",
-  trash_folder: "Trashed folder",
+  move: "Moved",
+  trash: "Trashed",
   replace_in_vault: "Replaced across notes",
   think: "Thought",
   recall_memory: "Recalled memory",
@@ -85,6 +81,10 @@ const RETIRED_TOOL_DISPLAY: Record<string, { icon: string; label: string }> = {
   get_outgoing_links: { icon: "external-link", label: "Found outgoing links" },
   read_file: { icon: "file-text", label: "Read note" },
   read_section: { icon: "text-select", label: "Read section" },
+  move_file: { icon: "file-symlink", label: "Moved file" },
+  move_folder: { icon: "folder-symlink", label: "Moved folder" },
+  trash_file: { icon: "trash-2", label: "Trashed file" },
+  trash_folder: { icon: "folder-x", label: "Trashed folder" },
 };
 
 /** Icon for a recorded tool call, including one naming a retired tool. */
@@ -110,10 +110,8 @@ export function toolLabel(toolName: string): string {
 export const TOOL_PENDING_LABELS: Record<string, string> = {
   write_file: "Write file",
   create_directory: "Create folder",
-  move_file: "Move file",
-  move_folder: "Move folder",
-  trash_file: "Trash file",
-  trash_folder: "Trash folder",
+  move: "Move",
+  trash: "Trash",
   replace_in_vault: "Replace across notes",
   add_memory: "Add memory",
   forget_memory: "Forget memory",
@@ -129,7 +127,8 @@ export function pendingToolLabel(toolName: string): string {
  * The tool name behind each converted operation kind, used to label a vault-op row that
  * has no matched timeline step of its own ({@link ../chat/messages/vaultReviewTimeline}).
  * Two kinds share one tool wherever the tool resolves its kind from path state
- * (`write_file` picks create/overwrite, ADR-0004).
+ * (`write_file` picks create/overwrite, ADR-0004; `move` and `trash` pick their file or
+ * folder kind the same way, RFC-0015), so this map is many-to-one in three places.
  *
  * The *keys* are typechecked against {@link VaultOperation}; the *values* are tool-name
  * strings nothing checks, so they live here beside the maps they index into rather than
@@ -139,10 +138,10 @@ export const TOOL_NAME_BY_OP_KIND: Record<VaultOperation["kind"], string> = {
   create: "write_file",
   overwrite: "write_file",
   createDir: "create_directory",
-  move: "move_file",
-  trash: "trash_file",
-  moveFolder: "move_folder",
-  trashFolder: "trash_folder",
+  move: "move",
+  trash: "trash",
+  moveFolder: "move",
+  trashFolder: "trash",
   replaceInVault: "replace_in_vault",
 };
 
@@ -171,10 +170,8 @@ export const TOOL_STATUS_LABELS: Record<string, string> = {
   update_frontmatter: "Updating frontmatter...",
   write_file: "Writing file...",
   create_directory: "Creating folder...",
-  move_file: "Moving file...",
-  move_folder: "Moving folder...",
-  trash_file: "Trashing file...",
-  trash_folder: "Trashing folder...",
+  move: "Moving...",
+  trash: "Trashing...",
   replace_in_vault: "Replacing text...",
   think: "Thinking...",
   recall_memory: "Recalling memory...",
@@ -244,11 +241,13 @@ export function extractToolInput(
     case "create_directory": return typeof args.path === "string" ? args.path : undefined;
     case "move_file":
     case "move_folder":
+    case "move":
       return typeof args.from === "string" && typeof args.to === "string"
         ? `${args.from} → ${args.to}`
         : undefined;
-    case "trash_file": return typeof args.path === "string" ? args.path : undefined;
-    case "trash_folder": return typeof args.path === "string" ? args.path : undefined;
+    case "trash_file":
+    case "trash_folder":
+    case "trash": return typeof args.path === "string" ? args.path : undefined;
     case "replace_in_vault":
       return typeof args.search === "string" && typeof args.replace === "string"
         ? `"${args.search}" → "${args.replace}"`

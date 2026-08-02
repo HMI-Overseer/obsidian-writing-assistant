@@ -44,19 +44,21 @@ export type CreateDirectoryResult =
   | ValidationOk<CreateDirectoryArgs>
   | { ok: true; satisfied: true; path: string; message: string }
   | ValidationErr;
-export interface MoveFileArgs {
+export interface MoveArgs {
   from: string;
   to: string;
+  /**
+   * What `from` turned out to be. `move` covers a note and a folder alike and
+   * dispatches on the probed state of its source (RFC-0015), so the branch is
+   * resolved once, here, rather than by each caller probing again and risking a
+   * different answer. The caller emits `moveFolder` for true and `move` for false.
+   */
+  isFolder: boolean;
 }
-export interface TrashFileArgs {
+export interface TrashArgs {
   path: string;
-}
-export interface MoveFolderArgs {
-  from: string;
-  to: string;
-}
-export interface TrashFolderArgs {
-  path: string;
+  /** What `path` turned out to be; see {@link MoveArgs.isFolder}. `trashFolder` for true. */
+  isFolder: boolean;
 }
 export interface ReplaceInVaultArgs {
   search: string;
@@ -117,11 +119,22 @@ export function validateCreateDirectory(
   return ok({ path: args.path });
 }
 
-export function validateMoveFile(
+/**
+ * `move` covers a note and a whole folder, so the checks its two pathways share run
+ * first and the source's probed state then picks the branch (RFC-0015; the same
+ * dispatch-on-path-state pattern `write_file` uses for create/overwrite, ADR-0004).
+ * The model never picks a pathway, so there is no wrong sibling to refuse.
+ *
+ * Ordering note: the source is resolved *before* the destination's file type is
+ * judged, because only a note's destination is type-constrained. A move from a
+ * nonexistent source therefore reports the missing source rather than the
+ * destination's type, which is the more useful of the two.
+ */
+export function validateMove(
   args: Record<string, unknown>,
   resolve: ResolvePath,
   configDir: string,
-): ValidationResult<MoveFileArgs> {
+): ValidationResult<MoveArgs> {
   if (typeof args.from !== "string" || args.from.trim() === "") {
     return err("from must be a non-empty string.");
   }
@@ -132,77 +145,27 @@ export function validateMoveFile(
   if (escapesVault(args.to)) return err(outsideVaultMessage(args.to));
   // Refuse a move *into* the config subtree (the destination is the write target),
   // the same defense-in-depth guard as write_file. The source is intentionally not
-  // guarded: it must already exist as a vault file, and relocating one out of the
-  // config dir is not a write into it.
+  // guarded: it must already exist in the vault, and relocating it out of the config
+  // dir is not a write into it.
   if (isReservedConfigPath(args.to, configDir)) return err(reservedConfigMessage(args.to, configDir));
-  // Hold the write_file allowlist on the destination too, so a move can't launder a
-  // blessed file (note.md) into a forbidden type (note.bat), the same invariant,
-  // enforced at every door a model can introduce an extension. Only the destination
-  // is constrained; the source already exists in the vault.
-  if (!hasWritableExtension(args.to)) return err(unsupportedTypeMessage(args.to));
-  if (args.from === args.to) {
-    return err("from and to are the same path, nothing to move.");
-  }
-  if (resolve(args.from) === "absent") {
-    return err(`source "${args.from}" does not exist.`);
-  }
-  if (resolve(args.to) !== "absent") {
-    return err(`destination "${args.to}" already exists, choose a new name.`);
-  }
-  return ok({ from: args.from, to: args.to });
-}
-
-export function validateMoveFolder(
-  args: Record<string, unknown>,
-  resolve: ResolvePath,
-  configDir: string,
-): ValidationResult<MoveFolderArgs> {
-  if (typeof args.from !== "string" || args.from.trim() === "") {
-    return err("from must be a non-empty string.");
-  }
-  if (typeof args.to !== "string" || args.to.trim() === "") {
-    return err("to must be a non-empty string.");
-  }
-  if (escapesVault(args.from)) return err(outsideVaultMessage(args.from));
-  if (escapesVault(args.to)) return err(outsideVaultMessage(args.to));
-  // Refuse a move *into* the config subtree (the destination is the write target), the
-  // same defense-in-depth guard as move_file. The source is not guarded: relocating a
-  // folder out of the config dir is not a write into it.
-  if (isReservedConfigPath(args.to, configDir)) return err(reservedConfigMessage(args.to, configDir));
-  // No document-extension allowlist here: a folder has no extension. The vault-boundary
-  // and reserved-config guards above are what keep a folder move in bounds.
   if (args.from === args.to) {
     return err("from and to are the same path, nothing to move.");
   }
   const fromState = resolve(args.from);
-  if (fromState === "absent") return err(`source folder "${args.from}" does not exist.`);
-  if (fromState === "file") {
-    return err(`"${args.from}" is a file, use move_file to move a note.`);
+  if (fromState === "absent") return err(`source "${args.from}" does not exist.`);
+  // Note pathway only. Hold the write_file allowlist on the destination, so a move can't
+  // launder a blessed file (note.md) into a forbidden type (note.bat), the same invariant,
+  // enforced at every door a model can introduce an extension. A folder has no extension,
+  // so the folder pathway has nothing to hold, and the branch is decided by the probe
+  // rather than by an argument, so the model cannot talk its way onto the wrong side.
+  // Only the destination is constrained; the source already exists in the vault.
+  if (fromState === "file" && !hasWritableExtension(args.to)) {
+    return err(unsupportedTypeMessage(args.to));
   }
   if (resolve(args.to) !== "absent") {
     return err(`destination "${args.to}" already exists, choose a new name.`);
   }
-  return ok({ from: args.from, to: args.to });
-}
-
-export function validateTrashFolder(
-  args: Record<string, unknown>,
-  resolve: ResolvePath,
-): ValidationResult<TrashFolderArgs> {
-  if (typeof args.path !== "string" || args.path.trim() === "") {
-    return err("path must be a non-empty string.");
-  }
-  if (escapesVault(args.path)) return err(outsideVaultMessage(args.path));
-  const state = resolve(args.path);
-  if (state === "absent") return err(`"${args.path}" does not exist.`);
-  if (state === "file") {
-    return err(`"${args.path}" is a file, use trash_file to trash a note.`);
-  }
-  // The files-safe check is *not* done here (this validator sees only path state, not the
-  // folder's children): the "no notes inside" guarantee is enforced authoritatively at
-  // apply via collectFolderSubtree (ADR-0012), after any same-batch moves have emptied the
-  // husk, and its refusal lists the blocking notes.
-  return ok({ path: args.path });
+  return ok({ from: args.from, to: args.to, isFolder: fromState === "dir" });
 }
 
 export function validateReplaceInVault(
@@ -237,10 +200,16 @@ export function validateReplaceInVault(
   });
 }
 
-export function validateTrashFile(
+/**
+ * `trash` covers a note and an empty folder husk, dispatching on the probed state of
+ * its target ({@link validateMove}). Resolving the target strictly is load-bearing for
+ * safety here, not a convenience: a destructive op must land on exactly what the path
+ * turns out to be, never on something the argument merely resembles (RFC-0015).
+ */
+export function validateTrash(
   args: Record<string, unknown>,
   resolve: ResolvePath,
-): ValidationResult<TrashFileArgs> {
+): ValidationResult<TrashArgs> {
   if (typeof args.path !== "string" || args.path.trim() === "") {
     return err("path must be a non-empty string.");
   }
@@ -249,9 +218,9 @@ export function validateTrashFile(
   if (state === "absent") {
     return err(`"${args.path}" does not exist.`);
   }
-  if (state === "dir") {
-    // Files-only in v1, folder removal is too blunt for an agent.
-    return err(`"${args.path}" is a folder, trash_file targets files only.`);
-  }
-  return ok({ path: args.path });
+  // The folder pathway's files-safe check is *not* done here (this validator sees only
+  // path state, not the folder's children): the "no notes inside" guarantee is enforced
+  // authoritatively at apply via collectFolderSubtree (ADR-0012), after any same-batch
+  // moves have emptied the husk, and its refusal lists the blocking notes.
+  return ok({ path: args.path, isFolder: state === "dir" });
 }

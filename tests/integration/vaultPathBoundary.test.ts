@@ -329,7 +329,7 @@ describe("vault path-boundary, real-filesystem resolution (section 6.1)", () => 
 });
 
 describe("folder ops, real-filesystem resolution (section 6.1)", () => {
-  it("refuses an escaping move_folder destination without moving the folder out of the vault", async () => {
+  it("refuses an escaping folder-move destination without moving the folder out of the vault", async () => {
     const app = makeRealFsApp(vaultRoot);
     fs.mkdirSync(nodePath.join(vaultRoot, "Drafts", "Act II"), { recursive: true });
     fs.writeFileSync(nodePath.join(vaultRoot, "Drafts", "Act II", "Scene.md"), "body");
@@ -364,7 +364,7 @@ describe("folder ops, real-filesystem resolution (section 6.1)", () => {
     expect(fs.existsSync(nodePath.join(vaultRoot, "Drafts", "Act II"))).toBe(false);
   });
 
-  it("trash_folder removes a husk of empty subfolders but refuses one with a nested note (files-safe, real disk)", async () => {
+  it("a folder trash removes a husk of empty subfolders but refuses one with a nested note (files-safe, real disk)", async () => {
     const app = makeRealFsApp(vaultRoot);
     // A husk whose only contents are nested empty subfolders (no notes anywhere).
     fs.mkdirSync(nodePath.join(vaultRoot, "Husk", "Dialogues"), { recursive: true });
@@ -563,7 +563,7 @@ describe("smart-quote path resolution, real filesystem", () => {
     expect(app.vault.getFileByPath(normalized.arguments.path as string)).not.toBeNull();
   });
 
-  it("snaps a move_file source and moves the real curly-quoted file on disk", async () => {
+  it("snaps a move source and moves the real curly-quoted file on disk", async () => {
     const app = makeRealFsApp(vaultRoot);
     fs.mkdirSync(nodePath.join(vaultRoot, "Lore"), { recursive: true });
     const realName = `The Sovereign${CURLY}s Halo.md`;
@@ -572,7 +572,7 @@ describe("smart-quote path resolution, real filesystem", () => {
 
     const call: ToolCall = {
       id: "m",
-      name: "move_file",
+      name: "move",
       arguments: { from: "Lore/The Sovereign's Halo.md", to: "Lore/Renamed.md" },
     };
     const normalized = normalizeVaultToolCall(app, call);

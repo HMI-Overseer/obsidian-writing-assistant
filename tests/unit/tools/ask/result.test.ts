@@ -125,7 +125,7 @@ describe("ask_user corrective failures", () => {
     const failures = [
       askRepeatedFailure(),
       askConcurrentFailure(),
-      askSkippedSiblingFailure("move_file"),
+      askSkippedSiblingFailure("move"),
       askCancellationFailure("stopped"),
     ];
     for (const result of failures) {
@@ -133,7 +133,7 @@ describe("ask_user corrective failures", () => {
       expect(result.isReadOnly).toBe(true);
       expect(result.isError).toBe(true);
     }
-    expect(failures[2].content).toContain("move_file");
+    expect(failures[2].content).toContain("move");
     expect(failures[3].content).toContain("stopped");
   });
 });

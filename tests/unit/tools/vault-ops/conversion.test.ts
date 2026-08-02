@@ -44,17 +44,22 @@ describe("toVaultOperations", () => {
     expect(ops).toEqual([{ kind: "overwrite", path: "a.md", content: "hi", expect: FP }]);
   });
 
-  test("move_file captures the source fingerprint", () => {
+  // `move` and `trash` each emit one of two kinds, chosen from the probed state of
+  // their target (RFC-0015), the same dispatch write_file uses for create/overwrite.
+  // The four assertions below are the four branches, and the kind is what proves which
+  // one ran: they are named `move`/`trash` for the file branch and `moveFolder`/
+  // `trashFolder` for the folder branch, and the fingerprint/snapshot payloads differ.
+  test("move on a note → move, capturing the source fingerprint", () => {
     const { ops } = toVaultOperations(
-      [call("move_file", { from: "a.md", to: "b.md" })],
+      [call("move", { from: "a.md", to: "b.md" })],
       probes({ "a.md": "file" }),
     );
     expect(ops).toEqual([{ kind: "move", from: "a.md", to: "b.md", expect: FP }]);
   });
 
-  test("trash_file captures fingerprint and content snapshot", () => {
+  test("trash on a note → trash, capturing fingerprint and content snapshot", () => {
     const { ops } = toVaultOperations(
-      [call("trash_file", { path: "a.md" })],
+      [call("trash", { path: "a.md" })],
       probes({ "a.md": "file" }, { "a.md": "body" }),
     );
     expect(ops).toEqual([{ kind: "trash", path: "a.md", expect: FP, snapshot: "body" }]);
@@ -65,32 +70,31 @@ describe("toVaultOperations", () => {
     expect(ops).toEqual([{ kind: "createDir", path: "Dir" }]);
   });
 
-  test("move_folder → moveFolder, no fingerprint (existence guard)", () => {
+  test("move on a folder → moveFolder, no fingerprint (existence guard)", () => {
     const { ops, errors } = toVaultOperations(
-      [call("move_folder", { from: "Drafts/Act II", to: "Manuscript/Act II" })],
+      [call("move", { from: "Drafts/Act II", to: "Manuscript/Act II" })],
       probes({ "Drafts/Act II": "dir" }),
     );
     expect(errors).toHaveLength(0);
     expect(ops).toEqual([{ kind: "moveFolder", from: "Drafts/Act II", to: "Manuscript/Act II" }]);
   });
 
-  test("trash_folder → trashFolder, no snapshot (empty-only, inverse is createDir)", () => {
+  test("trash on a folder → trashFolder, no snapshot (empty-only, inverse is createDir)", () => {
     const { ops, errors } = toVaultOperations(
-      [call("trash_folder", { path: "Drafts/Act II" })],
+      [call("trash", { path: "Drafts/Act II" })],
       probes({ "Drafts/Act II": "dir" }),
     );
     expect(errors).toHaveLength(0);
     expect(ops).toEqual([{ kind: "trashFolder", path: "Drafts/Act II" }]);
   });
 
-  test("a move_folder whose source is a file is an error, not an op (steers to move_file)", () => {
-    const { ops, errors } = toVaultOperations(
-      [call("move_folder", { from: "note.md", to: "Archive" })],
-      probes({ "note.md": "file" }),
-    );
-    expect(ops).toHaveLength(0);
-    expect(errors).toHaveLength(1);
-    expect(errors[0].error).toContain("move_file");
+  test("the same arguments emit opposite kinds when the probe disagrees", () => {
+    // The dispatch stated once, with the probe as the only variable. A folder trash that
+    // captured a snapshot, or a note move that skipped its fingerprint, would show here.
+    const asFile = toVaultOperations([call("trash", { path: "X" })], probes({ X: "file" }, { X: "b" }));
+    const asFolder = toVaultOperations([call("trash", { path: "X" })], probes({ X: "dir" }, { X: "b" }));
+    expect(asFile.ops).toEqual([{ kind: "trash", path: "X", expect: FP, snapshot: "b" }]);
+    expect(asFolder.ops).toEqual([{ kind: "trashFolder", path: "X" }]);
   });
 
   test("create_directory on an existing folder → flagged no-op, no error (idempotent)", () => {
@@ -107,12 +111,13 @@ describe("toVaultOperations", () => {
 
   test("validation failures become self-correcting errors, not ops", () => {
     const { ops, errors } = toVaultOperations(
-      [call("move_file", { from: "missing.md", to: "b.md" })],
+      [call("move", { from: "missing.md", to: "b.md" })],
       probes(),
     );
     expect(ops).toHaveLength(0);
     expect(errors).toHaveLength(1);
-    expect(errors[0].toolName).toBe("move_file");
+    expect(errors[0].toolName).toBe("move");
+    expect(errors[0].error).toBe('source "missing.md" does not exist.');
   });
 
   test("unknown tool name is an error", () => {
@@ -188,7 +193,7 @@ describe("toVaultOperations", () => {
     const { ops, sources } = toVaultOperations(
       [
         call("write_file", { path: "a.md", content: "x" }, "t1"),
-        call("move_file", { from: "missing.md", to: "b.md" }, "t2"),
+        call("move", { from: "missing.md", to: "b.md" }, "t2"),
         call("create_directory", { path: "Dir" }, "t3"),
       ],
       probes(),

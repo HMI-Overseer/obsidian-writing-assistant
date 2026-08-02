@@ -34,7 +34,7 @@ ${strategyLines}
 ## Guidance
 - To change part of an existing note, prefer edit. Reach for write_file only to create a new note or replace one wholesale.
 - To rename a term, character, or place everywhere it appears, use replace_in_vault in a single call; there is no separate rename_in_vault tool. Its scope narrows all the way down: pass a folder, or a single note path, to limit it, or omit the scope to cover the whole vault. Never rewrite whole notes with write_file, or edit them one at a time, just to swap a recurring term.
-- Renaming a note in full usually takes two tools together: move_file renames the note file itself and rewrites every [[wikilink]] to it, while replace_in_vault catches the plain-prose mentions of the old name in other notes. Pair them when the user renames something that is both a note title and a recurring word.
+- Renaming a note in full usually takes two tools together: move renames the note file itself and rewrites every [[wikilink]] to it, while replace_in_vault catches the plain-prose mentions of the old name in other notes. Pair them when the user renames something that is both a note title and a recurring word.
 - Always provide the complete file content for write_file, it replaces the file entirely, so partial content discards the rest.
 - The review panel already shows every queued operation as a folder/file tree the user can inspect, so don't redraw it: skip ASCII diagrams or bullet lists that re-list the paths. Explain intent and trade-offs in prose instead.${errorSection}`;
 }

@@ -32,10 +32,8 @@ const EDIT_NAMES = ["edit", "insert_into_note", "update_frontmatter"];
 const VAULT_OP_NAMES = [
   "write_file",
   "create_directory",
-  "move_file",
-  "move_folder",
-  "trash_file",
-  "trash_folder",
+  "move",
+  "trash",
   "replace_in_vault",
 ];
 
@@ -79,9 +77,9 @@ describe("resolveWriteTools (the single-source write gate)", () => {
   it("drops a deny-classed vault-op (ask posture)", () => {
     const policy: VaultOpPolicy = { ...DEFAULT_VAULT_OP_POLICY, trash: "deny" };
     const got = names(resolveWriteTools(opts({ policy })));
-    expect(got).not.toContain("trash_file");
-    expect(got).not.toContain("trash_folder");
-    expect(got).toContain("move_file");
+    // Denying the class removes the whole tool, both pathways with it.
+    expect(got).not.toContain("trash");
+    expect(got).toContain("move");
   });
 
   it("read-only is a deny-all policy: no writes offered (ask posture)", () => {
@@ -424,10 +422,9 @@ describe("anthropicLayer2ToolSet (the direct-API L2 emission)", () => {
     // absent from it entirely (ADR-0009 open seam), not merely refused at execution.
     const policy: VaultOpPolicy = { ...DEFAULT_VAULT_OP_POLICY, trash: "deny" };
     const got = names(anthropicLayer2ToolSet(opts({ policy })));
-    expect(got).not.toContain("trash_file");
-    expect(got).not.toContain("trash_folder");
+    expect(got).not.toContain("trash");
     // A non-denied write is still present (and will be deferred at the wire layer).
-    expect(got).toContain("move_file");
+    expect(got).toContain("move");
   });
 
   it("read-only (deny-all policy) emits core reads + think + tail reads, no writes", () => {

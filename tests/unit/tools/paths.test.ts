@@ -208,10 +208,10 @@ describe("normalizeVaultToolCall", () => {
     ]);
   });
 
-  it("rewrites both endpoints of a move_file", () => {
+  it("rewrites both endpoints of a move", () => {
     const call: ToolCall = {
       id: "2",
-      name: "move_file",
+      name: "move",
       arguments: {
         from: "D:\\vault\\ExampleVault\\Inbox\\Draft.md",
         to: "D:\\vault\\ExampleVault\\Characters\\Alice.md",
@@ -297,10 +297,10 @@ describe("normalizeVaultToolCall confusable snapping (existing-file keys only)",
     `Lore/Anno${CURLY}s Crucible.md`,
   ]);
 
-  it("snaps move_file `from` to the on-disk curly name but leaves `to` (a destination) alone", () => {
+  it("snaps move `from` to the on-disk curly name but leaves `to` (a destination) alone", () => {
     const call: ToolCall = {
       id: "m",
-      name: "move_file",
+      name: "move",
       arguments: { from: "Lore/The Sovereign's Halo.md", to: "Archive/The Sovereign's Halo.md" },
     };
     const out = normalizeVaultToolCall(app, call);
@@ -391,6 +391,6 @@ describe("SNAP_TOOL_KEYS drift guard", () => {
     expect(SNAP_TOOL_KEYS.write_file).toBeUndefined();
     expect(SNAP_TOOL_KEYS.create_directory).toBeUndefined();
     expect(SNAP_TOOL_KEYS.replace_in_vault).toBeUndefined();
-    expect(SNAP_TOOL_KEYS.move_file).not.toContain("to");
+    expect(SNAP_TOOL_KEYS.move).not.toContain("to");
   });
 });

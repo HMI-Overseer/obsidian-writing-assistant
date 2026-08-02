@@ -29,7 +29,7 @@ const PATH_ARRAY_ARG_KEYS = ["paths"] as const;
  * Per-tool path-arg keys whose value must reference an *existing* file, so a
  * confusable-punctuation mismatch may be snapped to the real on-disk path
  * ({@link snapToExistingFile}). Deliberately excludes write destinations
- * (`write_file.path`, `move_file.to`, `create_directory.path`, `replace_in_vault.path`):
+ * (`write_file.path`, `move.to`, `create_directory.path`, `replace_in_vault.path`):
  * those are meant to be absent, and snapping one could silently retarget a new file
  * onto an existing note. Read/source/edit-target keys only.
  *
@@ -41,12 +41,12 @@ export const SNAP_TOOL_KEYS: Record<string, readonly string[]> = {
   read: ["path"],
   get_outline: ["path"],
   get_links: ["path"],
-  trash_file: ["path"],
+  trash: ["path"],
   edit: ["path"],
   insert_into_note: ["path"],
   update_frontmatter: ["path"],
   get_frontmatter: ["paths"],
-  move_file: ["from"],
+  move: ["from"],
 };
 
 /**

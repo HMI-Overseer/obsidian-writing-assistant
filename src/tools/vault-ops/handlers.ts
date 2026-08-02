@@ -8,11 +8,9 @@ import { buildOverlay, makeResolver, type PendingOverlay } from "./overlay";
 import { toVaultOperations, type ConversionProbes } from "./conversion";
 import {
   validateCreateDirectory,
-  validateMoveFile,
-  validateMoveFolder,
+  validateMove,
   validateReplaceInVault,
-  validateTrashFile,
-  validateTrashFolder,
+  validateTrash,
   validateWriteFile,
 } from "./validation";
 
@@ -43,6 +41,8 @@ export function executeVaultOpTool(call: ToolCall, ctx: VaultOpContext): ToolRes
   const resolve = makeResolver(ctx.overlay, (path) => diskState(ctx.app, path));
   const configDir = ctx.app.vault.configDir;
 
+  // Every `case` below is a **tool name**, never a `VaultOperation["kind"]`, though
+  // `move` and `trash` are spelled the same in both vocabularies.
   switch (call.name) {
     case "write_file": {
       const v = validateWriteFile(call.arguments, resolve, configDir);
@@ -58,25 +58,17 @@ export function executeVaultOpTool(call: ToolCall, ctx: VaultOpContext): ToolRes
       if ("satisfied" in v) return { content: v.message, isReadOnly: false };
       return queued(`New folder "${v.args.path}"`);
     }
-    case "move_file": {
-      const v = validateMoveFile(call.arguments, resolve, configDir);
-      if (!v.ok) return fail("move_file", v.error);
-      return queued(`Move "${v.args.from}" → "${v.args.to}"`);
+    case "move": {
+      const v = validateMove(call.arguments, resolve, configDir);
+      if (!v.ok) return fail("move", v.error);
+      const verb = v.args.isFolder ? "Move folder" : "Move";
+      return queued(`${verb} "${v.args.from}" → "${v.args.to}"`);
     }
-    case "trash_file": {
-      const v = validateTrashFile(call.arguments, resolve);
-      if (!v.ok) return fail("trash_file", v.error);
-      return queued(`Trash "${v.args.path}"`);
-    }
-    case "move_folder": {
-      const v = validateMoveFolder(call.arguments, resolve, configDir);
-      if (!v.ok) return fail("move_folder", v.error);
-      return queued(`Move folder "${v.args.from}" → "${v.args.to}"`);
-    }
-    case "trash_folder": {
-      const v = validateTrashFolder(call.arguments, resolve);
-      if (!v.ok) return fail("trash_folder", v.error);
-      return queued(`Trash folder "${v.args.path}"`);
+    case "trash": {
+      const v = validateTrash(call.arguments, resolve);
+      if (!v.ok) return fail("trash", v.error);
+      const verb = v.args.isFolder ? "Trash folder" : "Trash";
+      return queued(`${verb} "${v.args.path}"`);
     }
     case "replace_in_vault": {
       // Validate + acknowledge only; the scan (which files, how many matches) runs at
@@ -103,7 +95,7 @@ function unknownVaultOpTool(name: string): ToolResult {
 
 /**
  * Build the per-turn pending overlay from vault-op calls accumulated
- * in prior rounds, so a later round's `move_file A→B` sees an earlier round's
+ * in prior rounds, so a later round's `move A→B` sees an earlier round's
  * `write_file A`. Calls are converted progressively, each against the overlay
  * built from the ops before it, so dependent ops chain correctly.
  */

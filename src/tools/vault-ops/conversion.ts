@@ -1,21 +1,20 @@
 /**
  * Convert vault-op tool calls into VaultOperations.
  *
- * `write_file` resolves to `create` or `overwrite` from path existence, the
- * model never sets a flag. Destructive ops capture their TargetFingerprint and
- * trash captures a content snapshot for its inverse. Pure: existence and disk
- * reads are injected as probes. Includes the max_tokens truncation guard.
+ * `write_file` resolves to `create` or `overwrite` from path existence, and `move` /
+ * `trash` resolve to their file or folder kind the same way; the model never sets a
+ * flag. Destructive ops capture their TargetFingerprint and a file trash captures a
+ * content snapshot for its inverse. Pure: existence and disk reads are injected as
+ * probes. Includes the max_tokens truncation guard.
  */
 
 import type { ToolCall } from "../types";
 import type { PathState, TargetFingerprint, VaultOperation } from "../../vault-ops/types";
 import {
   validateCreateDirectory,
-  validateMoveFile,
-  validateMoveFolder,
+  validateMove,
   validateReplaceInVault,
-  validateTrashFile,
-  validateTrashFolder,
+  validateTrash,
   validateWriteFile,
 } from "./validation";
 
@@ -86,6 +85,9 @@ export function toVaultOperations(
       satisfied.push(isSatisfied);
     };
 
+    // Every `case` below is a **tool name**. Two of them, `move` and `trash`, are also
+    // the spelling of a `VaultOperation["kind"]` emitted inside the very same arms; the
+    // switch is on `tc.name` and never on `op.kind`.
     switch (tc.name) {
       case "write_file": {
         // Truncation guard: a write_file whose generation hit max_tokens
@@ -124,9 +126,14 @@ export function toVaultOperations(
         emit({ kind: "createDir", path: v.args.path });
         return;
       }
-      case "move_file": {
-        const v = validateMoveFile(tc.arguments, probes.resolve, probes.configDir);
+      case "move": {
+        const v = validateMove(tc.arguments, probes.resolve, probes.configDir);
         if (!v.ok) return fail(v.error);
+        if (v.args.isFolder) {
+          // A folder move needs no fingerprint (existence guard) and no content snapshot.
+          emit({ kind: "moveFolder", from: v.args.from, to: v.args.to });
+          return;
+        }
         emit({
           kind: "move",
           from: v.args.from,
@@ -135,28 +142,21 @@ export function toVaultOperations(
         });
         return;
       }
-      case "trash_file": {
-        const v = validateTrashFile(tc.arguments, probes.resolve);
+      case "trash": {
+        const v = validateTrash(tc.arguments, probes.resolve);
         if (!v.ok) return fail(v.error);
+        if (v.args.isFolder) {
+          // An empty folder husk carries neither fingerprint nor snapshot: its inverse
+          // is a createDir, and the subtree it re-creates is captured at apply time.
+          emit({ kind: "trashFolder", path: v.args.path });
+          return;
+        }
         emit({
           kind: "trash",
           path: v.args.path,
           expect: probes.fingerprint(v.args.path) ?? MISSING_FINGERPRINT,
           snapshot: probes.readContent(v.args.path) ?? "",
         });
-        return;
-      }
-      case "move_folder": {
-        const v = validateMoveFolder(tc.arguments, probes.resolve, probes.configDir);
-        if (!v.ok) return fail(v.error);
-        // A folder move needs no fingerprint (existence guard) and no content snapshot.
-        emit({ kind: "moveFolder", from: v.args.from, to: v.args.to });
-        return;
-      }
-      case "trash_folder": {
-        const v = validateTrashFolder(tc.arguments, probes.resolve);
-        if (!v.ok) return fail(v.error);
-        emit({ kind: "trashFolder", path: v.args.path });
         return;
       }
       case "replace_in_vault": {

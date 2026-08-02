@@ -1,11 +1,9 @@
 import { describe, test, expect } from "vitest";
 import {
   validateCreateDirectory as _validateCreateDirectory,
-  validateMoveFile as _validateMoveFile,
-  validateMoveFolder as _validateMoveFolder,
+  validateMove as _validateMove,
   validateReplaceInVault,
-  validateTrashFile,
-  validateTrashFolder,
+  validateTrash,
   validateWriteFile as _validateWriteFile,
 } from "../../../../src/tools/vault-ops/validation";
 import type { PathState } from "../../../../src/vault-ops/types";
@@ -20,10 +18,8 @@ const validateWriteFile = (args: Record<string, unknown>, resolve: Resolve, cfg 
   _validateWriteFile(args, resolve, cfg);
 const validateCreateDirectory = (args: Record<string, unknown>, resolve: Resolve, cfg = CONFIG_DIR) =>
   _validateCreateDirectory(args, resolve, cfg);
-const validateMoveFile = (args: Record<string, unknown>, resolve: Resolve, cfg = CONFIG_DIR) =>
-  _validateMoveFile(args, resolve, cfg);
-const validateMoveFolder = (args: Record<string, unknown>, resolve: Resolve, cfg = CONFIG_DIR) =>
-  _validateMoveFolder(args, resolve, cfg);
+const validateMove = (args: Record<string, unknown>, resolve: Resolve, cfg = CONFIG_DIR) =>
+  _validateMove(args, resolve, cfg);
 
 const absent = (): PathState => "absent";
 const resolveWith = (states: Record<string, PathState>) => (p: string) => states[p] ?? "absent";
@@ -104,143 +100,170 @@ describe("validateCreateDirectory", () => {
   });
 });
 
-describe("validateMoveFile", () => {
-  test("accepts an existing source to an absent destination", () => {
-    const r = validateMoveFile({ from: "a.md", to: "b.md" }, resolveWith({ "a.md": "file" }));
+// `move` and `trash` are one tool each (RFC-0015): the probed state of the source picks
+// the note or the folder pathway, so the two predecessors' cases live under one describe
+// and the pathway is an assertion rather than a choice of function. The wrong-sibling
+// refusals ("use move_file instead") are gone, not moved: they were the model's mistake
+// to make and it can no longer make it.
+describe("validateMove", () => {
+  test("accepts an existing note to an absent destination, on the note pathway", () => {
+    const r = validateMove({ from: "a.md", to: "b.md" }, resolveWith({ "a.md": "file" }));
     expect(r.ok).toBe(true);
+    if (r.ok) expect(r.args).toEqual({ from: "a.md", to: "b.md", isFolder: false });
   });
 
-  test("rejects a missing source", () => {
-    expect(validateMoveFile({ from: "a.md", to: "b.md" }, absent).ok).toBe(false);
-  });
-
-  test("rejects an occupied destination", () => {
-    const r = validateMoveFile(
-      { from: "a.md", to: "b.md" },
-      resolveWith({ "a.md": "file", "b.md": "file" }),
-    );
-    expect(r.ok).toBe(false);
-  });
-
-  test("rejects identical from/to", () => {
-    expect(validateMoveFile({ from: "a.md", to: "a.md" }, resolveWith({ "a.md": "file" })).ok)
-      .toBe(false);
-  });
-
-  test("refuses laundering a blessed file into a forbidden type (note.md -> note.bat)", () => {
-    // The whole point of the write_file allowlist would be moot if a move could
-    // rename an allowed file into an executable, so the destination is held to the
-    // same allowlist. This is the invariant: no non-blessed extension ever lands.
-    const r = validateMoveFile({ from: "note.md", to: "note.bat" }, resolveWith({ "note.md": "file" }));
-    expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.error).toContain("unsupported file type");
-  });
-
-  test("refuses a move whose destination drops the extension", () => {
-    const r = validateMoveFile({ from: "note.md", to: "Archive/note" }, resolveWith({ "note.md": "file" }));
-    expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.error).toContain(".md");
-  });
-
-  test("allows a move between blessed document types (.md -> .canvas)", () => {
-    expect(
-      validateMoveFile({ from: "note.md", to: "board.canvas" }, resolveWith({ "note.md": "file" })).ok,
-    ).toBe(true);
-  });
-});
-
-describe("validateTrashFile", () => {
-  test("accepts an existing file", () => {
-    expect(validateTrashFile({ path: "a.md" }, resolveWith({ "a.md": "file" })).ok).toBe(true);
-  });
-
-  test("rejects an absent path", () => {
-    expect(validateTrashFile({ path: "a.md" }, absent).ok).toBe(false);
-  });
-
-  test("rejects a folder (files only in v1)", () => {
-    expect(validateTrashFile({ path: "Dir" }, resolveWith({ Dir: "dir" })).ok).toBe(false);
-  });
-});
-
-describe("validateMoveFolder", () => {
-  test("accepts an existing folder to an absent destination", () => {
-    const r = validateMoveFolder(
+  test("accepts an existing folder to an absent destination, on the folder pathway", () => {
+    const r = validateMove(
       { from: "Drafts/Act II", to: "Manuscript/Act II" },
       resolveWith({ "Drafts/Act II": "dir" }),
     );
     expect(r.ok).toBe(true);
-    if (r.ok) expect(r.args).toEqual({ from: "Drafts/Act II", to: "Manuscript/Act II" });
+    if (r.ok) {
+      expect(r.args).toEqual({
+        from: "Drafts/Act II",
+        to: "Manuscript/Act II",
+        isFolder: true,
+      });
+    }
   });
 
-  test("needs no document extension (a folder has none, unlike move_file's destination)", () => {
-    // The whole point of the folder op: an extensionless destination that move_file
-    // would refuse as an unsupported type is exactly what a folder move requires.
-    const r = validateMoveFolder({ from: "A", to: "B" }, resolveWith({ A: "dir" }));
+  test("the probed source picks the pathway, not the arguments", () => {
+    // Identical arguments, opposite branches: the only difference is what `from` is on
+    // disk. Both accept, so the assertion is on the branch itself rather than on which
+    // one happened to error, and it fails from either side.
+    const args = { from: "X.md", to: "Y.md" };
+    const asFile = validateMove(args, resolveWith({ "X.md": "file" }));
+    const asFolder = validateMove(args, resolveWith({ "X.md": "dir" }));
+    expect(asFile.ok).toBe(true);
+    expect(asFolder.ok).toBe(true);
+    if (asFile.ok && asFolder.ok) {
+      expect(asFile.args.isFolder).toBe(false);
+      expect(asFolder.args.isFolder).toBe(true);
+    }
+  });
+
+  test("rejects a missing source, whatever the caller meant to move", () => {
+    const r = validateMove({ from: "a.md", to: "b.md" }, absent);
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error).toBe('source "a.md" does not exist.');
+  });
+
+  test("an absent source outranks an unsupported destination type", () => {
+    // Ordering change taken deliberately with the merge: the retired move_file judged
+    // the destination's extension before it resolved the source, so this call used to
+    // report the type. The source is the thing that is actually wrong, and the merged
+    // tool cannot know whether the destination needs an extension until it knows what
+    // the source is.
+    const r = validateMove({ from: "Ghost.md", to: "x.bat" }, absent);
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error).toBe('source "Ghost.md" does not exist.');
+  });
+
+  test("rejects an occupied destination on either pathway", () => {
+    const note = validateMove(
+      { from: "a.md", to: "b.md" },
+      resolveWith({ "a.md": "file", "b.md": "file" }),
+    );
+    expect(note.ok).toBe(false);
+    if (!note.ok) expect(note.error).toContain("already exists");
+
+    const folder = validateMove({ from: "A", to: "B" }, resolveWith({ A: "dir", B: "dir" }));
+    expect(folder.ok).toBe(false);
+    if (!folder.ok) expect(folder.error).toContain("already exists");
+  });
+
+  test("rejects identical from/to on either pathway", () => {
+    expect(validateMove({ from: "a.md", to: "a.md" }, resolveWith({ "a.md": "file" })).ok)
+      .toBe(false);
+    expect(validateMove({ from: "A", to: "A" }, resolveWith({ A: "dir" })).ok).toBe(false);
+  });
+
+  test("refuses laundering a blessed note into a forbidden type (note.md -> note.bat)", () => {
+    // The whole point of the write_file allowlist would be moot if a move could
+    // rename an allowed file into an executable, so the destination is held to the
+    // same allowlist. This is the invariant: no non-blessed extension ever lands.
+    const r = validateMove({ from: "note.md", to: "note.bat" }, resolveWith({ "note.md": "file" }));
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error).toContain("unsupported file type");
+  });
+
+  test("refuses a note move whose destination drops the extension", () => {
+    const r = validateMove({ from: "note.md", to: "Archive/note" }, resolveWith({ "note.md": "file" }));
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error).toContain(".md");
+  });
+
+  test("allows a note move between blessed document types (.md -> .canvas)", () => {
+    expect(
+      validateMove({ from: "note.md", to: "board.canvas" }, resolveWith({ "note.md": "file" })).ok,
+    ).toBe(true);
+  });
+
+  test("needs no document extension on the folder pathway (a folder has none)", () => {
+    // The extensionless destination the note pathway refuses as an unsupported type is
+    // exactly what a folder move requires, which is why the allowlist is per-pathway.
+    const r = validateMove({ from: "A", to: "B" }, resolveWith({ A: "dir" }));
     expect(r.ok).toBe(true);
   });
 
-  test("rejects a missing source folder", () => {
-    const r = validateMoveFolder({ from: "Gone", to: "B" }, absent);
-    expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.error).toContain("does not exist");
-  });
-
-  test("rejects a file source, steering to move_file", () => {
-    const r = validateMoveFolder({ from: "note.md", to: "B" }, resolveWith({ "note.md": "file" }));
-    expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.error).toContain("move_file");
-  });
-
-  test("rejects an occupied destination", () => {
-    const r = validateMoveFolder(
-      { from: "A", to: "B" },
-      resolveWith({ A: "dir", B: "dir" }),
-    );
-    expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.error).toContain("already exists");
-  });
-
-  test("rejects identical from/to", () => {
-    expect(validateMoveFolder({ from: "A", to: "A" }, resolveWith({ A: "dir" })).ok).toBe(false);
-  });
-
   test("rejects an escaping source or destination", () => {
-    const fromBad = validateMoveFolder({ from: "../X", to: "B" }, absent);
+    const fromBad = validateMove({ from: "../X", to: "B" }, absent);
     expect(fromBad.ok).toBe(false);
     if (!fromBad.ok) expect(fromBad.error).toContain("outside the vault");
 
-    const toBad = validateMoveFolder({ from: "A", to: "../../X" }, resolveWith({ A: "dir" }));
+    const toBad = validateMove({ from: "A", to: "../../X" }, resolveWith({ A: "dir" }));
     expect(toBad.ok).toBe(false);
     if (!toBad.ok) expect(toBad.error).toContain("outside the vault");
   });
 
-  test("refuses a move whose destination is inside the config subtree", () => {
-    const r = validateMoveFolder({ from: "A", to: ".obsidian/A" }, resolveWith({ A: "dir" }));
-    expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.error).toContain("configuration folder");
+  test("refuses a move whose destination is inside the config subtree, on either pathway", () => {
+    const folder = validateMove({ from: "A", to: ".obsidian/A" }, resolveWith({ A: "dir" }));
+    expect(folder.ok).toBe(false);
+    if (!folder.ok) expect(folder.error).toContain("configuration folder");
+
+    const note = validateMove(
+      { from: "note.md", to: ".obsidian/note.md" },
+      resolveWith({ "note.md": "file" }),
+    );
+    expect(note.ok).toBe(false);
+    if (!note.ok) expect(note.error).toContain("configuration folder");
   });
 });
 
-describe("validateTrashFolder", () => {
-  test("accepts an existing folder (emptiness is enforced later, at apply)", () => {
-    const r = validateTrashFolder({ path: "Drafts/Act II" }, resolveWith({ "Drafts/Act II": "dir" }));
+describe("validateTrash", () => {
+  test("accepts an existing note, on the note pathway", () => {
+    const r = validateTrash({ path: "a.md" }, resolveWith({ "a.md": "file" }));
     expect(r.ok).toBe(true);
-    if (r.ok) expect(r.args).toEqual({ path: "Drafts/Act II" });
+    if (r.ok) expect(r.args).toEqual({ path: "a.md", isFolder: false });
   });
 
-  test("rejects an absent path", () => {
-    expect(validateTrashFolder({ path: "Gone" }, absent).ok).toBe(false);
+  test("accepts an existing folder, on the folder pathway (emptiness is enforced at apply)", () => {
+    const r = validateTrash({ path: "Drafts/Act II" }, resolveWith({ "Drafts/Act II": "dir" }));
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.args).toEqual({ path: "Drafts/Act II", isFolder: true });
   });
 
-  test("rejects a file, steering to trash_file", () => {
-    const r = validateTrashFolder({ path: "note.md" }, resolveWith({ "note.md": "file" }));
+  test("the probed target picks the pathway, not the arguments", () => {
+    // One destructive tool resolving its target strictly: the same path is a note trash
+    // or a folder trash purely by what it turns out to be (RFC-0015's safety constraint).
+    const asFile = validateTrash({ path: "X" }, resolveWith({ X: "file" }));
+    const asFolder = validateTrash({ path: "X" }, resolveWith({ X: "dir" }));
+    expect(asFile.ok).toBe(true);
+    expect(asFolder.ok).toBe(true);
+    if (asFile.ok && asFolder.ok) {
+      expect(asFile.args.isFolder).toBe(false);
+      expect(asFolder.args.isFolder).toBe(true);
+    }
+  });
+
+  test("rejects an absent path, in one wording for both pathways", () => {
+    const r = validateTrash({ path: "a.md" }, absent);
     expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.error).toContain("trash_file");
+    if (!r.ok) expect(r.error).toBe('"a.md" does not exist.');
   });
 
   test("rejects an escaping path", () => {
-    const r = validateTrashFolder({ path: "../../secret" }, resolveWith({}));
+    const r = validateTrash({ path: "../../secret" }, resolveWith({}));
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.error).toContain("outside the vault");
   });
@@ -322,18 +345,18 @@ describe("vault-boundary rejection (out-of-vault paths fail before the review ga
     if (!r.ok) expect(r.error).toContain("outside the vault");
   });
 
-  test("validateMoveFile rejects an escaping source or destination", () => {
-    const fromBad = validateMoveFile({ from: "../x.md", to: "B.md" }, absent);
+  test("validateMove rejects an escaping source or destination", () => {
+    const fromBad = validateMove({ from: "../x.md", to: "B.md" }, absent);
     expect(fromBad.ok).toBe(false);
     if (!fromBad.ok) expect(fromBad.error).toContain("outside the vault");
 
-    const toBad = validateMoveFile({ from: "A.md", to: "../../x.md" }, resolveWith({ "A.md": "file" }));
+    const toBad = validateMove({ from: "A.md", to: "../../x.md" }, resolveWith({ "A.md": "file" }));
     expect(toBad.ok).toBe(false);
     if (!toBad.ok) expect(toBad.error).toContain("outside the vault");
   });
 
-  test("validateTrashFile rejects an escaping path", () => {
-    const r = validateTrashFile({ path: "../../secret.md" }, resolveWith({}));
+  test("validateTrash rejects an escaping path", () => {
+    const r = validateTrash({ path: "../../secret.md" }, resolveWith({}));
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.error).toContain("outside the vault");
   });
@@ -361,8 +384,8 @@ describe("config-subtree rejection (.obsidian writes refused before the gate)", 
     if (!r.ok) expect(r.error).toContain("off limits");
   });
 
-  test("validateMoveFile refuses a move whose destination is inside .obsidian", () => {
-    const r = validateMoveFile({ from: "note.md", to: ".obsidian/note.md" }, resolveWith({ "note.md": "file" }));
+  test("validateMove refuses a move whose destination is inside .obsidian", () => {
+    const r = validateMove({ from: "note.md", to: ".obsidian/note.md" }, resolveWith({ "note.md": "file" }));
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.error).toContain("configuration folder");
   });
@@ -396,8 +419,8 @@ describe("config-subtree rejection (.obsidian writes refused before the gate)", 
     if (!r.ok) expect(r.error).toContain("off limits");
   });
 
-  test("validateMoveFile refuses a destination reaching .obsidian via internal .. traversal", () => {
-    const r = validateMoveFile(
+  test("validateMove refuses a note destination reaching .obsidian via internal .. traversal", () => {
+    const r = validateMove(
       { from: "note.md", to: "x/../.obsidian/note.md" },
       resolveWith({ "note.md": "file" }),
     );
@@ -405,8 +428,8 @@ describe("config-subtree rejection (.obsidian writes refused before the gate)", 
     if (!r.ok) expect(r.error).toContain("configuration folder");
   });
 
-  test("validateMoveFolder refuses a destination reaching .obsidian via internal .. traversal", () => {
-    const r = validateMoveFolder(
+  test("validateMove refuses a folder destination reaching .obsidian via internal .. traversal", () => {
+    const r = validateMove(
       { from: "Notes", to: "x/../.obsidian/Notes" },
       resolveWith({ Notes: "dir" }),
     );

@@ -15,8 +15,12 @@
  *
  * Enforced at every door a model can introduce a new file extension through:
  *  - {@link ../validation.validateWriteFile}, `write_file`'s path (create + overwrite); and
- *  - {@link ../validation.validateMoveFile}, `move_file`'s **destination**, so a move
- *    can't launder a blessed file (`note.md`) into a forbidden type (`note.bat`).
+ *  - {@link ../validation.validateMove}, `move`'s **destination on its note pathway**, so
+ *    a move can't launder a blessed file (`note.md`) into a forbidden type (`note.bat`).
+ *    `move` also moves folders, which have no extension, so the check runs only when the
+ *    source probes as a file. That branch is chosen from the source's on-disk state, not
+ *    from an argument, so the model cannot route a note down the folder pathway to escape
+ *    the allowlist.
  *
  * Scope: this constrains what the model may **newly write or rename to**. It
  * deliberately does not gate the disk executor, which must still recreate any

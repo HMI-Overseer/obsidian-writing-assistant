@@ -50,12 +50,16 @@ export const SETTINGS_SURFACES = {
     ),
   },
 
-  // S17: settings Providers tab, provider cards (brand-tint icons, status dots, auth fields).
+  // S17: settings Providers tab, provider cards (brand-tint icons, status dots, auth fields)
+  // inside the page's one section card.
   settingsProviders: {
     source: "src/settings/ProvidersTab.ts",
     shot: ".setting-page",
     html: settingsView(
-      `<div class="lmsa-provider-cards">
+      section(
+        "Model providers",
+        "Enable the LLM providers you use and manage their credentials and models in one place.",
+        `<div class="lmsa-provider-cards">
         <div class="lmsa-provider-card">
           <div class="lmsa-provider-card-header">
             <div class="lmsa-provider-card-iconwrap">
@@ -150,6 +154,8 @@ export const SETTINGS_SURFACES = {
         </div>
       </div>
       <p class="lmsa-provider-footnote">Cloud model catalogs ship with the plugin and refresh with each release. Local models are discovered live from LM Studio.</p>`,
+        I.plug,
+      ),
       720,
       "providers",
     ),

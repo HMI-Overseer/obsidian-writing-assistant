@@ -13,7 +13,7 @@ import { PROVIDER_OPTIONS } from "../shared/modelKeys";
 import { CLAUDE_CODE_SETUP_URL } from "../services/ClaudeCodeService";
 import type { ClaudeCodeDetection } from "../services/ClaudeCodeService";
 import { ApiKeysDisclaimerModal } from "./modals";
-import { Button, Dropdown, SettingItem, TextInput, Toggle } from "./ui";
+import { Button, createSettingsSection, Dropdown, SettingItem, TextInput, Toggle } from "./ui";
 
 /**
  * The Providers tab: one expandable card per provider, replacing the
@@ -87,13 +87,25 @@ export function renderProvidersTab(
   refresh: () => void,
 ): () => void {
   let disposed = false;
-  const listEl = container.createDiv({ cls: "lmsa-provider-cards" });
+
+  // The page is a single list, but it still opens with a section card: every other settings page
+  // heads its content with one, and a page that drops straight into its own chrome reads as a
+  // different surface rather than a quieter one.
+  const section = createSettingsSection(
+    container,
+    "Model providers",
+    "Enable the LLM providers you use and manage their credentials and models in one place.",
+    { icon: "plug" },
+  );
+
+  const listEl = section.bodyEl.createDiv({ cls: "lmsa-provider-cards" });
 
   for (const provider of PROVIDER_OPTIONS) {
     renderProviderCard(listEl, plugin, provider, refresh, () => disposed);
   }
 
-  const footnote = container.createEl("p", { cls: "lmsa-provider-footnote" });
+  // Prose, so it stays in the body: the footer is a right-aligned row for buttons.
+  const footnote = section.bodyEl.createEl("p", { cls: "lmsa-provider-footnote" });
   footnote.setText(
     "Cloud model catalogs ship with the plugin and refresh with each release. Local models are discovered live from LM Studio.",
   );

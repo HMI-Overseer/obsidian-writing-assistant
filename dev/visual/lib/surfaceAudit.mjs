@@ -223,6 +223,14 @@ export function auditSurfaceContracts(surfaces) {
     [">Agentic mode<", ">Document Editing<"],
     failures,
   );
+  // The one page whose content is a single list, and the one that went without a section card
+  // longest. The heading is the contract: the list is allowed to change shape, the card is not.
+  requireMarkup(
+    surfaces.settingsProviders,
+    "settingsProviders",
+    [">Model providers<", "lmsa-settings-section-icon", "lmsa-provider-cards"],
+    failures,
+  );
   // The two list tabs draw their collections as block rows, and the button that used to sit in the
   // card footer element is now a row. A fixture that loses one of those loses the whole affordance.
   requireMarkup(

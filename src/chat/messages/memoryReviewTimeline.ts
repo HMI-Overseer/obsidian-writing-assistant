@@ -170,7 +170,12 @@ export class MemoryReviewTimelineView {
     body: HTMLElement,
     proposal: ReviewableMemoryProposal,
   ): void {
-    if (proposal.mutation.kind !== "add") return;
+    const explanation = proposal.mutation.explanation;
+    if (proposal.mutation.kind !== "add") {
+      // A forget carries no record to preview, so its reason is the whole preview.
+      if (explanation) this.renderExplanation(body, explanation);
+      return;
+    }
     const memory = proposal.mutation.memory;
     const preview = body.createDiv({
       cls: "lmsa-vault-timeline-preview lmsa-memory-review-preview",
@@ -180,6 +185,7 @@ export class MemoryReviewTimelineView {
       cls: "lmsa-agentic-timeline-arg-value",
       text: memory.description,
     });
+    if (explanation) this.renderExplanation(preview, explanation);
     if (memory.content) {
       const details = preview.createEl("details", {
         cls: "lmsa-vault-replace-files",
@@ -193,6 +199,19 @@ export class MemoryReviewTimelineView {
         text: memory.content,
       });
     }
+  }
+
+  /**
+   * The model's stated reason for the proposal, under the record rather than over it:
+   * the description and body are the evidence, this is the claim about it. Mirrors how
+   * an edit tool's `explanation` reaches the reviewer on its own step.
+   */
+  private renderExplanation(parent: HTMLElement, explanation: string): void {
+    const el = parent.createDiv({
+      cls: "lmsa-memory-review-why",
+      text: explanation,
+    });
+    el.addEventListener("click", (event) => event.stopPropagation());
   }
 }
 

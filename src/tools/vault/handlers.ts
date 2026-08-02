@@ -69,6 +69,9 @@ export async function executeVaultTool(
 // Implementations
 // ---------------------------------------------------------------------------
 
+/** Upper bound on semantic_search's topK, matching the Retrieval setting's own range. */
+const MAX_SEMANTIC_SEARCH_TOP_K = 20;
+
 async function executeSearchVault(
   args: Record<string, unknown>,
   ctx: VaultToolContext,
@@ -77,6 +80,15 @@ async function executeSearchVault(
   if (!query) {
     return toolFailure({ kind: "invalid-args", what: "query is required" });
   }
+
+  // An out-of-range topK clamps rather than erroring, exactly as contextLines does
+  // below: the model named a breadth, and the nearest legal breadth is a better answer
+  // than spending a round trip on a refusal. Absent or unusable, the configured
+  // retrieval limit stays in charge and nothing about the call changes.
+  const topK =
+    typeof args.topK === "number" && Number.isFinite(args.topK)
+      ? Math.min(MAX_SEMANTIC_SEARCH_TOP_K, Math.max(1, Math.floor(args.topK)))
+      : undefined;
 
   // Branch "can't run" on the exact reason, so the model is never told the vault is
   // empty when search merely couldn't run, nor pointed at a recovery it can't perform
@@ -93,7 +105,7 @@ async function executeSearchVault(
 
   let results: RagContextBlock[] | null;
   try {
-    results = await ctx.ragService.retrieve(query, ctx.activeFilePath);
+    results = await ctx.ragService.retrieve(query, ctx.activeFilePath, topK);
   } catch (e) {
     // A live backend that failed at call time, a failure to run, reported as such
     // (isError) rather than laundered into "found nothing".

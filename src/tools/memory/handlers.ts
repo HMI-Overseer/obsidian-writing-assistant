@@ -71,8 +71,13 @@ export function executeMemoryTool(
     prepared.mutation.kind === "add"
       ? prepared.mutation.memory.name
       : prepared.mutation.name;
+  // Echo the explanation back the way the edit tools do, so the model can see that the
+  // reason it gave reached the review rather than being swallowed.
+  const explanation = prepared.mutation.explanation
+    ? ` (${prepared.mutation.explanation})`
+    : "";
   return {
-    content: `${call.name} for memory "${name}" queued for review.`,
+    content: `${call.name} for memory "${name}"${explanation} queued for review.`,
     isReadOnly: false,
   };
 }

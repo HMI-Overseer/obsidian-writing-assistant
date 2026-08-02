@@ -35,8 +35,17 @@ export class Retriever {
   /**
    * Retrieve the most relevant chunks for a query string.
    * Returns an empty array if the store is empty or embedding fails.
+   *
+   * `limit` overrides the configured `topK` for one call, for a caller that named its
+   * own breadth (`semantic_search`'s `topK` argument). Omitted, the configured value
+   * stands, which is what the automatic retrieval path always does.
    */
-  async retrieve(query: string, activeFilePath?: string, signal?: AbortSignal): Promise<RetrievalResult[]> {
+  async retrieve(
+    query: string,
+    activeFilePath?: string,
+    limit?: number,
+    signal?: AbortSignal,
+  ): Promise<RetrievalResult[]> {
     if (this.store.getChunkCount() === 0 || !query.trim()) {
       return [];
     }
@@ -52,8 +61,9 @@ export class Retriever {
     const searchableChunks = activeFilePath
       ? allChunks.filter((c) => c.filePath !== activeFilePath)
       : allChunks;
-    const topResults = topKSimilar(queryVector, searchableChunks, this.topK * 3, this.minScore);
+    const topK = limit ?? this.topK;
+    const topResults = topKSimilar(queryVector, searchableChunks, topK * 3, this.minScore);
 
-    return limitPerFile(topResults, this.maxChunksPerFile).slice(0, this.topK);
+    return limitPerFile(topResults, this.maxChunksPerFile).slice(0, topK);
   }
 }

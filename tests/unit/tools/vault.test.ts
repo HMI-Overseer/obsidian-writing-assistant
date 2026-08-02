@@ -957,6 +957,41 @@ describe("semantic_search", () => {
     expect(result.content).toContain("0.912");
     expect(result.content).toContain("Will trained as a smith.");
   });
+
+  // The limit argument was advertised and discarded from 2026-04-10 until it was wired
+  // on 2026-08-02: the handler read only `query`, so a model asking for a broader survey
+  // got the configured default and no signal that its request went nowhere.
+  describe("topK reaches the retriever", () => {
+    function retrieveArgs(ctx: VaultToolContext): unknown[] {
+      return (ctx.ragService.retrieve as unknown as { mock: { calls: unknown[][] } }).mock.calls[0];
+    }
+
+    async function callWith(args: Record<string, unknown>): Promise<unknown[]> {
+      const ctx = makeCtx({ ragAvailability: "ready", ragRetrieve: () => Promise.resolve([]) });
+      await executeVaultTool(tc("semantic_search", { query: "Will", ...args }), ctx);
+      return retrieveArgs(ctx);
+    }
+
+    test("an explicit topK is passed through", async () => {
+      expect(await callWith({ topK: 3 })).toEqual(["Will", undefined,3]);
+    });
+
+    test("omitting it leaves the configured retrieval limit in charge", async () => {
+      expect(await callWith({})).toEqual(["Will", undefined,undefined]);
+    });
+
+    // Clamping rather than erroring mirrors search_content's contextLines: the model
+    // named a breadth, and the nearest legal breadth beats spending a round trip.
+    test("an out-of-range topK clamps instead of erroring", async () => {
+      expect(await callWith({ topK: 999 })).toEqual(["Will", undefined,20]);
+      expect(await callWith({ topK: 0 })).toEqual(["Will", undefined,1]);
+      expect(await callWith({ topK: 2.7 })).toEqual(["Will", undefined,2]);
+    });
+
+    test("a non-numeric topK is ignored rather than coerced", async () => {
+      expect(await callWith({ topK: "lots" })).toEqual(["Will", undefined,undefined]);
+    });
+  });
 });
 
 // ---------------------------------------------------------------------------

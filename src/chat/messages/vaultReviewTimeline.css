@@ -109,6 +109,18 @@
   opacity: 0.6;
 }
 
+/* The model's reason for a memory proposal, muted under the record it argues for. On a
+   forget there is no record to preview, so this line stands alone below the step row and
+   needs the same full-width break the preview gets. */
+.lmsa-memory-review-why {
+  flex-basis: 100%;
+  width: 100%;
+  margin-top: 6px;
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+  overflow-wrap: anywhere;
+}
+
 /* ── Affected-file list: replace_in_vault blast radius, collapsed (F2) ── */
 
 /* Wraps onto its own line below the step row, like the write preview. Collapsed by

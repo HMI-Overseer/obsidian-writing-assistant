@@ -638,7 +638,9 @@ describe("Claude Code lease-owned context", () => {
     // Criterion 23: the active note is the one the generation captured. The old
     // path re-read `workspace.getActiveFile()` at callback time, which this
     // harness leaves null, so reading it live would pass `undefined` here.
-    expect(retrieve).toHaveBeenCalledWith("captured", "Notes/captured.md");
+    // The third argument is the per-call result limit, absent because this call
+    // named no topK.
+    expect(retrieve).toHaveBeenCalledWith("captured", "Notes/captured.md", undefined);
   });
 
   it("enforces the lease's own allow-list rather than a later generation's", async () => {

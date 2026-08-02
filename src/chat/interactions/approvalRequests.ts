@@ -71,5 +71,9 @@ export function memoryApprovalRequest(input: {
     channel: "memory",
     toolCallId: input.toolCallId,
     summary: `${mutation.kind === "add" ? "Remember" : "Forget"} "${name}"`,
+    // The model's own reason, which is the one thing the reviewer cannot read off the
+    // record itself: a memory's name and description say what it is, never why it earns
+    // a place. Derived like every other line here, never authored.
+    ...(mutation.explanation ? { detail: mutation.explanation } : {}),
   };
 }

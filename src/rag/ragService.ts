@@ -38,6 +38,26 @@ export class RagRetrievalError extends Error {
   }
 }
 
+/**
+ * Character budget for one retrieval. The configured budget is sized for the configured
+ * number of results, so a caller that names its own count keeps the same per-result
+ * allowance rather than squeezing more results into a budget set for fewer. Without a
+ * limit, which is every automatic retrieval, the configured budget stands untouched.
+ *
+ * This exists because the budget, not `topK`, was the real ceiling: at the defaults
+ * (6000 chars against 1500-char chunks) it admits four results, so wiring
+ * `semantic_search.topK` to the retriever alone would have left the parameter nearly as
+ * inert as it was when nothing read it at all.
+ */
+export function retrievalCharBudget(
+  maxContextChars: number,
+  configuredTopK: number,
+  limit?: number,
+): number {
+  if (limit === undefined) return maxContextChars;
+  return Math.round((maxContextChars / Math.max(1, configuredTopK)) * limit);
+}
+
 /** Create an EmbeddingClient for the given model. Shared by RagService and GraphService. */
 export function createEmbeddingClient(
   model: EmbeddingModel,
@@ -99,6 +119,8 @@ export class RagService {
   /** Tracks the settings used by the currently configured pipeline. */
   private configuredModelId: string | null = null;
   private maxContextChars = 6000;
+  /** The configured result count {@link maxContextChars} was sized for. */
+  private configuredTopK = 5;
   private graphService: GraphService | null = null;
 
   constructor(
@@ -221,6 +243,7 @@ export class RagService {
     this.embeddingClient = client;
     this.configuredModelId = model.modelId;
     this.maxContextChars = ragSettings.maxContextChars;
+    this.configuredTopK = ragSettings.topK;
     const store = new VectorStore(model.modelId, 0, ragSettings.chunkSize, ragSettings.chunkOverlap);
     this.store = store;
 
@@ -348,6 +371,7 @@ export class RagService {
     await this.loadIndex();
 
     // Update retriever to point at the new store.
+    this.configuredTopK = ragSettings.topK;
     this.retriever = new Retriever({
       store,
       embeddingClient: client,
@@ -393,15 +417,27 @@ export class RagService {
    * Applies three filters after retrieval, in order:
    * 1. Relative threshold, excludes results below 60% of the best score.
    * 2. Score gap detection, cuts off after a large relevance drop.
-   * 3. Character budget, keeps total context within budget.
+   * 3. Character budget, keeps total context within budget
+   *    ({@link retrievalCharBudget}).
+   *
+   * `limit` is an explicit per-call result count, which only the `semantic_search`
+   * tool supplies. It moves both the retrieval count and the character budget, since
+   * the budget alone would otherwise cap the request (at the defaults it admits four
+   * chunks). The two relevance filters are deliberately untouched: a caller may ask
+   * for breadth, not for weaker matches, so an explicit count is still a maximum.
+   * Omitted, every number here is exactly what it was before this parameter existed.
    */
-  async retrieve(query: string, activeFilePath?: string): Promise<RagContextBlock[] | null> {
+  async retrieve(
+    query: string,
+    activeFilePath?: string,
+    limit?: number,
+  ): Promise<RagContextBlock[] | null> {
     if (!this.retriever || !this.isReady()) {
       return null;
     }
 
     try {
-      const results = await this.retriever.retrieve(query, activeFilePath);
+      const results = await this.retriever.retrieve(query, activeFilePath, limit);
       if (results.length === 0) return null;
 
       // Graph boost: re-rank results using knowledge graph entity relevance.
@@ -429,7 +465,7 @@ export class RagService {
       }
 
       // Character budget: drop lowest-scoring results if total exceeds budget.
-      const maxChars = this.maxContextChars;
+      const maxChars = retrievalCharBudget(this.maxContextChars, this.configuredTopK, limit);
       let totalChars = 0;
       const budgeted: typeof filtered = [];
       for (const r of filtered) {

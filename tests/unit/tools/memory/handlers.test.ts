@@ -177,6 +177,9 @@ describe("memory mutation validation and persistence", () => {
     expect(result.isReadOnly).toBe(false);
     expect(result.content).toContain("vault-tone");
     expect(result.content).toContain("review");
+    // Echoed back the way the edit tools echo theirs ("... (tightens the pacing).
+    // Queued for user review."), so the model can see its own stated reason survived.
+    expect(result.content).toContain("The user stated this preference");
   });
 
   // One word for the model's justification across the whole surface (RFC-0015): both

@@ -208,4 +208,48 @@ describe("memoryApprovalRequest", () => {
       summary: 'Forget "Alice speaks in short sentences"',
     });
   });
+
+  // The model's stated reason is the one thing a reviewer cannot reconstruct from the
+  // record in front of them, and the drawer is where the decision is actually made
+  // (RFC-0012). It was validated and then dropped until 2026-08-02.
+  it("carries the model's explanation as the detail line, on both mutations", () => {
+    expect(
+      memoryApprovalRequest({
+        approvalId: "memory-3",
+        toolCallId: "call-7",
+        mutation: {
+          kind: "add",
+          memory: {
+            name: "alice-voice",
+            type: "context",
+            description: "Voice note",
+            enabled: true,
+          },
+          explanation: "The user corrected Alice's dialogue twice this session.",
+        },
+      }).detail,
+    ).toBe("The user corrected Alice's dialogue twice this session.");
+
+    expect(
+      memoryApprovalRequest({
+        approvalId: "memory-4",
+        toolCallId: "call-8",
+        mutation: {
+          kind: "forget",
+          name: "alice-voice",
+          explanation: "Superseded by the fuller voice record.",
+        },
+      }).detail,
+    ).toBe("Superseded by the fuller voice record.");
+  });
+
+  it("omits the detail line when the model gave no explanation", () => {
+    expect(
+      memoryApprovalRequest({
+        approvalId: "memory-5",
+        toolCallId: "call-9",
+        mutation: { kind: "forget", name: "alice-voice" },
+      }),
+    ).not.toHaveProperty("detail");
+  });
 });

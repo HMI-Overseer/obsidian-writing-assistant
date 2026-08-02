@@ -242,8 +242,9 @@ export const SEARCH_VAULT_TOOL: CanonicalToolDefinition = {
       topK: {
         type: "number",
         description:
-          "Maximum number of results to return. Defaults to the configured retrieval limit. " +
-          "Use a higher value for broad survey queries.",
+          "Maximum number of results to return, 1 to 20. Defaults to the configured " +
+          "retrieval limit. Raise it for a broad survey, lower it when one strong hit is " +
+          "enough; fewer may come back when the remaining matches are much weaker.",
       },
     },
     required: ["query"],

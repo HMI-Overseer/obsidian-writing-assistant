@@ -14,7 +14,7 @@ import { renderRagTab } from "./RagTab";
 import { renderKnowledgeGraphTab } from "./KnowledgeGraphTab";
 import { renderMemoriesTab } from "./MemoriesTab";
 import { renderBenchmarkTab } from "./BenchmarkTab";
-import { renderVaultOpsTab } from "./VaultOpsTab";
+import { vaultOpsTabSections } from "./VaultOpsTab";
 import type { TabPageRenderer } from "./definitions/ImperativeTabPage";
 import { ImperativeTabPage } from "./definitions/ImperativeTabPage";
 import type { SettingsSection } from "./definitions/sections";
@@ -99,7 +99,7 @@ export class WritingAssistantSettingTab extends PluginSettingTab {
       ]),
       group("Config", [
         page("Commands", (el, refresh) => renderCommandsTab(el, this.plugin, refresh)),
-        page("Vault Operations", (el) => renderVaultOpsTab(el, this.plugin)),
+        converted("Vault Operations", vaultOpsTabSections(this.plugin)),
         converted("Advanced", advancedTabSections(this.plugin)),
         page("Benchmark", (el, refresh) => renderBenchmarkTab(el, this.plugin, refresh)),
       ]),

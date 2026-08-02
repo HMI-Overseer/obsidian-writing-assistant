@@ -1,6 +1,6 @@
-import { settingsView } from "../scaffold.mjs";
+import { settingsItemsView, settingsView } from "../scaffold.mjs";
 import { I } from "../fixtures/icons.mjs";
-import { section, settingItem } from "../fixtures/primitives.mjs";
+import { convertedRow, convertedSection, section } from "../fixtures/primitives.mjs";
 
 const BUILTIN_COMMAND_CATEGORIES = [
   {
@@ -320,30 +320,35 @@ export const SETTINGS_COVERAGE_SURFACES = {
     ),
   },
 
+  // Converted: Obsidian's declarative renderer builds the group and row elements, so there is no
+  // panel and each card is the token host. The only tab whose rows carry a <select> or a
+  // <textarea>, so it is where the form-control skin meets the group cascade.
   settingsVaultOps: {
     source: "src/settings/VaultOpsTab.ts",
     shot: ".setting-page",
-    html: settingsView(
-      section(
+    html: settingsItemsView(
+      convertedSection(
+        "vault-operations",
         "Approvals",
         "Decide how each kind of vault operation is handled. Deny removes the tool entirely; Ask waits for your review; Auto-apply applies it without a click, but every operation is still shown and can be undone.",
-        `${settingItem("Create file", "Writing a brand-new note at a path that doesn't exist yet.", gateSelect())}
-        ${settingItem("Overwrite file", "Replacing the entire contents of an existing note. Targeted prose changes go through document edits instead.", gateSelect())}
-        ${settingItem("Move or rename", "Moving or renaming a note. Wikilinks and backlinks are rewritten automatically.", gateSelect())}
-        ${settingItem("Trash file", "Sending a note to trash (honoring your deleted-files preference). Files only.", gateSelect())}
-        ${settingItem("Create folder", "Creating a folder. Idempotent, does nothing if it already exists.", gateSelect())}
-        ${settingItem("Edit document", "Targeted in-document changes and frontmatter updates (propose_edit, update_frontmatter). Ask shows the diff and waits; Auto-apply lands the edit without a click, even on a note you don't have open.", gateSelect())}`,
+        `${convertedRow("Create file", "Writing a brand-new note at a path that doesn't exist yet.", gateSelect())}
+        ${convertedRow("Overwrite file", "Replacing the entire contents of an existing note. Targeted prose changes go through document edits instead.", gateSelect())}
+        ${convertedRow("Move or rename", "Moving or renaming a note. Wikilinks and backlinks are rewritten automatically.", gateSelect())}
+        ${convertedRow("Trash file", "Sending a note to trash (honoring your deleted-files preference). Files only.", gateSelect())}
+        ${convertedRow("Create folder", "Creating a folder. Idempotent, does nothing if it already exists.", gateSelect())}
+        ${convertedRow("Edit document", "Targeted in-document changes and frontmatter updates (propose_edit, update_frontmatter). Ask shows the diff and waits; Auto-apply lands the edit without a click, even on a note you don't have open.", gateSelect())}`,
         I.shieldCheck,
       ) +
-        section(
+        convertedSection(
+          "vault-operations",
           "Auto-apply limits",
           "Bound what auto-applied operations can touch and how many can run before the rest fall back to Ask.",
-          `${settingItem(
+          `${convertedRow(
             "Auto-apply scopes",
             "Folder prefixes eligible for auto-apply (one per line). When set, operations outside these folders fall back to manual review. Leave empty to allow auto-apply anywhere.",
             '<textarea rows="4" placeholder="e.g. drafts/ai">Drafts/AI\nScenes</textarea>',
           )}
-          ${settingItem(
+          ${convertedRow(
             "Max auto operations per turn",
             'Circuit breaker for the per-class auto-apply policy: once this many operations auto-apply in a single turn, the rest fall back to Ask. "Edit automatically" is unbounded and ignores this. Default: 8.',
             '<input type="text" placeholder="8" value="8">',

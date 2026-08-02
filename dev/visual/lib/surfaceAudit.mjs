@@ -1,3 +1,27 @@
+import { readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const REPO = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
+
+// Which arrangement a settings tab actually renders in: a converted tab exports the sections
+// builder its declarative page consumes, one still behind an ImperativeTabPage exports a renderer.
+// Reading the tab module is what makes a stale fixture fail. Deriving the arrangement from the
+// fixture's own markup only ever agrees with itself, so a fixture left wholly in the old form after
+// its tab converts satisfies the old branch and passes silently, which is the one mistake a
+// conversion stage is most likely to make.
+const tabArrangement = (source) => {
+  let code;
+  try {
+    code = readFileSync(resolve(REPO, source), "utf8");
+  } catch {
+    return null;
+  }
+  if (/export function \w+TabSections\(/.test(code)) return "converted";
+  if (/export function render\w+Tab\(/.test(code)) return "imperative";
+  return null; // not a tab module (ui.ts, the benchmark renderers): the markup decides.
+};
+
 const requireMarkup = (surface, id, fragments, failures) => {
   for (const fragment of fragments) {
     if (!surface.html.includes(fragment)) {
@@ -41,7 +65,15 @@ export function auditSurfaceContracts(surfaces) {
       // Every settings surface reconstructs Obsidian's settings page. A converted tab renders its
       // rows from `items`, so its cards are the token host and there is no panel; a tab still
       // behind an ImperativeTabPage puts both on the page root.
-      const converted = surface.html.includes("setting-group lmsa-ui-card");
+      const arrangement = tabArrangement(surface.source);
+      const drawnConverted = surface.html.includes("setting-group lmsa-ui-card");
+      if (arrangement && (arrangement === "converted") !== drawnConverted) {
+        failures.push(
+          `${id}: ${surface.source} renders the ${arrangement} form, ` +
+            `but the fixture draws the ${drawnConverted ? "converted" : "imperative"} one`,
+        );
+      }
+      const converted = arrangement ? arrangement === "converted" : drawnConverted;
       requireMarkup(
         surface,
         id,

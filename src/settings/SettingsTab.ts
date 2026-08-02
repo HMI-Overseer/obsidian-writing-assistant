@@ -10,7 +10,7 @@ import { advancedTabSections } from "./AdvancedTab";
 import { renderCommandsTab } from "./CommandsTab";
 import { renderProvidersTab } from "./ProvidersTab";
 import { generalTabSections } from "./GeneralTab";
-import { renderRagTab } from "./RagTab";
+import { ragTabSections } from "./RagTab";
 import { renderKnowledgeGraphTab } from "./KnowledgeGraphTab";
 import { renderMemoriesTab } from "./MemoriesTab";
 import { renderBenchmarkTab } from "./BenchmarkTab";
@@ -93,7 +93,7 @@ export class WritingAssistantSettingTab extends PluginSettingTab {
         page("Providers", (el, refresh) => renderProvidersTab(el, this.plugin, refresh)),
       ]),
       group("Knowledge", [
-        page("Retrieval", (el) => renderRagTab(el, this.plugin)),
+        converted("Retrieval", ragTabSections(this.plugin, () => this.refreshDomState())),
         page("Knowledge Graph", (el) => renderKnowledgeGraphTab(el, this.plugin)),
         page("Memories", (el) => renderMemoriesTab(el, this.plugin)),
       ]),

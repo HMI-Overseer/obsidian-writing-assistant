@@ -13,6 +13,12 @@ export interface SettingsSection {
   /** Lucide icon drawn in the card's badge. */
   icon: string;
   rows: SettingDefinitionRender[];
+  /**
+   * Hides the whole card, heading and rows alike, and drops its rows from settings search while it
+   * is hidden. Re-evaluated on every render and by `refreshDomState()`, which toggles the card in
+   * place rather than rebuilding it.
+   */
+  visible?: boolean | (() => boolean);
 }
 
 /**
@@ -39,18 +45,23 @@ export function blockRow(
   };
 }
 
-/** A name / description / control row, drawn as the {@link SettingItem} every other tab draws. */
+/**
+ * A name / description / control row, drawn as the {@link SettingItem} every other tab draws.
+ *
+ * `build` may return a cleanup, which Obsidian runs before the row is torn down or re-rendered.
+ * A row that only wires an `onChange` returns nothing; a row that mounts something owning a
+ * document listener or a service subscription returns the teardown for it.
+ */
 export function settingRow(
   name: string,
   desc: string,
-  build: (item: SettingItem) => void
+  build: (item: SettingItem) => void | (() => void)
 ): SettingDefinitionRender {
   return {
     name,
     desc,
-    render: (setting) => {
-      build(new SettingItem(setting.settingEl, { adopt: true }).setName(name).setDesc(desc));
-    },
+    render: (setting) =>
+      build(new SettingItem(setting.settingEl, { adopt: true }).setName(name).setDesc(desc)),
   };
 }
 
@@ -69,6 +80,7 @@ export function settingsSections(
   return sections.map((section) => ({
     type: "group",
     cls: `lmsa-ui-card lmsa-settings-section lmsa-settings-root lmsa-tab-${slug}`,
+    visible: section.visible,
     items: [
       blockRow(section.name, section.desc, "lmsa-settings-section-head", (el) => {
         const headerEl = el.createDiv({ cls: "lmsa-settings-section-header" });

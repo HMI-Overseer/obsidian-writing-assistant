@@ -67,13 +67,16 @@ export const convertedSection = (tab, title, desc, rows, icon) => {
 };
 
 // A converted row: Obsidian's `.setting-item` host, re-dressed by SettingItem's adopt path.
-export const convertedRow = (name, desc, control) =>
+// `below` is the case where a caller mounts into `settingEl` instead of `controlEl` (RagTab's
+// embedding-model selector does this), so the control lands after the control slot and renders
+// full width under the row rather than beside it.
+export const convertedRow = (name, desc, control, below = "") =>
   `<div class="setting-item lmsa-setting-item">
     <div class="lmsa-setting-item-info">
       <div class="lmsa-setting-item-name">${name}</div>
       <div class="lmsa-setting-item-desc">${desc}</div>
     </div>
-    <div class="lmsa-setting-item-control">${control}</div>
+    <div class="lmsa-setting-item-control">${control}</div>${below}
   </div>`;
 
 // A converted row that draws a block instead of a name / description / control pair.

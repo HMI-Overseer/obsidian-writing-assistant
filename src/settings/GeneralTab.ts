@@ -20,18 +20,19 @@ export function generalTabSections(plugin: WritingAssistantChat): SettingsSectio
         settingRow(
           "Include active note as context",
           "Send the content of the currently open note alongside each request.",
-          (item) =>
+          (item) => {
             item.addToggle((toggle) =>
               toggle.setValue(plugin.settings.includeNoteContext).onChange(async (value) => {
                 plugin.settings.includeNoteContext = value;
                 await plugin.saveSettings();
               })
-            )
+            );
+          }
         ),
         settingRow(
           "Include local attachments as context when supported",
           "When a note is attached and the active model supports vision, send supported local image embeds from that note as extra context.",
-          (item) =>
+          (item) => {
             item.addToggle((toggle) =>
               toggle
                 .setValue(plugin.settings.includeLocalAttachmentsAsContext)
@@ -39,12 +40,13 @@ export function generalTabSections(plugin: WritingAssistantChat): SettingsSectio
                   plugin.settings.includeLocalAttachmentsAsContext = value;
                   await plugin.saveSettings();
                 })
-            )
+            );
+          }
         ),
         settingRow(
           "Note context limit",
           `Maximum characters of note text sent as context, ${MIN_CONTEXT_CHARS}–${MAX_CONTEXT_CHARS} (default: ${DEFAULT_SETTINGS.maxContextChars}). Longer notes are trimmed; continuation commands keep the ending.`,
-          (item) =>
+          (item) => {
             item.addText((text) =>
               text
                 .setPlaceholder(String(DEFAULT_SETTINGS.maxContextChars))
@@ -60,7 +62,8 @@ export function generalTabSections(plugin: WritingAssistantChat): SettingsSectio
                     await plugin.saveSettings();
                   }
                 })
-            )
+            );
+          }
         ),
       ],
     },

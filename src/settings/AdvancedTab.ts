@@ -13,18 +13,19 @@ export function advancedTabSections(plugin: WritingAssistantChat): SettingsSecti
         settingRow(
           "Enable agentic mode",
           "Vault search and edit tools become available. The model can read notes and iterate before producing a response.",
-          (item) =>
+          (item) => {
             item.addToggle((toggle) =>
               toggle.setValue(plugin.settings.agenticMode).onChange(async (value) => {
                 plugin.settings.agenticMode = value;
                 await plugin.saveSettings();
               })
-            )
+            );
+          }
         ),
         settingRow(
           "Max tool rounds",
           `Maximum read-only tool rounds per turn (vault search and outline inspection before the model responds or edits). Default: ${DEFAULT_MAX_TOOL_ROUNDS}.`,
-          (item) =>
+          (item) => {
             item.addText((text) =>
               text
                 .setPlaceholder(String(DEFAULT_MAX_TOOL_ROUNDS))
@@ -36,7 +37,8 @@ export function advancedTabSections(plugin: WritingAssistantChat): SettingsSecti
                     await plugin.saveSettings();
                   }
                 })
-            )
+            );
+          }
         ),
       ],
     },
@@ -48,7 +50,7 @@ export function advancedTabSections(plugin: WritingAssistantChat): SettingsSecti
         settingRow(
           "Diff context lines",
           "Number of lines shown above and below each diff hunk for context.",
-          (item) =>
+          (item) => {
             item.addText((text) =>
               text
                 .setPlaceholder("3")
@@ -60,12 +62,13 @@ export function advancedTabSections(plugin: WritingAssistantChat): SettingsSecti
                     await plugin.saveSettings();
                   }
                 })
-            )
+            );
+          }
         ),
         settingRow(
           "Minimum match confidence",
           "Fuzzy match confidence threshold (0–1). Matches below this score are flagged as unresolved. Default: 0.7",
-          (item) =>
+          (item) => {
             item.addText((text) =>
               text
                 .setPlaceholder("0.7")
@@ -77,7 +80,8 @@ export function advancedTabSections(plugin: WritingAssistantChat): SettingsSecti
                     await plugin.saveSettings();
                   }
                 })
-            )
+            );
+          }
         ),
       ],
     },

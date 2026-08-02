@@ -64,7 +64,7 @@ export function vaultOpsTabSections(plugin: WritingAssistantChat): SettingsSecti
         settingRow(
           "Auto-apply scopes",
           "Folder prefixes eligible for auto-apply (one per line). When set, operations outside these folders fall back to manual review. Leave empty to allow auto-apply anywhere.",
-          (item) =>
+          (item) => {
             item.addTextArea((textarea) => {
               textarea.inputEl.rows = 4;
               textarea.setValue(plugin.settings.vaultOpPolicy.scopes.join("\n"));
@@ -76,12 +76,13 @@ export function vaultOpsTabSections(plugin: WritingAssistantChat): SettingsSecti
                   .filter((line) => line.length > 0);
                 await plugin.saveSettings();
               });
-            })
+            });
+          }
         ),
         settingRow(
           "Max auto operations per turn",
           `Circuit breaker for the per-class auto-apply policy: once this many operations auto-apply in a single turn, the rest fall back to Ask. "Edit automatically" is unbounded and ignores this. Default: ${DEFAULT_VAULT_OP_POLICY.maxAutoOps}.`,
-          (item) =>
+          (item) => {
             item.addText((text) => {
               text.setPlaceholder(String(DEFAULT_VAULT_OP_POLICY.maxAutoOps));
               text.setValue(String(plugin.settings.vaultOpPolicy.maxAutoOps));
@@ -92,7 +93,8 @@ export function vaultOpsTabSections(plugin: WritingAssistantChat): SettingsSecti
                   await plugin.saveSettings();
                 }
               });
-            })
+            });
+          }
         ),
       ],
     },
@@ -114,7 +116,7 @@ function gateRow(
   desc: string,
   key: GateClass,
 ): SettingDefinitionRender {
-  return settingRow(name, desc, (item) =>
+  return settingRow(name, desc, (item) => {
     item.addDropdown((dropdown) => {
       for (const opt of GATE_OPTIONS) dropdown.addOption(opt.value, opt.label);
       dropdown.setValue(plugin.settings.vaultOpPolicy[key]);
@@ -122,6 +124,6 @@ function gateRow(
         plugin.settings.vaultOpPolicy[key] = value as Gate;
         await plugin.saveSettings();
       });
-    })
-  );
+    });
+  });
 }

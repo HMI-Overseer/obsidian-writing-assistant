@@ -279,16 +279,19 @@ export const SETTINGS_SURFACES = {
     ),
   },
 
-  // S20: settings Index / RAG tab. The stale/drift notice (muted amber) is the key chip.
+  // S20: settings Index / RAG tab. The stale/drift notice (muted amber) is the key chip. Converted:
+  // the four cards below the enable toggle carry `visible` instead of sitting in a wrapper div, and
+  // this fixture pictures them shown, which is retrieval enabled.
   settingsRag: {
     source: "src/settings/RagTab.ts",
     shot: ".setting-page",
-    html: settingsView(
-      section(
+    html: settingsItemsView(
+      convertedSection(
+        "retrieval",
         "Vault retrieval",
         "Automatically find and inject relevant vault content into each chat request using embedding-based search.",
-        `${settingItem("Enable vault retrieval", "When enabled, the plugin can index your vault and retrieve relevant notes for each chat message.", sw("is-enabled"))}
-        ${settingItem(
+        `${convertedRow("Enable vault retrieval", "When enabled, the plugin can index your vault and retrieve relevant notes for each chat message.", sw("is-enabled"))}
+        ${convertedRow(
           "Embedding model",
           "Encodes vault content as vectors for similarity search.",
           "",
@@ -299,10 +302,12 @@ export const SETTINGS_SURFACES = {
         )}`,
         I.search,
       ) +
-        `<div class="lmsa-rag-conditional">${section(
+        convertedSection(
+          "retrieval",
           "Index",
           "Manage the vector index used for retrieval.",
-          `<div class="lmsa-index-status">
+          convertedBlock(
+            `<div class="lmsa-index-status">
             <div class="lmsa-index-status-header">
               <div class="lmsa-index-status-info">
                 <p class="lmsa-index-status-text">128 files, 512 chunks indexed.</p>
@@ -318,33 +323,37 @@ export const SETTINGS_SURFACES = {
               <span class="lmsa-index-progress-text"></span>
             </div>
           </div>`,
+          ),
           I.database,
         ) +
-          section(
-            "Automatic reindexing",
-            "Keep the index current as your vault changes. Automatic runs never load a local embedding model that is not already running, they wait until it is.",
-            `${settingItem("Reindex on startup", "When the plugin loads, scan for notes changed while it was off and index them.", sw("is-enabled"))}
-            ${settingItem("Watch for changes", "Reindex each note as it is created, edited, renamed, or deleted.", sw("is-enabled"))}
-            ${settingItem("Auto-reindex on cloud models", "Allow automatic runs to embed through a metered cloud model. Off keeps automatic reindexing local-only, so cloud embedding stays manual and avoids unexpected API cost.", sw())}`,
-            I.refresh,
-          ) +
-          section(
-            "Retrieval",
-            "Control how many and which results are injected as context.",
-            `${settingItem("Metadata enrichment", "Prepend tags, folder path, and wikilink targets to each chunk before embedding. Improves entity disambiguation in creative writing vaults.", sw("is-enabled"))}
-            ${settingItem("Results per query", "Number of relevant chunks to inject, 1–20 (default: 5).", `<input type="text" value="5">`)}
-            ${settingItem("Max chunks per file", "Limit how many chunks a single file can contribute, 1–20 (default: 5).", `<input type="text" value="5">`)}
-            ${settingItem("Minimum similarity", "Only include results above this score, 0–0.8 (default: 0.3).", `<input type="text" value="0.3">`)}`,
-            I.filter,
-          ) +
-          section(
-            "Chunking",
-            "Configure how vault notes are split into retrieval-friendly pieces.",
-            `${settingItem("Chunk size", "Target characters per chunk, 500–3000 (default: 1500).", `<input type="text" value="1500">`)}
-            ${settingItem("Chunk overlap", "Characters of overlap between adjacent chunks, 0–500 (default: 200).", `<input type="text" value="200">`)}
-            ${settingItem("Exclude patterns", "Glob patterns for files to exclude from indexing (one per line).", `<textarea rows="4" placeholder="e.g. templates/**">Templates/**</textarea>`)}`,
-            I.scissors,
-          )}</div>`,
+        convertedSection(
+          "retrieval",
+          "Automatic reindexing",
+          "Keep the index current as your vault changes. Automatic runs never load a local embedding model that is not already running, they wait until it is.",
+          `${convertedRow("Reindex on startup", "When the plugin loads, scan for notes changed while it was off and index them.", sw("is-enabled"))}
+          ${convertedRow("Watch for changes", "Reindex each note as it is created, edited, renamed, or deleted.", sw("is-enabled"))}
+          ${convertedRow("Auto-reindex on cloud models", "Allow automatic runs to embed through a metered cloud model. Off keeps automatic reindexing local-only, so cloud embedding stays manual and avoids unexpected API cost.", sw())}`,
+          I.refresh,
+        ) +
+        convertedSection(
+          "retrieval",
+          "Retrieval",
+          "Control how many and which results are injected as context.",
+          `${convertedRow("Metadata enrichment", "Prepend tags, folder path, and wikilink targets to each chunk before embedding. Improves entity disambiguation in creative writing vaults.", sw("is-enabled"))}
+          ${convertedRow("Results per query", "Number of relevant chunks to inject, 1–20 (default: 5).", `<input type="text" value="5">`)}
+          ${convertedRow("Max chunks per file", "Limit how many chunks a single file can contribute, 1–20 (default: 5).", `<input type="text" value="5">`)}
+          ${convertedRow("Minimum similarity", "Only include results above this score, 0–0.8 (default: 0.3).", `<input type="text" value="0.3">`)}`,
+          I.filter,
+        ) +
+        convertedSection(
+          "retrieval",
+          "Chunking",
+          "Configure how vault notes are split into retrieval-friendly pieces.",
+          `${convertedRow("Chunk size", "Target characters per chunk, 500–3000 (default: 1500).", `<input type="text" value="1500">`)}
+          ${convertedRow("Chunk overlap", "Characters of overlap between adjacent chunks, 0–500 (default: 200).", `<input type="text" value="200">`)}
+          ${convertedRow("Exclude patterns", "Glob patterns for files to exclude from indexing (one per line).", `<textarea rows="4" placeholder="e.g. templates/**">Templates/**</textarea>`)}`,
+          I.scissors,
+        ),
       720,
       "retrieval",
     ),

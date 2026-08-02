@@ -138,7 +138,7 @@ export function convertToolCallToEditBlock(tc: ToolCall): EditBlock | null {
       if (!v.ok) return null; // surfaced to the model via the loop's editError result
       // Structural: searchText/replaceText are computed at resolution time from the
       // anchor and the document content (resolveStructuralEditBlocks). Escapes are
-      // normalized here so the stored anchor/text match what the document holds.
+      // normalized here so the stored anchor/content match what the document holds.
       return {
         id: tc.id,
         searchText: "",
@@ -148,7 +148,7 @@ export function convertToolCallToEditBlock(tc: ToolCall): EditBlock | null {
         toolName: "insert_into_note" as const,
         toolArgs: {
           anchor: normalizeEscapes(v.args.anchor ?? ""),
-          text: normalizeEscapes(v.args.text),
+          content: normalizeEscapes(v.args.content),
           where: v.args.where,
         },
       };

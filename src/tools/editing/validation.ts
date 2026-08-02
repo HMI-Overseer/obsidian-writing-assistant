@@ -48,7 +48,7 @@ export interface UpdateFrontmatterArgs {
   explanation?: string;
 }
 
-/** Where insert_into_note places its text relative to the anchor / the document. */
+/** Where insert_into_note places its content relative to the anchor / the document. */
 export type InsertWhere = "before" | "after" | "append" | "prepend";
 
 /** Valid `where` values, also the schema enum (single source of truth). */
@@ -59,7 +59,7 @@ export interface InsertIntoNoteArgs {
   path?: string;
   /** Existing text to anchor on; required for "before"/"after", ignored for append/prepend. */
   anchor?: string;
-  text: string;
+  content: string;
   where: InsertWhere;
   explanation?: string;
 }
@@ -151,8 +151,8 @@ export function validateUpdateFrontmatter(
 export function validateInsertIntoNote(
   args: Record<string, unknown>,
 ): ValidationResult<InsertIntoNoteArgs> {
-  if (typeof args.text !== "string" || args.text === "") {
-    return err("text must be a non-empty string.");
+  if (typeof args.content !== "string" || args.content === "") {
+    return err("content must be a non-empty string.");
   }
   if (typeof args.where !== "string" || !INSERT_WHERES.includes(args.where as InsertWhere)) {
     return err(`where must be one of ${INSERT_WHERES.join(", ")}. Got: ${JSON.stringify(args.where)}`);
@@ -166,7 +166,7 @@ export function validateInsertIntoNote(
   return ok({
     path: typeof args.path === "string" ? args.path : undefined,
     anchor: typeof args.anchor === "string" ? args.anchor : undefined,
-    text: args.text,
+    content: args.content,
     where,
     explanation: typeof args.explanation === "string" ? args.explanation : undefined,
   });

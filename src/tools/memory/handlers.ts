@@ -25,12 +25,12 @@ export type MemoryMutation =
   | {
       kind: "add";
       memory: Memory;
-      rationale?: string;
+      explanation?: string;
     }
   | {
       kind: "forget";
       name: string;
-      reason?: string;
+      explanation?: string;
     };
 
 export type PreparedMemoryMutation =
@@ -95,14 +95,14 @@ export function prepareMemoryMutation(
     if (!validation.ok) {
       return { ok: false, result: validationFailure(validation.issue) };
     }
-    const rationale = optionalText(call.arguments.rationale, "rationale", false);
-    if (!rationale.ok) return rationale;
+    const explanation = optionalText(call.arguments.explanation, "explanation", false);
+    if (!explanation.ok) return explanation;
     return {
       ok: true,
       mutation: {
         kind: "add",
         memory: { ...validation.value, enabled: true },
-        ...(rationale.value === undefined ? {} : { rationale: rationale.value }),
+        ...(explanation.value === undefined ? {} : { explanation: explanation.value }),
       },
     };
   }
@@ -139,14 +139,14 @@ export function prepareMemoryMutation(
         }),
       };
     }
-    const reason = optionalText(call.arguments.reason, "reason", false);
-    if (!reason.ok) return reason;
+    const explanation = optionalText(call.arguments.explanation, "explanation", false);
+    if (!explanation.ok) return explanation;
     return {
       ok: true,
       mutation: {
         kind: "forget",
         name: existing.name,
-        ...(reason.value === undefined ? {} : { reason: reason.value }),
+        ...(explanation.value === undefined ? {} : { explanation: explanation.value }),
       },
     };
   }

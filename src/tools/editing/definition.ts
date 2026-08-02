@@ -126,11 +126,11 @@ export const INSERT_INTO_NOTE_TOOL: CanonicalToolDefinition = {
   name: "insert_into_note",
   description:
     "Add new text to an existing note without rewriting it. Always pass `path`, the " +
-    "vault-relative path of the note to change, plus `text` (the content to add) and `where`. " +
+    "vault-relative path of the note to change, plus `content` (the text to add) and `where`. " +
     "Use `where`: \"after\" or \"before\" to place the text just after/before an existing passage " +
     "(pass that passage as `anchor`); \"append\" to add it at the end of the note, or \"prepend\" " +
     "at the start (no anchor needed). The text is added as its own paragraph, separated by a blank " +
-    "line, so put structure (headings, list markers) inside `text` itself. " +
+    "line, so put structure (headings, list markers) inside `content` itself. " +
     "The change is shown to the user for review before it is applied. " +
     "Prefer this over write_file (which replaces the whole file) when adding to a note, and over " +
     "propose_edit when you only need to add content rather than rewrite an existing passage.",
@@ -152,11 +152,11 @@ export const INSERT_INTO_NOTE_TOOL: CanonicalToolDefinition = {
           "Vault-relative path of the note to add to (e.g. \"Journal/2026-06-27.md\"). " +
           "Use the path of the document under edit or the file you read with read_file.",
       },
-      text: {
+      content: {
         type: "string",
         description:
-          "The content to add. It is inserted as its own paragraph (separated by a blank line); " +
-          "include any headings or list markers in this text yourself.",
+          "The text to add. It is inserted as its own paragraph (separated by a blank line); " +
+          "include any headings or list markers in it yourself.",
       },
       where: {
         type: "string",
@@ -177,7 +177,7 @@ export const INSERT_INTO_NOTE_TOOL: CanonicalToolDefinition = {
         description: "Brief explanation of what this insertion adds and why.",
       },
     },
-    required: ["path", "text", "where"],
+    required: ["path", "content", "where"],
   },
 };
 

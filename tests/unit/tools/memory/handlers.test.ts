@@ -6,6 +6,7 @@ import {
   MEMORY_RECALL_MAX_NAMES,
   applyApprovedMemoryMutation,
   executeMemoryTool,
+  prepareMemoryMutation,
 } from "../../../../src/tools/memory/handlers";
 
 function call(name: string, arguments_: Record<string, unknown>): ToolCall {
@@ -167,7 +168,7 @@ describe("memory mutation validation and persistence", () => {
         type: "context",
         description: "Vault tone guide, recall when writing scene mood.",
         content: "Keep the atmosphere restrained and uncanny.",
-        rationale: "The user stated this preference.",
+        explanation: "The user stated this preference.",
       }),
       context,
     );
@@ -176,6 +177,42 @@ describe("memory mutation validation and persistence", () => {
     expect(result.isReadOnly).toBe(false);
     expect(result.content).toContain("vault-tone");
     expect(result.content).toContain("review");
+  });
+
+  // One word for the model's justification across the whole surface (RFC-0015): both
+  // mutations take `explanation`, where add_memory said `rationale` and forget_memory
+  // said `reason`. The prepared mutation is the only place either value is observable.
+  it("carries the explanation into both mutations under one name", () => {
+    const { memories } = harness([record("stale-fact")]);
+
+    const added = prepareMemoryMutation(
+      call("add_memory", {
+        name: "vault-tone",
+        type: "context",
+        description: "Vault tone guide, recall when writing scene mood.",
+        explanation: "The user stated this preference.",
+      }),
+      memories,
+    );
+    expect(added.ok).toBe(true);
+    if (added.ok) {
+      expect(added.mutation).toMatchObject({
+        kind: "add",
+        explanation: "The user stated this preference.",
+      });
+    }
+
+    const forgotten = prepareMemoryMutation(
+      call("forget_memory", { name: "stale-fact", explanation: "No longer applies." }),
+      memories,
+    );
+    expect(forgotten.ok).toBe(true);
+    if (forgotten.ok) {
+      expect(forgotten.mutation).toMatchObject({
+        kind: "forget",
+        explanation: "No longer applies.",
+      });
+    }
   });
 
   it("returns named actionable add_memory validation failures", async () => {
@@ -276,7 +313,7 @@ describe("memory mutation validation and persistence", () => {
 
     const invalidate = vi.spyOn(memoryService, "invalidatePinsContaining");
     const result = await applyApprovedMemoryMutation(
-      call("forget_memory", { name: "forgotten", reason: "No longer applies." }),
+      call("forget_memory", { name: "forgotten", explanation: "No longer applies." }),
       context,
       "applied",
     );

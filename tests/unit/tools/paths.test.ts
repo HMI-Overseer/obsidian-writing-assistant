@@ -321,7 +321,7 @@ describe("normalizeVaultToolCall confusable snapping (existing-file keys only)",
     const out = normalizeVaultToolCall(app, {
       id: "i",
       name: "insert_into_note",
-      arguments: { path: "Lore/Anno's Crucible.md", text: "x", where: "append" },
+      arguments: { path: "Lore/Anno's Crucible.md", content: "x", where: "append" },
     });
     expect(out.arguments.path).toBe(`Lore/Anno${CURLY}s Crucible.md`);
   });

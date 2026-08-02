@@ -292,7 +292,7 @@ async function resolveInsertIntoNote(
   block: EditBlock,
 ): Promise<EditBlock> {
   const where = block.toolArgs?.where as InsertWhere | undefined;
-  const rawText = typeof block.toolArgs?.text === "string" ? block.toolArgs.text : "";
+  const rawText = typeof block.toolArgs?.content === "string" ? block.toolArgs.content : "";
   const anchor = typeof block.toolArgs?.anchor === "string" ? block.toolArgs.anchor : "";
   // Malformed args never reach here (conversion validated the call); guard anyway.
   if (!where || rawText === "") return block;

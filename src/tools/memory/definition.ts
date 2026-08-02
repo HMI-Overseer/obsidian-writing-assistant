@@ -67,7 +67,7 @@ export const ADD_MEMORY_TOOL: CanonicalToolDefinition = {
         description:
           "Optional detailed body, up to 4000 Unicode code points. Rules often need no body.",
       },
-      rationale: {
+      explanation: {
         type: "string",
         description: "Optional reason this memory will help future sessions.",
       },
@@ -94,7 +94,7 @@ export const FORGET_MEMORY_TOOL: CanonicalToolDefinition = {
         type: "string",
         description: "Canonical kebab-case name of the memory to remove.",
       },
-      reason: {
+      explanation: {
         type: "string",
         description: "Optional reason the memory no longer applies.",
       },

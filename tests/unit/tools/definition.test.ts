@@ -10,10 +10,12 @@ import {
   GET_OUTLINE_TOOL,
   READ_SECTION_TOOL,
   GET_OUTGOING_LINKS_TOOL,
+  SEARCH_VAULT_TOOL,
   VAULT_TOOL_NAMES,
   filterSemanticSearchByAvailability,
   SEMANTIC_SEARCH_UNAVAILABLE_MESSAGE,
 } from "../../../src/tools/vault/definition";
+import { cloudStableToolSet } from "../../../src/tools/toolSurface";
 import { toolCallsToEditBlocks } from "../../../src/tools/editing/conversion";
 import type { ToolCall } from "../../../src/tools/types";
 
@@ -102,6 +104,29 @@ describe("GET_OUTGOING_LINKS_TOOL (M3)", () => {
   test("mirrors get_backlinks' tiering: cloud-only, not in the local CORE tier", () => {
     const core = CORE_VAULT_TOOLS.map((t) => t.name);
     expect(core).not.toContain("get_outgoing_links");
+  });
+});
+
+describe("SEARCH_VAULT_TOOL", () => {
+  test("names the retrieval limit topK, matching every other multi-word parameter", () => {
+    const props = SEARCH_VAULT_TOOL.parameters.properties;
+    expect(props.topK).toBeDefined();
+    expect(props.top_k).toBeUndefined();
+  });
+});
+
+// Drift guard for the parameter vocabulary RFC-0015 settled. `top_k` was the surface's
+// only snake_case parameter, and nothing typechecks a schema key, so the next tool can
+// reintroduce one invisibly. Top-level names only, the level the RFC surveyed.
+describe("advertised parameter names", () => {
+  test("every top-level parameter is camelCase", () => {
+    const offenders: string[] = [];
+    for (const tool of cloudStableToolSet(true)) {
+      for (const name of Object.keys(tool.parameters.properties)) {
+        if (!/^[a-z][a-zA-Z0-9]*$/.test(name)) offenders.push(`${tool.name}.${name}`);
+      }
+    }
+    expect(offenders).toEqual([]);
   });
 });
 

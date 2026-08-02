@@ -421,7 +421,7 @@ describe("insert_into_note path boundary (edit channel), real filesystem (sectio
 
     for (const path of ESCAPING_PATHS) {
       const result = await executeEditTool(
-        { id: `c-${path}`, name: "insert_into_note", arguments: { path, text: "pwned", where: "append" } },
+        { id: `c-${path}`, name: "insert_into_note", arguments: { path, content: "pwned", where: "append" } },
         { app, filePath: "" },
       );
       expect(result.isError, `should refuse "${path}"`).toBe(true);
@@ -439,7 +439,7 @@ describe("insert_into_note path boundary (edit channel), real filesystem (sectio
       const block = convertToolCallToEditBlock({
         id: "i",
         name: "insert_into_note",
-        arguments: { path, text: "pwned", where: "append" },
+        arguments: { path, content: "pwned", where: "append" },
       });
       expect(block).not.toBeNull();
       const [resolved] = await resolveStructuralEditBlocks([block!], { app, filePath: path });
@@ -461,7 +461,7 @@ describe("insert_into_note path boundary (edit channel), real filesystem (sectio
     const block = convertToolCallToEditBlock({
       id: "i",
       name: "insert_into_note",
-      arguments: { path: "Notes/Journal.md", text: "Day 2.", where: "append" },
+      arguments: { path: "Notes/Journal.md", content: "Day 2.", where: "append" },
     });
     const [resolved] = await resolveStructuralEditBlocks([block!], { app, filePath: "Notes/Journal.md" });
     const doc = fs.readFileSync(nodePath.join(vaultRoot, "Notes", "Journal.md"), "utf8");

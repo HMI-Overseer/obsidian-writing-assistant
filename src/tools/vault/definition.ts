@@ -239,7 +239,7 @@ export const SEARCH_VAULT_TOOL: CanonicalToolDefinition = {
           "The search query. Be specific, include character names, concept names, or " +
           "event descriptions rather than generic phrases.",
       },
-      top_k: {
+      topK: {
         type: "number",
         description:
           "Maximum number of results to return. Defaults to the configured retrieval limit. " +

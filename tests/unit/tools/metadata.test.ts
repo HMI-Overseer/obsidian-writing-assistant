@@ -86,7 +86,6 @@ describe("display-metadata coverage", () => {
     to: "Notes/B.md",
     search: "old",
     replace: "new",
-    text: "content",
     where: "append",
     anchor: "line",
     thought: "hmm",

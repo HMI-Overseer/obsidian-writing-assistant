@@ -49,9 +49,11 @@ export const convertedSection = (tab, title, desc, rows, icon) => {
   if (!icon) {
     throw new Error(`convertedSection("${title}") needs the icon its tab passes to settingsSections`);
   }
+  // A card with no description draws its title alone and marks the head row, so the row below it
+  // draws no divider: settingsSections() omits the paragraph rather than emitting an empty one.
   return `<div class="setting-group lmsa-ui-card lmsa-settings-section lmsa-settings-root lmsa-tab-${tab}">
     <div class="setting-items">
-      <div class="setting-item lmsa-settings-section-head">
+      <div class="setting-item lmsa-settings-section-head${desc ? "" : " is-title-only"}">
         <div class="lmsa-settings-section-header">
           <div class="lmsa-settings-section-heading">
             <div class="lmsa-settings-section-icon">${icon}</div>
@@ -59,7 +61,7 @@ export const convertedSection = (tab, title, desc, rows, icon) => {
           </div>
           <div class="lmsa-settings-section-actions"></div>
         </div>
-        <p class="lmsa-settings-section-desc">${desc}</p>
+        ${desc ? `<p class="lmsa-settings-section-desc">${desc}</p>` : ""}
       </div>
       ${rows}
     </div>
@@ -82,6 +84,11 @@ export const convertedRow = (name, desc, control, below = "") =>
 // A converted row that draws a block instead of a name / description / control pair.
 export const convertedBlock = (body) =>
   `<div class="setting-item lmsa-settings-section-block">${body}</div>`;
+
+// The card footer, which a converted card carries as its last row: a group has no footer element,
+// so the button that used to sit in one is a row that owns its host and keeps the footer class.
+export const convertedFooter = (body) =>
+  `<div class="setting-item lmsa-settings-section-footer">${body}</div>`;
 
 // A custom (non-Obsidian) settings row: name + description on the left, a control on the right.
 // `below` is the SettingItem case where a caller mounts into `settingEl` instead of `controlEl`

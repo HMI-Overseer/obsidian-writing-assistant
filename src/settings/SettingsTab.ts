@@ -7,12 +7,12 @@ import type {
 import { PluginSettingTab } from "obsidian";
 import type WritingAssistantChat from "../main";
 import { advancedTabSections } from "./AdvancedTab";
-import { renderCommandsTab } from "./CommandsTab";
+import { commandsTabSections } from "./CommandsTab";
 import { renderProvidersTab } from "./ProvidersTab";
 import { generalTabSections } from "./GeneralTab";
 import { ragTabSections } from "./RagTab";
 import { renderKnowledgeGraphTab } from "./KnowledgeGraphTab";
-import { renderMemoriesTab } from "./MemoriesTab";
+import { memoriesTabSections } from "./MemoriesTab";
 import { renderBenchmarkTab } from "./BenchmarkTab";
 import { vaultOpsTabSections } from "./VaultOpsTab";
 import type { TabPageRenderer } from "./definitions/ImperativeTabPage";
@@ -95,10 +95,10 @@ export class WritingAssistantSettingTab extends PluginSettingTab {
       group("Knowledge", [
         converted("Retrieval", ragTabSections(this.plugin, () => this.refreshDomState())),
         page("Knowledge Graph", (el) => renderKnowledgeGraphTab(el, this.plugin)),
-        page("Memories", (el) => renderMemoriesTab(el, this.plugin)),
+        converted("Memories", memoriesTabSections(this.plugin)),
       ]),
       group("Config", [
-        page("Commands", (el, refresh) => renderCommandsTab(el, this.plugin, refresh)),
+        converted("Commands", commandsTabSections(this.plugin)),
         converted("Vault Operations", vaultOpsTabSections(this.plugin)),
         converted("Advanced", advancedTabSections(this.plugin)),
         page("Benchmark", (el, refresh) => renderBenchmarkTab(el, this.plugin, refresh)),

@@ -2,7 +2,9 @@ import { setIcon } from "obsidian";
 import type WritingAssistantChat from "../main";
 import type { Memory } from "../shared/types";
 import { MemoryModal } from "./modals";
-import { createSettingsSection, SettingItem, Toggle } from "./ui";
+import { Toggle } from "./ui";
+import type { SettingsSection } from "./definitions/sections";
+import { blockRow, settingRow } from "./definitions/sections";
 import { voidAsync } from "../asyncCallbacks";
 import { computeMemoryCapacity } from "../memory/capacity";
 import type { Gate } from "../vault-ops/gateway";
@@ -26,6 +28,18 @@ const MEMORY_GATE_OPTIONS: ReadonlyArray<{ value: Gate; label: string }> = [
 ];
 
 /**
+ * Handles between rows of one page build. The master switch lives in the feature card and acts on
+ * two rows of the records card: switching memories off makes every stored entry undelivered, so the
+ * table becomes a message and the add button goes inert. Each handle is set by the row that owns
+ * the thing and nulled by that row's cleanup.
+ */
+interface MemoriesPageRefs {
+  /** Repaints the records card: the budget readout and the table or its off-state. */
+  syncRecords: (() => void) | null;
+  setAddEnabled: ((enabled: boolean) => void) | null;
+}
+
+/**
  * "Memories" settings (RFC-0005 + RFC-0007), the user-owned half of the feature:
  * the master switch, the memory-mutation approval gate, the always-on index's
  * capacity readout, and CRUD over the stored records.
@@ -37,95 +51,131 @@ const MEMORY_GATE_OPTIONS: ReadonlyArray<{ value: Gate; label: string }> = [
  * touches a pin, so a failed write leaves both the store and every live session
  * exactly as they were.
  */
-export function renderMemoriesTab(container: HTMLElement, plugin: WritingAssistantChat): void {
-  const { settings } = plugin;
-  const memoryService = plugin.services.memoryService;
+export function memoriesTabSections(plugin: WritingAssistantChat): SettingsSection[] {
+  const refs: MemoriesPageRefs = { syncRecords: null, setAddEnabled: null };
 
-  const store = {
-    getMemories: () => settings.memories,
-    setMemories: (next: Memory[]) => {
-      settings.memories = next;
+  return [
+    {
+      name: "Memory",
+      desc: "",
+      icon: "brain",
+      rows: [
+        settingRow(
+          "Enable memories",
+          "Deliver the memory index with every request and offer the memory tools.",
+          (item) => {
+            item.addToggle((toggle) => {
+              toggle.setValue(plugin.settings.memoriesEnabled);
+              toggle.onChange(
+                voidAsync(async (value: boolean) => {
+                  try {
+                    await commitMemoryFeatureToggle(
+                      {
+                        getEnabled: () => plugin.settings.memoriesEnabled,
+                        setEnabled: (next) => {
+                          plugin.settings.memoriesEnabled = next;
+                        },
+                        save: () => plugin.saveSettings(),
+                        invalidateAll: () => plugin.services.memoryService.invalidateAll(),
+                      },
+                      value
+                    );
+                  } finally {
+                    // Follow the stored value, so a rejected save leaves the switch
+                    // and the records card showing what is actually persisted.
+                    toggle.setValue(plugin.settings.memoriesEnabled);
+                    refs.syncRecords?.();
+                    refs.setAddEnabled?.(plugin.settings.memoriesEnabled);
+                  }
+                }, "Failed to save the memory setting.")
+              );
+            });
+          }
+        ),
+        settingRow(
+          "Memory changes",
+          "How the assistant's add and forget requests are handled. Deny removes both tools. The vault edit posture overrides this, as it does every other approval class.",
+          (item) => {
+            item.addDropdown((dropdown) => {
+              for (const option of MEMORY_GATE_OPTIONS) {
+                dropdown.addOption(option.value, option.label);
+              }
+              dropdown.setValue(plugin.settings.vaultOpPolicy.memory);
+              dropdown.onChange(
+                voidAsync(async (value: string) => {
+                  try {
+                    await commitMemoryGate(
+                      {
+                        getGate: () => plugin.settings.vaultOpPolicy.memory,
+                        setGate: (gate) => {
+                          plugin.settings.vaultOpPolicy.memory = gate;
+                        },
+                        save: () => plugin.saveSettings(),
+                      },
+                      value as Gate
+                    );
+                  } finally {
+                    dropdown.setValue(plugin.settings.vaultOpPolicy.memory);
+                  }
+                }, "Failed to save the memory approval setting.")
+              );
+            });
+          }
+        ),
+      ],
     },
-    save: () => plugin.saveSettings(),
-    invalidateAll: () => memoryService.invalidateAll(),
-    invalidatePinsContaining: (name: string) => memoryService.invalidatePinsContaining(name),
-  };
+    {
+      name: "Stored memories",
+      desc: "",
+      icon: "book-open",
+      rows: [
+        // The budget and the table share one row: the budget belongs to the records, not the
+        // feature switch, it is what this list costs, and it heads the row so the cost is read
+        // before the entries.
+        blockRow("Index budget", "", "lmsa-settings-section-block", (el) =>
+          renderRecords(el, plugin, refs)
+        ),
+        blockRow("Add memory", "", "lmsa-settings-section-footer", (el) => {
+          const addButtonEl = el.createEl("button", {
+            cls: "lmsa-btn-add lmsa-ui-btn lmsa-ui-btn-primary",
+            text: "Add memory",
+          });
+          addButtonEl.disabled = !plugin.settings.memoriesEnabled;
+          addButtonEl.addEventListener("click", () => {
+            // The footer row persists on its own and asks the records row only for the repaint, so
+            // an add still lands if that row is torn down while the modal is open.
+            const save = voidAsync(async (memory: Memory) => {
+              try {
+                await commitMemoryMutation(memoryStore(plugin), { kind: "add", memory });
+              } finally {
+                refs.syncRecords?.();
+              }
+            }, "Failed to save the memory.");
+            new MemoryModal(plugin.app, null, plugin.settings.memories, save).open();
+          });
+          refs.setAddEnabled = (enabled) => {
+            addButtonEl.disabled = !enabled;
+          };
+          return () => {
+            refs.setAddEnabled = null;
+          };
+        }),
+      ],
+    },
+  ];
+}
 
-  // ── Feature ────────────────────────────────────────────────────────────
+/** The budget readout and the records table, the whole body of the "Stored memories" card. */
+function renderRecords(
+  el: HTMLElement,
+  plugin: WritingAssistantChat,
+  refs: MemoriesPageRefs
+): () => void {
+  const capacity = renderCapacityBar(el, () =>
+    plugin.services.memoryService.estimateIndexTokens()
+  );
 
-  // Assigned once the records card below exists. The master toggle repaints it,
-  // because switching the feature off makes every stored entry undelivered.
-  let syncRecordsState = (): void => {};
-
-  const feature = createSettingsSection(container, "Memory", undefined, { icon: "brain" });
-
-  new SettingItem(feature.bodyEl)
-    .setName("Enable memories")
-    .setDesc("Deliver the memory index with every request and offer the memory tools.")
-    .addToggle((toggle) => {
-      toggle.setValue(settings.memoriesEnabled);
-      toggle.onChange(
-        voidAsync(async (value: boolean) => {
-          try {
-            await commitMemoryFeatureToggle(
-              {
-                getEnabled: () => settings.memoriesEnabled,
-                setEnabled: (next) => {
-                  settings.memoriesEnabled = next;
-                },
-                save: () => plugin.saveSettings(),
-                invalidateAll: () => memoryService.invalidateAll(),
-              },
-              value
-            );
-          } finally {
-            // Follow the stored value, so a rejected save leaves the switch
-            // and the records card showing what is actually persisted.
-            toggle.setValue(settings.memoriesEnabled);
-            syncRecordsState();
-          }
-        }, "Failed to save the memory setting.")
-      );
-    });
-
-  new SettingItem(feature.bodyEl)
-    .setName("Memory changes")
-    .setDesc(
-      "How the assistant's add and forget requests are handled. Deny removes both tools. The vault edit posture overrides this, as it does every other approval class."
-    )
-    .addDropdown((dropdown) => {
-      for (const option of MEMORY_GATE_OPTIONS) dropdown.addOption(option.value, option.label);
-      dropdown.setValue(settings.vaultOpPolicy.memory);
-      dropdown.onChange(
-        voidAsync(async (value: string) => {
-          try {
-            await commitMemoryGate(
-              {
-                getGate: () => settings.vaultOpPolicy.memory,
-                setGate: (gate) => {
-                  settings.vaultOpPolicy.memory = gate;
-                },
-                save: () => plugin.saveSettings(),
-              },
-              value as Gate
-            );
-          } finally {
-            dropdown.setValue(settings.vaultOpPolicy.memory);
-          }
-        }, "Failed to save the memory approval setting.")
-      );
-    });
-
-  // ── Stored records ─────────────────────────────────────────────────────
-
-  const library = createSettingsSection(container, "Stored memories", undefined, {
-    icon: "book-open",
-  });
-  // The budget belongs to the records, not the feature switch: it is what this
-  // list costs. It heads the card, so the cost is read before the entries.
-  const capacity = renderCapacityBar(library.bodyEl, () => memoryService.estimateIndexTokens());
-
-  const listEl = library.bodyEl.createDiv({ cls: "lmsa-memory-list" });
+  const listEl = el.createDiv({ cls: "lmsa-memory-list" });
 
   // The row awaiting delete confirmation, by name. Deleting is two-step in place,
   // the same shape the history drawer and the profile list use.
@@ -135,7 +185,7 @@ export function renderMemoriesTab(container: HTMLElement, plugin: WritingAssista
   const commit = voidAsync(async (mutation: MemoryMutation) => {
     pendingDeleteName = null;
     try {
-      await commitMemoryMutation(store, mutation);
+      await commitMemoryMutation(memoryStore(plugin), mutation);
     } finally {
       // Repaint from the store either way: after a rollback the rows must show
       // the persisted state, not the one the click implied.
@@ -145,6 +195,7 @@ export function renderMemoriesTab(container: HTMLElement, plugin: WritingAssista
   }, "Failed to save the memory.");
 
   const renderList = () => {
+    const { settings } = plugin;
     listEl.empty();
 
     // With the feature off the card states why instead of rendering the table.
@@ -231,30 +282,36 @@ export function renderMemoriesTab(container: HTMLElement, plugin: WritingAssista
     }
   };
 
-  const addButtonEl = library.footerEl.createEl("button", {
-    cls: "lmsa-btn-add lmsa-ui-btn lmsa-ui-btn-primary",
-    text: "Add memory",
-  });
-  addButtonEl.addEventListener("click", () => {
-    new MemoryModal(plugin.app, null, settings.memories, (memory) =>
-      commit({ kind: "add", memory })
-    ).open();
-  });
-
-  syncRecordsState = () => {
-    const off = !settings.memoriesEnabled;
-    if (off) pendingDeleteName = null;
-    addButtonEl.disabled = off;
+  const syncRecords = () => {
+    if (!plugin.settings.memoriesEnabled) pendingDeleteName = null;
     // The budget describes an index that is not delivered while the feature is
     // off, so it goes away with the table rather than quoting a phantom cost.
-    capacity.wrapEl.toggleClass("lmsa-hidden", off);
+    capacity.wrapEl.toggleClass("lmsa-hidden", !plugin.settings.memoriesEnabled);
     // Nothing interactive is rendered while off, so the card needs no `inert`
     // and no scrim: the list simply is the message.
     renderList();
     capacity.refresh();
   };
 
-  syncRecordsState();
+  syncRecords();
+  refs.syncRecords = syncRecords;
+  return () => {
+    refs.syncRecords = null;
+  };
+}
+
+/** The persistence surface {@link commitMemoryMutation} writes through. */
+function memoryStore(plugin: WritingAssistantChat) {
+  const memoryService = plugin.services.memoryService;
+  return {
+    getMemories: () => plugin.settings.memories,
+    setMemories: (next: Memory[]) => {
+      plugin.settings.memories = next;
+    },
+    save: () => plugin.saveSettings(),
+    invalidateAll: () => memoryService.invalidateAll(),
+    invalidatePinsContaining: (name: string) => memoryService.invalidatePinsContaining(name),
+  };
 }
 
 /** A square row action: the house button chrome, sized down to the icon. */

@@ -3,6 +3,7 @@ import { BRAND, I } from "../fixtures/icons.mjs";
 import { memoryOffState, memoryRow, memoryTable } from "../fixtures/memory.mjs";
 import {
   convertedBlock,
+  convertedFooter,
   convertedRow,
   convertedSection,
   section,
@@ -385,32 +386,36 @@ export const SETTINGS_SURFACES = {
     ),
   },
 
-  // S21d: settings Memories tab (feature card + the records table + budget bar).
+  // S21d: settings Memories tab (feature card + the records table + budget bar). Converted: both
+  // cards carry no description, so each head row is title-only and draws no divider under it.
   settingsMemories: {
     source: "src/settings/MemoriesTab.ts",
     shot: ".setting-page",
-    html: settingsView(
-      section(
+    html: settingsItemsView(
+      convertedSection(
+        "memories",
         "Memory",
         "",
-        `${settingItem("Enable memories", "Deliver the memory index with every request and offer the memory tools.", sw("is-enabled"))}
-        ${settingItem("Memory changes", "How the assistant's add and forget requests are handled. Deny removes both tools. The vault edit posture overrides this, as it does every other approval class.", `<select><option>Ask</option><option>Auto-apply</option><option>Deny</option></select>`)}
-`,
+        `${convertedRow("Enable memories", "Deliver the memory index with every request and offer the memory tools.", sw("is-enabled"))}
+        ${convertedRow("Memory changes", "How the assistant's add and forget requests are handled. Deny removes both tools. The vault edit posture overrides this, as it does every other approval class.", `<select><option>Ask</option><option>Auto-apply</option><option>Deny</option></select>`)}`,
         I.brain,
       ) +
-        section(
+        convertedSection(
+          "memories",
           "Stored memories",
           "",
-          memoryTable(
-            `${memoryRow("no-emdashes", "rule", "Never use em dashes; use commas for asides and colons before lists.")}
-             ${memoryRow("no-emojis", "rule", "Never use emojis.", false)}
-             ${memoryRow("pov-limited", "rule", "Write in third person limited, one viewpoint per scene.", true, true)}
-             ${memoryRow("vault-tone", "context", "The vault's grimdark tone and genre; recall when setting scene mood.")}`,
-          ),
+          convertedBlock(
+            memoryTable(
+              `${memoryRow("no-emdashes", "rule", "Never use em dashes; use commas for asides and colons before lists.")}
+               ${memoryRow("no-emojis", "rule", "Never use emojis.", false)}
+               ${memoryRow("pov-limited", "rule", "Write in third person limited, one viewpoint per scene.", true, true)}
+               ${memoryRow("vault-tone", "context", "The vault's grimdark tone and genre; recall when setting scene mood.")}`,
+            ),
+          ) +
+            convertedFooter(
+              '<button class="lmsa-btn-add lmsa-ui-btn lmsa-ui-btn-primary">Add memory</button>',
+            ),
           I.bookOpen,
-        ).replace(
-          '<div class="lmsa-settings-section-footer"></div>',
-          '<div class="lmsa-settings-section-footer"><button class="lmsa-btn-add lmsa-ui-btn lmsa-ui-btn-primary">Add memory</button></div>',
         ),
       720,
       "memories",
@@ -421,23 +426,25 @@ export const SETTINGS_SURFACES = {
   settingsMemoriesOff: {
     source: "src/settings/MemoriesTab.ts",
     shot: ".setting-page",
-    html: settingsView(
-      section(
+    html: settingsItemsView(
+      convertedSection(
+        "memories",
         "Memory",
         "",
-        `${settingItem("Enable memories", "Deliver the memory index with every request and offer the memory tools.", sw())}
-        ${settingItem("Memory changes", "How the assistant's add and forget requests are handled. Deny removes both tools. The vault edit posture overrides this, as it does every other approval class.", `<select><option>Ask</option><option>Auto-apply</option><option>Deny</option></select>`)}
-`,
+        `${convertedRow("Enable memories", "Deliver the memory index with every request and offer the memory tools.", sw())}
+        ${convertedRow("Memory changes", "How the assistant's add and forget requests are handled. Deny removes both tools. The vault edit posture overrides this, as it does every other approval class.", `<select><option>Ask</option><option>Auto-apply</option><option>Deny</option></select>`)}`,
         I.brain,
       ) +
-        section(
+        convertedSection(
+          "memories",
           "Stored memories",
           "",
-          memoryOffState(),
+          // The budget bar goes away with the table: it describes an index that is not delivered.
+          convertedBlock(memoryOffState()) +
+            convertedFooter(
+              '<button class="lmsa-btn-add lmsa-ui-btn lmsa-ui-btn-primary" disabled>Add memory</button>',
+            ),
           I.bookOpen,
-        ).replace(
-          '<div class="lmsa-settings-section-footer"></div>',
-          '<div class="lmsa-settings-section-footer"><button class="lmsa-btn-add lmsa-ui-btn lmsa-ui-btn-primary" disabled>Add memory</button></div>',
         ),
       720,
       "memories",

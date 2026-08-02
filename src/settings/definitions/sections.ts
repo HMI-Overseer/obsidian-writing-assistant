@@ -39,7 +39,7 @@ export function blockRow(
     desc,
     render: (setting) => {
       setting.settingEl.empty();
-      setting.settingEl.addClass(cls);
+      setting.settingEl.addClasses(cls.split(" "));
       return build(setting.settingEl);
     },
   };
@@ -66,6 +66,15 @@ export function settingRow(
 }
 
 /**
+ * The card headline is always a row, where the lead paragraph used to be optional. A card with no
+ * description therefore draws its title alone, and the row under it draws no divider: the paragraph
+ * is what stood between them on an imperative page.
+ */
+function headCls(desc: string): string {
+  return desc ? "lmsa-settings-section-head" : "lmsa-settings-section-head is-title-only";
+}
+
+/**
  * Builds one group per section card, for a page that renders its own `items` rather than handing a
  * subtree to an imperative renderer.
  *
@@ -82,13 +91,15 @@ export function settingsSections(
     cls: `lmsa-ui-card lmsa-settings-section lmsa-settings-root lmsa-tab-${slug}`,
     visible: section.visible,
     items: [
-      blockRow(section.name, section.desc, "lmsa-settings-section-head", (el) => {
+      blockRow(section.name, section.desc, headCls(section.desc), (el) => {
         const headerEl = el.createDiv({ cls: "lmsa-settings-section-header" });
         const headingEl = headerEl.createDiv({ cls: "lmsa-settings-section-heading" });
         setIcon(headingEl.createDiv({ cls: "lmsa-settings-section-icon" }), section.icon);
         headingEl.createEl("h3", { cls: "lmsa-settings-section-title", text: section.name });
         headerEl.createDiv({ cls: "lmsa-settings-section-actions" });
-        el.createEl("p", { cls: "lmsa-settings-section-desc", text: section.desc });
+        if (section.desc) {
+          el.createEl("p", { cls: "lmsa-settings-section-desc", text: section.desc });
+        }
       }),
       ...section.rows,
     ],

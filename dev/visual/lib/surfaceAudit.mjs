@@ -211,6 +211,40 @@ export function auditSurfaceContracts(surfaces) {
     [">Agentic mode<", ">Document Editing<"],
     failures,
   );
+  // The two list tabs draw their collections as block rows, and the button that used to sit in the
+  // card footer element is now a row. A fixture that loses one of those loses the whole affordance.
+  requireMarkup(
+    surfaces.settingsCommands,
+    "settingsCommands",
+    [">Command library<", ">Prompt variables<", ">Custom commands<", ">Add command<"],
+    failures,
+  );
+  requireMarkup(
+    surfaces.settingsCommandsEmpty,
+    "settingsCommandsEmpty",
+    [">No custom commands configured yet.<", ">Add command<"],
+    failures,
+  );
+  rejectMarkup(surfaces.settingsCommandsEmpty, "settingsCommandsEmpty", ["is-user-created"], failures);
+  requireMarkup(
+    surfaces.settingsMemories,
+    "settingsMemories",
+    [">Memory<", ">Stored memories<", ">Index budget (advisory)<", ">Add memory<"],
+    failures,
+  );
+  // Feature off: the budget describes an index that is not delivered, so it goes with the table.
+  requireMarkup(
+    surfaces.settingsMemoriesOff,
+    "settingsMemoriesOff",
+    [">Memories are off<", "disabled>Add memory<"],
+    failures,
+  );
+  rejectMarkup(
+    surfaces.settingsMemoriesOff,
+    "settingsMemoriesOff",
+    ["lmsa-memory-table", "lmsa-memory-capacity"],
+    failures,
+  );
 
   if (failures.length > 0) {
     throw new Error(`Visual surface contract audit failed:\n- ${failures.join("\n- ")}`);

@@ -1,6 +1,12 @@
 import { settingsItemsView, settingsView } from "../scaffold.mjs";
 import { I } from "../fixtures/icons.mjs";
-import { convertedRow, convertedSection, section } from "../fixtures/primitives.mjs";
+import {
+  convertedBlock,
+  convertedFooter,
+  convertedRow,
+  convertedSection,
+  section,
+} from "../fixtures/primitives.mjs";
 
 const BUILTIN_COMMAND_CATEGORIES = [
   {
@@ -93,26 +99,33 @@ const builtinCommandList = BUILTIN_COMMAND_CATEGORIES.map(
        .join("")}`,
 ).join("");
 
+// Converted: the hint block, the read-only catalogue, the custom list and the add button are four
+// rows of one group. Consecutive block rows sit flush, the way these four sat inside the card body.
 const commandLibrary = (customContent) =>
-  section(
+  convertedSection(
+    "commands",
     "Command library",
     "Prompt shortcuts that appear in chat and the editor context menu. Select text, right-click, and pick a command from the Writing assistant submenu.",
-    `<div class="lmsa-settings-note">
-      <div class="lmsa-settings-note-title">Prompt variables</div>
-      <ul class="lmsa-hint-list">
-        <li>{{selection}} inserts the current editor selection.</li>
-        <li>{{note}} inserts the active note text, trimmed to the note context limit (keeps the ending when trimmed).</li>
-      </ul>
-    </div>
-    <div class="lmsa-item-list">${builtinCommandList}</div>
-    <div class="lmsa-item-list">
-      <div class="lmsa-command-category-label">Custom commands</div>
-      ${customContent}
-    </div>`,
+    convertedBlock(
+      `<div class="lmsa-settings-note">
+        <div class="lmsa-settings-note-title">Prompt variables</div>
+        <ul class="lmsa-hint-list">
+          <li>{{selection}} inserts the current editor selection.</li>
+          <li>{{note}} inserts the active note text, trimmed to the note context limit (keeps the ending when trimmed).</li>
+        </ul>
+      </div>`,
+    ) +
+      convertedBlock(`<div class="lmsa-item-list">${builtinCommandList}</div>`) +
+      convertedBlock(
+        `<div class="lmsa-item-list">
+          <div class="lmsa-command-category-label">Custom commands</div>
+          ${customContent}
+        </div>`,
+      ) +
+      convertedFooter(
+        '<button class="lmsa-btn-add lmsa-ui-btn lmsa-ui-btn-primary">Add command</button>',
+      ),
     I.terminal,
-  ).replace(
-    '<div class="lmsa-settings-section-footer"></div>',
-    '<div class="lmsa-settings-section-footer"><button class="lmsa-btn-add lmsa-ui-btn lmsa-ui-btn-primary">Add command</button></div>',
   );
 
 const gateSelect = () =>
@@ -294,7 +307,7 @@ export const SETTINGS_COVERAGE_SURFACES = {
   settingsCommands: {
     source: "src/settings/CommandsTab.ts",
     shot: ".setting-page",
-    html: settingsView(
+    html: settingsItemsView(
       commandLibrary(
         commandRow(
           "Tighten dialogue",
@@ -311,7 +324,7 @@ export const SETTINGS_COVERAGE_SURFACES = {
   settingsCommandsEmpty: {
     source: "src/settings/CommandsTab.ts",
     shot: ".setting-page",
-    html: settingsView(
+    html: settingsItemsView(
       commandLibrary(
         '<p class="lmsa-empty-state">No custom commands configured yet.</p>',
       ),

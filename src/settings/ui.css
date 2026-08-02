@@ -129,6 +129,30 @@
   @apply lmsa:pb-0 lmsa:pt-5;
 }
 
+/* A card with no description draws no lead paragraph, so the row below the title is the one the
+   gradient divider would separate from a paragraph that is not there. */
+.setting-group.lmsa-settings-section
+  > .setting-items
+  > .lmsa-settings-section-head.is-title-only
+  + .setting-item::before {
+  content: none;
+}
+
+/* Block rows draw DOM that sat flush inside the section body, one child against the next. Their row
+   hosts would otherwise stack a padding from each side of every seam, so a block row leaves the gap
+   below it to whatever follows: nothing between two blocks, the footer's own inset before a footer,
+   the card's inset when it is the last row. */
+.setting-group.lmsa-settings-section > .setting-items > .lmsa-settings-section-block {
+  @apply lmsa:pb-0;
+}
+
+.setting-group.lmsa-settings-section
+  > .setting-items
+  > .lmsa-settings-section-block
+  + .lmsa-settings-section-block {
+  @apply lmsa:pt-0;
+}
+
 .lmsa-settings-section-head,
 .lmsa-settings-section-block {
   @apply lmsa:block;

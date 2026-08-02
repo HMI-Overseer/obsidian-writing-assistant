@@ -1,4 +1,9 @@
-import type { App, SettingDefinitionItem, SettingDefinitionPage } from "obsidian";
+import type {
+  App,
+  SettingDefinitionGroup,
+  SettingDefinitionItem,
+  SettingDefinitionPage,
+} from "obsidian";
 import { PluginSettingTab } from "obsidian";
 import type WritingAssistantChat from "../main";
 import { renderAdvancedTab } from "./AdvancedTab";
@@ -48,6 +53,8 @@ export class WritingAssistantSettingTab extends PluginSettingTab {
     private plugin: WritingAssistantChat
   ) {
     super(app, plugin);
+    // Puts the design tokens in scope for the root list, the same hook the pages carry.
+    this.containerEl.addClass("lmsa-settings-root");
   }
 
   getSettingDefinitions(): SettingDefinitionItem[] {
@@ -58,16 +65,32 @@ export class WritingAssistantSettingTab extends PluginSettingTab {
       page: () => new ImperativeTabPage(name, TAB_SLUGS[name], render),
     });
 
+    // Groups render their pages inline under a heading, so this is the rail's grouping without the
+    // extra navigation level nesting would cost. Search is unaffected: both index walkers descend
+    // through a group carrying the page path through unchanged.
+    const group = (heading: string, pages: SettingDefinitionPage[]): SettingDefinitionGroup => ({
+      type: "group",
+      heading,
+      cls: "lmsa-settings-nav-group",
+      items: pages,
+    });
+
     return [
-      page("General", (el) => renderGeneralTab(el, this.plugin)),
-      page("Providers", (el, refresh) => renderProvidersTab(el, this.plugin, refresh)),
-      page("Retrieval", (el) => renderRagTab(el, this.plugin)),
-      page("Knowledge Graph", (el) => renderKnowledgeGraphTab(el, this.plugin)),
-      page("Memories", (el) => renderMemoriesTab(el, this.plugin)),
-      page("Commands", (el, refresh) => renderCommandsTab(el, this.plugin, refresh)),
-      page("Vault Operations", (el) => renderVaultOpsTab(el, this.plugin)),
-      page("Advanced", (el) => renderAdvancedTab(el, this.plugin)),
-      page("Benchmark", (el, refresh) => renderBenchmarkTab(el, this.plugin, refresh)),
+      group("Plugin", [
+        page("General", (el) => renderGeneralTab(el, this.plugin)),
+        page("Providers", (el, refresh) => renderProvidersTab(el, this.plugin, refresh)),
+      ]),
+      group("Knowledge", [
+        page("Retrieval", (el) => renderRagTab(el, this.plugin)),
+        page("Knowledge Graph", (el) => renderKnowledgeGraphTab(el, this.plugin)),
+        page("Memories", (el) => renderMemoriesTab(el, this.plugin)),
+      ]),
+      group("Config", [
+        page("Commands", (el, refresh) => renderCommandsTab(el, this.plugin, refresh)),
+        page("Vault Operations", (el) => renderVaultOpsTab(el, this.plugin)),
+        page("Advanced", (el) => renderAdvancedTab(el, this.plugin)),
+        page("Benchmark", (el, refresh) => renderBenchmarkTab(el, this.plugin, refresh)),
+      ]),
     ];
   }
 }

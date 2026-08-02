@@ -455,22 +455,24 @@ export const SETTINGS_SURFACES = {
   settingsKnowledgeGraph: {
     source: "src/settings/KnowledgeGraphTab.ts",
     shot: ".setting-page",
-    html: settingsView(
-      section(
+    html: settingsItemsView(
+      convertedSection(
+        "knowledge-graph",
         "Before you begin",
         "",
-        `${settingItem("Compute", "Every note is sent to a completion model to find relationships and interconnect entities, then each entity is embedded. This is resource intensive on both compute and memory.", "")}
-        ${settingItem("Large vaults", "Vaults with hundreds or thousands of notes will take considerably longer to process.", "")}
-        ${settingItem("Cost", "Cloud providers charge per token. A full build can consume a meaningful amount of API credits.", "")}
-        ${settingItem("Benefits", "Once built, the graph surfaces connections across notes that are hard to find manually, useful for world-building, story planning, and discovering narrative threads between characters, locations, and events.", "")}`,
+        `${convertedRow("Compute", "Every note is sent to a completion model to find relationships and interconnect entities, then each entity is embedded. This is resource intensive on both compute and memory.", "")}
+        ${convertedRow("Large vaults", "Vaults with hundreds or thousands of notes will take considerably longer to process.", "")}
+        ${convertedRow("Cost", "Cloud providers charge per token. A full build can consume a meaningful amount of API credits.", "")}
+        ${convertedRow("Benefits", "Once built, the graph surfaces connections across notes that are hard to find manually, useful for world-building, story planning, and discovering narrative threads between characters, locations, and events.", "")}`,
         I.triangleAlert,
         "lmsa-kg-warning",
       ) +
-        section(
+        convertedSection(
+          "knowledge-graph",
           "Knowledge graph",
           "Use an LLM to extract entities and relationships from your vault, building a semantic knowledge graph that discovers connections across notes.",
-          `${settingItem("Enable knowledge graph", "When enabled, the plugin can extract entities and relationships from your vault using a completion model.", sw("is-enabled"))}
-          ${settingItem(
+          `${convertedRow("Enable knowledge graph", "When enabled, the plugin can extract entities and relationships from your vault using a completion model.", sw("is-enabled"))}
+          ${convertedRow(
             "Completion model",
             "Generates structured entity and relationship data from your notes.",
             "",
@@ -483,7 +485,7 @@ export const SETTINGS_SURFACES = {
               <div class="lmsa-model-dropdown lmsa-hidden"></div>
             </div>`,
           )}
-          ${settingItem(
+          ${convertedRow(
             "Embedding model",
             "Encodes extracted entities as vectors for similarity search.",
             "",
@@ -498,10 +500,12 @@ export const SETTINGS_SURFACES = {
           )}`,
           I.gitFork,
         ) +
-        `<div class="lmsa-kg-conditional">${section(
+        convertedSection(
+          "knowledge-graph",
           "Graph",
           "Manage the extracted knowledge graph.",
-          `<div class="lmsa-index-status">
+          convertedBlock(
+            `<div class="lmsa-index-status">
             <div class="lmsa-index-status-header">
               <div class="lmsa-index-status-info">
                 <p class="lmsa-index-status-text">40 files processed. 312 entities, 580 relationships.</p>
@@ -533,18 +537,20 @@ export const SETTINGS_SURFACES = {
               </div>
             </div>
           </div>`,
+          ),
           I.database,
         ) +
-          section(
-            "Filtering",
-            "Control which files are included in graph extraction.",
-            settingItem(
-              "Exclude patterns",
-              "Glob patterns for files to exclude from extraction (one per line).",
-              `<textarea rows="4" placeholder="e.g. templates/**">Templates/**</textarea>`,
-            ),
-            I.filter,
-          )}</div>`,
+        convertedSection(
+          "knowledge-graph",
+          "Filtering",
+          "Control which files are included in graph extraction.",
+          convertedRow(
+            "Exclude patterns",
+            "Glob patterns for files to exclude from extraction (one per line).",
+            `<textarea rows="4" placeholder="e.g. templates/**">Templates/**</textarea>`,
+          ),
+          I.filter,
+        ),
       720,
       "knowledge-graph",
     ),

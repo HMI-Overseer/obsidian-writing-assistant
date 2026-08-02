@@ -87,6 +87,18 @@ export function auditSurfaceContracts(surfaces) {
         ],
         failures,
       );
+      // The card classes alone do not prove the arrangement: a fixture that rebuilds its cards but
+      // keeps the old page wrapper draws both, and passed until this rejected it. A converted page
+      // has no panel and no token host on the page root, because groups cannot nest and there is
+      // nothing above the card left to be either.
+      if (converted) {
+        rejectMarkup(
+          surface,
+          id,
+          ["lmsa-settings-panel", "vertical-tab-content lmsa-settings-root"],
+          failures,
+        );
+      }
     }
 
     const toolRows =

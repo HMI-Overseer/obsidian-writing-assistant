@@ -25,13 +25,6 @@
   @apply lmsa:flex lmsa:flex-col lmsa:gap-5 lmsa:p-5;
 }
 
-/* The knowledge graph's conditional wrapper inherits the same flex gap layout so that section
-   cards inside it don't collapse together. A converted tab has no wrapper: the cards it used to
-   hold carry `visible` instead. */
-.lmsa-settings-content > .lmsa-kg-conditional {
-  @apply lmsa:flex lmsa:flex-col lmsa:gap-5;
-}
-
 /* ── Section (card) ────────────────────────────────────────────────────── */
 
 .lmsa-settings-section {

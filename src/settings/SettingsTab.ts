@@ -11,7 +11,7 @@ import { commandsTabSections } from "./CommandsTab";
 import { renderProvidersTab } from "./ProvidersTab";
 import { generalTabSections } from "./GeneralTab";
 import { ragTabSections } from "./RagTab";
-import { renderKnowledgeGraphTab } from "./KnowledgeGraphTab";
+import { knowledgeGraphTabSections } from "./KnowledgeGraphTab";
 import { memoriesTabSections } from "./MemoriesTab";
 import { renderBenchmarkTab } from "./BenchmarkTab";
 import { vaultOpsTabSections } from "./VaultOpsTab";
@@ -94,7 +94,10 @@ export class WritingAssistantSettingTab extends PluginSettingTab {
       ]),
       group("Knowledge", [
         converted("Retrieval", ragTabSections(this.plugin, () => this.refreshDomState())),
-        page("Knowledge Graph", (el) => renderKnowledgeGraphTab(el, this.plugin)),
+        converted(
+          "Knowledge Graph",
+          knowledgeGraphTabSections(this.plugin, () => this.refreshDomState()),
+        ),
         converted("Memories", memoriesTabSections(this.plugin)),
       ]),
       group("Config", [

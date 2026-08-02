@@ -12,6 +12,11 @@ export interface SettingsSection {
   desc: string;
   /** Lucide icon drawn in the card's badge. */
   icon: string;
+  /**
+   * Extra classes for this card alone, on top of the four every card carries. For a card with its
+   * own skin, the way `createSettingsSection` callers used to reach for `sectionEl.addClass`.
+   */
+  cls?: string;
   rows: SettingDefinitionRender[];
   /**
    * Hides the whole card, heading and rows alike, and drops its rows from settings search while it
@@ -88,7 +93,9 @@ export function settingsSections(
 ): SettingDefinitionGroup[] {
   return sections.map((section) => ({
     type: "group",
-    cls: `lmsa-ui-card lmsa-settings-section lmsa-settings-root lmsa-tab-${slug}`,
+    cls: `lmsa-ui-card lmsa-settings-section lmsa-settings-root lmsa-tab-${slug}${
+      section.cls ? ` ${section.cls}` : ""
+    }`,
     visible: section.visible,
     items: [
       blockRow(section.name, section.desc, headCls(section.desc), (el) => {

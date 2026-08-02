@@ -9,6 +9,7 @@ import { voidAsync } from "../asyncCallbacks";
 import { DEFAULT_RAG_SETTINGS } from "../constants";
 import type { SettingsSection } from "./definitions/sections";
 import { blockRow, settingRow } from "./definitions/sections";
+import { formatLineList, parseLineList } from "./definitions/lineList";
 
 /**
  * What two rows publish for rows in other cards that act on them: the model selector, which the
@@ -463,13 +464,10 @@ function chunkingCard(plugin: WritingAssistantChat): SettingsSection {
         "Glob patterns for files to exclude from indexing (one per line).",
         (item) => {
           item.addTextArea((textarea) => {
-            textarea.setValue(plugin.settings.rag.excludePatterns.join("\n"));
+            textarea.setValue(formatLineList(plugin.settings.rag.excludePatterns));
             textarea.setPlaceholder("e.g. templates/**");
             textarea.onChange(async (value) => {
-              plugin.settings.rag.excludePatterns = value
-                .split("\n")
-                .map((line) => line.trim())
-                .filter((line) => line.length > 0);
+              plugin.settings.rag.excludePatterns = parseLineList(value);
               await plugin.saveSettings();
             });
           });

@@ -4,6 +4,7 @@ import type { Gate, VaultOpPolicy } from "../vault-ops/gateway";
 import { DEFAULT_VAULT_OP_POLICY } from "../vault-ops/gateway";
 import type { SettingsSection } from "./definitions/sections";
 import { settingRow } from "./definitions/sections";
+import { formatLineList, parseLineList } from "./definitions/lineList";
 
 /**
  * "Vault operations" settings (ADR-0023), the approval policy surface for the
@@ -67,13 +68,10 @@ export function vaultOpsTabSections(plugin: WritingAssistantChat): SettingsSecti
           (item) => {
             item.addTextArea((textarea) => {
               textarea.inputEl.rows = 4;
-              textarea.setValue(plugin.settings.vaultOpPolicy.scopes.join("\n"));
+              textarea.setValue(formatLineList(plugin.settings.vaultOpPolicy.scopes));
               textarea.setPlaceholder("e.g. drafts/ai");
               textarea.onChange(async (value) => {
-                plugin.settings.vaultOpPolicy.scopes = value
-                  .split("\n")
-                  .map((line) => line.trim())
-                  .filter((line) => line.length > 0);
+                plugin.settings.vaultOpPolicy.scopes = parseLineList(value);
                 await plugin.saveSettings();
               });
             });

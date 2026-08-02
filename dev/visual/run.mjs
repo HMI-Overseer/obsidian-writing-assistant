@@ -38,7 +38,10 @@ if (!existsSync(currentCss)) {
   process.exit(1);
 }
 
-console.log(`surface audit: ${auditSurfaceContracts(SURFACES)} fixture contract(s) covered`);
+// The number is the surfaces audited, not the assertions run: contracts are added and removed
+// inside the audit without moving it. It said "contract(s) covered" until Stage 7, and four run
+// records quoted it as a contract count on that reading.
+console.log(`surface audit: ${auditSurfaceContracts(SURFACES)} surface(s) audited, no failures`);
 
 const iconAudit = auditIconNames(join(REPO, "src"));
 if (iconAudit.missing.length > 0) {

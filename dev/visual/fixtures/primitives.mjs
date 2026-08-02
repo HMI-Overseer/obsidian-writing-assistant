@@ -45,13 +45,15 @@ export const section = (title, desc, body, icon, extraCls = "") => {
 // hook a definition carries, so it holds the card class, the token host and the tab accent), the
 // group's `.setting-items` list is the card body, and the header plus the lead paragraph share the
 // first row host. `tab` is the accent slug, `rows` are convertedRow()/convertedBlock() hosts.
-export const convertedSection = (tab, title, desc, rows, icon) => {
+export const convertedSection = (tab, title, desc, rows, icon, extraCls = "") => {
   if (!icon) {
     throw new Error(`convertedSection("${title}") needs the icon its tab passes to settingsSections`);
   }
   // A card with no description draws its title alone and marks the head row, so the row below it
   // draws no divider: settingsSections() omits the paragraph rather than emitting an empty one.
-  return `<div class="setting-group lmsa-ui-card lmsa-settings-section lmsa-settings-root lmsa-tab-${tab}">
+  return `<div class="setting-group lmsa-ui-card lmsa-settings-section lmsa-settings-root lmsa-tab-${tab}${
+    extraCls ? " " + extraCls : ""
+  }">
     <div class="setting-items">
       <div class="setting-item lmsa-settings-section-head${desc ? "" : " is-title-only"}">
         <div class="lmsa-settings-section-header">

@@ -10,11 +10,11 @@
  */
 
 /**
- * CLI version the bundled SDK was validated against. SDK `0.3.207` vendors
- * Claude Code `2.1.207`. Keep this in lockstep with the `@anthropic-ai/
+ * CLI version the bundled SDK was validated against. SDK `0.3.220` vendors
+ * Claude Code `2.1.220`. Keep this in lockstep with the `@anthropic-ai/
  * claude-agent-sdk` pin in `package.json`.
  */
-export const EXPECTED_CLAUDE_CLI_VERSION = "2.1.207";
+export const EXPECTED_CLAUDE_CLI_VERSION = "2.1.220";
 
 export interface ParsedVersion {
   major: number;

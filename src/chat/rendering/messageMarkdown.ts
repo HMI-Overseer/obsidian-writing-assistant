@@ -1,5 +1,5 @@
 import MarkdownIt from "markdown-it";
-import type { RenderRule, StateInline, Token } from "markdown-it";
+import type { RendererRule, StateInline, Token } from "markdown-it";
 
 function escapeHtml(value: string): string {
   return value
@@ -120,7 +120,7 @@ function parseInternalMarkdownLink(state: StateInline, silent: boolean): boolean
 markdownIt.inline.ruler.before("link", "lmsa_wikilink", parseWikilink);
 markdownIt.inline.ruler.before("link", "lmsa_internal_markdown_link", parseInternalMarkdownLink);
 
-const defaultLinkOpen: RenderRule =
+const defaultLinkOpen: RendererRule =
   markdownIt.renderer.rules.link_open ??
   ((tokens, idx, options, _env, self) => self.renderToken(tokens, idx, options));
 

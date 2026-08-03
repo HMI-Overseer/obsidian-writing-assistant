@@ -40,6 +40,14 @@ import { toolFailure } from "./toolFailure";
  * so it can auto-apply at the gate. Reads are never gated on the cloud paths, and the
  * local read tier is now the full read suite too (the per-mode read-narrowing went
  * away with the modes). Portable: no Obsidian, no disk, so it unit-tests in isolation.
+ *
+ * Every name resolved here obeys one naming rule (ADR-0034): a target noun stays while
+ * it is true and discriminating, and disappears only where a merge made it false. The
+ * surface is verb-first and lowercase snake_case, with `semantic_search` as its one
+ * recorded qualifier-first exception, and that is asserted over
+ * {@link CLOUD_STABLE_TOOL_SET} rather than left to taste. A retired name is never
+ * advertised again on any path; the old spellings survive only in the display lookups
+ * ({@link ./metadata}), so a conversation saved before a rename still renders as written.
  */
 
 /** Inputs that decide a request's tool surface. */

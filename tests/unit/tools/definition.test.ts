@@ -190,6 +190,63 @@ describe("advertised parameter names", () => {
   });
 });
 
+// The naming rule as a test (ADR-0034). RFC-0015's sharpest self-identified drawback is
+// that the one-rule story "lives in a doc rather than in the names, so this will be
+// re-raised". These two assertions are that rule at the smallest size that is still
+// mechanical: the shape every advertised name has, and the register of names that break
+// the surface's word order, which holds exactly one. Sibling of the camelCase parameter
+// guard above; the two are deliberately separate assertions.
+describe("advertised tool names (ADR-0034)", () => {
+  const advertised = cloudStableToolSet(true).map((tool) => tool.name);
+
+  /**
+   * `semantic_search` is the surface's only qualifier-first name, settled knowingly by
+   * RFC-0015 rather than left as an inconsistency. Written down at length one so the
+   * exception is a decision on the record and a second one cannot arrive quietly.
+   */
+  const QUALIFIER_FIRST_EXCEPTIONS = ["semantic_search"];
+
+  /**
+   * The leading words the surface uses today. This is a **tripwire, not a vocabulary**:
+   * a genuinely new verb is a legitimate red here (add it, deliberately), and a leading
+   * word that is a qualifier rather than a verb is the violation it exists to catch. It
+   * has weak discriminating power on its own (18 words for 22 tools), and the value is
+   * the conversation the red forces at the moment a tool is named, which is exactly the
+   * maintenance cost RFC-0015 opened on.
+   */
+  const LEADING_VERBS = [
+    "add", "ask", "create", "edit", "find", "forget", "get", "insert", "list",
+    "move", "read", "recall", "replace", "search", "think", "trash", "update", "write",
+  ];
+
+  test("every advertised name is lowercase words joined by single underscores", () => {
+    const offenders = advertised.filter((name) => !/^[a-z]+(_[a-z]+)*$/.test(name));
+    expect(
+      offenders,
+      "a tool name is lowercase words joined by single underscores (ADR-0034)",
+    ).toEqual([]);
+  });
+
+  test("the qualifier-first register holds exactly one advertised name", () => {
+    expect(QUALIFIER_FIRST_EXCEPTIONS).toEqual(["semantic_search"]);
+    for (const name of QUALIFIER_FIRST_EXCEPTIONS) expect(advertised).toContain(name);
+  });
+
+  test("every other advertised name leads with a verb", () => {
+    const offenders = advertised
+      .filter((name) => !QUALIFIER_FIRST_EXCEPTIONS.includes(name))
+      .map((name) => ({ name, word: name.split("_")[0] }))
+      .filter(({ word }) => !LEADING_VERBS.includes(word))
+      .map(({ name, word }) => `${name} leads with "${word}"`);
+    expect(
+      offenders,
+      "the surface is verb-first (ADR-0034): if the leading word is a new verb, add it to " +
+        "LEADING_VERBS deliberately; if it is a qualifier, the name is the second exception " +
+        "to a rule whose exception list is semantic_search and nothing else",
+    ).toEqual([]);
+  });
+});
+
 describe("filterSemanticSearchByAvailability", () => {
   test("keeps semantic_search only when availability is 'ready'", () => {
     const ready = filterSemanticSearchByAvailability(ALL_VAULT_TOOLS, "ready");

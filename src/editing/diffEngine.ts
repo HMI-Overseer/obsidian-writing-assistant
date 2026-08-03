@@ -1,3 +1,20 @@
+/**
+ * The edit matcher: resolves a model's `search` text against a document through three
+ * tiers, exact, then whitespace-normalized, then line-level fuzzy above a confidence
+ * floor.
+ *
+ * **The leniency is a contract, not unfinished strictness (ADR-0035).** Prose has no
+ * compiler, no type checker and no linter, so there is no build step to punish an
+ * approximate match: if a passage looks right it almost certainly is, and the reviewing
+ * human is the check. Hence a non-unique search anchors the first occurrence
+ * deterministically and reports {@link ResolvedEdit.occurrenceCount} rather than failing
+ * the call, read-before-edit is advisory rather than a precondition, and Tier 3 stays out
+ * of the in-loop preflight ({@link findEditMatch}) so a genuine wording miss is still
+ * surfaced while pure spacing drift passes. The tool is named `edit` (ADR-0034), whose
+ * `path` / `search` / `replace` signature invites alignment with Claude Code's exact-only
+ * `Edit`; that alignment is exactly what ADR-0035 refuses.
+ */
+
 import { generateId } from "../utils";
 import { toLf } from "./lineEndings";
 import type { EditBlock, ResolvedEdit, DiffHunk, MatchType } from "./editTypes";

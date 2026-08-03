@@ -660,8 +660,14 @@ export class LiveVaultReview implements VaultOpReviewer {
   }
 
   /**
-   * Remove loop-time compatibility controls before the canonical ledger view
-   * renders the durable action state.
+   * Hand every decorated step over to the durable ledger view.
+   *
+   * Loop-time controls go because the ledger renders the decisions that are still
+   * open, and loop-time evidence goes because the ledger renders that too, from the
+   * persisted payload
+   * ({@link ../messages/ActionLedgerEvidenceView.ActionLedgerEvidenceView}). Both are
+   * removed rather than left in place: they belong to the review objects this
+   * generation owns, and leaving them would show each diff twice.
    */
   detachPanels(): void {
     this.detachEditPanel();
@@ -672,9 +678,17 @@ export class LiveVaultReview implements VaultOpReviewer {
           ".lmsa-vault-review-footer, " +
           ".lmsa-vault-review-fallback, " +
           ".lmsa-vault-step-controls, " +
-          ".lmsa-vault-timeline-preview",
+          ".lmsa-vault-timeline-preview, " +
+          ".lmsa-edit-step-controls, " +
+          ".lmsa-edit-timeline-hunk",
       )
-      .forEach((element) => element.remove());
+      // The durable view renders the same cards from the same classes. Only the
+      // loop's own decorations are swept, so a second finalization pass cannot
+      // strip the record that the first one handed over.
+      .forEach((element) => {
+        if (element.closest(".lmsa-action-evidence")) return;
+        element.remove();
+      });
     this.timelineEl
       .querySelectorAll(".lmsa-assistant-turn-item")
       .forEach((element) => {

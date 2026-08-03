@@ -568,6 +568,7 @@ export class ChatTranscript {
     });
     const turnView = new AssistantTurnView(
       turnHostEl,
+      this.app,
       this.markdownRenderer,
       () => this.scrollToBottom(),
     );

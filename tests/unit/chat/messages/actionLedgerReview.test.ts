@@ -1,8 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  actionLedgerSummaryEntries,
-  buildActionLedgerReviewModel,
-} from "../../../../src/chat/messages/actionLedgerReview";
+import { buildActionLedgerReviewModel } from "../../../../src/chat/messages/actionLedgerReview";
 import type {
   ToolActionLedgerEntry,
 } from "../../../../src/shared/types";
@@ -131,21 +128,6 @@ const activeEligibility = {
 };
 
 describe("ledger-backed review models", () => {
-  it("leaves edit hunks to the original edit review renderer", () => {
-    const summaries = actionLedgerSummaryEntries([
-      entry("edit"),
-      entry("vault_op"),
-      entry("memory"),
-      entry("interaction"),
-    ]);
-
-    expect(summaries.map((candidate) => candidate.family)).toEqual([
-      "vault_op",
-      "memory",
-      "interaction",
-    ]);
-  });
-
   it.each([
     ["edit", "Fixture.md"],
     ["vault_op", "Create Fixture.md"],

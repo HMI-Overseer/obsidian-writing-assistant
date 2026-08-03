@@ -15,6 +15,15 @@ interface AssistantTurnItemIdentity {
 
 export interface AssistantActionView {
   element: HTMLElement;
+  /**
+   * Full-width evidence (a diff, an affected-file list) for the same action.
+   *
+   * It cannot live inside {@link element}: on a tool step that host is an inline,
+   * content-sized slot sharing the row with the step's name and path, so a diff
+   * nested in it would be sized by the words beside it. This is placed as the row's
+   * own sibling instead, which is what the live review does with the same content.
+   */
+  presentationEl?: HTMLElement;
   refresh(entry: ToolActionLedgerEntry): void;
   destroy(): void;
 }
@@ -147,6 +156,16 @@ export class AssistantTurnItemHostRegistry {
   }
 }
 
+interface ActionViewHosts {
+  controlsEl: HTMLElement;
+  /**
+   * What the evidence follows. On a step that is the inline action host itself, so
+   * the evidence lands beside it in the step body instead of inside it; in the
+   * stacked sections there is no such row, so it simply follows the controls.
+   */
+  presentationAnchorEl: HTMLElement | null;
+}
+
 /**
  * Moves one action view between provisional, placed, and safety-audit hosts.
  *
@@ -168,6 +187,7 @@ export class AssistantActionHostCoordinator {
     for (const [actionRef, view] of this.views) {
       if (activeRefs.has(actionRef)) continue;
       view.element.remove();
+      view.presentationEl?.remove();
       view.destroy();
       this.views.delete(actionRef);
     }
@@ -181,8 +201,17 @@ export class AssistantActionHostCoordinator {
         this.views.set(entry.actionRef, view);
       }
       view.refresh(entry);
-      if (view.element.parentElement !== host) {
-        host.appendChild(view.element);
+      if (view.element.parentElement !== host.controlsEl) {
+        host.controlsEl.appendChild(view.element);
+      }
+      // Directly after the row the controls sit on, so the evidence reads as
+      // belonging to that step rather than to whatever the turn renders next.
+      const anchorEl = host.presentationAnchorEl ?? view.element;
+      if (
+        view.presentationEl &&
+        view.presentationEl.previousElementSibling !== anchorEl
+      ) {
+        anchorEl.after(view.presentationEl);
       }
     }
   }
@@ -190,22 +219,31 @@ export class AssistantActionHostCoordinator {
   destroy(): void {
     for (const view of this.views.values()) {
       view.element.remove();
+      view.presentationEl?.remove();
       view.destroy();
     }
     this.views.clear();
   }
 
-  private hostFor(entry: ToolActionLedgerEntry): HTMLElement | null {
+  /**
+   * Where one entry's controls and evidence belong.
+   *
+   * A placed entry splits them: controls into the step's inline action host, evidence
+   * into the step body that host sits in, so a diff is sized by the whole row. The
+   * provisional and audit sections are plain stacks, so both go in the one host.
+   */
+  private hostFor(entry: ToolActionLedgerEntry): ActionViewHosts | null {
     if (entry.placement.state === "provisional") {
-      return this.provisionalHostEl;
+      return { controlsEl: this.provisionalHostEl, presentationAnchorEl: null };
     }
     if (entry.placement.state === "unplaced") {
-      return this.auditHostEl;
+      return { controlsEl: this.auditHostEl, presentationAnchorEl: null };
     }
-    return (
-      this.registry.getByActionRef(entry.actionRef)?.actionEl ??
-      this.registry.get(entry.placement.itemId)?.actionEl ??
-      null
-    );
+    const host =
+      this.registry.getByActionRef(entry.actionRef) ??
+      this.registry.get(entry.placement.itemId);
+    return host
+      ? { controlsEl: host.actionEl, presentationAnchorEl: host.actionEl }
+      : null;
   }
 }

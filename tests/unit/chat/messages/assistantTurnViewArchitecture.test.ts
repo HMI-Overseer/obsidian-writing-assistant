@@ -193,11 +193,39 @@ describe("AssistantTurnView architecture", () => {
     expect(handler).toContain("executeMessageAction");
   });
 
-  it("leaves the original edit hunk in place without a generic summary", () => {
+  /**
+   * The diff is the record. The live review's own cards die with the generation that
+   * mounted them, so every family, edits included, is rendered from the ledger
+   * afterwards: no family may be filtered back out of the coordinator, and the
+   * evidence must mount beside the inline control host rather than inside it.
+   */
+  it("keeps every reviewed family's evidence on its step after the turn", () => {
     const view = source("src/chat/messages/AssistantTurnView.ts");
+    const registry = source(
+      "src/chat/messages/AssistantTurnItemHostRegistry.ts",
+    );
+    const evidence = source(
+      "src/chat/messages/ActionLedgerEvidenceView.ts",
+    );
+    const live = source("src/chat/actions/liveVaultReview.ts");
 
-    expect(view).toContain("actionLedgerSummaryEntries");
-    expect(view).not.toContain("EditActionLedgerView");
-    expect(view).not.toContain('return "Edit review"');
+    expect(view).toContain("ActionLedgerEvidenceView");
+    expect(view).toContain("this.actionCoordinator.reconcile(actionLedger)");
+    expect(view).not.toContain("actionLedgerSummaryEntries");
+    expect(view).not.toContain(
+      "Edit entries require the inline edit action view.",
+    );
+    expect(registry).toContain("presentationEl");
+    expect(registry).toContain("anchorEl.after(view.presentationEl)");
+    // The cards are display only; every decision stays on the control row.
+    expect(evidence).toContain("lmsa-edit-timeline-hunk");
+    expect(evidence).toContain("lmsa-vault-timeline-preview");
+    expect(evidence).toContain("RECORD_ONLY_CALLBACKS");
+    expect(evidence).not.toContain("applyVaultOpBatch");
+    expect(evidence).not.toContain("appendActionEvent");
+    expect(evidence).not.toMatch(/on(?:Accept|Reject|Undo):\s*\(\w/u);
+    // Finalization hands the slot over instead of leaving two copies of each diff.
+    expect(live).toContain(".lmsa-edit-timeline-hunk");
+    expect(live).toContain('closest(".lmsa-action-evidence")');
   });
 });

@@ -35,16 +35,6 @@ export interface ActionLedgerReviewModel {
   targets: ActionLedgerReviewTarget[];
 }
 
-/**
- * The original edit review renderer owns edit controls and hunk presentation.
- * Generic ledger summaries cover only the remaining action families.
- */
-export function actionLedgerSummaryEntries(
-  entries: readonly ToolActionLedgerEntry[],
-): ToolActionLedgerEntry[] {
-  return entries.filter((entry) => entry.family !== "edit");
-}
-
 export function buildActionLedgerReviewModel(
   entry: ToolActionLedgerEntry,
   getEligibility: (targetId: string) => ActionControlEligibility,

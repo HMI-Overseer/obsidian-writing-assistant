@@ -106,6 +106,7 @@ const SURFACE_ORDER = [
   "vaultReviewTimeline",
   "editReviewTimeline",
   "editReviewDeclined",
+  "durableReviewEvidence",
   "inlineDiff",
   "memoryModal",
   "commandModal",

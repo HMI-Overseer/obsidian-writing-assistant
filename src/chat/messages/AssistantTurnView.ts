@@ -1,4 +1,4 @@
-import { setIcon } from "obsidian";
+import { type App, setIcon } from "obsidian";
 import type {
   AssistantTurnRecord,
   ToolActionLedgerEntry,
@@ -27,10 +27,10 @@ import {
 } from "./assistantTurnRenderModel";
 import type { RegexEditPreview } from "./regexEditPreview";
 import {
-  actionLedgerSummaryEntries,
   buildActionLedgerReviewModel,
   type ActionReviewControl,
 } from "./actionLedgerReview";
+import { ActionLedgerEvidenceView } from "./ActionLedgerEvidenceView";
 
 export interface AssistantTurnViewRefreshOptions {
   actionLedger?: readonly ToolActionLedgerEntry[];
@@ -109,6 +109,7 @@ export class AssistantTurnView {
 
   constructor(
     containerEl: HTMLElement,
+    private readonly app: App,
     private readonly markdownRenderer: MarkdownBubbleRenderer,
     private readonly onContentChanged: () => void = () => undefined,
   ) {
@@ -155,9 +156,10 @@ export class AssistantTurnView {
       this.provisionalHostEl,
       this.auditHostEl,
       (entry) =>
-        new ActionLedgerSummaryView(
+        new ActionLedgerEntryView(
           entry,
           this.rootEl,
+          this.app,
           (currentEntry, targetId) =>
             this.getActionEligibility(currentEntry, targetId),
           (currentEntry, targetId, control) =>
@@ -246,9 +248,7 @@ export class AssistantTurnView {
   ): void {
     this.getActionEligibility = getEligibility;
     this.onActionControl = onControl;
-    this.actionCoordinator.reconcile(
-      actionLedgerSummaryEntries(this.actionLedger),
-    );
+    this.actionCoordinator.reconcile(this.actionLedger);
     this.updateActionSectionVisibility();
   }
 
@@ -335,9 +335,7 @@ export class AssistantTurnView {
     this.updateNotice(model);
     this.updateRegexEditPreview(regexEditPreview);
     this.actionLedger = actionLedger;
-    this.actionCoordinator.reconcile(
-      actionLedgerSummaryEntries(actionLedger),
-    );
+    this.actionCoordinator.reconcile(actionLedger);
     this.updateActionSectionVisibility();
     await Promise.all(proseRenders);
     this.onContentChanged();
@@ -534,9 +532,7 @@ export class AssistantTurnView {
           return;
         }
         this.markdownRenderer.clear(state.contentEl);
-        state.contentEl
-          .querySelectorAll(":scope > :not(.lmsa-assistant-turn-action-host)")
-          .forEach((element) => element.remove());
+        this.clearRenderedProse(state.contentEl);
         state.contentEl.prepend(...Array.from(stagingEl.childNodes));
         state.renderedText = text;
         state.requestedText = undefined;
@@ -544,9 +540,7 @@ export class AssistantTurnView {
       .catch(() => {
         if (!this.renderSequencer.isCurrent(token)) return;
         this.markdownRenderer.clear(state.contentEl);
-        state.contentEl
-          .querySelectorAll(":scope > :not(.lmsa-assistant-turn-action-host)")
-          .forEach((element) => element.remove());
+        this.clearRenderedProse(state.contentEl);
         state.contentEl.prepend(state.contentEl.ownerDocument.createTextNode(text));
         state.renderedText = text;
         state.requestedText = undefined;
@@ -556,6 +550,21 @@ export class AssistantTurnView {
       });
     this.pendingRenders.add(render);
     return render;
+  }
+
+  /**
+   * Drop the previously rendered markdown, and only that.
+   *
+   * The action hosts are the item's, not the markdown's: a prose item can anchor a
+   * review (a regex-parsed edit does exactly that), and both its controls and the diff
+   * beneath them have to survive re-rendering the words above them.
+   */
+  private clearRenderedProse(contentEl: HTMLElement): void {
+    contentEl
+      .querySelectorAll(
+        ":scope > :not(.lmsa-assistant-turn-action-host):not(.lmsa-action-evidence)",
+      )
+      .forEach((element) => element.remove());
   }
 
   private updateTool(
@@ -819,12 +828,25 @@ export class AssistantTurnView {
   }
 }
 
-class ActionLedgerSummaryView implements AssistantActionView {
+/**
+ * One action-ledger entry as the transcript keeps it: what the reader can still do
+ * about it, and what it changed.
+ *
+ * Both halves are rendered from the same durable entry, so a mutation reviewed during
+ * the turn keeps its diff afterwards, through a reload and a conversation switch. Every
+ * family is welcome here, edits included: the live edit review is torn down with the
+ * generation that owned it, and nothing else durable would speak for those hunks.
+ */
+class ActionLedgerEntryView implements AssistantActionView {
   readonly element: HTMLElement;
+  readonly presentationEl: HTMLElement;
+
+  private readonly evidenceView: ActionLedgerEvidenceView;
 
   constructor(
     entry: ToolActionLedgerEntry,
     containerEl: HTMLElement,
+    app: App,
     private readonly getEligibility: (
       entry: ToolActionLedgerEntry,
       targetId: string,
@@ -838,13 +860,13 @@ class ActionLedgerSummaryView implements AssistantActionView {
     this.element = containerEl.createDiv();
     this.element.remove();
     this.element.addClass("lmsa-assistant-turn-action-summary");
+    this.evidenceView = new ActionLedgerEvidenceView(app, containerEl);
+    this.presentationEl = this.evidenceView.element;
     this.refresh(entry);
   }
 
   refresh(entry: ToolActionLedgerEntry): void {
-    if (entry.family === "edit") {
-      throw new Error("Edit entries require the inline edit action view.");
-    }
+    this.evidenceView.refresh(entry);
     this.element.empty();
     this.element.dataset.actionRef = entry.actionRef;
     if (entry.placement.state === "provisional") {
@@ -898,7 +920,9 @@ class ActionLedgerSummaryView implements AssistantActionView {
     }
   }
 
-  destroy(): void {}
+  destroy(): void {
+    this.evidenceView.destroy();
+  }
 }
 
 export function actionTargetLabels(

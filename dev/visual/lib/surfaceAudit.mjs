@@ -180,6 +180,26 @@ export function auditSurfaceContracts(surfaces) {
     ["lmsa-edit-review-bulk", "lmsa-edit-step-btn--approve"],
     failures,
   );
+  // After the turn the ledger owns both halves: its own controls on the row, and the same
+  // diff cards under it. The live review's step controls are gone by then, so a fixture
+  // still drawing them would be showing a state the settled turn cannot reach.
+  requireMarkup(
+    surfaces.durableReviewEvidence,
+    "durableReviewEvidence",
+    [
+      "lmsa-assistant-turn-action-summary",
+      "lmsa-action-evidence",
+      "lmsa-edit-timeline-hunk",
+      "lmsa-vault-timeline-preview",
+    ],
+    failures,
+  );
+  rejectMarkup(
+    surfaces.durableReviewEvidence,
+    "durableReviewEvidence",
+    ["lmsa-edit-step-controls", "lmsa-vault-step-controls"],
+    failures,
+  );
   requireMarkup(
     surfaces.settingsRag,
     "settingsRag",

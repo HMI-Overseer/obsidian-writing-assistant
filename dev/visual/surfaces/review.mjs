@@ -253,6 +253,82 @@ export const REVIEW_SURFACES = {
     ),
   },
 
+  // The same turn after it ends: the live review is gone and the action ledger renders both
+  // halves, its remaining controls on the row and the diff it made under it. The evidence
+  // wrapper is what proves the cards still break to their own full-width line once the inline
+  // control host, not a live review, is what they sit beside.
+  durableReviewEvidence: {
+    source: "src/chat/messages/ActionLedgerEvidenceView.ts",
+    w: 620,
+    shot: ".lmsa-chat-window-message--assistant",
+    html: view(
+      assistantBubble(
+        assistantTurn(
+          turnItem(
+            "ledger-edit",
+            "tool_call",
+            "tool",
+            toolTurnBody("Edited note", "Chapter 1.md", "Completed"),
+            {
+              state: "completed",
+              mutating: true,
+              toolCallId: "ledger-edit",
+              actionRef: "action-ledger-edit",
+              toolIcon: I.pencil,
+              action: `<div class="lmsa-assistant-turn-action-summary">
+                <div class="lmsa-assistant-turn-action-controls">
+                  <button class="lmsa-assistant-turn-action-control is-undo" type="button" aria-label="Undo Chapter 1.md">${I.undo2}</button>
+                </div>
+              </div>`,
+              presentation: `<div class="lmsa-action-evidence">
+                <div class="lmsa-edit-timeline-hunk">${splitHunk("accepted")}</div>
+              </div>`,
+            },
+          ) +
+            turnItem(
+              "ledger-write",
+              "tool_call",
+              "tool",
+              toolTurnBody("Wrote file", "Scenes/New Scene.md", "Completed"),
+              {
+                after: false,
+                state: "completed",
+                mutating: true,
+                toolCallId: "ledger-write",
+                actionRef: "action-ledger-write",
+                toolIcon: I.filePlus,
+                action: `<div class="lmsa-assistant-turn-action-summary"></div>`,
+                presentation: `<div class="lmsa-action-evidence">
+                  <div class="lmsa-vault-timeline-preview">
+                    <div class="lmsa-chat-window-diff-hunk" data-status="accepted">
+                      <div class="lmsa-chat-window-diff-hunk-body lmsa-chat-window-diff-hunk-body--split">
+                        <div class="lmsa-chat-window-diff-row">
+                          <div class="lmsa-chat-window-diff-side lmsa-chat-window-diff-side--left lmsa-chat-window-diff-side--empty"></div>
+                          <div class="lmsa-chat-window-diff-side lmsa-chat-window-diff-side--right lmsa-chat-window-diff-line--added">
+                            <span class="lmsa-chat-window-diff-gutter"></span>
+                            <span class="lmsa-chat-window-diff-text"># New Scene</span>
+                          </div>
+                        </div>
+                        <div class="lmsa-chat-window-diff-row">
+                          <div class="lmsa-chat-window-diff-side lmsa-chat-window-diff-side--left lmsa-chat-window-diff-side--empty"></div>
+                          <div class="lmsa-chat-window-diff-side lmsa-chat-window-diff-side--right lmsa-chat-window-diff-line--added">
+                            <span class="lmsa-chat-window-diff-gutter"></span>
+                            <span class="lmsa-chat-window-diff-text">The harbour was empty by the time she reached it.</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>`+
+                `</div>`,
+              },
+            ),
+          "completed",
+        ),
+      ),
+      620,
+    ),
+  },
+
   // S25: inline diff decoration in the editor (CM6 mark + block widget). Add/remove coloring, no gutter
   // class of our own (Obsidian's native gutters show through unstyled, the correct expectation).
   inlineDiff: {

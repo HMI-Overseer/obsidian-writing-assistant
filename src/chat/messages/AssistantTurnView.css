@@ -427,6 +427,23 @@
   padding-top: 0;
 }
 
+/* ── Durable review evidence: the diff a finished action left behind ──
+   The full-width row directly under the step, the same slot the live review's
+   diff occupied, so a reviewed change reads identically before and after the
+   turn ends. The cards inside keep their own channel classes, and with them
+   their height cap and dimming, so this is only the row they sit on. */
+
+.lmsa-action-evidence {
+  flex-basis: 100%;
+  width: 100%;
+  min-width: 0;
+}
+
+/* Most steps have no evidence to show; their row must then take no space. */
+.lmsa-action-evidence:empty {
+  display: none;
+}
+
 /* ── Ask transcript: the questions and the answers given ──────────
    Its own full-width row under the step, the same slot the write preview and
    the edit diff take, so a question reads as part of the conversation instead

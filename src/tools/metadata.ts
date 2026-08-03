@@ -87,6 +87,20 @@ const RETIRED_TOOL_DISPLAY: Record<string, { icon: string; label: string }> = {
   trash_folder: { icon: "folder-x", label: "Trashed folder" },
 };
 
+/**
+ * Tools a harness calls to run itself rather than to do the reader's work.
+ *
+ * Claude Code's `ToolSearch` loads a deferred tool's schema before the model may call
+ * that tool, the CLI-side half of the Layer-2 core/tail split (ADR-0009). It is load
+ * bearing on the cloud path and is never suppressed on the wire or in the record: this
+ * set only names it as plumbing, so the timeline
+ * ({@link ../chat/messages/assistantTurnRenderModel}) can stay the account of what the
+ * assistant did about the request. The direct Anthropic path already reads this way
+ * because its tool search arrives as `server_tool_use`, which the stream translator does
+ * not turn into a step at all; naming this one keeps the two paths telling one story.
+ */
+export const HARNESS_INTERNAL_TOOL_NAMES: ReadonlySet<string> = new Set(["ToolSearch"]);
+
 /** Icon for a recorded tool call, including one naming a retired tool. */
 export function toolIcon(toolName: string): string {
   return TOOL_ICONS[toolName] ?? RETIRED_TOOL_DISPLAY[toolName]?.icon ?? "wrench";

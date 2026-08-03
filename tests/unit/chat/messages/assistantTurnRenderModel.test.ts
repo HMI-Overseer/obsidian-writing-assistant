@@ -374,6 +374,95 @@ describe("assistant turn render model", () => {
     ).toEqual(["Books", "prequel", undefined]);
   });
 
+  it("keeps the harness's own tool search off the rail without stranding the rows around it", () => {
+    const model = buildAssistantTurnRenderModel(
+      turn("completed", [
+        prose("p1", "s1", "Looking"),
+        { ...tool("search-1", "s1", "call-search-1"), toolName: "ToolSearch" },
+        tool("t1", "s1", "call-1"),
+        prose("p2", "s1", "Done"),
+        { ...tool("search-2", "s2", "call-search-2"), toolName: "ToolSearch" },
+      ]),
+    );
+    const searchOnly = buildAssistantTurnRenderModel(
+      turn("completed", [
+        { ...tool("search-1", "s1", "call-search-1"), toolName: "ToolSearch" },
+      ]),
+    );
+
+    expect(model.items.map((item) => item.id)).toEqual(["p1", "t1", "p2"]);
+    // The trailing search is gone, so the prose before it ends the turn: it takes the
+    // endpoint marker, connector, and fade rather than pointing at a row nobody sees.
+    expect(model.items.map((item) => item.marker)).toEqual([
+      "thinking",
+      "tool",
+      "none",
+    ]);
+    expect(model.items.map((item) => item.connector)).toEqual([
+      { before: true, after: true },
+      { before: true, after: true },
+      { before: true, after: false },
+    ]);
+    expect(model.items.map((item) => item.fadeIncomingConnector)).toEqual([
+      false,
+      false,
+      true,
+    ]);
+    // A turn that produced nothing but plumbing produced nothing for the reader.
+    expect(searchOnly.items).toEqual([]);
+    expect(searchOnly.emptyState?.label).toBe("No response.");
+  });
+
+  it("shows a harness tool search that failed, whichever way the failure was recorded", () => {
+    const failedState = buildAssistantTurnRenderModel(
+      turn("completed", [
+        { ...tool("search-1", "s1", "call-search-1", "failed"), toolName: "ToolSearch" },
+      ]),
+    );
+    const errorFlag = buildAssistantTurnRenderModel(
+      turn("completed", [
+        {
+          ...tool("search-1", "s1", "call-search-1"),
+          toolName: "ToolSearch",
+          isError: true,
+          errorContent: "No matching tool.",
+        },
+      ]),
+    );
+
+    expect(failedState.items.map((item) => item.id)).toEqual(["search-1"]);
+    expect(failedState.items[0].accessibleState).toBe("Failed");
+    expect(errorFlag.items.map((item) => item.id)).toEqual(["search-1"]);
+    expect(failedState.emptyState).toBeNull();
+  });
+
+  it("applies the same rail filter to a legacy turn's recorded steps", () => {
+    const model = buildLegacyAssistantRenderModel({
+      key: "legacy-search",
+      status: "completed",
+      content: "",
+      steps: [
+        {
+          type: "tool_call",
+          round: 0,
+          toolName: "ToolSearch",
+          toolCallId: "legacy-search-call",
+        },
+        {
+          type: "tool_call",
+          round: 0,
+          toolName: "read",
+          toolCallId: "legacy-read-call",
+          toolInput: "Legacy.md",
+        },
+      ],
+    });
+
+    expect(model.items.map((item) => item.id)).toEqual([
+      "legacy:legacy-search:step:1",
+    ]);
+  });
+
   it("recovers arguments a lifecycle capture recorded as a JSON input blob", () => {
     const model = buildAssistantTurnRenderModel(
       turn("completed", [

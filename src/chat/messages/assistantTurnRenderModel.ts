@@ -11,6 +11,7 @@ import type {
 } from "../turns/AssistantTurnBuilder";
 import { getActiveAssistantRevision } from "../conversation/assistantRevisions";
 import {
+  HARNESS_INTERNAL_TOOL_NAMES,
   extractToolInput,
   pendingToolLabel,
   toolLabel,
@@ -126,8 +127,12 @@ export function buildAssistantTurnRenderModel(
   turn: AssistantTurnSnapshot,
   options: { errorMessage?: string } = {},
 ): AssistantTurnRenderModel {
-  const items = turn.items.map((item, index) =>
-    buildRenderItem(item, turn.items[index + 1], turn.status, index, turn.items.length),
+  // Filtered before the mapping, never after: each item reads its neighbours to place
+  // its marker, connector, and endpoint fade, so a hidden row must be absent from the
+  // sequence those are derived over rather than removed from the result.
+  const shown = turn.items.filter(isShownOnRail);
+  const items = shown.map((item, index) =>
+    buildRenderItem(item, shown[index + 1], turn.status, index, shown.length),
   );
   return {
     id: turn.id,
@@ -339,6 +344,25 @@ export function planAssistantTurnRenderUpdate(
         : [];
     }),
   };
+}
+
+/**
+ * Whether a recorded item earns a row on the rail.
+ *
+ * A harness's own plumbing ({@link HARNESS_INTERNAL_TOOL_NAMES}) does not: the reader
+ * asked for work on their vault, and a schema lookup the harness ran to reach a tool is
+ * not that work. The call is still captured, still persisted, and still replayed, so the
+ * turn's record is unchanged and only the account shown of it is quieter.
+ *
+ * A search that failed is shown. That is the one state where the plumbing is the story:
+ * it explains a turn that would otherwise appear to stall or give up for no visible
+ * reason, and a step that failed belongs on the timeline rather than in the console.
+ */
+function isShownOnRail(item: AssistantTurnSnapshotItem): boolean {
+  if (item.type !== "tool_call" || !HARNESS_INTERNAL_TOOL_NAMES.has(item.toolName)) {
+    return true;
+  }
+  return item.state === "failed" || item.isError === true;
 }
 
 function buildRenderItem(

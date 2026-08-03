@@ -1,5 +1,5 @@
 {
-  "asOf": "2026-07-12",
+  "asOf": "2026-08-03",
   "source": "https://openrouter.ai/api/v1/models",
   "providers": {
     "anthropic": [
@@ -62,6 +62,13 @@
       {
         "modelId": "claude-opus-4-8",
         "name": "Claude Opus 4.8",
+        "role": "completion",
+        "contextWindowSize": 1000000,
+        "vision": true
+      },
+      {
+        "modelId": "claude-opus-5",
+        "name": "Claude Opus 5",
         "role": "completion",
         "contextWindowSize": 1000000,
         "vision": true
@@ -161,20 +168,6 @@
         "vision": true
       },
       {
-        "modelId": "gpt-5-chat",
-        "name": "GPT-5 Chat",
-        "role": "completion",
-        "contextWindowSize": 128000,
-        "vision": true
-      },
-      {
-        "modelId": "gpt-5-codex",
-        "name": "GPT-5 Codex",
-        "role": "completion",
-        "contextWindowSize": 400000,
-        "vision": true
-      },
-      {
         "modelId": "gpt-5-mini",
         "name": "GPT-5 Mini",
         "role": "completion",
@@ -200,13 +193,6 @@
         "name": "GPT-5.1",
         "role": "completion",
         "contextWindowSize": 400000,
-        "vision": true
-      },
-      {
-        "modelId": "gpt-5.1-chat",
-        "name": "GPT-5.1 Chat",
-        "role": "completion",
-        "contextWindowSize": 128000,
         "vision": true
       },
       {

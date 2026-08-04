@@ -28,8 +28,11 @@ There is **no telemetry** in Writing Assistant. If you have problems, or simply 
 to give feedback, reach out to me.
 
 Writing Assistant itself **never** collects, stores, or transmits your data. Anything \
-it keeps lives on your machine, inside your vault. Removing the plugin clears that \
-plugin data.`;
+it keeps lives on your machine. Your settings live inside your vault and removing the \
+plugin clears them; your API keys do not, they are handed to Obsidian's own keychain, \
+which keeps them outside every vault and encrypted by your operating system where it \
+provides a keystore. That means a key survives uninstalling this plugin, and you remove \
+it yourself from Obsidian's Keychain settings.`;
 
 /**
  * One-time privacy disclaimer shown before the user can access API key management.

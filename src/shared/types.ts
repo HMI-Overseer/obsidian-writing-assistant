@@ -1078,14 +1078,24 @@ export interface LMStudioProviderSettings {
   bypassCors: boolean;
 }
 
+/**
+ * `apiKeySecretId` is the id of an entry in Obsidian's secret storage, never a
+ * credential (ADR-0039). `""` means unlinked. A non-empty id is not evidence of a
+ * usable credential either: the user can delete the secret from Obsidian's Keychain
+ * tab without reference to us, so "is this provider configured" is a runtime
+ * resolution rather than a string-length test.
+ *
+ * The retired plaintext `apiKey` field does not appear here. Per ADR-0027 the load
+ * migration reads it untyped off the raw persisted blob and scrubs it.
+ */
 export interface AnthropicProviderSettings {
   enabled: boolean;
-  apiKey: string;
+  apiKeySecretId: string;
 }
 
 export interface OpenAIProviderSettings {
   enabled: boolean;
-  apiKey: string;
+  apiKeySecretId: string;
   baseUrl: string;
 }
 
@@ -1243,7 +1253,11 @@ export interface PluginSettings {
   memoriesEnabled: boolean;
   /** Persistent memories (RFC-0007 shape); seeded once from `DEFAULT_MEMORIES`, then user-owned. */
   memories: Memory[];
-  /** Whether the user has accepted the API keys privacy disclaimer. */
+  /**
+   * Whether the user has accepted the API keys privacy disclaimer. The name still
+   * fits: it records consent to use paid cloud providers from this vault, which was
+   * never a claim about where a key is stored.
+   */
   apiKeysDisclaimerAccepted: boolean;
   /** Master gate for all tool use. When false, no mode uses tools. */
   agenticMode: boolean;

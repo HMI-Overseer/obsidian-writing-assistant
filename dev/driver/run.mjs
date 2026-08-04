@@ -38,7 +38,11 @@ import {
   scratchSummary,
 } from "./lib/clean.mjs";
 import { handOver, perishableNotice } from "./lib/handoff.mjs";
-import { INSTALLED_SETTINGS_PATH, readLiveProviderSettings } from "./lib/liveSettings.mjs";
+import {
+  INSTALLED_SETTINGS_PATH,
+  assertLiveCredentialsReachable,
+  readLiveProviderSettings,
+} from "./lib/liveSettings.mjs";
 import { askLiveModel, preflight, reachability, selectModelInUi } from "./lib/models.mjs";
 import {
   createTerminal,
@@ -716,6 +720,14 @@ try {
     scenario?.provider.kind === "live"
       ? await resolveLive({ terminal, choices, scenario, livePatch, consoleLines: [] })
       : { live: choices.live ?? null, models: [], skipped: [] };
+  // A keyed cloud provider's credential does not travel to the scratch profile any more, and the
+  // picker cannot know that: the app offers its catalog models because the copied settings still
+  // carry a linked secret id. Say so here rather than letting the run reach a send and fail as a
+  // missing credential. Hand-driven runs are exempt: somebody is at the keyboard and can link one.
+  if (livePatch && resolved.live?.provider) {
+    assertLiveCredentialsReachable(livePatch, resolved.live.provider);
+  }
+
   choices.live = resolved.live;
   writeLastChoices(LAST, choices);
 

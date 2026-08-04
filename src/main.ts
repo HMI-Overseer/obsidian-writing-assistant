@@ -9,6 +9,8 @@ import { InlineDiffManager } from "./editing/inlineDiff/InlineDiffManager";
 import { inlineDiffExtension } from "./editing/inlineDiff/inlineDiffState";
 import { registerBrandIcons, unregisterBrandIcons } from "./providers/brandIcons";
 import { normalizePluginSettings } from "./settings/settingsMigration";
+import type { CredentialMigrationOutcome, KeyedProvider } from "./providers/credentials";
+import { migrateProviderCredentials } from "./providers/credentials";
 import { WritingAssistantSettingTab } from "./settings/SettingsTab";
 import { ServiceContainer } from "./services/ServiceContainer";
 import { reportIfRejected } from "./asyncCallbacks";
@@ -17,6 +19,15 @@ export default class WritingAssistantChat extends Plugin {
   settings!: PluginSettings;
   services!: ServiceContainer;
   inlineDiff!: InlineDiffManager;
+  /**
+   * What this launch's credential migration did, per provider. The Providers tab
+   * reads it: a refused or failed relocation is reported on the card and nowhere
+   * else, because the provider keeps working and the card is where the user can fix
+   * it in one click.
+   */
+  credentialMigration: CredentialMigrationOutcome[] = [];
+  /** Plaintext the migration could not relocate, seeding the session overlay. */
+  private retainedLegacyKeys: ReadonlyMap<KeyedProvider, string> = new Map();
 
   async onload(): Promise<void> {
     registerBrandIcons();
@@ -28,6 +39,7 @@ export default class WritingAssistantChat extends Plugin {
       () => this.settings,
       pluginDir,
       () => this.saveSettings(),
+      this.retainedLegacyKeys,
     );
     await this.services.initialize();
 
@@ -154,6 +166,20 @@ export default class WritingAssistantChat extends Plugin {
     }
   }
 
+  /**
+   * Close out a refused or failed relocation now that the user has linked a working secret. Drops
+   * the session overlay so the next save removes the plaintext from the vault, and drops the
+   * outcome so the card stops reporting a problem that no longer exists. Idempotent, and a no-op
+   * for a provider whose migration succeeded or had nothing to do.
+   */
+  resolveCredentialMigration(provider: KeyedProvider): boolean {
+    if (!this.services.credentials.retireLegacyKeyIfLinked(provider)) return false;
+    this.credentialMigration = this.credentialMigration.filter(
+      (outcome) => outcome.provider !== provider,
+    );
+    return true;
+  }
+
   onunload(): void {
     for (const leaf of this.app.workspace.getLeavesOfType(VIEW_TYPE_CHAT)) {
       if (leaf.view instanceof ChatView) {
@@ -168,12 +194,32 @@ export default class WritingAssistantChat extends Plugin {
   }
 
   async loadSettings(): Promise<void> {
-    const data = (await this.loadData()) as Partial<PluginSettings> | null;
-    this.settings = normalizePluginSettings(data);
+    const raw = (await this.loadData()) as Record<string, unknown> | null;
+
+    // Relocate any plaintext provider key into Obsidian's secret storage before
+    // normalization, so normalization sees a blob that already carries ids
+    // (ADR-0039). Fails closed: a key that could not be moved stays in the blob and
+    // keeps working through the session overlay below.
+    const migration = migrateProviderCredentials(raw, this.app.secretStorage);
+    this.credentialMigration = migration.outcomes;
+    this.retainedLegacyKeys = migration.retained;
+
+    this.settings = normalizePluginSettings(migration.raw);
+    if (migration.changed) await this.saveSettings();
   }
 
+  /**
+   * Persists through the credential store, which re-attaches any plaintext a failed
+   * migration preserved. Without that, normalization (which builds a fresh object
+   * holding only known fields) would scrub the key on the very next save, from any
+   * settings change anywhere in the app.
+   *
+   * Guarded on `services`, because the first save happens inside `loadSettings`,
+   * before the container exists. At that point the blob on disk is already the
+   * migrated one, so there is nothing to re-attach.
+   */
   async saveSettings(): Promise<void> {
-    await this.saveData(this.settings);
+    await this.saveData(this.services?.credentials.withLegacyOverlay(this.settings) ?? this.settings);
   }
 
   private initLeafIfNeeded(): void {

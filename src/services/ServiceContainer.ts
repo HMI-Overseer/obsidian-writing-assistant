@@ -12,6 +12,8 @@ import { RagService } from "../rag";
 import { GraphService } from "../rag/graph";
 import { MemoryService } from "../memory/MemoryService";
 import { getProviderDescriptor } from "../providers/registry";
+import type { CredentialStore, KeyedProvider } from "../providers/credentials";
+import { SecretStorageCredentialStore } from "../providers/credentials";
 import { ClaudeCodeService } from "./ClaudeCodeService";
 
 /**
@@ -28,13 +30,22 @@ export class ServiceContainer {
   readonly graphService: GraphService;
   readonly memoryService: MemoryService;
   readonly claudeCode: ClaudeCodeService;
+  /** Where a keyed provider's credential comes from. The one switch site for ADR-0039. */
+  readonly credentials: CredentialStore;
 
   constructor(
     private readonly app: App,
     private readonly getSettings: () => PluginSettings,
     private readonly pluginDir: string,
     private readonly persistSettings?: () => Promise<void>,
+    /** Plaintext the load migration could not relocate; see the store's overlay. */
+    retainedLegacyKeys?: ReadonlyMap<KeyedProvider, string>,
   ) {
+    this.credentials = new SecretStorageCredentialStore(
+      app.secretStorage,
+      () => this.getSettings().providerSettings,
+      retainedLegacyKeys,
+    );
     this.conversationStorage = new ConversationStorage(app, pluginDir);
     this.modelAvailability = new ModelAvailabilityService(
       () => this.getSettings().providerSettings,
@@ -44,12 +55,12 @@ export class ServiceContainer {
         await this.persistSettings?.();
       },
     );
-    this.ragService = new RagService(app, pluginDir);
+    this.ragService = new RagService(app, pluginDir, this.credentials);
     // Automatic reindex may only embed when the model won't be force-loaded:
     // local models must already be loaded (probed via a non-loading listing
     // call), cloud models only with the user's opt-in.
     this.ragService.setAutoEmbedGate((model) => this.canAutoEmbed(model));
-    this.graphService = new GraphService(app, pluginDir);
+    this.graphService = new GraphService(app, pluginDir, this.credentials);
     this.memoryService = new MemoryService(() => this.getSettings().memories);
     this.claudeCode = new ClaudeCodeService(
       app,

@@ -1,8 +1,14 @@
-import { setIcon } from "obsidian";
+import { SecretComponent, setIcon } from "obsidian";
 import type WritingAssistantChat from "../main";
 import type { CustomModelEntry, ModelRole, ProviderOption } from "../shared/types";
+import type {
+  CredentialMigrationOutcome,
+  CredentialState,
+  KeyedProvider,
+} from "../providers/credentials";
+import { SECRET_IDS } from "../providers/credentials";
 import { normalizeLMStudioBaseUrl } from "../api";
-import { voidAsync } from "../asyncCallbacks";
+import { reportIfRejected, voidAsync } from "../asyncCallbacks";
 import { PROVIDER_DESCRIPTORS, PROVIDER_ICONS } from "../providers/descriptors";
 import { getCatalogEntries } from "../providers/catalog";
 import {
@@ -54,10 +60,66 @@ function cleanCliVersion(version: string): string {
   return version.replace(/\s*\(.*\)\s*$/, "");
 }
 
-function hasApiKey(plugin: WritingAssistantChat, provider: ProviderOption): boolean {
-  if (provider === "anthropic") return plugin.settings.providerSettings.anthropic.apiKey.length > 0;
-  if (provider === "openai") return plugin.settings.providerSettings.openai.apiKey.length > 0;
-  return true;
+/**
+ * Whether this provider's credential resolves right now. Keyless providers are
+ * always "ok": they have nothing to resolve.
+ *
+ * A stored id is not evidence of a usable credential, because the user can delete
+ * the secret from Obsidian's Keychain tab without reference to us, so this is a
+ * runtime resolution rather than a string-length test (ADR-0039 part 2). Resolving
+ * on every re-render is cheap: the one side effect of `getSecret` is an access
+ * timestamp throttled to once per id per five minutes, so a resolution inside that
+ * window is an object property read.
+ */
+function credentialState(plugin: WritingAssistantChat, provider: ProviderOption): CredentialState {
+  if (provider !== "anthropic" && provider !== "openai") return "ok";
+  return plugin.services.credentials.state(provider);
+}
+
+/**
+ * What this launch's credential migration did to a provider, when that is something
+ * the user needs to act on. A refused or failed relocation is reported here and
+ * nowhere else: the provider keeps working through the session overlay, so a startup
+ * modal would be alarming about something that is not broken, and this card is where
+ * the Link control that fixes it permanently already sits.
+ */
+function unresolvedMigration(
+  plugin: WritingAssistantChat,
+  provider: ProviderOption,
+): CredentialMigrationOutcome | null {
+  const outcome = plugin.credentialMigration.find((entry) => entry.provider === provider);
+  if (!outcome) return null;
+  return outcome.result === "collision" || outcome.result === "failed" ? outcome : null;
+}
+
+/**
+ * Copy for the API-key row. It claims exactly what ADR-0039 permits and no more:
+ * relocation out of the vault is unconditional, encryption at rest is Obsidian's and
+ * only where the OS provides a keystore, and we never encrypt anything ourselves.
+ *
+ * When a relocation was refused or failed, the row says so here rather than in the
+ * status line: the Link control that fixes it permanently is right beside this text,
+ * which is what makes the state actionable in place instead of merely reported.
+ */
+function keyRowDesc(plugin: WritingAssistantChat, provider: KeyedProvider): string {
+  const unresolved = unresolvedMigration(plugin, provider);
+  if (unresolved?.result === "collision") {
+    return (
+      `This key is still stored in this vault. Moving it was refused because a secret ` +
+      `named ${SECRET_IDS[provider]} already exists and is not ours to overwrite. ` +
+      `Link a key to finish moving it out.`
+    );
+  }
+  if (unresolved) {
+    return (
+      "This key is still stored in this vault. It could not be moved to Obsidian's " +
+      "keychain, so it stays here and keeps working. Link a key to finish moving it out."
+    );
+  }
+  return (
+    "Stored in Obsidian's keychain, outside your vault, encrypted where your OS " +
+    "supports it. Linking a key enables the provider."
+  );
 }
 
 /** Models this provider would contribute to selection (catalog/cache + custom). */
@@ -104,6 +166,16 @@ export function renderProvidersTab(
     renderProviderCard(listEl, plugin, provider, refresh, () => disposed);
   }
 
+  // Secrets are user-managed and shared: Obsidian's own Keychain tab can delete the
+  // one a card is pointing at, with no confirmation and no check for who is using
+  // it. Re-render on that so an open card cannot keep claiming a key that is gone.
+  // A full refresh, not a header sync, because SecretComponent reads its value once
+  // at setValue and cannot repaint itself.
+  const onSecretsChanged = () => {
+    if (!disposed) refresh();
+  };
+  plugin.app.secretStorage.on("changed", onSecretsChanged);
+
   // Prose, so it stays in the body: the footer is a right-aligned row for buttons.
   const footnote = section.bodyEl.createEl("p", { cls: "lmsa-provider-footnote" });
   footnote.setText(
@@ -112,6 +184,7 @@ export function renderProvidersTab(
 
   return () => {
     disposed = true;
+    plugin.app.secretStorage.off("changed", onSecretsChanged);
   };
 }
 
@@ -175,9 +248,11 @@ function renderProviderCard(
 
   const syncHeader = (): void => {
     const keyed = descriptor.authType === "api-key";
-    const keyPresent = hasApiKey(plugin, provider);
     toggle.setValue(settings.enabled);
-    toggle.setDisabled(keyed && !keyPresent);
+    // Gated on linkage, matching what normalization clamps on. A dangling id leaves
+    // the toggle live: the provider is configured, its secret is just missing, and
+    // re-linking is the fix rather than re-enabling.
+    toggle.setDisabled(keyed && credentialState(plugin, provider) === "unlinked");
     card.toggleClass("is-off", !settings.enabled);
 
     const state = buildHeaderState(plugin, provider, detection);
@@ -210,11 +285,16 @@ function renderProviderCard(
     syncHeader();
   };
 
-  toggle.onChange(async (value) => {
-    // Enabling a cloud provider requires the one-time privacy acknowledgement.
-    // Claude Code is keyless, so this toggle is its only enable path; the keyed
-    // clouds are additionally gated at the API-key field. Declining or closing
-    // the modal leaves the provider off (revert the optimistic visual flip).
+  /**
+   * The one place a cloud provider is allowed to turn on, and therefore the only
+   * gate the privacy disclaimer needs. Linking a secret in Obsidian's keychain
+   * transmits nothing, and a provider cannot be used without being enabled, so
+   * entry is no longer gated; but linking also flips the provider on, which would
+   * otherwise let a first-time user enable a cloud provider having never seen the
+   * disclaimer. Routing that flip through here closes it. Declining or closing the
+   * modal leaves the provider off (revert the optimistic visual flip).
+   */
+  const requestEnabled = async (value: boolean): Promise<void> => {
     if (value && descriptor.kind === "cloud" && !plugin.settings.apiKeysDisclaimerAccepted) {
       toggle.setValue(false);
       new ApiKeysDisclaimerModal(plugin.app, plugin, () => {
@@ -223,13 +303,23 @@ function renderProviderCard(
       return;
     }
     await applyEnabled(value);
-  });
+  };
+
+  toggle.onChange(requestEnabled);
 
   // ── Body, driven by the descriptor rather than hardcoded per provider ──
   if (provider === "lmstudio") {
     renderLmStudioBody(body, plugin, refresh);
   } else if (descriptor.authType === "api-key") {
-    renderKeyedCloudBody(body, plugin, provider as "anthropic" | "openai", syncHeader, refresh);
+    renderKeyedCloudBody(
+      body,
+      plugin,
+      provider as "anthropic" | "openai",
+      syncHeader,
+      requestEnabled,
+      applyEnabled,
+      refresh,
+    );
   } else if (detectionPromise) {
     renderClaudeCodeBody(body, plugin, detectionPromise, refresh, isDisposed);
   }
@@ -248,8 +338,23 @@ function buildHeaderState(
   const count = providerModelCount(plugin, provider);
   const models = `${count} model${count === 1 ? "" : "s"}`;
 
-  if (descriptor.authType === "api-key" && !hasApiKey(plugin, provider)) {
-    return { dot: "error", status: "Needs API key" };
+  if (descriptor.authType === "api-key") {
+    // A relocation we refused or could not complete. The provider still works, so
+    // this is quiet and actionable rather than alarming: the Link control below
+    // resolves it permanently in one click.
+    // Short enough to survive the status line's truncation. The why and the what-to-do
+    // live in the key row's description, which has room for them.
+    if (unresolvedMigration(plugin, provider)) {
+      return { dot: "warn", status: "Your key is still stored in this vault" };
+    }
+
+    const state = credentialState(plugin, provider);
+    if (state === "unlinked") return { dot: "error", status: "Needs API key" };
+    // A linked id whose secret is gone. Distinct from "never configured", which the
+    // secret picker itself renders identically, so only this line can tell them apart.
+    if (state === "missing") {
+      return { dot: "error", status: "Linked key is missing from Obsidian's keychain" };
+    }
   }
 
   if (provider === "lmstudio") {
@@ -279,11 +384,11 @@ function buildHeaderState(
   }
 
   if (!enabled) return { dot: "warn", status: "Disabled · API key kept" };
-  return { dot: "ok", status: `API key set · ${models} available in chat` };
+  return { dot: "ok", status: `API key linked · ${models} available in chat` };
 }
 
 // ---------------------------------------------------------------------------
-// Cloud cards (Anthropic, OpenAI): inline API key + curated catalog + custom ids
+// Cloud cards (Anthropic, OpenAI): linked API key + curated catalog + custom ids
 // ---------------------------------------------------------------------------
 
 function renderKeyedCloudBody(
@@ -291,41 +396,52 @@ function renderKeyedCloudBody(
   plugin: WritingAssistantChat,
   provider: "anthropic" | "openai",
   syncHeader: () => void,
+  requestEnabled: (value: boolean) => Promise<void>,
+  applyEnabled: (value: boolean) => Promise<void>,
   refresh: () => void,
 ): void {
   const providerSettings = plugin.settings.providerSettings[provider];
 
-  const keyItem = new SettingItem(body)
-    .setName("API key")
-    .setDesc("Stored locally in this vault and never shared. Saving a key enables the provider.");
+  const keyItem = new SettingItem(body).setName("API key").setDesc(keyRowDesc(plugin, provider));
 
-  keyItem.addText((text) => {
-    text.inputEl.type = "password";
-    text.setPlaceholder(provider === "anthropic" ? "sk-ant-…" : "sk-…");
-    text.setValue(providerSettings.apiKey);
+  // Obsidian's own secret picker. Our SettingItem is homegrown rather than an
+  // Obsidian Setting, so there is no addComponent(); the component takes a container
+  // element directly. It is wrapped so the three unclassed children it appends (a
+  // warning icon, a value div, and a bare <button> wearing Obsidian's full base
+  // button chrome) can be styled without reaching every other control in the row.
+  const secretWrap = keyItem.controlEl.createDiv({ cls: "lmsa-secret-control" });
+  const secret = new SecretComponent(plugin.app, secretWrap);
+  secret.setValue(providerSettings.apiKeySecretId);
 
-    // The one-time privacy disclaimer gates key entry wherever it lives.
-    text.inputEl.addEventListener("focus", () => {
-      if (plugin.settings.apiKeysDisclaimerAccepted) return;
-      text.inputEl.blur();
-      new ApiKeysDisclaimerModal(plugin.app, plugin, () => {
-        text.inputEl.focus();
-      }).open();
-    });
+  const handleSecretChange = async (value: string | null): Promise<void> => {
+    const id = (value ?? "").trim();
+    const hadId = providerSettings.apiKeySecretId.length > 0;
+    providerSettings.apiKeySecretId = id;
+    // Linking a working secret retires any plaintext a refused or failed relocation kept alive, so
+    // this save is the one that finally removes it from the vault. Before the save, so the save
+    // itself carries the scrub.
+    const migrationResolved = plugin.resolveCredentialMigration(provider);
+    await plugin.saveSettings();
+    plugin.services.modelAvailability.invalidate();
 
-    text.onChange(async (value) => {
-      const key = value.trim();
-      const hadKey = providerSettings.apiKey.length > 0;
-      providerSettings.apiKey = key;
-      // Entering a key is an unambiguous statement of intent: unlock and flip
-      // on in the same gesture. Clearing it re-locks the toggle.
-      if (key.length > 0 && !hadKey) providerSettings.enabled = true;
-      if (key.length === 0) providerSettings.enabled = false;
-      await plugin.saveSettings();
-      plugin.services.modelAvailability.invalidate();
-      syncHeader();
-    });
-  });
+    // Linking is an unambiguous statement of intent: unlock and flip on in the same
+    // gesture, through the path that carries the privacy disclaimer. Unlinking
+    // re-locks the toggle.
+    if (id.length > 0 && !hadId) await requestEnabled(true);
+    else if (id.length === 0) await applyEnabled(false);
+
+    // The row's description is built once per render, so a resolved relocation needs a
+    // rebuild rather than a header sync to stop describing a problem that is now fixed.
+    if (migrationResolved) refresh();
+    else syncHeader();
+  };
+
+  // Typed against `string | null` rather than the published `(value: string)`: the
+  // unlink control calls back with null, and unguarded, so a handler written to the
+  // signature would mishandle normal use. A wider parameter is still assignable.
+  secret.onChange((value: string | null) =>
+    reportIfRejected(handleSecretChange(value), "Failed to save the API key link."),
+  );
 
   if (provider === "openai") {
     new SettingItem(body)

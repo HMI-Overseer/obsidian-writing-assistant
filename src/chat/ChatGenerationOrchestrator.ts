@@ -189,6 +189,7 @@ export class ChatGenerationOrchestrator {
     const client = createChatClient(
       activeModel.provider,
       this.deps.plugin.settings.providerSettings,
+      this.deps.plugin.services.credentials,
       runtime,
     );
 

@@ -53,6 +53,7 @@ import {
 import { DEFAULT_VAULT_OP_POLICY, type Gate, type VaultOpPolicy } from "../vault-ops/gateway";
 import { isReasoningLevel } from "../shared/reasoning";
 import { PROVIDER_DESCRIPTORS } from "../providers/descriptors";
+import { hasLinkedCredential } from "../providers/credentials";
 import { getCatalogEntries } from "../providers/catalog";
 import { modelKey, parseModelKey } from "../shared/modelKeys";
 import { normalizeChatHistory } from "../chat/conversation/conversationUtils";
@@ -180,22 +181,28 @@ export function normalizeVaultOpPolicy(raw: unknown): VaultOpPolicy {
 /**
  * Derive the per-provider `enabled` toggle. A saved boolean wins; absent
  * (pre-Providers-tab data or first run) keyless providers default on and
- * api-key providers default to "on exactly when a key is stored". Either way
- * an api-key provider is clamped off without a key, so the enabled-but-broken
+ * api-key providers default to "on exactly when a credential is linked". Either way
+ * an api-key provider is clamped off without one, so the enabled-but-broken
  * state is unrepresentable at the data layer, not just in the UI.
+ *
+ * `hasCredential` is "an id is linked, or plaintext survived the load migration",
+ * never "the secret resolves". That split is deliberate: normalization stays pure
+ * and ignorant of secret storage, the runtime gates on resolution, and the whole
+ * settings suite stays runnable without an `App`.
  */
 function deriveEnabled(
   saved: unknown,
   provider: ProviderOption,
-  hasKey: boolean,
+  hasCredential: boolean,
   disclaimerAccepted: boolean,
 ): boolean {
   const descriptor = PROVIDER_DESCRIPTORS[provider];
   if (descriptor.authType === "api-key") {
-    // Keyed clouds gate on the key itself, whose entry is disclaimer-gated in
-    // the Providers tab. No key, never enabled; otherwise honor the saved flag
-    // (or auto-enable a freshly upgraded blob that already carries a key).
-    if (!hasKey) return false;
+    // Keyed clouds gate on the credential itself, whose linkage is disclaimer-gated
+    // through the enable toggle in the Providers tab. Nothing linked, never enabled;
+    // otherwise honor the saved flag (or auto-enable a freshly upgraded blob that
+    // already carries one).
+    if (!hasCredential) return false;
     return typeof saved === "boolean" ? saved : true;
   }
   if (descriptor.kind === "cloud") {
@@ -215,12 +222,12 @@ export function normalizeProviderSettingsMap(
   const saved = data?.providerSettings;
   const defaults = DEFAULT_SETTINGS.providerSettings;
   const disclaimerAccepted = data?.apiKeysDisclaimerAccepted === true;
-  const anthropicKey = typeof saved?.anthropic?.apiKey === "string"
-    ? saved.anthropic.apiKey
-    : defaults.anthropic.apiKey;
-  const openaiKey = typeof saved?.openai?.apiKey === "string"
-    ? saved.openai.apiKey
-    : defaults.openai.apiKey;
+  const anthropicSecretId = typeof saved?.anthropic?.apiKeySecretId === "string"
+    ? saved.anthropic.apiKeySecretId
+    : defaults.anthropic.apiKeySecretId;
+  const openaiSecretId = typeof saved?.openai?.apiKeySecretId === "string"
+    ? saved.openai.apiKeySecretId
+    : defaults.openai.apiKeySecretId;
   return {
     lmstudio: {
       enabled: deriveEnabled(saved?.lmstudio?.enabled, "lmstudio", true, disclaimerAccepted),
@@ -230,22 +237,26 @@ export function normalizeProviderSettingsMap(
         : defaults.lmstudio.bypassCors,
     },
     anthropic: {
+      // hasLinkedCredential also counts plaintext that survived a failed migration,
+      // which is the fail-closed path: without it a provider whose key still works
+      // through the session overlay would be force-disabled at load, the opposite of
+      // what the failure was preserving it for.
       enabled: deriveEnabled(
         saved?.anthropic?.enabled,
         "anthropic",
-        anthropicKey.length > 0,
+        hasLinkedCredential(saved?.anthropic),
         disclaimerAccepted,
       ),
-      apiKey: anthropicKey,
+      apiKeySecretId: anthropicSecretId,
     },
     openai: {
       enabled: deriveEnabled(
         saved?.openai?.enabled,
         "openai",
-        openaiKey.length > 0,
+        hasLinkedCredential(saved?.openai),
         disclaimerAccepted,
       ),
-      apiKey: openaiKey,
+      apiKeySecretId: openaiSecretId,
       baseUrl: typeof saved?.openai?.baseUrl === "string"
         ? saved.openai.baseUrl
         : defaults.openai.baseUrl,

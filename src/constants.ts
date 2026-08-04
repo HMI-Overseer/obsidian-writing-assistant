@@ -226,8 +226,8 @@ export const DEFAULT_SETTINGS: PluginSettings = {
     // the privacy disclaimer. normalizeProviderSettingsMap enforces both gates
     // on every load.
     lmstudio: { enabled: true, baseUrl: "http://localhost:1234/v1", bypassCors: true },
-    anthropic: { enabled: false, apiKey: "" },
-    openai: { enabled: false, apiKey: "", baseUrl: "https://api.openai.com/v1" },
+    anthropic: { enabled: false, apiKeySecretId: "" },
+    openai: { enabled: false, apiKeySecretId: "", baseUrl: "https://api.openai.com/v1" },
     claudecode: { enabled: false, claudePath: "" },
   },
   includeNoteContext: true,

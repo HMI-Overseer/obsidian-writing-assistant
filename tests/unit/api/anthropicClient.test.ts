@@ -93,7 +93,7 @@ describe("AnthropicClient.complete retry", () => {
       .mockRejectedValueOnce(new Error("HTTP 529: overloaded"))
       .mockResolvedValueOnce(successBody("recovered"));
 
-    const client = new AnthropicClient("test-key");
+    const client = new AnthropicClient(() => "test-key");
     const p = client.complete(makeRequest(), "claude-opus-4-8", makeParams());
 
     // Advance past withRetry's first backoff so the second attempt runs.
@@ -108,7 +108,7 @@ describe("AnthropicClient.complete retry", () => {
   test("does not retry a 4xx (bad request fails fast)", async () => {
     mockRequest.mockRejectedValue(new Error("HTTP 400: invalid_request_error"));
 
-    const client = new AnthropicClient("test-key");
+    const client = new AnthropicClient(() => "test-key");
     const p = client.complete(makeRequest(), "claude-opus-4-8", makeParams());
 
     await expect(p).rejects.toThrow("HTTP 400");
@@ -118,7 +118,7 @@ describe("AnthropicClient.complete retry", () => {
   test("succeeds on the first attempt without any delay", async () => {
     mockRequest.mockResolvedValueOnce(successBody("first-try"));
 
-    const client = new AnthropicClient("test-key");
+    const client = new AnthropicClient(() => "test-key");
     const result = await client.complete(makeRequest(), "claude-opus-4-8", makeParams());
 
     expect(mockRequest).toHaveBeenCalledTimes(1);
@@ -133,7 +133,7 @@ describe("AnthropicClient.stream tool-call parsing", () => {
 
   async function collectToolCalls(events: unknown[]) {
     mockStreamNode.mockImplementation(streamNodeImpl(events));
-    const client = new AnthropicClient("test-key");
+    const client = new AnthropicClient(() => "test-key");
     const result = client.stream(makeRequest(), "claude-opus-4-8", makeParams(), detachedAttemptContext("t"));
     const ordered = await collectEvents(result);
     return toolCallsOf(ordered);
@@ -160,7 +160,7 @@ describe("AnthropicClient.stream thinking-block capture (tool round trip)", () =
 
   async function collectThinkingBlocks(events: unknown[]) {
     mockStreamNode.mockImplementation(streamNodeImpl(events));
-    const client = new AnthropicClient("test-key");
+    const client = new AnthropicClient(() => "test-key");
     const result = client.stream(makeRequest(), "claude-opus-4-8", makeParams(), detachedAttemptContext("t"));
     await collectEvents(result);
     return (await result.replayCapsule)?.thinkingBlocks ?? null;
@@ -279,7 +279,7 @@ describe("AnthropicClient.complete Layer-2 block tolerance", () => {
       headers: {},
     });
 
-    const client = new AnthropicClient("test-key");
+    const client = new AnthropicClient(() => "test-key");
     const result = await client.complete(makeRequest(), "claude-opus-4-8", makeParams());
 
     expect(result.text).toBe("searching");
@@ -305,7 +305,7 @@ describe("AnthropicClient.complete Layer-2 block tolerance", () => {
       headers: {},
     });
 
-    const client = new AnthropicClient("test-key");
+    const client = new AnthropicClient(() => "test-key");
     const result = await client.complete(makeRequest(), "claude-opus-4-8", makeParams());
 
     expect(result.text).toBe("");

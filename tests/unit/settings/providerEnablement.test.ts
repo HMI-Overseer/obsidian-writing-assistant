@@ -136,6 +136,61 @@ describe("provider enabled flag", () => {
   });
 });
 
+/**
+ * Credentials live in Obsidian's secret storage and `data.json` holds only an id
+ * (ADR-0039). Enablement therefore gates on "a credential is linked", which
+ * deliberately does not mean "the secret resolves": normalization stays pure and
+ * ignorant of secret storage, and the runtime gates on resolution instead.
+ */
+describe("enablement gates on a linked credential, not a stored key", () => {
+  it("carries a linked secret id through and enables the provider", () => {
+    const settings = normalizePluginSettings({
+      providerSettings: {
+        anthropic: { apiKeySecretId: "writing-assistant-chat-anthropic" },
+      },
+    } as unknown as Partial<PluginSettings>);
+    expect(settings.providerSettings.anthropic.apiKeySecretId).toBe(
+      "writing-assistant-chat-anthropic",
+    );
+    expect(settings.providerSettings.anthropic.enabled).toBe(true);
+  });
+
+  it("clamps a keyed provider off when no id is linked", () => {
+    const settings = normalizePluginSettings({
+      providerSettings: {
+        openai: { apiKeySecretId: "", enabled: true },
+      },
+    } as unknown as Partial<PluginSettings>);
+    expect(settings.providerSettings.openai.enabled).toBe(false);
+  });
+
+  it("keeps a provider enabled when only plaintext survived a failed migration", () => {
+    // The fail-closed path. Without counting the legacy field, a provider whose key
+    // still works through the session overlay would be force-disabled at load, which
+    // is the opposite of what the failure preserved it for.
+    const settings = normalizePluginSettings({
+      providerSettings: {
+        anthropic: { apiKey: "sk-ant-xxx", enabled: true },
+      },
+    } as unknown as Partial<PluginSettings>);
+    expect(settings.providerSettings.anthropic.enabled).toBe(true);
+  });
+
+  it("never carries a plaintext key onto the live settings object", () => {
+    // Normalization builds a fresh object holding only known fields, and `apiKey` is
+    // no longer one of them, so a legacy blob cannot leak a credential into memory
+    // under a name any consumer might still read.
+    const settings = normalizePluginSettings({
+      providerSettings: {
+        anthropic: { apiKey: "sk-ant-xxx" },
+        openai: { apiKey: "sk-xxx" },
+      },
+    } as unknown as Partial<PluginSettings>);
+    expect(Object.hasOwn(settings.providerSettings.anthropic, "apiKey")).toBe(false);
+    expect(Object.hasOwn(settings.providerSettings.openai, "apiKey")).toBe(false);
+  });
+});
+
 describe("legacy model-row migration", () => {
   it("seeds the LM Studio last-seen cache from legacy rows (identity only, no caps)", () => {
     const settings = normalizePluginSettings(legacyBlob());

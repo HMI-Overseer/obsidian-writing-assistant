@@ -116,6 +116,7 @@ export async function sendMessage(options: SendMessageOptions): Promise<void> {
   const client = createChatClient(
     activeModel.provider,
     plugin.settings.providerSettings,
+    plugin.services.credentials,
     runtime,
   );
 

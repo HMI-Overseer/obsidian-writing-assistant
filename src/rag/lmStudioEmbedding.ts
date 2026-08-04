@@ -12,10 +12,18 @@ interface OpenAIEmbeddingResponse {
  * Works with LM Studio and OpenAI `/v1/embeddings` endpoints.
  */
 export class LMStudioEmbeddingClient implements EmbeddingClient {
+  /**
+   * `extraHeaders` is a thunk rather than a record because the only caller that
+   * supplies it is the OpenAI path, whose header carries a credential, and this
+   * client is held for the life of `RagService` / `GraphService`. Resolving per
+   * request is what keeps the long-lived field free of a secret (ADR-0039); it also
+   * lets the thunk throw when nothing resolves, so a deleted key fails as a missing
+   * credential rather than as a provider 401.
+   */
   constructor(
     private readonly baseUrl: string,
     private readonly bypassCors: boolean = true,
-    private readonly headers?: Record<string, string>,
+    private readonly extraHeaders?: () => Record<string, string>,
   ) {}
 
   async embed(
@@ -36,6 +44,7 @@ export class LMStudioEmbeddingClient implements EmbeddingClient {
       this.bypassCors,
       body,
       signal,
+      this.extraHeaders?.(),
     );
 
     const json = JSON.parse(raw) as OpenAIEmbeddingResponse;

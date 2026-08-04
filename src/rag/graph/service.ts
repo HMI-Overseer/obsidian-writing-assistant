@@ -5,6 +5,7 @@ import type { CompletionModel, EmbeddingModel, ProviderSettingsMap } from "../..
 import { KnowledgeGraph, isSerializedKnowledgeGraph } from "./knowledgeGraph";
 import { GraphExtractor, matchGlob, getTopLevelFolder } from "./extractor";
 import { createChatClient } from "../../providers/registry";
+import type { CredentialStore } from "../../providers/credentials";
 import type { ChatClient } from "../../api/chatClient";
 import type { EmbeddingClient } from "../embeddingClient";
 import { createEmbeddingClient } from "../ragService";
@@ -44,6 +45,12 @@ export class GraphService {
   constructor(
     app: App,
     private readonly pluginDir: string,
+    /**
+     * Held rather than threaded through `configure`, because it is a port and not a
+     * credential: it resolves on demand and stores nothing, so the long-lived
+     * {@link chatClient} and {@link embeddingClient} fields below carry no secret.
+     */
+    private readonly credentials: CredentialStore,
   ) {
     this.app = app;
   }
@@ -161,9 +168,9 @@ export class GraphService {
     const embModel = embeddingModels.find((m) => m.id === settings.activeEmbeddingModelId);
     if (!embModel) return;
 
-    this.chatClient = createChatClient(model.provider, providerSettings);
+    this.chatClient = createChatClient(model.provider, providerSettings, this.credentials);
     this.configuredModelId = model.modelId;
-    this.embeddingClient = createEmbeddingClient(embModel, providerSettings);
+    this.embeddingClient = createEmbeddingClient(embModel, providerSettings, this.credentials);
     this.configuredEmbeddingModelId = embModel.modelId;
 
     this.graph = new KnowledgeGraph();

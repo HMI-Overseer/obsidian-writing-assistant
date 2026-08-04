@@ -24,6 +24,8 @@ import {
   buildAnthropicHeaders,
   buildAnthropicPayload,
 } from "./buildAnthropicPayload";
+import type { CredentialResolver } from "../providers/credentials";
+import { MissingCredentialError } from "../providers/credentials";
 import { generateId } from "../utils";
 import { AnthropicStreamTranslator } from "./anthropicStreamTranslator";
 import {
@@ -76,12 +78,23 @@ function extractUsageFromJson(json: Record<string, unknown>): UsageResult | null
 }
 
 export class AnthropicClient implements ChatClient {
-  constructor(private readonly apiKey: string) {
-    if (!apiKey) {
-      throw new Error(
-        "Anthropic API key not configured. Add your key in Settings → General → Provider API Keys."
-      );
-    }
+  /**
+   * Takes a resolver rather than a key: the client outlives the credential, since
+   * `GraphService` builds one in `configure()` and keeps it, and the user can delete
+   * the secret from Obsidian's Keychain tab at any moment. Holding a thunk means the
+   * field may live as long as it likes because it holds no secret (ADR-0039).
+   */
+  constructor(private readonly resolveApiKey: CredentialResolver) {}
+
+  /**
+   * Headers for one request. The credential is resolved here rather than in the
+   * constructor, so a key deleted after the client was built fails the same way as
+   * one that was never linked.
+   */
+  private requestHeaders(): Record<string, string> {
+    const apiKey = this.resolveApiKey();
+    if (!apiKey) throw new MissingCredentialError("Anthropic");
+    return buildAnthropicHeaders(apiKey, ANTHROPIC_VERSION);
   }
 
   async complete(
@@ -94,6 +107,7 @@ export class AnthropicClient implements ChatClient {
     const { system, messages } = buildAnthropicMessages(request, cacheSettings, model);
     const anthropicTools = formatRequestTools(request);
     const payload = buildAnthropicPayload(model, system, messages, params, false, anthropicTools);
+    const headers = this.requestHeaders();
 
     // Wrap the request in withRetry so a transient 429 / 5xx (incl. 529
     // overloaded) is retried with backoff, matching the LM Studio / OpenAI
@@ -107,7 +121,7 @@ export class AnthropicClient implements ChatClient {
           "/v1/messages",
           payload,
           signal,
-          buildAnthropicHeaders(this.apiKey, ANTHROPIC_VERSION)
+          headers
         ),
       { signal }
     );
@@ -163,6 +177,7 @@ export class AnthropicClient implements ChatClient {
     const { system, messages } = buildAnthropicMessages(request, cacheSettings, model);
     const anthropicTools = formatRequestTools(request);
     const payload = buildAnthropicPayload(model, system, messages, params, true, anthropicTools);
+    const headers = this.requestHeaders();
     const url = `${ANTHROPIC_BASE_URL}/v1/messages`;
     const translator = new AnthropicStreamTranslator({
       segmentId: `segment-${generateId()}`,
@@ -178,7 +193,7 @@ export class AnthropicClient implements ChatClient {
       url,
       payload,
       transport.signal,
-      buildAnthropicHeaders(this.apiKey, ANTHROPIC_VERSION),
+      headers,
       anthropicDeltaExtractor,
       frames.onPayload,
     );

@@ -11,6 +11,24 @@ import {
   sw,
 } from "../fixtures/primitives.mjs";
 
+/**
+ * Obsidian's SecretComponent, reconstructed from the shipped bundle: a warning icon
+ * (omitted here, it is display:none wherever the OS provides a keystore), an
+ * unclassed value div carrying the masked value, and a bare <button>. None of the
+ * three can be classed by us, which is why the wrapper exists and why this fixture
+ * does. See the .lmsa-secret-control block in ProvidersTab.css.
+ */
+const SECRET_CONTROL_LINKED = `<div class="lmsa-secret-control">
+              <div><span class="setting-hotkey"><span class="setting-password">•••••••</span><span class="setting-hotkey-icon">${I.x}</span></span></div>
+              <button>Change</button>
+            </div>`;
+
+/** The same control with nothing linked: no value at all, and the button reads "Link". */
+const SECRET_CONTROL_UNLINKED = `<div class="lmsa-secret-control">
+              <div></div>
+              <button>Link</button>
+            </div>`;
+
 export const SETTINGS_SURFACES = {
 
   // S16: settings General tab, two section cards. Converted: Obsidian's declarative renderer
@@ -89,13 +107,13 @@ export const SETTINGS_SURFACES = {
                 <span class="lmsa-provider-card-name">Anthropic</span>
                 <span class="lmsa-provider-card-version lmsa-hidden"></span>
               </div>
-              <div class="lmsa-provider-card-status">API key set · 8 models available in chat</div>
+              <div class="lmsa-provider-card-status">API key linked · 8 models available in chat</div>
             </div>
             <span class="lmsa-provider-card-chevron">${I.chevronDown}</span>
             <div class="lmsa-provider-card-toggle">${sw("is-enabled")}</div>
           </div>
           <div class="lmsa-provider-card-bodywrap"><div class="lmsa-provider-card-bodyclip"><div class="lmsa-provider-card-body">
-            ${settingItem("API key", "Stored locally in this vault and never shared. Saving a key enables the provider.", `<input type="password" placeholder="sk-ant-…">`)}
+            ${settingItem("API key", "Stored in Obsidian's keychain, outside your vault, encrypted where your OS supports it. Linking a key enables the provider.", SECRET_CONTROL_LINKED)}
             <div class="lmsa-provider-models">
               <div class="lmsa-provider-models-header">
                 <span class="lmsa-provider-models-title">Models</span>
@@ -127,7 +145,7 @@ export const SETTINGS_SURFACES = {
                 <span class="lmsa-provider-card-name">OpenAI</span>
                 <span class="lmsa-provider-card-version lmsa-hidden"></span>
               </div>
-              <div class="lmsa-provider-card-status">API key set · 6 models available in chat</div>
+              <div class="lmsa-provider-card-status">API key linked · 6 models available in chat</div>
             </div>
             <span class="lmsa-provider-card-chevron">${I.chevronDown}</span>
             <div class="lmsa-provider-card-toggle">${sw("is-enabled")}</div>
@@ -154,6 +172,68 @@ export const SETTINGS_SURFACES = {
         </div>
       </div>
       <p class="lmsa-provider-footnote">Cloud model catalogs ship with the plugin and refresh with each release. Local models are discovered live from LM Studio.</p>`,
+        I.plug,
+      ),
+      720,
+      "providers",
+    ),
+  },
+
+  // S17b: the two keyed-cloud states a correctly configured user never reaches, so nothing
+  // else in the harness renders them. "Linked key is missing" is a dangling id, which the
+  // secret picker itself draws identically to "never configured" (it renders nothing and
+  // its button reads "Link"), so the status line is the only thing distinguishing them; the
+  // second card is a refused relocation, which keeps working and must read as actionable
+  // rather than alarming.
+  settingsProvidersCredentialStates: {
+    source: "src/settings/ProvidersTab.ts",
+    shot: ".setting-page",
+    html: settingsView(
+      section(
+        "Model providers",
+        "Enable the LLM providers you use and manage their credentials and models in one place.",
+        `<div class="lmsa-provider-cards">
+        <div class="lmsa-provider-card is-expanded">
+          <div class="lmsa-provider-card-header">
+            <div class="lmsa-provider-card-iconwrap">
+              <div class="lmsa-provider-card-icon lmsa-brand-tint-anthropic">${BRAND.anthropic}</div>
+              <span class="lmsa-provider-status-dot is-error"></span>
+            </div>
+            <div class="lmsa-provider-card-info">
+              <div class="lmsa-provider-card-name-row">
+                <span class="lmsa-provider-card-name">Anthropic</span>
+                <span class="lmsa-provider-card-version lmsa-hidden"></span>
+              </div>
+              <div class="lmsa-provider-card-status">Linked key is missing from Obsidian's keychain</div>
+            </div>
+            <span class="lmsa-provider-card-chevron">${I.chevronDown}</span>
+            <div class="lmsa-provider-card-toggle">${sw("is-enabled")}</div>
+          </div>
+          <div class="lmsa-provider-card-bodywrap"><div class="lmsa-provider-card-bodyclip"><div class="lmsa-provider-card-body">
+            ${settingItem("API key", "Stored in Obsidian's keychain, outside your vault, encrypted where your OS supports it. Linking a key enables the provider.", SECRET_CONTROL_UNLINKED)}
+          </div></div></div>
+        </div>
+        <div class="lmsa-provider-card is-expanded">
+          <div class="lmsa-provider-card-header">
+            <div class="lmsa-provider-card-iconwrap">
+              <div class="lmsa-provider-card-icon lmsa-brand-tint-openai">${BRAND.openai}</div>
+              <span class="lmsa-provider-status-dot is-warn"></span>
+            </div>
+            <div class="lmsa-provider-card-info">
+              <div class="lmsa-provider-card-name-row">
+                <span class="lmsa-provider-card-name">OpenAI</span>
+                <span class="lmsa-provider-card-version lmsa-hidden"></span>
+              </div>
+              <div class="lmsa-provider-card-status">Your key is still stored in this vault</div>
+            </div>
+            <span class="lmsa-provider-card-chevron">${I.chevronDown}</span>
+            <div class="lmsa-provider-card-toggle">${sw("is-enabled")}</div>
+          </div>
+          <div class="lmsa-provider-card-bodywrap"><div class="lmsa-provider-card-bodyclip"><div class="lmsa-provider-card-body">
+            ${settingItem("API key", "This key is still stored in this vault. Moving it was refused because a secret named writing-assistant-chat-openai already exists and is not ours to overwrite. Link a key to finish moving it out.", SECRET_CONTROL_UNLINKED)}
+          </div></div></div>
+        </div>
+      </div>`,
         I.plug,
       ),
       720,

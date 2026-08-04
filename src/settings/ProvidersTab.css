@@ -209,6 +209,55 @@
   @apply lmsa:flex lmsa:flex-none lmsa:items-center lmsa:justify-center lmsa:px-2;
 }
 
+/* ── Linked API key (Obsidian's SecretComponent) ─────────────────────
+ *
+ * The component appends three children we do not control and cannot class: a
+ * warning icon (shown only where the OS provides no keystore), an unclassed value
+ * div, and a bare <button>. Dropped straight into a row, that button arrives
+ * wearing Obsidian's full base button chrome inside a card whose own buttons are
+ * deliberately quieter, so the rules below re-dress it in the card's idiom.
+ *
+ * Everything is scoped through the wrapper rather than reaching down from
+ * .lmsa-setting-item-control, which also carries our own controls. The selectors
+ * are element-level on purpose: there is no class to hook, and a future Obsidian
+ * release that changes this DOM makes them go stale toward Obsidian's default
+ * chrome, which is legible rather than broken.
+ */
+
+.lmsa-secret-control {
+  @apply lmsa:flex lmsa:items-center lmsa:gap-2;
+}
+
+.lmsa-secret-control > button {
+  @apply lmsa:inline-flex lmsa:min-h-9 lmsa:items-center lmsa:justify-center lmsa:rounded-[10px] lmsa:border lmsa:border-obsidian-border lmsa:bg-obsidian-surface-secondary lmsa:px-3.5 lmsa:py-2 lmsa:text-sm lmsa:text-obsidian-text;
+  box-shadow: none;
+}
+
+.lmsa-secret-control > button:hover {
+  background: var(--background-modifier-hover);
+  box-shadow: none;
+}
+
+/* The masked value, which the component wraps in Obsidian's hotkey chrome. */
+.lmsa-secret-control .setting-hotkey {
+  @apply lmsa:flex lmsa:items-center lmsa:gap-1 lmsa:rounded-md lmsa:px-2 lmsa:py-1 lmsa:text-xs;
+  background: var(--background-modifier-form-field);
+  color: var(--lmsa-text-secondary);
+}
+
+.lmsa-secret-control .setting-password {
+  @apply lmsa:cursor-pointer lmsa:font-mono;
+}
+
+.lmsa-secret-control .setting-hotkey-icon {
+  @apply lmsa:flex lmsa:cursor-pointer lmsa:items-center;
+  color: var(--lmsa-text-muted);
+}
+
+.lmsa-secret-control .setting-hotkey-icon:hover {
+  color: var(--lmsa-text-primary);
+}
+
 /* ── Detection status (Claude Code) ─────────────────────────────── */
 
 .lmsa-provider-detection {

@@ -4,6 +4,7 @@ import { GraphService } from "../../../../src/rag/graph/service";
 import type { KnowledgeGraphSettings } from "../../../../src/rag/graph/types";
 import type { ExtractionResult, GraphFileMeta } from "../../../../src/rag/graph/types";
 import type { CompletionModel, EmbeddingModel, ProviderSettingsMap } from "../../../../src/shared/types";
+import type { CredentialStore } from "../../../../src/providers/credentials";
 
 /** A captured `vault.on(...)` registration we can fire by hand. */
 type CapturedHandler = { name: string; handler: (...args: unknown[]) => void };
@@ -51,6 +52,13 @@ const providerSettings: ProviderSettingsMap = {
   claudecode: { claudePath: "" },
 };
 
+// These watchers are pure bookkeeping (rename / delete, no LLM), and the models
+// above are local, so nothing here ever resolves a credential.
+const credentials: CredentialStore = {
+  resolve: () => null,
+  state: () => "unlinked",
+};
+
 function makeMeta(filePath: string, mtime = 1): GraphFileMeta {
   return { filePath, mtime, contentHash: "hash" };
 }
@@ -75,7 +83,7 @@ describe("GraphService vault watchers", () => {
 
   test("a configured graph registers rename and delete watchers", async () => {
     const { app, handlers } = makeApp();
-    service = new GraphService(app, "plugin-dir");
+    service = new GraphService(app, "plugin-dir", credentials);
     await service.configure(settings, completionModels, embeddingModels, providerSettings);
 
     expect(handlers.some((h) => h.name === "rename")).toBe(true);
@@ -84,7 +92,7 @@ describe("GraphService vault watchers", () => {
 
   test("a disabled graph is not configured and registers no watchers", async () => {
     const { app, handlers } = makeApp();
-    service = new GraphService(app, "plugin-dir");
+    service = new GraphService(app, "plugin-dir", credentials);
     await service.configure(
       { ...settings, enabled: false },
       completionModels,
@@ -98,7 +106,7 @@ describe("GraphService vault watchers", () => {
 
   test("rename re-keys the graph so the entity follows the file", async () => {
     const { app, handlers } = makeApp();
-    service = new GraphService(app, "plugin-dir");
+    service = new GraphService(app, "plugin-dir", credentials);
     await service.configure(settings, completionModels, embeddingModels, providerSettings);
 
     const graph = service.getGraph();
@@ -117,7 +125,7 @@ describe("GraphService vault watchers", () => {
 
   test("delete drops entities sourced only from the removed file", async () => {
     const { app, handlers } = makeApp();
-    service = new GraphService(app, "plugin-dir");
+    service = new GraphService(app, "plugin-dir", credentials);
     await service.configure(settings, completionModels, embeddingModels, providerSettings);
 
     const graph = service.getGraph();
@@ -134,7 +142,7 @@ describe("GraphService vault watchers", () => {
 
   test("non-markdown rename/delete events are ignored", async () => {
     const { app, handlers } = makeApp();
-    service = new GraphService(app, "plugin-dir");
+    service = new GraphService(app, "plugin-dir", credentials);
     await service.configure(settings, completionModels, embeddingModels, providerSettings);
 
     const graph = service.getGraph();
@@ -157,7 +165,7 @@ describe("GraphService vault watchers", () => {
     (app.vault as unknown as { offref: (ref: unknown) => void }).offref = (ref) =>
       offrefCalls.push(ref);
 
-    service = new GraphService(app, "plugin-dir");
+    service = new GraphService(app, "plugin-dir", credentials);
     await service.configure(settings, completionModels, embeddingModels, providerSettings);
     const registered = handlers.length;
 
@@ -183,7 +191,7 @@ describe("GraphService.getStaleFileCount", () => {
       { path: "c.md", stat: { mtime: 9 } }, // never tracked → not counted
     ];
     const { app } = makeApp(files);
-    service = new GraphService(app, "plugin-dir");
+    service = new GraphService(app, "plugin-dir", credentials);
     await service.configure(settings, completionModels, embeddingModels, providerSettings);
 
     const graph = service.getGraph()!;
@@ -196,7 +204,7 @@ describe("GraphService.getStaleFileCount", () => {
   test("excluded files are not counted", async () => {
     const files: FakeFile[] = [{ path: "templates/note.md", stat: { mtime: 5 } }];
     const { app } = makeApp(files);
-    service = new GraphService(app, "plugin-dir");
+    service = new GraphService(app, "plugin-dir", credentials);
     await service.configure(settings, completionModels, embeddingModels, providerSettings);
 
     const graph = service.getGraph()!;

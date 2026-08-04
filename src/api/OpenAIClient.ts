@@ -13,6 +13,8 @@ import type {
 import { createLinkedAbort } from "./assistantStreamRuntime";
 import type { ToolCall } from "../tools/types";
 import { formatOpenAITools } from "../tools/formatters/openai";
+import type { CredentialResolver } from "../providers/credentials";
+import { MissingCredentialError } from "../providers/credentials";
 import { normalizeModelList } from "./modelNormalization";
 import { requestJson } from "./httpTransport";
 import { generateId } from "../utils";
@@ -31,20 +33,30 @@ export interface OpenAIModelListResult {
 }
 
 export class OpenAIClient implements ChatClient {
-  private readonly headers: Record<string, string>;
-
+  /**
+   * Takes a resolver rather than a key, and builds headers per request rather than
+   * once in the constructor: the client outlives the credential, since `GraphService`
+   * builds one in `configure()` and keeps it, and the user can delete the secret from
+   * Obsidian's Keychain tab at any moment (ADR-0039).
+   */
   constructor(
-    private readonly apiKey: string,
+    private readonly resolveApiKey: CredentialResolver,
     private readonly baseUrl: string,
-  ) {
-    this.headers = {
-      "Authorization": `Bearer ${apiKey}`,
-    };
+  ) {}
+
+  /**
+   * Headers for one request. A key deleted after the client was built fails the same
+   * way as one that was never linked.
+   */
+  private requestHeaders(): Record<string, string> {
+    const apiKey = this.resolveApiKey();
+    if (!apiKey) throw new MissingCredentialError("OpenAI");
+    return { "Authorization": `Bearer ${apiKey}` };
   }
 
   async listModels(signal?: AbortSignal): Promise<Array<{ id: string; name: string }>> {
     const payload = await requestJson(
-      "GET", this.baseUrl, "/models", false, undefined, signal, this.headers,
+      "GET", this.baseUrl, "/models", false, undefined, signal, this.requestHeaders(),
     );
     const models = normalizeModelList(payload, "openai");
     if (!models) {
@@ -66,7 +78,7 @@ export class OpenAIClient implements ChatClient {
     const payload = buildCompletionPayload(model, messages, params, false, openAITools);
 
     const json = await requestJson(
-      "POST", this.baseUrl, "/chat/completions", false, payload, signal, this.headers,
+      "POST", this.baseUrl, "/chat/completions", false, payload, signal, this.requestHeaders(),
     );
     if (!isRecord(json)) {
       throw new Error("OpenAI returned an invalid chat completion response.");
@@ -95,6 +107,7 @@ export class OpenAIClient implements ChatClient {
       : undefined;
     const url = `${this.baseUrl}/chat/completions`;
     const body = buildCompletionPayload(model, messages, params, true, openAITools, true);
+    const headers = this.requestHeaders();
 
     const translator = new OpenAICompatibleStreamTranslator({
       segmentId: `segment-${generateId()}`,
@@ -109,7 +122,7 @@ export class OpenAIClient implements ChatClient {
       url,
       body,
       transport.signal,
-      this.headers,
+      headers,
       undefined,
       frames.onPayload,
     );

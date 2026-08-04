@@ -127,7 +127,7 @@ describe("OpenAIClient.stream usage accounting", () => {
 
   test("requests usage accounting via stream_options.include_usage", async () => {
     mockStreamFetch.mockImplementation(streamImpl([]));
-    const client = new OpenAIClient("key", "https://api.openai.com/v1");
+    const client = new OpenAIClient(() => "key", "https://api.openai.com/v1");
 
     const result = client.stream(makeRequest(), "gpt-4o", makeParams(), detachedAttemptContext("t"));
     await drain(result);
@@ -143,7 +143,7 @@ describe("OpenAIClient.stream usage accounting", () => {
       // Terminal accounting chunk: empty choices, populated usage.
       { event: { choices: [], usage: { prompt_tokens: 12, completion_tokens: 5, total_tokens: 17 } } },
     ]));
-    const client = new OpenAIClient("key", "https://api.openai.com/v1");
+    const client = new OpenAIClient(() => "key", "https://api.openai.com/v1");
 
     const result = client.stream(makeRequest(), "gpt-4o", makeParams(), detachedAttemptContext("t"));
     const events = await drain(result);
@@ -160,7 +160,7 @@ describe("OpenAIClient.stream usage accounting", () => {
       { event: { choices: [{ index: 0, delta: { content: "Hi" } }] }, delta: "Hi" },
       { event: { choices: [{ index: 0, delta: {}, finish_reason: "stop" }] } },
     ]));
-    const client = new OpenAIClient("key", "https://api.openai.com/v1");
+    const client = new OpenAIClient(() => "key", "https://api.openai.com/v1");
 
     const result = client.stream(makeRequest(), "gpt-4o", makeParams(), detachedAttemptContext("t"));
     await drain(result);
@@ -175,7 +175,7 @@ describe("OpenAIClient.stream usage accounting", () => {
       { event: { choices: [{ index: 0, delta: {}, finish_reason: "tool_calls" }] } },
       { event: { choices: [], usage: { prompt_tokens: 20, completion_tokens: 8, total_tokens: 28 } } },
     ]));
-    const client = new OpenAIClient("key", "https://api.openai.com/v1");
+    const client = new OpenAIClient(() => "key", "https://api.openai.com/v1");
     const request = makeRequest({
       tools: [{
         name: "edit",
@@ -202,7 +202,7 @@ describe("OpenAIClient.stream usage accounting", () => {
       { event: { choices: [{ index: 0, delta: { tool_calls: [{ index: 0, id: "call_1", function: { name: "edit", arguments: "{\"a\":" } }] } }] } },
       { event: { choices: [{ index: 0, delta: {}, finish_reason: "tool_calls" }] } },
     ]));
-    const client = new OpenAIClient("key", "https://api.openai.com/v1");
+    const client = new OpenAIClient(() => "key", "https://api.openai.com/v1");
     const request = makeRequest({
       tools: [{
         name: "edit",

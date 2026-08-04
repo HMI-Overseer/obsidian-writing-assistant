@@ -652,7 +652,11 @@ export function renderBenchmarkTab(
     const suite = findSuiteForTest(tc.id);
 
     try {
-      const client = createChatClient(selectedModel.provider, plugin.settings.providerSettings);
+      const client = createChatClient(
+        selectedModel.provider,
+        plugin.settings.providerSettings,
+        plugin.services.credentials,
+      );
       const profile = getActiveProfile(plugin.settings, selectedModel.provider);
       lastRunConditions = buildRunConditions(selectedModel, profile);
       const result = await runBenchmarkTest(
@@ -703,7 +707,11 @@ export function renderBenchmarkTab(
 
     const completedThisRun = new Set<string>();
     try {
-      const client = createChatClient(selectedModel.provider, plugin.settings.providerSettings);
+      const client = createChatClient(
+        selectedModel.provider,
+        plugin.settings.providerSettings,
+        plugin.services.credentials,
+      );
       const profile = getActiveProfile(plugin.settings, selectedModel.provider);
       lastRunConditions = buildRunConditions(selectedModel, profile);
       await runAllBenchmarks(
@@ -772,7 +780,11 @@ export function renderBenchmarkTab(
 
     const completedThisRun = new Set<string>();
     try {
-      const client = createChatClient(selectedModel.provider, plugin.settings.providerSettings);
+      const client = createChatClient(
+        selectedModel.provider,
+        plugin.settings.providerSettings,
+        plugin.services.credentials,
+      );
       const profile = getActiveProfile(plugin.settings, selectedModel.provider);
       lastRunConditions = buildRunConditions(selectedModel, profile);
       for (const suite of suites) {

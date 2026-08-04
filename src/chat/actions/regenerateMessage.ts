@@ -85,6 +85,7 @@ export async function regenerateMessage(options: RegenerateOptions): Promise<voi
   const client = createChatClient(
     activeModel.provider,
     plugin.settings.providerSettings,
+    plugin.services.credentials,
     runtime,
   );
 

@@ -7,6 +7,8 @@ import { VectorStore, isSerializedVectorIndex } from "./vectorStore";
 import { VaultIndexer } from "./indexer";
 import { Retriever } from "./retriever";
 import { LMStudioEmbeddingClient } from "./lmStudioEmbedding";
+import type { CredentialStore } from "../providers/credentials";
+import { MissingCredentialError } from "../providers/credentials";
 import type { EmbeddingClient } from "./embeddingClient";
 import type { GraphService } from "./graph";
 import { boostByGraphRelevance, annotateBlockWithGraph } from "./graph/retrieval";
@@ -62,6 +64,7 @@ export function retrievalCharBudget(
 export function createEmbeddingClient(
   model: EmbeddingModel,
   providerSettings: ProviderSettingsMap,
+  credentials: CredentialStore,
 ): EmbeddingClient | null {
   switch (model.provider) {
     case "lmstudio":
@@ -70,10 +73,17 @@ export function createEmbeddingClient(
         providerSettings.lmstudio.bypassCors,
       );
     case "openai":
+      // The header is built per request: this client is stored in a field that
+      // lives for as long as the service does (see {@link RagService.embeddingClient}),
+      // so capturing the key here would outlive the user deleting the secret.
       return new LMStudioEmbeddingClient(
         providerSettings.openai.baseUrl,
         false,
-        { Authorization: `Bearer ${providerSettings.openai.apiKey}` },
+        () => {
+          const apiKey = credentials.resolve("openai");
+          if (!apiKey) throw new MissingCredentialError("OpenAI");
+          return { Authorization: `Bearer ${apiKey}` };
+        },
       );
     default:
       return null;
@@ -126,6 +136,12 @@ export class RagService {
   constructor(
     app: App,
     private readonly pluginDir: string,
+    /**
+     * Held rather than threaded through `configure` / `startIndexing` / `rebuild`,
+     * because it is a port and not a credential: it resolves on demand and stores
+     * nothing, so a long-lived reference to it carries no secret.
+     */
+    private readonly credentials: CredentialStore,
   ) {
     this.app = app;
   }
@@ -549,7 +565,7 @@ export class RagService {
     model: EmbeddingModel,
     providerSettings: ProviderSettingsMap,
   ): EmbeddingClient | null {
-    return createEmbeddingClient(model, providerSettings);
+    return createEmbeddingClient(model, providerSettings, this.credentials);
   }
 
   private getIndexPath(): string {

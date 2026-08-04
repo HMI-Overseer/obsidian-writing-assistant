@@ -84,6 +84,7 @@ const SURFACE_ORDER = [
   "historyDrawerClosed",
   "settingsGeneral",
   "settingsProviders",
+  "settingsProvidersCredentialStates",
   "settingsModelSelector",
   "settingsBenchmark",
   "settingsRag",

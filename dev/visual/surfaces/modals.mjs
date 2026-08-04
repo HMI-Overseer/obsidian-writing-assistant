@@ -136,7 +136,7 @@ export const MODAL_SURFACES = {
         <p>When using Writing Assistant with a local provider <strong>such as LM Studio</strong> your data never leaves your machine. All processing happens locally, nothing is sent over the internet, and you can use the plugin fully offline.</p>
         <p>I fully understand not everyone has the hardware that running a local environment might require, but I encourage you to try local solutions first.</p>
         <p>There is <strong>no telemetry</strong> in Writing Assistant. If you have problems, or simply want to give feedback, reach out to me.</p>
-        <p>Writing Assistant itself <strong>never</strong> collects, stores, or transmits your data. Anything it keeps lives on your machine, inside your vault. Removing the plugin clears that plugin data.</p>
+        <p>Writing Assistant itself <strong>never</strong> collects, stores, or transmits your data. Anything it keeps lives on your machine. Your settings live inside your vault and removing the plugin clears them; your API keys do not, they are handed to Obsidian's own keychain, which keeps them outside every vault and encrypted by your operating system where it provides a keystore. That means a key survives uninstalling this plugin, and you remove it yourself from Obsidian's Keychain settings.</p>
       </div>
       <div class="lmsa-disclaimer-buttons">
         <button>Close</button>

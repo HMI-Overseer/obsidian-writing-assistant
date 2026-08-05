@@ -76,7 +76,8 @@ describe("buildClaudeCodePrompt", () => {
         }],
       }),
     );
-    expect(prompt).toContain("User: About this note");
+    // Opening turn, so no speaker label; the attachment still renders.
+    expect(prompt).toContain("About this note");
     expect(prompt).toContain("Attached note (notes/topic.md):");
     expect(prompt).toContain("Frozen body");
   });
@@ -86,13 +87,15 @@ describe("buildClaudeCodePrompt", () => {
       makeRequest({
         messages: [
           { role: "assistant", content: null },
+          { role: "user", content: "First" },
+          { role: "assistant", content: "Ack" },
           { role: "user", content: "Only this" },
         ],
       }),
     );
-    // The null assistant turn renders no header; only the one user turn does.
+    // The null assistant turn renders no header; only the non-empty one does.
     expect(prompt.endsWith("User: Only this")).toBe(true);
-    expect(prompt).not.toMatch(/^Assistant:/m);
+    expect(prompt.match(/^Assistant: /gm)?.length).toBe(1);
   });
 
   it("opens the mint blob with the framing preamble, byte-stable across rebuilds (section 4.B)", () => {
@@ -118,6 +121,63 @@ describe("buildClaudeCodePrompt", () => {
       }),
     );
     expect(prompt).not.toContain("prior conversation");
+  });
+
+  it("ships an opening turn unlabeled and unframed: there is no history to replay", () => {
+    const prompt = buildClaudeCodePrompt(
+      makeRequest({ messages: [{ role: "user", content: "Look at the vault." }] }),
+    );
+    // Telling the opening turn it is a replay whose bracketed tool lines already ran
+    // is false, and a model that believes it answers by transcribing calls it never made.
+    expect(prompt).not.toContain("prior conversation");
+    expect(prompt).not.toMatch(/^User: /m);
+    expect(prompt).toBe("Look at the vault.");
+  });
+
+  it("keeps an opening turn's mode framing without a speaker label", () => {
+    const prompt = buildClaudeCodePrompt(
+      makeRequest({
+        modeTail: "Planning mode framing.",
+        messages: [{ role: "user", content: "Look at the vault." }],
+      }),
+    );
+    expect(prompt).toBe("Planning mode framing.\n\nLook at the vault.");
+  });
+
+  it("treats a transcript whose only assistant turn renders empty as having no history", () => {
+    const prompt = buildClaudeCodePrompt(
+      makeRequest({
+        messages: [
+          { role: "assistant", content: null },
+          { role: "user", content: "Only this" },
+        ],
+      }),
+    );
+    expect(prompt).not.toContain("prior conversation");
+    expect(prompt).toBe("Only this");
+  });
+
+  it("still frames a rebuild whose transcript holds real assistant history", () => {
+    const prompt = buildClaudeCodePrompt(
+      makeRequest({
+        messages: [
+          { role: "user", content: "First" },
+          { role: "assistant", content: "Ack" },
+          { role: "user", content: "Second" },
+        ],
+      }),
+    );
+    expect(prompt.startsWith("The following is a prior conversation")).toBe(true);
+    expect(prompt).toContain("Assistant: Ack");
+  });
+
+  it("mints an opening turn byte-identically to the delta path", () => {
+    const request = makeRequest({
+      modeTail: "Mode framing.",
+      messages: [{ role: "user", content: "Open" }],
+    });
+    // Mint and reuse must not disagree about what the opening turn even says.
+    expect(buildClaudeCodePrompt(request)).toBe(buildDeltaPrompt(request));
   });
 
   it("escapes a line-leading User:/Assistant: label inside a turn body (section 1 symptom 3)", () => {

@@ -541,9 +541,15 @@ function applyRecoveryDecision(
  * resuming a replayed conversation, that it is the Assistant, and that the bracketed
  * digest lines beneath an assistant turn record tool calls that already ran,
  * so it must not repeat them or re-propose anything the user declined. Prepended only
- * when a transcript is present, and only on the mint path: the delta path (session
- * reuse) already holds this context, and keeping the preamble out of it plus stable
- * across rebuilds is what stops it from becoming a linearity drift source (ADR-0016).
+ * when the transcript actually replays an assistant turn, and only on the mint path: the
+ * delta path (session reuse) already holds this context, and keeping the preamble out of
+ * it plus stable across rebuilds is what stops it from becoming a linearity drift source
+ * (ADR-0016).
+ *
+ * The assistant-turn condition is load-bearing, not a tidy-up. A conversation's opening
+ * turn also mints cold, and every claim here is false of it: there is no prior
+ * conversation, nothing was replayed, and no tool call already ran. A model that believes
+ * it answers by transcribing bracketed calls it never made, inventing their results.
  */
 const REPLAY_PREAMBLE =
   "The following is a prior conversation, replayed after your session was restarted. " +
@@ -573,23 +579,45 @@ export function buildClaudeCodePrompt(request: ChatRequest): string {
     blocks.push(`# Retrieved context\n\n${chunks}`);
   }
 
+  // Speaker labels and the preamble both describe a *prior* conversation, so both hang
+  // on the same fact: whether any assistant turn survives rendering. Without one this is
+  // a conversation's opening turn, which ships exactly as the delta path sends it.
+  const replayed = request.messages.some(
+    (turn) => turn.role === "assistant" && renderTurnBody(turn).length > 0,
+  );
+
   // Per-mode wording rides the latest user turn so request.systemPrompt stays
   // mode-invariant and the live session's configFingerprint stops rebuilding on
   // mode switch. On a cold mint the whole transcript
   // is replayed, so the framing is prepended to the last user turn within it.
   const lastIdx = request.messages.length - 1;
   const transcript = request.messages
-    .map((turn, i) =>
-      i === lastIdx && turn.role === "user" ? renderTurn(turn, request.modeTail) : renderTurn(turn),
-    )
+    .map((turn, i) => {
+      const framing = i === lastIdx && turn.role === "user" ? request.modeTail : undefined;
+      return replayed ? renderTurn(turn, framing) : renderLiveTurn(turn, framing);
+    })
     .filter(Boolean)
     .join("\n\n");
   if (transcript) blocks.push(transcript);
 
   const body = blocks.join("\n\n---\n\n");
-  // Frame the replay only when there is a transcript to frame; a transcript-less
-  // analyst blob (documentContext only) is not a replayed conversation.
-  return transcript ? `${REPLAY_PREAMBLE}\n\n${body}` : body;
+  // Frame the replay only when there is a replayed turn to frame; a transcript-less
+  // analyst blob (documentContext only) is not a replayed conversation, and neither is
+  // an opening turn.
+  return replayed && transcript ? `${REPLAY_PREAMBLE}\n\n${body}` : body;
+}
+
+/**
+ * One live turn: its body plus any per-mode framing, with no speaker label.
+ *
+ * Nothing is escaped here. Labels are what {@link escapeSpeakerLabels} protects, and
+ * without them a literal `User:` in the body is just text, exactly as the delta path
+ * already sends it.
+ */
+function renderLiveTurn(turn: ChatTurn, framing?: string): string {
+  const body = renderTurnBody(turn);
+  if (!body) return "";
+  return framing ? `${framing}\n\n${body}` : body;
 }
 
 function renderTurn(turn: ChatTurn, framing?: string): string {

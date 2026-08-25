@@ -96,6 +96,21 @@ describe("ask_user success and guidance", () => {
       questions: [{ ...guidance.questions[0], extra: true }],
     })).toBeNull();
   });
+
+  it("reloads a long Other answer instead of discarding the record", () => {
+    const { request, answers } = validated();
+    const guidance = buildCompletedAskGuidance(request, answers);
+    // The read path must not gate on length: an answer this long is now writable, so
+    // a ceiling here would turn a saved answer into a silently dropped one on load.
+    const essay = "\u{1F600}".repeat(5_000);
+    const long = { questions: [{ ...guidance.questions[0], answer: essay }] };
+    expect(normalizeCompletedAskGuidance(long)).toEqual(long);
+
+    const longArray = {
+      questions: [{ ...guidance.questions[0], answer: ["Concise", essay] }],
+    };
+    expect(normalizeCompletedAskGuidance(longArray)).toEqual(longArray);
+  });
 });
 
 describe("ask_user corrective failures", () => {

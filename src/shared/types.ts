@@ -1263,6 +1263,13 @@ export interface PluginSettings {
   agenticMode: boolean;
   /** Maximum read-only tool rounds per turn (multi-hop vault retrieval / outline inspection before responding or editing); a high backstop, with the per-turn identical-call guard as the primary spin control. */
   maxToolRounds: number;
+  /**
+   * How many questions one `ask_user` call may carry. The single ceiling on the ask
+   * window: question, option, and answer text are all unbounded. Enforced once at the
+   * live request boundary, never on replay, so lowering it cannot retroactively
+   * invalidate a conversation recorded under a larger value.
+   */
+  askMaxQuestions: number;
   /** Benchmark report folder and persisted run history. */
   benchmark: BenchmarkSettings;
   /**

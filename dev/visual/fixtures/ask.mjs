@@ -35,7 +35,7 @@ export const askOther = (
     </label>
     <div class="lmsa-interaction-other-text"${checked ? "" : " hidden"}>
       <textarea class="lmsa-interaction-other-textarea" id="${id}-text" aria-label="Other answer" rows="3"
-        maxlength="500" placeholder="Type your answer">${text}</textarea>
+        placeholder="Type your answer">${text}</textarea>
     </div>
   </div>`;
 

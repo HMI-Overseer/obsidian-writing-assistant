@@ -8,6 +8,7 @@ import type {
   ValidatedAskRequest,
 } from "../../tools/ask/types";
 import {
+  enforceAskQuestionLimit,
   validateAskAnswers,
   validateAskRequest,
 } from "../../tools/ask/validation";
@@ -53,9 +54,14 @@ export class AskInteractionCoordinator implements AskUserResponder {
   private pending: PendingInteraction | null = null;
   private destroyed = false;
 
+  /**
+   * @param getMaxQuestions Read at ask time rather than captured, so a ceiling the user
+   *   changes mid-generation takes effect on the next call instead of on the next reload.
+   */
   constructor(
     private readonly host: ComposerInteractionHostPort,
     private readonly signal: AbortSignal,
+    private readonly getMaxQuestions: () => number,
   ) {}
 
   ask(request: unknown, context: AskRequestContext): Promise<AskAnswers> {
@@ -69,6 +75,12 @@ export class AskInteractionCoordinator implements AskUserResponder {
     const validated = validateAskRequest(request);
     if (!validated.ok) {
       return Promise.reject(new AskInteractionValidationError(validated));
+    }
+    // The one ceiling the ask window keeps, and the only place it is applied. Replay and
+    // ledger paths deliberately reuse `validateAskRequest` without it.
+    const overLimit = enforceAskQuestionLimit(validated.value, this.getMaxQuestions());
+    if (overLimit) {
+      return Promise.reject(new AskInteractionValidationError(overLimit));
     }
 
     let resolvePromise!: (answers: AskAnswers) => void;

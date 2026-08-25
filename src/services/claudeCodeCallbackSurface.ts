@@ -86,7 +86,10 @@ export function createClaudeCodeCallbackProvider(
 ): McpToolProvider {
   return {
     listTools: (): CanonicalToolDefinition[] =>
-      claudeCodeStableToolSet(deps.getSettings().memoriesEnabled),
+      claudeCodeStableToolSet({
+        memoriesEnabled: deps.getSettings().memoriesEnabled,
+        askMaxQuestions: deps.getSettings().askMaxQuestions,
+      }),
     callTool: async (
       rawCall: ToolCall,
       context?: McpToolCallContext,

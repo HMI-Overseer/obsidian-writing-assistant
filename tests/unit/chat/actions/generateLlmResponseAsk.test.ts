@@ -72,7 +72,7 @@ import type {
   GenerationAuditIdentity,
   GenerationAuditIntent,
 } from "../../../../src/shared/types";
-import { ASK_USER_TOOL } from "../../../../src/tools/ask/definition";
+import { buildAskUserTool } from "../../../../src/tools/ask/definition";
 import {
   askCancellationFailure,
   buildAskUserResult,
@@ -746,7 +746,7 @@ describe("generateLlmResponse ask_user integration", () => {
       documentContext: null,
       ragContext: null,
       messages: [],
-      tools: [ASK_USER_TOOL],
+      tools: [buildAskUserTool(4)],
       allowedToolNames: ["ask_user"],
     });
   });

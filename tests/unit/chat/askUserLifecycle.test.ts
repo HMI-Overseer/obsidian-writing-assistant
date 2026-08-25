@@ -61,7 +61,7 @@ class LifecycleHost implements ComposerInteractionHostPort {
 function pendingInteraction() {
   const abortController = new AbortController();
   const host = new LifecycleHost();
-  const coordinator = new AskInteractionCoordinator(host, abortController.signal);
+  const coordinator = new AskInteractionCoordinator(host, abortController.signal, () => 4);
   const promise = coordinator.ask(REQUEST, {
     interactionId: "ask-1",
     toolCallId: "tool-1",

@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import {
-  APPROVAL_LIMITS,
   buildApprovalDecision,
   createApprovalDecisionState,
   reduceApprovalDecisionState,
@@ -80,43 +79,40 @@ describe("approval decision state", () => {
     expect(buildApprovalDecision(state)).toEqual({ kind: "decline", guidance: "" });
   });
 
-  // RFC-0010: a bound on our own input field clamps at write time and never gates a read.
-  it("clamps the draft as it is written, counting code points not UTF-16 units", () => {
-    const overLong = "a".repeat(APPROVAL_LIMITS.guidance + 25);
-    const clamped = reduceApprovalDecisionState(createApprovalDecisionState(), {
+  // The guidance field is deliberately uncapped, matching the ask window's Other. A
+  // ceiling here named no failure and only truncated the reasoning that makes a
+  // decline useful to the model.
+  it("carries a long draft through write and read without truncating it", () => {
+    const essay = "a".repeat(5_000);
+    const state = reduceApprovalDecisionState(createApprovalDecisionState(), {
       type: "set-guidance",
-      text: overLong,
+      text: essay,
     });
-    expect([...clamped.guidance]).toHaveLength(APPROVAL_LIMITS.guidance);
+    expect(state.guidance).toBe(essay);
+    expect(buildApprovalDecision({ ...state, choice: "decline" })).toEqual({
+      kind: "decline",
+      guidance: essay,
+    });
+  });
 
-    // Astral characters are two UTF-16 units each; the clamp must not split one.
-    const astral = "🜁".repeat(APPROVAL_LIMITS.guidance + 10);
-    const clampedAstral = reduceApprovalDecisionState(createApprovalDecisionState(), {
+  it("keeps astral text intact instead of splitting a surrogate pair", () => {
+    const astral = "\u{1F701}".repeat(2_000);
+    const state = reduceApprovalDecisionState(createApprovalDecisionState(), {
       type: "set-guidance",
       text: astral,
     });
-    expect([...clampedAstral.guidance]).toHaveLength(APPROVAL_LIMITS.guidance);
-    expect(clampedAstral.guidance.endsWith("🜁")).toBe(true);
+    expect(state.guidance).toBe(astral);
+    expect([...state.guidance]).toHaveLength(2_000);
   });
 
-  it("leaves an at-limit draft byte-identical rather than rebuilding it", () => {
-    const exact = "b".repeat(APPROVAL_LIMITS.guidance);
-    const state = reduceApprovalDecisionState(createApprovalDecisionState(), {
-      type: "set-guidance",
-      text: exact,
-    });
-    expect(state.guidance).toBe(exact);
-  });
-
-  it("never re-applies the clamp when reading a stored value back", () => {
+  it("never re-applies a bound when reading a stored value back", () => {
     const stored: ApprovalDecisionState = {
       choice: "decline",
-      guidance: "c".repeat(APPROVAL_LIMITS.guidance + 40),
+      guidance: "c".repeat(4_000),
     };
-    const decision = buildApprovalDecision(stored);
-    expect(decision).toEqual({
+    expect(buildApprovalDecision(stored)).toEqual({
       kind: "decline",
-      guidance: "c".repeat(APPROVAL_LIMITS.guidance + 40),
+      guidance: "c".repeat(4_000),
     });
   });
 });

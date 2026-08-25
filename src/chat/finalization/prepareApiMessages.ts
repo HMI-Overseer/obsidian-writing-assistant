@@ -240,6 +240,7 @@ export async function prepareApiMessages(
     policy: settings.vaultOpPolicy,
     useThinkTool,
     memoriesEnabled: settings.memoriesEnabled,
+    askMaxQuestions: settings.askMaxQuestions,
   };
   const availability = ragService?.availability() ?? "no-backend";
 
@@ -284,7 +285,10 @@ export async function prepareApiMessages(
         };
       } else {
         // Layer 1: the full stable superset, held byte-identical across postures.
-        tools = cloudStableToolSet(settings.memoriesEnabled);
+        tools = cloudStableToolSet({
+          memoriesEnabled: settings.memoriesEnabled,
+          askMaxQuestions: settings.askMaxQuestions,
+        });
       }
     } else {
       const lean = filterSemanticSearchByAvailability(resolveLocalToolSet(surfaceOpts), availability);

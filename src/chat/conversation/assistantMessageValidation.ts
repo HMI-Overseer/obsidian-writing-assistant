@@ -1239,12 +1239,15 @@ function isValidMemory(value: unknown): value is Memory {
 function isValidGuidance(
   value: unknown,
 ): value is CompletedAskGuidanceRecord {
+  // Shape, never size. Every field here is either the model's question text or the
+  // user's answer, and neither is bounded on the way in; a ceiling on this path would
+  // only turn a saved conversation into a silently dropped one. The question count is
+  // likewise the user's `askMaxQuestions` to choose, including after the fact.
   if (
     !isRecord(value) ||
     !exact(value, ["questions"]) ||
     !Array.isArray(value.questions) ||
-    value.questions.length === 0 ||
-    value.questions.length > MAX_OPTIONS
+    value.questions.length === 0
   ) {
     return false;
   }
@@ -1252,20 +1255,15 @@ function isValidGuidance(
     (question) =>
       isRecord(question) &&
       exact(question, ["question", "header", "answer"]) &&
-      isBoundedNonEmptyString(
-        question.question,
-        ASSISTANT_ACTION_MAX_TEXT_CHARS,
-      ) &&
-      isBoundedNonEmptyString(
-        question.header,
-        ASSISTANT_ACTION_MAX_TEXT_CHARS,
-      ) &&
-      (isBoundedString(question.answer, ASSISTANT_ACTION_MAX_TEXT_CHARS) ||
+      isNonEmptyString(question.question) &&
+      isNonEmptyString(question.header) &&
+      // The question and header are model-authored and bounded by the ask_user
+      // contract, so they keep the generic ceiling. The answer is the user's own
+      // words: unbounded on the way in, so it must be unbounded on the way back out,
+      // or a long answer would save cleanly and then vanish on the next load.
+      (typeof question.answer === "string" ||
         (Array.isArray(question.answer) &&
-          question.answer.length <= MAX_OPTIONS &&
-          question.answer.every((answer) =>
-            isBoundedString(answer, ASSISTANT_ACTION_MAX_TEXT_CHARS),
-          )))
+          question.answer.every((answer) => typeof answer === "string")))
   );
 }
 
@@ -1510,6 +1508,11 @@ function isNonNegativeNumber(value: unknown): value is number {
     Number.isFinite(value) &&
     value >= 0
   );
+}
+
+/** The unbounded sibling of {@link isBoundedNonEmptyString}, for user-authored text. */
+function isNonEmptyString(value: unknown): value is string {
+  return typeof value === "string" && value.trim().length > 0;
 }
 
 function isBoundedNonEmptyString(

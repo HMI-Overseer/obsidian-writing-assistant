@@ -92,7 +92,7 @@ describe("AskInteractionCoordinator", () => {
   it("validates before mounting", async () => {
     const controller = new AbortController();
     const host = new FakeHost();
-    const coordinator = new AskInteractionCoordinator(host, controller.signal);
+    const coordinator = new AskInteractionCoordinator(host, controller.signal, () => 4);
 
     await expect(
       coordinator.ask({ questions: [] }, context("ask-1", controller.signal)),
@@ -109,7 +109,7 @@ describe("AskInteractionCoordinator", () => {
     const addSpy = vi.spyOn(controller.signal, "addEventListener");
     const removeSpy = vi.spyOn(controller.signal, "removeEventListener");
     const host = new FakeHost();
-    const coordinator = new AskInteractionCoordinator(host, controller.signal);
+    const coordinator = new AskInteractionCoordinator(host, controller.signal, () => 4);
 
     const pending = coordinator.ask(REQUEST, context("ask-1", controller.signal));
     expect(await promiseStatus(pending)).toBe("pending");
@@ -128,7 +128,7 @@ describe("AskInteractionCoordinator", () => {
   it("refuses a second concurrent ask without replacing the first", async () => {
     const controller = new AbortController();
     const host = new FakeHost();
-    const coordinator = new AskInteractionCoordinator(host, controller.signal);
+    const coordinator = new AskInteractionCoordinator(host, controller.signal, () => 4);
 
     const first = coordinator.ask(REQUEST, context("ask-1", controller.signal));
     const second = coordinator.ask(REQUEST, context("ask-2", controller.signal));
@@ -147,7 +147,7 @@ describe("AskInteractionCoordinator", () => {
   it("lets submit win over a later abort", async () => {
     const controller = new AbortController();
     const host = new FakeHost();
-    const coordinator = new AskInteractionCoordinator(host, controller.signal);
+    const coordinator = new AskInteractionCoordinator(host, controller.signal, () => 4);
     const pending = coordinator.ask(REQUEST, context("ask-1", controller.signal));
 
     submit(host);
@@ -160,7 +160,7 @@ describe("AskInteractionCoordinator", () => {
   it("lets abort win over a late submit with the repository AbortError shape", async () => {
     const controller = new AbortController();
     const host = new FakeHost();
-    const coordinator = new AskInteractionCoordinator(host, controller.signal);
+    const coordinator = new AskInteractionCoordinator(host, controller.signal, () => 4);
     const pending = coordinator.ask(REQUEST, context("ask-1", controller.signal));
     const lateSubmit = host.active?.onSubmit;
 
@@ -179,7 +179,7 @@ describe("AskInteractionCoordinator", () => {
     const controller = new AbortController();
     const removeSpy = vi.spyOn(controller.signal, "removeEventListener");
     const host = new FakeHost();
-    const coordinator = new AskInteractionCoordinator(host, controller.signal);
+    const coordinator = new AskInteractionCoordinator(host, controller.signal, () => 4);
     const pending = coordinator.ask(REQUEST, context("ask-1", controller.signal));
 
     host.destroy();
@@ -196,7 +196,7 @@ describe("AskInteractionCoordinator", () => {
   it("settles only once across double submit and double cancellation", async () => {
     const controller = new AbortController();
     const host = new FakeHost();
-    const coordinator = new AskInteractionCoordinator(host, controller.signal);
+    const coordinator = new AskInteractionCoordinator(host, controller.signal, () => 4);
     const pending = coordinator.ask(REQUEST, context("ask-1", controller.signal));
     const submitTwice = host.active?.onSubmit;
 
@@ -220,7 +220,7 @@ describe("AskInteractionCoordinator", () => {
   it("destroy cancels once and blocks later use", async () => {
     const controller = new AbortController();
     const host = new FakeHost();
-    const coordinator = new AskInteractionCoordinator(host, controller.signal);
+    const coordinator = new AskInteractionCoordinator(host, controller.signal, () => 4);
     const pending = coordinator.ask(REQUEST, context("ask-1", controller.signal));
 
     coordinator.destroy();
@@ -250,7 +250,7 @@ describe("AskInteractionCoordinator", () => {
 
   it("accepts every cancellation reason through the responder contract", () => {
     const controller = new AbortController();
-    const coordinator = new AskInteractionCoordinator(new FakeHost(), controller.signal);
+    const coordinator = new AskInteractionCoordinator(new FakeHost(), controller.signal, () => 4);
     const reasons: AskCancellationReason[] = [
       "stopped",
       "conversation-switched",

@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { jsonSchemaToZodShape } from "../../../src/mcp/sdkToolSchema";
 import type { CanonicalToolDefinition } from "../../../src/tools/types";
-import { ASK_USER_TOOL } from "../../../src/tools/ask/definition";
+import { buildAskUserTool } from "../../../src/tools/ask/definition";
 import { RECALL_MEMORY_TOOL } from "../../../src/tools/memory/definition";
 
 function shapeFor(parameters: CanonicalToolDefinition["parameters"]) {
@@ -124,7 +124,7 @@ describe("jsonSchemaToZodShape", () => {
   });
 
   it("round-trips the ask_user array of questions and nested option arrays", () => {
-    const shape = shapeFor(ASK_USER_TOOL.parameters);
+    const shape = shapeFor(buildAskUserTool(4).parameters);
     const valid = [{
       question: "Which output shape?",
       header: "Output",

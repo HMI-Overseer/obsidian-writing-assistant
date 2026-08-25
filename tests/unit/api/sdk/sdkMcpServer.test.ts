@@ -4,7 +4,7 @@ import {
   extractClaudeCodeToolUseId,
 } from "../../../../src/api/sdk/sdkMcpServer";
 import {
-  CLAUDE_CODE_STABLE_TOOL_SET,
+  claudeCodeStableBaseToolSet,
   isAlwaysLoadedCoreTool,
 } from "../../../../src/tools/toolSurface";
 import type {
@@ -14,10 +14,13 @@ import type {
 import type { ToolCall } from "../../../../src/tools/types";
 import type { ToolResult } from "../../../../src/tools/types";
 
+/** Any ceiling; these assertions are about the catalog's shape, not the number. */
+const STABLE_SET = claudeCodeStableBaseToolSet(4);
+
 // Faithful provider: lists exactly the constant Claude Code stable superset (what the
 // real ClaudeCodeService.createToolProvider advertises). callTool is never invoked here.
 const provider: McpToolProvider = {
-  listTools: () => CLAUDE_CODE_STABLE_TOOL_SET,
+  listTools: () => STABLE_SET,
   callTool: async (): Promise<ToolResult> => ({ content: "", isReadOnly: true }),
 };
 
@@ -44,7 +47,7 @@ describe("buildVaultSdkTools (Layer-2 core/tail alwaysLoad split, ADR-0009)", ()
       .filter((t) => alwaysLoadOf(t._meta) === true)
       .map((t) => t.name)
       .sort();
-    const expectedCore = CLAUDE_CODE_STABLE_TOOL_SET.filter((d) => isAlwaysLoadedCoreTool(d.name))
+    const expectedCore = STABLE_SET.filter((d) => isAlwaysLoadedCoreTool(d.name))
       .map((d) => d.name)
       .sort();
     expect(alwaysLoaded).toEqual(expectedCore);
@@ -112,7 +115,7 @@ describe("buildVaultSdkTools tool-use ID threading", () => {
       context: McpToolCallContext | undefined;
     }> = [];
     const exactProvider: McpToolProvider = {
-      listTools: () => [CLAUDE_CODE_STABLE_TOOL_SET[0]],
+      listTools: () => [STABLE_SET[0]],
       callTool: vi.fn(async (call, context) => {
         calls.push({ call, context });
         return { content: "ok", isReadOnly: true };
@@ -148,7 +151,7 @@ describe("buildVaultSdkTools tool-use ID threading", () => {
       context: McpToolCallContext | undefined;
     }> = [];
     const degradedProvider: McpToolProvider = {
-      listTools: () => [CLAUDE_CODE_STABLE_TOOL_SET[0]],
+      listTools: () => [STABLE_SET[0]],
       callTool: vi.fn(async (call, context) => {
         calls.push({ call, context });
         return { content: "ok", isReadOnly: true };

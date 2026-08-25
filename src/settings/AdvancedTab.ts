@@ -1,5 +1,5 @@
 import type WritingAssistantChat from "../main";
-import { DEFAULT_MAX_TOOL_ROUNDS } from "../constants";
+import { DEFAULT_ASK_MAX_QUESTIONS, DEFAULT_MAX_TOOL_ROUNDS, MIN_ASK_MAX_QUESTIONS } from "../constants";
 import type { SettingsSection } from "./definitions/sections";
 import { settingRow } from "./definitions/sections";
 
@@ -19,6 +19,28 @@ export function advancedTabSections(plugin: WritingAssistantChat): SettingsSecti
                 plugin.settings.agenticMode = value;
                 await plugin.saveSettings();
               })
+            );
+          }
+        ),
+        settingRow(
+          "Questions per ask",
+          "How many questions the model may put in a single ask window. Nothing else about " +
+            `the window is limited: questions, choices, and your own answers can run as long ` +
+            `as they need to. Default: ${DEFAULT_ASK_MAX_QUESTIONS}.`,
+          (item) => {
+            item.addText((text) =>
+              text
+                .setPlaceholder(String(DEFAULT_ASK_MAX_QUESTIONS))
+                .setValue(String(plugin.settings.askMaxQuestions))
+                .onChange(async (value) => {
+                  const parsed = parseInt(value, 10);
+                  // No upper bound on purpose: how many questions you are willing to
+                  // answer at once is your call, not the plugin's.
+                  if (!Number.isNaN(parsed) && parsed >= MIN_ASK_MAX_QUESTIONS) {
+                    plugin.settings.askMaxQuestions = parsed;
+                    await plugin.saveSettings();
+                  }
+                })
             );
           }
         ),

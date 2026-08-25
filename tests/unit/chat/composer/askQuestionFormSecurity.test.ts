@@ -20,7 +20,9 @@ describe("ask question rendering security", () => {
     expect(form).toContain("text: question.question");
     expect(form).toContain("text: option.label");
     expect(form).toContain("text: option.description");
-    expect(form).toContain("maxlength: String(ASK_USER_LIMITS.otherText)");
+    // The Other field is deliberately uncapped: no maxlength, no code-point ceiling.
+    // Safety here comes from the text-only DOM path above, not from length.
+    expect(form).not.toContain("maxlength");
     // The completed transcript shows the question and the answer in the open now,
     // so both stay on `text:` assignments rather than any markup-bearing path.
     expect(timeline).toContain("text: question.question");

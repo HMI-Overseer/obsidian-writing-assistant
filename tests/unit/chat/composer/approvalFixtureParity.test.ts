@@ -71,15 +71,12 @@ describe("approval drawer fixture copy matches the component", () => {
     }
   });
 
-  it("uses the same guidance bound the component clamps at", () => {
-    // The component binds maxlength from APPROVAL_LIMITS; the fixture hard-codes the
-    // number, so pin them together rather than letting the rendered field drift.
-    const limit = source("src/chat/composer/approvalDecisionState.ts").match(
-      /guidance:\s*(\d+)/u,
-    );
-    expect(limit?.[1]).toBeDefined();
-    expect(FIXTURE).toContain(`maxlength="${limit?.[1]}"`);
-    expect(FORM).toContain("maxlength: String(APPROVAL_LIMITS.guidance)");
+  it("leaves the guidance field unbounded in both the component and the fixture", () => {
+    // The pair used to be pinned to a shared 500. Now the assertion is that neither
+    // side reintroduces a bound, since a fixture that quietly grew a maxlength would
+    // render a field the component does not build.
+    expect(FORM).not.toContain("maxlength");
+    expect(FIXTURE).not.toContain("maxlength");
   });
 
   it("reconstructs the collapsing shell the component actually builds", () => {

@@ -227,6 +227,7 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
   const askCoordinator = new AskInteractionCoordinator(
     interactionHost,
     abortController.signal,
+    () => plugin.settings.askMaxQuestions,
   );
   // The generation's live-approval lane (RFC-0012): the same host and the same signal as
   // the ask coordinator, sharing a mount point and nothing else.

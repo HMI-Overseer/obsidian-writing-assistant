@@ -331,7 +331,7 @@ describe("ClaudeCodeService ask_user", () => {
   it("returns the canonical validation failure without mounting a form", async () => {
     const { provider, activate } = harness(["ask_user"]);
     const host = new FakeInteractionHost();
-    const coordinator = new AskInteractionCoordinator(host, new AbortController().signal);
+    const coordinator = new AskInteractionCoordinator(host, new AbortController().signal, () => 4);
     const lease = activate({ askResponder: coordinator });
 
     const result = await provider.callTool(
@@ -349,7 +349,7 @@ describe("ClaudeCodeService ask_user", () => {
     const { handle, provider, activate } = harness(["ask_user"]);
     const host = new FakeInteractionHost();
     const abortController = new AbortController();
-    const coordinator = new AskInteractionCoordinator(host, abortController.signal);
+    const coordinator = new AskInteractionCoordinator(host, abortController.signal, () => 4);
     const events: ClaudeCodeToolEvent[] = [];
     const lease = activate({
       askResponder: coordinator,
@@ -381,7 +381,7 @@ describe("ClaudeCodeService ask_user", () => {
     const { provider, activate } = harness(["ask_user"]);
     const host = new FakeInteractionHost();
     const abortController = new AbortController();
-    const coordinator = new AskInteractionCoordinator(host, abortController.signal);
+    const coordinator = new AskInteractionCoordinator(host, abortController.signal, () => 4);
     const lease = activate({
       askResponder: coordinator,
       askSignal: abortController.signal,
@@ -410,7 +410,7 @@ describe("ClaudeCodeService ask_user", () => {
   it("routes an exactly correlated SDK call and refuses legacy loopback", async () => {
     const { provider, activate } = harness(["ask_user"]);
     const host = new FakeInteractionHost();
-    const coordinator = new AskInteractionCoordinator(host, new AbortController().signal);
+    const coordinator = new AskInteractionCoordinator(host, new AbortController().signal, () => 4);
     const lease = activate({ askResponder: coordinator });
 
     const sdkAsk = buildVaultSdkTools(provider).find((tool) => tool.name === "ask_user");
@@ -483,7 +483,7 @@ describe("ClaudeCodeService ask_user", () => {
     const { service, seam, provider, activate } = harness(["ask_user"]);
     const host = new FakeInteractionHost();
     const abortController = new AbortController();
-    const coordinator = new AskInteractionCoordinator(host, abortController.signal);
+    const coordinator = new AskInteractionCoordinator(host, abortController.signal, () => 4);
     const disposeAll = vi.spyOn(seam.sessionRegistry, "disposeAll");
     const lease = activate({
       askResponder: coordinator,

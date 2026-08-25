@@ -40,6 +40,7 @@ import {
   DEFAULT_RAG_SETTINGS,
   DEFAULT_SETTINGS,
   MAX_BENCHMARK_HISTORY,
+  MIN_ASK_MAX_QUESTIONS,
 } from "../constants";
 import {
   MEMORY_CONTENT_MAX_CODE_POINTS,
@@ -535,6 +536,19 @@ function migrateMaxToolRounds(data: LegacyPersistedSettings | null): number {
 }
 
 /**
+ * The ask window's question ceiling. Absent, non-numeric, or below the floor falls
+ * back to the default; a fractional value is floored. There is no upper clamp on
+ * purpose: how many questions the user is willing to answer at once is their call.
+ */
+function normalizeAskMaxQuestions(value: unknown): number {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return DEFAULT_SETTINGS.askMaxQuestions;
+  }
+  const floored = Math.floor(value);
+  return floored < MIN_ASK_MAX_QUESTIONS ? DEFAULT_SETTINGS.askMaxQuestions : floored;
+}
+
+/**
  * Starred models are composed `provider:modelId` keys; anything else (wrong
  * type, malformed key, duplicate) is dropped rather than carried forever.
  */
@@ -698,6 +712,7 @@ export function normalizePluginSettings(data: Partial<PluginSettings> | null): P
         ? data.agenticMode
         : DEFAULT_SETTINGS.agenticMode,
     maxToolRounds: migrateMaxToolRounds(data),
+    askMaxQuestions: normalizeAskMaxQuestions(data?.askMaxQuestions),
     benchmark: normalizeBenchmarkSettings(data?.benchmark),
     vaultOpPolicy: normalizeVaultOpPolicy(data?.vaultOpPolicy),
     favoriteModelKeys: normalizeFavoriteModelKeys(data?.favoriteModelKeys),

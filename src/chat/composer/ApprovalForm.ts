@@ -6,7 +6,6 @@ import type {
   ApprovalRequest,
 } from "../interactions/approvalTypes";
 import {
-  APPROVAL_LIMITS,
   buildApprovalDecision,
   createApprovalDecisionState,
   reduceApprovalDecisionState,
@@ -309,7 +308,6 @@ export class ApprovalForm {
         id: `${this.formId}-guidance`,
         "aria-label": "Guidance for the model",
         rows: "3",
-        maxlength: String(APPROVAL_LIMITS.guidance),
         placeholder: "Optional: what should it do instead?",
       },
     });

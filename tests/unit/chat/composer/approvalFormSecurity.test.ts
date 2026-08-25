@@ -32,7 +32,8 @@ describe("approval form rendering security", () => {
     expect(form).toContain('type: "radio"');
     expect(form).toContain('"aria-describedby": descriptionId');
     expect(form).toContain("attr: { for: inputId }");
-    expect(form).toContain("maxlength: String(APPROVAL_LIMITS.guidance)");
+    // Uncapped by design; safety on this field is the text-only DOM path, not length.
+    expect(form).not.toContain("maxlength");
     expect(form).toContain('"aria-label": "Guidance for the model"');
     expect(form).toContain("this.choiceRefs[0]?.input.focus()");
     expect(form).toContain("if (refs.input.checked) textarea.focus()");

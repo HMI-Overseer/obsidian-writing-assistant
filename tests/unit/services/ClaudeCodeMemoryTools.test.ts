@@ -7,7 +7,10 @@ import { ClaudeCodeService } from "../../../src/services/ClaudeCodeService";
 import { ClaudeCodeGenerationHandle } from "../../../src/services/ClaudeCodeGenerationLease";
 import type { McpToolProvider } from "../../../src/mcp/VaultMcpServer";
 import type { ToolCall, ToolResult, VaultOpReviewer } from "../../../src/tools/types";
-import { CLAUDE_CODE_STABLE_TOOL_SET } from "../../../src/tools/toolSurface";
+import { claudeCodeStableBaseToolSet } from "../../../src/tools/toolSurface";
+
+/** Any ceiling; these assertions are about the catalog's shape, not the number. */
+const STABLE_SET = claudeCodeStableBaseToolSet(4);
 
 function app(): App {
   return {
@@ -110,7 +113,7 @@ describe("ClaudeCodeService memory tools", () => {
     const { currentSettings, provider } = harness();
     currentSettings.memoriesEnabled = false;
     expect(JSON.stringify(provider.listTools())).toBe(
-      JSON.stringify(CLAUDE_CODE_STABLE_TOOL_SET),
+      JSON.stringify(STABLE_SET),
     );
   });
 

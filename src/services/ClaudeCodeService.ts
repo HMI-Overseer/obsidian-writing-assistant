@@ -359,9 +359,10 @@ export class ClaudeCodeService {
    * from it.
    */
   private stableToolNames(): string[] {
-    return claudeCodeStableToolSet(this.getSettings().memoriesEnabled).map(
-      (definition) => definition.name,
-    );
+    return claudeCodeStableToolSet({
+      memoriesEnabled: this.getSettings().memoriesEnabled,
+      askMaxQuestions: this.getSettings().askMaxQuestions,
+    }).map((definition) => definition.name);
   }
 
   /**
@@ -499,6 +500,7 @@ function buildRuntimeScope(
             policy: settings.vaultOpPolicy,
             useThinkTool: false,
             memoriesEnabled: settings.memoriesEnabled,
+            askMaxQuestions: settings.askMaxQuestions,
           }).map((tool) => tool.name),
         )
       : new Set<string>(),

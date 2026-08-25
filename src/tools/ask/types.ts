@@ -55,11 +55,8 @@ export type AskValidationCode =
   | "option_label_reserved"
   | "option_description_invalid"
   | "multi_select_invalid"
-  | "field_too_long"
   | "answer_incomplete"
-  | "answer_invalid"
-  | "answer_other_too_long"
-  | "answer_custom_total_too_long";
+  | "answer_invalid";
 
 export interface AskValidationFailure {
   ok: false;

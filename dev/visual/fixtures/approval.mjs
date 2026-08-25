@@ -59,7 +59,7 @@ const approvalOther = (id, copy, selected, guidance) =>
     </label>
     <div class="lmsa-interaction-other-text"${selected ? "" : " hidden"}>
       <textarea class="lmsa-interaction-other-textarea" id="${id}-guidance"
-        aria-label="Guidance for the model" rows="3" maxlength="500"
+        aria-label="Guidance for the model" rows="3"
         placeholder="Optional: what should it do instead?">${guidance}</textarea>
     </div>
   </div>`;

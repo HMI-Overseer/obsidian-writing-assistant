@@ -10,11 +10,8 @@ import type {
   AskValidationFailure,
   ValidatedAskRequest,
 } from "./types";
-import { ASK_USER_LIMITS, validateAskAnswers, validateAskRequest } from "./validation";
+import { validateAskAnswers, validateAskRequest } from "./validation";
 
-const GUIDANCE_ANSWER_TOTAL_LIMIT =
-  ASK_USER_LIMITS.questions *
-  (ASK_USER_LIMITS.options * ASK_USER_LIMITS.optionLabel + ASK_USER_LIMITS.otherText);
 const LINE_BREAK = /[\r\n\u2028\u2029]/u;
 
 export interface AskGuidanceCapture {
@@ -85,21 +82,17 @@ export function normalizeCompletedAskGuidance(
   input: unknown,
 ): CompletedAskGuidanceRecord | null {
   if (!hasExactKeys(input, ["questions"]) || !Array.isArray(input.questions)) return null;
-  if (
-    input.questions.length < 1 ||
-    input.questions.length > ASK_USER_LIMITS.questions
-  ) {
-    return null;
-  }
+  // A floor, not a ceiling. The question count is the user's setting to choose, and a
+  // record written under a larger setting must still load after they lower it.
+  if (input.questions.length < 1) return null;
 
   const questions: CompletedAskGuidanceQuestion[] = [];
   const identities = new Set<string>();
-  let answerTotal = 0;
   for (const rawQuestion of input.questions) {
     if (!hasExactKeys(rawQuestion, ["question", "header", "answer"])) return null;
 
-    const question = exactBoundedLine(rawQuestion.question, ASK_USER_LIMITS.question);
-    const header = exactBoundedLine(rawQuestion.header, ASK_USER_LIMITS.header);
+    const question = exactLine(rawQuestion.question);
+    const header = exactLine(rawQuestion.header);
     if (question === null || header === null) return null;
 
     const identity = question.toLowerCase();
@@ -108,10 +101,6 @@ export function normalizeCompletedAskGuidance(
 
     const answer = normalizePersistedAnswer(rawQuestion.answer);
     if (answer === null) return null;
-    answerTotal += typeof answer === "string"
-      ? codePointLength(answer)
-      : answer.reduce((total, value) => total + codePointLength(value), 0);
-    if (answerTotal > GUIDANCE_ANSWER_TOTAL_LIMIT) return null;
 
     questions.push({ question, header, answer });
   }
@@ -180,9 +169,7 @@ function askPreconditionFailure(
 
 function normalizePersistedAnswer(input: unknown): string | string[] | null {
   if (typeof input === "string") return exactAnswerString(input);
-  if (!Array.isArray(input) || input.length < 1 || input.length > ASK_USER_LIMITS.options + 1) {
-    return null;
-  }
+  if (!Array.isArray(input) || input.length < 1) return null;
 
   const answer: string[] = [];
   const identities = new Set<string>();
@@ -197,18 +184,29 @@ function normalizePersistedAnswer(input: unknown): string | string[] | null {
   return answer;
 }
 
+/**
+ * Shape only, never length. What protects provenance here is that the record is
+ * cloned exactly rather than trimmed or repaired, so a padded or malformed answer is
+ * rejected instead of quietly rewritten. A code-point ceiling adds nothing to that,
+ * a forged short answer passes any length test, and gating the read on one would
+ * discard a long answer the user really did type.
+ */
 function exactAnswerString(input: unknown): string | null {
   if (typeof input !== "string" || input.length === 0 || input !== input.trim()) return null;
-  return codePointLength(input) <= ASK_USER_LIMITS.otherText ? input : null;
+  return input;
 }
 
-function exactBoundedLine(input: unknown, limit: number): string | null {
+/**
+ * Shape only, matching {@link exactAnswerString}. Single-line is a structural rule the
+ * question and header are authored under, not a size limit, so it stays while the
+ * length ceiling that used to sit beside it does not.
+ */
+function exactLine(input: unknown): string | null {
   if (
     typeof input !== "string" ||
     input.length === 0 ||
     input !== input.trim() ||
-    LINE_BREAK.test(input) ||
-    codePointLength(input) > limit
+    LINE_BREAK.test(input)
   ) {
     return null;
   }
@@ -217,10 +215,6 @@ function exactBoundedLine(input: unknown, limit: number): string | null {
 
 function cloneAnswer(answer: string | string[]): string | string[] {
   return Array.isArray(answer) ? [...answer] : answer;
-}
-
-function codePointLength(value: string): number {
-  return [...value].length;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

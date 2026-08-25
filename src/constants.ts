@@ -186,6 +186,17 @@ export const DEFAULT_MEMORIES: readonly Memory[] = [
 // cap keyed off the live document, which no longer exists).
 export const DEFAULT_MAX_TOOL_ROUNDS = 20;
 
+/**
+ * How many questions one `ask_user` call may carry by default. The only ceiling the
+ * ask window keeps: nothing bounds how long a question, option, or answer may be.
+ * Four is a starting point, not a limit the design depends on, and the user owns it
+ * through `askMaxQuestions`.
+ */
+export const DEFAULT_ASK_MAX_QUESTIONS = 4;
+
+/** A question ceiling below this cannot ask anything, so the setting clamps up to it. */
+export const MIN_ASK_MAX_QUESTIONS = 1;
+
 /** Maximum persisted benchmark runs. Oldest entries are dropped beyond this. */
 export const MAX_BENCHMARK_HISTORY = 50;
 
@@ -253,6 +264,7 @@ export const DEFAULT_SETTINGS: PluginSettings = {
   apiKeysDisclaimerAccepted: false,
   agenticMode: true,
   maxToolRounds: DEFAULT_MAX_TOOL_ROUNDS,
+  askMaxQuestions: DEFAULT_ASK_MAX_QUESTIONS,
   benchmark: { ...DEFAULT_BENCHMARK_SETTINGS },
   vaultOpPolicy: { ...DEFAULT_VAULT_OP_POLICY, scopes: [...DEFAULT_VAULT_OP_POLICY.scopes] },
   favoriteModelKeys: [],

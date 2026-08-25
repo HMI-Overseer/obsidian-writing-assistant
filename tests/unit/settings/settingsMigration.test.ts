@@ -57,6 +57,31 @@ describe("normalizePluginSettings", () => {
     expect(newWins.maxToolRounds).toBe(30);
   });
 
+  // askMaxQuestions is the ask window's only ceiling. Absent or unusable falls back to
+  // the default; a usable value is kept as given, with no upper clamp, because how many
+  // questions the user will answer at once is theirs to decide.
+  it("normalizes the ask question ceiling without imposing an upper bound", () => {
+    expect(normalizePluginSettings({}).askMaxQuestions).toBe(
+      DEFAULT_SETTINGS.askMaxQuestions,
+    );
+    for (const askMaxQuestions of [1, 2, 7, 40, 500]) {
+      expect(
+        normalizePluginSettings({ askMaxQuestions } as Partial<PluginSettings>)
+          .askMaxQuestions,
+      ).toBe(askMaxQuestions);
+    }
+    for (const bad of [0, -3, Number.NaN, Number.POSITIVE_INFINITY, "6", null]) {
+      expect(
+        normalizePluginSettings({ askMaxQuestions: bad } as unknown as Partial<PluginSettings>)
+          .askMaxQuestions,
+      ).toBe(DEFAULT_SETTINGS.askMaxQuestions);
+    }
+    expect(
+      normalizePluginSettings({ askMaxQuestions: 6.7 } as Partial<PluginSettings>)
+        .askMaxQuestions,
+    ).toBe(6);
+  });
+
   // The always-on system prompt prefix is retired: the profile's custom prompt is the only
   // user-authored prompt text. A retired key still on disk (the unified field or either
   // pre-unification per-mode field) is dropped rather than carried into the live settings.

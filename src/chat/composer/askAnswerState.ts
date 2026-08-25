@@ -3,10 +3,7 @@ import type {
   AskAnswers,
   ValidatedAskRequest,
 } from "../../tools/ask/types";
-import {
-  ASK_USER_LIMITS,
-  validateAskAnswers,
-} from "../../tools/ask/validation";
+import { validateAskAnswers } from "../../tools/ask/validation";
 
 export interface AskQuestionAnswerState {
   selectedOptionIndexes: number[];
@@ -143,11 +140,7 @@ function isQuestionComplete(
   state: AskQuestionAnswerState | undefined,
 ): boolean {
   if (!state) return false;
-  const customTextLength = [...state.otherText.trim()].length;
-  const hasValidOther =
-    state.otherSelected &&
-    customTextLength > 0 &&
-    customTextLength <= ASK_USER_LIMITS.otherText;
+  const hasValidOther = state.otherSelected && state.otherText.trim().length > 0;
   if (state.otherSelected && !hasValidOther) return false;
   if (multiSelect) {
     return state.selectedOptionIndexes.length > 0 || hasValidOther;

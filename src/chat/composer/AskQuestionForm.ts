@@ -5,7 +5,6 @@ import type {
   ValidatedAskQuestion,
   ValidatedAskRequest,
 } from "../../tools/ask/types";
-import { ASK_USER_LIMITS } from "../../tools/ask/validation";
 import {
   buildAskAnswersFromState,
   createAskAnswerState,
@@ -357,7 +356,6 @@ export class AskQuestionForm {
         id: textId,
         "aria-label": "Other answer",
         rows: "3",
-        maxlength: String(ASK_USER_LIMITS.otherText),
         placeholder: "Type your answer",
       },
     });

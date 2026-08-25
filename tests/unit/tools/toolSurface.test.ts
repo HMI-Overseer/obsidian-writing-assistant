@@ -4,12 +4,12 @@ import {
   resolveLocalToolSet,
   cloudAllowedToolSet,
   cloudAllowedToolNames,
-  CLOUD_STABLE_TOOL_SET,
-  CLAUDE_CODE_STABLE_TOOL_SET,
+  cloudStableBaseToolSet,
+  claudeCodeStableBaseToolSet,
   cloudStableToolSet,
   claudeCodeStableToolSet,
-  CORE_INTERACTION_TOOLS,
-  ALWAYS_LOADED_CORE_TOOLS,
+  coreInteractionTools,
+  alwaysLoadedCoreTools,
   CORE_READ_TOOLS,
   CORE_READ_TOOL_NAMES,
   isAlwaysLoadedCoreTool,
@@ -47,12 +47,16 @@ const DENY_ALL: VaultOpPolicy = {
   edit: "deny",
 };
 
+/** Any ceiling; these assertions are about tool identity, never about the number. */
+const ASK_QUESTIONS = 4;
+
 function opts(overrides: Partial<ToolSurfaceOptions> = {}): ToolSurfaceOptions {
   return {
     posture: "ask",
     policy: DEFAULT_VAULT_OP_POLICY,
     useThinkTool: true,
     memoriesEnabled: false,
+    askMaxQuestions: ASK_QUESTIONS,
     ...overrides,
   };
 }
@@ -153,7 +157,7 @@ describe("cloudAllowedToolSet (reads unrestricted, writes posture/policy-gated)"
 
 describe("stable cloud surfaces (Layer 1 superset)", () => {
   it("the Anthropic superset is a superset of the allow-list in every posture", () => {
-    const superset = new Set(CLOUD_STABLE_TOOL_SET.map((t) => t.name));
+    const superset = new Set(cloudStableBaseToolSet(ASK_QUESTIONS).map((t) => t.name));
     for (const posture of ["ask", "auto"] as const) {
       for (const name of cloudAllowedToolNames(opts({ posture }))) {
         expect(superset.has(name)).toBe(true);
@@ -162,7 +166,7 @@ describe("stable cloud surfaces (Layer 1 superset)", () => {
   });
 
   it("the Claude Code superset covers the allow-list minus think (think is never bridged)", () => {
-    const superset = new Set(CLAUDE_CODE_STABLE_TOOL_SET.map((t) => t.name));
+    const superset = new Set(claudeCodeStableBaseToolSet(ASK_QUESTIONS).map((t) => t.name));
     expect(superset.has("think")).toBe(false);
     expect(superset.has("ask_user")).toBe(true);
     for (const posture of ["ask", "auto"] as const) {
@@ -173,31 +177,31 @@ describe("stable cloud surfaces (Layer 1 superset)", () => {
   });
 
   it("the Anthropic superset adds only think over the Claude Code superset", () => {
-    expect(CLOUD_STABLE_TOOL_SET.map((t) => t.name)).toEqual([
-      ...CLAUDE_CODE_STABLE_TOOL_SET.map((t) => t.name),
+    expect(cloudStableBaseToolSet(ASK_QUESTIONS).map((t) => t.name)).toEqual([
+      ...claudeCodeStableBaseToolSet(ASK_QUESTIONS).map((t) => t.name),
       "think",
     ]);
   });
 
   it("advertises ask_user exactly once in both Claude Code memory variants", () => {
-    expect(names(CLAUDE_CODE_STABLE_TOOL_SET).filter((name) => name === "ask_user"))
+    expect(names(claudeCodeStableBaseToolSet(ASK_QUESTIONS)).filter((name) => name === "ask_user"))
       .toHaveLength(1);
-    expect(names(claudeCodeStableToolSet(true)).filter((name) => name === "ask_user"))
+    expect(names(claudeCodeStableToolSet({ memoriesEnabled: true, askMaxQuestions: ASK_QUESTIONS })).filter((name) => name === "ask_user"))
       .toHaveLength(1);
   });
 
   it("keeps both stable catalogs byte-identical to baseline while memories are off", () => {
-    expect(JSON.stringify(cloudStableToolSet(false))).toBe(
-      JSON.stringify(CLOUD_STABLE_TOOL_SET),
+    expect(JSON.stringify(cloudStableToolSet({ memoriesEnabled: false, askMaxQuestions: ASK_QUESTIONS }))).toBe(
+      JSON.stringify(cloudStableBaseToolSet(ASK_QUESTIONS)),
     );
-    expect(JSON.stringify(claudeCodeStableToolSet(false))).toBe(
-      JSON.stringify(CLAUDE_CODE_STABLE_TOOL_SET),
+    expect(JSON.stringify(claudeCodeStableToolSet({ memoriesEnabled: false, askMaxQuestions: ASK_QUESTIONS }))).toBe(
+      JSON.stringify(claudeCodeStableBaseToolSet(ASK_QUESTIONS)),
     );
   });
 
   it("adds the complete memory family based only on memoriesEnabled", () => {
-    const cloud = names(cloudStableToolSet(true));
-    const claudeCode = names(claudeCodeStableToolSet(true));
+    const cloud = names(cloudStableToolSet({ memoriesEnabled: true, askMaxQuestions: ASK_QUESTIONS }));
+    const claudeCode = names(claudeCodeStableToolSet({ memoriesEnabled: true, askMaxQuestions: ASK_QUESTIONS }));
     for (const memoryName of MEMORY_TOOL_NAMES) {
       expect(cloud).toContain(memoryName);
       expect(claudeCode).toContain(memoryName);
@@ -277,8 +281,8 @@ describe("Layer 2 progressive-disclosure core (ADR-0009 / section 6.2.5)", () =>
   });
 
   it("keeps ask_user in a separate always-loaded interaction family", () => {
-    expect(names(CORE_INTERACTION_TOOLS)).toEqual(["ask_user"]);
-    expect(names(ALWAYS_LOADED_CORE_TOOLS)).toEqual([
+    expect(names(coreInteractionTools(ASK_QUESTIONS))).toEqual(["ask_user"]);
+    expect(names(alwaysLoadedCoreTools(ASK_QUESTIONS))).toEqual([
       ...names(CORE_READ_TOOLS),
       "ask_user",
     ]);
@@ -359,13 +363,13 @@ describe("memory catalog and runtime denial semantics", () => {
   });
 
   it("keeps the enabled Layer 1 and Claude Code catalog bytes policy-invariant", () => {
-    const stableCloud = JSON.stringify(cloudStableToolSet(true));
-    const stableClaudeCode = JSON.stringify(claudeCodeStableToolSet(true));
+    const stableCloud = JSON.stringify(cloudStableToolSet({ memoriesEnabled: true, askMaxQuestions: ASK_QUESTIONS }));
+    const stableClaudeCode = JSON.stringify(claudeCodeStableToolSet({ memoriesEnabled: true, askMaxQuestions: ASK_QUESTIONS }));
     for (const memory of ["ask", "auto", "deny"] as const) {
       const policy = { ...DEFAULT_VAULT_OP_POLICY, memory };
       const surface = opts({ policy, memoriesEnabled: true });
-      expect(JSON.stringify(cloudStableToolSet(surface.memoriesEnabled))).toBe(stableCloud);
-      expect(JSON.stringify(claudeCodeStableToolSet(surface.memoriesEnabled))).toBe(
+      expect(JSON.stringify(cloudStableToolSet({ memoriesEnabled: surface.memoriesEnabled, askMaxQuestions: ASK_QUESTIONS }))).toBe(stableCloud);
+      expect(JSON.stringify(claudeCodeStableToolSet({ memoriesEnabled: surface.memoriesEnabled, askMaxQuestions: ASK_QUESTIONS }))).toBe(
         stableClaudeCode,
       );
     }

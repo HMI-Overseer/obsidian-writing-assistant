@@ -18,7 +18,7 @@ import {
 } from "./memory/definition";
 import {
   ASK_TOOL_NAMES,
-  ASK_USER_TOOL,
+  buildAskUserTool,
 } from "./ask/definition";
 import { toolFailure } from "./toolFailure";
 
@@ -45,7 +45,7 @@ import { toolFailure } from "./toolFailure";
  * it is true and discriminating, and disappears only where a merge made it false. The
  * surface is verb-first and lowercase snake_case, with `semantic_search` as its one
  * recorded qualifier-first exception, and that is asserted over
- * {@link CLOUD_STABLE_TOOL_SET} rather than left to taste. A retired name is never
+ * {@link cloudStableBaseToolSet} rather than left to taste. A retired name is never
  * advertised again on any path; the old spellings survive only in the display lookups
  * ({@link ./metadata}), so a conversation saved before a rename still renders as written.
  */
@@ -60,12 +60,20 @@ export interface ToolSurfaceOptions {
   useThinkTool: boolean;
   /** Whether the memory family exists on this request's tool surface. */
   memoriesEnabled: boolean;
+  /** The user's `ask_user` question ceiling, which the tool advertises in its schema. */
+  askMaxQuestions: number;
 }
 
-/** Blocking control interactions that remain available without tool discovery. */
-export const CORE_INTERACTION_TOOLS: CanonicalToolDefinition[] = [
-  ASK_USER_TOOL,
-];
+/**
+ * Blocking control interactions that remain available without tool discovery.
+ *
+ * A function of the user's question ceiling, because `ask_user` advertises that number
+ * in its own schema. Like `memoriesEnabled`, it varies only when the user changes a
+ * setting, so the emitted superset stays byte-identical across a session's requests.
+ */
+export function coreInteractionTools(askMaxQuestions: number): CanonicalToolDefinition[] {
+  return [buildAskUserTool(askMaxQuestions)];
+}
 
 /**
  * The mutating tools the session permits, policy-filtered. **The single source for
@@ -88,13 +96,13 @@ export function resolveWriteTools(opts: ToolSurfaceOptions): CanonicalToolDefini
  * The tools the session permits the model to actually call: every read tool
  * (unrestricted) + the posture/policy's permitted writes + `think`. Local providers
  * emit exactly this set; cloud emits the full stable superset
- * ({@link CLOUD_STABLE_TOOL_SET}) for cache stability but enforces this narrower
+ * ({@link cloudStableBaseToolSet}) for cache stability but enforces this narrower
  * allow-list at the execution gate.
  */
 function permittedTools(opts: ToolSurfaceOptions): CanonicalToolDefinition[] {
   return [
     ...ALL_VAULT_TOOLS,
-    ...CORE_INTERACTION_TOOLS,
+    ...coreInteractionTools(opts.askMaxQuestions),
     ...(opts.memoriesEnabled ? allowedMemoryTools(opts.policy, opts.posture) : []),
     ...resolveWriteTools(opts),
     ...(opts.useThinkTool ? [THINK_TOOL] : []),
@@ -133,47 +141,61 @@ export function cloudAllowedToolNames(opts: ToolSurfaceOptions): string[] {
  * runtime allow-list, not by shrinking this block. It is the union of every read,
  * edit, and vault-op tool plus `think`.
  */
-export const CLOUD_STABLE_TOOL_SET: CanonicalToolDefinition[] = [
-  ...ALL_VAULT_TOOLS,
-  ...ALL_EDIT_TOOLS,
-  ...ALL_VAULT_OPS_TOOLS,
-  ...CORE_INTERACTION_TOOLS,
-  THINK_TOOL,
-];
+export function cloudStableBaseToolSet(
+  askMaxQuestions: number,
+): CanonicalToolDefinition[] {
+  return [
+    ...ALL_VAULT_TOOLS,
+    ...ALL_EDIT_TOOLS,
+    ...ALL_VAULT_OPS_TOOLS,
+    ...coreInteractionTools(askMaxQuestions),
+    THINK_TOOL,
+  ];
+}
 
 /**
- * The Claude Code analogue of {@link CLOUD_STABLE_TOOL_SET}: the same superset minus
+ * The Claude Code analogue of {@link cloudStableBaseToolSet}: the same superset minus
  * `think`, which is never bridged over MCP. Advertising it unchanged keeps
  * the live session alive instead of cold-rebuilding (the `toolNames` fingerprint field
  * stops drifting).
  */
-export const CLAUDE_CODE_STABLE_TOOL_SET: CanonicalToolDefinition[] = [
-  ...ALL_VAULT_TOOLS,
-  ...ALL_EDIT_TOOLS,
-  ...ALL_VAULT_OPS_TOOLS,
-  ...CORE_INTERACTION_TOOLS,
-];
-
-/** Feature-conditional Layer 1 superset. The flag is its only varying input. */
-export function claudeCodeStableToolSet(
-  memoriesEnabled: boolean,
+export function claudeCodeStableBaseToolSet(
+  askMaxQuestions: number,
 ): CanonicalToolDefinition[] {
-  return memoriesEnabled
-    ? [...CLAUDE_CODE_STABLE_TOOL_SET, ...ALL_MEMORY_TOOLS]
-    : CLAUDE_CODE_STABLE_TOOL_SET;
+  return [
+    ...ALL_VAULT_TOOLS,
+    ...ALL_EDIT_TOOLS,
+    ...ALL_VAULT_OPS_TOOLS,
+    ...coreInteractionTools(askMaxQuestions),
+  ];
 }
 
-/** Feature-conditional Anthropic Layer 1 superset. The flag is its only varying input. */
-export function cloudStableToolSet(
-  memoriesEnabled: boolean,
+/**
+ * The settings a Layer 1 superset varies on. Both are user settings, so the emitted
+ * block is stable for as long as the user leaves them alone, which is what the cached
+ * prefix needs. Neither is a per-request or per-posture input.
+ */
+export interface StableToolSetOptions {
+  memoriesEnabled: boolean;
+  askMaxQuestions: number;
+}
+
+/** Feature-conditional Layer 1 superset. Its settings are its only varying input. */
+export function claudeCodeStableToolSet(
+  opts: StableToolSetOptions,
 ): CanonicalToolDefinition[] {
-  return memoriesEnabled
-    ? [
-        ...CLAUDE_CODE_STABLE_TOOL_SET,
-        ...ALL_MEMORY_TOOLS,
-        THINK_TOOL,
-      ]
-    : CLOUD_STABLE_TOOL_SET;
+  const base = claudeCodeStableBaseToolSet(opts.askMaxQuestions);
+  return opts.memoriesEnabled ? [...base, ...ALL_MEMORY_TOOLS] : base;
+}
+
+/** Feature-conditional Anthropic Layer 1 superset. Its settings are its only varying input. */
+export function cloudStableToolSet(
+  opts: StableToolSetOptions,
+): CanonicalToolDefinition[] {
+  const base = claudeCodeStableBaseToolSet(opts.askMaxQuestions);
+  return opts.memoriesEnabled
+    ? [...base, ...ALL_MEMORY_TOOLS, THINK_TOOL]
+    : cloudStableBaseToolSet(opts.askMaxQuestions);
 }
 
 /*
@@ -213,20 +235,26 @@ export const CORE_READ_TOOLS: CanonicalToolDefinition[] = [
  * The complete always-loaded core. Interaction tools stay distinct from vault
  * reads while sharing the same non-deferred transport treatment.
  */
-export const ALWAYS_LOADED_CORE_TOOLS: CanonicalToolDefinition[] = [
-  ...CORE_READ_TOOLS,
-  ...CORE_INTERACTION_TOOLS,
-];
+export function alwaysLoadedCoreTools(
+  askMaxQuestions: number,
+): CanonicalToolDefinition[] {
+  return [...CORE_READ_TOOLS, ...coreInteractionTools(askMaxQuestions)];
+}
 
 /** Names of {@link CORE_READ_TOOLS}, for the wire-layer defer / `alwaysLoad` split. */
 export const CORE_READ_TOOL_NAMES: ReadonlySet<string> = new Set(
   CORE_READ_TOOLS.map((tool) => tool.name),
 );
 
-/** Names of every always-loaded core tool, including blocking interactions. */
-export const ALWAYS_LOADED_CORE_TOOL_NAMES: ReadonlySet<string> = new Set(
-  ALWAYS_LOADED_CORE_TOOLS.map((tool) => tool.name),
-);
+/**
+ * Names of every always-loaded core tool, including blocking interactions. Derived
+ * from names rather than from {@link alwaysLoadedCoreTools}, because a name does not
+ * depend on the question ceiling and this set is consumed where no setting is in hand.
+ */
+export const ALWAYS_LOADED_CORE_TOOL_NAMES: ReadonlySet<string> = new Set([
+  ...CORE_READ_TOOL_NAMES,
+  ...ASK_TOOL_NAMES,
+]);
 
 /**
  * Whether `name` is a non-deferred Layer-2 core read, always loaded on both billed
@@ -291,7 +319,7 @@ export function anthropicLayer2ToolSet(opts: ToolSurfaceOptions): CanonicalToolD
     : [];
   return [
     ...coreReads,
-    ...CORE_INTERACTION_TOOLS,
+    ...coreInteractionTools(opts.askMaxQuestions),
     ...(opts.useThinkTool ? [THINK_TOOL] : []),
     ...tailReads,
     ...resolveWriteTools(opts),

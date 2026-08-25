@@ -232,9 +232,15 @@
   color: color-mix(in srgb, var(--text-muted) 82%, transparent);
 }
 
-.lmsa-chat-composer-textarea:hover,
-.lmsa-chat-composer-textarea:focus,
-.lmsa-chat-composer-textarea:focus-visible {
+/* The field is a bare writing surface: the composer draws its hover and focus treatment on the
+   panel, never on the textarea. Obsidian styles form fields natively and paints
+   `--background-modifier-form-field-hover` over this one, so the reset below is what keeps it
+   transparent. The `.lmsa-root` scope is load-bearing, not decorative: Obsidian's rule is
+   `textarea:not(:disabled):hover` (0,2,1), and a bare `.lmsa-chat-composer-textarea:hover` is
+   (0,2,0), which loses to it. The scope lifts the reset to (0,3,0). */
+.lmsa-root .lmsa-chat-composer-textarea:hover,
+.lmsa-root .lmsa-chat-composer-textarea:focus,
+.lmsa-root .lmsa-chat-composer-textarea:focus-visible {
   outline: none;
   border: none;
   box-shadow: none;

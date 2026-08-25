@@ -33,7 +33,12 @@
 .lmsa-chat-window-diff-hunk-header {
   @apply lmsa:flex lmsa:items-center lmsa:justify-between lmsa:gap-2 lmsa:px-3 lmsa:py-2;
   border-bottom: 1px solid var(--background-modifier-border);
-  background: var(--background-secondary);
+  /* Transparent, not a surface color. The hunk body already paints --background-primary, so
+     pinning the header to --background-secondary tied its contrast to two Obsidian variables
+     tuned independently of each other. A palette retune widened the gap and the header began
+     reading as a band. Letting the body color through keeps the two locked together, and the
+     border-bottom stays the separator. */
+  background: transparent;
 }
 
 .lmsa-chat-window-diff-hunk-meta {

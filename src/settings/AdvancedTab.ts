@@ -24,9 +24,8 @@ export function advancedTabSections(plugin: WritingAssistantChat): SettingsSecti
         ),
         settingRow(
           "Questions per ask",
-          "How many questions the model may put in a single ask window. Nothing else about " +
-            `the window is limited: questions, choices, and your own answers can run as long ` +
-            `as they need to. Default: ${DEFAULT_ASK_MAX_QUESTIONS}.`,
+          "How many questions the model may put in a single ask window." +
+            ` Default: ${DEFAULT_ASK_MAX_QUESTIONS}.`,
           (item) => {
             item.addText((text) =>
               text

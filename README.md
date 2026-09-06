@@ -1,164 +1,167 @@
+<div align="center">
+
 # Writing Assistant Chat
 
-AI writing assistant for [Obsidian](https://obsidian.md) with a unified chat and editing surface. Connects to local or cloud LLM providers. Features vault-wide RAG retrieval, knowledge graph, agentic tool use, note context, and reusable prompt commands.
+**An AI writing assistant that lives inside your Obsidian vault.**
+
+Local or cloud models. Ground your writing, reorganise your vault, assist you in reaching your goals.
+
+[![Latest release](https://img.shields.io/github/v/release/Resolve-public/writing-assistant-chat?label=release)](https://github.com/Resolve-public/writing-assistant-chat/releases/latest)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
+
+</div>
+
+![The chat panel beside an open chapter. The assistant has read the writer's research notes and shown where the chapter contradicts them.](assets/readme/hero.png)
+
+## What it does
+
+A chat panel that knows your vault. Ask whether a chapter holds up against your research and it
+reads the notes before it answers. Ask for a change and it shows you the diff and waits. It runs
+on a local model through LM Studio, or on a cloud provider you choose, and nothing leaves your
+machine unless you point it somewhere.
+
+- **Grounded in your vault.** The open note travels with your message. The assistant can read,
+  search, and semantically search your notes, backed by a vault-wide index and an optional knowledge
+  graph, so it builds on what you have written and researched instead of inventing around it.
+- **Edits you review.** Changes arrive as diffs, hunk by hunk, and land in the open note only after
+  you approve. New files, moves, and deletions go through the same gate. Deleting means trash, never
+  delete.
+- **Local first, multi-provider.** LM Studio, Anthropic, OpenAI, or the Claude Code CLI, with saved
+  model profiles you can switch mid-conversation.
+- **Theme friendly.** The panel is styled with your Obsidian theme's own variables, so it takes on
+  whatever theme you run and tries to blend in rather than stand out.
+- **Transparent about cost.** Token counts and cost estimates from the providers that bill you, and
+  a session history that lets you organise your work.
 
 Desktop only.
 
----
+## See it work
 
-## Features
+![A chapter checked against two research notes, read before the answer streams in.](assets/readme/grounded-answer.gif)
 
-### One conversation, two ways to work
+Ask whether the draft holds up and watch it read the research before it answers. Every figure in
+the reply comes from the notes it read.
 
-- **Ask before edits**, The default. Write operations follow the per-operation policy in settings, which
-  normally asks you to review changes before they are applied.
-- **Edit automatically**, Applies proposed changes without per-operation review. Use it for trusted
-  sessions where hands-off editing is intentional.
+### Edits you can see before they land
 
-### Multi-provider support
+![An approved edit: the belt crossing rewritten to match the research, the diff on the timeline and the chapter already updated in the editor.](assets/readme/edit-applied.png)
 
-Connect to one or more LLM providers:
+Every edit is a diff you approve in the composer. Approve it and it lands in the editor, with undo
+one click away. Decline it and you can tell the model what to do instead.
 
-- **LM Studio**, Local inference via OpenAI-compatible API. No cloud, no API keys, no data leaving your machine.
-- **Anthropic**, Claude models with native API support and prompt caching.
-- **OpenAI**, GPT models via the OpenAI API (or any OpenAI-compatible endpoint).
-- **Claude Code**, Anthropic's agent harness via the local `claude` CLI. Runs its own tool loop over the vault toolstack and uses your existing Claude Code login, so no API key is needed.
+<table>
+  <tr>
+    <td width="50%"><img src="assets/readme/edit-review.png" alt="A proposed edit waiting in the composer, with Approve, Approve everything this session, and Other."></td>
+    <td width="50%"><img src="assets/readme/note-created.png" alt="A synthesis note created after approval, its contents shown on the timeline."></td>
+  </tr>
+  <tr>
+    <td align="center">A proposed edit</td>
+    <td align="center">An approved change</td>
+  </tr>
+</table>
 
-Switch between providers and model profiles from the chat panel.
+### At home in your theme
 
-### Agentic tool use
+The same conversation under Obsidian's light theme and three community themes. Nothing in the panel
+is hard-coded; it reads the theme's variables like the rest of the app.
 
-When enabled, the model can use tools across multiple reasoning rounds.
+<table>
+  <tr>
+    <td width="50%"><img src="assets/readme/theme-light.png" alt="The same conversation in Obsidian's default light theme."></td>
+    <td width="50%"><img src="assets/readme/theme-minimal.png" alt="The same conversation in the Minimal theme."></td>
+  </tr>
+  <tr>
+    <td align="center">Obsidian, light</td>
+    <td align="center"><a href="https://github.com/kepano/obsidian-minimal">Minimal</a></td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="assets/readme/theme-things.png" alt="The same conversation in the Things theme."></td>
+    <td width="50%"><img src="assets/readme/theme-gruvbox.png" alt="The same conversation in the Obsidian gruvbox theme."></td>
+  </tr>
+  <tr>
+    <td align="center"><a href="https://github.com/colineckert/obsidian-things">Things</a></td>
+    <td align="center"><a href="https://github.com/insanum/obsidian_gruvbox">Obsidian gruvbox</a></td>
+  </tr>
+</table>
 
-Every operation that changes your vault is routed through an approval gateway. By default each kind (create, overwrite, move, trash, create folder, in-document edit) is set to **Ask**, so nothing is applied without your review. In settings you can set any kind to **Auto-apply** or **Deny** (the tool is removed entirely so the model is never offered it).
+## Providers
 
-### Vault-wide retrieval (RAG)
+| Provider | Where it runs | What you need |
+|----------|---------------|---------------|
+| **LM Studio** | On your machine | [LM Studio](https://lmstudio.ai) with a model loaded. No account, no key. |
+| **Anthropic** | Cloud | An API key from [console.anthropic.com](https://console.anthropic.com). Metered, billed to you. |
+| **OpenAI** | Cloud, or any OpenAI-compatible endpoint | An API key from [platform.openai.com](https://platform.openai.com). Metered, billed to you. |
+| **Claude Code** | The local `claude` CLI, which calls Anthropic | The [Claude Code](https://claude.com/claude-code) CLI installed and signed in. Uses your subscription, no key. |
 
-Semantic search over your entire vault using local or cloud embeddings. Configurable chunk size, overlap, similarity threshold, and metadata enrichment (tags, folder paths, wikilinks).
+Requires Obsidian 1.13 or later on desktop.
 
-### Knowledge graph
+## Install
 
-LLM-powered entity and relationship extraction from your vault. Enables entity-based retrieval and graph-aware ranking of search results.
+**From community plugins.** Open **Settings > Community plugins > Browse**, search for
+**Writing Assistant Chat**, click **Install**, then **Enable**.
 
-### Note context
+**Beta through BRAT.** Add `Resolve-public/writing-assistant-chat` in the
+[BRAT plugin](https://github.com/TfTHacker/obsidian42-brat), then enable **Writing Assistant Chat**
+under **Community plugins**.
 
-The active note is automatically available to conversations, so the model writes with awareness of your current document. Configurable context size.
+## First run
 
-### Prompt commands
+1. Open **Settings > Writing Assistant Chat > Providers** and set up one provider. LM Studio is
+   discovered from its local server, Anthropic and OpenAI take an API key, and Claude Code needs the
+   `claude` CLI on your `PATH`.
+2. Open the panel from the ribbon icon or the **Open chat** command.
+3. Pick a model in the panel header, open a note, and ask something about it.
 
-Reusable prompt templates (e.g. "Tighten dialogue", "Expand this scene") that appear as buttons in the chat panel and in the editor right-click context menu. Supports `{{selection}}` and `{{noteText}}` placeholders.
+Tools are on from the start and every kind of change is set to **Ask**, so nothing touches your
+vault without your approval. Change that per kind under **Vault operations**.
 
-### Streaming and message management
+## Privacy and network
 
-- Real-time streaming responses.
-- Message version history with regeneration.
-- Token usage tracking and cost estimation.
-- Inline message editing.
-- Chat history with conversation switching.
-- Draft auto-save.
+**Local providers keep everything on your machine.** With LM Studio alone, no data leaves it.
 
-### Model profiles
+**Cloud providers receive what you send.** Your messages, the note context you include, and any
+tool results the model reads go to the provider you enabled:
 
-Save multiple configurations per provider, each with its own system prompt, temperature, max tokens, top-p, top-k, and reasoning level. Switch profiles from the chat panel.
+| Provider | Endpoint | Used for |
+|----------|----------|----------|
+| Anthropic | `api.anthropic.com` | Chat |
+| OpenAI | `api.openai.com`, or your custom base URL | Chat, embeddings |
+| LM Studio | `localhost` (configurable) | Chat, embeddings, model discovery |
+| Claude Code | The local `claude` CLI, which calls Anthropic | Agentic chat; the CLI runs its own tool loop |
 
----
+- API keys are kept in Obsidian's secret storage on your device and sent only to their own provider.
+- Conversations, the retrieval index, and the knowledge graph are stored locally.
+- No telemetry, no analytics, and no requests beyond the provider you chose. Pricing tables and
+  model catalogs ship with each release; nothing is fetched at runtime.
+- The plugin is free. Cloud usage is metered against your own key or subscription, including
+  OpenAI embeddings if you pick them for retrieval.
 
-## Requirements
-
-- [Obsidian](https://obsidian.md) v1.0.0 or later (desktop only; tested on recent 1.12.x releases)
-- At least one LLM provider:
-  - **LM Studio**, [lmstudio.ai](https://lmstudio.ai), running locally with at least one model loaded
-  - **Anthropic**, An API key from [console.anthropic.com](https://console.anthropic.com)
-  - **OpenAI**, An API key from [platform.openai.com](https://platform.openai.com)
-  - **Claude Code**, The [Claude Code](https://claude.com/claude-code) CLI installed and signed in (no API key needed, will use your existing Subscription)
-
----
-
-## Installation
-
-### From community plugins
-
-1. Open **Settings > Community plugins > Browse**
-2. Search for **Writing Assistant Chat**
-3. Click **Install**, then **Enable**
-
-### Beta via BRAT
-
-1. Install the [BRAT plugin](https://github.com/TfTHacker/obsidian42-brat) from community plugins
-2. Open **Settings > BRAT > Add Beta plugin**
-3. Enter `Resolve-public/writing-assistant-chat` and click **Add Plugin**
-4. Enable **Writing Assistant Chat** in **Settings > Community plugins**
-
----
-
-## Getting started
-
-1. Open **Settings > Writing Assistant Chat**
-2. Choose a provider and configure it:
-   - **LM Studio**, Start the local server (default `http://localhost:1234`) and the plugin will discover loaded models
-   - **Anthropic / OpenAI**, Enter your API key
-   - **Claude Code**, Make sure the `claude` CLI is installed and signed in (set its path only if it isn't on your `PATH`)
-3. Add a model profile with your preferred system prompt, temperature, and token limit
-4. Click the chat icon in the ribbon, or run the command **Open writing assistant chat**
-5. Start writing
-
----
-
-## Network and privacy
-
-### Remote services
-
-When using **cloud providers**, the plugin sends your messages (and any note context you include) to the provider's API:
-
-| Provider | Endpoint | Purpose |
-|----------|----------|---------|
-| Anthropic | `api.anthropic.com` | Chat completions |
-| OpenAI | `api.openai.com` (or custom base URL) | Chat completions, embeddings |
-| LM Studio | `localhost` (configurable) | Chat completions, embeddings, model discovery |
-| Claude Code | Local `claude` CLI, which calls Anthropic | Agentic chat (the CLI runs its own tool loop) |
-
-When using **Local providers** exclusively, **no data leaves your machine**.
-
-### Data handling
-
-- **API keys** are stored locally in Obsidian's plugin data file and are only sent to their respective provider.
-- **Conversations**, **RAG embeddings**, and **knowledge graph data** are stored locally on your device.
-- **No telemetry, analytics, or tracking.** The plugin makes no network requests beyond what is required to communicate with your chosen provider.
-- **No account required.** LM Studio needs no account; Anthropic and OpenAI require their own API accounts.
-- **Cloud usage is billed to you.** The plugin is free. When you use a cloud provider, Anthropic and OpenAI charge metered usage against your own API key (this includes OpenAI embeddings if you select an OpenAI embedding model for RAG), and Claude Code draws on your existing Claude subscription. Local providers such as LM Studio are free to run.
-
-### External tools and files outside your vault
-
-The **Claude Code** provider is the only part of the plugin that reaches outside your vault:
-
-- **It launches an external program.** When you use this provider, the plugin runs the `claude` command-line tool as a subprocess, with its working directory set to your vault. To find the executable it searches the directories on your system `PATH`, and on Windows it reads the npm shim files (`claude.cmd` / `claude.bat`) to resolve the real program. It only ever runs a `claude` binary that you have already installed; it never downloads, installs, or updates one.
-- **The CLI keeps its own files outside the vault.** The `claude` tool stores its login, configuration, and per-conversation session files in its own home-directory folder (`~/.claude`), outside your Obsidian vault. The plugin relies on these to resume a conversation after a restart. These files are created and managed by the Claude Code CLI itself.
-
-Every other tool the plugin offers the model (read, edit, create, move, trash) is path-restricted to your vault.
-
----
+**Claude Code reaches outside the vault, and it is the only part that does.** It runs the `claude`
+command-line tool as a subprocess with your vault as its working directory. To find it, the plugin
+searches the directories on your `PATH`; on Windows it also reads the npm `claude.cmd` / `claude.bat`
+shims to resolve the real program. It only ever runs a `claude` you installed and never downloads,
+installs, or updates one. The CLI keeps its own login, configuration, and per-conversation session
+files in its home folder (`~/.claude`), outside the vault, and the plugin relies on those to resume a
+conversation after a restart. Every other tool the model is given (read, edit, create, move, trash)
+is restricted to paths inside your vault.
 
 ## Support
 
-This plugin and all of its features are, and will always be, free. If it helped you get closer to achieving your creative goals, you can support this project in the following ways:
-
-- [Buy Me a Coffee](https://buymeacoffee.com/resolvepublic)
-
-You can also find these links in **Settings > Writing Assistant Chat > General**.
-
----
+This plugin and all of its features are, and will always be, free. If it helped you get closer to
+your creative goals, you can support the project on
+[Buy Me a Coffee](https://buymeacoffee.com/resolvepublic). The link is also under
+**Settings > Writing Assistant Chat > General**.
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for setup instructions, project structure, coding standards, and the development workflow.
-
----
+See [CONTRIBUTING.md](CONTRIBUTING.md) for setup, project structure, coding standards, and the
+development workflow. The pictures above come from the plugin itself, driven by the scenario in
+[dev/readme](dev/readme/README.md).
 
 ## License
 
-MIT, see [LICENSE](LICENSE) for details.
+MIT, see [LICENSE](LICENSE).
 
-The distributed build bundles third-party components under their own licenses,
-including one proprietary Anthropic component that is not covered by this
-plugin's MIT license. See [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md) for
-the full list and terms.
+The distributed build bundles third-party components under their own licenses, including one
+proprietary Anthropic component that is not covered by this plugin's MIT license. See
+[THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md) for the full list and terms.

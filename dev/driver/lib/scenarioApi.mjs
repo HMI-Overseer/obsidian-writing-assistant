@@ -207,6 +207,8 @@ export function createScenarioApi({ page, record, onBreakpoint, onProgress = nul
 
   const api = {
     page,
+    /** The run directory, for a scenario that writes more than shots into it. */
+    dir: record.dir,
     shot,
     state: () => readState(page),
 

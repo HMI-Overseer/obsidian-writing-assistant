@@ -1,0 +1,553 @@
+{
+  "description": "A comparison table and a short list for the series bible, in one prose round.",
+  "completionText": "",
+  "_comment": [
+    "This turn exists for the README's theme pictures: a table, a list, bold text, and a link",
+    "are what a theme restyles, so the finished conversation is shot under each theme with this",
+    "on screen. Every figure is in the fixture's Research notes."
+  ],
+  "frames": [
+    {
+      "frameKey": "compare:r1-01",
+      "providerMessageKey": "readme-showcase:msg-1",
+      "delayMs": 700,
+      "facts": [
+        {
+          "type": "segment_start",
+          "segmentId": "compare-r1"
+        }
+      ]
+    },
+    {
+      "frameKey": "compare:r1-02",
+      "providerMessageKey": "readme-showcase:msg-1",
+      "delayMs": 40,
+      "facts": [
+        {
+          "type": "prose_delta",
+          "segmentId": "compare-r1",
+          "delta": "Kept to what "
+        }
+      ]
+    },
+    {
+      "frameKey": "compare:r1-03",
+      "providerMessageKey": "readme-showcase:msg-1",
+      "delayMs": 40,
+      "facts": [
+        {
+          "type": "prose_delta",
+          "segmentId": "compare-r1",
+          "delta": "the scenes will "
+        }
+      ]
+    },
+    {
+      "frameKey": "compare:r1-04",
+      "providerMessageKey": "readme-showcase:msg-1",
+      "delayMs": 40,
+      "facts": [
+        {
+          "type": "prose_delta",
+          "segmentId": "compare-r1",
+          "delta": "touch.\n\n| | "
+        }
+      ]
+    },
+    {
+      "frameKey": "compare:r1-05",
+      "providerMessageKey": "readme-showcase:msg-1",
+      "delayMs": 40,
+      "facts": [
+        {
+          "type": "prose_delta",
+          "segmentId": "compare-r1",
+          "delta": "Belt | Rings "
+        }
+      ]
+    },
+    {
+      "frameKey": "compare:r1-06",
+      "providerMessageKey": "readme-showcase:msg-1",
+      "delayMs": 40,
+      "facts": [
+        {
+          "type": "prose_delta",
+          "segmentId": "compare-r1",
+          "delta": "|\n|---|---|---|\n| "
+        }
+      ]
+    },
+    {
+      "frameKey": "compare:r1-07",
+      "providerMessageKey": "readme-showcase:msg-1",
+      "delayMs": 40,
+      "facts": [
+        {
+          "type": "prose_delta",
+          "segmentId": "compare-r1",
+          "delta": "Where | 2.06 "
+        }
+      ]
+    },
+    {
+      "frameKey": "compare:r1-08",
+      "providerMessageKey": "readme-showcase:msg-1",
+      "delayMs": 40,
+      "facts": [
+        {
+          "type": "prose_delta",
+          "segmentId": "compare-r1",
+          "delta": "to 3.27 AU "
+        }
+      ]
+    },
+    {
+      "frameKey": "compare:r1-09",
+      "providerMessageKey": "readme-showcase:msg-1",
+      "delayMs": 40,
+      "facts": [
+        {
+          "type": "prose_delta",
+          "segmentId": "compare-r1",
+          "delta": "| 7,000 to "
+        }
+      ]
+    },
+    {
+      "frameKey": "compare:r1-10",
+      "providerMessageKey": "readme-showcase:msg-1",
+      "delayMs": 40,
+      "facts": [
+        {
+          "type": "prose_delta",
+          "segmentId": "compare-r1",
+          "delta": "80,000 km up "
+        }
+      ]
+    },
+    {
+      "frameKey": "compare:r1-11",
+      "providerMessageKey": "readme-showcase:msg-1",
+      "delayMs": 40,
+      "facts": [
+        {
+          "type": "prose_delta",
+          "segmentId": "compare-r1",
+          "delta": "|\n| Made "
+        }
+      ]
+    },
+    {
+      "frameKey": "compare:r1-12",
+      "providerMessageKey": "readme-showcase:msg-1",
+      "delayMs": 40,
+      "facts": [
+        {
+          "type": "prose_delta",
+          "segmentId": "compare-r1",
+          "delta": "of | Rock, "
+        }
+      ]
+    },
+    {
+      "frameKey": "compare:r1-13",
+      "providerMessageKey": "readme-showcase:msg-1",
+      "delayMs": 40,
+      "facts": [
+        {
+          "type": "prose_delta",
+          "segmentId": "compare-r1",
+          "delta": "mostly C-type | "
+        }
+      ]
+    },
+    {
+      "frameKey": "compare:r1-14",
+      "providerMessageKey": "readme-showcase:msg-1",
+      "delayMs": 40,
+      "facts": [
+        {
+          "type": "prose_delta",
+          "segmentId": "compare-r1",
+          "delta": "99.9% water ice "
+        }
+      ]
+    },
+    {
+      "frameKey": "compare:r1-15",
+      "providerMessageKey": "readme-showcase:msg-1",
+      "delayMs": 40,
+      "facts": [
+        {
+          "type": "prose_delta",
+          "segmentId": "compare-r1",
+          "delta": "|\n| Spacing "
+        }
+      ]
+    },
+    {
+      "frameKey": "compare:r1-16",
+      "providerMessageKey": "readme-showcase:msg-1",
+      "delayMs": 40,
+      "facts": [
+        {
+          "type": "prose_delta",
+          "segmentId": "compare-r1",
+          "delta": "| About 965,600 "
+        }
+      ]
+    },
+    {
+      "frameKey": "compare:r1-17",
+      "providerMessageKey": "readme-showcase:msg-1",
+      "delayMs": 40,
+      "facts": [
+        {
+          "type": "prose_delta",
+          "segmentId": "compare-r1",
+          "delta": "km apart | "
+        }
+      ]
+    },
+    {
+      "frameKey": "compare:r1-18",
+      "providerMessageKey": "readme-showcase:msg-1",
+      "delayMs": 40,
+      "facts": [
+        {
+          "type": "prose_delta",
+          "segmentId": "compare-r1",
+          "delta": "A sheet 10 "
+        }
+      ]
+    },
+    {
+      "frameKey": "compare:r1-19",
+      "providerMessageKey": "readme-showcase:msg-1",
+      "delayMs": 40,
+      "facts": [
+        {
+          "type": "prose_delta",
+          "segmentId": "compare-r1",
+          "delta": "m thick |\n"
+        }
+      ]
+    },
+    {
+      "frameKey": "compare:r1-20",
+      "providerMessageKey": "readme-showcase:msg-1",
+      "delayMs": 40,
+      "facts": [
+        {
+          "type": "prose_delta",
+          "segmentId": "compare-r1",
+          "delta": "| Mass | "
+        }
+      ]
+    },
+    {
+      "frameKey": "compare:r1-21",
+      "providerMessageKey": "readme-showcase:msg-1",
+      "delayMs": 40,
+      "facts": [
+        {
+          "type": "prose_delta",
+          "segmentId": "compare-r1",
+          "delta": "3% of the "
+        }
+      ]
+    },
+    {
+      "frameKey": "compare:r1-22",
+      "providerMessageKey": "readme-showcase:msg-1",
+      "delayMs": 40,
+      "facts": [
+        {
+          "type": "prose_delta",
+          "segmentId": "compare-r1",
+          "delta": "Moon | 0.41 "
+        }
+      ]
+    },
+    {
+      "frameKey": "compare:r1-23",
+      "providerMessageKey": "readme-showcase:msg-1",
+      "delayMs": 40,
+      "facts": [
+        {
+          "type": "prose_delta",
+          "segmentId": "compare-r1",
+          "delta": "Mimas |\n| "
+        }
+      ]
+    },
+    {
+      "frameKey": "compare:r1-24",
+      "providerMessageKey": "readme-showcase:msg-1",
+      "delayMs": 40,
+      "facts": [
+        {
+          "type": "prose_delta",
+          "segmentId": "compare-r1",
+          "delta": "On the page "
+        }
+      ]
+    },
+    {
+      "frameKey": "compare:r1-25",
+      "providerMessageKey": "readme-showcase:msg-1",
+      "delayMs": 40,
+      "facts": [
+        {
+          "type": "prose_delta",
+          "segmentId": "compare-r1",
+          "delta": "| Empty | "
+        }
+      ]
+    },
+    {
+      "frameKey": "compare:r1-26",
+      "providerMessageKey": "readme-showcase:msg-1",
+      "delayMs": 40,
+      "facts": [
+        {
+          "type": "prose_delta",
+          "segmentId": "compare-r1",
+          "delta": "A floor |\n\n"
+        }
+      ]
+    },
+    {
+      "frameKey": "compare:r1-27",
+      "providerMessageKey": "readme-showcase:msg-1",
+      "delayMs": 40,
+      "facts": [
+        {
+          "type": "prose_delta",
+          "segmentId": "compare-r1",
+          "delta": "Three things the "
+        }
+      ]
+    },
+    {
+      "frameKey": "compare:r1-28",
+      "providerMessageKey": "readme-showcase:msg-1",
+      "delayMs": 40,
+      "facts": [
+        {
+          "type": "prose_delta",
+          "segmentId": "compare-r1",
+          "delta": "series bible should "
+        }
+      ]
+    },
+    {
+      "frameKey": "compare:r1-29",
+      "providerMessageKey": "readme-showcase:msg-1",
+      "delayMs": 40,
+      "facts": [
+        {
+          "type": "prose_delta",
+          "segmentId": "compare-r1",
+          "delta": "carry:\n\n- **Crossing "
+        }
+      ]
+    },
+    {
+      "frameKey": "compare:r1-30",
+      "providerMessageKey": "readme-showcase:msg-1",
+      "delayMs": 40,
+      "facts": [
+        {
+          "type": "prose_delta",
+          "segmentId": "compare-r1",
+          "delta": "the belt is "
+        }
+      ]
+    },
+    {
+      "frameKey": "compare:r1-31",
+      "providerMessageKey": "readme-showcase:msg-1",
+      "delayMs": 40,
+      "facts": [
+        {
+          "type": "prose_delta",
+          "segmentId": "compare-r1",
+          "delta": "boring**, and the "
+        }
+      ]
+    },
+    {
+      "frameKey": "compare:r1-32",
+      "providerMessageKey": "readme-showcase:msg-1",
+      "delayMs": 40,
+      "facts": [
+        {
+          "type": "prose_delta",
+          "segmentId": "compare-r1",
+          "delta": "story should treat "
+        }
+      ]
+    },
+    {
+      "frameKey": "compare:r1-33",
+      "providerMessageKey": "readme-showcase:msg-1",
+      "delayMs": 40,
+      "facts": [
+        {
+          "type": "prose_delta",
+          "segmentId": "compare-r1",
+          "delta": "it that way.\n"
+        }
+      ]
+    },
+    {
+      "frameKey": "compare:r1-34",
+      "providerMessageKey": "readme-showcase:msg-1",
+      "delayMs": 40,
+      "facts": [
+        {
+          "type": "prose_delta",
+          "segmentId": "compare-r1",
+          "delta": "- **The rings "
+        }
+      ]
+    },
+    {
+      "frameKey": "compare:r1-35",
+      "providerMessageKey": "readme-showcase:msg-1",
+      "delayMs": 40,
+      "facts": [
+        {
+          "type": "prose_delta",
+          "segmentId": "compare-r1",
+          "delta": "are the dangerous "
+        }
+      ]
+    },
+    {
+      "frameKey": "compare:r1-36",
+      "providerMessageKey": "readme-showcase:msg-1",
+      "delayMs": 40,
+      "facts": [
+        {
+          "type": "prose_delta",
+          "segmentId": "compare-r1",
+          "delta": "place**, so every "
+        }
+      ]
+    },
+    {
+      "frameKey": "compare:r1-37",
+      "providerMessageKey": "readme-showcase:msg-1",
+      "delayMs": 40,
+      "facts": [
+        {
+          "type": "prose_delta",
+          "segmentId": "compare-r1",
+          "delta": "dodging scene moves "
+        }
+      ]
+    },
+    {
+      "frameKey": "compare:r1-38",
+      "providerMessageKey": "readme-showcase:msg-1",
+      "delayMs": 40,
+      "facts": [
+        {
+          "type": "prose_delta",
+          "segmentId": "compare-r1",
+          "delta": "to Saturn.\n- "
+        }
+      ]
+    },
+    {
+      "frameKey": "compare:r1-39",
+      "providerMessageKey": "readme-showcase:msg-1",
+      "delayMs": 40,
+      "facts": [
+        {
+          "type": "prose_delta",
+          "segmentId": "compare-r1",
+          "delta": "The rings are "
+        }
+      ]
+    },
+    {
+      "frameKey": "compare:r1-40",
+      "providerMessageKey": "readme-showcase:msg-1",
+      "delayMs": 40,
+      "facts": [
+        {
+          "type": "prose_delta",
+          "segmentId": "compare-r1",
+          "delta": "**dying**, at 4,800 "
+        }
+      ]
+    },
+    {
+      "frameKey": "compare:r1-41",
+      "providerMessageKey": "readme-showcase:msg-1",
+      "delayMs": 40,
+      "facts": [
+        {
+          "type": "prose_delta",
+          "segmentId": "compare-r1",
+          "delta": "to 44,000 kg/s. "
+        }
+      ]
+    },
+    {
+      "frameKey": "compare:r1-42",
+      "providerMessageKey": "readme-showcase:msg-1",
+      "delayMs": 40,
+      "facts": [
+        {
+          "type": "prose_delta",
+          "segmentId": "compare-r1",
+          "delta": "See [[Rings of "
+        }
+      ]
+    },
+    {
+      "frameKey": "compare:r1-43",
+      "providerMessageKey": "readme-showcase:msg-1",
+      "delayMs": 40,
+      "facts": [
+        {
+          "type": "prose_delta",
+          "segmentId": "compare-r1",
+          "delta": "Saturn]] for the "
+        }
+      ]
+    },
+    {
+      "frameKey": "compare:r1-44",
+      "providerMessageKey": "readme-showcase:msg-1",
+      "delayMs": 40,
+      "facts": [
+        {
+          "type": "prose_delta",
+          "segmentId": "compare-r1",
+          "delta": "ring rain figures."
+        }
+      ]
+    },
+    {
+      "frameKey": "compare:r1-45",
+      "providerMessageKey": "readme-showcase:msg-1",
+      "delayMs": 0,
+      "facts": [
+        {
+          "type": "segment_end",
+          "segmentId": "compare-r1"
+        },
+        {
+          "type": "turn_end",
+          "status": "completed"
+        }
+      ]
+    }
+  ]
+}

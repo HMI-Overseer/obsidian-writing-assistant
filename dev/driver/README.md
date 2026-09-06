@@ -14,10 +14,12 @@ The two instruments do not overlap. `dev/visual` renders hand-written static HTM
 Obsidian CSS and never executes the plugin's own render code, so it is structurally blind to any
 change in how the plugin builds DOM. This runs the assembled application.
 
-**Status: Stage 3, live mode, 2026-07-31.** Nine scripted scenarios over the composer, the
-transcript, the turn timeline, approvals, and the `ask_user` drawer, plus three that run against a
-real provider, including RFC-0011's live Obsidian walk. See
-[the implementation plan](../../docs/work/plans/2026-07-30-live-scenario-driver-plan.md).
+**Status: Stage 3, live mode, 2026-07-31.** Ten scripted scenarios over the composer, the
+transcript, the turn timeline, approvals, and the `ask_user` drawer, one of which
+([`readme-showcase`](scenarios/readme-showcase.mjs)) takes the pictures in the top-level README,
+plus three that run against a real provider, including RFC-0011's live Obsidian walk. See
+[the implementation plan](../../docs/work/plans/2026-07-30-live-scenario-driver-plan.md) and
+[dev/readme](../readme/README.md).
 
 ## Usage
 
@@ -39,7 +41,11 @@ launched detached and would otherwise outlive it. Anything else typed while the 
 is discarded at the moment it arrives, never held to answer the next question with.
 
 If stdin is not a terminal (a pipe, a CI job), the same lists are printed numbered and read a line
-at a time. Nothing else changes.
+at a time. Answers may arrive ahead of their questions, one per line, and are held until asked for,
+so `printf '2
+11
+1
+' | npm run drive -- --no-build` is a complete run. Nothing else changes.
 
 The first question is what to do:
 

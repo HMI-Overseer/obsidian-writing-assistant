@@ -1,0 +1,67 @@
+{
+  "_comment": [
+    "Plugin settings baseline for the readme-showcase fixture vault, which exists for the",
+    "readme-showcase scenario and nothing else. It is writing-basic's baseline with three",
+    "differences, each of which is what a README picture needs to show:",
+    "",
+    "`includeNoteContext` is on, so the open chapter rides on the user turn as a note chip.",
+    "",
+    "The model is a curated catalog id, because its name and id are in every picture. The custom",
+    "entry under the same id is a fallback, not a duplicate: selectableModels dedupes by id with",
+    "the catalog first, so while the catalog carries it the catalog entry is used, and if a sync",
+    "ever drops it this entry keeps the fixture bootable instead of opening on 'No model",
+    "selected'. The scripted client is installed at the createChatClient seam, so nothing reaches",
+    "Anthropic and the key is a placeholder that only satisfies the enablement gate.",
+    "",
+    "The seeded conversation is titled for the history drawer rather than for the driver.",
+    "",
+    "Everything else is writing-basic's reasoning, which its own settings.json records."
+  ],
+  "apiKeysDisclaimerAccepted": true,
+  "agenticMode": true,
+  "includeNoteContext": true,
+  "providerSettings": {
+    "lmstudio": {
+      "enabled": false,
+      "baseUrl": "http://127.0.0.1:1234",
+      "bypassCors": false
+    },
+    "anthropic": {
+      "enabled": true,
+      "apiKey": "driver-fixture-placeholder-never-sent"
+    },
+    "openai": { "enabled": false, "apiKey": "", "baseUrl": "" },
+    "claudecode": { "enabled": false, "claudePath": "" }
+  },
+  "customModels": {
+    "anthropic": [
+      {
+        "modelId": "claude-sonnet-4-5",
+        "name": "Claude Sonnet 4.5",
+        "role": "completion"
+      }
+    ]
+  },
+  "lmStudioModelCache": {
+    "completion": [],
+    "embedding": [],
+    "discoveredAt": null
+  },
+  "rag": { "enabled": false },
+  "knowledgeGraph": { "enabled": false },
+  "chatHistory": {
+    "conversations": [
+      {
+        "id": "readme-showcase-conversation",
+        "title": "Shepherd, chapter one",
+        "createdAt": 1757152800000,
+        "updatedAt": 1757152800000,
+        "modelId": "anthropic:claude-sonnet-4-5",
+        "modelName": "Claude Sonnet 4.5",
+        "messageCount": 0,
+        "approvalPosture": "ask"
+      }
+    ],
+    "activeConversationId": "readme-showcase-conversation"
+  }
+}

@@ -1,0 +1,562 @@
+{
+  "description": "Two research notes read, then an answer that checks the chapter against them. Paced for a recording.",
+  "completionText": "",
+  "_comment": [
+    "The readme-showcase scenario records this turn frame by frame for the README's animation,",
+    "so the prose is chunked a few words at a time and paced at 90ms rather than the 40ms default.",
+    "Nothing in the driver waits on that pacing; it only makes streaming visible.",
+    "",
+    "Every figure in the answer is in the fixture's Research notes, which carry the figures of the",
+    "Wikipedia articles they were clipped from."
+  ],
+  "frames": [
+    {
+      "frameKey": "grounded:r1-01",
+      "providerMessageKey": "readme-showcase:msg-1",
+      "delayMs": 700,
+      "facts": [
+        {
+          "type": "segment_start",
+          "segmentId": "grounded-r1"
+        }
+      ]
+    },
+    {
+      "frameKey": "grounded:r1-02",
+      "providerMessageKey": "readme-showcase:msg-1",
+      "delayMs": 90,
+      "facts": [
+        {
+          "type": "prose_delta",
+          "segmentId": "grounded-r1",
+          "delta": "Let me read "
+        }
+      ]
+    },
+    {
+      "frameKey": "grounded:r1-03",
+      "providerMessageKey": "readme-showcase:msg-1",
+      "delayMs": 90,
+      "facts": [
+        {
+          "type": "prose_delta",
+          "segmentId": "grounded-r1",
+          "delta": "both research notes "
+        }
+      ]
+    },
+    {
+      "frameKey": "grounded:r1-04",
+      "providerMessageKey": "readme-showcase:msg-1",
+      "delayMs": 90,
+      "facts": [
+        {
+          "type": "prose_delta",
+          "segmentId": "grounded-r1",
+          "delta": "before I answer.\n\n"
+        }
+      ]
+    },
+    {
+      "frameKey": "grounded:r1-05",
+      "providerMessageKey": "readme-showcase:msg-1",
+      "delayMs": 350,
+      "facts": [
+        {
+          "type": "tool_call_start",
+          "segmentId": "grounded-r1",
+          "declarationKey": "grounded-r1-decl-1",
+          "toolName": "read"
+        }
+      ]
+    },
+    {
+      "frameKey": "grounded:r1-06",
+      "providerMessageKey": "readme-showcase:msg-1",
+      "delayMs": 350,
+      "facts": [
+        {
+          "type": "tool_call_delta",
+          "declarationKey": "grounded-r1-decl-1",
+          "argumentsDelta": "{\"path\":\"Research/Asteroid belt.md\"}"
+        }
+      ]
+    },
+    {
+      "frameKey": "grounded:r1-07",
+      "providerMessageKey": "readme-showcase:msg-1",
+      "delayMs": 350,
+      "facts": [
+        {
+          "type": "tool_call_identity",
+          "declarationKey": "grounded-r1-decl-1",
+          "toolCallId": "readme-grounded-1-1",
+          "correlation": "provider_id"
+        }
+      ]
+    },
+    {
+      "frameKey": "grounded:r1-08",
+      "providerMessageKey": "readme-showcase:msg-1",
+      "delayMs": 350,
+      "facts": [
+        {
+          "type": "tool_call_start",
+          "segmentId": "grounded-r1",
+          "declarationKey": "grounded-r1-decl-2",
+          "toolName": "read"
+        }
+      ]
+    },
+    {
+      "frameKey": "grounded:r1-09",
+      "providerMessageKey": "readme-showcase:msg-1",
+      "delayMs": 350,
+      "facts": [
+        {
+          "type": "tool_call_delta",
+          "declarationKey": "grounded-r1-decl-2",
+          "argumentsDelta": "{\"path\":\"Research/Rings of Saturn.md\"}"
+        }
+      ]
+    },
+    {
+      "frameKey": "grounded:r1-10",
+      "providerMessageKey": "readme-showcase:msg-1",
+      "delayMs": 350,
+      "facts": [
+        {
+          "type": "tool_call_identity",
+          "declarationKey": "grounded-r1-decl-2",
+          "toolCallId": "readme-grounded-1-2",
+          "correlation": "provider_id"
+        }
+      ]
+    },
+    {
+      "frameKey": "grounded:r1-11",
+      "providerMessageKey": "readme-showcase:msg-1",
+      "delayMs": 0,
+      "facts": [
+        {
+          "type": "segment_end",
+          "segmentId": "grounded-r1"
+        },
+        {
+          "type": "turn_end",
+          "status": "completed"
+        }
+      ]
+    },
+    {
+      "frameKey": "grounded:r2-01",
+      "providerMessageKey": "readme-showcase:msg-2",
+      "delayMs": 800,
+      "facts": [
+        {
+          "type": "segment_start",
+          "segmentId": "grounded-r2"
+        }
+      ]
+    },
+    {
+      "frameKey": "grounded:r2-02",
+      "providerMessageKey": "readme-showcase:msg-2",
+      "delayMs": 90,
+      "facts": [
+        {
+          "type": "prose_delta",
+          "segmentId": "grounded-r2",
+          "delta": "It does not, "
+        }
+      ]
+    },
+    {
+      "frameKey": "grounded:r2-03",
+      "providerMessageKey": "readme-showcase:msg-2",
+      "delayMs": 90,
+      "facts": [
+        {
+          "type": "prose_delta",
+          "segmentId": "grounded-r2",
+          "delta": "and your own "
+        }
+      ]
+    },
+    {
+      "frameKey": "grounded:r2-04",
+      "providerMessageKey": "readme-showcase:msg-2",
+      "delayMs": 90,
+      "facts": [
+        {
+          "type": "prose_delta",
+          "segmentId": "grounded-r2",
+          "delta": "notes are what "
+        }
+      ]
+    },
+    {
+      "frameKey": "grounded:r2-05",
+      "providerMessageKey": "readme-showcase:msg-2",
+      "delayMs": 90,
+      "facts": [
+        {
+          "type": "prose_delta",
+          "segmentId": "grounded-r2",
+          "delta": "say so.\n\nThe "
+        }
+      ]
+    },
+    {
+      "frameKey": "grounded:r2-06",
+      "providerMessageKey": "readme-showcase:msg-2",
+      "delayMs": 90,
+      "facts": [
+        {
+          "type": "prose_delta",
+          "segmentId": "grounded-r2",
+          "delta": "belt is nearly "
+        }
+      ]
+    },
+    {
+      "frameKey": "grounded:r2-07",
+      "providerMessageKey": "readme-showcase:msg-2",
+      "delayMs": 90,
+      "facts": [
+        {
+          "type": "prose_delta",
+          "segmentId": "grounded-r2",
+          "delta": "empty. Its whole "
+        }
+      ]
+    },
+    {
+      "frameKey": "grounded:r2-08",
+      "providerMessageKey": "readme-showcase:msg-2",
+      "delayMs": 90,
+      "facts": [
+        {
+          "type": "prose_delta",
+          "segmentId": "grounded-r2",
+          "delta": "mass is 3% "
+        }
+      ]
+    },
+    {
+      "frameKey": "grounded:r2-09",
+      "providerMessageKey": "readme-showcase:msg-2",
+      "delayMs": 90,
+      "facts": [
+        {
+          "type": "prose_delta",
+          "segmentId": "grounded-r2",
+          "delta": "of the Moon's, "
+        }
+      ]
+    },
+    {
+      "frameKey": "grounded:r2-10",
+      "providerMessageKey": "readme-showcase:msg-2",
+      "delayMs": 90,
+      "facts": [
+        {
+          "type": "prose_delta",
+          "segmentId": "grounded-r2",
+          "delta": "39% of that "
+        }
+      ]
+    },
+    {
+      "frameKey": "grounded:r2-11",
+      "providerMessageKey": "readme-showcase:msg-2",
+      "delayMs": 90,
+      "facts": [
+        {
+          "type": "prose_delta",
+          "segmentId": "grounded-r2",
+          "delta": "is Ceres alone, "
+        }
+      ]
+    },
+    {
+      "frameKey": "grounded:r2-12",
+      "providerMessageKey": "readme-showcase:msg-2",
+      "delayMs": 90,
+      "facts": [
+        {
+          "type": "prose_delta",
+          "segmentId": "grounded-r2",
+          "delta": "and asteroids average "
+        }
+      ]
+    },
+    {
+      "frameKey": "grounded:r2-13",
+      "providerMessageKey": "readme-showcase:msg-2",
+      "delayMs": 90,
+      "facts": [
+        {
+          "type": "prose_delta",
+          "segmentId": "grounded-r2",
+          "delta": "about 965,600 km "
+        }
+      ]
+    },
+    {
+      "frameKey": "grounded:r2-14",
+      "providerMessageKey": "readme-showcase:msg-2",
+      "delayMs": 90,
+      "facts": [
+        {
+          "type": "prose_delta",
+          "segmentId": "grounded-r2",
+          "delta": "apart, which is "
+        }
+      ]
+    },
+    {
+      "frameKey": "grounded:r2-15",
+      "providerMessageKey": "readme-showcase:msg-2",
+      "delayMs": 90,
+      "facts": [
+        {
+          "type": "prose_delta",
+          "segmentId": "grounded-r2",
+          "delta": "why probes cross "
+        }
+      ]
+    },
+    {
+      "frameKey": "grounded:r2-16",
+      "providerMessageKey": "readme-showcase:msg-2",
+      "delayMs": 90,
+      "facts": [
+        {
+          "type": "prose_delta",
+          "segmentId": "grounded-r2",
+          "delta": "it with hit "
+        }
+      ]
+    },
+    {
+      "frameKey": "grounded:r2-17",
+      "providerMessageKey": "readme-showcase:msg-2",
+      "delayMs": 90,
+      "facts": [
+        {
+          "type": "prose_delta",
+          "segmentId": "grounded-r2",
+          "delta": "odds under one "
+        }
+      ]
+    },
+    {
+      "frameKey": "grounded:r2-18",
+      "providerMessageKey": "readme-showcase:msg-2",
+      "delayMs": 90,
+      "facts": [
+        {
+          "type": "prose_delta",
+          "segmentId": "grounded-r2",
+          "delta": "in a billion. "
+        }
+      ]
+    },
+    {
+      "frameKey": "grounded:r2-19",
+      "providerMessageKey": "readme-showcase:msg-2",
+      "delayMs": 90,
+      "facts": [
+        {
+          "type": "prose_delta",
+          "segmentId": "grounded-r2",
+          "delta": "Threading a rock "
+        }
+      ]
+    },
+    {
+      "frameKey": "grounded:r2-20",
+      "providerMessageKey": "readme-showcase:msg-2",
+      "delayMs": 90,
+      "facts": [
+        {
+          "type": "prose_delta",
+          "segmentId": "grounded-r2",
+          "delta": "field is the "
+        }
+      ]
+    },
+    {
+      "frameKey": "grounded:r2-21",
+      "providerMessageKey": "readme-showcase:msg-2",
+      "delayMs": 90,
+      "facts": [
+        {
+          "type": "prose_delta",
+          "segmentId": "grounded-r2",
+          "delta": "film version.\n\nThe "
+        }
+      ]
+    },
+    {
+      "frameKey": "grounded:r2-22",
+      "providerMessageKey": "readme-showcase:msg-2",
+      "delayMs": 90,
+      "facts": [
+        {
+          "type": "prose_delta",
+          "segmentId": "grounded-r2",
+          "delta": "rings are the "
+        }
+      ]
+    },
+    {
+      "frameKey": "grounded:r2-23",
+      "providerMessageKey": "readme-showcase:msg-2",
+      "delayMs": 90,
+      "facts": [
+        {
+          "type": "prose_delta",
+          "segmentId": "grounded-r2",
+          "delta": "opposite: a sheet "
+        }
+      ]
+    },
+    {
+      "frameKey": "grounded:r2-24",
+      "providerMessageKey": "readme-showcase:msg-2",
+      "delayMs": 90,
+      "facts": [
+        {
+          "type": "prose_delta",
+          "segmentId": "grounded-r2",
+          "delta": "as thin as "
+        }
+      ]
+    },
+    {
+      "frameKey": "grounded:r2-25",
+      "providerMessageKey": "readme-showcase:msg-2",
+      "delayMs": 90,
+      "facts": [
+        {
+          "type": "prose_delta",
+          "segmentId": "grounded-r2",
+          "delta": "10 m, 99.9% "
+        }
+      ]
+    },
+    {
+      "frameKey": "grounded:r2-26",
+      "providerMessageKey": "readme-showcase:msg-2",
+      "delayMs": 90,
+      "facts": [
+        {
+          "type": "prose_delta",
+          "segmentId": "grounded-r2",
+          "delta": "water ice, particles "
+        }
+      ]
+    },
+    {
+      "frameKey": "grounded:r2-27",
+      "providerMessageKey": "readme-showcase:msg-2",
+      "delayMs": 90,
+      "facts": [
+        {
+          "type": "prose_delta",
+          "segmentId": "grounded-r2",
+          "delta": "from dust to "
+        }
+      ]
+    },
+    {
+      "frameKey": "grounded:r2-28",
+      "providerMessageKey": "readme-showcase:msg-2",
+      "delayMs": 90,
+      "facts": [
+        {
+          "type": "prose_delta",
+          "segmentId": "grounded-r2",
+          "delta": "10 m across. "
+        }
+      ]
+    },
+    {
+      "frameKey": "grounded:r2-29",
+      "providerMessageKey": "readme-showcase:msg-2",
+      "delayMs": 90,
+      "facts": [
+        {
+          "type": "prose_delta",
+          "segmentId": "grounded-r2",
+          "delta": "If you want "
+        }
+      ]
+    },
+    {
+      "frameKey": "grounded:r2-30",
+      "providerMessageKey": "readme-showcase:msg-2",
+      "delayMs": 90,
+      "facts": [
+        {
+          "type": "prose_delta",
+          "segmentId": "grounded-r2",
+          "delta": "a dodging scene, "
+        }
+      ]
+    },
+    {
+      "frameKey": "grounded:r2-31",
+      "providerMessageKey": "readme-showcase:msg-2",
+      "delayMs": 90,
+      "facts": [
+        {
+          "type": "prose_delta",
+          "segmentId": "grounded-r2",
+          "delta": "it belongs at "
+        }
+      ]
+    },
+    {
+      "frameKey": "grounded:r2-32",
+      "providerMessageKey": "readme-showcase:msg-2",
+      "delayMs": 90,
+      "facts": [
+        {
+          "type": "prose_delta",
+          "segmentId": "grounded-r2",
+          "delta": "Saturn, where your "
+        }
+      ]
+    },
+    {
+      "frameKey": "grounded:r2-33",
+      "providerMessageKey": "readme-showcase:msg-2",
+      "delayMs": 90,
+      "facts": [
+        {
+          "type": "prose_delta",
+          "segmentId": "grounded-r2",
+          "delta": "story is."
+        }
+      ]
+    },
+    {
+      "frameKey": "grounded:r2-34",
+      "providerMessageKey": "readme-showcase:msg-2",
+      "delayMs": 0,
+      "facts": [
+        {
+          "type": "segment_end",
+          "segmentId": "grounded-r2"
+        },
+        {
+          "type": "turn_end",
+          "status": "completed"
+        }
+      ]
+    }
+  ]
+}

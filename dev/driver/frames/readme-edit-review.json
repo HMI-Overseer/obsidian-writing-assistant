@@ -1,0 +1,285 @@
+{
+  "description": "An edit to the open chapter, stopped at the ask gate, then prose once it is applied.",
+  "completionText": "",
+  "_comment": [
+    "Round one is paced at 400ms a frame for the reason vault-write.json records: the composer's",
+    "draft-save debounce and the write-ahead audit race on the same conversation file, and a",
+    "tool call that lands too soon after send is refused as unreviewed. The defect is the",
+    "plugin's; this is a declared delay, not a workaround hidden in the driver.",
+    "",
+    "The search text is the first paragraph of Story/Chapters/01 Outbound.md in the",
+    "readme-showcase fixture, character for character. Change one and the other must follow."
+  ],
+  "frames": [
+    {
+      "frameKey": "edit:r1-01",
+      "providerMessageKey": "readme-showcase:msg-1",
+      "delayMs": 700,
+      "facts": [
+        {
+          "type": "segment_start",
+          "segmentId": "edit-r1"
+        }
+      ]
+    },
+    {
+      "frameKey": "edit:r1-02",
+      "providerMessageKey": "readme-showcase:msg-1",
+      "delayMs": 400,
+      "facts": [
+        {
+          "type": "prose_delta",
+          "segmentId": "edit-r1",
+          "delta": "Same paragraph and "
+        }
+      ]
+    },
+    {
+      "frameKey": "edit:r1-03",
+      "providerMessageKey": "readme-showcase:msg-1",
+      "delayMs": 400,
+      "facts": [
+        {
+          "type": "prose_delta",
+          "segmentId": "edit-r1",
+          "delta": "the same boredom, "
+        }
+      ]
+    },
+    {
+      "frameKey": "edit:r1-04",
+      "providerMessageKey": "readme-showcase:msg-1",
+      "delayMs": 400,
+      "facts": [
+        {
+          "type": "prose_delta",
+          "segmentId": "edit-r1",
+          "delta": "but the danger "
+        }
+      ]
+    },
+    {
+      "frameKey": "edit:r1-05",
+      "providerMessageKey": "readme-showcase:msg-1",
+      "delayMs": 400,
+      "facts": [
+        {
+          "type": "prose_delta",
+          "segmentId": "edit-r1",
+          "delta": "is gone and "
+        }
+      ]
+    },
+    {
+      "frameKey": "edit:r1-06",
+      "providerMessageKey": "readme-showcase:msg-1",
+      "delayMs": 400,
+      "facts": [
+        {
+          "type": "prose_delta",
+          "segmentId": "edit-r1",
+          "delta": "the emptiness does "
+        }
+      ]
+    },
+    {
+      "frameKey": "edit:r1-07",
+      "providerMessageKey": "readme-showcase:msg-1",
+      "delayMs": 400,
+      "facts": [
+        {
+          "type": "prose_delta",
+          "segmentId": "edit-r1",
+          "delta": "the work instead.\n\n"
+        }
+      ]
+    },
+    {
+      "frameKey": "edit:r1-08",
+      "providerMessageKey": "readme-showcase:msg-1",
+      "delayMs": 400,
+      "facts": [
+        {
+          "type": "tool_call_start",
+          "segmentId": "edit-r1",
+          "declarationKey": "edit-r1-decl-1",
+          "toolName": "edit"
+        }
+      ]
+    },
+    {
+      "frameKey": "edit:r1-09",
+      "providerMessageKey": "readme-showcase:msg-1",
+      "delayMs": 400,
+      "facts": [
+        {
+          "type": "tool_call_delta",
+          "declarationKey": "edit-r1-decl-1",
+          "argumentsDelta": "{\"path\":\"Story/Chapters/01 Outbound.md\",\"search\":\"The hauler cleared Ceres on the third day and Ines set the board to quiet, because the belt was where the run got dangerous. For two weeks she would be threading a field of tumbling rock, some of it the size of the ship and most of it too small to see until it was close enough to matter, and every one of the eleven runs before this one had cost her a coat of paint or a night's sleep.\",\"replace\":\"The hauler cleared Ceres on the third day and Ines set the board to quiet, because the belt was where the run got boring. Two weeks of nothing: the nearest rock most days was a million kilometres off, the ship would sooner win a lottery than hit one, and every one of the eleven runs before this one had cost her nothing but sleep.\",\"explanation\":\"Replace the rock-field crossing with the empty belt the research notes describe, keeping Ines's boredom.\"}"
+        }
+      ]
+    },
+    {
+      "frameKey": "edit:r1-10",
+      "providerMessageKey": "readme-showcase:msg-1",
+      "delayMs": 400,
+      "facts": [
+        {
+          "type": "tool_call_identity",
+          "declarationKey": "edit-r1-decl-1",
+          "toolCallId": "readme-edit-1-1",
+          "correlation": "provider_id"
+        }
+      ]
+    },
+    {
+      "frameKey": "edit:r1-11",
+      "providerMessageKey": "readme-showcase:msg-1",
+      "delayMs": 0,
+      "facts": [
+        {
+          "type": "segment_end",
+          "segmentId": "edit-r1"
+        },
+        {
+          "type": "turn_end",
+          "status": "completed"
+        }
+      ]
+    },
+    {
+      "frameKey": "edit:r2-01",
+      "providerMessageKey": "readme-showcase:msg-2",
+      "delayMs": 600,
+      "facts": [
+        {
+          "type": "segment_start",
+          "segmentId": "edit-r2"
+        }
+      ]
+    },
+    {
+      "frameKey": "edit:r2-02",
+      "providerMessageKey": "readme-showcase:msg-2",
+      "delayMs": 40,
+      "facts": [
+        {
+          "type": "prose_delta",
+          "segmentId": "edit-r2",
+          "delta": "Applied. The belt "
+        }
+      ]
+    },
+    {
+      "frameKey": "edit:r2-03",
+      "providerMessageKey": "readme-showcase:msg-2",
+      "delayMs": 40,
+      "facts": [
+        {
+          "type": "prose_delta",
+          "segmentId": "edit-r2",
+          "delta": "is empty on "
+        }
+      ]
+    },
+    {
+      "frameKey": "edit:r2-04",
+      "providerMessageKey": "readme-showcase:msg-2",
+      "delayMs": 40,
+      "facts": [
+        {
+          "type": "prose_delta",
+          "segmentId": "edit-r2",
+          "delta": "the page now, "
+        }
+      ]
+    },
+    {
+      "frameKey": "edit:r2-05",
+      "providerMessageKey": "readme-showcase:msg-2",
+      "delayMs": 40,
+      "facts": [
+        {
+          "type": "prose_delta",
+          "segmentId": "edit-r2",
+          "delta": "and the fear "
+        }
+      ]
+    },
+    {
+      "frameKey": "edit:r2-06",
+      "providerMessageKey": "readme-showcase:msg-2",
+      "delayMs": 40,
+      "facts": [
+        {
+          "type": "prose_delta",
+          "segmentId": "edit-r2",
+          "delta": "she keeps for "
+        }
+      ]
+    },
+    {
+      "frameKey": "edit:r2-07",
+      "providerMessageKey": "readme-showcase:msg-2",
+      "delayMs": 40,
+      "facts": [
+        {
+          "type": "prose_delta",
+          "segmentId": "edit-r2",
+          "delta": "the rings has "
+        }
+      ]
+    },
+    {
+      "frameKey": "edit:r2-08",
+      "providerMessageKey": "readme-showcase:msg-2",
+      "delayMs": 40,
+      "facts": [
+        {
+          "type": "prose_delta",
+          "segmentId": "edit-r2",
+          "delta": "somewhere to land "
+        }
+      ]
+    },
+    {
+      "frameKey": "edit:r2-09",
+      "providerMessageKey": "readme-showcase:msg-2",
+      "delayMs": 40,
+      "facts": [
+        {
+          "type": "prose_delta",
+          "segmentId": "edit-r2",
+          "delta": "in the next "
+        }
+      ]
+    },
+    {
+      "frameKey": "edit:r2-10",
+      "providerMessageKey": "readme-showcase:msg-2",
+      "delayMs": 40,
+      "facts": [
+        {
+          "type": "prose_delta",
+          "segmentId": "edit-r2",
+          "delta": "paragraph."
+        }
+      ]
+    },
+    {
+      "frameKey": "edit:r2-11",
+      "providerMessageKey": "readme-showcase:msg-2",
+      "delayMs": 0,
+      "facts": [
+        {
+          "type": "segment_end",
+          "segmentId": "edit-r2"
+        },
+        {
+          "type": "turn_end",
+          "status": "completed"
+        }
+      ]
+    }
+  ]
+}

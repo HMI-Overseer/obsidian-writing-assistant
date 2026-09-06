@@ -1,0 +1,245 @@
+{
+  "description": "A synthesis note the ask gate stops on, then prose once it exists.",
+  "completionText": "",
+  "_comment": [
+    "Round one is paced at 400ms a frame for the reason vault-write.json records.",
+    "",
+    "Every line of the note traces to a figure in the fixture's Research notes."
+  ],
+  "frames": [
+    {
+      "frameKey": "note:r1-01",
+      "providerMessageKey": "readme-showcase:msg-1",
+      "delayMs": 700,
+      "facts": [
+        {
+          "type": "segment_start",
+          "segmentId": "note-r1"
+        }
+      ]
+    },
+    {
+      "frameKey": "note:r1-02",
+      "providerMessageKey": "readme-showcase:msg-1",
+      "delayMs": 400,
+      "facts": [
+        {
+          "type": "prose_delta",
+          "segmentId": "note-r1",
+          "delta": "From the two "
+        }
+      ]
+    },
+    {
+      "frameKey": "note:r1-03",
+      "providerMessageKey": "readme-showcase:msg-1",
+      "delayMs": 400,
+      "facts": [
+        {
+          "type": "prose_delta",
+          "segmentId": "note-r1",
+          "delta": "notes I read "
+        }
+      ]
+    },
+    {
+      "frameKey": "note:r1-04",
+      "providerMessageKey": "readme-showcase:msg-1",
+      "delayMs": 400,
+      "facts": [
+        {
+          "type": "prose_delta",
+          "segmentId": "note-r1",
+          "delta": "earlier, kept to "
+        }
+      ]
+    },
+    {
+      "frameKey": "note:r1-05",
+      "providerMessageKey": "readme-showcase:msg-1",
+      "delayMs": 400,
+      "facts": [
+        {
+          "type": "prose_delta",
+          "segmentId": "note-r1",
+          "delta": "what the station "
+        }
+      ]
+    },
+    {
+      "frameKey": "note:r1-06",
+      "providerMessageKey": "readme-showcase:msg-1",
+      "delayMs": 400,
+      "facts": [
+        {
+          "type": "prose_delta",
+          "segmentId": "note-r1",
+          "delta": "scenes will touch.\n\n"
+        }
+      ]
+    },
+    {
+      "frameKey": "note:r1-07",
+      "providerMessageKey": "readme-showcase:msg-1",
+      "delayMs": 400,
+      "facts": [
+        {
+          "type": "tool_call_start",
+          "segmentId": "note-r1",
+          "declarationKey": "note-r1-decl-1",
+          "toolName": "write_file"
+        }
+      ]
+    },
+    {
+      "frameKey": "note:r1-08",
+      "providerMessageKey": "readme-showcase:msg-1",
+      "delayMs": 400,
+      "facts": [
+        {
+          "type": "tool_call_delta",
+          "declarationKey": "note-r1-decl-1",
+          "argumentsDelta": "{\"path\":\"Research/Ring facts the scenes must respect.md\",\"content\":\"---\\ntype: synthesis\\nsources:\\n  - \\\"[[Rings of Saturn]]\\\"\\n  - \\\"[[Asteroid belt]]\\\"\\n---\\n\\n# Ring facts the scenes must respect\\n\\n- The station sits in the Keeler Gap at the outer edge of the A ring, where Daphnis orbits and keeps the gap open.\\n- The ring is a sheet, not a cloud: 10 m thick where the station works, up to 1 km elsewhere. From fifty metres up it is a floor.\\n- 99.9% water ice, particles from dust to 10 m. There is nothing to harvest but water.\\n- The Cassini Division is 4,800 km of near-empty space between the B and A rings, kept clear by Mimas. A place to lose a ship.\\n- Spokes in the B ring turn with the planet, not with the ring. Let a character see one and not explain it.\\n- Ring rain: 4,800 to 44,000 kg/s falling into Saturn. The rings could be gone in 300 million years. Nobody on the station will see it, and everyone knows.\\n\"}"
+        }
+      ]
+    },
+    {
+      "frameKey": "note:r1-09",
+      "providerMessageKey": "readme-showcase:msg-1",
+      "delayMs": 400,
+      "facts": [
+        {
+          "type": "tool_call_identity",
+          "declarationKey": "note-r1-decl-1",
+          "toolCallId": "readme-note-1-1",
+          "correlation": "provider_id"
+        }
+      ]
+    },
+    {
+      "frameKey": "note:r1-10",
+      "providerMessageKey": "readme-showcase:msg-1",
+      "delayMs": 0,
+      "facts": [
+        {
+          "type": "segment_end",
+          "segmentId": "note-r1"
+        },
+        {
+          "type": "turn_end",
+          "status": "completed"
+        }
+      ]
+    },
+    {
+      "frameKey": "note:r2-01",
+      "providerMessageKey": "readme-showcase:msg-2",
+      "delayMs": 600,
+      "facts": [
+        {
+          "type": "segment_start",
+          "segmentId": "note-r2"
+        }
+      ]
+    },
+    {
+      "frameKey": "note:r2-02",
+      "providerMessageKey": "readme-showcase:msg-2",
+      "delayMs": 40,
+      "facts": [
+        {
+          "type": "prose_delta",
+          "segmentId": "note-r2",
+          "delta": "Created. Every line "
+        }
+      ]
+    },
+    {
+      "frameKey": "note:r2-03",
+      "providerMessageKey": "readme-showcase:msg-2",
+      "delayMs": 40,
+      "facts": [
+        {
+          "type": "prose_delta",
+          "segmentId": "note-r2",
+          "delta": "traces to a "
+        }
+      ]
+    },
+    {
+      "frameKey": "note:r2-04",
+      "providerMessageKey": "readme-showcase:msg-2",
+      "delayMs": 40,
+      "facts": [
+        {
+          "type": "prose_delta",
+          "segmentId": "note-r2",
+          "delta": "research note, so "
+        }
+      ]
+    },
+    {
+      "frameKey": "note:r2-05",
+      "providerMessageKey": "readme-showcase:msg-2",
+      "delayMs": 40,
+      "facts": [
+        {
+          "type": "prose_delta",
+          "segmentId": "note-r2",
+          "delta": "when a fact "
+        }
+      ]
+    },
+    {
+      "frameKey": "note:r2-06",
+      "providerMessageKey": "readme-showcase:msg-2",
+      "delayMs": 40,
+      "facts": [
+        {
+          "type": "prose_delta",
+          "segmentId": "note-r2",
+          "delta": "changes, change it "
+        }
+      ]
+    },
+    {
+      "frameKey": "note:r2-07",
+      "providerMessageKey": "readme-showcase:msg-2",
+      "delayMs": 40,
+      "facts": [
+        {
+          "type": "prose_delta",
+          "segmentId": "note-r2",
+          "delta": "there first and "
+        }
+      ]
+    },
+    {
+      "frameKey": "note:r2-08",
+      "providerMessageKey": "readme-showcase:msg-2",
+      "delayMs": 40,
+      "facts": [
+        {
+          "type": "prose_delta",
+          "segmentId": "note-r2",
+          "delta": "this note second."
+        }
+      ]
+    },
+    {
+      "frameKey": "note:r2-09",
+      "providerMessageKey": "readme-showcase:msg-2",
+      "delayMs": 0,
+      "facts": [
+        {
+          "type": "segment_end",
+          "segmentId": "note-r2"
+        },
+        {
+          "type": "turn_end",
+          "status": "completed"
+        }
+      ]
+    }
+  ]
+}

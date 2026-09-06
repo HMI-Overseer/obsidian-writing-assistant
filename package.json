@@ -20,7 +20,8 @@
     "visual": "node dev/visual/run.mjs",
     "drive": "node dev/driver/run.mjs",
     "update-pricing": "node scripts/update-pricing.mjs",
-    "version": "node version-bump.mjs && node scripts/update-pricing.mjs && git add manifest.json versions.json src/api/pricingData.json src/providers/catalogData.json"
+    "version": "node version-bump.mjs && node scripts/update-pricing.mjs && git add manifest.json versions.json src/api/pricingData.json src/providers/catalogData.json",
+    "readme:assets": "node dev/readme/assemble.mjs"
   },
   "keywords": [],
   "author": "Resolve-public",
@@ -38,8 +39,11 @@
     "esbuild": "^0.21.0",
     "eslint": "^9.39.0",
     "eslint-plugin-obsidianmd": "^0.4.1",
+    "gifenc": "1.0.3",
+    "image-q": "4.0.0",
     "obsidian": "1.13.1",
     "playwright": "^1.61.1",
+    "pngjs": "7.0.0",
     "postcss": "8.4.49",
     "postcss-cli": "11.0.0",
     "stylelint": "^17.14.0",

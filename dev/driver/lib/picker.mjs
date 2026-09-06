@@ -280,18 +280,30 @@ function pipedTerminal({ input, output, onAbort }) {
   const closed = new Promise((settle) => rl.once("close", () => settle(null)));
   let hook = onAbort;
 
+  // Lines are held until a question asks for one, which is the opposite of the interactive rule
+  // and deliberately so: a pipe's whole content is answers, and a pipe delivers them in one chunk,
+  // so the second and third arrive while the driver is still printing the menu the first one
+  // chose. `rl.question` hears only the next line and lets earlier ones go, which read as the
+  // terminal closing at the scenario question. Measured 2026-09-06 by piping three answers, one
+  // per line, and losing the second.
+  const held = [];
+  const asking = [];
+  rl.on("line", (line) => {
+    const settle = asking.shift();
+    if (settle) settle(line);
+    else held.push(line);
+  });
+  const nextLine = (prompt) => {
+    output.write(prompt);
+    if (held.length > 0) return Promise.resolve(held.shift());
+    return new Promise((settle) => asking.push(settle));
+  };
+
   const answer = async (prompt) => {
-    let value;
-    try {
-      value = await Promise.race([rl.question(prompt), closed]);
-    } catch (error) {
-      // Closing *during* a question resolves the race; asking after it has already closed throws
-      // instead. Both mean the same thing to the caller and should read the same way.
-      if (error?.code === "ERR_USE_AFTER_CLOSE") {
-        throw new TerminalClosed("The terminal closed before the driver had an answer.");
-      }
-      throw error;
-    }
+    // A held line wins the race against a stdin that has already ended, because both promises are
+    // settled and the line is listed first; a pipe that ends after delivering every answer is the
+    // normal case, not a closed terminal.
+    const value = await Promise.race([nextLine(prompt), closed]);
     if (value === null) {
       if (hook) hook();
       throw new TerminalClosed("The terminal closed before the driver had an answer.");

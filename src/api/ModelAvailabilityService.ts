@@ -23,6 +23,29 @@ export interface ModelAvailabilityInfo {
   reasoning?: ReasoningCapability;
 }
 
+/** The one lookup {@link resolveVisionSupport} needs, so callers can pass a stub. */
+export type VisionCapabilityLookup = Pick<ModelAvailabilityService, "getVision">;
+
+/**
+ * The model's vision capability as a tri-state: `true` known to see, `false` known
+ * not to, `undefined` never established. The catalog flag wins, discovery answers
+ * for models that have none (LM Studio), and neither answering leaves the question
+ * genuinely open.
+ *
+ * It deliberately does NOT apply a default. The two conventions in the tree are both
+ * deliberate: every gate that decides whether bytes are *sent* reads `undefined` as
+ * allow-the-attempt, because a never-probed local model would otherwise refuse a
+ * legitimate image, while the two capability *indicators* fail closed rather than
+ * promise a capability nobody has checked. One resolver, five call sites, each
+ * keeping its own `??` (RFC-0021 M1, P2).
+ */
+export function resolveVisionSupport(
+  model: CompletionModel,
+  availability: VisionCapabilityLookup,
+): boolean | undefined {
+  return model.vision ?? availability.getVision(model.modelId);
+}
+
 export class ModelAvailabilityService {
   private availabilityMap = new Map<string, ModelAvailabilityInfo>();
   /**

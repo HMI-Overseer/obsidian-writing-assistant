@@ -2,6 +2,7 @@ import { type App, setIcon } from "obsidian";
 import type {
   AssistantTurnRecord,
   ToolActionLedgerEntry,
+  ToolResultImageRecord,
 } from "../../shared/types";
 import type {
   AssistantTurnSnapshot,
@@ -16,6 +17,7 @@ import {
   type AssistantTurnItemHost,
 } from "./AssistantTurnItemHostRegistry";
 import { AssistantTurnRenderSequencer } from "./AssistantTurnRenderSequencer";
+import { ImagePreviewModal } from "./ImagePreviewModal";
 import {
   buildAssistantTurnRenderModel,
   buildLegacyAssistantRenderModel,
@@ -668,6 +670,9 @@ export class AssistantTurnView {
         item.toolArguments,
       );
     }
+    if (item.resultImages?.length) {
+      this.renderToolImages(diagnosticsEl, item.resultImages);
+    }
     if (item.resultRecord) {
       this.renderDiagnosticEntry(
         diagnosticsEl,
@@ -680,6 +685,51 @@ export class AssistantTurnView {
         "Result",
         item.resultDigest,
       );
+    }
+  }
+
+  /**
+   * The pictures a `read` step returned, as thumbnails on the step itself rather than a
+   * panel of their own (RFC-0021 D9, ADR-0041).
+   *
+   * The record holds no bytes, so each thumb is loaded live from the vault by path. That
+   * is the point: an image deleted or renamed since the read shows as missing, naming the
+   * path, instead of showing a stale copy the vault no longer has. The thumb and lightbox
+   * classes are the transcript's, unchanged, so an image looks the same wherever it
+   * appears.
+   */
+  private renderToolImages(
+    diagnosticsEl: HTMLElement,
+    images: ToolResultImageRecord[],
+  ): void {
+    const rowEl = diagnosticsEl.createDiv({
+      cls: "lmsa-agentic-timeline-images",
+    });
+    for (const image of images) {
+      const file = this.app.vault.getFileByPath(image.path);
+      if (!file) {
+        const chipEl = rowEl.createDiv({
+          cls: "lmsa-agentic-timeline-image-missing",
+        });
+        setIcon(
+          chipEl.createSpan({ cls: "lmsa-agentic-timeline-image-missing-icon" }),
+          "image-off",
+        );
+        chipEl.createSpan({ text: `${image.path} (no longer in the vault)` });
+        continue;
+      }
+      const src = this.app.vault.getResourcePath(file);
+      const thumbEl = rowEl.createEl("button", {
+        cls: "lmsa-chat-window-attachment-thumb",
+        attr: { type: "button", "aria-label": `Open ${image.path}` },
+      });
+      thumbEl.createEl("img", {
+        cls: "lmsa-chat-window-attachment-img",
+        attr: { src, alt: image.path },
+      });
+      thumbEl.addEventListener("click", () => {
+        new ImagePreviewModal(this.app, src, image.path).open();
+      });
     }
   }
 

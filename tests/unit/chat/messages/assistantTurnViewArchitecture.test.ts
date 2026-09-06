@@ -194,6 +194,30 @@ describe("AssistantTurnView architecture", () => {
   });
 
   /**
+   * The step shows the picture it read, reloaded live from the vault (RFC-0021 D9), so a
+   * conversation reopened after the file moved shows it missing rather than stale. This
+   * suite reads source, so it holds the wiring: the record must never be the image
+   * source, and the thumb chrome must be the transcript's, not a second one.
+   */
+  it("loads step thumbnails from the vault by path, reusing the transcript thumb", () => {
+    const view = source("src/chat/messages/AssistantTurnView.ts");
+    const styles = source("src/chat/messages/AssistantTurnView.css");
+
+    expect(view).toContain("item.resultImages");
+    expect(view).toContain("this.app.vault.getFileByPath(image.path)");
+    expect(view).toContain("this.app.vault.getResourcePath(file)");
+    expect(view).toContain("ImagePreviewModal");
+    expect(view).toContain("lmsa-chat-window-attachment-thumb");
+    expect(view).toContain("lmsa-agentic-timeline-image-missing");
+    // The record carries no bytes, so nothing here may build a data URI from it.
+    expect(view).not.toContain("data:image/");
+    expect(view).not.toContain("image.data");
+    // The row is laid out here; the thumb itself keeps the transcript's chrome.
+    expect(styles).toContain(".lmsa-agentic-timeline-images");
+    expect(styles).not.toContain(".lmsa-chat-window-attachment-thumb {");
+  });
+
+  /**
    * The diff is the record. The live review's own cards die with the generation that
    * mounted them, so every family, edits included, is rendered from the ledger
    * afterwards: no family may be filtered back out of the coordinator, and the

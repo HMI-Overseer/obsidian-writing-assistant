@@ -4,15 +4,13 @@
  * No Obsidian, no disk, so they are unit-testable.
  */
 
+import { formatByteCount } from "../utils";
 import type { VaultOperation } from "./types";
 import type { Gate } from "./gateway";
 
 /** Human-readable byte size of a string's UTF-8 encoding (e.g. "1.2 KB"). */
 export function formatBytes(content: string): string {
-  const bytes = new TextEncoder().encode(content).length;
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  return formatByteCount(new TextEncoder().encode(content).length);
 }
 
 /** Plural-aware "N note(s)" for a replace's target count. */

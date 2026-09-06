@@ -1,6 +1,7 @@
 import type { SamplingParams, AnthropicCacheSettings } from "../shared/types";
 import type { ChatRequest, NoteImageContextItem } from "../shared/chatRequest";
 import type { AnthropicToolEntry } from "../tools/formatters/anthropic";
+import type { ToolResultImage } from "../tools/types";
 import { formatRagContext } from "../rag/formatContext";
 import {
   formatAdditionalContextItem,
@@ -149,7 +150,14 @@ export type AnthropicContentBlock =
   | {
       type: "tool_result";
       tool_use_id: string;
-      content: string;
+      /**
+       * A plain string for a text-only result, or the nested block list Anthropic
+       * accepts when the result carries an image (RFC-0021 D5, ADR-0041): the stub
+       * as one `text` block, then one `image` block per picture. A result without
+       * images still emits the string, so a turn that read no image is byte-identical
+       * to what this builder sent before the field existed.
+       */
+      content: string | Array<AnthropicToolResultBlock>;
       is_error?: boolean;
       cache_control?: AnthropicCacheControl;
     }
@@ -160,6 +168,16 @@ export type AnthropicContentBlock =
   // the API requires unmodified).
   | { type: "thinking"; thinking: string; signature: string; cache_control?: AnthropicCacheControl }
   | { type: "redacted_thinking"; data: string; cache_control?: AnthropicCacheControl };
+
+/**
+ * The block types Anthropic admits *inside* a `tool_result`. A nested block never
+ * carries `cache_control`: the breakpoint placer marks a message's last top-level
+ * block, which on a tool round is the enclosing `tool_result` itself, so the image
+ * is inside a cached block and never a breakpoint target of its own (RFC-0021 M10).
+ */
+export type AnthropicToolResultBlock =
+  | { type: "text"; text: string }
+  | { type: "image"; source: { type: "base64"; media_type: string; data: string } };
 
 export interface AnthropicMessage {
   // `system` is the mid-conversation operator channel: a {role:"system"} message
@@ -244,7 +262,9 @@ export function buildAnthropicMessages(
       const block: AnthropicContentBlock = {
         type: "tool_result",
         tool_use_id: turn.toolCallId ?? "",
-        content: turn.content ?? "",
+        content: turn.toolResultImages?.length
+          ? toolResultBlocks(turn.content ?? "", turn.toolResultImages)
+          : turn.content ?? "",
         ...(turn.toolResultIsError ? { is_error: true } : {}),
       };
       const prev = messages[messages.length - 1];
@@ -463,6 +483,27 @@ function appendTextToUserMessage(message: AnthropicMessage, text: string): void 
   } else if (Array.isArray(message.content)) {
     message.content.push({ type: "text", text });
   }
+}
+
+/**
+ * The nested `text` then `image` list for a tool result that carries pictures
+ * (RFC-0021 D5). The stub goes first because it is the text that explains what the
+ * images are, and Anthropic reads a nested list in order; the image source is the
+ * same `base64` shape the user-turn emitter already sends, so there is one image
+ * encoding on this wire format, not two.
+ */
+function toolResultBlocks(
+  stub: string,
+  images: ToolResultImage[],
+): AnthropicToolResultBlock[] {
+  const blocks: AnthropicToolResultBlock[] = [{ type: "text", text: stub }];
+  for (const image of images) {
+    blocks.push({
+      type: "image",
+      source: { type: "base64", media_type: image.mimeType, data: image.data },
+    });
+  }
+  return blocks;
 }
 
 function appendNoteImageContextToUserMessage(

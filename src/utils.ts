@@ -17,6 +17,37 @@ export function assertNever(value: never): never {
   throw new Error(`Unhandled union member: ${JSON.stringify(value)}`);
 }
 
+/**
+ * Human-readable byte size (e.g. `2.0 KB`, `1.2 MB`). Takes a count, so a caller
+ * that already knows the size in bytes does not have to materialise a string to
+ * be measured; {@link ./vault-ops/summary.formatBytes} wraps it for the callers
+ * that do, so both surfaces round identically.
+ */
+export function formatByteCount(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+/**
+ * Base64 for a binary buffer, with no data-URI prefix (the
+ * {@link ./shared/types.ImageAttachment} convention). Chunked because
+ * `String.fromCharCode` is applied to the byte array and a single spread of a
+ * multi-megabyte image overflows the call stack.
+ *
+ * Lifted out of `noteImageContext` when the `read` image pathway became its
+ * second consumer (RFC-0021 P11).
+ */
+export function arrayBufferToBase64(buffer: ArrayBuffer): string {
+  const bytes = new Uint8Array(buffer);
+  const chunkSize = 0x8000;
+  const chunks: string[] = [];
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    chunks.push(String.fromCharCode(...bytes.subarray(i, i + chunkSize)));
+  }
+  return btoa(chunks.join(""));
+}
+
 function resolveModel<T extends { id: string }>(
   models: T[],
   id: string,

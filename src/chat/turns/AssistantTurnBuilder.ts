@@ -20,6 +20,7 @@ import type {
   ProviderItemPlacement,
   ProviderQuiescence,
   ProviderReplayCapsule,
+  ToolResultImageRecord,
 } from "../../shared/types";
 import { generateId } from "../../utils";
 import { validateAssistantTurn } from "./assistantTurnValidation";
@@ -67,6 +68,7 @@ export interface AssistantToolLifecycleUpdate {
   toolInput?: string;
   resultRecord?: string;
   resultDigest?: string;
+  resultImages?: ToolResultImageRecord[];
   isError?: boolean;
   errorContent?: string;
   actionRef?: string;
@@ -1187,6 +1189,14 @@ export class AssistantTurnBuilder {
       update.resultDigest,
       `Tool "${tool.id}" result digest`,
     );
+    // Compared by value, like ask guidance: a step's image list is set once, by whichever
+    // choke point recorded the result, so a second and different value is the same defect
+    // the result record guards against (RFC-0021).
+    tool.resultImages = mergeValueField(
+      tool.resultImages,
+      update.resultImages,
+      `Tool "${tool.id}" result images`,
+    );
     tool.isError = mergeScalarField(
       tool.isError,
       update.isError,
@@ -1234,6 +1244,7 @@ export class AssistantTurnBuilder {
     mergeUpdateField(merged, update, "toolInput");
     mergeUpdateField(merged, update, "resultRecord");
     mergeUpdateField(merged, update, "resultDigest");
+    mergeUpdateField(merged, update, "resultImages");
     mergeUpdateField(merged, update, "isError");
     mergeUpdateField(merged, update, "errorContent");
     mergeUpdateField(merged, update, "actionRef");
@@ -1547,6 +1558,9 @@ export class AssistantTurnBuilder {
       ...(item.resultDigest === undefined
         ? {}
         : { resultDigest: item.resultDigest }),
+      ...(item.resultImages === undefined
+        ? {}
+        : { resultImages: cloneValue(item.resultImages) }),
       ...(item.isError === undefined ? {} : { isError: item.isError }),
       ...(item.errorContent === undefined
         ? {}

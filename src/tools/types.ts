@@ -1,3 +1,4 @@
+import type { ImageMimeType } from "../shared/types";
 import type { VaultOpDisposition } from "../vault-ops/disposition";
 
 /** JSON Schema subset for tool parameter definitions. */
@@ -120,10 +121,40 @@ export interface ToolFailure {
   recovery?: string;
 }
 
+/**
+ * One image a tool returns for the model to look at (RFC-0021, {@link ../../docs/03-decisions/ADR-0041-read-returns-vault-images-to-vision-models.md ADR-0041}).
+ *
+ * Field names follow the {@link ../shared/types.ImageAttachment} convention, bare
+ * base64 under `mimeType`, so the three carriage emitters each map from one shape
+ * and none reads another's: Anthropic nests a `source.base64` image block, the
+ * OpenAI wire format sends an `image_url` data URI on a synthesized user message,
+ * and both MCP bridges emit an `image` content item.
+ */
+export interface ToolResultImage {
+  mimeType: ImageMimeType;
+  /** Base64, no data-URI prefix (the ImageAttachment convention). */
+  data: string;
+  /** Vault-relative path, the model's pointer back to it. */
+  path: string;
+  byteLength: number;
+  /** Absent when the header parser did not recognise the format (never a guess). */
+  width?: number;
+  height?: number;
+}
+
 /** Result returned by a tool handler. */
 export interface ToolResult {
   /** Text content returned to the model. */
   content: string;
+  /**
+   * Images the model can look at, beside `content` rather than inside it
+   * (RFC-0021 D2). `content` stays the complete text contract: it carries the
+   * stub that names each image, so a consumer that does not know this field
+   * still tells the model what it read. Additive in the same sense as
+   * {@link failure}, absence means "this result has no image", never "images
+   * were dropped". Only `read` produces it today.
+   */
+  images?: ToolResultImage[];
   /** Whether this tool only reads data (true) or proposes document changes (false). */
   isReadOnly: boolean;
   /** Whether the tool execution failed. */

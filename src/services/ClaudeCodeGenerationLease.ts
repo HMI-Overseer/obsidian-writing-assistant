@@ -6,6 +6,7 @@ import type {
   EffectIntentRequest,
   EffectRunOwnership,
   GenerationAuditRecorder,
+  ToolResultImageRecord,
 } from "../shared/types";
 import { crossWithDurableIntent } from "../shared/generationAudit";
 import { ASK_TOOL_NAMES } from "../tools/ask/definition";
@@ -14,6 +15,7 @@ import { EDIT_TOOL_NAMES } from "../tools/editing/definition";
 import { MEMORY_MUTATION_TOOL_NAMES } from "../tools/memory/definition";
 import type { VaultOpReviewer } from "../tools/types";
 import { VAULT_OPS_TOOL_NAMES } from "../tools/vault-ops/definition";
+import type { ImageDelivery } from "../tools/vault/handlers";
 import type { VaultOpDisposition } from "../vault-ops/disposition";
 
 /**
@@ -65,6 +67,17 @@ export type ClaudeCodeToolEvent =
        * (a decline resolves `isError: false`; ADR-0016). Absent on read tools.
        */
       disposition?: VaultOpDisposition;
+      /**
+       * Metadata for the images this result returned, never their bytes (RFC-0021 D6,
+       * P7). The picture itself leaves through the MCP bridge; this is the side that
+       * reaches the timeline and the persisted step, so the step can show a thumbnail
+       * it reloads from the vault by path.
+       *
+       * This is the source the record is set from on the Claude Code path. The SDK's
+       * echo of the same tool result carries text only, so it sets nothing here and
+       * the identity merge keeps this value.
+       */
+      images?: ToolResultImageRecord[];
       /** Structured terminal ask state for transcript persistence and reload. */
       askStatus?: AgenticStep["askStatus"];
     };
@@ -123,6 +136,12 @@ export interface ClaudeCodeGenerationContext {
   readonly activeFilePath: string;
   /** The best correlation this transport can offer. Runtime evidence only lowers it. */
   readonly correlationPosture: "provider_id" | "none";
+  /**
+   * Whether an image `read` can reach this run's model, fixed with the rest of the
+   * scope before any callback enters (RFC-0021 P1). The vault handler reads it off
+   * the context the callback surface builds.
+   */
+  readonly imageDelivery: ImageDelivery;
   readonly review: VaultOpReviewer | null;
   readonly askResponder: AskUserResponder | null;
   readonly askSignal: AbortSignal | null;

@@ -87,6 +87,15 @@ describe("READ_TOOL / GET_OUTLINE_TOOL", () => {
     expect(text).not.toContain("read_section");
     // Whole-note pathway.
     expect(READ_TOOL.description).toContain("whole note");
+    // Image pathway (RFC-0021 D1). Static and in the description, not the errorGuidance:
+    // the guidance rides the system prompt and the Claude Code config fingerprint, where a
+    // change cold-rebuilds every live session. Measured load-bearing, not cosmetic: without
+    // this sentence Claude Code read the description, concluded `read` was for text notes,
+    // and refused to call it on a PNG at all.
+    expect(READ_TOOL.description).toContain("image");
+    expect(READ_TOOL.description).toContain("png, jpg, jpeg, gif, webp");
+    expect(READ_TOOL.description).toContain("not guess what the image shows");
+    expect(READ_TOOL.errorGuidance).not.toContain("image");
     // Section pathway, including both halves of the ambiguity guidance.
     expect(READ_TOOL.description).toContain("duplicated");
     expect(READ_TOOL.errorGuidance).toContain("ambiguous");

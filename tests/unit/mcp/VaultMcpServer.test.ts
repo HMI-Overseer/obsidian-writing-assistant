@@ -14,6 +14,24 @@ const provider: McpToolProvider = {
   listTools: () => [TOOL],
   callTool: (call) => {
     calls.push(call);
+    // The one advertised tool doubles as the image case, keyed off its argument, so the
+    // catalog stays a single tool and the listing assertions above are untouched.
+    if (call.arguments.text === "picture") {
+      return Promise.resolve({
+        content: "[Art/map.png]\n\nImage: PNG, 1x1, 3 B",
+        isReadOnly: true,
+        images: [
+          {
+            path: "Art/map.png",
+            mimeType: "image/png" as const,
+            data: "AQID",
+            byteLength: 3,
+            width: 1,
+            height: 1,
+          },
+        ],
+      });
+    }
     if (call.name !== "echo") {
       return Promise.resolve({ content: "unknown", isReadOnly: true, isError: true });
     }
@@ -86,6 +104,24 @@ describe("VaultMcpServer", () => {
     expect(json.result.content).toEqual([{ type: "text", text: "echo:hi" }]);
     expect(json.result.isError).toBe(false);
     expect(calls.at(-1)).toMatchObject({ name: "echo", arguments: { text: "hi" } });
+  });
+
+  // The legacy loopback path never receives bytes in the shipped plugin (the handler is
+  // handed "transport-cannot-carry" there), but both bridges share one content builder,
+  // so the shape is asserted on both rather than left to drift (RFC-0021 D5).
+  it("emits the text item then one image item per picture", async () => {
+    const res = await rpc({
+      jsonrpc: "2.0",
+      id: 31,
+      method: "tools/call",
+      params: { name: "echo", arguments: { text: "picture" } },
+    });
+    const json = await res.json();
+    expect(json.result.content).toEqual([
+      { type: "text", text: "[Art/map.png]\n\nImage: PNG, 1x1, 3 B" },
+      { type: "image", data: "AQID", mimeType: "image/png" },
+    ]);
+    expect(json.result.isError).toBe(false);
   });
 
   it("returns 202 with no body for notifications", async () => {

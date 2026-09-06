@@ -11,11 +11,12 @@ import type { RagContextBlock } from "../../../src/shared/chatRequest";
 // Mock builders
 // ---------------------------------------------------------------------------
 
-function makeFile(path: string, extension = "md"): TFile {
+function makeFile(path: string, extension = "md", size = 0): TFile {
   const f = new TFile();
   f.path = path;
   f.name = path.split("/").pop() ?? path;
   f.extension = extension;
+  f.stat = { size, ctime: 0, mtime: 0 };
   return f;
 }
 
@@ -38,6 +39,10 @@ function makeCtx(overrides: {
   abstractFiles?: Record<string, TFile | TFolder>;
   ragAvailability?: RagAvailability;
   ragRetrieve?: (query: string, activeFilePath?: string) => Promise<RagContextBlock[] | null>;
+  /** Raw bytes per path, for the image read pathway (RFC-0021). */
+  binaryContents?: Record<string, Uint8Array>;
+  /** Defaults to the delivering value, so only the refusal tests name it. */
+  imageDelivery?: VaultToolContext["imageDelivery"];
 }): VaultToolContext {
   const {
     files = [],
@@ -50,6 +55,8 @@ function makeCtx(overrides: {
     abstractFiles = {},
     ragAvailability = "no-backend",
     ragRetrieve = () => Promise.resolve([]),
+    binaryContents = {},
+    imageDelivery = "inline",
   } = overrides;
 
   const fileMap = new Map(files.map((f) => [f.path, f]));
@@ -58,11 +65,17 @@ function makeCtx(overrides: {
     app: {
       vault: {
         getFileByPath: vi.fn((path: string) => fileMap.get(path) ?? null),
-        getMarkdownFiles: vi.fn(() => files),
+        getMarkdownFiles: vi.fn(() => files.filter((f) => f.extension === "md")),
+        getFiles: vi.fn(() => files),
         getRoot: vi.fn(() => root),
         getAbstractFileByPath: vi.fn((path: string) => abstractFiles[path] ?? null),
         read: vi.fn((file: TFile) => Promise.resolve(fileContents[file.path] ?? "")),
         cachedRead: vi.fn((file: TFile) => Promise.resolve(fileContents[file.path] ?? "")),
+        readBinary: vi.fn((file: TFile) =>
+          Promise.resolve(
+            (binaryContents[file.path] ?? new Uint8Array(0)).buffer as ArrayBuffer,
+          ),
+        ),
       },
       metadataCache: {
         getFileCache: vi.fn((file: TFile) => fileCaches[file.path] ?? null),
@@ -80,6 +93,7 @@ function makeCtx(overrides: {
       availability: vi.fn(() => ragAvailability),
       retrieve: vi.fn(ragRetrieve),
     } as unknown as import("../../../src/rag/ragService").RagService,
+    imageDelivery,
   };
 }
 
@@ -118,15 +132,24 @@ describe("list_directory", () => {
     expect(result.content).toContain("[FILE] index.md");
   });
 
-  test("excludes non-markdown files", async () => {
+  // Images earn their own prefix now that `read` can open one (RFC-0021, Q2). Everything
+  // else the vault holds stays unlisted: a listed path the model can do nothing with is
+  // the dead end this change exists to close, pointed the other way.
+  test("lists images as [IMAGE] and still excludes every other non-note file", async () => {
     const md = makeFile("Assets/note.md");
     const img = makeFile("Assets/image.png", "png");
-    const folder = makeFolder("Assets", [md, img]);
+    const upper = makeFile("Assets/PHOTO.JPEG", "JPEG");
+    const pdf = makeFile("Assets/paper.pdf", "pdf");
+    const canvas = makeFile("Assets/board.canvas", "canvas");
+    const folder = makeFolder("Assets", [md, img, upper, pdf, canvas]);
     const ctx = makeCtx({ abstractFiles: { Assets: folder } });
 
     const result = await executeVaultTool(tc("list_directory", { path: "Assets" }), ctx);
     expect(result.content).toContain("[FILE] Assets/note.md");
-    expect(result.content).not.toContain("image.png");
+    expect(result.content).toContain("[IMAGE] Assets/image.png");
+    expect(result.content).toContain("[IMAGE] Assets/PHOTO.JPEG");
+    expect(result.content).not.toContain("paper.pdf");
+    expect(result.content).not.toContain("board.canvas");
   });
 
   test("returns error when folder not found", async () => {
@@ -296,6 +319,32 @@ describe("search_files", () => {
     expect(result.content).toContain("Characters/Will.md");
     expect(result.content).not.toContain("Alaric.md");
     expect(result.content).not.toContain("Act1.md");
+  });
+
+  // Q9: `*.png` used to find nothing, the same dead end `list_directory` had. It now
+  // matches notes plus the five extensions `read` can open, and nothing else the vault
+  // happens to hold.
+  test("matches images too, and still no other file type", async () => {
+    const ctx = makeCtx({
+      files: [
+        makeFile("Art/map.png", "png"),
+        makeFile("Art/map.pdf", "pdf"),
+        makeFile("Art/PHOTO.JPEG", "JPEG"),
+        makeFile("Art/board.canvas", "canvas"),
+        makeFile("Art/map.md"),
+      ],
+    });
+
+    const images = await executeVaultTool(tc("search_files", { pattern: "*.png" }), ctx);
+    expect(images.content).toContain("Art/map.png");
+    expect(images.isError).toBeUndefined();
+
+    const everything = await executeVaultTool(tc("search_files", { pattern: "*" }), ctx);
+    expect(everything.content).toContain("Art/map.md");
+    expect(everything.content).toContain("Art/map.png");
+    expect(everything.content).toContain("Art/PHOTO.JPEG");
+    expect(everything.content).not.toContain("map.pdf");
+    expect(everything.content).not.toContain("board.canvas");
   });
 
   test("search is case-insensitive", async () => {
@@ -783,6 +832,203 @@ describe("read", () => {
     const sectioned = await executeVaultTool(tc("read", { headingPath: "Act I" }), bookCtx());
     expect(sectioned.failure?.kind).toBe("invalid-args");
   });
+
+  // -------------------------------------------------------------------------
+  // The image pathway (RFC-0021, ADR-0041). One tool, one dispatch on the
+  // extension: an image path returns a text stub plus the picture, or a refusal
+  // that names which of the two reasons stopped it and reads no bytes.
+  // -------------------------------------------------------------------------
+
+  /** A real 1x1 PNG header, enough for the parser to report its dimensions. */
+  const PNG_1X1 = new Uint8Array([
+    0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
+    0x00, 0x00, 0x00, 0x0d, 0x49, 0x48, 0x44, 0x52,
+    0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
+    0x08, 0x06, 0x00, 0x00, 0x00,
+  ]);
+
+  const mapCtx = (
+    overrides: {
+      extension?: string;
+      size?: number;
+      bytes?: Uint8Array;
+      imageDelivery?: VaultToolContext["imageDelivery"];
+      path?: string;
+    } = {},
+  ) => {
+    const extension = overrides.extension ?? "png";
+    const path = overrides.path ?? `Art/map.${extension}`;
+    const bytes = overrides.bytes ?? PNG_1X1;
+    const file = makeFile(path, extension, overrides.size ?? bytes.length);
+    return makeCtx({
+      files: [file],
+      binaryContents: { [path]: bytes },
+      ...(overrides.imageDelivery ? { imageDelivery: overrides.imageDelivery } : {}),
+    });
+  };
+
+  test("an image path returns the stub plus one image, not decoded bytes", async () => {
+    const ctx = mapCtx();
+    const result = await executeVaultTool(tc("read", { path: "Art/map.png" }), ctx);
+
+    expect(result.isError).toBeUndefined();
+    expect(result.isReadOnly).toBe(true);
+    expect(result.content).toBe(
+      "[Art/map.png]\n\nImage: PNG, 1x1, 29 B, attached as an image block. If no image is " +
+        "visible to you, this model has no image input: tell the user and do not guess its " +
+        "contents.",
+    );
+    expect(result.images).toEqual([
+      {
+        path: "Art/map.png",
+        mimeType: "image/png",
+        data: Buffer.from(PNG_1X1).toString("base64"),
+        byteLength: 29,
+        width: 1,
+        height: 1,
+      },
+    ]);
+    // Never the text decode: that is the mojibake this pathway exists to end.
+    expect(ctx.app.vault.read).not.toHaveBeenCalled();
+  });
+
+  test("takes the pathway on an upper-case extension", async () => {
+    const result = await executeVaultTool(
+      tc("read", { path: "Art/MAP.PNG" }),
+      mapCtx({ extension: "PNG", path: "Art/MAP.PNG" }),
+    );
+
+    expect(result.images).toHaveLength(1);
+    expect(result.images?.[0].mimeType).toBe("image/png");
+  });
+
+  test("omits the dimensions when the header is unreadable, and still returns the image", async () => {
+    const garbage = new Uint8Array([1, 2, 3, 4, 5]);
+    const result = await executeVaultTool(
+      tc("read", { path: "Art/map.png" }),
+      mapCtx({ bytes: garbage }),
+    );
+
+    expect(result.content).toContain("Image: PNG, 5 B, attached as an image block.");
+    expect(result.images?.[0]).toEqual({
+      path: "Art/map.png",
+      mimeType: "image/png",
+      data: Buffer.from(garbage).toString("base64"),
+      byteLength: 5,
+    });
+  });
+
+  test("a gif carries the static-frame caveat", async () => {
+    const result = await executeVaultTool(
+      tc("read", { path: "Art/map.gif" }),
+      mapCtx({ extension: "gif" }),
+    );
+
+    expect(result.content).toContain(
+      "Animated GIFs may be read as their first frame only.",
+    );
+    expect(result.images?.[0].mimeType).toBe("image/gif");
+  });
+
+  test("a png carries no gif caveat", async () => {
+    const result = await executeVaultTool(tc("read", { path: "Art/map.png" }), mapCtx());
+    expect(result.content).not.toContain("Animated GIFs");
+  });
+
+  test("a model that cannot see gets an unavailable failure and no bytes are read", async () => {
+    const ctx = mapCtx({ imageDelivery: "model-cannot-see", size: 245760 });
+    const result = await executeVaultTool(tc("read", { path: "Art/map.png" }), ctx);
+
+    expect(result.isError).toBe(true);
+    expect(result.failure?.kind).toBe("unavailable");
+    expect(result.images).toBeUndefined();
+    expect(result.content).toContain('the image at "Art/map.png" (PNG, 240.0 KB)');
+    expect(result.content).toContain("cannot be viewed by the current model");
+    expect(result.content).toContain("should not guess its contents");
+    // P5: a refusal reads nothing. No dimensions either, they describe a picture
+    // the model will not receive.
+    expect(ctx.app.vault.readBinary).not.toHaveBeenCalled();
+    expect(result.content).not.toContain("1x1");
+  });
+
+  test("a runtime that cannot carry an image names the runtime, not the model", async () => {
+    const ctx = mapCtx({ imageDelivery: "transport-cannot-carry" });
+    const result = await executeVaultTool(tc("read", { path: "Art/map.png" }), ctx);
+
+    expect(result.isError).toBe(true);
+    expect(result.failure?.kind).toBe("unavailable");
+    expect(result.images).toBeUndefined();
+    expect(result.content).toContain('the image at "Art/map.png"');
+    expect(result.content).toContain("cannot be delivered on this runtime");
+    expect(result.content).not.toContain("cannot be viewed by the current model");
+    expect(ctx.app.vault.readBinary).not.toHaveBeenCalled();
+  });
+
+  test("an image over the size gate is refused by precondition, unread", async () => {
+    const ctx = mapCtx({ size: 6 * 1024 * 1024 });
+    const result = await executeVaultTool(tc("read", { path: "Art/map.png" }), ctx);
+
+    expect(result.isError).toBe(true);
+    expect(result.failure?.kind).toBe("precondition");
+    expect(result.images).toBeUndefined();
+    expect(result.content).toContain("6.0 MB");
+    expect(result.content).toContain("5.0 MB");
+    expect(ctx.app.vault.readBinary).not.toHaveBeenCalled();
+  });
+
+  test("an image at exactly the size gate is read", async () => {
+    const ctx = mapCtx({ size: 5 * 1024 * 1024 });
+    const result = await executeVaultTool(tc("read", { path: "Art/map.png" }), ctx);
+
+    expect(result.isError).toBeUndefined();
+    expect(result.images).toHaveLength(1);
+  });
+
+  test("headingPath on an image is invalid-args, and nothing is read", async () => {
+    const ctx = mapCtx();
+    const result = await executeVaultTool(
+      tc("read", { path: "Art/map.png", headingPath: "Act I" }),
+      ctx,
+    );
+
+    expect(result.isError).toBe(true);
+    expect(result.failure?.kind).toBe("invalid-args");
+    expect(result.content).toContain("omit headingPath");
+    expect(ctx.app.vault.readBinary).not.toHaveBeenCalled();
+  });
+
+  test("a blank headingPath on an image still reads the image", async () => {
+    const result = await executeVaultTool(
+      tc("read", { path: "Art/map.png", headingPath: "   " }),
+      mapCtx(),
+    );
+
+    expect(result.images).toHaveLength(1);
+  });
+
+  test("a note read carries no images and is byte-identical to before", async () => {
+    const result = await executeVaultTool(
+      tc("read", { path: "Notes/chapter.md" }),
+      chapterCtx(),
+    );
+
+    expect(result.content).toBe(WHOLE_SMALL);
+    expect(result.images).toBeUndefined();
+  });
+
+  test("a non-image, non-markdown extension still takes the note pathway", async () => {
+    // `read` resolves anything the index holds; only the five image extensions
+    // branch, so a .canvas keeps today's text behaviour rather than silently
+    // becoming an unsupported-image error.
+    const ctx = makeCtx({
+      files: [makeFile("Art/board.canvas", "canvas")],
+      fileContents: { "Art/board.canvas": "{}" },
+    });
+    const result = await executeVaultTool(tc("read", { path: "Art/board.canvas" }), ctx);
+
+    expect(result.content).toBe("[Art/board.canvas]\n\n1\t{}");
+    expect(result.images).toBeUndefined();
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -1234,6 +1480,20 @@ describe("path-boundary safety (reads stay inside the vault)", () => {
     // Backstop preserved: the index lookup was never even reached for an escaping path.
     expect(ctx.app.vault.getFileByPath).not.toHaveBeenCalled();
     expect(ctx.app.vault.read).not.toHaveBeenCalled();
+  });
+
+  // The image pathway is a second branch of the same tool, and it opens a second byte
+  // channel (readBinary). The boundary runs before the dispatch, so an escaping image
+  // path is refused at the same place a note path is, and no bytes are opened.
+  test("read names the boundary on an image path too, opening no byte channel", async () => {
+    const ctx = makeCtx({ files: [makeFile("Art/map.png", "png", 100)] });
+    for (const path of ["../outside.png", "../../etc/logo.png", "..\\..\\x.webp"]) {
+      const result = await executeVaultTool(tc("read", { path }), ctx);
+      expectBoundaryRefusal(result);
+      expect(result.images).toBeUndefined();
+    }
+    expect(ctx.app.vault.getFileByPath).not.toHaveBeenCalled();
+    expect(ctx.app.vault.readBinary).not.toHaveBeenCalled();
   });
 
   test("get_links names the boundary, in every direction, never reaching the lookup", async () => {

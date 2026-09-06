@@ -77,6 +77,13 @@ export interface ClaudeCodeRunOptions {
    * the preflight is a passive no-op.
    */
   contextWindow?: number;
+  /**
+   * Whether the model can look at an image, as the tri-state
+   * {@link ../api/ModelAvailabilityService.resolveVisionSupport} returns: absent
+   * means never established, which the delivery flag reads as allow-the-attempt
+   * (RFC-0021 P2). Only an explicit `false` refuses an image read.
+   */
+  supportsVision?: boolean;
 }
 
 /** Official Claude Code install / setup documentation. */
@@ -507,6 +514,17 @@ function buildRuntimeScope(
       : new Set<string>(),
     activeFilePath: options.activeFilePath ?? "",
     correlationPosture: useSdk ? "provider_id" : "none",
+    // Two independent facts, folded into one flag the vault handler reads without
+    // knowing the provider (RFC-0021 P1). Carriage first: only the SDK bridge speaks
+    // MCP, so the legacy loopback path carries no image at all, whatever the model
+    // can see. Both SDK paths, the persistent session and the one-shot, share that
+    // bridge and both deliver, measured 2026-09-06, so `useSdk` is the predicate.
+    // Then capability, where unknown allows the attempt.
+    imageDelivery: !useSdk
+      ? "transport-cannot-carry"
+      : options.supportsVision === false
+        ? "model-cannot-see"
+        : "inline",
   };
 }
 

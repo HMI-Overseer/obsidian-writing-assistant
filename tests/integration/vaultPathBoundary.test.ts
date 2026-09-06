@@ -56,6 +56,13 @@ function makeRealFsApp(root: string): App {
   // Populated *recursively*, matching Obsidian's in-memory TFolder tree (each
   // subfolder carries its own children), so a subtree walk (collectFolderSubtree,
   // ADR-0012) sees notes nested any number of levels deep, against real disk.
+  // Obsidian's TFile carries the lower-cased extension; the read pathway dispatches on
+  // it, so the harness has to reproduce it rather than leave the mock's "md" default.
+  const extensionOf = (p: string) => {
+    const name = normalizePath(p).split("/").pop() ?? "";
+    const dot = name.lastIndexOf(".");
+    return dot > 0 ? name.slice(dot + 1) : "";
+  };
   const childrenOf = (relDir: string): (TFile | TFolder)[] => {
     const abs = full(relDir);
     if (!fs.existsSync(abs)) return [];
@@ -64,7 +71,7 @@ function makeRealFsApp(root: string): App {
       const childRel = normalizePath(norm ? `${norm}/${entry.name}` : entry.name);
       return entry.isDirectory()
         ? Object.assign(new TFolder(), { path: childRel, children: childrenOf(childRel) })
-        : Object.assign(new TFile(), { path: childRel });
+        : Object.assign(new TFile(), { path: childRel, extension: extensionOf(childRel) });
     });
   };
   return {
@@ -84,6 +91,7 @@ function makeRealFsApp(root: string): App {
         }
         return Object.assign(new TFile(), {
           path: normalizePath(p),
+          extension: extensionOf(p),
           stat: { mtime: st.mtimeMs, size: st.size },
         });
       },
@@ -93,11 +101,24 @@ function makeRealFsApp(root: string): App {
         const st = fs.statSync(abs);
         return Object.assign(new TFile(), {
           path: normalizePath(p),
+          extension: extensionOf(p),
           stat: { mtime: st.mtimeMs, size: st.size },
         });
       },
       read(file: TFile) {
         return Promise.resolve(fs.readFileSync(full(file.path), "utf8"));
+      },
+      // The image read pathway's byte channel, backed by the same real disk as
+      // `read`, so an escaping image path would show up as a real file read from
+      // outside vaultRoot rather than a Map miss (RFC-0021).
+      readBinary(file: TFile) {
+        const buffer = fs.readFileSync(full(file.path));
+        return Promise.resolve(
+          buffer.buffer.slice(
+            buffer.byteOffset,
+            buffer.byteOffset + buffer.byteLength,
+          ) as ArrayBuffer,
+        );
       },
       create(p: string, content: string) {
         fs.writeFileSync(full(p), content);
@@ -485,7 +506,11 @@ describe("read / get_outline path boundary (read channel), real filesystem (sect
   // behind one entry point: a boundary check guarding only the whole-note arm would
   // leave the section arm open, and no compiler sees that.
   const readCtx = (app: App) =>
-    ({ app, ragService: {} as unknown as RagService } as VaultToolContext);
+    ({
+      app,
+      ragService: {} as unknown as RagService,
+      imageDelivery: "inline",
+    } as VaultToolContext);
 
   it("refuses every escaping read, on either pathway, naming the boundary", async () => {
     const app = makeRealFsApp(vaultRoot);
@@ -514,6 +539,60 @@ describe("read / get_outline path boundary (read channel), real filesystem (sect
     }
     expect(filesOutsideVault()).toEqual([]); // reads never write, and nothing escaped.
   });
+
+  // The image pathway is a new branch of a path-taking tool, so it earns the same
+  // real-disk treatment: the bytes must round-trip from the actual file, and an
+  // escaping image path must be refused before anything is opened (RFC-0021, ADR-0020).
+  it("reads a real PNG's bytes back through the tool, from inside the vault", async () => {
+    const app = makeRealFsApp(vaultRoot);
+    // A real 1x1 PNG, written to disk so the read is a genuine file read.
+    const png = Buffer.from(
+      "89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c4890000000a49444154" +
+        "789c6300010000050001" +
+        "0d0a2db40000000049454e44ae426082",
+      "hex",
+    );
+    fs.mkdirSync(nodePath.join(vaultRoot, "Art"), { recursive: true });
+    fs.writeFileSync(nodePath.join(vaultRoot, "Art", "map.png"), png);
+
+    const result = await executeVaultTool(
+      { id: "img", name: "read", arguments: { path: "Art/map.png" } },
+      readCtx(app),
+    );
+
+    expect(result.isError).toBeUndefined();
+    expect(result.images).toHaveLength(1);
+    const image = result.images?.[0];
+    expect(image?.path).toBe("Art/map.png");
+    expect(image?.mimeType).toBe("image/png");
+    expect(image?.byteLength).toBe(png.byteLength);
+    // The bytes the model receives decode back to exactly the file on disk.
+    expect(Buffer.from(image?.data ?? "", "base64").equals(png)).toBe(true);
+    expect(image?.width).toBe(1);
+    expect(image?.height).toBe(1);
+    expect(result.content).toContain("[Art/map.png]");
+    expect(result.content).toContain("1x1");
+  });
+
+  it("refuses an escaping image path at the boundary, touching nothing outside the vault", async () => {
+    const app = makeRealFsApp(vaultRoot);
+    // A real image outside the vault: the escape has something to find if the guard
+    // ever stops holding.
+    const outside = nodePath.join(sandbox, "outside.png");
+    fs.writeFileSync(outside, Buffer.from("89504e470d0a1a0a", "hex"));
+
+    for (const path of ["../../outside.png", "..\\..\\outside.png", "C:/Windows/x.png"]) {
+      const result = await executeVaultTool(
+        { id: `esc-${path}`, name: "read", arguments: { path } },
+        readCtx(app),
+      );
+      expect(result.isError, `read should refuse the image at "${path}"`).toBe(true);
+      expect(result.content).toContain("outside the vault");
+      expect(result.images).toBeUndefined();
+    }
+    // The only file outside the vault is the fixture this test wrote itself.
+    expect(filesOutsideVault()).toEqual([outside]);
+  });
 });
 
 describe("get_links path boundary (read channel), real filesystem (section 6.1)", () => {
@@ -522,7 +601,11 @@ describe("get_links path boundary (read channel), real filesystem (section 6.1)"
   // model on "not found". Verify on real disk that every escaping link read is refused
   // at the boundary, in every direction, and that nothing escapes.
   const readCtx = (app: App) =>
-    ({ app, ragService: {} as unknown as RagService } as VaultToolContext);
+    ({
+      app,
+      ragService: {} as unknown as RagService,
+      imageDelivery: "inline",
+    } as VaultToolContext);
 
   it("refuses every escaping link read, in every direction, naming the boundary", async () => {
     const app = makeRealFsApp(vaultRoot);

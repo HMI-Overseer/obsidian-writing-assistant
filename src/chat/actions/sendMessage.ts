@@ -1,5 +1,6 @@
 import type { Component } from "obsidian";
 import { createChatClient } from "../../providers/registry";
+import { resolveVisionSupport } from "../../api/ModelAvailabilityService";
 import type { ApprovalPosture } from "../../shared/types";
 import type WritingAssistantChat from "../../main";
 import type { ChatComposer } from "../composer/ChatComposer";
@@ -69,17 +70,20 @@ export async function sendMessage(options: SendMessageOptions): Promise<void> {
   // of being re-read into the prefix every send. There is no live document re-read
   // anymore under ambient editing; the model reads current content via
   // tools when it edits.
-  // Unknown vision capability is treated as allow-the-attempt (mirrors the composer attach
-  // gate), so an unprobed model's image rides the turn instead of being silently dropped.
-  const supportsVision =
-    validated.activeModel.vision
-    ?? plugin.services.modelAvailability.getVision(validated.activeModel.modelId)
-    ?? true;
+  // Kept as the tri-state the resolver returns: the note-image gate below reads unknown
+  // as allow-the-attempt (mirrors the composer attach gate), so an unprobed model's image
+  // rides the turn instead of being silently dropped, while the Claude Code runtime wants
+  // the raw answer so its delivery flag can tell unknown from a known "cannot see".
+  const visionSupport = resolveVisionSupport(
+    validated.activeModel,
+    plugin.services.modelAvailability,
+  );
   const noteAttachments = await snapshotNoteAttachments(plugin.app, {
     activeNoteAttached: composer.isActiveNoteAttached(),
     extraContextItems: composer.getExtraContextItems(),
     maxContextChars: plugin.settings.maxContextChars,
-    includeImages: plugin.settings.includeLocalAttachmentsAsContext && supportsVision,
+    includeImages:
+      plugin.settings.includeLocalAttachmentsAsContext && (visionSupport ?? true),
   });
 
   composer.clearDraft();
@@ -112,6 +116,7 @@ export async function sendMessage(options: SendMessageOptions): Promise<void> {
     conversationId: store.getActiveConversationId() ?? undefined,
     resumeCursor: store.getClaudeCodeResumeCursor(),
     contextWindow: plugin.services.modelAvailability.resolveContextWindow(activeModel),
+    ...(visionSupport === undefined ? {} : { supportsVision: visionSupport }),
   });
   const client = createChatClient(
     activeModel.provider,

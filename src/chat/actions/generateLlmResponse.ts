@@ -22,6 +22,7 @@ import { estimateTokenCount } from "../../shared/tokenEstimation";
 import { insertLastResponse } from "../finalization/insertLastResponse";
 import { buildRegexEditProposals } from "../finalization/regexEditProposals";
 import { estimateCost } from "../../api/pricing";
+import { resolveVisionSupport } from "../../api/ModelAvailabilityService";
 import type { UsageResult } from "../../api/usageTypes";
 import type { MessageUsage } from "../../shared/types";
 import { isActionTool, runToolLoop } from "./toolLoop";
@@ -238,6 +239,12 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
     abortController.signal,
   );
 
+  // Gate: unknown vision capability is allow-the-attempt, keep image attachments in the
+  // request for an unprobed model rather than stripping them (matches the attach gate).
+  // Read twice below: once for history projection, once for the vault tools' delivery flag.
+  const supportsVision =
+    resolveVisionSupport(activeModel, plugin.services.modelAvailability) ?? true;
+
   let apiMessages;
   try {
     apiMessages = await prepareApiMessages({
@@ -263,11 +270,7 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
       // are attached just below; prepareApiMessages needs the flag up front to choose the
       // tool emission.
       anthropicCacheEnabled: activeProfile.anthropicCacheSettings.enabled,
-      // Unknown vision capability is treated as allow-the-attempt: keep image attachments in
-      // the request for an unprobed model rather than stripping them (matches the attach gate).
-      supportsVision: activeModel.vision
-        ?? plugin.services.modelAvailability.getVision(activeModel.modelId)
-        ?? true,
+      supportsVision,
       ...(finalization.kind === "replace"
         ? { excludeMessageId: finalization.oldMessage.id }
         : {}),
@@ -353,6 +356,11 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
     // The active note rides as a frozen attachment; the model reads current content
     // via tools, so the active file is just the current pane's file (RAG exclusion).
     activeFilePath,
+    // Every direct provider's wire format carries an image (nested for Anthropic, a
+    // synthesized user message on the OpenAI shape), so this site never emits
+    // "transport-cannot-carry": the model's own capability is the only gate, and an
+    // unprobed model is allowed the attempt (RFC-0021 P2).
+    imageDelivery: supportsVision === false ? "model-cannot-see" : "inline",
   };
 
   const editToolContext: ToolExecutionContext | undefined =
@@ -615,6 +623,8 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
               content: event.content,
               isError: event.isError,
               disposition: event.disposition,
+              // Already stripped of bytes by the callback surface (RFC-0021 P7).
+              ...(event.images ? { images: event.images } : {}),
             });
             // The one-line detail the step shows, as the plugin loop records it.
             // The arguments themselves arrive through the SDK capture as
@@ -629,6 +639,7 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
               ...(detail === undefined ? {} : { toolInput: detail }),
               resultRecord: capture.resultRecord,
               resultDigest: capture.resultDigest,
+              resultImages: capture.resultImages,
               askGuidance: capture.askGuidance,
               ...(event.askStatus && { askStatus: event.askStatus }),
               ...(event.isError && { isError: true, errorContent: event.content }),

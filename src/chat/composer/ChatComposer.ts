@@ -17,6 +17,7 @@ import {
   MAX_TEXT_ATTACHMENT_BYTES,
   SUPPORTED_IMAGE_TYPES,
 } from "../../constants";
+import { resolveVisionSupport } from "../../api/ModelAvailabilityService";
 import {
   getDraggedVaultMarkdownFiles,
   getDroppedVaultMarkdownFiles,
@@ -327,13 +328,12 @@ export class ChatComposer {
    * Called alongside the vision indicator refresh so image attachment stays in sync.
    */
   refreshVisionSupport(activeModel: CompletionModel | null): void {
-    // Treat an unprobed model (capability unknown) as allow-the-attempt rather than a hard
-    // block: a never-checked local model would otherwise present as "no vision" and refuse a
-    // legitimate image attach. A model known to lack vision (explicit false) still blocks.
+    // Gate: treat an unprobed model (capability unknown) as allow-the-attempt rather than a
+    // hard block, a never-checked local model would otherwise present as "no vision" and
+    // refuse a legitimate image attach. A model known to lack vision (explicit false) still
+    // blocks.
     this.supportsVision = activeModel
-      ? (activeModel.vision
-        ?? this.plugin.services.modelAvailability.getVision(activeModel.modelId)
-        ?? true)
+      ? resolveVisionSupport(activeModel, this.plugin.services.modelAvailability) ?? true
       : false;
   }
 
@@ -437,9 +437,10 @@ export class ChatComposer {
       return;
     }
 
-    const supportsVision = activeModel.vision
-      ?? this.plugin.services.modelAvailability.getVision(activeModel.modelId)
-      ?? false;
+    // Indicator: an unprobed model reads as off rather than promising a capability
+    // nobody has checked.
+    const supportsVision =
+      resolveVisionSupport(activeModel, this.plugin.services.modelAvailability) ?? false;
 
     el.toggleClass("is-active", supportsVision);
     el.setAttribute("aria-label", supportsVision

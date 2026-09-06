@@ -1,6 +1,7 @@
 import type { Component } from "obsidian";
 import { Notice } from "obsidian";
 import { createChatClient } from "../../providers/registry";
+import { resolveVisionSupport } from "../../api/ModelAvailabilityService";
 import type WritingAssistantChat from "../../main";
 import type { ChatComposer } from "../composer/ChatComposer";
 import type { ChatSessionStore } from "../conversation/ChatSessionStore";
@@ -65,6 +66,10 @@ export async function regenerateMessage(options: RegenerateOptions): Promise<voi
   }
 
   const posture = composer.getPosture();
+  const visionSupport = resolveVisionSupport(
+    activeModel,
+    plugin.services.modelAvailability,
+  );
 
   const oldMessage = lastMessage;
 
@@ -81,6 +86,9 @@ export async function regenerateMessage(options: RegenerateOptions): Promise<voi
     // the turn synthetically rebuilds; passed for a uniform recovery path.
     resumeCursor: store.getClaudeCodeResumeCursor(),
     contextWindow: plugin.services.modelAvailability.resolveContextWindow(activeModel),
+    // The tri-state, not a collapsed boolean: the runtime's image-delivery flag refuses
+    // only on a known "cannot see" and lets an unprobed model try (RFC-0021 P2).
+    ...(visionSupport === undefined ? {} : { supportsVision: visionSupport }),
   });
   const client = createChatClient(
     activeModel.provider,

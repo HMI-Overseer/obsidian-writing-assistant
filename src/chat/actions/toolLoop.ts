@@ -559,6 +559,8 @@ export async function runToolLoop(
       });
       for (const { tc, result } of barrierResults) {
         recordToolResult(turnBuilder, tc, result, round);
+        // No `toolResultImages` here, and none is possible: this push is the ask
+        // barrier, and an ask result is the user's own answer text (RFC-0021 P3).
         toolLoopTurns.push({
           role: "tool",
           content: result.content,
@@ -933,6 +935,9 @@ function recordToolResult(
     ...(capture.resultDigest === undefined
       ? {}
       : { resultDigest: capture.resultDigest }),
+    ...(capture.resultImages === undefined
+      ? {}
+      : { resultImages: capture.resultImages }),
     ...(capture.askGuidance === undefined
       ? {}
       : {
@@ -1002,6 +1007,12 @@ function flushPendingEmission(
       role: "tool",
       content: result.content,
       toolCallId: toolCall.id,
+      // The round's real results, so this is the one place an image enters the loop's
+      // history. It rides the turn rather than the result because the payload builders
+      // read `ChatTurn`, and each nests or synthesizes per its own wire format
+      // (RFC-0021 P3). In memory for this generation only; the persisted step keeps
+      // metadata, so the structural replay cannot carry bytes.
+      ...(result.images?.length ? { toolResultImages: result.images } : {}),
     });
   }
   return null;

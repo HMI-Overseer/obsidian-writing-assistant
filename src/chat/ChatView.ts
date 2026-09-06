@@ -11,6 +11,7 @@ import {
   getSelectableCompletionModels,
   getSelectableEmbeddingModels,
 } from "../providers/selectableModels";
+import { resolveVisionSupport } from "../api/ModelAvailabilityService";
 import { getActiveNoteText } from "../context/noteContext";
 import { ChatBubbleActionHandler } from "./ChatBubbleActionHandler";
 import { ChatGenerationOrchestrator } from "./ChatGenerationOrchestrator";
@@ -408,11 +409,8 @@ export class ChatView extends ItemView {
       getVisionSupported: () => {
         const model = this.sessionStore?.getResolvedConversationModel() ?? null;
         if (!model) return null;
-        return (
-          model.vision ??
-          this.plugin.services.modelAvailability.getVision(model.modelId) ??
-          false
-        );
+        // Indicator: unknown reads as off, never as a promised capability.
+        return resolveVisionSupport(model, this.plugin.services.modelAvailability) ?? false;
       },
       onOpenTools: () => this.toolUsePopover?.open(),
       onOpenKnowledge: () => this.knowledgePopover?.open(),

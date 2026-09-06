@@ -2,6 +2,7 @@ import * as http from "http";
 import { randomBytes, timingSafeEqual } from "crypto";
 import type { CanonicalToolDefinition, ToolCall, ToolResult } from "../tools/types";
 import { toMcpToolSchema } from "./toolSchema";
+import { toMcpContent } from "./toolResultContent";
 
 /**
  * Minimal in-process MCP server (stateless Streamable-HTTP transport) that
@@ -204,11 +205,14 @@ export class VaultMcpServer {
                 : { transportId: String(id) }),
             },
           );
-          // MCP carries only text + isError, so a structured `failure` is flattened to
-          // its sentence here, the recovery contract still reaches the model via
-          // `content`; the typed kind stays plugin-loop-only (telemetry/UI branching).
+          // MCP carries only content items + isError, so a structured `failure` is
+          // flattened to its sentence here, the recovery contract still reaches the model
+          // via `content`; the typed kind stays plugin-loop-only (telemetry/UI branching).
+          // The image arm is a formality on this transport: the handler is handed
+          // "transport-cannot-carry" on the legacy path, so a result reaching here never
+          // has images. Shared with the SDK bridge so the two shapes cannot drift.
           const result = {
-            content: [{ type: "text", text: toolResult.content }],
+            content: toMcpContent(toolResult),
             isError: toolResult.isError ?? false,
           };
           return isNotification ? null : { jsonrpc: "2.0", id, result };

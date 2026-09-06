@@ -113,22 +113,26 @@
       {
         "modelId": "fable",
         "name": "Fable (Claude Code)",
-        "role": "completion"
+        "role": "completion",
+        "vision": true
       },
       {
         "modelId": "haiku",
         "name": "Haiku (Claude Code)",
-        "role": "completion"
+        "role": "completion",
+        "vision": true
       },
       {
         "modelId": "opus",
         "name": "Opus (Claude Code)",
-        "role": "completion"
+        "role": "completion",
+        "vision": true
       },
       {
         "modelId": "sonnet",
         "name": "Sonnet (Claude Code)",
-        "role": "completion"
+        "role": "completion",
+        "vision": true
       }
     ],
     "openai": [

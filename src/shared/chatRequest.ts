@@ -7,7 +7,7 @@ import type {
   ImageMimeType,
   ProviderReplayCapsule,
 } from "./types";
-import type { CanonicalToolDefinition } from "../tools/types";
+import type { CanonicalToolDefinition, ToolResultImage } from "../tools/types";
 
 /** A context item manually attached by the user via the context picker or drag-and-drop. */
 export interface ExtraContextItem {
@@ -108,6 +108,18 @@ export interface ChatTurn {
    * generation's tool loop), never persisted.
    */
   anthropicThinkingBlocks?: unknown[];
+  /**
+   * Images a tool result on this turn returned for the model to look at
+   * (RFC-0021 D5). One generation's loop state, in memory only and never
+   * persisted, the same discipline {@link anthropicThinkingBlocks} follows: the
+   * persisted step keeps metadata only, and the structural replay rebuilds tool
+   * turns from that record, so a replayed turn cannot carry bytes.
+   *
+   * Each payload builder reads it and nests or synthesizes per its wire format,
+   * which is why the field rides the turn rather than the tool result: the
+   * builders see `ChatTurn`, never `ToolResult`.
+   */
+  toolResultImages?: ToolResultImage[];
   /** File attachments (images, future: documents). Only present on user turns. */
   attachments?: Attachment[];
 }

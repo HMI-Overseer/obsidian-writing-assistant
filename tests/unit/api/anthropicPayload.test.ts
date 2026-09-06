@@ -810,3 +810,166 @@ describe("buildAnthropicMessages conversation cache breakpoint", () => {
     expect((system as { cache_control?: unknown }[])[0].cache_control).toBeDefined();
   });
 });
+
+// ---------------------------------------------------------------------------
+// Tool-result images (RFC-0021 D5, ADR-0041). Anthropic is the cheap wire shape:
+// the image nests inside the tool_result it belongs to, so the round keeps the
+// same message count and the same roles it has always had.
+// ---------------------------------------------------------------------------
+
+describe("buildAnthropicMessages tool-result images", () => {
+  const STUB = "[Art/map.png]\n\nImage: PNG, 1x1, 29 B, attached as an image block.";
+
+  /** One read round: user asks, assistant calls `read`, the tool answers. */
+  function readRound(images?: ChatRequest["messages"][number]["toolResultImages"]): ChatTurn[] {
+    return [
+      { role: "user", content: "look at the map" },
+      {
+        role: "assistant",
+        content: "reading",
+        toolCalls: [{ id: "call_1", name: "read", arguments: { path: "Art/map.png" } }],
+      },
+      {
+        role: "tool",
+        content: STUB,
+        toolCallId: "call_1",
+        ...(images ? { toolResultImages: images } : {}),
+      },
+    ];
+  }
+
+  const ONE_IMAGE = [
+    {
+      path: "Art/map.png",
+      mimeType: "image/png" as const,
+      data: "AQID",
+      byteLength: 3,
+      width: 1,
+      height: 1,
+    },
+  ];
+
+  test("nests the stub then one image block per picture, in order", () => {
+    const { messages } = buildAnthropicMessages(
+      makeRequest({ messages: readRound(ONE_IMAGE) }),
+    );
+
+    // The round is still user, assistant, user: no synthesized message on this wire.
+    expect(messages.map((m) => m.role)).toEqual(["user", "assistant", "user"]);
+    expect(messages[2].content).toEqual([
+      {
+        type: "tool_result",
+        tool_use_id: "call_1",
+        content: [
+          { type: "text", text: STUB },
+          {
+            type: "image",
+            source: { type: "base64", media_type: "image/png", data: "AQID" },
+          },
+        ],
+      },
+    ]);
+  });
+
+  test("emits every image of a multi-image result, after the one stub", () => {
+    const { messages } = buildAnthropicMessages(
+      makeRequest({
+        messages: readRound([
+          ...ONE_IMAGE,
+          {
+            path: "Art/tree.webp",
+            mimeType: "image/webp" as const,
+            data: "BAUG",
+            byteLength: 3,
+          },
+        ]),
+      }),
+    );
+
+    const block = (messages[2].content as { content: unknown }[])[0];
+    expect(block.content).toEqual([
+      { type: "text", text: STUB },
+      { type: "image", source: { type: "base64", media_type: "image/png", data: "AQID" } },
+      { type: "image", source: { type: "base64", media_type: "image/webp", data: "BAUG" } },
+    ]);
+  });
+
+  // The guarantee the whole carriage change rests on: a turn that read no image is
+  // byte-identical to what this builder emitted before the field existed. The literal
+  // below was captured from the tree before the change, not written by hand.
+  test("a tool round with no images is byte-identical to the pre-change output", () => {
+    const { messages } = buildAnthropicMessages(makeRequest({ messages: readRound() }));
+
+    expect(messages).toEqual([
+      { role: "user", content: "look at the map" },
+      {
+        role: "assistant",
+        content: [
+          { type: "text", text: "reading" },
+          { type: "tool_use", id: "call_1", name: "read", input: { path: "Art/map.png" } },
+        ],
+      },
+      {
+        role: "user",
+        content: [{ type: "tool_result", tool_use_id: "call_1", content: STUB }],
+      },
+    ]);
+  });
+
+  test("an errored image result keeps is_error beside the nested content", () => {
+    const { messages } = buildAnthropicMessages(
+      makeRequest({
+        messages: [
+          ...readRound(ONE_IMAGE).slice(0, 2),
+          {
+            role: "tool",
+            content: "Error: something",
+            toolCallId: "call_1",
+            toolResultIsError: true,
+            toolResultImages: ONE_IMAGE,
+          },
+        ],
+      }),
+    );
+
+    const block = (messages[2].content as { is_error?: boolean }[])[0];
+    expect(block.is_error).toBe(true);
+  });
+
+  // M10: the breakpoint placer marks a message's last TOP-LEVEL block, which on a tool
+  // round is the tool_result itself, so the nested image never carries cache_control and
+  // `placeConversationBreakpoints` needs no change. Asserted on the placer's own terms:
+  // the image tool round is the last stable message here, which is where the newest
+  // breakpoint goes.
+  test("a cache breakpoint lands on the tool_result, never on the nested image", () => {
+    const { messages } = buildAnthropicMessages(
+      makeRequest({
+        messages: [...readRound(ONE_IMAGE), { role: "user", content: "thanks" }],
+      }),
+      { enabled: true, ttl: "default" },
+      "claude-opus-4-8",
+    );
+
+    const marked: { blockType: string; nested: string[] }[] = [];
+    for (const message of messages) {
+      if (!Array.isArray(message.content)) continue;
+      for (const block of message.content) {
+        if (!block.cache_control) continue;
+        marked.push({
+          blockType: block.type,
+          nested:
+            block.type === "tool_result" && Array.isArray(block.content)
+              ? block.content.map((nested) => nested.type)
+              : [],
+        });
+      }
+    }
+
+    // The tool round is stable history by now, so it is where a breakpoint can land.
+    const onToolResult = marked.filter((mark) => mark.blockType === "tool_result");
+    expect(onToolResult).toHaveLength(1);
+    expect(onToolResult[0].nested).toEqual(["text", "image"]);
+    // And no breakpoint anywhere is on an image block.
+    expect(marked.some((mark) => mark.blockType === "image")).toBe(false);
+  });
+});

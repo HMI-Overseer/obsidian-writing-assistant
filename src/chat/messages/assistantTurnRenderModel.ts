@@ -4,6 +4,7 @@ import type {
   CompletedAskGuidanceRecord,
   ConversationMessage,
   ToolActionLedgerEntry,
+  ToolResultImageRecord,
 } from "../../shared/types";
 import type {
   AssistantTurnSnapshot,
@@ -53,6 +54,8 @@ export interface AssistantTurnToolRenderItem
   state: "declared" | "running" | "completed" | "interrupted" | "failed";
   resultRecord?: string;
   resultDigest?: string;
+  /** Image metadata for the step's thumbnails, never bytes (RFC-0021 D9). */
+  resultImages?: ToolResultImageRecord[];
   isError?: boolean;
   errorContent?: string;
   askGuidance?: CompletedAskGuidanceRecord;
@@ -195,6 +198,9 @@ export function buildLegacyAssistantRenderModel(
       ...(step.resultDigest === undefined
         ? {}
         : { resultDigest: step.resultDigest }),
+      ...(step.resultImages === undefined
+        ? {}
+        : { resultImages: structuredClone(step.resultImages) }),
       ...(step.isError ? { isError: true } : {}),
       ...(step.errorContent === undefined
         ? {}
@@ -423,6 +429,9 @@ function buildRenderItem(
     ...(item.resultDigest === undefined
       ? {}
       : { resultDigest: item.resultDigest }),
+    ...(item.resultImages === undefined
+      ? {}
+      : { resultImages: structuredClone(item.resultImages) }),
     ...(item.isError === undefined
       ? {}
       : { isError: item.isError }),

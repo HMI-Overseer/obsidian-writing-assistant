@@ -276,6 +276,39 @@
   color: var(--text-error);
 }
 
+/* The pictures a `read` step returned (RFC-0021 D9). One row inside the step's expand
+   block, above the Result entry, wrapping when a round read several images. The thumbs
+   themselves are the transcript's attachment thumbs, styled in ChatTranscript.css and
+   deliberately not restyled here: an image should look the same on a step as it does on
+   a message. */
+.lmsa-agentic-timeline-images {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+  margin-bottom: 0.375rem;
+}
+
+/* The record holds a path, not bytes, so an image gone from the vault has nothing to
+   show. It says so, in the muted voice of the other diagnostics, rather than rendering a
+   broken image frame. */
+.lmsa-agentic-timeline-image-missing {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: var(--font-ui-smaller);
+  color: var(--text-muted);
+}
+
+.lmsa-agentic-timeline-image-missing-icon {
+  display: inline-flex;
+  color: var(--text-faint);
+}
+
+.lmsa-agentic-timeline-image-missing-icon .svg-icon {
+  width: 0.875em;
+  height: 0.875em;
+}
+
 .lmsa-assistant-turn
   .lmsa-agentic-timeline-step-expand:not(.lmsa-hidden) {
   display: block;

@@ -487,3 +487,60 @@ describe("assistant turn render model", () => {
 function sourceItemKeys(value: object): string[] {
   return Object.keys(value);
 }
+
+// ---------------------------------------------------------------------------
+// Tool-result image metadata reaches the render item on BOTH projections (RFC-0021
+// D9, ADR-0041): the canonical turn record and the legacy AgenticStep replay. A
+// conversation from before the ordered-turn record still shows its thumbnails.
+// ---------------------------------------------------------------------------
+
+describe("tool-result images on the render item", () => {
+  const IMAGES = [
+    {
+      path: "Art/map.png",
+      mimeType: "image/png" as const,
+      byteLength: 245760,
+      width: 1024,
+      height: 768,
+    },
+  ];
+
+  it("reaches the render item from a canonical turn record", () => {
+    const item = { ...tool("t1", "s1", "call-1"), resultImages: IMAGES };
+    const model = buildAssistantTurnRenderModel(turn("completed", [item]));
+
+    expect(model.items[0]).toMatchObject({ type: "tool_call", resultImages: IMAGES });
+    // Cloned, so a render pass cannot write back into the persisted record.
+    expect(
+      (model.items[0] as { resultImages?: unknown[] }).resultImages,
+    ).not.toBe(IMAGES);
+  });
+
+  it("reaches the render item from a legacy step", () => {
+    const model = buildLegacyAssistantRenderModel({
+      key: "message-legacy:revision-legacy",
+      status: "completed",
+      content: "",
+      steps: [
+        {
+          type: "tool_call",
+          round: 0,
+          toolName: "read",
+          toolCallId: "legacy-call",
+          toolInput: "Art/map.png",
+          resultImages: IMAGES,
+        },
+      ],
+    });
+
+    expect(model.items[0]).toMatchObject({ type: "tool_call", resultImages: IMAGES });
+  });
+
+  it("is absent, not empty, on a text result", () => {
+    const model = buildAssistantTurnRenderModel(
+      turn("completed", [tool("t1", "s1", "call-1")]),
+    );
+
+    expect("resultImages" in model.items[0]).toBe(false);
+  });
+});

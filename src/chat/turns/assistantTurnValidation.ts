@@ -76,6 +76,8 @@ export type AssistantTurnInvalidReasonCode =
   | "result_record_too_long"
   | "result_digest_invalid"
   | "result_digest_too_long"
+  | "result_images_invalid"
+  | "result_image_field_unexpected"
   | "is_error_invalid"
   | "error_content_invalid"
   | "error_content_too_long"
@@ -589,6 +591,7 @@ const TOOL_ITEM_FIELDS = new Set([
   "state",
   "resultRecord",
   "resultDigest",
+  "resultImages",
   "isError",
   "errorContent",
   "actionRef",
@@ -672,6 +675,8 @@ function validateToolLifecycleFields(
     `${path}.resultDigest`,
   );
   if (resultDigestFailure) return resultDigestFailure;
+  const resultImagesFailure = validateResultImages(item.resultImages, `${path}.resultImages`);
+  if (resultImagesFailure) return resultImagesFailure;
   if (item.isError !== undefined && typeof item.isError !== "boolean") {
     return reason("is_error_invalid", `${path}.isError`);
   }
@@ -691,6 +696,62 @@ function validateToolLifecycleFields(
   }
   return null;
 }
+
+/**
+ * Tool-result image metadata, validated by shape (RFC-0021 D6, ADR-0040): a list of
+ * records naming a vault path, one of the four media types the read pathway produces, a
+ * byte count, and optional pixel dimensions.
+ *
+ * An unknown key inside a record is its own reason code rather than a generic one,
+ * because the key this rejects in practice is `data`: bytes must never reach the
+ * conversation record, and a field nobody validated is exactly how they would.
+ */
+function validateResultImages(
+  value: unknown,
+  path: string,
+): AssistantTurnInvalidReason | null {
+  if (value === undefined) return null;
+  if (!Array.isArray(value)) return reason("result_images_invalid", path);
+  for (const [index, entry] of value.entries()) {
+    const entryPath = `${path}[${index}]`;
+    if (!isRecord(entry)) return reason("result_images_invalid", entryPath);
+    const unexpected = unexpectedField(entry, RESULT_IMAGE_FIELDS, entryPath);
+    if (unexpected) return reason("result_image_field_unexpected", unexpected);
+    if (!isBoundedNonEmptyString(entry.path, ASSISTANT_TURN_MAX_ID_CHARS)) {
+      return reason("result_images_invalid", `${entryPath}.path`);
+    }
+    if (!isOneOf(entry.mimeType, RESULT_IMAGE_MIME_TYPES)) {
+      return reason("result_images_invalid", `${entryPath}.mimeType`);
+    }
+    if (!Number.isSafeInteger(entry.byteLength) || (entry.byteLength as number) < 0) {
+      return reason("result_images_invalid", `${entryPath}.byteLength`);
+    }
+    for (const key of ["width", "height"] as const) {
+      const dimension = entry[key];
+      if (dimension === undefined) continue;
+      if (!Number.isSafeInteger(dimension) || (dimension as number) <= 0) {
+        return reason("result_images_invalid", `${entryPath}.${key}`);
+      }
+    }
+  }
+  return null;
+}
+
+const RESULT_IMAGE_FIELDS = new Set([
+  "path",
+  "mimeType",
+  "byteLength",
+  "width",
+  "height",
+]);
+
+/** The four media types `read`'s image pathway can produce (SUPPORTED_IMAGE_MIME_BY_EXTENSION). */
+const RESULT_IMAGE_MIME_TYPES = [
+  "image/jpeg",
+  "image/png",
+  "image/gif",
+  "image/webp",
+] as const;
 
 function validateAskFields(
   item: Record<string, unknown>,

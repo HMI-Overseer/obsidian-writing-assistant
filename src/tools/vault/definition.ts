@@ -22,7 +22,10 @@ export const READ_TOOL: CanonicalToolDefinition = {
     "come back with cat -n style line numbers (a right-aligned number, a tab, then the " +
     "line) for reference only, and a section carries the note's own numbers, so the two " +
     "agree. The text after the tab is verbatim; when quoting a line back to an edit tool, " +
-    "use only that text and drop the line-number prefix.",
+    "use only that text and drop the line-number prefix. A path to an image (png, jpg, " +
+    "jpeg, gif, webp) returns the picture itself for you to look at when the current " +
+    "model can see images; otherwise it returns an error saying so, and you should not " +
+    "guess what the image shows.",
   strategyHint:
     "read a note once you know its path (output is line-numbered); for a long structured " +
     "note, prefer get_outline then read with that headingPath",

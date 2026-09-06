@@ -176,3 +176,76 @@ describe("buildVaultSdkTools tool-use ID threading", () => {
     expect(calls[0].call.id).not.toBe("73");
   });
 });
+
+// ---------------------------------------------------------------------------
+// Tool-result images through the SDK bridge (RFC-0021 D5, ADR-0041). This is the
+// carriage Stage 0 measured end to end: the CLI delivers the image and echoes the
+// text item byte-identically, which is what the step's record depends on.
+// ---------------------------------------------------------------------------
+
+describe("buildVaultSdkTools image carriage", () => {
+  const IMAGE = {
+    path: "Art/map.png",
+    mimeType: "image/png" as const,
+    data: "AQID",
+    byteLength: 3,
+    width: 1,
+    height: 1,
+  };
+
+  const definition = STABLE_SET[0];
+
+  function bridgeFor(result: ToolResult) {
+    const provider: McpToolProvider = {
+      listTools: () => [definition],
+      callTool: async () => result,
+    };
+    return buildVaultSdkTools(provider)[0];
+  }
+
+  it("returns the text item then one image item per picture", async () => {
+    const tool = bridgeFor({
+      content: "[Art/map.png]\n\nImage: PNG, 1x1, 3 B",
+      isReadOnly: true,
+      images: [IMAGE],
+    });
+
+    const result = await tool.handler({}, { requestId: 1 });
+
+    expect(result.content).toEqual([
+      { type: "text", text: "[Art/map.png]\n\nImage: PNG, 1x1, 3 B" },
+      { type: "image", data: "AQID", mimeType: "image/png" },
+    ]);
+    expect(result.isError).toBe(false);
+  });
+
+  it("emits every image, in result order", async () => {
+    const tool = bridgeFor({
+      content: "two",
+      isReadOnly: true,
+      images: [
+        IMAGE,
+        { path: "Art/tree.webp", mimeType: "image/webp", data: "BAUG", byteLength: 3 },
+      ],
+    });
+
+    const result = await tool.handler({}, { requestId: 1 });
+
+    expect(result.content).toEqual([
+      { type: "text", text: "two" },
+      { type: "image", data: "AQID", mimeType: "image/png" },
+      { type: "image", data: "BAUG", mimeType: "image/webp" },
+    ]);
+  });
+
+  it("is byte-identical to the pre-change shape for a text-only result", async () => {
+    const tool = bridgeFor({ content: "just text", isReadOnly: true });
+
+    const result = await tool.handler({}, { requestId: 1 });
+
+    expect(result).toEqual({
+      content: [{ type: "text", text: "just text" }],
+      isError: false,
+    });
+  });
+});

@@ -10,7 +10,7 @@ import type {
 } from "../vault-ops/types";
 import type { VaultOpPolicy } from "../vault-ops/gateway";
 import type { VaultOpDisposition } from "../vault-ops/disposition";
-import type { ToolCall } from "../tools/types";
+import type { ToolCall, ToolResultImage } from "../tools/types";
 
 // ---------------------------------------------------------------------------
 // Attachments
@@ -37,6 +37,19 @@ export interface ImageAttachment {
    */
   sourceNotePath?: string;
 }
+
+/**
+ * What a persisted step keeps of an image a tool returned: everything about the
+ * picture except the picture (RFC-0021 D6, ADR-0041). The bytes stay out of the
+ * conversation record, which is bounded on purpose, and the timeline reloads the
+ * thumbnail from the vault by `path`, so a deleted image reads as missing rather
+ * than stale.
+ *
+ * Declared here rather than in the tool domain because three consumers share it:
+ * the persisted {@link AssistantToolCallItem}, the legacy {@link AgenticStep}, and
+ * Claude Code's tool-lifecycle event.
+ */
+export type ToolResultImageRecord = Omit<ToolResultImage, "data">;
 
 /**
  * A point-in-time snapshot of a vault note attached to a user message.
@@ -465,6 +478,12 @@ export interface AssistantToolCallItem {
   askGuidance?: CompletedAskGuidanceRecord;
   askStatus?: "completed" | "cancelled" | "skipped";
   round?: number;
+  /**
+   * Metadata for the images this tool result returned, never their bytes (RFC-0021 D6,
+   * ADR-0041). Validated by shape on reload; the picture itself is reloaded from the
+   * vault by `path`.
+   */
+  resultImages?: ToolResultImageRecord[];
   /** Required on every item of a version-2 turn (ADR-0031). */
   captureEvidence?: ProviderItemCaptureEvidence;
 }
@@ -921,6 +940,15 @@ export interface AgenticStep {
    * completed, cancelled, and skipped survive transcript persistence.
    */
   askStatus?: "completed" | "cancelled" | "skipped";
+  /**
+   * For tool_call: metadata for the images the tool returned, never their bytes
+   * (RFC-0021 D6, ADR-0041). The timeline reloads each picture from the vault by
+   * `path`, so a deleted image reads as missing rather than stale, and the
+   * conversation JSON stays the bounded footprint {@link resultRecord}'s cap exists
+   * to keep. Absent on every text result and on every step recorded before the
+   * field existed.
+   */
+  resultImages?: ToolResultImageRecord[];
 }
 
 /**

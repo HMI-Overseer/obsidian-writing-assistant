@@ -498,3 +498,75 @@ describe("DISCOVERY_DIGEST_TOOLS drift guard", () => {
     }
   });
 });
+
+// ---------------------------------------------------------------------------
+// Tool-result image metadata (RFC-0021 D6, ADR-0041). The capture is the one place
+// the bytes are dropped, so neither choke point can forget to.
+// ---------------------------------------------------------------------------
+
+describe("captureStepFields with tool-result images", () => {
+  const STUB =
+    "[Art/map.png]\n\nImage: PNG, 1024x768, 240.0 KB, attached as an image block.";
+
+  const image = {
+    path: "Art/map.png",
+    mimeType: "image/png" as const,
+    data: "AQID",
+    byteLength: 245760,
+    width: 1024,
+    height: 768,
+  };
+
+  it("records the metadata, drops the bytes, and keeps the stub as the record", () => {
+    const fields = captureStepFields(
+      "read",
+      { path: "Art/map.png" },
+      { content: STUB, images: [image] },
+    );
+
+    expect(fields.resultImages).toEqual([
+      {
+        path: "Art/map.png",
+        mimeType: "image/png",
+        byteLength: 245760,
+        width: 1024,
+        height: 768,
+      },
+    ]);
+    // The one assertion this whole field exists for.
+    expect(JSON.stringify(fields.resultImages)).not.toContain("AQID");
+    expect(fields.resultRecord).toBe(STUB);
+    // `read` is not a discovery tool, so it earns no pointer digest, image or not.
+    expect(fields.resultDigest).toBeUndefined();
+  });
+
+  it("omits absent dimensions rather than storing undefined", () => {
+    const { data: _data, width: _width, height: _height, ...noDimensions } = image;
+    const fields = captureStepFields("read", {}, { content: STUB, images: [noDimensions] });
+
+    expect(fields.resultImages).toEqual([
+      { path: "Art/map.png", mimeType: "image/png", byteLength: 245760 },
+    ]);
+    expect(Object.keys(fields.resultImages?.[0] ?? {})).toEqual([
+      "path",
+      "mimeType",
+      "byteLength",
+    ]);
+  });
+
+  it("accepts already-stripped metadata, which is what Claude Code hands it", () => {
+    const { data: _data, ...record } = image;
+    const fields = captureStepFields("read", {}, { content: STUB, images: [record] });
+
+    expect(fields.resultImages).toEqual([record]);
+  });
+
+  it("leaves a text result exactly as before", () => {
+    const withField = captureStepFields("read", { path: "a.md" }, { content: "text" });
+    const withEmpty = captureStepFields("read", { path: "a.md" }, { content: "text", images: [] });
+
+    expect(withField.resultImages).toBeUndefined();
+    expect(withEmpty.resultImages).toBeUndefined();
+    expect(withField).toEqual({ resultRecord: "text" });
+  });
+});

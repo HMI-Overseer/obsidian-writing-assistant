@@ -15,12 +15,33 @@ import {
 } from "./definition";
 import { formatWithLineNumbers } from "./readFormat";
 import { buildOutline, sectionLines, matchSection, countWords } from "./outline";
+import { readImageDimensions } from "./imageHeader";
+import {
+  MAX_NOTE_CONTEXT_IMAGE_SIZE_BYTES,
+  SUPPORTED_IMAGE_MIME_BY_EXTENSION,
+} from "../../constants";
+import { arrayBufferToBase64, formatByteCount } from "../../utils";
+import type { ImageMimeType } from "../../shared/types";
+
+/**
+ * Whether an image `read` can put the picture in front of the model, and when it
+ * cannot, which of the two reasons applies (RFC-0021 D3, P1). Three-valued so the
+ * handler names the right refusal without knowing the provider: the model has no
+ * image input, or this runtime's wire shape carries no image at all.
+ */
+export type ImageDelivery = "inline" | "model-cannot-see" | "transport-cannot-carry";
 
 export interface VaultToolContext {
   app: App;
   ragService: RagService;
   /** Vault-relative path of the active file, for `semantic_search` relevance boosting. */
   activeFilePath?: string;
+  /**
+   * Required, not optional: an omitted flag would silently default one of the two
+   * construction sites and drop images on a path that could carry them, so `tsc`
+   * names every site instead (RFC-0021 P1).
+   */
+  imageDelivery: ImageDelivery;
 }
 
 /**
@@ -172,6 +193,15 @@ async function executeRead(
     });
   }
 
+  // One tool, one dispatch: `read` is the path-to-content tool and an image is content
+  // at a path (RFC-0021 D1, ADR-0041). The five extensions are the ones the attachment
+  // pipeline already accepts, so anything else, a `.canvas` included, keeps today's
+  // text behaviour rather than becoming an unsupported-image error.
+  const imageMimeType = SUPPORTED_IMAGE_MIME_BY_EXTENSION[file.extension.toLowerCase()];
+  if (imageMimeType) {
+    return readImage(file, path, imageMimeType, args, ctx);
+  }
+
   // A blank headingPath is an absent one, so it widens to the whole note rather than
   // refusing: there is no value here that returns a plausible wrong answer.
   const headingPath = typeof args.headingPath === "string" ? args.headingPath.trim() : "";
@@ -218,6 +248,124 @@ async function executeRead(
     content: `[${path} > ${match.heading.headingPath}]\n\n${numbered}`,
     isReadOnly: true,
   };
+}
+
+/**
+ * `read`'s image pathway (RFC-0021,
+ * {@link ../../../docs/03-decisions/ADR-0041-read-returns-vault-images-to-vision-models.md ADR-0041}):
+ * the picture itself for a model that can
+ * see it, and a failure that says why not for one that cannot. Before this existed the
+ * bytes were decoded as UTF-8 and line-numbered, so an image read cost thousands of
+ * tokens of replacement characters and told the model nothing.
+ *
+ * The order of the checks is the contract. `headingPath` is a call the model got wrong
+ * whatever the delivery, so it is named first. The delivery gate then runs BEFORE any
+ * read: composing "cannot be viewed" out of bytes nobody will look at is waste, and
+ * the dimensions of a refused picture are not the model's business (P5). The size gate
+ * reads `stat.size`, so an oversized file is refused without loading it either.
+ */
+async function readImage(
+  file: TFile,
+  path: string,
+  mimeType: ImageMimeType,
+  args: Record<string, unknown>,
+  ctx: VaultToolContext,
+): Promise<ToolResult> {
+  const format = imageFormatLabel(mimeType);
+
+  const headingPath = typeof args.headingPath === "string" ? args.headingPath.trim() : "";
+  if (headingPath) {
+    return toolFailure({
+      kind: "invalid-args",
+      what: `an image has no sections to read: "${path}" is a ${format} image`,
+      recovery: "omit headingPath to read the image itself",
+    });
+  }
+
+  if (ctx.imageDelivery !== "inline") {
+    // Two refusals, one shape (RFC-0021 D4). The handler picks the clause from the
+    // delivery value and never asks which provider is running: the model's own limit
+    // and the runtime's wire format are different facts, and telling the user the
+    // wrong one is worse than saying nothing.
+    const size = formatByteCount(file.stat.size);
+    const cannotSee = ctx.imageDelivery === "model-cannot-see";
+    return toolFailure({
+      kind: "unavailable",
+      what:
+        `the image at "${path}" (${format}, ${size}) ` +
+        (cannotSee
+          ? "cannot be viewed by the current model"
+          : "cannot be delivered on this runtime"),
+      recovery: cannotSee
+        ? "tell the user this model has no image input, they can switch to a " +
+          "vision-capable model or describe the image, and you should not guess its contents"
+        : "tell the user this runtime cannot pass images to the model, they can describe " +
+          "the image, and you should not guess its contents",
+    });
+  }
+
+  if (file.stat.size > MAX_NOTE_CONTEXT_IMAGE_SIZE_BYTES) {
+    // A named failure, not a silent downscale: there is no image codec in this process
+    // and this RFC does not add one (RFC-0021 D8, RFC-0010).
+    return toolFailure({
+      kind: "precondition",
+      what:
+        `the image at "${path}" is ${formatByteCount(file.stat.size)}, over the ` +
+        `${formatByteCount(MAX_NOTE_CONTEXT_IMAGE_SIZE_BYTES)} limit for one image`,
+      recovery:
+        "ask the user to resize or crop it, or to describe what it shows, and read a " +
+        "smaller image instead",
+    });
+  }
+
+  const binary = await ctx.app.vault.readBinary(file);
+  const dimensions = readImageDimensions(new Uint8Array(binary));
+  return {
+    content: imageStub(path, format, binary.byteLength, dimensions, mimeType),
+    isReadOnly: true,
+    images: [
+      {
+        path,
+        mimeType,
+        data: arrayBufferToBase64(binary),
+        byteLength: binary.byteLength,
+        ...(dimensions ?? {}),
+      },
+    ],
+  };
+}
+
+/**
+ * The text beside the picture (RFC-0021 D2, P13). It states what was attached and, in
+ * the same breath, what to do if it did not arrive: on the one provider where the
+ * vision flag can be unknown, a server that drops the image part would otherwise leave
+ * the model holding a promise of a picture it never got, which is exactly the guessing
+ * the refusal above exists to prevent. So the stub never asserts delivery.
+ */
+function imageStub(
+  path: string,
+  format: string,
+  byteLength: number,
+  dimensions: { width: number; height: number } | null,
+  mimeType: ImageMimeType,
+): string {
+  const size = dimensions
+    ? `${dimensions.width}x${dimensions.height}, ${formatByteCount(byteLength)}`
+    : formatByteCount(byteLength);
+  // Static for every GIF, animated or not: counting frames means walking every image
+  // descriptor in the file, which is a parser for one sentence (RFC-0021 P9).
+  const gifCaveat =
+    mimeType === "image/gif" ? " Animated GIFs may be read as their first frame only." : "";
+  return (
+    `[${path}]\n\nImage: ${format}, ${size}, attached as an image block. If no image is ` +
+    "visible to you, this model has no image input: tell the user and do not guess its " +
+    `contents.${gifCaveat}`
+  );
+}
+
+/** The format name a human reads, from the media type rather than the extension. */
+function imageFormatLabel(mimeType: ImageMimeType): string {
+  return mimeType.slice("image/".length).toUpperCase();
 }
 
 async function executeGetOutline(
@@ -333,8 +481,14 @@ function executeListDirectory(
 }
 
 /**
- * Collect one folder's `[DIR]` / `[FILE]` lines, recursing while levels remain.
- * Full paths, so the flat sorted list still encodes the tree.
+ * Collect one folder's `[DIR]` / `[FILE]` / `[IMAGE]` lines, recursing while levels
+ * remain. Full paths, so the flat sorted list still encodes the tree, and a listed path
+ * is the exact on-disk path `read` takes.
+ *
+ * Images are listed because `read` can now open one (RFC-0021). Only the five extensions
+ * that pathway accepts, never every non-Markdown file: a `.pdf` or a `.canvas` in the
+ * listing would be a path the model can do nothing with, which is the dead end this
+ * change exists to close, pointed the other way.
  */
 function collectDirectoryEntries(folder: TFolder, levels: number, into: string[]): void {
   for (const child of folder.children) {
@@ -343,8 +497,15 @@ function collectDirectoryEntries(folder: TFolder, levels: number, into: string[]
       if (levels > 1) collectDirectoryEntries(child, levels - 1, into);
     } else if (child instanceof TFile && child.extension === "md") {
       into.push(`[FILE] ${child.path}`);
+    } else if (child instanceof TFile && isReadableImage(child)) {
+      into.push(`[IMAGE] ${child.path}`);
     }
   }
+}
+
+/** Whether `read` would take its image pathway for this file. */
+function isReadableImage(file: TFile): boolean {
+  return SUPPORTED_IMAGE_MIME_BY_EXTENSION[file.extension.toLowerCase()] !== undefined;
 }
 
 function executeSearchFiles(
@@ -371,8 +532,12 @@ function executeSearchFiles(
   const patternRegex = globToRegex(rawPattern);
   const excludeRegexes = excludePatterns.map(globToRegex);
 
+  // Notes plus the images `read` can open (RFC-0021): a `*.png` pattern used to find
+  // nothing, which is the same dead end one tool over. Everything else the vault holds
+  // stays unlisted, because no read tool can do anything with it.
   const matches: string[] = [];
-  for (const file of ctx.app.vault.getMarkdownFiles()) {
+  for (const file of ctx.app.vault.getFiles()) {
+    if (file.extension !== "md" && !isReadableImage(file)) continue;
     if (scopePath && !file.path.startsWith(scopePath + "/") && file.path !== scopePath) {
       continue;
     }

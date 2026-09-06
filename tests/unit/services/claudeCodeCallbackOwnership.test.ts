@@ -1,4 +1,5 @@
 import type { App } from "obsidian";
+import { TFile } from "obsidian";
 import { describe, expect, it, vi } from "vitest";
 import { DEFAULT_SETTINGS } from "../../../src/constants";
 import { MemoryService } from "../../../src/memory/MemoryService";
@@ -47,6 +48,23 @@ function app(): App {
   } as unknown as App;
 }
 
+/**
+ * An app whose vault holds exactly one image, so a `read` through the callback surface
+ * reaches the image pathway against real bytes (RFC-0021).
+ */
+function appWithImage(path: string, bytes: Uint8Array): App {
+  const file = Object.assign(new TFile(), {
+    path,
+    name: path.split("/").pop() ?? path,
+    extension: path.split(".").pop() ?? "",
+    stat: { size: bytes.length, ctime: 0, mtime: 0 },
+  });
+  const base = app() as unknown as { vault: Record<string, unknown> };
+  base.vault.getFileByPath = (p: string) => (p === path ? file : null);
+  base.vault.readBinary = () => Promise.resolve(bytes.buffer as ArrayBuffer);
+  return base as unknown as App;
+}
+
 function settings(): PluginSettings {
   return {
     ...DEFAULT_SETTINGS,
@@ -80,11 +98,14 @@ function scope(overrides: Partial<ClaudeCodeRuntimeScope> = {}): ClaudeCodeRunti
     ]),
     activeFilePath: "Notes/active.md",
     correlationPosture: "provider_id",
+    // Required on the context, so every scope names it. The SDK bridge delivers, which
+    // is what these cases run on (RFC-0021 P1).
+    imageDelivery: "inline",
     ...overrides,
   };
 }
 
-function harness() {
+function harness(vaultApp: App = app()) {
   const currentSettings = settings();
   const memoryService = new MemoryService(() => currentSettings.memories);
   const retrieve = vi.fn(async () => []);
@@ -94,7 +115,7 @@ function harness() {
     retrieve,
   };
   const service = new ClaudeCodeService(
-    app(),
+    vaultApp,
     () => currentSettings,
     () => ragService as never,
     () => memoryService,
@@ -865,5 +886,69 @@ describe("ClaudeCodeService generation handles", () => {
     expect(cancelPending).toHaveBeenCalledWith("destroyed");
     expect(seam.liveHandles.size).toBe(0);
     expect(runtime?.generation?.activeLease?.state).toBe("tombstoned");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Tool-result image metadata on the lifecycle event (RFC-0021 P7, D6). The bytes
+// leave through the MCP bridge; the timeline and the persisted step get the
+// metadata, and never the base64.
+// ---------------------------------------------------------------------------
+
+describe("tool-result images on the lifecycle end event", () => {
+  /** A real 1x1 PNG header, so the dimensions come from the parser, not a fixture. */
+  const PNG_1X1 = new Uint8Array([
+    0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
+    0x00, 0x00, 0x00, 0x0d, 0x49, 0x48, 0x44, 0x52,
+    0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
+    0x08, 0x06, 0x00, 0x00, 0x00,
+  ]);
+
+  it("carries the image metadata without the bytes", async () => {
+    const events: ClaudeCodeToolEvent[] = [];
+    const { surface } = harness(appWithImage("Art/map.png", PNG_1X1));
+    const { handle, provider } = surface();
+    handle.activate(owners({ lifecycle: (event) => events.push(event) }));
+
+    const result = await provider.callTool(
+      { id: "toolu_img", name: "read", arguments: { path: "Art/map.png" } },
+      { toolCorrelation: "provider_id" },
+    );
+
+    // The result the bridge returns still carries the picture.
+    expect(result.images?.[0].data).toBe(Buffer.from(PNG_1X1).toString("base64"));
+
+    const end = events.find((event) => event.phase === "end");
+    expect(end?.phase).toBe("end");
+    if (end?.phase !== "end") throw new Error("no end event");
+    expect(end.images).toEqual([
+      {
+        path: "Art/map.png",
+        mimeType: "image/png",
+        byteLength: PNG_1X1.length,
+        width: 1,
+        height: 1,
+      },
+    ]);
+    // The one thing this event must never carry.
+    expect(JSON.stringify(end.images)).not.toContain("data");
+    // And the text record is the stub, unchanged by the image beside it.
+    expect(end.content).toContain("[Art/map.png]");
+  });
+
+  it("omits the field entirely for a text result", async () => {
+    const events: ClaudeCodeToolEvent[] = [];
+    const { surface } = harness();
+    const { handle, provider } = surface();
+    handle.activate(owners({ lifecycle: (event) => events.push(event) }));
+
+    await provider.callTool(
+      { id: "toolu_txt", name: "read", arguments: { path: "Notes/missing.md" } },
+      { toolCorrelation: "provider_id" },
+    );
+
+    const end = events.find((event) => event.phase === "end");
+    if (end?.phase !== "end") throw new Error("no end event");
+    expect("images" in end).toBe(false);
   });
 });

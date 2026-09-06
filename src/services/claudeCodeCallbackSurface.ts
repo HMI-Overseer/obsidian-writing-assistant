@@ -1,5 +1,5 @@
 import type { App } from "obsidian";
-import type { AgenticStep, PluginSettings } from "../shared/types";
+import type { AgenticStep, PluginSettings, ToolResultImageRecord } from "../shared/types";
 import type { MemoryService } from "../memory/MemoryService";
 import type { RagService } from "../rag/ragService";
 import type { McpToolCallContext, McpToolProvider } from "../mcp/VaultMcpServer";
@@ -157,6 +157,10 @@ async function routeCallback(
   // The reviewed op's real disposition, when present, so the persisted step records
   // the outcome for the cold-rebuild replay digest (ADR-0016).
   let disposition: VaultOpDisposition | undefined;
+  // Image metadata, stripped of the bytes here rather than downstream: nothing past
+  // this point has any use for base64, and the lifecycle event is what the persisted
+  // step is built from (RFC-0021 P7).
+  let images: ToolResultImageRecord[] | undefined;
   try {
     if (barrierResult) {
       content = barrierResult.content;
@@ -166,6 +170,7 @@ async function routeCallback(
     isError = result.isError ?? false;
     content = result.content;
     disposition = result.disposition;
+    images = result.images?.map(({ data: _data, ...record }) => record);
     return result;
   } finally {
     if (claimedAsk) lease.releaseAsk();
@@ -178,6 +183,7 @@ async function routeCallback(
         content,
         toolCallId,
         disposition,
+        ...(images?.length ? { images } : {}),
         ...(isAsk && { askStatus: askStatusFromResult(isError, content) }),
       });
     }
@@ -212,6 +218,7 @@ function executeUnderLease(
         app: deps.app,
         ragService: deps.getRagService(),
         activeFilePath: lease.context.activeFilePath || undefined,
+        imageDelivery: lease.context.imageDelivery,
       }),
     );
   }

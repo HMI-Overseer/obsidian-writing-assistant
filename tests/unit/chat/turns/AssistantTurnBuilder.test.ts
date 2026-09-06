@@ -512,3 +512,103 @@ describe("AssistantTurnBuilder terminal records", () => {
     expect(Object.isFrozen(finished.items)).toBe(true);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Tool-result image metadata through the builder (RFC-0021 D6, ADR-0041). It travels
+// the same four paths `resultRecord` does, so it is asserted on all four.
+// ---------------------------------------------------------------------------
+
+describe("AssistantTurnBuilder tool-result images", () => {
+  const IMAGES = [
+    {
+      path: "Art/map.png",
+      mimeType: "image/png" as const,
+      byteLength: 245760,
+      width: 1024,
+      height: 768,
+    },
+  ];
+
+  it("survives a lifecycle update onto a declared tool item", () => {
+    const turn = builder();
+    turn.startSegment({ segmentId: "segment-1" });
+    turn.startToolCall("segment-1", {
+      declarationKey: "segment-1:0",
+      toolCallId: "call-a",
+      toolName: "read",
+    });
+    turn.updateToolLifecycle("call-a", {
+      state: "completed",
+      resultRecord: "[Art/map.png]",
+      resultImages: IMAGES,
+    });
+
+    expect(turn.snapshot().items[0]).toMatchObject({ resultImages: IMAGES });
+    expect(turn.finishTurn("completed").items[0]).toMatchObject({
+      resultImages: IMAGES,
+    });
+  });
+
+  it("survives a pending update that lands before the declaration", () => {
+    const turn = builder();
+    const reservedId = turn.reserveToolItemId("call-race", "item-reserved");
+    turn.updateToolLifecycle("call-race", {
+      state: "completed",
+      resultRecord: "[Art/map.png]",
+      resultImages: IMAGES,
+    });
+    expect(turn.snapshot().items).toEqual([]);
+
+    turn.startSegment({ segmentId: "segment-1" });
+    turn.startToolCall("segment-1", {
+      declarationKey: "segment-1:0",
+      toolCallId: "call-race",
+      toolName: "read",
+    });
+
+    expect(turn.snapshot().items[0]).toMatchObject({
+      id: reservedId,
+      resultImages: IMAGES,
+    });
+  });
+
+  it("is cloned, not shared, by the snapshot", () => {
+    const turn = builder();
+    turn.startSegment({ segmentId: "segment-1" });
+    turn.startToolCall("segment-1", {
+      declarationKey: "segment-1:0",
+      toolCallId: "call-a",
+      toolName: "read",
+    });
+    turn.updateToolLifecycle("call-a", { state: "completed", resultImages: IMAGES });
+
+    const first = turn.snapshot().items[0] as { resultImages?: unknown[] };
+    expect(first.resultImages).toEqual(IMAGES);
+    // A published snapshot is a copy of the draft, never a window onto it.
+    expect(first.resultImages).not.toBe(IMAGES);
+  });
+
+  it("accepts the same list twice and rejects a different one, like the result record", () => {
+    const turn = builder();
+    turn.startSegment({ segmentId: "segment-1" });
+    turn.startToolCall("segment-1", {
+      declarationKey: "segment-1:0",
+      toolCallId: "call-a",
+      toolName: "read",
+    });
+    turn.updateToolLifecycle("call-a", { state: "completed", resultImages: IMAGES });
+    // Compared by value: the same list from a second source is not a conflict.
+    turn.updateToolLifecycle("call-a", {
+      state: "completed",
+      resultImages: structuredClone(IMAGES),
+    });
+    expect(turn.snapshot().items[0]).toMatchObject({ resultImages: IMAGES });
+
+    expect(() =>
+      turn.updateToolLifecycle("call-a", {
+        state: "completed",
+        resultImages: [{ ...IMAGES[0], path: "Art/other.png" }],
+      }),
+    ).toThrow(/result images cannot be changed/i);
+  });
+});

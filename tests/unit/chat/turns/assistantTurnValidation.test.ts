@@ -319,6 +319,92 @@ describe("validateAssistantTurn", () => {
     turn.rawProviderEvents = [{ secret: "not allowed" }];
     expect(reasonCode(turn)).toBe("field_unexpected");
   });
+
+  // Tool-result image metadata (RFC-0021 D6, ADR-0041). A field the allowlist does not
+  // know is rejected outright, so an unregistered `resultImages` would make every
+  // conversation holding an image read fail validation on reload. That is the exact
+  // failure these cases exist to have already happened once, in a test.
+  describe("tool-result image metadata", () => {
+    /** The turn's tool item, with a well-formed image list. */
+    function withImages(images: unknown): Record<string, unknown> {
+      const turn = mutableTurn();
+      const items = turn.items as Record<string, unknown>[];
+      const tool = items.find((item) => item.type === "tool_call");
+      if (!tool) throw new Error("fixture has no tool item");
+      tool.resultImages = images;
+      return turn;
+    }
+
+    const ONE_IMAGE = [
+      {
+        path: "Art/map.png",
+        mimeType: "image/png",
+        byteLength: 245760,
+        width: 1024,
+        height: 768,
+      },
+    ];
+
+    it("accepts a well-formed list, with and without dimensions", () => {
+      expect(validateAssistantTurn(withImages(ONE_IMAGE)).ok).toBe(true);
+      expect(
+        validateAssistantTurn(
+          withImages([{ path: "Art/map.gif", mimeType: "image/gif", byteLength: 0 }]),
+        ).ok,
+      ).toBe(true);
+      expect(
+        validateAssistantTurn(
+          withImages([
+            ONE_IMAGE[0],
+            { path: "Art/tree.webp", mimeType: "image/webp", byteLength: 12, width: 2, height: 3 },
+          ]),
+        ).ok,
+      ).toBe(true);
+    });
+
+    it("accepts an empty list and an absent field", () => {
+      expect(validateAssistantTurn(withImages([])).ok).toBe(true);
+      expect(validateAssistantTurn(mutableTurn()).ok).toBe(true);
+    });
+
+    it("rejects a malformed list with its own reason code", () => {
+      for (const bad of [
+        "not an array",
+        {},
+        [null],
+        ["a string"],
+        // Missing path.
+        [{ mimeType: "image/png", byteLength: 1 }],
+        // Blank path.
+        [{ path: "  ", mimeType: "image/png", byteLength: 1 }],
+        // A media type this pathway never produces.
+        [{ path: "a.bmp", mimeType: "image/bmp", byteLength: 1 }],
+        // Sizes that cannot be real.
+        [{ path: "a.png", mimeType: "image/png", byteLength: -1 }],
+        [{ path: "a.png", mimeType: "image/png", byteLength: 1.5 }],
+        [{ path: "a.png", mimeType: "image/png" }],
+        // Dimensions present but not positive integers.
+        [{ path: "a.png", mimeType: "image/png", byteLength: 1, width: 0, height: 1 }],
+        [{ path: "a.png", mimeType: "image/png", byteLength: 1, width: 1, height: -3 }],
+        [{ path: "a.png", mimeType: "image/png", byteLength: 1, width: "1", height: 1 }],
+      ]) {
+        expect(reasonCode(withImages(bad)), JSON.stringify(bad)).toBe(
+          "result_images_invalid",
+        );
+      }
+    });
+
+    it("rejects an unknown key inside an image record, bytes above all", () => {
+      // The one thing this record must never carry, named explicitly: a persisted
+      // conversation must not grow base64 through a field nobody validated.
+      expect(
+        reasonCode(withImages([{ ...ONE_IMAGE[0], data: "AQID" }])),
+      ).toBe("result_image_field_unexpected");
+      expect(
+        reasonCode(withImages([{ ...ONE_IMAGE[0], hash: "abc" }])),
+      ).toBe("result_image_field_unexpected");
+    });
+  });
 });
 
 describe("validateProviderReplayCapsule", () => {

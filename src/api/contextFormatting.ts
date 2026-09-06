@@ -30,3 +30,13 @@ export function formatAdditionalContextItem(item: AdditionalContextItem): string
 export function noteImageLabel(sourceNotePath: string, fileName: string): string {
   return `Embedded image from attached note (${sourceNotePath}): ${fileName}`;
 }
+
+/**
+ * Provenance label for an image a tool read returned (RFC-0021 D5). It rides a
+ * synthesized `user` message on the OpenAI wire format, because a `tool` message
+ * accepts text parts only, so the label has to say whose voice this is: without it
+ * the model can read the picture as something the user just sent.
+ */
+export function toolImageLabel(path: string): string {
+  return `Image returned by read for ${path}`;
+}

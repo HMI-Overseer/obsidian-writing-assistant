@@ -54,11 +54,15 @@ export const STATIC_CATALOG_ENTRIES = {
     { modelId: "text-embedding-3-large", name: "Text Embedding 3 Large", role: "embedding", contextWindowSize: 8191 },
     { modelId: "text-embedding-3-small", name: "Text Embedding 3 Small", role: "embedding", contextWindowSize: 8191 },
   ],
+  // The four aliases resolve to vision-capable Claude models, and the harness delivers
+  // images on both its SDK paths, so the flag is `true` rather than absent: without it the
+  // resolver falls through to LM Studio-only discovery and reports "cannot see" on the one
+  // provider whose bridge already carries a picture (RFC-0021 D3).
   claudecode: [
-    { modelId: "fable", name: "Fable (Claude Code)", role: "completion" },
-    { modelId: "haiku", name: "Haiku (Claude Code)", role: "completion" },
-    { modelId: "opus", name: "Opus (Claude Code)", role: "completion" },
-    { modelId: "sonnet", name: "Sonnet (Claude Code)", role: "completion" },
+    { modelId: "fable", name: "Fable (Claude Code)", role: "completion", vision: true },
+    { modelId: "haiku", name: "Haiku (Claude Code)", role: "completion", vision: true },
+    { modelId: "opus", name: "Opus (Claude Code)", role: "completion", vision: true },
+    { modelId: "sonnet", name: "Sonnet (Claude Code)", role: "completion", vision: true },
   ],
 };
 

@@ -13,7 +13,12 @@
  */
 
 import { assertNever } from "../utils";
-import type { AgenticStep, CompletedAskGuidanceRecord } from "../shared/types";
+import type {
+  AgenticStep,
+  CompletedAskGuidanceRecord,
+  ToolResultImageRecord,
+} from "../shared/types";
+import type { ToolResultImage } from "./types";
 import type { VaultOpDisposition } from "../vault-ops/disposition";
 import { ASK_USER_TOOL_NAME } from "./ask/definition";
 import {
@@ -40,6 +45,12 @@ export interface ResolvedToolResult {
   isError?: boolean;
   /** The reviewed op's real disposition, when this call went through review. */
   disposition?: VaultOpDisposition;
+  /**
+   * Images the result carried, with or without their bytes. The plugin loop hands the
+   * full {@link ../tools/types.ToolResultImage}s, Claude Code's lifecycle event hands
+   * metadata already stripped; either way the capture stores metadata only (RFC-0021 D6).
+   */
+  images?: ToolResultImageRecord[] | ToolResultImage[];
 }
 
 /** The replay-capture fields merged onto an {@link ../shared/types.AgenticStep} (ADR-0016). */
@@ -48,6 +59,14 @@ export interface StepCaptureFields {
   resultRecord?: string;
   disposition?: VaultOpDisposition;
   askGuidance?: CompletedAskGuidanceRecord;
+  /**
+   * What the step keeps of an image the tool returned: the path, format, size and
+   * dimensions, never the base64 (RFC-0021 D6). The bound on `resultRecord` exists so
+   * vault content in the conversation JSON stays linear, and a loop can read as many
+   * images as it likes, so bytes here would defeat that bound outright. The timeline
+   * reloads the picture from the vault by path instead.
+   */
+  resultImages?: ToolResultImageRecord[];
 }
 
 /**
@@ -80,6 +99,16 @@ export function captureStepFields(
   if (result.content) fields.resultRecord = boundToolResult(result.content);
   if (result.disposition !== undefined) fields.disposition = result.disposition;
   if (askCapture) fields.askGuidance = askCapture.guidance;
+  // `data` is dropped here rather than at each choke point, so neither can forget to.
+  if (result.images?.length) {
+    fields.resultImages = result.images.map(({ path, mimeType, byteLength, width, height }) => ({
+      path,
+      mimeType,
+      byteLength,
+      ...(width === undefined ? {} : { width }),
+      ...(height === undefined ? {} : { height }),
+    }));
+  }
   return fields;
 }
 

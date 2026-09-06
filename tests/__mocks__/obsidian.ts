@@ -63,6 +63,8 @@ export class TFile {
   name = "";
   path = "";
   extension = "md";
+  /** Obsidian's file stats. `size` is what the image size gate reads. */
+  stat: { size: number; ctime: number; mtime: number } = { size: 0, ctime: 0, mtime: 0 };
 }
 
 export class TFolder {

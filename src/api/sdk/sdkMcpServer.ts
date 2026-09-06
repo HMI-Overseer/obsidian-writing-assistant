@@ -1,4 +1,5 @@
 import { jsonSchemaToZodShape } from "../../mcp/sdkToolSchema";
+import { toMcpContent } from "../../mcp/toolResultContent";
 import type { ZodRawShape } from "../../mcp/sdkToolSchema";
 import type { McpToolProvider } from "../../mcp/VaultMcpServer";
 import { isAlwaysLoadedCoreTool } from "../../tools/toolSurface";
@@ -49,7 +50,7 @@ export function buildVaultSdkTools(
             : { toolCorrelation: "provider_id" },
         );
         return {
-          content: [{ type: "text", text: result.content }],
+          content: toMcpContent(result),
           isError: result.isError ?? false,
         };
       },

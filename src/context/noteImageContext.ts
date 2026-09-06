@@ -6,6 +6,7 @@ import {
   SUPPORTED_IMAGE_MIME_BY_EXTENSION,
 } from "../constants";
 import type { NoteImageContextItem } from "../shared/chatRequest";
+import { arrayBufferToBase64 } from "../utils";
 
 interface NoteImageSource {
   file: TFile;
@@ -130,16 +131,6 @@ function notifySkippedImages(skipped: string[]): void {
     ? fresh.join(", ")
     : `${fresh.slice(0, 3).join(", ")} and ${fresh.length - 3} more`;
   new Notice(`Some embedded images were not sent to the model: ${detail}`);
-}
-
-function arrayBufferToBase64(buffer: ArrayBuffer): string {
-  const bytes = new Uint8Array(buffer);
-  const chunkSize = 0x8000;
-  const chunks: string[] = [];
-  for (let i = 0; i < bytes.length; i += chunkSize) {
-    chunks.push(String.fromCharCode(...bytes.subarray(i, i + chunkSize)));
-  }
-  return btoa(chunks.join(""));
 }
 
 function unwrapAngleBrackets(value: string): string {

@@ -269,34 +269,42 @@ describe("list_directory depth", () => {
     }
   });
 
-  test("a listing over the entry bound truncates, names the next move, and does not error", async () => {
+  // The listing has no entry ceiling. It used to clamp at 500, which named no failure of
+  // its own (RFC-0010) and, once images joined the listing, cut them first: `[IMAGE]`
+  // sorts after `[DIR]` and `[FILE]`, so every picture in a large folder fell outside the
+  // clamp and the one discovery path a model has for images was closed in exactly the
+  // folders that need it. The conversation record stays bounded where it always was, at
+  // `boundToolResult`.
+  test("a large listing returns whole, with no clamp and no truncation notice", async () => {
     const files = Array.from({ length: 600 }, (_, i) =>
       makeFile(`Big/n${String(i).padStart(4, "0")}.md`),
     );
     const ctx = makeCtx({ abstractFiles: { Big: makeFolder("Big", files) } });
     const result = await executeVaultTool(tc("list_directory", { path: "Big" }), ctx);
 
-    // RFC-0010: a bound on our own output clamps at write time, it never gates a read.
     expect(result.isError).toBeUndefined();
     expect(result.isReadOnly).toBe(true);
-    expect(result.content.startsWith('Contents of "Big", showing first 500 of 600:\n')).toBe(true);
+    expect(result.content.startsWith('Contents of "Big":\n')).toBe(true);
     expect(result.content).toContain("[FILE] Big/n0000.md");
-    expect(result.content).not.toContain("[FILE] Big/n0500.md");
-    expect(result.content).toContain(
-      "[Showing 500 of 600 entries, narrow path to a subfolder or lower depth to see the rest.]",
-    );
+    expect(result.content).toContain("[FILE] Big/n0599.md");
+    expect(result.content).not.toContain("showing first");
+    expect(result.content).not.toContain("entries, narrow path");
+    expect(result.content.split("\n")).toHaveLength(601);
   });
 
-  test("a listing exactly at the entry bound is not truncated", async () => {
-    const files = Array.from({ length: 500 }, (_, i) =>
+  test("images in a folder larger than the old clamp are still listed", async () => {
+    const notes = Array.from({ length: 600 }, (_, i) =>
       makeFile(`Big/n${String(i).padStart(4, "0")}.md`),
     );
-    const ctx = makeCtx({ abstractFiles: { Big: makeFolder("Big", files) } });
+    const images = [makeFile("Big/map.png", "png"), makeFile("Big/sketch.webp", "webp")];
+    const ctx = makeCtx({
+      abstractFiles: { Big: makeFolder("Big", [...notes, ...images]) },
+    });
     const result = await executeVaultTool(tc("list_directory", { path: "Big" }), ctx);
 
-    expect(result.content.startsWith('Contents of "Big":\n')).toBe(true);
-    expect(result.content).not.toContain("showing first");
-    expect(result.content).toContain("[FILE] Big/n0499.md");
+    // `[IMAGE]` sorts last, so these are the entries a clamp would drop first.
+    expect(result.content).toContain("[IMAGE] Big/map.png");
+    expect(result.content).toContain("[IMAGE] Big/sketch.webp");
   });
 });
 

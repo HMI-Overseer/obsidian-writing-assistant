@@ -362,6 +362,31 @@ describe("validateAssistantTurn", () => {
       ).toBe(true);
     });
 
+    // A vault path is bounded as a path, not as an identifier. Borrowing the id bound
+    // (512) refused real vault paths, and the cost was not local: the salvage pass cuts
+    // away whatever the failure names, so an over-long path took the whole tool step with
+    // it and demoted the turn to textual replay on reload.
+    it("bounds the path as a path, accepting one far longer than an identifier", () => {
+      const deep = (target: number) => {
+        let path = "";
+        while (path.length + 7 < target) path += "Folder/";
+        return path + "map.png";
+      };
+      for (const length of [600, 1024, 4000]) {
+        const path = deep(length);
+        expect(
+          validateAssistantTurn(
+            withImages([{ path, mimeType: "image/png", byteLength: 1 }]),
+          ).ok,
+          `a ${path.length}-character vault path must validate`,
+        ).toBe(true);
+      }
+      // Still bounded: nothing unbounded reaches the conversation record.
+      expect(
+        reasonCode(withImages([{ path: deep(5000), mimeType: "image/png", byteLength: 1 }])),
+      ).toBe("result_images_invalid");
+    });
+
     it("accepts an empty list and an absent field", () => {
       expect(validateAssistantTurn(withImages([])).ok).toBe(true);
       expect(validateAssistantTurn(mutableTurn()).ok).toBe(true);

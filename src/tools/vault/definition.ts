@@ -84,10 +84,10 @@ export const GET_OUTLINE_TOOL: CanonicalToolDefinition = {
 export const LIST_DIRECTORY_TOOL: CanonicalToolDefinition = {
   name: "list_directory",
   description:
-    "List the contents of a vault folder as [FILE] and [DIR] lines, one full path per line, " +
-    "sorted. Use this to discover what notes and subfolders exist. Omit path for the vault " +
-    "root. One level by default; raise depth to take in a whole subtree in one call. " +
-    "A very large listing is truncated and says so.",
+    "List the contents of a vault folder as [DIR], [FILE] and [IMAGE] lines, one full path " +
+    "per line, sorted. Use this to discover what notes, images and subfolders exist; an " +
+    "[IMAGE] path can be opened with read. Omit path for the vault root. One level by " +
+    "default; raise depth to take in a whole subtree in one call.",
   strategyHint:
     "discover what a folder holds, its immediate children by default, a subtree with depth",
   parameters: {

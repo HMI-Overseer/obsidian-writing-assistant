@@ -164,6 +164,23 @@ describe("LIST_DIRECTORY_TOOL (directory_tree absorbed, D5/D6)", () => {
     expect(depth).not.toMatch(/1 to [0-9]/);
   });
 
+  // The description enumerates the line kinds, so it has to name every kind the tool
+  // emits: a model reasons about a tool from its description before calling it, and one
+  // told to expect [FILE] and [DIR] has been told images are not there (RFC-0021 Q2).
+  test("its description names every line kind the listing emits, images included", () => {
+    const text = LIST_DIRECTORY_TOOL.description;
+    expect(text).toContain("[DIR]");
+    expect(text).toContain("[FILE]");
+    expect(text).toContain("[IMAGE]");
+  });
+
+  // The listing returns whole, so the description must not promise a truncation that no
+  // longer happens.
+  test("its description promises no truncation", () => {
+    expect(LIST_DIRECTORY_TOOL.description).not.toContain("truncated");
+    expect(LIST_DIRECTORY_TOOL.strategyHint ?? "").not.toContain("truncated");
+  });
+
   // D5: one output shape at every depth. The retired JSON tree left no trace on the
   // advertised surface, and nothing offers a second encoding to select.
   test("no tool advertises a directory tree or an output-format switch", () => {

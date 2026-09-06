@@ -13,6 +13,16 @@ import {
 export const ASSISTANT_TURN_MAX_SEGMENTS = 256;
 export const ASSISTANT_TURN_MAX_ITEMS = 1024;
 export const ASSISTANT_TURN_MAX_ID_CHARS = 512;
+/**
+ * Vault paths are bounded as paths, not as identifiers. A path has no id's shape and no
+ * id's length: nesting and long note titles put a legitimate vault-relative path well past
+ * 512 characters, and refusing one is not a local cost, because the salvage pass cuts away
+ * whatever a failure names, so an over-long path takes its whole tool step with it and
+ * demotes the turn to textual replay on reload. The failure this still names is an
+ * unbounded string reaching the conversation record; 4096 is the bound the persisted-
+ * message validator already applies to every other vault path.
+ */
+export const ASSISTANT_TURN_MAX_PATH_CHARS = 4_096;
 export const ASSISTANT_TURN_MAX_PROSE_CHARS = 1_000_000;
 export const ASSISTANT_TURN_MAX_TOOL_NAME_CHARS = 256;
 export const ASSISTANT_TURN_MAX_RESULT_RECORD_CHARS =
@@ -717,7 +727,7 @@ function validateResultImages(
     if (!isRecord(entry)) return reason("result_images_invalid", entryPath);
     const unexpected = unexpectedField(entry, RESULT_IMAGE_FIELDS, entryPath);
     if (unexpected) return reason("result_image_field_unexpected", unexpected);
-    if (!isBoundedNonEmptyString(entry.path, ASSISTANT_TURN_MAX_ID_CHARS)) {
+    if (!isBoundedNonEmptyString(entry.path, ASSISTANT_TURN_MAX_PATH_CHARS)) {
       return reason("result_images_invalid", `${entryPath}.path`);
     }
     if (!isOneOf(entry.mimeType, RESULT_IMAGE_MIME_TYPES)) {

@@ -420,9 +420,6 @@ async function executeGetOutline(
   return { content: JSON.stringify(payload, null, 2), isReadOnly: true };
 }
 
-/** Cap on the entries one listing shows, so a deep call cannot flood context. */
-const MAX_LIST_ENTRIES = 500;
-
 function executeListDirectory(
   args: Record<string, unknown>,
   ctx: VaultToolContext,
@@ -448,9 +445,10 @@ function executeListDirectory(
     });
   }
 
-  // Depth has no ceiling: the model named a reach, and MAX_LIST_ENTRIES bounds the
-  // output whatever it asks for, so a cap on the walk itself would name no failure
-  // (RFC-0010). Below one it floors to a level; absent or non-numeric, one level stands.
+  // Depth has no ceiling, and neither does the listing: the model named a reach, and a
+  // long answer is a consequence of that reach, not a failure a cap could name (RFC-0010).
+  // What the conversation carries is bounded where it always was, at `boundToolResult`.
+  // Below one it floors to a level; absent or non-numeric, one level stands.
   const depth =
     typeof args.depth === "number" && Number.isFinite(args.depth)
       ? Math.max(1, Math.floor(args.depth))
@@ -463,19 +461,6 @@ function executeListDirectory(
   const header = rawPath ? `Contents of "${rawPath}"` : "Vault root";
   if (items.length === 0) {
     return { content: `${header}: (empty)`, isReadOnly: true };
-  }
-  // Over the bound, the listing is clamped and says how to narrow. It is never refused:
-  // a bound on our own output clamps at write time and does not gate a read (RFC-0010),
-  // and the same shape already serves search_content's hit cap.
-  if (items.length > MAX_LIST_ENTRIES) {
-    const shown = items.slice(0, MAX_LIST_ENTRIES);
-    return {
-      content:
-        `${header}, showing first ${MAX_LIST_ENTRIES} of ${items.length}:\n${shown.join("\n")}` +
-        `\n\n[Showing ${MAX_LIST_ENTRIES} of ${items.length} entries, narrow path to a ` +
-        "subfolder or lower depth to see the rest.]",
-      isReadOnly: true,
-    };
   }
   return { content: `${header}:\n${items.join("\n")}`, isReadOnly: true };
 }

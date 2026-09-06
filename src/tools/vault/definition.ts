@@ -78,9 +78,6 @@ export const GET_OUTLINE_TOOL: CanonicalToolDefinition = {
   },
 };
 
-/** Upper bound on list_directory's `depth`, also the schema's stated range. */
-export const MAX_LIST_DIRECTORY_DEPTH = 5;
-
 export const LIST_DIRECTORY_TOOL: CanonicalToolDefinition = {
   name: "list_directory",
   description:
@@ -102,8 +99,8 @@ export const LIST_DIRECTORY_TOOL: CanonicalToolDefinition = {
       depth: {
         type: "number",
         description:
-          `How many folder levels to list, 1 to ${MAX_LIST_DIRECTORY_DEPTH}. Defaults to 1, ` +
-          "the folder's immediate children. Higher values also list what its subfolders hold.",
+          "How many folder levels to list. Defaults to 1, the folder's immediate children. " +
+          "Higher values also list what its subfolders hold, down to the whole subtree.",
       },
     },
     required: [],

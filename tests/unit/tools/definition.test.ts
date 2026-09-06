@@ -12,7 +12,6 @@ import {
   GET_LINKS_TOOL,
   LIST_DIRECTORY_TOOL,
   LINK_DIRECTIONS,
-  MAX_LIST_DIRECTORY_DEPTH,
   SEARCH_VAULT_TOOL,
   VAULT_TOOL_NAMES,
   filterSemanticSearchByAvailability,
@@ -150,10 +149,10 @@ describe("LIST_DIRECTORY_TOOL (directory_tree absorbed, D5/D6)", () => {
     expect(LIST_DIRECTORY_TOOL.parameters.properties.depth).toBeDefined();
   });
 
-  test("its description states the depth range and the default", () => {
+  test("its description states the default and names no ceiling", () => {
     const depth = LIST_DIRECTORY_TOOL.parameters.properties.depth.description ?? "";
-    expect(depth).toContain(`1 to ${MAX_LIST_DIRECTORY_DEPTH}`);
     expect(depth).toContain("Defaults to 1");
+    expect(depth).not.toMatch(/1 to [0-9]/);
   });
 
   // D5: one output shape at every depth. The retired JSON tree left no trace on the

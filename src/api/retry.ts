@@ -12,7 +12,7 @@ import {
 import type { AssistantCaptureBatch } from "./assistantCapture";
 
 export interface RetryOptions {
-  /** Maximum number of attempts (including the initial one). Default: 3. */
+  /** Maximum number of attempts (including the initial one). Default: 5. */
   maxAttempts?: number;
   /** Initial delay between retries in ms. Default: 500. */
   initialDelayMs?: number;
@@ -22,7 +22,7 @@ export interface RetryOptions {
   signal?: AbortSignal;
 }
 
-const DEFAULT_MAX_ATTEMPTS = 3;
+const DEFAULT_MAX_ATTEMPTS = 5;
 const DEFAULT_INITIAL_DELAY_MS = 500;
 const DEFAULT_MAX_DELAY_MS = 5000;
 

@@ -218,19 +218,19 @@ describe("list_directory depth", () => {
     );
   });
 
-  test("an out-of-range depth clamps rather than erroring, exactly as topK does", async () => {
-    const ctx = makeCtx({ abstractFiles: { Root: makeNestedRoot(6) } });
+  test("depth has no ceiling: the entry bound is the only limit on a listing", async () => {
+    const ctx = makeCtx({ abstractFiles: { Root: makeNestedRoot(8) } });
     const listAt = async (depth: unknown) =>
       (await executeVaultTool(tc("list_directory", { path: "Root", depth }), ctx)).content;
 
-    // Above the range: clamped to 5, so it stops where depth 5 stops and never reaches
-    // L6, even though the fixture nests six levels deep.
-    expect(await listAt(9)).toBe(await listAt(5));
-    expect(await listAt(9)).toContain("[DIR] Root/L1/L2/L3/L4/L5\n");
-    expect(await listAt(9)).not.toContain("Root/L1/L2/L3/L4/L5/L6");
-    // The ceiling is 5 and not lower: depth 4 stops one level short of what 5 reaches.
+    // A deep ask reaches the bottom of the fixture: nothing between the model and the
+    // subtree it named except the 500-entry bound on the output (RFC-0010).
+    expect(await listAt(9)).toContain("[DIR] Root/L1/L2/L3/L4/L5/L6/L7/L8\n");
+    expect(await listAt(9)).toContain("[FILE] Root/L1/L2/L3/L4/L5/L6/L7/L8/n8.md\n");
+    // Depth still means what it says: 4 stops one level short of what 5 reaches.
+    expect(await listAt(5)).toContain("[DIR] Root/L1/L2/L3/L4/L5\n");
     expect(await listAt(4)).not.toContain("[DIR] Root/L1/L2/L3/L4/L5\n");
-    // Below the range, and a fractional value: floored into range, never refused.
+    // Below one, and a fractional value: floored to a level, never refused.
     expect(await listAt(0)).toBe(await listAt(1));
     expect(await listAt(-4)).toBe(await listAt(1));
     expect(await listAt(2.7)).toBe(await listAt(2));

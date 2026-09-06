@@ -501,7 +501,10 @@ export class ChatComposer {
   private async processExternalTextFiles(files: File[]): Promise<void> {
     for (const file of files) {
       if (file.size > MAX_TEXT_ATTACHMENT_BYTES) {
-        new Notice(`File too large: ${file.name}. Maximum size is 2 MB.`);
+        new Notice(
+          `File too large: ${file.name}. Maximum size is ` +
+            `${MAX_TEXT_ATTACHMENT_BYTES / (1024 * 1024)} MB.`,
+        );
         continue;
       }
       let content: string;

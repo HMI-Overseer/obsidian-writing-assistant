@@ -11,7 +11,6 @@ import type { RagService } from "../../rag/ragService";
 import {
   VAULT_TOOL_NAMES,
   SEMANTIC_SEARCH_UNAVAILABLE_MESSAGE,
-  MAX_LIST_DIRECTORY_DEPTH,
 } from "./definition";
 import { formatWithLineNumbers } from "./readFormat";
 import { buildOutline, sectionLines, matchSection, countWords } from "./outline";
@@ -300,14 +299,12 @@ function executeListDirectory(
     });
   }
 
-  // An out-of-range depth clamps, exactly as semantic_search's topK and
-  // search_content's contextLines do above: the model named a reach, and the nearest
-  // legal reach is a better answer than spending a round trip on a refusal. There is
-  // no cost argument for refusing either, since MAX_LIST_ENTRIES bounds the output
-  // whatever depth asks for. Absent or non-numeric, one level stands.
+  // Depth has no ceiling: the model named a reach, and MAX_LIST_ENTRIES bounds the
+  // output whatever it asks for, so a cap on the walk itself would name no failure
+  // (RFC-0010). Below one it floors to a level; absent or non-numeric, one level stands.
   const depth =
     typeof args.depth === "number" && Number.isFinite(args.depth)
-      ? Math.min(MAX_LIST_DIRECTORY_DEPTH, Math.max(1, Math.floor(args.depth)))
+      ? Math.max(1, Math.floor(args.depth))
       : 1;
 
   const items: string[] = [];

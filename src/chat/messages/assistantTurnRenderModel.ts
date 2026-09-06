@@ -455,11 +455,11 @@ function buildRenderItem(
  * What a step shows about the call it made: its arguments as an object, and the
  * one-line detail rendered beside the label.
  *
- * The two capture paths record arguments in different fields. The plugin tool loop
- * streams them into `toolArguments`, which the builder parses into `toolArgs`; the
- * Claude Code lifecycle has no argument stream and records them as a JSON blob in
- * `toolInput` instead. Reading both as one source makes the paths render alike and
- * recovers the arguments of already persisted turns without rewriting them.
+ * Both capture paths now record the arguments as `toolArguments`, which the builder
+ * parses into `toolArgs`, and the detail as `toolInput`. Before ADR-0040 the Claude
+ * Code lifecycle recorded the arguments as a JSON blob in `toolInput` instead, so
+ * reading both as one source recovers the arguments of those persisted turns
+ * without rewriting them.
  *
  * The detail is always the reader's phrasing of the target ("Books"), never the
  * wire form the model sent ("{"path":"Books"}"), which belongs in the disclosure

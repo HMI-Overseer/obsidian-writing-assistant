@@ -1012,3 +1012,85 @@ describe("generateLlmResponse ask_user integration", () => {
     expect(state.messages[0].agenticSteps).toBeUndefined();
   });
 });
+
+/**
+ * A Claude Code run that writes one note through the plugin's MCP tool: the
+ * lifecycle events are the only account the chat has of that call.
+ */
+function makeClaudeCodeWriteClient(
+  bridge: FakeClaudeCodeBridge,
+  call: ToolCall,
+): ChatClient {
+  return {
+    complete: vi.fn(),
+    stream: vi.fn(
+      (): AssistantStreamRun<AssistantStreamEvent> => {
+        const deltas = (async function* () {
+          bridge.emitToolEvent({
+            phase: "start",
+            toolName: call.name,
+            toolCallId: call.id,
+          });
+          bridge.emitToolEvent({
+            phase: "end",
+            toolName: call.name,
+            args: call.arguments,
+            isError: false,
+            content: `Wrote ${String(call.arguments.path)}.`,
+            toolCallId: call.id,
+          });
+          yield "Written.";
+        })();
+        return textStreamResult(deltas, "claude-code-write", call);
+      },
+    ),
+  } as ChatClient;
+}
+
+describe("generateLlmResponse Claude Code tool steps", () => {
+  beforeEach(() => {
+    vi.mocked(prepareApiMessages).mockResolvedValue({
+      systemPrompt: "",
+      documentContext: null,
+      ragContext: null,
+      messages: [],
+      tools: [],
+      allowedToolNames: [],
+    });
+  });
+
+  it("records a step's summary as its detail whatever the size of its arguments", async () => {
+    const state = harness();
+    state.options.activeModel = {
+      provider: "claudecode",
+      modelId: "claude-sonnet-test",
+      name: "Claude test",
+    };
+    const writeCall: ToolCall = {
+      id: "write-1",
+      name: "write_file",
+      arguments: { path: "Notes/Big.md", content: "x".repeat(16_000) },
+    };
+
+    await generateLlmResponse({
+      ...state.options,
+      client: makeClaudeCodeWriteClient(state.claudeCode, writeCall),
+    });
+
+    expect(state.messages).toHaveLength(1);
+    const message = state.messages[0];
+    expect(message.isError).not.toBe(true);
+    const revision = message.revisions?.find(
+      (entry) => entry.revisionId === message.activeRevisionId,
+    );
+    if (revision?.kind !== "turn") throw new Error("expected a turn revision");
+    expect(revision.turn.status).toBe("completed");
+    const step = revision.turn.items.find(
+      (item) => item.type === "tool_call" && item.toolName === "write_file",
+    );
+    if (step?.type !== "tool_call") throw new Error("expected the write_file step");
+    expect(step).toMatchObject({ state: "completed", toolInput: "Notes/Big.md" });
+    expect(step.toolArgs).toEqual(writeCall.arguments);
+    expect(revision.turn.items.some((item) => item.type === "prose")).toBe(true);
+  });
+});

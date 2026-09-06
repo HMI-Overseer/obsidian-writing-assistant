@@ -15,8 +15,6 @@ export const ASSISTANT_TURN_MAX_ITEMS = 1024;
 export const ASSISTANT_TURN_MAX_ID_CHARS = 512;
 export const ASSISTANT_TURN_MAX_PROSE_CHARS = 1_000_000;
 export const ASSISTANT_TURN_MAX_TOOL_NAME_CHARS = 256;
-export const ASSISTANT_TURN_MAX_TOOL_ARGUMENTS_CHARS = 65_536;
-export const ASSISTANT_TURN_MAX_TOOL_INPUT_CHARS = 8_000;
 export const ASSISTANT_TURN_MAX_RESULT_RECORD_CHARS =
   TOOL_RESULT_CHAR_LIMIT + RESULT_TRUNCATION_MARKER.length;
 export const ASSISTANT_TURN_MAX_RESULT_DIGEST_CHARS = 2_000;
@@ -70,7 +68,6 @@ export type AssistantTurnInvalidReasonCode =
   | "tool_call_id_duplicate"
   | "tool_name_invalid"
   | "tool_arguments_invalid"
-  | "tool_arguments_too_long"
   | "tool_args_invalid"
   | "tool_args_mismatch"
   | "tool_state_invalid"
@@ -621,11 +618,11 @@ function validateToolDeclaration(
   ) {
     return reason("tool_name_invalid", `${path}.toolName`);
   }
+  // Declaration text and the detail line are checked for shape only. What the
+  // model put in a call is bounded by the provider's output limit, and a size
+  // at which a whole turn is refused names no failure (ADR-0040).
   if (typeof item.toolArguments !== "string") {
     return reason("tool_arguments_invalid", `${path}.toolArguments`);
-  }
-  if (item.toolArguments.length > ASSISTANT_TURN_MAX_TOOL_ARGUMENTS_CHARS) {
-    return reason("tool_arguments_too_long", `${path}.toolArguments`);
   }
   if (item.toolArgs !== undefined) {
     const parsed = parseJsonObject(item.toolArguments);
@@ -640,10 +637,7 @@ function validateToolDeclaration(
       return reason("tool_args_mismatch", `${path}.toolArgs`);
     }
   }
-  if (
-    item.toolInput !== undefined &&
-    !isBoundedString(item.toolInput, ASSISTANT_TURN_MAX_TOOL_INPUT_CHARS)
-  ) {
+  if (item.toolInput !== undefined && typeof item.toolInput !== "string") {
     return reason("tool_input_invalid", `${path}.toolInput`);
   }
   if (

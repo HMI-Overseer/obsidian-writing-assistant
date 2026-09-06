@@ -6,7 +6,6 @@ import type {
 } from "../../../../src/shared/types";
 import {
   ASSISTANT_TURN_MAX_RESULT_RECORD_CHARS,
-  ASSISTANT_TURN_MAX_TOOL_ARGUMENTS_CHARS,
   ASSISTANT_TURN_MAX_REPLAY_CAPSULE_CHARS,
   validateAssistantTurn,
   validateProviderReplayCapsule,
@@ -265,16 +264,26 @@ describe("validateAssistantTurn", () => {
     expect(reasonCode(mismatch)).toBe("tool_args_mismatch");
   });
 
-  it("enforces declaration and result bounds", () => {
-    const argumentsTooLong = validTurn();
-    const argumentItem = argumentsTooLong.items[1];
-    if (argumentItem.type !== "tool_call") throw new Error("Fixture shape changed.");
-    argumentItem.toolArguments = "x".repeat(
-      ASSISTANT_TURN_MAX_TOOL_ARGUMENTS_CHARS + 1,
-    );
-    delete argumentItem.toolArgs;
-    expect(reasonCode(argumentsTooLong)).toBe("tool_arguments_too_long");
+  it("refuses a declaration by shape, never by size", () => {
+    // A note write carries the whole note in its arguments. The provider's own
+    // output limit is the only bound on that text; the record has none (ADR-0040).
+    const large = validTurn();
+    const largeItem = large.items[1];
+    if (largeItem.type !== "tool_call") throw new Error("Fixture shape changed.");
+    const content = "x".repeat(200_000);
+    largeItem.toolArguments = JSON.stringify({ path: "Fixtures/a.md", content });
+    largeItem.toolArgs = { path: "Fixtures/a.md", content };
+    largeItem.toolInput = "y".repeat(20_000);
+    expect(validateAssistantTurn(large).ok).toBe(true);
 
+    const notText = validTurn();
+    const notTextItem = notText.items[1];
+    if (notTextItem.type !== "tool_call") throw new Error("Fixture shape changed.");
+    (notTextItem as Record<string, unknown>).toolInput = 42;
+    expect(reasonCode(notText)).toBe("tool_input_invalid");
+  });
+
+  it("enforces the result record's capture-time bound", () => {
     const resultAtBound = validTurn();
     const atBoundItem = resultAtBound.items[1];
     if (atBoundItem.type !== "tool_call") throw new Error("Fixture shape changed.");

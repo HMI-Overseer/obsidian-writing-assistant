@@ -34,6 +34,8 @@ import type {
 } from "./toolLoop";
 import { LiveVaultReview } from "./liveVaultReview";
 import { captureStepFields } from "../../tools/resultDigest";
+import { extractToolInput } from "../../tools/metadata";
+import { finishOrSalvageAssistantTurn } from "../turns/assistantTurnSalvage";
 import { CONTEXT_DANGER_THRESHOLD } from "../../constants";
 import type { ComposerInteractionHostPort } from "../interactions/ComposerInteractionHost";
 import { AskInteractionCoordinator } from "../interactions/AskInteractionCoordinator";
@@ -614,10 +616,17 @@ export async function generateLlmResponse(options: LlmGenerationOptions): Promis
               isError: event.isError,
               disposition: event.disposition,
             });
+            // The one-line detail the step shows, as the plugin loop records it.
+            // The arguments themselves arrive through the SDK capture as
+            // `toolArguments`, so the detail never carries a note's whole body.
+            const detail = extractToolInput({
+              name: event.toolName,
+              arguments: event.args,
+            });
             turnBuilder.updateToolLifecycle(event.toolCallId, {
               state: event.isError ? "failed" : "completed",
               toolName: event.toolName,
-              toolInput: JSON.stringify(event.args),
+              ...(detail === undefined ? {} : { toolInput: detail }),
               resultRecord: capture.resultRecord,
               resultDigest: capture.resultDigest,
               askGuidance: capture.askGuidance,
@@ -837,19 +846,16 @@ function finishDirectTurn(
       }
     }
   }
-  try {
-    return builder.finishTurn(status);
-  } catch {
-    // Version 2 with no items, so it carries no capture claim to be checked
-    // against. Every runtime writer emits version 2 (ADR-0031).
-    return {
-      schemaVersion: 2,
-      id: builder.snapshot().id,
-      status,
-      segments: [],
-      items: [],
-    };
+  const salvage = finishOrSalvageAssistantTurn(builder, status);
+  if (salvage.finishError !== undefined) {
+    console.error(
+      "[chat] The assistant turn could not be finished as built; " +
+        `${salvage.dropped.length} item(s) were dropped from the persisted record.`,
+      salvage.finishError,
+      salvage.dropped,
+    );
   }
+  return salvage.turn;
 }
 
 function interruptCapturedTurn(

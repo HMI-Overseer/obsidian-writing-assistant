@@ -4,6 +4,7 @@ import type { ToolCall, ToolResult } from "../types";
 import { toolFailure } from "../toolFailure";
 import { refuseOutsideVault } from "../pathBoundary";
 import { escapesVault, outsideVaultMessage } from "../../vault-ops/pathSafety";
+import { backlinkSources } from "../../vault-ops/metadata";
 import type { ExtendedMetadataCache } from "../../vault-ops/metadata";
 import type { RagContextBlock } from "../../shared/chatRequest";
 import { RagRetrievalError } from "../../rag/ragService";
@@ -637,8 +638,7 @@ function executeGetLinks(
   const sections: string[] = [];
 
   if (wantIncoming) {
-    const backlinks = (ctx.app.metadataCache as ExtendedMetadataCache).getBacklinksForFile(file);
-    const incoming = Object.keys(backlinks?.data ?? {}).sort();
+    const incoming = backlinkSources(ctx.app, file).sort();
     sections.push(
       incoming.length === 0
         ? `No notes link to "${path}". This note has no incoming wikilinks; nothing to follow up.`

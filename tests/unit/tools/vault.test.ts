@@ -66,7 +66,11 @@ function makeCtx(overrides: {
       },
       metadataCache: {
         getFileCache: vi.fn((file: TFile) => fileCaches[file.path] ?? null),
-        getBacklinksForFile: vi.fn((file: TFile) => ({ data: backlinks[file.path] ?? {} })),
+        // The real shape (Obsidian 1.13.7): a dictionary whose `data` is a Map, so a
+        // reader that treats it as a plain object sees no keys at all.
+        getBacklinksForFile: vi.fn((file: TFile) => ({
+          data: new Map(Object.entries(backlinks[file.path] ?? {})),
+        })),
         resolvedLinks,
         getTags: vi.fn(() => tags),
       },

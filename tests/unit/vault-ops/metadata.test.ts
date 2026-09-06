@@ -5,14 +5,18 @@ import { backlinkCount } from "../../../src/vault-ops/metadata";
 /** Minimal app exposing only what backlinkCount touches. */
 function makeApp(
   files: Record<string, { path: string }>,
-  backlinks: Record<string, { data: Record<string, unknown[]> } | null | undefined>,
+  backlinks: Record<string, Record<string, unknown[]> | null | undefined>,
 ): App {
   return {
     vault: {
       getFileByPath: (p: string) => files[p] ?? null,
     },
     metadataCache: {
-      getBacklinksForFile: (file: { path: string }) => backlinks[file.path],
+      // The real shape (Obsidian 1.13.7): a dictionary whose `data` is a Map.
+      getBacklinksForFile: (file: { path: string }) => {
+        const entries = backlinks[file.path];
+        return entries ? { data: new Map(Object.entries(entries)) } : entries;
+      },
     },
   } as unknown as App;
 }
@@ -27,14 +31,14 @@ describe("backlinkCount", () => {
     const file = { path: "alice.md" };
     const app = makeApp(
       { "alice.md": file },
-      { "alice.md": { data: { "a.md": [], "b.md": [], "c.md": [] } } },
+      { "alice.md": { "a.md": [], "b.md": [], "c.md": [] } },
     );
     expect(backlinkCount(app, "alice.md")).toBe(3);
   });
 
   it("returns 0 when the file has no incoming links", () => {
     const file = { path: "alice.md" };
-    const app = makeApp({ "alice.md": file }, { "alice.md": { data: {} } });
+    const app = makeApp({ "alice.md": file }, { "alice.md": {} });
     expect(backlinkCount(app, "alice.md")).toBe(0);
   });
 

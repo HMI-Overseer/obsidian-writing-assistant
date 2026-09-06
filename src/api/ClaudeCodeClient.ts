@@ -2,6 +2,7 @@ import type { ClaudeCodeResumeCursor, SamplingParams } from "../shared/types";
 import type { ChatRequest, ChatTurn } from "../shared/chatRequest";
 import type { ChatClient } from "./chatClient";
 import { formatNoteAttachment } from "./contextFormatting";
+import type { ImageAttachment } from "../shared/types";
 import type { CompletionResult, UsageResult } from "./usageTypes";
 import type {
   AssistantCaptureBatch,
@@ -57,6 +58,13 @@ export interface SdkSessionTurnInput {
   reasoning: SamplingParams["reasoning"];
   /** Full live transcript including the new user turn (drives the reuse check). */
   turns: SessionTurn[];
+  /**
+   * Images attached to the new user turn, sent as content blocks beside the prompt
+   * text on every tier. The prompt itself never carries them: a session's transcript
+   * is text, and a cold mint replays only that text, so images attached to earlier
+   * turns do not survive a rebuild.
+   */
+  images: ImageAttachment[];
   signal?: AbortSignal;
   onResult?: (result: ClaudeCodeResultUsage) => void;
   /** Reports the recovery tier this turn took: reused / resumed / rebuilt. */
@@ -351,7 +359,9 @@ export class ClaudeCodeClient implements ChatClient {
     onSessionBanked?: (cursor: ClaudeCodeResumeCursor) => void,
     processOwner?: ClaudeCodeProcessOwner,
   ): AsyncGenerator<AssistantCaptureFrame> {
-    const prompt = buildClaudeCodePrompt(request);
+    // The persistent session delivers images as blocks; the fallback paths cannot.
+    const imagesDelivered = this.runtime.sdkSession !== undefined;
+    const prompt = buildClaudeCodePrompt(request, { imagesDelivered });
     // Passive preflight: refuse a mint blob that would overflow the discovered
     // window (leaving no room for a reply) rather than let it die opaquely
     // mid-turn once CLI compaction is disabled. Reads only, mutates nothing.
@@ -360,7 +370,8 @@ export class ClaudeCodeClient implements ChatClient {
     if (this.runtime.sdkSession) {
       const sessionEvents = this.runtime.sdkSession.run({
         fullPrompt: prompt,
-        deltaPrompt: buildDeltaPrompt(request),
+        deltaPrompt: buildDeltaPrompt(request, { imagesDelivered }),
+        images: latestUserTurnImages(request),
         model,
         systemPrompt: request.systemPrompt,
         reasoning: params.reasoning,
@@ -558,7 +569,22 @@ const REPLAY_PREAMBLE =
   "re-run those actions, and do not re-propose anything the user declined. Continue from " +
   "the final User message below.";
 
-export function buildClaudeCodePrompt(request: ChatRequest): string {
+/** How the prompt builders treat image attachments on user turns. */
+export interface ClaudeCodePromptOptions {
+  /**
+   * True when the runtime sends images as content blocks beside the text (the
+   * persistent SDK session), so the text says nothing about them. False on the
+   * `--print` and one-shot paths, where an image cannot cross and the text names
+   * it as undeliverable rather than dropping it silently.
+   */
+  imagesDelivered?: boolean;
+}
+
+export function buildClaudeCodePrompt(
+  request: ChatRequest,
+  options: ClaudeCodePromptOptions = {},
+): string {
+  const delivered = options.imagesDelivered === true;
   const blocks: string[] = [];
 
   if (request.documentContext) {
@@ -583,7 +609,7 @@ export function buildClaudeCodePrompt(request: ChatRequest): string {
   // on the same fact: whether any assistant turn survives rendering. Without one this is
   // a conversation's opening turn, which ships exactly as the delta path sends it.
   const replayed = request.messages.some(
-    (turn) => turn.role === "assistant" && renderTurnBody(turn).length > 0,
+    (turn) => turn.role === "assistant" && renderTurnBody(turn, delivered).length > 0,
   );
 
   // Per-mode wording rides the latest user turn so request.systemPrompt stays
@@ -594,7 +620,9 @@ export function buildClaudeCodePrompt(request: ChatRequest): string {
   const transcript = request.messages
     .map((turn, i) => {
       const framing = i === lastIdx && turn.role === "user" ? request.modeTail : undefined;
-      return replayed ? renderTurn(turn, framing) : renderLiveTurn(turn, framing);
+      return replayed
+        ? renderTurn(turn, delivered, framing)
+        : renderLiveTurn(turn, delivered, framing);
     })
     .filter(Boolean)
     .join("\n\n");
@@ -614,14 +642,14 @@ export function buildClaudeCodePrompt(request: ChatRequest): string {
  * without them a literal `User:` in the body is just text, exactly as the delta path
  * already sends it.
  */
-function renderLiveTurn(turn: ChatTurn, framing?: string): string {
-  const body = renderTurnBody(turn);
+function renderLiveTurn(turn: ChatTurn, imagesDelivered: boolean, framing?: string): string {
+  const body = renderTurnBody(turn, imagesDelivered);
   if (!body) return "";
   return framing ? `${framing}\n\n${body}` : body;
 }
 
-function renderTurn(turn: ChatTurn, framing?: string): string {
-  const body = renderTurnBody(turn);
+function renderTurn(turn: ChatTurn, imagesDelivered: boolean, framing?: string): string {
+  const body = renderTurnBody(turn, imagesDelivered);
   if (!body) return "";
   const speaker = turn.role === "assistant" ? "Assistant" : "User";
   // Escape line-leading speaker labels inside the body so a literal `User:` /
@@ -639,34 +667,62 @@ function escapeSpeakerLabels(body: string): string {
 }
 
 /**
- * A turn's text body: its content plus any frozen note snapshots. Images can't
- * cross Claude Code's stdin, so only note attachments are rendered.
+ * A turn's text body: its content plus any frozen note snapshots. An image rides
+ * the message as a content block where the runtime delivers one (the persistent
+ * session), and is named here as undeliverable where it cannot (the `--print` and
+ * one-shot paths), so the model reports the limitation instead of reporting nothing.
  */
-function renderTurnBody(turn: ChatTurn): string {
+function renderTurnBody(turn: ChatTurn, imagesDelivered: boolean): string {
   const parts: string[] = [];
   if (turn.content) parts.push(turn.content);
   for (const att of turn.attachments ?? []) {
     if (att.type === "note") parts.push(formatNoteAttachment(att));
+    else if (att.type === "image" && !imagesDelivered) parts.push(undeliverableImageLine(att));
   }
   return parts.join("\n\n");
+}
+
+function undeliverableImageLine(image: ImageAttachment): string {
+  return (
+    `[Attached image "${image.fileName ?? "image"}" could not be delivered on this Claude Code ` +
+    "runtime. Ask the user to paste it into a note or describe it.]"
+  );
+}
+
+/** The images on the new user turn, the ones a session sends as blocks beside its text. */
+export function latestUserTurnImages(request: ChatRequest): ImageAttachment[] {
+  const last = request.messages[request.messages.length - 1];
+  if (!last || last.role !== "user") return [];
+  return (last.attachments ?? []).filter(
+    (att): att is ImageAttachment => att.type === "image",
+  );
 }
 
 /**
  * The delta prompt sent when a persistent session is reused: only the new user
  * turn's text. The session already holds the prior conversation in memory, so
  * re-sending the transcript (or the context blocks, which are re-grounded via MCP)
- * would defeat the point. Falls back to the full prompt if the last turn isn't a
- * user message, reuse won't fire in that case, but the value must still be valid.
+ * would defeat the point. An image-only turn has no text but is still one live
+ * turn: its images ride the message as blocks, and replaying the transcript into
+ * a session that holds it would double the history. Falls back to the full prompt
+ * only when the last turn isn't a user message; reuse won't fire in that case,
+ * but the value must still be valid.
  */
-export function buildDeltaPrompt(request: ChatRequest): string {
+export function buildDeltaPrompt(
+  request: ChatRequest,
+  options: ClaudeCodePromptOptions = {},
+): string {
+  const delivered = options.imagesDelivered === true;
   const last = request.messages[request.messages.length - 1];
   if (last && last.role === "user") {
-    const body = renderTurnBody(last);
-    if (body) {
+    const body = renderTurnBody(last, delivered);
+    const carriesImages =
+      delivered && (last.attachments ?? []).some((att) => att.type === "image");
+    if (body || carriesImages) {
       // The per-mode framing is prepended to the new user turn so the baked
       // systemPrompt stays mode-invariant.
-      return request.modeTail ? `${request.modeTail}\n\n${body}` : body;
+      return [request.modeTail, body].filter(Boolean).join("\n\n");
     }
   }
-  return buildClaudeCodePrompt(request);
+  return buildClaudeCodePrompt(request, options);
 }

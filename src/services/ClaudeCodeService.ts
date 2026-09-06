@@ -336,6 +336,7 @@ export class ClaudeCodeService {
       cfg,
       effort: input.reasoning ?? null,
       turns: input.turns,
+      images: input.images,
       fullPrompt: input.fullPrompt,
       deltaPrompt: input.deltaPrompt,
       buildOptions,

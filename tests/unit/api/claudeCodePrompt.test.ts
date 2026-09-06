@@ -287,3 +287,50 @@ describe("buildDeltaPrompt", () => {
     expect(prompt).not.toContain("[response interrupted by user]");
   });
 });
+
+describe("image attachments on the Claude Code prompt", () => {
+  const image = {
+    type: "image" as const,
+    id: "i1",
+    mimeType: "image/png" as const,
+    data: "AAAA",
+    fileName: "design.png",
+  };
+
+  it("names an undeliverable image in the text rather than dropping it silently", () => {
+    const prompt = buildClaudeCodePrompt(
+      makeRequest({
+        messages: [{ role: "user", content: "Look at this", attachments: [image] }],
+      }),
+    );
+    expect(prompt).toContain("Look at this");
+    expect(prompt).toContain("design.png");
+    expect(prompt).toContain("could not be delivered");
+  });
+
+  it("adds nothing to the text when the runtime delivers images as blocks", () => {
+    const prompt = buildClaudeCodePrompt(
+      makeRequest({
+        messages: [{ role: "user", content: "Look at this", attachments: [image] }],
+      }),
+      { imagesDelivered: true },
+    );
+    expect(prompt).toBe("Look at this");
+  });
+
+  it("keeps an image-only turn on the delta path instead of replaying the transcript", () => {
+    const request = makeRequest({
+      messages: [
+        { role: "user", content: "Earlier question" },
+        { role: "assistant", content: "Earlier answer" },
+        { role: "user", content: "", attachments: [image] },
+      ],
+    });
+    // Delivered as a block: the turn has no text to send, and the session holds the rest.
+    expect(buildDeltaPrompt(request, { imagesDelivered: true })).toBe("");
+    // Undeliverable: the placeholder is the turn's whole text, still a delta.
+    const undelivered = buildDeltaPrompt(request);
+    expect(undelivered).toContain("design.png");
+    expect(undelivered).not.toContain("Earlier answer");
+  });
+});

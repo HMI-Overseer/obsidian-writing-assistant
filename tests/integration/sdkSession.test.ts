@@ -95,6 +95,23 @@ function installInterruptibleQuery(
   return { interrupt };
 }
 
+/**
+ * Like {@link installEchoQuery} but records every pushed user message verbatim, so
+ * a test can assert the content blocks the session actually sent.
+ */
+function installCapturingQuery(pushed: unknown[]) {
+  queryMock.mockImplementation((params: { prompt: AsyncIterable<{ message: unknown }> }) => {
+    const input = params.prompt;
+    return (async function* () {
+      for await (const msg of input) {
+        pushed.push(msg.message);
+        yield textDeltaMessage("echo");
+        yield successResult();
+      }
+    })();
+  });
+}
+
 const buildOptions = (): Options => ({}) as Options;
 
 function cfg(overrides: Partial<SessionConfig> = {}): SessionConfig {
@@ -313,6 +330,52 @@ describe("SdkSessionRegistry", () => {
     );
 
     expect(decisions).toEqual([{ outcome: "rebuilt", reason: "no-session" }, { outcome: "reused" }]);
+  });
+
+  it("carries the new turn's images as blocks and still reuses the live session", async () => {
+    const pushed: unknown[] = [];
+    installCapturingQuery(pushed);
+    const decisions: unknown[] = [];
+    const onRecoveryDecision = (d: unknown) => decisions.push(d);
+    const image = {
+      type: "image" as const,
+      id: "i1",
+      mimeType: "image/png" as const,
+      data: "AAAA",
+      fileName: "design.png",
+    };
+
+    const reply = await drain(
+      registry.runTurn("c1", turnRequest([{ role: "user", content: "hi" }], "hi", { onRecoveryDecision })),
+    );
+    await drain(
+      registry.runTurn(
+        "c1",
+        turnRequest(
+          [
+            { role: "user", content: "hi" },
+            { role: "assistant", content: reply },
+            { role: "user", content: "again" },
+          ],
+          "again",
+          { onRecoveryDecision, images: [image] },
+        ),
+      ),
+    );
+
+    // Images live outside the watermark (role + text), so the turn is a plain reuse:
+    // one process, no rebuild.
+    expect(decisions).toEqual([{ outcome: "rebuilt", reason: "no-session" }, { outcome: "reused" }]);
+    expect(queryMock).toHaveBeenCalledTimes(1);
+    // The first turn is a cold mint, so it carries the full fixture prompt, text only.
+    expect(pushed[0]).toEqual({ role: "user", content: "user:hi" });
+    expect(pushed[1]).toEqual({
+      role: "user",
+      content: [
+        { type: "text", text: "again" },
+        { type: "image", source: { type: "base64", media_type: "image/png", data: "AAAA" } },
+      ],
+    });
   });
 
   it("reports the field that drove a cold rebuild", async () => {

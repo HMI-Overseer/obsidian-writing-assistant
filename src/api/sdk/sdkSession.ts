@@ -23,6 +23,8 @@ import { resultErrorMessage, resultUsage } from "./sdkQueryEngine";
 import { ClaudeCodeSdkMessageTranslator } from "./claudeCodeSdkMessageTranslator";
 import { AbortError, query } from "./claudeAgentSdk";
 import type { ModelInfo, Options, Query, SDKMessage, SDKUserMessage } from "./claudeAgentSdk";
+import type { ImageAttachment } from "../../shared/types";
+import { noteImageLabel } from "../contextFormatting";
 import { ClaudeCodeProcessOwner } from "./claudeCodeSpawn";
 
 /**
@@ -53,12 +55,41 @@ const DEFAULT_IDLE_MS = 15 * 60 * 1000;
 const SWEEP_INTERVAL_MS = 60 * 1000;
 
 /** Wraps a turn's prompt as the streaming-input user message the SDK expects. */
-function userMessage(text: string): SDKUserMessage {
+function userMessage(text: string, images: readonly ImageAttachment[] = []): SDKUserMessage {
   return {
     type: "user",
-    message: { role: "user", content: text },
+    message: { role: "user", content: userContent(text, images) },
     parent_tool_use_id: null,
   };
+}
+
+/**
+ * A turn's content: the plain string the session has always sent, or the block
+ * array the API accepts when the turn carries images. The text stays a string
+ * whenever it can, so a turn without images is byte-identical to before. Images
+ * ride beside the text on every tier (reuse, resume, mint); they sit outside the
+ * watermark, which hashes role and text only, so they never decide a rebuild.
+ */
+function userContent(
+  text: string,
+  images: readonly ImageAttachment[],
+): SDKUserMessage["message"]["content"] {
+  if (images.length === 0) return text;
+  const blocks: Exclude<SDKUserMessage["message"]["content"], string> = [];
+  if (text) blocks.push({ type: "text", text });
+  for (const image of images) {
+    if (image.sourceNotePath) {
+      blocks.push({
+        type: "text",
+        text: noteImageLabel(image.sourceNotePath, image.fileName ?? "image"),
+      });
+    }
+    blocks.push({
+      type: "image",
+      source: { type: "base64", media_type: image.mimeType, data: image.data },
+    });
+  }
+  return blocks;
 }
 
 /**
@@ -126,6 +157,8 @@ class SessionInputStream implements AsyncIterable<SDKUserMessage> {
 interface SessionTurnContext {
   /** Full live transcript including the new user turn being sent. */
   turns: readonly SessionTurn[];
+  /** Images on the new user turn, sent as content blocks beside its text. */
+  images?: readonly ImageAttachment[];
   signal?: AbortSignal;
   onResult?: (usage: ClaudeCodeResultUsage) => void;
 }
@@ -289,7 +322,7 @@ export class SdkSession {
     let reachedTerminal = false;
     let threw = false;
     try {
-      this.input.push(userMessage(prompt));
+      this.input.push(userMessage(prompt, ctx.images));
       // Manual iteration (not `for await`): a `for await` that `break`s on the
       // terminal `result` would call the Query's `return()` and kill the session.
       // We read until `result`, then pause the iterator, leaving the process alive.
@@ -468,6 +501,8 @@ export interface SessionTurnRequest {
   effort: ReasoningLevel | null;
   /** Full live transcript including the new user turn being sent. */
   turns: readonly SessionTurn[];
+  /** Images on the new user turn; they ride every tier as blocks and never gate reuse. */
+  images?: readonly ImageAttachment[];
   /** Prompt sent on a cold mint, the full transcript. */
   fullPrompt: string;
   /** Prompt sent on reuse *and on a disk resume*, only the new user turn. */
@@ -715,7 +750,7 @@ export class SdkSessionRegistry {
 
   /** Per-turn context passed into {@link SdkSession.runTurn}. */
   private turnCtx(req: SessionTurnRequest): SessionTurnContext {
-    return { turns: req.turns, signal: req.signal, onResult: req.onResult };
+    return { turns: req.turns, images: req.images, signal: req.signal, onResult: req.onResult };
   }
 
   /**

@@ -160,3 +160,42 @@ describe("ClaudeCodeClient send-path preflight", () => {
     expect(opts.env.DISABLE_COMPACT).toBe("1");
   });
 });
+
+describe("ClaudeCodeClient image attachments", () => {
+  it("hands the new user turn's images to the persistent session as blocks", async () => {
+    const run = vi.fn(() => okGen());
+    const runtime: ClaudeCodeRuntime = {
+      useSdk: true,
+      contextWindow: 200_000,
+      sdkSession: { conversationId: "c", run },
+    };
+    const client = new ClaudeCodeClient("claude", runtime);
+    const image = {
+      type: "image" as const,
+      id: "i1",
+      mimeType: "image/png" as const,
+      data: "AAAA",
+      fileName: "design.png",
+    };
+    const withImage: ChatRequest = {
+      systemPrompt: "",
+      documentContext: null,
+      ragContext: null,
+      messages: [
+        { role: "user", content: "First" },
+        { role: "assistant", content: "Reply" },
+        { role: "user", content: "Does this design hold?", attachments: [image] },
+      ],
+    };
+
+    const { events } = client.stream(withImage, "haiku", params, detachedAttemptContext("t"));
+    expect(await drain(events)).toEqual(["ok"]);
+
+    expect(run).toHaveBeenCalledTimes(1);
+    const input = run.mock.calls[0][0];
+    expect(input.images).toEqual([image]);
+    // The block carries the image, so neither prompt form mentions a failed delivery.
+    expect(input.deltaPrompt).toBe("Does this design hold?");
+    expect(input.fullPrompt).not.toContain("could not be delivered");
+  });
+});

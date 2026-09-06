@@ -1,0 +1,66 @@
+name: Bug report
+description: Something is broken or does not behave the way you expected
+labels: ["bug"]
+body:
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: Tell us what you were doing, what you expected, and what happened instead.
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: How can we make it happen again?
+      description: If you know how to trigger it, list the steps. If it seems random, say so.
+      placeholder: |
+        1. Open the chat panel
+        2. ...
+        3. ...
+
+  - type: dropdown
+    id: provider
+    attributes:
+      label: Which provider were you using?
+      options:
+        - LM Studio
+        - Anthropic
+        - OpenAI
+        - Claude Code
+        - Not sure
+        - Not related to a provider
+    validations:
+      required: true
+
+  - type: input
+    id: plugin-version
+    attributes:
+      label: Plugin version
+      description: Shown next to Writing Assistant Chat in Settings > Community plugins.
+      placeholder: "1.5.5"
+    validations:
+      required: true
+
+  - type: input
+    id: obsidian-version
+    attributes:
+      label: Obsidian version
+      description: Shown in Settings > General.
+      placeholder: "1.13.0"
+
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options:
+        - Windows
+        - macOS
+        - Linux
+
+  - type: textarea
+    id: extra
+    attributes:
+      label: Anything else?
+      description: Screenshots or a short screen recording are welcome. You can drag files into this box.

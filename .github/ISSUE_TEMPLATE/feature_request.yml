@@ -1,0 +1,30 @@
+name: Feature request
+description: Something you wish the plugin could do
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: goal
+    attributes:
+      label: What would you like to be able to do?
+      description: Describe the thing you are trying to do in your writing that the plugin does not help with yet, or makes harder than it should be.
+    validations:
+      required: true
+
+  - type: textarea
+    id: picture
+    attributes:
+      label: How do you picture it working?
+      description: Only if you have something in mind. A rough idea is plenty, no need to think about how it would be built.
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Which part of the plugin is this about?
+      options:
+        - Chat panel
+        - Editing notes and approving changes
+        - Providers and models
+        - Vault search and knowledge graph
+        - Prompt commands
+        - Settings
+        - Not sure
